@@ -328,7 +328,7 @@ describe('enrolInTraining — the employee relocates to the training building', 
 // ── availableTrainingOffers ──────────────────────────────────────────────────
 
 function makeBuilding(overrides: Partial<Building> = {}): Building {
-  return { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true, ...overrides };
+  return { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true, occupantIds: [], ...overrides };
 }
 
 describe('availableTrainingOffers', () => {

@@ -16,7 +16,7 @@ function makeBuilding(
   z = 0,
   hp = 100,
 ): Building {
-  return { id, type, tier, x, z, hp, active: true };
+  return { id, type, tier, x, z, hp, active: true, occupantIds: [] };
 }
 
 /** Model height of a building of `type`/`tier`, in a scene of its own — with real assets when `library` is loaded, else the stand-in's. */

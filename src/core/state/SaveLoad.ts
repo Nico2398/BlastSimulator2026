@@ -406,6 +406,25 @@ function migrateV21ToV22(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v23 -> v24 (#1202): Building gained `occupantIds` — the building case of
+ * the occupancy model `Vehicle.occupantIds` is the vehicle case of. Nobody
+ * could be inside a building before it, so every building loads empty and
+ * every employee stays wherever their saved locomotion put them, on foot or
+ * mounted. Mutates `obj` in place, matching every other migration block in
+ * `deserialize` below.
+ */
+function migrateV23ToV24(obj: Record<string, unknown>): Record<string, unknown> {
+  const buildingsContainer = obj['buildings'] as Record<string, unknown> | undefined;
+  const buildingsList = buildingsContainer?.['buildings'] as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(buildingsList)) return obj;
+
+  for (const b of buildingsList) {
+    if (!Array.isArray(b['occupantIds'])) b['occupantIds'] = [];
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -637,6 +656,11 @@ export function deserialize(json: string): GameState {
   // folded into VehicleState.reservations (#1138).
   if ((obj['version'] as number) < 22) {
     migrateV21ToV22(obj);
+  }
+
+  // v23 -> v24: Building.occupantIds, nobody inside (#1202).
+  if ((obj['version'] as number) < 24) {
+    migrateV23ToV24(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

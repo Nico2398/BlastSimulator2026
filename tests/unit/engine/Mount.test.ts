@@ -9,7 +9,10 @@
 // compile/type error.
 
 import { describe, it, expect } from 'vitest';
-import { board, alight } from '../../../src/core/engine/Mount.js';
+import {
+  board, alight, enterBuilding, leaveBuilding, releaseOccupantsOfRemovedBuildings,
+} from '../../../src/core/engine/Mount.js';
+import { placeBuilding, destroyBuilding, getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -394,5 +397,190 @@ describe('alight', () => {
       (employee.x === vehicle.x && employee.z === vehicle.z) ||
       NEIGHBOR_OFFSETS.some(([dx, dz]) => employee.x === vehicle.x + dx && employee.z === vehicle.z + dz);
     expect(isNeighbourOrOwnCell).toBe(true);
+  });
+});
+
+// ── Building case of the occupancy model (#1202) ──
+//
+// A tier-1 driving_center is a 2x2 footprint; placed at (10, 10) it covers
+// (10..11, 10..11) and its ring is every cell of (9..12, 9..12) outside that.
+
+const SCHOOL_X = 10;
+const SCHOOL_Z = 10;
+
+function placeSchool(state: ReturnType<typeof createGame>) {
+  const result = placeBuilding(state.buildings, 'driving_center', SCHOOL_X, SCHOOL_Z, 64, 64);
+  if (!result.success || !result.building) throw new Error(`test setup: ${result.error}`);
+  return result.building;
+}
+
+/** A 16x16 walkable grid whose school footprint cells are blocked, with `occupied` cells vehicle-occupied. */
+function schoolNavGrid(occupied: ReadonlyArray<readonly [number, number]> = []): NavGrid {
+  const taken = new Set(occupied.map(([x, z]) => `${x},${z}`));
+  return makeNavGrid(0, 0, 16, 16, (x, z) => {
+    const inFootprint = x >= SCHOOL_X && x <= SCHOOL_X + 1 && z >= SCHOOL_Z && z <= SCHOOL_Z + 1;
+    if (inFootprint) return cell('blocked');
+    return cell('walkable', taken.has(`${x},${z}`));
+  });
+}
+
+describe('enterBuilding', () => {
+  it('takes an on-foot employee standing on the ring inside, both sides together', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    const emitter = new EventEmitter();
+    const events: unknown[] = [];
+    emitter.on('employee:entered_building', (e) => events.push(e));
+
+    const result = enterBuilding(state, school.id, employee.id, emitter);
+
+    expect(result.success).toBe(true);
+    expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: school.id });
+    expect(school.occupantIds).toEqual([employee.id]);
+    expect(events).toEqual([{ employeeId: employee.id, buildingId: school.id }]);
+  });
+
+  it('refuses an employee who is not on the ring', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 3, SCHOOL_Z);
+
+    const result = enterBuilding(state, school.id, employee.id);
+
+    expect(result.success).toBe(false);
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(school.occupantIds).toEqual([]);
+  });
+
+  it('refuses the next employee once the building is at its people capacity', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const capacity = getBuildingPeopleCapacity(school.type, school.tier);
+    expect(capacity).toBeGreaterThan(0);
+    for (let i = 0; i < capacity; i++) {
+      const inside = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+      expect(enterBuilding(state, school.id, inside.id).success).toBe(true);
+    }
+    const late = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+
+    const result = enterBuilding(state, school.id, late.id);
+
+    expect(result.success).toBe(false);
+    expect(late.locomotion).toEqual({ kind: 'on_foot' });
+    expect(school.occupantIds).toHaveLength(capacity);
+  });
+
+  it('refuses a building type that takes no people', () => {
+    const state = createGame({ seed: SEED });
+    const placed = placeBuilding(state.buildings, 'freight_warehouse', SCHOOL_X, SCHOOL_Z, 64, 64);
+    const warehouse = placed.building!;
+    expect(getBuildingPeopleCapacity(warehouse.type, warehouse.tier)).toBe(0);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+
+    expect(enterBuilding(state, warehouse.id, employee.id).success).toBe(false);
+    expect(warehouse.occupantIds).toEqual([]);
+  });
+
+  it('refuses a mounted employee — entering is done on foot', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', SCHOOL_X - 1, SCHOOL_Z);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    expect(board(state, vehicle.id, employee.id).success).toBe(true);
+
+    expect(enterBuilding(state, school.id, employee.id).success).toBe(false);
+    expect(employee.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(school.occupantIds).toEqual([]);
+  });
+});
+
+describe('leaveBuilding', () => {
+  it('puts the employee back on foot on the ring cell they entered from when it is free', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = schoolNavGrid();
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    enterBuilding(state, school.id, employee.id);
+
+    const result = leaveBuilding(state, employee.id);
+
+    expect(result.success).toBe(true);
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(school.occupantIds).toEqual([]);
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: SCHOOL_X - 1, z: SCHOOL_Z });
+  });
+
+  it('puts the employee on the nearest free ring cell when their entry cell has since been taken', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    enterBuilding(state, school.id, employee.id);
+    state.navGrid = schoolNavGrid([[SCHOOL_X - 1, SCHOOL_Z]]);
+
+    leaveBuilding(state, employee.id);
+
+    const onRing = employee.x >= SCHOOL_X - 1 && employee.x <= SCHOOL_X + 2
+      && employee.z >= SCHOOL_Z - 1 && employee.z <= SCHOOL_Z + 2
+      && !(employee.x >= SCHOOL_X && employee.x <= SCHOOL_X + 1 && employee.z >= SCHOOL_Z && employee.z <= SCHOOL_Z + 1);
+    expect(onRing).toBe(true);
+    expect({ x: employee.x, z: employee.z }).not.toEqual({ x: SCHOOL_X - 1, z: SCHOOL_Z });
+    expect(Math.max(Math.abs(employee.x - (SCHOOL_X - 1)), Math.abs(employee.z - SCHOOL_Z))).toBe(1);
+  });
+
+  it('refuses an employee who is not inside a building', () => {
+    const state = createGame({ seed: SEED });
+    const employee = hireTruckDriver(state, 3, 3);
+
+    expect(leaveBuilding(state, employee.id).success).toBe(false);
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+  });
+
+  it('frees the place so the next employee can enter a full building', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const capacity = getBuildingPeopleCapacity(school.type, school.tier);
+    const insiders = Array.from({ length: capacity }, () => hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z));
+    for (const e of insiders) enterBuilding(state, school.id, e.id);
+    const late = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    expect(enterBuilding(state, school.id, late.id).success).toBe(false);
+
+    leaveBuilding(state, insiders[0]!.id);
+
+    expect(enterBuilding(state, school.id, late.id).success).toBe(true);
+  });
+});
+
+describe('releaseOccupantsOfRemovedBuildings', () => {
+  it('puts everyone inside a removed building back on foot on its ring, and leaves other buildings alone', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const other = placeBuilding(state.buildings, 'geology_lab', 30, 30, 64, 64).building!;
+    const trapped = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    const safe = hireTruckDriver(state, 29, 30);
+    enterBuilding(state, school.id, trapped.id);
+    enterBuilding(state, other.id, safe.id);
+
+    destroyBuilding(state.buildings, school.id);
+    const released = releaseOccupantsOfRemovedBuildings(state);
+
+    expect(released).toEqual([trapped.id]);
+    expect(trapped.locomotion).toEqual({ kind: 'on_foot' });
+    expect({ x: trapped.x, z: trapped.z }).toEqual({ x: SCHOOL_X - 1, z: SCHOOL_Z });
+    expect(safe.locomotion).toEqual({ kind: 'inside', buildingId: other.id });
+  });
+});
+
+describe('board — the vehicle case of the same model', () => {
+  it('refuses an employee who is inside a building', () => {
+    const state = createGame({ seed: SEED });
+    const school = placeSchool(state);
+    const employee = hireTruckDriver(state, SCHOOL_X - 1, SCHOOL_Z);
+    enterBuilding(state, school.id, employee.id);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', SCHOOL_X - 1, SCHOOL_Z);
+
+    expect(board(state, vehicle.id, employee.id).success).toBe(false);
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: school.id });
   });
 });

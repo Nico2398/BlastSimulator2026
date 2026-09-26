@@ -101,7 +101,7 @@ export function processProjections(
       const dist = distanceBetween(fx, fz, cx, cz);
       const effectiveKe = keAtDistance(ke, dist);
       if (effectiveKe === null) continue;
-      const acc = processBuildingHit(b, buildings, frag, effectiveKe, tick);
+      const acc = processBuildingHit(b, buildings, employees, frag, effectiveKe, tick);
       if (acc) newAccidents.push(acc);
     }
 
@@ -151,6 +151,7 @@ export function processProjections(
 function processBuildingHit(
   b: Building,
   state: BuildingState,
+  employees: EmployeeState,
   frag: FragmentData,
   ke: number,
   tick: number,
@@ -162,6 +163,14 @@ function processBuildingHit(
   b.hp -= dmg;
 
   if (b.hp <= 0) {
+    // gameplay-buildings: employees inside a destroyed building are injured
+    // (#1202). They are put back out on its ring by the tick's
+    // releaseOccupantsOfRemovedBuildings, which owns the occupancy write.
+    for (const employeeId of b.occupantIds) {
+      // Same once-only rule as processEmployeeHit: a second injury would
+      // re-apply injureEmployee's morale penalty for one event.
+      if (employees.employees.find(e => e.id === employeeId)?.injured === false) injureEmployee(employees, employeeId);
+    }
     destroyBuilding(state, b.id);
     return { tick, type: 'building_destroyed', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
   }

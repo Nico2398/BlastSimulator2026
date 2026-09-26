@@ -75,7 +75,7 @@ describe('pickScene', () => {
   it('resolves a building hit to its (kind, id)', () => {
     const scene = new THREE.Scene();
     const bm = new BuildingMesh(scene);
-    bm.addBuilding({ id: 7, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true }, 0);
+    bm.addBuilding({ id: 7, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 0);
     scene.updateMatrixWorld(true); // group transforms are never auto-updated without a render() call
     const camera = makeTopDownCamera(5, 5); // management_office is 2x2 footprint centred at (5,0,5)
     const renderer = makeFakeRenderer({ pickables: bm.pickables() });
@@ -144,7 +144,7 @@ describe('pickScene', () => {
     const tm = makeSolidTerrain(8, 4, 8); // solid up to y=4, surface at y=4
     const scene = new THREE.Scene();
     const bm = new BuildingMesh(scene);
-    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true }, 4); // sits on the surface
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 4); // sits on the surface
     scene.updateMatrixWorld(true);
     // Off pure-integer so the pick point can't land exactly on a tile boundary
     // (the marching-cubes surface isn't a perfectly flat integer-aligned plane).
@@ -162,7 +162,7 @@ describe('pickScene', () => {
     const scene = new THREE.Scene();
     const bm = new BuildingMesh(scene);
     // Buried well below the terrain surface — camera above should hit the terrain top first.
-    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true }, -10);
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, -10);
     scene.updateMatrixWorld(true);
     const camera = makeTopDownCamera(5.3, 5.3, 60);
     const renderer = makeFakeRenderer({ pickables: bm.pickables(), terrainMeshes: tm.meshes });
@@ -203,7 +203,7 @@ describe('pickScene', () => {
     const landscape = makeFlatLandscapeMesh(0, 200);
     const scene = new THREE.Scene();
     const bm = new BuildingMesh(scene);
-    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 50, z: 50, hp: 100, active: true }, 4); // sits above the landscape
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 50, z: 50, hp: 100, active: true, occupantIds: [] }, 4); // sits above the landscape
     scene.updateMatrixWorld(true);
     const camera = makeTopDownCamera(51.3, 51.3, 60);
     const renderer = makeFakeRenderer({ pickables: bm.pickables(), landscapeMeshes: [landscape] });

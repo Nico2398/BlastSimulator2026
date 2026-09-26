@@ -122,7 +122,12 @@ import type { RampDef } from '../mining/Ramp.js';
 // simply has it undefined, which `regenerateGridParams`/`terrainConfigOf`
 // already treat as "use the biome's normal strata". No migration
 // function needed, matching precedent for a pure addition.
-export const SAVE_VERSION = 23;
+// v23 -> v24: Building gained `occupantIds: number[]` and Employee.locomotion
+// gained an `inside` variant (#1202 — one occupancy model for vehicles and
+// buildings). A pre-v24 save has nobody inside any building: every building
+// gets `occupantIds: []` and every employee keeps the on-foot/mounted
+// locomotion it was saved with. See SaveLoad.ts's migrateV23ToV24.
+export const SAVE_VERSION = 24;
 
 export interface GameConfig {
   seed: number;

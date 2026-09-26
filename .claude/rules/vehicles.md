@@ -19,11 +19,15 @@ model, cost formula, and the numbered invariant list: `gameplay-vehicle-fleet` s
 
 - A vehicle's `x`/`z` is written in exactly one place: the locomotion tick, from its occupant's
   position. Nothing else moves a vehicle, and nothing pathfinds from a vehicle's position.
-- `occupantIds` and `Locomotion` agree in both directions, always. One employee rides at most one
-  vehicle; a vehicle holds at most `VEHICLE_SEAT_COUNT[role]` occupants.
+- `occupantIds` and `Locomotion` agree in both directions, always — for a vehicle and for a
+  building alike: they are one occupancy model, and `Mount.ts` is the single writer of both sides.
+  One employee is inside at most one host; a vehicle holds at most `VEHICLE_SEAT_COUNT[role]`
+  occupants, a building at most `getBuildingPeopleCapacity(type, tier)`.
 - A mounted employee's position equals their vehicle's position, and their character mesh is not
-  rendered. The two 3D models are never both visible.
-- Boarding and alighting happen within 1 tile of the vehicle.
+  rendered. The two 3D models are never both visible. An employee inside a building has no
+  character mesh and no minimap dot either.
+- Boarding and alighting happen within 1 tile of the vehicle; entering and leaving a building
+  happen on its ring.
 - `VehicleOperationalState` and `VehicleTask` are derived for display by `computeVehicleStatus`.
   Storing either on the vehicle reintroduces a second truth.
 - Every stat read goes through `getVehicleDefByTier(role, tier)`, upkeep and fuel included.

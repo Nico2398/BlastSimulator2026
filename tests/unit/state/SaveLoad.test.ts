@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createGame, SAVE_VERSION } from '../../../src/core/state/GameState.js';
-import { createBuildingState } from '../../../src/core/entities/Building.js';
+import { createBuildingState, placeBuilding } from '../../../src/core/entities/Building.js';
+import { enterBuilding } from '../../../src/core/engine/Mount.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -1136,8 +1137,8 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 23', () => {
-    expect(SAVE_VERSION).toBe(23);
+  it('SAVE_VERSION is 24', () => {
+    expect(SAVE_VERSION).toBe(24);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1199,8 +1200,8 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 23', () => {
-    expect(SAVE_VERSION).toBe(23);
+  it('SAVE_VERSION is 24', () => {
+    expect(SAVE_VERSION).toBe(24);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1280,8 +1281,8 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // to the fragment, mid-break, or never hauling at all) gets `payload: null`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 23', () => {
-    expect(SAVE_VERSION).toBe(23);
+  it('SAVE_VERSION is 24', () => {
+    expect(SAVE_VERSION).toBe(24);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {
@@ -1373,8 +1374,8 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 // truth since v19) left exactly as they were.
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
-  it('SAVE_VERSION is 23', () => {
-    expect(SAVE_VERSION).toBe(23);
+  it('SAVE_VERSION is 24', () => {
+    expect(SAVE_VERSION).toBe(24);
   });
 
   it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
@@ -1459,8 +1460,8 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
 // taken mid vehicle-gated action doesn't forget which vehicle it claimed.
 
 describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
-  it('SAVE_VERSION is 23', () => {
-    expect(SAVE_VERSION).toBe(23);
+  it('SAVE_VERSION is 24', () => {
+    expect(SAVE_VERSION).toBe(24);
   });
 
   it('a v21 vehicle with reservedForActionId set migrates its reservation into VehicleState.reservations, with none of the seven other fields on the restored Vehicle', () => {
@@ -1579,5 +1580,49 @@ describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1
     expect(restored.vehicles.reservations).toEqual([]);
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
     expect('reservedForActionId' in restoredVehicle).toBe(false);
+  });
+});
+
+// ── v23→v24 migration for building occupancy (#1202) ───────────────────────
+//
+// Building gained `occupantIds` and Employee.locomotion an `inside` variant.
+// Nobody could be inside a building before v24, so an older save loads with
+// every building empty and every employee exactly where their saved
+// locomotion put them.
+
+describe('deserialize — v23→v24 migration for building occupancy (#1202)', () => {
+  it('SAVE_VERSION is 24', () => {
+    expect(SAVE_VERSION).toBe(24);
+  });
+
+  it('a pre-v24 save loads with every building empty and everyone outside', () => {
+    const state = createGame({ seed: 42 });
+    const { building } = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64);
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state.employees, 'driver', rng, 9, 10);
+
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    parsed['version'] = 23;
+    const buildingsList = (parsed['buildings'] as Record<string, unknown>)['buildings'] as Array<Record<string, unknown>>;
+    for (const b of buildingsList) delete b['occupantIds'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.buildings.buildings.find(b => b.id === building!.id)!.occupantIds).toEqual([]);
+    expect(restored.employees.employees.find(e => e.id === employee.id)!.locomotion).toEqual({ kind: 'on_foot' });
+  });
+
+  it('a save with an employee inside a building round-trips both sides', () => {
+    const state = createGame({ seed: 42 });
+    const { building } = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64);
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(1), 9, 10);
+    expect(enterBuilding(state, building!.id, employee.id).success).toBe(true);
+
+    const restored = deserialize(serialize(state));
+
+    expect(restored.buildings.buildings.find(b => b.id === building!.id)!.occupantIds).toEqual([employee.id]);
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
+    expect(restoredEmployee.locomotion).toEqual({ kind: 'inside', buildingId: building!.id });
+    expect({ x: restoredEmployee.x, z: restoredEmployee.z }).toEqual({ x: 9, z: 10 });
   });
 });

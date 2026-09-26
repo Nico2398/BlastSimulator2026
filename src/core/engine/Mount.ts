@@ -1,12 +1,20 @@
-// BlastSimulator2026 — Board/alight: the only entry points that change an
-// employee's Locomotion and a vehicle's occupantIds together.
+// BlastSimulator2026 — The occupancy model's single writer (#1087, #1202).
+// An employee can be inside a vehicle (mounted) or inside a building; both
+// are one model — a host's `occupantIds` capped by its capacity, mirrored by
+// the employee's `locomotion` — and this module is the only place either
+// side is written. `board`/`alight` are its vehicle case, `enterBuilding`/
+// `leaveBuilding` its building case; both go through the same
+// `admitOccupant`/`releaseOccupant` pair below.
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
+import type { Locomotion } from '../entities/EmployeeLocomotion.js';
 import { canAssignDriver, canReleaseDriver, vehicleDriverId } from '../entities/Vehicle.js';
-import { isMounted } from '../entities/EmployeeLocomotion.js';
+import { getBuildingDef, getBuildingPeopleCapacity } from '../entities/Building.js';
+import { isMounted, isInsideBuilding } from '../entities/EmployeeLocomotion.js';
+import { findBuildingExitCell, isOnBuildingRing } from '../nav/BuildingApproach.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
@@ -14,6 +22,65 @@ import { isStepClimbable } from '../nav/NavGrid.js';
 import { isImpassable } from '../nav/Pathfinding.js';
 
 type MountResult = { success: true } | { success: false; error: string };
+
+/** Anything an employee can be inside of — a vehicle or a building. */
+interface OccupancyHost {
+  occupantIds: number[];
+}
+
+/**
+ * The one admission step every host shares: refuses when `host` is already at
+ * `capacity`, otherwise adds the employee to its occupants and sets the
+ * matching `locomotion` — both sides of the fact together, as invariant I1
+ * requires. Callers run their own host-specific eligibility checks first.
+ */
+function admitOccupant(host: OccupancyHost, capacity: number, employee: Employee, locomotion: Locomotion): boolean {
+  if (host.occupantIds.length >= capacity) return false;
+  host.occupantIds.push(employee.id);
+  employee.locomotion = locomotion;
+  return true;
+}
+
+/**
+ * The one release step every host shares: removes `employeeId` from `host`'s
+ * occupants and, when the employee still exists, stands them on foot at
+ * (x, z) with no journey in flight.
+ */
+function releaseOccupant(host: OccupancyHost | undefined, employeeId: number, employee: Employee | undefined, x: number, z: number): void {
+  if (host) host.occupantIds = host.occupantIds.filter(id => id !== employeeId);
+  if (!employee) return;
+  employee.x = x;
+  employee.z = z;
+  employee.locomotion = { kind: 'on_foot' };
+  // #1089 regression fix: any itinerary this employee was mid-flight on
+  // named the host they just left (a drive leg, or a board leg for it) — now
+  // stale the instant they step out, since they no longer occupy it.
+  // Locomotion.ts always advances a non-null `itinerary`, so a caller that
+  // releases an employee and then, this same tick, starts a fresh walk
+  // (beginRestTravel, a reassigned foot task) had that walk silently ignored:
+  // Locomotion still took the itinerary branch, spending the whole tick
+  // self-healing the now impossible drive leg (advanceLeg's own
+  // occupant-mismatch check aborts it) instead of picking up the fresh one,
+  // so the new walk didn't actually start until the NEXT tick — one tick
+  // later than it should every single time an employee is dismounted with a
+  // stale itinerary still attached. Confirmed live: a `set_policy
+  // mode:continuous` forced rest interrupting a driller mid-drive
+  // (ForceShiftRest.ts) lost exactly one tick per rest this way, compounding
+  // into vibration-budget.json's own 22-tick-slower drift and
+  // level2/3-playthrough-win.json's cash drift over a run with many such
+  // cycles. Clearing it here, the one place an employee ever leaves a host,
+  // fixes every caller at its root instead of each one separately
+  // remembering to.
+  employee.itinerary = null;
+  employee.pendingDriverVehicleId = null;
+  // #1178: destinationX/Z is a read-only mirror of the itinerary's current
+  // leg (MoveTo.ts's syncItineraryMirrors) — nulled here too so a release
+  // mid-itinerary doesn't leave it stale, which would otherwise read as
+  // "still walking" to isMidEvacuationWalk (Evacuation.ts) and
+  // isIdleForReposition (VehicleDriverAssignment.ts).
+  employee.destinationX = null;
+  employee.destinationZ = null;
+}
 
 /**
  * Whether two points are within one tile of each other (Chebyshev distance
@@ -39,6 +106,7 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
 
   const employee = state.employees.employees.find(e => e.id === employeeId);
   if (!employee || !employee.alive) return { success: false, error: t('mount.employee_not_found') };
+  if (isInsideBuilding(employee.locomotion)) return { success: false, error: t('mount.not_on_foot') };
 
   if (!isWithinBoardingRange(employee.x, employee.z, vehicle.x, vehicle.z)) {
     return { success: false, error: t('mount.too_far_to_board') };
@@ -47,14 +115,11 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   const eligible = canAssignDriver(state.vehicles, state.employees, vehicleId, employeeId);
   if (!eligible.success) return { success: false, error: eligible.error };
 
-  if (vehicle.occupantIds.length >= VEHICLE_SEAT_COUNT[vehicle.type]) {
+  if (!admitOccupant(vehicle, VEHICLE_SEAT_COUNT[vehicle.type], employee, { kind: 'mounted', vehicleId })) {
     return { success: false, error: t('mount.vehicle_full') };
   }
-
-  vehicle.occupantIds.push(employeeId);
   employee.x = vehicle.x;
   employee.z = vehicle.z;
-  employee.locomotion = { kind: 'mounted', vehicleId };
 
   // #1083's lifetime counter — every prior mover (requestBoardVehicle/
   // ArrivalGate.resolveBoarding, pre-#1089) incremented it on a successful
@@ -88,43 +153,9 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   const guard = canReleaseDriver(state.vehicles, vehicleId);
   if (!guard.success) return { success: false, error: guard.error ?? t('mount.alight_failed') };
 
-  vehicle.occupantIds = vehicle.occupantIds.filter(id => id !== employeeId);
-
   const employee = state.employees.employees.find(e => e.id === employeeId);
   const cell = findAlightCell(state, vehicle);
-  if (employee) {
-    employee.x = cell.x;
-    employee.z = cell.z;
-    employee.locomotion = { kind: 'on_foot' };
-    // #1089 regression fix: any itinerary this employee was mid-flight on
-    // named THIS vehicle (a drive leg, or a board leg for it) — now stale
-    // the instant they alight, since they no longer occupy it. Locomotion.ts
-    // always advances a non-null `itinerary`, so a caller that alights an
-    // employee and then, this same tick, starts a fresh walk (beginRestTravel,
-    // a reassigned foot task) had that walk silently ignored: Locomotion still
-    // took the itinerary branch, spending the whole tick self-healing the now
-    // impossible drive leg (advanceLeg's own occupant-mismatch check aborts
-    // it) instead of picking up the fresh one, so the new walk didn't actually
-    // start until the NEXT tick — one tick later than it should every single
-    // time an employee is dismounted with a stale itinerary still attached.
-    // Confirmed live: a `set_policy mode:continuous` forced rest interrupting
-    // a driller mid-drive (ForceShiftRest.ts) lost exactly one tick per rest
-    // this way, compounding into vibration-budget.json's own 22-tick-slower
-    // drift and level2/3-playthrough-win.json's cash drift over a run with
-    // many such cycles. Clearing it here, the one place an employee ever
-    // stops being mounted, fixes every caller (dismountVehicleDriver, the
-    // console `vehicle driver <id> none` command, and any future one) at its
-    // root instead of each one separately remembering to.
-    employee.itinerary = null;
-    employee.pendingDriverVehicleId = null;
-    // #1178: destinationX/Z is a read-only mirror of the itinerary's current
-    // leg (MoveTo.ts's syncItineraryMirrors) — nulled here too so a mount
-    // ending mid-itinerary doesn't leave it stale, which would otherwise read
-    // as "still walking" to isMidEvacuationWalk (Evacuation.ts) and
-    // isIdleForReposition (VehicleDriverAssignment.ts).
-    employee.destinationX = null;
-    employee.destinationZ = null;
-  }
+  releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
 
   emitter?.emit('employee:alighted', { employeeId, vehicleId });
 
@@ -181,4 +212,85 @@ export function alightIfMounted(state: GameState, emp: Employee, emitter?: Event
   if (isMounted(emp.locomotion)) {
     alight(state, emp.locomotion.vehicleId, emitter);
   }
+}
+
+// ── Building case (#1202) ──
+
+/**
+ * Take an on-foot employee standing on a building's ring (the cells just
+ * outside its footprint) inside it. Refused when the building takes no
+ * people or is already at its people capacity (`getBuildingPeopleCapacity`).
+ * The employee keeps the ring cell they entered from as their x/z — the cell
+ * they are put back out near on leaving — but holds no ground while inside:
+ * no character is drawn, picked or shown on the minimap for them.
+ */
+export function enterBuilding(state: GameState, buildingId: number, employeeId: number, emitter?: EventEmitter): MountResult {
+  const building = state.buildings.buildings.find(b => b.id === buildingId);
+  if (!building) return { success: false, error: t('mount.building_not_found') };
+
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (!employee || !employee.alive) return { success: false, error: t('mount.employee_not_found') };
+
+  if (employee.locomotion.kind !== 'on_foot') return { success: false, error: t('mount.not_on_foot') };
+
+  if (!isOnBuildingRing(building, getBuildingDef(building.type, building.tier), employee.x, employee.z)) {
+    return { success: false, error: t('mount.too_far_to_enter') };
+  }
+
+  const capacity = getBuildingPeopleCapacity(building.type, building.tier);
+  if (capacity === 0) return { success: false, error: t('mount.building_takes_no_people') };
+  if (!admitOccupant(building, capacity, employee, { kind: 'inside', buildingId })) {
+    return { success: false, error: t('building.full') };
+  }
+
+  emitter?.emit('employee:entered_building', { employeeId, buildingId });
+  return { success: true };
+}
+
+/**
+ * Put an employee inside a building back out on foot, on the free ring cell
+ * nearest the one they entered from (`findBuildingExitCell`). When their
+ * building no longer exists — destroyed or demolished around them — they are
+ * put out where they entered, which was on its ring.
+ */
+export function leaveBuilding(state: GameState, employeeId: number, emitter?: EventEmitter): MountResult {
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (!employee) return { success: false, error: t('mount.employee_not_found') };
+  if (!isInsideBuilding(employee.locomotion)) return { success: false, error: t('mount.not_inside') };
+
+  const buildingId = employee.locomotion.buildingId;
+  const building = state.buildings.buildings.find(b => b.id === buildingId);
+  const cell = building
+    ? findBuildingExitCell(state.navGrid, building, getBuildingDef(building.type, building.tier), employee.x, employee.z)
+    : { x: employee.x, z: employee.z };
+  releaseOccupant(building, employeeId, employee, cell.x, cell.z);
+
+  emitter?.emit('employee:left_building', { employeeId, buildingId });
+  return { success: true };
+}
+
+/** Leave the building `emp` is inside, if any — the building counterpart of `alightIfMounted`. */
+export function leaveBuildingIfInside(state: GameState, emp: Employee, emitter?: EventEmitter): MountResult {
+  if (!isInsideBuilding(emp.locomotion)) return { success: true };
+  return leaveBuilding(state, emp.id, emitter);
+}
+
+/**
+ * Put out everyone still inside a building that no longer exists. A
+ * building is removed from `state.buildings` by several paths — blast
+ * clearing, projection or seismic damage, demolition, an upgrade's
+ * replace — none of which can reach the employees, so the release happens
+ * here, once per tick (TickPipeline.ts) and straight after a console
+ * demolition. Returns the ids put out.
+ */
+export function releaseOccupantsOfRemovedBuildings(state: GameState, emitter?: EventEmitter): number[] {
+  const released: number[] = [];
+  for (const emp of state.employees.employees) {
+    if (!isInsideBuilding(emp.locomotion)) continue;
+    const buildingId = emp.locomotion.buildingId;
+    if (state.buildings.buildings.some(b => b.id === buildingId)) continue;
+    leaveBuilding(state, emp.id, emitter);
+    released.push(emp.id);
+  }
+  return released;
 }

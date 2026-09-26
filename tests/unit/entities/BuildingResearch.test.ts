@@ -50,7 +50,7 @@ function placeResearchCenter(state: BuildingState, x = 40, z = 40): void {
 
 /** Push a raw building instance directly into state, bypassing placeBuilding's research gate. */
 function pushRawBuilding(state: BuildingState, type: BuildingType, tier: 1 | 2 | 3, x: number, z: number, active = true): void {
-  state.buildings.push({ id: state.nextId++, type, tier, x, z, hp: 100, active });
+  state.buildings.push({ id: state.nextId++, type, tier, x, z, hp: 100, active, occupantIds: [] });
 }
 
 // ── Section 1: hasActiveResearchCenter ───────────────────────────────────────

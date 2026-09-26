@@ -23,6 +23,8 @@ import { syncEntitySets, buildingFootprintSurfaceY } from '../../../src/renderer
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import { BuildingMesh } from '../../../src/renderer/BuildingMesh.js';
 import type { Building } from '../../../src/core/entities/Building.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { enterBuilding, leaveBuilding } from '../../../src/core/engine/Mount.js';
 import { VoxelGrid, getSmoothTerrainSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 
 const SEED = 42;
@@ -30,7 +32,7 @@ const SEED = 42;
 // driving_center tier 1 has a 2x2 footprint (BuildingDefs.ts) — big enough
 // for its 4 corners to land on different voxel columns.
 function makeBuilding(x: number, z: number): Building {
-  return { id: 1, type: 'driving_center', tier: 1, x, z, hp: 100, active: true };
+  return { id: 1, type: 'driving_center', tier: 1, x, z, hp: 100, active: true, occupantIds: [] };
 }
 
 describe('syncEntitySets — suppresses the character mesh for a seated driver (#922)', () => {
@@ -215,6 +217,45 @@ describe('syncEntitySets — reads employee.locomotion, not just the driver seat
 
     expect(characters.count).toBe(1);
     expect(renderedEmployeeIds.has(employee.id)).toBe(true);
+  });
+});
+
+describe('syncEntitySets — no character mesh for an employee inside a building (#1202)', () => {
+  it('drops the mesh when the employee enters and gives it back on the ring cell when they leave', () => {
+    const state = createGame({ seed: SEED });
+    const { building } = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 9, 10);
+
+    const scene = new THREE.Scene();
+    const characters = new CharacterMesh(scene);
+    const renderedEmployeeIds = new Set<number>();
+
+    syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
+    expect(characters.count).toBe(1);
+
+    expect(enterBuilding(state, building!.id, employee.id).success).toBe(true);
+    syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
+    expect(characters.count).toBe(0);
+    expect(renderedEmployeeIds.has(employee.id)).toBe(false);
+
+    expect(leaveBuilding(state, employee.id).success).toBe(true);
+    syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
+    expect(characters.count).toBe(1);
+    expect(renderedEmployeeIds.has(employee.id)).toBe(true);
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: 9, z: 10 });
+  });
+
+  it('creates no mesh on first sync for an employee already inside (a loaded save)', () => {
+    const state = createGame({ seed: SEED });
+    const { building } = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 9, 10);
+    enterBuilding(state, building!.id, employee.id);
+
+    const characters = new CharacterMesh(new THREE.Scene());
+    const renderedEmployeeIds = new Set<number>();
+    syncEntitySets(state, null, new Set(), null, new Set(), characters, renderedEmployeeIds);
+
+    expect(characters.count).toBe(0);
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createBuildingState,
   placeBuilding,
+  getBuildingPeopleCapacity,
   destroyBuilding,
   demolishBuilding,
   getTotalOperatingCost,
@@ -327,12 +328,12 @@ describe('findNearestActiveBuildingOfType', () => {
 
 describe('getDemolishCost()', () => {
   it('equals the demolish cost of the building def for its type and tier', () => {
-    const building: Building = { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    const building: Building = { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
     expect(getDemolishCost(building)).toBe(getBuildingDef('management_office', 1).demolishCost);
   });
 
   it('uses the tier-specific demolish cost, not tier 1, for an upgraded building', () => {
-    const building: Building = { id: 2, type: 'freight_warehouse', tier: 3, x: 0, z: 0, hp: 100, active: true };
+    const building: Building = { id: 2, type: 'freight_warehouse', tier: 3, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
     expect(getDemolishCost(building)).toBe(getBuildingDef('freight_warehouse', 3).demolishCost);
     expect(getDemolishCost(building)).not.toBe(getBuildingDef('freight_warehouse', 1).demolishCost);
   });
@@ -340,7 +341,7 @@ describe('getDemolishCost()', () => {
 
 describe('getUpgradeCost()', () => {
   it('is the sum of the current tier demolish cost and the next tier construction cost', () => {
-    const building: Building = { id: 1, type: 'living_quarters', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    const building: Building = { id: 1, type: 'living_quarters', tier: 1, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
     const currentDemolish = getBuildingDef('living_quarters', 1).demolishCost;
     const nextConstruction = getBuildingDef('living_quarters', 2).constructionCost;
 
@@ -352,7 +353,7 @@ describe('getUpgradeCost()', () => {
   });
 
   it('computes the same demolish-plus-construction sum for a tier-2 to tier-3 upgrade', () => {
-    const building: Building = { id: 2, type: 'vehicle_depot', tier: 2, x: 0, z: 0, hp: 100, active: true };
+    const building: Building = { id: 2, type: 'vehicle_depot', tier: 2, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
     const expected = getBuildingDef('vehicle_depot', 2).demolishCost + getBuildingDef('vehicle_depot', 3).constructionCost;
 
     expect(getUpgradeCost(building, 3)).toBe(expected);
@@ -361,13 +362,13 @@ describe('getUpgradeCost()', () => {
 
 describe('getMoveCost()', () => {
   it('is 50% of the construction cost for the building type and tier', () => {
-    const building: Building = { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    const building: Building = { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
     expect(getMoveCost(building)).toBe(Math.round(getBuildingDef('geology_lab', 1).constructionCost * 0.5));
     expect(getMoveCost(building)).toBe(6000);
   });
 
   it('scales with tier via the tier-specific construction cost', () => {
-    const building: Building = { id: 2, type: 'freight_warehouse', tier: 3, x: 0, z: 0, hp: 100, active: true };
+    const building: Building = { id: 2, type: 'freight_warehouse', tier: 3, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
     expect(getMoveCost(building)).toBe(Math.round(getBuildingDef('freight_warehouse', 3).constructionCost * 0.5));
     expect(getMoveCost(building)).toBe(36000);
   });
@@ -377,7 +378,7 @@ describe('getMoveCost()', () => {
     // never lands on a fraction. Nudge one entry's cost odd for this case only,
     // to prove Math.round — not truncation, not a no-op — is what runs.
     const original = BUILDING_DEFS.management_office[1].constructionCost;
-    const building: Building = { id: 3, type: 'management_office', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    const building: Building = { id: 3, type: 'management_office', tier: 1, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
     try {
       BUILDING_DEFS.management_office[1].constructionCost = 8001; // raw product: 4000.5
       expect(getMoveCost(building)).toBe(4001); // Math.round(4000.5) === 4001, not 4000
@@ -729,5 +730,29 @@ describe('moveBuilding — terrain levelness gate (#1008)', () => {
     expect(result.success).toBe(true);
     expect(state.buildings[0]!.x).toBe(20);
     expect(state.buildings[0]!.z).toBe(20);
+  });
+});
+
+describe('getBuildingPeopleCapacity (#1202)', () => {
+  it('schools and living quarters hold as many people as their BuildingDef.capacity, every tier', () => {
+    for (const type of ['driving_center', 'blasting_academy', 'management_office', 'geology_lab', 'living_quarters'] as const) {
+      for (const tier of [1, 2, 3] as const) {
+        expect(getBuildingPeopleCapacity(type, tier)).toBe(getBuildingDef(type, tier).capacity);
+      }
+    }
+  });
+
+  it('buildings that take no people hold none, whatever their capacity field counts', () => {
+    for (const type of ['research_center', 'explosive_warehouse', 'freight_warehouse', 'vehicle_depot'] as const) {
+      for (const tier of [1, 2, 3] as const) {
+        expect(getBuildingPeopleCapacity(type, tier)).toBe(0);
+      }
+    }
+  });
+
+  it('a freshly placed building has nobody inside', () => {
+    const state = createBuildingState();
+    const { building } = placeBuilding(state, 'driving_center', 5, 5, 64, 64);
+    expect(building!.occupantIds).toEqual([]);
   });
 });
