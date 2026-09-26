@@ -34,7 +34,7 @@ Two rules follow, and they hold under every runtime:
 1. **Parallel means several delegations issued in one message and awaited together in that same turn.** Never work launched now and collected later, whatever background or notify-me-when-done mode the runtime offers.
 2. **A turn ends on a pull request whose CI has reported green, a `PAUSED:` line, an `ESCALATED:` line, or the `blocked` label** — never on outstanding work. One more ending is allowed and is not outstanding work: a pull request whose CI reported red after the single fix round `agentic-pipeline-finalization` gives a run. That red is handed to a fresh session by the fail-safe in `references/github-loop.md`, which is a better use of a budget than the tail of a spent one.
 
-The single turn is also why the CI verdict has to be read inside it. The channels CI owns report minutes after the pull request opens, and a red one is announced to nobody: `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked pull request. So the run waits for the report — `agentic-pipeline-finalization`'s `[await-ci]` step, which blocks in-turn and returns to the session that called it. Waiting on an event that returns to you is not the outstanding work rule 1 forbids; it is the last verification channel being read. `agentic-ci-failure.yml` covers the session that dies before it returns, and `references/github-loop.md` holds how.
+The single turn is also why the CI verdict has to be read inside it. The channels CI owns report minutes after the pull request opens, and a red one is announced to nobody: the merge gate declines a failed CI run, and the watchdog skips any issue with a linked pull request. So the run waits for the report — `agentic-pipeline-finalization`'s `[await-ci]` step, which blocks in-turn and returns to the session that called it. Waiting on an event that returns to you is not the outstanding work rule 1 forbids; it is the last verification channel being read. `agentic-ci-failure.yml` covers the session that dies before it returns, and `references/github-loop.md` holds how.
 
 The runtimes disagree on what delegation defaults to, so the same sentence produces opposite behaviour depending on where it is read. Each runtime's own configuration layer enforces the rule; `references/runtime-parity.md` records which layer, and the run that died proving it necessary.
 
@@ -95,6 +95,16 @@ main
 7. **Resolve conflicts** if the cherry-pick fails — a conflict resolver agent merges both sides and stages the result; on resolution failure the implementer re-runs
 8. **All subsequent quality gates** run on `pipeline/feature-<label>`
 
+## ▶ Other sessions may be live
+
+Up to `AGENTIC_MAX_PARALLEL_RUNS` sessions run at once, each on its own issue, and a run is only given an issue whose `scope:*` labels clash with none in flight. The default is one. Either way `main` can move while a run works — another session's merge, a human's push — and the merge gate is what keeps that safe: it merges a pull request only when CI is green on a head that already contains `main`'s tip, merging `main` into a green head that is behind and handing a conflict back to an agent. Three rules follow for every session:
+
+1. **Only this run's branches are yours.** Never check out, push to or delete another issue's `pipeline/*` branch, and never touch another issue's labels. Names that carry another issue's number belong to a live session you cannot see.
+2. **Merge `origin/main` into the feature branch just before opening the pull request**, resolve any conflict, and re-run `static` and `logic` — `agentic-pipeline-finalization` holds the step. A branch cut hours ago from an older `main` is otherwise the gate's first update.
+3. **`git pull --no-rebase` before every push to a branch that already has a pull request.** The gate may have merged `main` into it since your last push. Never rebase it, never force-push it.
+
+`references/github-loop.md` holds capacity, scopes, the gate and the per-entity runner group.
+
 ## What the loop stops for
 
 Autonomy is measured by what the pipeline can finish without a human, and every halt costs more than its own run: an issue holds `in-progress` until its run produces a merged PR or releases it, so a stopped run defers every later assignment behind it. A halt has to earn that.
@@ -134,7 +144,7 @@ Binds every session that touches a numbered issue, not only ones dispatched thro
 
 | Subject | Where |
 |---------|-------|
-| Issue in, pull request out — intake, assignment, single flight, rescue, watchdog, the tokens the loop depends on | `references/github-loop.md` |
+| Issue in, pull request out — intake, assignment, parallel runs and scopes, the merge gate, rescue, watchdog, the tokens the loop depends on | `references/github-loop.md` |
 | Runtime parity — the three config trees, per-runtime delegation defaults, Claude Code prerequisites | `references/runtime-parity.md` |
 | GitHub's closing-keyword parser, and the real incident it caused | `references/keyword-closing-postmortem.md` |
 | Per-pipeline step sequences | `agentic-pipeline-full`, `agentic-pipeline-fix-bug`, `agentic-pipeline-multi`, `agentic-pipeline-review-pr`, `agentic-pipeline-ask`, `agentic-pipeline-executor`, `agentic-pipeline-ci-fix` |

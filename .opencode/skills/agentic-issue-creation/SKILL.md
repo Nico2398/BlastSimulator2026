@@ -83,6 +83,24 @@ An issue held for confirmation carries an `## Open question` section naming exac
 
 Leave `ready` off while you are uncertain. An issue carrying `agent-task` alone loses nothing — it keeps its number, its body and its place — and gains `ready` the moment a human agrees.
 
+### Scope labels — where the diff will stay
+
+With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the queue runs issues side by side only when their `scope:*` labels are disjoint. Add every scope the `## Files` section falls into; several are allowed:
+
+| Label | Covers |
+|-------|--------|
+| `scope:engine` | `src/core/engine`, `src/core/entities`, `src/core/state` |
+| `scope:nav` | `src/core/nav`, `src/core/mining` |
+| `scope:economy` | `src/core/economy`, `src/core/campaign`, `src/core/scores` |
+| `scope:world` | `src/core/world`, `src/core/weather`, `src/core/events` |
+| `scope:ui` | `src/ui` |
+| `scope:renderer` | `src/renderer`, `src/audio`, 3D models |
+| `scope:console` | `src/console` |
+| `scope:scenarios` | `scripts/scenario-defs` and the scenario runners |
+| `scope:pipeline` | `.github`, `.claude`, `.opencode` — always runs alone |
+
+Files every area touches — `balance.ts`, the locale files, `main.ts`, mirrored skills — belong to no scope; name the feature's scope and let the merge gate handle the overlap. **When unsure, leave scope off.** An issue with no scope label runs alone, which costs parallelism and nothing else; a wrong one costs a conflict round. The taxonomy lives in `SCOPES` in `.github/scripts/assignability.cjs` — a label naming anything else also runs alone.
+
 ## Issue Body Template
 
 ```markdown
@@ -274,6 +292,7 @@ recorded can be picked up in that window.
 - [ ] Verification names the scenario that drives the change, if one does — CI runs every scenario in both modes on every PR regardless
 - [ ] Open issues searched for this problem — none covers it, or the existing one was updated instead of a new one filed
 - [ ] Labels set on creation per the Labels table: `ready` only at high confidence, `agent-task` alone otherwise, unless the human specified something else
+- [ ] Every `scope:*` label the `## Files` section falls into, or none when unsure
 - [ ] An issue held for confirmation carries `## Open question`
 - [ ] A finding or a scope cut carries `## Where found` and `## Why not fixed here`
 - [ ] A scope cut names its remainder issues in the pull request body and on the original issue

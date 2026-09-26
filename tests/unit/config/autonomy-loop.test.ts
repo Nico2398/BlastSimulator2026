@@ -157,6 +157,16 @@ describe('every entry point assigns under the configured parallel limit', () => 
     expect(text).toContain('outputs.issues');
   });
 
+  // The skill that tells a run which scope labels to put on an issue it files
+  // lists them for the reader; the assigner's taxonomy is the authority. A
+  // label the skill names that the assigner does not know runs alone forever.
+  it('documents exactly the scopes the assigner knows', () => {
+    const rules = require(join(ROOT, '.github/scripts/assignability.cjs'));
+    const skill = readFileSync(join(ROOT, '.claude/skills/agentic-issue-creation/SKILL.md'), 'utf8');
+    const documented = [...skill.matchAll(/^\| `scope:([a-z]+)` \|/gm)].map((m) => m[1]);
+    expect(documented).toEqual(Object.keys(rules.SCOPES));
+  });
+
   // A scope label a human picks from the UI has to exist, and has to name a
   // scope the assigner knows — so intake reads the one taxonomy rather than
   // carrying its own list of names.
