@@ -16,7 +16,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
-import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
+import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix, parseAgentOccupancyFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { regionForColumns, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
@@ -422,15 +422,16 @@ export function newGameCommand(
     return { success: false, output: staffedFlag.error };
   }
 
-  // TODO(#1206): thread an `agent_occupancy:true|false` flag through here the
-  // same way `staffed` is parsed above (parseBooleanFlag in commandUtils.ts),
-  // into `createGame`'s `agentOccupancyEnabled` config field, once the
-  // occupancy check itself is implemented. Left unwired in the skeleton phase
-  // — `debug occupancy on|off` (debug.ts) is the primary toggle for now.
+  const agentOccupancyFlag = parseAgentOccupancyFlag(named['agent_occupancy']);
+  if (agentOccupancyFlag.error) {
+    return { success: false, output: agentOccupancyFlag.error };
+  }
+
   ctx.state = createGame({
     seed, mineType,
     ...(startingCash !== undefined ? { startingCash } : {}),
     ...(staffedFlag.staffed ? { staffed: true } : {}),
+    ...(agentOccupancyFlag.agentOccupancy !== undefined ? { agentOccupancyEnabled: agentOccupancyFlag.agentOccupancy } : {}),
   });
   const datum = defaultDatumForSize(size);
   ctx.state.world = createWorldState(size, datum, size, true);

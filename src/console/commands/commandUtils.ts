@@ -61,3 +61,19 @@ export function parseStaffedFlag(raw: string | undefined): { staffed: boolean; e
   }
   return { staffed: parsed === true, error: null };
 }
+
+/**
+ * Parses the `agent_occupancy:true|false` console flag (#1206) shared by
+ * `new_game` and `sandbox start` — mirrors `parseStaffedFlag` exactly,
+ * defaulting to `undefined` (let `createGame` fall back to
+ * `AGENT_OCCUPANCY_ENABLED_DEFAULT`) when omitted, rather than `false`: this
+ * flag opts a fresh game in or out explicitly, it does not itself carry a
+ * default the way `staffed` does.
+ */
+export function parseAgentOccupancyFlag(raw: string | undefined): { agentOccupancy: boolean | undefined; error: null } | { agentOccupancy: undefined; error: string } {
+  const parsed = parseBooleanFlag(raw);
+  if (parsed === null) {
+    return { agentOccupancy: undefined, error: t('console.invalid_agent_occupancy_flag', { value: raw! }) };
+  }
+  return { agentOccupancy: parsed, error: null };
+}

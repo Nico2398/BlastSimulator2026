@@ -7,6 +7,7 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { requireGame } from './commandUtils.js';
+import { t } from '../../core/i18n/I18n.js';
 
 export function debugCommand(
   ctx: GameContext,
@@ -18,9 +19,31 @@ export function debugCommand(
 
   const sub = args[0] ?? '';
   if (sub !== 'occupancy') {
-    return { success: false, output: 'Usage: debug occupancy (status|on|off)' };
+    return { success: false, output: t('console.debug_usage') };
   }
 
-  // TODO: implement — read/write state.agentOccupancyEnabled per args[1].
-  throw new Error('not implemented');
+  const state = ctx.state!;
+  const action = args[1] ?? 'status';
+
+  if (action === 'on') {
+    state.agentOccupancyEnabled = true;
+    return { success: true, output: t('console.debug_occupancy_on') };
+  }
+
+  if (action === 'off') {
+    state.agentOccupancyEnabled = false;
+    // Clean slate for next re-enable — rebuildAgentOccupancy runs again the
+    // next tick the switch is on (Locomotion.ts's tickLocomotion).
+    state.agentOccupancy = null;
+    return { success: true, output: t('console.debug_occupancy_off') };
+  }
+
+  if (action === 'status') {
+    return {
+      success: true,
+      output: state.agentOccupancyEnabled ? t('console.debug_occupancy_on') : t('console.debug_occupancy_off'),
+    };
+  }
+
+  return { success: false, output: t('console.debug_usage') };
 }

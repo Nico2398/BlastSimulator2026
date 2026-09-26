@@ -15,8 +15,9 @@ import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
+import type { NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
-import type { Occupant, AgentOccupancy } from '../nav/AgentOccupancy.js';
+import { rebuildAgentOccupancy, reconcileAgentOccupancy, type Occupant, type AgentOccupancy } from '../nav/AgentOccupancy.js';
 import {
   AGENT_WALK_SPEED,
   STUCK_MORALE_PENALTY,
@@ -163,6 +164,18 @@ interface LocomotionResult {
  */
 export function tickLocomotion(state: GameState, emitter?: EventEmitter): LocomotionResult {
   const result: LocomotionResult = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [], trainingCancelled: [] };
+
+  // #1206: built lazily, the first tick the switch is on — never rebuilt
+  // again after that (see AgentOccupancy.ts's own header comment on the cost
+  // distinction). Reconciled every tick before the movement loop so a dead
+  // employee/destroyed vehicle's cell frees up before anyone else's move is
+  // resolved against it this tick.
+  if (state.agentOccupancyEnabled) {
+    if (state.agentOccupancy === null) {
+      state.agentOccupancy = rebuildAgentOccupancy(state);
+    }
+    reconcileAgentOccupancy(state, state.agentOccupancy);
+  }
 
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
@@ -391,6 +404,19 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   const driveFromX = state.navGrid ? state.navGrid.clampX(emp.x) : emp.x;
   const driveFromZ = state.navGrid ? state.navGrid.clampZ(emp.z) : emp.z;
 
+  // #1206: once the switch is on, AgentOccupancy — via advanceAlongPath's own
+  // per-hop check (mover/occupancy threaded in below) and
+  // handleAgentOccupancyBlock's ladder (after the outcome is applied, below)
+  // — replaces both the drive-only detour latch and the nextGridStep/
+  // isOccupiedByOtherVehicle/handleOccupancyBlock precheck dispatch that
+  // follow. Bit-identical to before when the switch is off: `occupancyActive`
+  // is false, so neither branch below ever runs and `mover` stays null,
+  // matching every fixture/caller that predates this feature.
+  const occupancyActive = state.agentOccupancyEnabled && state.agentOccupancy !== null;
+  const mover: Occupant | null = occupancyActive
+    ? (isDrive ? { kind: 'vehicle', id: vehicle!.id } : { kind: 'employee', id: emp.id })
+    : null;
+
   // #1166: a drive leg part-way around a still-parked blocker keeps following
   // the vehicle-avoiding route it committed to, rather than repathing back
   // through the blocker and stalling again — see isDetouringAroundVehicle.
@@ -398,7 +424,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // back to ordinary routing, which re-enters handleOccupancyBlock below and
   // reaches its own stuck/relocate escalation from there.
   let detourPath: PathResult | null = null;
-  if (isDrive && state.navGrid && isDetouringAroundVehicle(state, emp, vehicle!.id)) {
+  if (!occupancyActive && isDrive && state.navGrid && isDetouringAroundVehicle(state, emp, vehicle!.id)) {
     const rerouted = findPathAvoidingOtherVehicles(state, emp, vehicle!, leg.destX, leg.destZ);
     if (rerouted.found) detourPath = rerouted;
     else clearVehicleDetour(emp);
@@ -412,7 +438,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
         })
       : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] });
 
-  if (isDrive && state.navGrid && path.found) {
+  if (!occupancyActive && isDrive && state.navGrid && path.found) {
     const nextStep = nextGridStep(emp.x, emp.z, path.waypoints);
     if (nextStep && isOccupiedByOtherVehicle(state, vehicle!.id, nextStep.x, nextStep.z)) {
       return handleOccupancyBlock(state, emp, vehicle!, leg, nextStep, result, emitter);
@@ -426,6 +452,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     path, navGrid: state.navGrid, avoidVehicles,
     committed: readCommitted(emp),
     ...readMoveHistory(emp),
+    ...(occupancyActive ? { mover, occupancy: state.agentOccupancy } : {}),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
@@ -474,6 +501,19 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
       result.moved.push(vehicle!.id);
       result.vehiclesMoved.push(vehicle!.id);
     }
+  }
+
+  // #1206: a per-hop occupancy block — only ever set when `occupancyActive`
+  // (mover/occupancy were threaded into advanceAlongPath above only in that
+  // case). handleAgentOccupancyBlock owns the wait/reroute/sidestep/
+  // destination-spread/escalate ladder from here on, in place of the
+  // ordinary stuck-check below — mirrors how handleOccupancyBlock (the
+  // vehicle-only precheck dispatch above) takes over the whole tick's fate
+  // once IT fires.
+  if (occupancyActive && outcome.blockedByOccupant) {
+    const blockedStep = state.agentOccupancy!.cellOfOccupant(outcome.blockedByOccupant)
+      ?? { x: Math.round(emp.x), z: Math.round(emp.z) };
+    return handleAgentOccupancyBlock(state, emp, mover!, leg, blockedStep, state.agentOccupancy!, result, emitter);
   }
 
   if (!outcome.pathFound || outcome.isStuck) {
@@ -528,27 +568,174 @@ function abandonStuckMovement(state: GameState, emp: Employee, vehicle: Vehicle 
 }
 
 /**
+ * The controlling employee of `occupant` — itself, for a foot occupant, or
+ * its driver, for a vehicle one (`occupantIds[0]`, #1092). Null when a
+ * vehicle occupant has no driver at all (idle/driverless) — nobody to
+ * tie-break against. Shared identity used both to read a blocker's own
+ * `isMoveStuck` (`handleAgentOccupancyBlock`'s sidestep condition) and to
+ * compare ids under `EmployeeDispatch.ts`'s own ascending-id convention.
+ */
+function controllingEmployee(state: GameState, occupant: Occupant): Employee | undefined {
+  if (occupant.kind === 'employee') {
+    return state.employees.employees.find(e => e.id === occupant.id);
+  }
+  const vehicle = state.vehicles.vehicles.find(v => v.id === occupant.id);
+  const driverId = vehicle ? vehicleDriverId(vehicle) : null;
+  return driverId === null ? undefined : state.employees.employees.find(e => e.id === driverId);
+}
+
+/**
  * Generalizes `handleOccupancyBlock` (below) to any agent — foot or vehicle
  * (#1206) — via `AgentOccupancy` rather than the live vehicle-position scan
  * `isOccupiedByOtherVehicle` does. `mover` is the occupant identity of
  * whichever entity is actually being blocked: the employee itself for a foot
  * leg, or its vehicle for a drive leg — mirrors `handleOccupancyBlock`'s own
  * split (that function always escalates the employee to stuck, but the
- * blocked *mover* on a drive leg is the vehicle). Implementer wires this in
- * as `handleOccupancyBlock`'s replacement once `AgentOccupancy` itself is
- * implemented; the vehicle-only functions below stay in place until then.
+ * blocked *mover* on a drive leg is the vehicle). `blockedStep` is the exact
+ * cell `mover` tried to move onto this tick and found held by someone else
+ * (`AgentAdvance.ts`'s own per-hop check, resolved back to a cell via
+ * `occupancy.cellOfOccupant` at the call site — see `advanceLeg`).
+ *
+ * The ladder, in order, once `AGENT_OCCUPANCY_WAIT_TICKS` have elapsed:
+ * 1. a one-shot reroute avoiding every occupied cell (unless the blocked hop
+ *    IS the leg's own destination — no point routing "around" the one cell
+ *    that has to be reached);
+ * 2. failing that, a deterministic sideways step when the blocker is itself
+ *    stuck and this requester's controlling employee outranks (has the
+ *    numerically higher id than) the blocker's — the lower id always holds
+ *    its ground, so the pair can never both step aside into each other;
+ * 3. failing that, "destination spreading" — retargeting the leg's own
+ *    destination to the nearest free cell around it — but only for a leg
+ *    whose arrival step actually needs an exact, unshared cell (never a
+ *    `board`/`enter_building` arrival, which must reach the specific
+ *    vehicle/building it names);
+ * 4. neither resolves — the same stuck/abandon escalation
+ *    `handleOccupancyBlock` already has for vehicles, unchanged, now
+ *    reachable for a foot agent too.
  */
 export function handleAgentOccupancyBlock(
-  _state: GameState,
-  _emp: Employee,
-  _mover: Occupant,
-  _leg: Leg,
-  _blockedStep: { x: number; z: number },
-  _occupancy: AgentOccupancy,
-  _result: LocomotionResult,
-  _emitter?: EventEmitter,
+  state: GameState,
+  emp: Employee,
+  mover: Occupant,
+  leg: Leg,
+  blockedStep: { x: number; z: number },
+  occupancy: AgentOccupancy,
+  result: LocomotionResult,
+  emitter?: EventEmitter,
 ): LegMoveOutcome {
-  throw new Error('not implemented');
+  const wasStuckBefore = emp.isMoveStuck;
+  emp.vehicleWaitingTicks++;
+
+  if (emp.vehicleWaitingTicks < AGENT_OCCUPANCY_WAIT_TICKS) return 'blocked';
+
+  const isDrive = mover.kind === 'vehicle';
+  const vehicle = isDrive ? state.vehicles.vehicles.find(v => v.id === mover.id) : undefined;
+  // The vehicle vanished (reassigned/destroyed) out from under this block —
+  // advanceLeg's own occupant-mismatch check aborts the leg cleanly next
+  // tick; nothing more to do with a mover that no longer resolves.
+  if (isDrive && !vehicle) return 'blocked';
+
+  const speed = isDrive ? getVehicleDefByTier(vehicle!.type, vehicle!.tier).speed : AGENT_WALK_SPEED;
+  const requiredClearance = isDrive ? vehicleRequiredClearanceCells(vehicle!) : undefined;
+  const isBlockedHopTheDestination = blockedStep.x === leg.destX && blockedStep.z === leg.destZ;
+
+  if (!isBlockedHopTheDestination) {
+    const reroute = findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
+    if (reroute.found) {
+      const outcome = advanceAlongPath({
+        x: emp.x, z: emp.z, walkSpeed: speed,
+        destinationX: leg.destX, destinationZ: leg.destZ,
+        consecutiveFailures: 0, isStuck: false,
+        path: reroute,
+        // A reroute is trusted immediately, same reasoning as
+        // handleOccupancyBlock's own identical reset below.
+        committed: NULL_ROUTE_COMMITMENT,
+        moveHistoryX: null, moveHistoryZ: null,
+        mover, occupancy,
+      });
+
+      emp.moveConsecutiveFailures = outcome.consecutiveFailures;
+      emp.isMoveStuck = outcome.isStuck;
+      emp.vehicleWaitingTicks = 0;
+      writeCommitted(emp, outcome.committed);
+      writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
+
+      const fromX = emp.x;
+      const fromZ = emp.z;
+      emp.x = outcome.x;
+      emp.z = outcome.z;
+      if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, isLegArrived(outcome.x, outcome.z, leg));
+      recordWalk(emp, vehicle, fromX, fromZ, outcome.trail);
+      result.moved.push(emp.id);
+      if (isDrive) {
+        result.moved.push(vehicle!.id);
+        result.vehiclesMoved.push(vehicle!.id);
+      }
+      return 'moved';
+    }
+
+    // Reroute failed — the deterministic tie-break sidestep: only when the
+    // blocker itself is stuck (so simply outwaiting it would deadlock both
+    // sides forever) and this requester's own controlling employee outranks
+    // the blocker's (EmployeeDispatch.ts's own ascending-id convention — the
+    // lower id always wins, so only the higher-id side ever gives way, and
+    // the pair can never both step aside at once).
+    const blocker = occupancy.holderOf(blockedStep.x, blockedStep.z);
+    const blockerEmp = blocker ? controllingEmployee(state, blocker) : undefined;
+    if (blockerEmp?.isMoveStuck && emp.id > blockerEmp.id) {
+      const freeCell = findNearestFreeCellForAgent(state, mover, emp.x, emp.z);
+      if (freeCell) {
+        const fromX = emp.x;
+        const fromZ = emp.z;
+        emp.x = freeCell.x;
+        emp.z = freeCell.z;
+        occupancy.tryMove(mover, freeCell.x, freeCell.z);
+        emp.vehicleWaitingTicks = 0;
+        emp.isMoveStuck = false;
+        emp.moveConsecutiveFailures = 0;
+        writeCommitted(emp, NULL_ROUTE_COMMITMENT);
+        writeMoveHistory(emp, null, null);
+        if (isDrive) writeVehiclePosition(state, vehicle!, freeCell.x, freeCell.z, true);
+        recordWalk(emp, vehicle, fromX, fromZ, [{ x: freeCell.x, z: freeCell.z }]);
+        result.moved.push(emp.id);
+        if (isDrive) {
+          result.moved.push(vehicle!.id);
+          result.vehiclesMoved.push(vehicle!.id);
+        }
+        return 'moved';
+      }
+    }
+  }
+
+  // "Destination spreading": only a leg whose arrival step needs an exact,
+  // unshared cell (never a board/enter_building arrival, which must reach
+  // the one specific vehicle/building cell it names) can have its target
+  // relocated out from under it.
+  const needsExactUnsharedCell = isBlockedHopTheDestination && leg.arrival !== 'adjacent'
+    && (leg.onArrive.kind === 'none' || leg.onArrive.kind === 'effect');
+  if (needsExactUnsharedCell) {
+    const spread = findNearestFreeCellForAgent(state, mover, leg.destX, leg.destZ);
+    if (spread) {
+      leg.destX = spread.x;
+      leg.destZ = spread.z;
+      emp.vehicleWaitingTicks = 0;
+      return 'blocked';
+    }
+  }
+
+  // Neither a reroute, a sidestep, nor destination-spreading resolved the
+  // block — same stuck/abandon escalation handleOccupancyBlock already has
+  // for a drive leg, unchanged, now reachable for a foot leg too.
+  emp.isMoveStuck = true;
+  if (!wasStuckBefore) {
+    if (isDrive) emitter?.emit('vehicle:stuck', { vehicleId: vehicle!.id });
+    else emitter?.emit('agent:stuck', { employeeId: emp.id });
+  }
+  if (emp.vehicleWaitingTicks >= MOVE_STUCK_ABANDON_TICKS) {
+    abandonStuckMovement(state, emp, isDrive ? vehicle : undefined, result, emitter);
+  }
+
+  return 'blocked';
 }
 
 /**
@@ -753,12 +940,24 @@ function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number
  * then two cells out) so a blocker wedged against another obstacle still
  * finds somewhere to go. Returns null when nothing nearby qualifies.
  */
-function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x: number; z: number } | null {
-  const grid = state.navGrid;
+/**
+ * Nearest walkable cell (ring search: immediate neighbours first, then two
+ * cells out) around (originX, originZ) that `isBlocked` reports free —
+ * shared core of `findNearestFreeCellForVehicle` (live vehicle-position scan)
+ * and its #1206 generalization `findNearestFreeCellForAgent` (AgentOccupancy
+ * freedom). Returns null when nothing within 2 cells qualifies, or there is
+ * no NavGrid yet.
+ */
+function findNearestFreeCell(
+  grid: NavGrid | null,
+  originX: number,
+  originZ: number,
+  isBlocked: (x: number, z: number) => boolean,
+): { x: number; z: number } | null {
   if (!grid) return null;
 
-  const bx = Math.floor(blocker.x);
-  const bz = Math.floor(blocker.z);
+  const bx = Math.floor(originX);
+  const bz = Math.floor(originZ);
   let best: { x: number; z: number } | null = null;
   let bestDistSq = Infinity;
 
@@ -771,7 +970,7 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
 
         const cell = grid.cellAt(x, z);
         if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
-        if (isOccupiedByOtherVehicle(state, blocker.id, x, z)) continue;
+        if (isBlocked(x, z)) continue;
 
         const distSq = (x - bx) ** 2 + (z - bz) ** 2;
         if (distSq < bestDistSq) {
@@ -784,6 +983,23 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
   }
 
   return best;
+}
+
+function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x: number; z: number } | null {
+  return findNearestFreeCell(state.navGrid, blocker.x, blocker.z, (x, z) => isOccupiedByOtherVehicle(state, blocker.id, x, z));
+}
+
+/**
+ * Generalizes `findNearestFreeCellForVehicle` (#1206) to any mover, via
+ * `AgentOccupancy` freedom rather than a live vehicle-position scan — used by
+ * `handleAgentOccupancyBlock`'s sidestep and destination-spreading steps.
+ * Null when the occupancy feature isn't active (nothing to check freedom
+ * against) or nothing nearby qualifies.
+ */
+function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX: number, originZ: number): { x: number; z: number } | null {
+  const occupancy = state.agentOccupancy;
+  if (!occupancy) return null;
+  return findNearestFreeCell(state.navGrid, originX, originZ, (x, z) => !occupancy.isFreeFor(mover, x, z));
 }
 
 /**
@@ -875,10 +1091,37 @@ function isOccupiedByOtherVehicle(state: GameState, selfVehicleId: number, x: nu
  * `isImpassable` call site in Pathfinding.ts, which would touch far more
  * than this one escalation path actually needs.
  */
+/**
+ * Temporarily zeroes every on-ground fragment's `NavCell.fragmentOccupancy`
+ * for the duration of `fn`, then restores it — the fragment-suppression half
+ * of `findPathAvoidingOtherVehicles`'s own doc comment above, factored out
+ * (#1206) so its #1206 generalization `findPathAvoidingOccupiedCells` below
+ * shares it exactly rather than re-deriving the same mark/revert dance.
+ */
+function withFragmentsUnmarked<T>(state: GameState, grid: NavGrid, fn: () => T): T {
+  const unmarkedFragments: Array<{ x: number; z: number; prev: number }> = [];
+  try {
+    for (const tracked of state.logistics.fragments) {
+      if (tracked.state !== 'on_ground') continue;
+      const fx = Math.round(tracked.fragment.position.x);
+      const fz = Math.round(tracked.fragment.position.z);
+      const cell = grid.cellAt(fx, fz);
+      if (!cell || !cell.fragmentOccupancy) continue;
+      unmarkedFragments.push({ x: fx, z: fz, prev: cell.fragmentOccupancy });
+      cell.fragmentOccupancy = 0;
+    }
+    return fn();
+  } finally {
+    for (const mark of unmarkedFragments) {
+      const cell = grid.cellAt(mark.x, mark.z);
+      if (cell) cell.fragmentOccupancy = mark.prev;
+    }
+  }
+}
+
 function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle: Vehicle, destX: number, destZ: number): PathResult {
   const grid = state.navGrid!;
   const marked: Array<{ x: number; z: number; prev: boolean }> = [];
-  const unmarkedFragments: Array<{ x: number; z: number; prev: number }> = [];
 
   try {
     for (const other of state.vehicles.vehicles) {
@@ -891,28 +1134,59 @@ function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle:
       cell.vehicleOccupied = true;
     }
 
-    for (const tracked of state.logistics.fragments) {
-      if (tracked.state !== 'on_ground') continue;
-      const fx = Math.round(tracked.fragment.position.x);
-      const fz = Math.round(tracked.fragment.position.z);
-      const cell = grid.cellAt(fx, fz);
-      if (!cell || !cell.fragmentOccupancy) continue;
-      unmarkedFragments.push({ x: fx, z: fz, prev: cell.fragmentOccupancy });
-      cell.fragmentOccupancy = 0;
-    }
-
-    return findPath(grid, {
+    return withFragmentsUnmarked(state, grid, () => findPath(grid, {
       agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: destX, toZ: destZ, avoidVehicles: true,
       requiredClearance: vehicleRequiredClearanceCells(vehicle),
-    });
+    }));
   } finally {
     for (const mark of marked) {
       const cell = grid.cellAt(mark.x, mark.z);
       if (cell) cell.vehicleOccupied = mark.prev;
     }
-    for (const mark of unmarkedFragments) {
+  }
+}
+
+/**
+ * Generalizes `findPathAvoidingOtherVehicles` (#1206) to any mover — foot or
+ * vehicle — and any occupant it must route around: every cell currently held
+ * in `state.agentOccupancy` (excluding `mover`'s own) is temporarily marked
+ * `vehicleOccupied`, not just other vehicles' cells. Ground fragments are
+ * unmarked for the search exactly as `findPathAvoidingOtherVehicles` does —
+ * this reroute fires just as often right up against a fresh blast's own
+ * fragment pile as that function's own vehicle-hauler case does. Marks are
+ * reverted before returning.
+ */
+function findPathAvoidingOccupiedCells(
+  state: GameState,
+  emp: Employee,
+  mover: Occupant,
+  fromX: number,
+  fromZ: number,
+  destX: number,
+  destZ: number,
+  requiredClearance: number | undefined,
+): PathResult {
+  const grid = state.navGrid!;
+  const occupancy = state.agentOccupancy!;
+  const marked: Array<{ x: number; z: number; prev: boolean }> = [];
+
+  try {
+    for (const held of occupancy.heldOccupants()) {
+      if (held.occupant.kind === mover.kind && held.occupant.id === mover.id) continue;
+      const cell = grid.cellAt(held.x, held.z);
+      if (!cell || cell.vehicleOccupied) continue;
+      marked.push({ x: held.x, z: held.z, prev: cell.vehicleOccupied });
+      cell.vehicleOccupied = true;
+    }
+
+    return withFragmentsUnmarked(state, grid, () => findPath(grid, {
+      agentId: emp.id, fromX, fromZ, toX: destX, toZ: destZ, avoidVehicles: true,
+      ...(requiredClearance !== undefined && { requiredClearance }),
+    }));
+  } finally {
+    for (const mark of marked) {
       const cell = grid.cellAt(mark.x, mark.z);
-      if (cell) cell.fragmentOccupancy = mark.prev;
+      if (cell) cell.vehicleOccupied = mark.prev;
     }
   }
 }
