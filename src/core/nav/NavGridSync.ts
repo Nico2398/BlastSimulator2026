@@ -13,16 +13,29 @@
 import type { EventEmitter, GameEventMap } from '../state/EventEmitter.js';
 import { NavGrid } from './NavGrid.js';
 import { computeColumnRangeY, type VoxelGrid } from '../world/VoxelGrid.js';
-import type { Building } from '../entities/Building.js';
+import type { FootprintOccupant } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
+import type { GameState } from '../state/GameState.js';
 
 /** The live objects a `terrain:updated` event needs to patch a NavGrid. */
 export interface NavGridSyncTarget {
   navGrid: NavGrid;
   grid: VoxelGrid;
-  buildings: Building[];
+  buildings: ReadonlyArray<FootprintOccupant>;
   drillHoles: DrillHole[];
+}
+
+/**
+ * Every footprint that blocks routing right now: live buildings plus
+ * still-under-construction orders (#1200) — a planned building blocks from
+ * the moment it is ordered, same as a finished one. The one place this
+ * concatenation happens, so buildNavGrid/patchNavGrid callers and
+ * checkFootprintPlacement callers (buildOrder.ts, entities.ts) read the
+ * same list.
+ */
+export function buildingFootprintOccupants(state: GameState): FootprintOccupant[] {
+  return [...state.buildings.buildings, ...state.plannedBuildings];
 }
 
 /**

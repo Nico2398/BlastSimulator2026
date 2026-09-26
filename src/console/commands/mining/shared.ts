@@ -7,6 +7,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/BlastPlan.js';
 import type { BlastPlan, ValidationError } from '../../../core/mining/BlastPlan.js';
 import type { MiningContext } from './types.js';
+import type { GameContext } from '../world.js';
 
 export function requireGame(ctx: MiningContext): string | null {
   if (!ctx.state || !ctx.grid) return t('console.no_game_loaded');
@@ -85,7 +86,8 @@ export function cancelOutstandingChargeAction(state: GameState, holeId: string):
  * populated at order time the same way (#553) — the identical gap existed
  * for a cancelled drill order too.
  */
-export function releasePlannedHoleForCancelledAction(state: GameState, action: PendingAction): void {
+export function releasePlannedHoleForCancelledAction(ctx: GameContext, action: PendingAction): void {
+  const state = ctx.state!;
   // #555: a cancelled dig_ramp_segment keyed off rampId/segmentIndex, not
   // holeId — handled separately, same generic-cancel-path gap as
   // drill_hole/charge_hole above (the Operations panel's Work Queue cancel

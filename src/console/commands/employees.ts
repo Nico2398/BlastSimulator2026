@@ -301,7 +301,7 @@ export function employeeCommand(
       // A cancelled drill_hole/charge_hole order still has a ghost in
       // plannedDrillHoles/plannedChargesByHole — cancelAction only removes
       // the generic PendingAction record (#554 code review).
-      releasePlannedHoleForCancelledAction(state, result.action!);
+      releasePlannedHoleForCancelledAction(ctx, result.action!);
       const refundSuffix = result.refunded && result.refunded > 0
         ? t('employees.cancel_refund_suffix', { amount: formatMoney(result.refunded) })
         : '';

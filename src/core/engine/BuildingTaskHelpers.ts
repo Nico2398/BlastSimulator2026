@@ -53,3 +53,13 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
 export function refreshLogisticsCapacity(state: GameState): void {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
 }
+
+/**
+ * Move every alive employee standing inside `region` (a footprint's world
+ * cells) to the nearest reachable free cell — called whenever a footprint
+ * newly blocks routing: ordering, completing, upgrading or moving a
+ * building (#1200).
+ */
+export function relocateFootprintOccupants(_state: GameState, _region: BlastRegion): void {
+  throw new Error('not implemented');
+}

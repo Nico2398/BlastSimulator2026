@@ -12,18 +12,26 @@
 // sleep, #437) have an actually reachable target.
 
 import type { NavGrid, NavCell } from './NavGrid.js';
-import type { Building, BuildingDef } from '../entities/Building.js';
+import type { BuildingDef } from '../entities/Building.js';
 import { getDefSize } from '../entities/Building.js';
 import { isImpassable } from './Pathfinding.js';
 
+/**
+ * The x/z every ring computation in this file actually reads off a
+ * building — narrow enough that a PlannedBuilding (no hp/active/
+ * occupantIds yet) satisfies it too, for the builder's own approach
+ * target at order time (#1200).
+ */
+export type FootprintAnchor = { x: number; z: number };
+
 /** The inclusive bounds of the one-cell ring around a building's footprint bounding box. */
-function ringBounds(building: Building, def: BuildingDef): { minX: number; maxX: number; minZ: number; maxZ: number } {
+function ringBounds(building: FootprintAnchor, def: BuildingDef): { minX: number; maxX: number; minZ: number; maxZ: number } {
   const { sizeX, sizeZ } = getDefSize(def);
   return { minX: building.x - 1, maxX: building.x + sizeX, minZ: building.z - 1, maxZ: building.z + sizeZ };
 }
 
 /** Whether (x, z) lies on the one-cell ring just outside a building's footprint bounding box. */
-export function isOnBuildingRing(building: Building, def: BuildingDef, x: number, z: number): boolean {
+export function isOnBuildingRing(building: FootprintAnchor, def: BuildingDef, x: number, z: number): boolean {
   const { minX, maxX, minZ, maxZ } = ringBounds(building, def);
   if (x < minX || x > maxX || z < minZ || z > maxZ) return false;
   return x === minX || x === maxX || z === minZ || z === maxZ;
@@ -36,7 +44,7 @@ export function isOnBuildingRing(building: Building, def: BuildingDef, x: number
  */
 function nearestRingCell(
   navGrid: NavGrid,
-  building: Building,
+  building: FootprintAnchor,
   def: BuildingDef,
   fromX: number,
   fromZ: number,
@@ -73,7 +81,7 @@ function nearestRingCell(
  */
 export function findBuildingApproachCell(
   navGrid: NavGrid | null,
-  building: Building,
+  building: FootprintAnchor,
   def: BuildingDef,
   fromX: number,
   fromZ: number,
@@ -93,7 +101,7 @@ export function findBuildingApproachCell(
  */
 export function findBuildingExitCell(
   navGrid: NavGrid | null,
-  building: Building,
+  building: FootprintAnchor,
   def: BuildingDef,
   fromX: number,
   fromZ: number,
