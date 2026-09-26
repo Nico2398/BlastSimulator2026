@@ -20,7 +20,7 @@ import type { ContractState } from '../economy/Contract.js';
 import { createContractState } from '../economy/Contract.js';
 import type { LogisticsState } from '../economy/Logistics.js';
 import { createLogisticsState } from '../economy/Logistics.js';
-import type { BuildingState, Building, BuildingType, BuildingTier } from '../entities/Building.js';
+import type { BuildingState, BuildingType, BuildingTier, FootprintOccupant } from '../entities/Building.js';
 import { createBuildingState } from '../entities/Building.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
@@ -600,7 +600,7 @@ function applyStaffedComposition(state: GameState): void {
 export function buildGameNavGrid(
   state: GameState,
   voxelGrid: VoxelGrid,
-  buildings: Building[],
+  buildings: ReadonlyArray<FootprintOccupant>,
   drillHoles: DrillHole[],
 ): void {
   if (voxelGrid.sizeX <= 0 || voxelGrid.sizeZ <= 0) return;

@@ -10,7 +10,7 @@ import { buildGameNavGrid, syncWorldBounds } from '../../core/state/GameState.js
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
-import { regionForColumns } from '../../core/nav/NavGridSync.js';
+import { regionForColumns, buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
 
 export interface ClaimOutcome {
   /** False when at least one cell was refused — the caller must abort the action. */
@@ -64,7 +64,7 @@ export function claimForAction(
   if (!result.expanded || !result.rect) return { ok: true, expanded: false };
 
   syncWorldBounds(state, grid);
-  buildGameNavGrid(state, grid, state.buildings.buildings, state.drillHoles);
+  buildGameNavGrid(state, grid, buildingFootprintOccupants(state), state.drillHoles);
   // Padded one voxel past the claim on every side: the chunks that were
   // already built next to it sealed themselves against empty space, and those
   // walls have to come down now that there is ground on the other side.

@@ -20,12 +20,12 @@ import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
-import { regionForColumns } from '../nav/NavGridSync.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
 import {
   makeFootprintRegion, levelBuildingFootprint,
-  siteBoundsForGrid, refreshLogisticsCapacity,
+  siteBoundsForGrid, refreshLogisticsCapacity, relocateFootprintOccupants,
+  emitFootprintRegionChanged,
 } from './BuildingTaskHelpers.js';
 
 /**
@@ -245,7 +245,7 @@ export function applyTaskCompletion(
             // (isStepClimbable reads them) and not the pre-construction
             // ones. NavGridSync patches on nav:occupancy_changed; no direct
             // call here.
-            emitter.emit('nav:occupancy_changed', { region: regionForColumns(footprintRegion, grid) });
+            emitFootprintRegionChanged(emitter, grid, order.x, order.z, sizeX, sizeZ);
           }
           // The employee who just finished the work is standing on the
           // footprint they were building — the NavGrid patch above just
@@ -273,24 +273,8 @@ export function applyTaskCompletion(
           // the new footprint (not just the one whose PendingAction just
           // completed) closes the gap the same relocate-to-nearest-reachable
           // move already uses, just applied to everyone it actually affects.
-          if (state.navGrid && footprintRegion) {
-            const region = footprintRegion;
-            for (const other of state.employees.employees) {
-              if (!other.alive) continue;
-              const cx = Math.round(other.x);
-              const cz = Math.round(other.z);
-              if (cx < region.minX || cx > region.maxX || cz < region.minZ || cz > region.maxZ) continue;
-              // avoidOccupancy: true (#954 follow-up fix): this relocates a
-              // living, foot-travelling employee, so the same fragment-/
-              // vehicle-occupancy rule their own foot travel obeys (#954)
-              // must gate the cell they get relocated onto — otherwise this
-              // sweep could "rescue" them from a newly-blocked footprint
-              // straight into a fragment-boxed spot with the same problem.
-              // See NavGrid.findNearestReachableCell's own doc comment.
-              const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, other.x, other.z, true);
-              other.x = nearest.x;
-              other.z = nearest.z;
-            }
+          if (footprintRegion) {
+            relocateFootprintOccupants(state, footprintRegion);
           }
           report.building = {
             outcome: 'built',
@@ -306,6 +290,13 @@ export function applyTaskCompletion(
           addIncome(state.finances, order.cost, 'refund',
             `Construction cancelled: ${order.type} T${order.tier} (${result.error})`, state.tickCount);
           state.plannedBuildings.splice(orderIdx, 1);
+          // The footprint has been blocked since order time (#1200) — a
+          // failed/refunded completion must free it, same as a cancelled
+          // order does (buildOrder.ts's cancellation path).
+          if (grid) {
+            const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
+            emitFootprintRegionChanged(emitter, grid, order.x, order.z, sizeX, sizeZ);
+          }
           report.building = {
             outcome: 'failed',
             type: order.type,

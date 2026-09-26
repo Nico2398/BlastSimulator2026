@@ -15,6 +15,8 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { levelGroundRect } from '../mining/LevelGround.js';
 import { DEFAULT_GRID_SIZE } from '../config/balance.js';
+import { NavGrid } from '../nav/NavGrid.js';
+import { regionForColumns } from '../nav/NavGridSync.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
 export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
@@ -52,4 +54,46 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
 /** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
 export function refreshLogisticsCapacity(state: GameState): void {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+}
+
+/**
+ * Emit `nav:occupancy_changed` for a footprint of `sizeX`x`sizeZ` anchored
+ * at (x, z) — the one shared implementation for every call site that needs
+ * NavGridSync to re-patch a footprint's region without a voxel carve
+ * (construction success, construction failure/refund, and the console-layer
+ * destroy/upgrade/move commands via `buildingHelpers.ts`'s wrapper). Used to
+ * be copied three times (#1200 finding).
+ */
+export function emitFootprintRegionChanged(
+  emitter: EventEmitter,
+  grid: VoxelGrid,
+  x: number,
+  z: number,
+  sizeX: number,
+  sizeZ: number,
+): void {
+  emitter.emit('nav:occupancy_changed', { region: regionForColumns(makeFootprintRegion(x, z, sizeX, sizeZ), grid) });
+}
+
+/**
+ * Move every alive employee standing inside `region` (a footprint's world
+ * cells) to the nearest reachable free cell — called whenever a footprint
+ * newly blocks routing: ordering, completing, upgrading or moving a
+ * building (#1200).
+ */
+export function relocateFootprintOccupants(state: GameState, region: BlastRegion): void {
+  if (!state.navGrid) return;
+  for (const emp of state.employees.employees) {
+    if (!emp.alive) continue;
+    const cx = Math.round(emp.x);
+    const cz = Math.round(emp.z);
+    if (cx < region.minX || cx > region.maxX || cz < region.minZ || cz > region.maxZ) continue;
+    // avoidOccupancy: true — same fragment-/vehicle-occupancy rule foot
+    // travel obeys (#954) gates the cell relocated onto, so this sweep
+    // never "rescues" someone from a newly-blocked footprint straight into
+    // another occupied cell. See NavGrid.findNearestReachableCell's doc.
+    const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, emp.x, emp.z, true);
+    emp.x = nearest.x;
+    emp.z = nearest.z;
+  }
 }

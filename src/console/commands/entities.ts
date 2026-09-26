@@ -26,28 +26,16 @@ import { releaseOccupantsOfRemovedBuildings } from '../../core/engine/Mount.js';
 
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
-import { makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity } from './buildingHelpers.js';
-import { regionForColumns } from '../../core/nav/NavGridSync.js';
+import {
+  makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity,
+  emitFootprintOccupancyChanged, relocateFootprintOccupants,
+} from './buildingHelpers.js';
 import { orderBuildingCommand } from './buildOrder.js';
 import { t } from '../../core/i18n/I18n.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.
 export { employeeCommand } from './employees.js';
-
-/**
- * Emit `nav:occupancy_changed` for a building's footprint (destroy/upgrade/
- * move), no-op when no grid exists yet (pre-game). Shared by the three
- * buildCommand branches below that touch occupancy without carving voxels.
- */
-function emitFootprintOccupancyChanged(
-  ctx: GameContext, x: number, z: number, sizeX: number, sizeZ: number,
-): void {
-  if (!ctx.grid) return;
-  ctx.emitter.emit('nav:occupancy_changed', {
-    region: regionForColumns(makeFootprintRegion(x, z, sizeX, sizeZ), ctx.grid),
-  });
-}
 
 // ── build command ──
 
@@ -176,6 +164,7 @@ export function buildCommand(
           ctx.grid, x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ, ctx.emitter,
         );
         emitFootprintOccupancyChanged(ctx, x, z, maxX, maxZ);
+        relocateFootprintOccupants(state, makeFootprintRegion(x, z, maxX, maxZ));
       }
       return {
         success: true,
@@ -238,6 +227,7 @@ export function buildCommand(
         );
         emitFootprintOccupancyChanged(ctx, oldX, oldZ, sizeX, sizeZ);
         emitFootprintOccupancyChanged(ctx, toCoords[0]!, toCoords[1]!, sizeX, sizeZ);
+        relocateFootprintOccupants(state, makeFootprintRegion(toCoords[0]!, toCoords[1]!, sizeX, sizeZ));
       }
       return { success: true, output: t('entities.build_move_success', { id, cost: result.cost! }) };
     }

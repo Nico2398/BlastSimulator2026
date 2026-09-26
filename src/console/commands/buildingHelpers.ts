@@ -8,12 +8,12 @@
 // console-facing `siteBounds(ctx: GameContext)` wrapper so existing call
 // sites (`siteBounds(ctx)`) need no edits.
 
-import { siteBoundsForGrid } from '../../core/engine/BuildingTaskHelpers.js';
+import { siteBoundsForGrid, emitFootprintRegionChanged } from '../../core/engine/BuildingTaskHelpers.js';
 import type { GameContext } from './world.js';
 
 export {
   makeFootprintRegion, levelBuildingFootprint,
-  refreshLogisticsCapacity,
+  refreshLogisticsCapacity, relocateFootprintOccupants,
 } from '../../core/engine/BuildingTaskHelpers.js';
 
 /**
@@ -23,4 +23,16 @@ export {
  */
 export function siteBounds(ctx: GameContext): { width: number; depth: number; originX: number; originZ: number } {
   return siteBoundsForGrid(ctx.grid ?? null);
+}
+
+/**
+ * Emit `nav:occupancy_changed` for a building's footprint (destroy/upgrade/
+ * move), no-op when no grid exists yet (pre-game). Shared by the three
+ * buildCommand branches below that touch occupancy without carving voxels.
+ */
+export function emitFootprintOccupancyChanged(
+  ctx: GameContext, x: number, z: number, sizeX: number, sizeZ: number,
+): void {
+  if (!ctx.grid) return;
+  emitFootprintRegionChanged(ctx.emitter, ctx.grid, x, z, sizeX, sizeZ);
 }

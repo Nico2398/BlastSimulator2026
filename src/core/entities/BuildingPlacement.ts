@@ -5,7 +5,7 @@
 // `checkFootprintPlacement` (#1008) — this file no longer duplicates it.
 
 import { type VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
-import { getBuildingDef, type Building } from './Building.js';
+import { getBuildingDef, type FootprintOccupant } from './Building.js';
 
 // Re-exported so `Building.ts` (the real placement path) can take a `VoxelGrid`
 // parameter without importing `../world/VoxelGrid.js` directly (#1008).
@@ -21,12 +21,13 @@ export function getSurfaceY(voxelGrid: VoxelGrid, x: number, z: number): number 
 
 /**
  * Returns true if the absolute grid cell (ax, az) falls within the given
- * building's footprint.
+ * occupant's footprint (a live `Building` or a still-planned
+ * `FootprintOccupant`, #1200).
  */
-export function isBuildingFootprintCell(building: Building, ax: number, az: number): boolean {
-  const def = getBuildingDef(building.type, building.tier);
+export function isBuildingFootprintCell(occupant: FootprintOccupant, ax: number, az: number): boolean {
+  const def = getBuildingDef(occupant.type, occupant.tier);
   for (const [dx, dz] of def.footprint) {
-    if (building.x + dx === ax && building.z + dz === az) return true;
+    if (occupant.x + dx === ax && occupant.z + dz === az) return true;
   }
   return false;
 }

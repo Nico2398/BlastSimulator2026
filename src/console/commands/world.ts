@@ -18,7 +18,7 @@ import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type Serialize
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
-import { regionForColumns, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
+import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -75,7 +75,10 @@ export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | nu
     ? {
         navGrid: ctx.state.navGrid,
         grid: ctx.grid,
-        buildings: ctx.state.buildings.buildings,
+        // Planned buildings block routing from the instant they're ordered
+        // (#1200), same as a finished one — buildingFootprintOccupants is the
+        // one place live+planned footprints are concatenated.
+        buildings: buildingFootprintOccupants(ctx.state),
         drillHoles: ctx.state.drillHoles,
       }
     : null;
@@ -236,7 +239,7 @@ export function regenerateGrid(
   ctx.landscape = null; // stale for the new grid — rebuilt lazily by ensureLandscape() (#458 T2.1)
   ctx.playableArea = new PlayableArea(ctx.grid, config);
   syncWorldBounds(ctx.state, ctx.grid);
-  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   // Terrain only exists now, so this is the first moment a spawn point picked
   // blind (staffed roster, campaign level literals) can be checked against it.
   // On a game's first grid the whole crew is regrouped onto one patch of
@@ -244,7 +247,7 @@ export function regenerateGrid(
   // because the vehicles carried their own `vehicleOccupied` cells with them.
   // Everywhere else — a save load — only genuinely stranded agents move.
   if (params.startingCrew && placeStartingCrew(ctx.state)) {
-    buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+    buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   snapAgentsToNavigableGround(ctx.state);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
@@ -305,7 +308,7 @@ function restoreGrid(ctx: GameContext, grid: VoxelGrid): void {
   const config = terrainConfigOf(ctx.state);
   ctx.playableArea = config ? new PlayableArea(ctx.grid, config) : null;
   syncWorldBounds(ctx.state, ctx.grid);
-  buildGameNavGrid(ctx.state, ctx.grid, ctx.state.buildings.buildings, ctx.state.drillHoles);
+  buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
 
