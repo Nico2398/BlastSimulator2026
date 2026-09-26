@@ -17,6 +17,14 @@ import { SCORE_DECAY_RATE } from '../config/balance.js';
 export function serialize(state: GameState): string {
   return JSON.stringify(state, (key, value) => {
     if (key === 'navGrid') return undefined;
+    // agentOccupancy (#1206): never rebuilt per tick, only lazily on the
+    // first tick after enable (tickLocomotion). Its two Map fields have no
+    // own enumerable JSON-representable state — JSON.stringify would
+    // silently flatten them to `{}`, and reloading that plain object throws
+    // on the first call to any of its prototype methods. Drop it here like
+    // navGrid; deserialize always sets it back to `null` and the next tick
+    // rebuilds it from live state.
+    if (key === 'agentOccupancy') return undefined;
     // Render-only walk trail (#1199): transient, a save never carries one.
     if (key === 'walkTrail') return undefined;
     if (value instanceof Set) return { __type: 'Set', values: [...value] };
@@ -692,6 +700,12 @@ export function deserialize(json: string): GameState {
   // null here, regardless of what an older save happened to carry. The
   // loader is responsible for rebuilding a real one.
   (obj as Record<string, unknown>)['navGrid'] = null;
+
+  // #1206: agentOccupancy is never part of the JSON (see serialize's
+  // replacer) — always null here, regardless of what an older save happened
+  // to carry. tickLocomotion rebuilds it from live state the first tick it
+  // runs while agentOccupancyEnabled is true and agentOccupancy is null.
+  (obj as Record<string, unknown>)['agentOccupancy'] = null;
 
   return obj as unknown as GameState;
 }

@@ -610,20 +610,26 @@ function controllingEmployee(state: GameState, occupant: Occupant): Employee | u
  * `occupancy.cellOfOccupant` at the call site — see `advanceLeg`).
  *
  * The ladder, in order, once `AGENT_OCCUPANCY_WAIT_TICKS` have elapsed:
- * 1. a one-shot reroute avoiding every occupied cell (unless the leg's own
- *    destination cell is ITSELF currently held by another occupant — no
- *    point routing "around" every occupied cell when one of them is the very
- *    cell that has to be reached; a route to an occupied destination can
- *    never be found no matter how many times it retries);
- * 2. failing that, a deterministic sideways step when the blocker is itself
- *    stuck and this requester's controlling employee outranks (has the
- *    numerically higher id than) the blocker's — the lower id always holds
- *    its ground, so the pair can never both step aside into each other;
- * 3. failing that, "destination spreading" — retargeting the leg's own
- *    destination to the nearest free cell around it — but only for a leg
- *    whose arrival step actually needs an exact, unshared cell (never a
- *    `board`/`enter_building` arrival, which must reach the specific
- *    vehicle/building it names);
+ * 1. a one-shot reroute avoiding every occupied cell — but only when the
+ *    leg's own destination cell is NOT itself currently held by another
+ *    occupant; when the destination itself is held, step 1 (and, nested
+ *    entirely inside it, step 2 below) is skipped altogether and the ladder
+ *    falls straight to step 3 — no point routing "around" every occupied
+ *    cell when one of them is the very cell that has to be reached; a route
+ *    to an occupied destination can never be found no matter how many times
+ *    it retries;
+ * 2. reachable only inside step 1's branch (i.e. only when the destination
+ *    is not itself held), and only once a reroute attempt has failed: a
+ *    deterministic sideways step, taken when the blocker is itself stuck and
+ *    this requester's controlling employee outranks (has the numerically
+ *    higher id than) the blocker's — the lower id always holds its ground,
+ *    so the pair can never both step aside into each other;
+ * 3. failing either of the above — including whenever the destination itself
+ *    was held, which skips straight here — "destination spreading":
+ *    retargeting the leg's own destination to the nearest free cell around
+ *    it, but only for a leg whose arrival step actually needs an exact,
+ *    unshared cell (never a `board`/`enter_building` arrival, which must
+ *    reach the specific vehicle/building it names);
  * 4. neither resolves — the same stuck/abandon escalation
  *    `handleOccupancyBlock` already has for vehicles, unchanged, now
  *    reachable for a foot agent too.

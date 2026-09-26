@@ -215,6 +215,11 @@ export interface Employee {
    * blocker, and a blocker on a chokepoint livelocks the driver in front of
    * it. Held only while that cell is genuinely still occupied; cleared by
    * Locomotion.ts the moment it frees up or the leg completes.
+   *
+   * Also latched by `handleAgentOccupancyBlock`'s tie-break sidestep (#1206)
+   * for a foot leg detouring around another agent's held cell — the same
+   * latch, not a vehicle-only one despite the field's name (kept for its 27
+   * dependent call sites).
    */
   vehicleDetourX?: number | null;
   vehicleDetourZ?: number | null;
@@ -267,10 +272,13 @@ export interface Employee {
    */
   itinerary: Itinerary | null;
   /**
-   * Consecutive ticks a mounted-but-not-yet-departed employee has spent
-   * waiting on their vehicle (e.g. a seat reserved but the drive leg not yet
-   * startable) — #1089's mirror of moveConsecutiveFailures for the
-   * vehicle-wait case tickLocomotion will own.
+   * Consecutive ticks the employee has spent stalled waiting on something
+   * other than a path failure — originally a mounted-but-not-yet-departed
+   * employee waiting on their vehicle (e.g. a seat reserved but the drive leg
+   * not yet startable, #1089's mirror of moveConsecutiveFailures for the
+   * vehicle-wait case), and since (#1206) also incremented for a foot agent
+   * stalled by `handleAgentOccupancyBlock`'s occupancy ladder. Kept under its
+   * original name (27 dependent call sites) despite covering both cases.
    */
   vehicleWaitingTicks: number;
 }
