@@ -15,6 +15,7 @@ import type { GhostMesh } from './GhostMesh.js';
 import type { RampArrowLayer } from './RampArrow.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
+import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
 import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { TerrainMesh } from './TerrainMesh.js';
@@ -44,6 +45,8 @@ export interface SyncDeps {
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
+  /** Optional: absent from existing GameRenderer.ts call sites until #1205's wiring lands there. */
+  buildingOccupancyLabels?: BuildingOccupancyLabels | null;
   skybox: SkyboxWeather | null;
   clouds: CloudLayer | null;
   zone: ZoneBounds | null;
