@@ -396,7 +396,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'focusTile': {
-      await page.evaluate(({ x, z, distance, pitch, yaw }: { x: number; z: number; distance: number; pitch?: number; yaw?: number }) => {
+      await page.evaluate(({ x, z, distance, pitch, yaw }: { x: number; z: number; distance: number; pitch: number | undefined; yaw: number | undefined }) => {
         (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
         if (yaw !== undefined || pitch !== undefined) {
           (window as unknown as { __cameraOrbit: (yaw?: number, pitch?: number) => void }).__cameraOrbit(yaw, pitch);
