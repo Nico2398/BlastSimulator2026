@@ -7,8 +7,6 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import type { EventEmitter } from '../state/EventEmitter.js';
-import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
@@ -39,15 +37,6 @@ export interface ArrivalGateResult {
    * reason. Always empty for the same reason as `driversBoarded` above.
    */
   boardingCancelled: Array<{ employeeId: number; reason: 'vehicle_gone' | 'vehicle_taken' | 'vehicle_moved' | string }>;
-  /**
-   * Training enrolments whose walk-in ended (school demolished, or full at
-   * arrival) without the employee ever entering the building (#1203) — the
-   * same shape as `EmployeeTraining.tickTraining`'s own mid-course
-   * cancellation, refunded and reported the same way by the caller
-   * (TickPipeline.ts), which concatenates both into one
-   * `TickReport.trainingCancellations` array.
-   */
-  trainingCancelled: TrainingCancellation[];
 }
 
 /**
@@ -64,12 +53,8 @@ export interface ArrivalGateResult {
  * `grid`, when provided, is threaded through to a vehicle-gated action's own
  * seedTaskTimerFields call below so a `dig_ramp_segment` action's duration
  * can be computed off the live voxel count (#924).
- *
- * `emitter`, when provided, carries the same `employee:training_cancelled`
- * event `tickTraining` emits for its own cancellation path — used here for
- * a training walk-in that ended (arrived) without ever entering the school.
  */
-export function tickArrivalGate(state: GameState, grid?: VoxelGrid, emitter?: EventEmitter): ArrivalGateResult {
+export function tickArrivalGate(state: GameState, grid?: VoxelGrid): ArrivalGateResult {
   // #1092: an evacuation driver is dismounted by their own itinerary's final
   // `alight` arrival step (Zone.ts's clearZone, via MoveTo's alightOnArrival)
   // the tick the drive lands, so there is no separate arrived-driver sweep
@@ -80,7 +65,6 @@ export function tickArrivalGate(state: GameState, grid?: VoxelGrid, emitter?: Ev
     trainingStarted: [],
     driversBoarded: [],
     boardingCancelled: [],
-    trainingCancelled: [],
   };
 
   for (const emp of state.employees.employees) {
@@ -123,32 +107,6 @@ export function tickArrivalGate(state: GameState, grid?: VoxelGrid, emitter?: Ev
       emp.trainingState = emp.pendingTrainingState!;
       emp.pendingTrainingState = null;
       result.trainingStarted.push(emp.id);
-    } else if ((emp.pendingTrainingState ?? null) !== null) {
-      // Stranded walk-in (#1203): the walk this employee took toward the
-      // school has ended (arrived === true, above) but they never entered
-      // it — the school was demolished out from under them, or was full the
-      // moment they reached it (isSchoolFull/enterBuilding refusing at
-      // arrival). Left alone, pendingTrainingState would stay set forever:
-      // isEnrolledInTraining reads it as "still enrolled", which permanently
-      // blocks both a future enrolment and ForceShiftRest/NeedRestoration
-      // from ever resting this employee again, and the fee is never
-      // refunded. Cancel and refund here, the same tick the walk ends,
-      // mirroring tickTraining's own mid-course cancellation.
-      const pending = emp.pendingTrainingState!;
-      emp.pendingTrainingState = null;
-      result.trainingCancelled.push({
-        employeeId: emp.id,
-        employeeName: emp.name,
-        skill: pending.skill,
-        buildingId: pending.buildingId,
-        refund: pending.fee,
-      });
-      emitter?.emit('employee:training_cancelled', {
-        employeeId: emp.id,
-        skill: pending.skill,
-        buildingId: pending.buildingId,
-        refund: pending.fee,
-      });
     }
 
     if (emp.pendingTaskDuration !== null) {

@@ -11,6 +11,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
+import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
@@ -135,6 +136,20 @@ interface LocomotionResult {
    * real "moved with nobody ever driving it" bug.
    */
   vehiclesMoved: number[];
+  /**
+   * Training enrolments whose walk-in ended in a genuine `enter_building`
+   * arrival-step failure this tick — the school was demolished out from
+   * under the walking employee, or was full the moment `enterBuilding` was
+   * actually called (#1203). Detected here, at the exact tick and call site
+   * the failure occurs, rather than inferred after the fact from generic
+   * position/locomotion fields (see ArrivalGate.ts's own history: that
+   * inference misfired on synthetic "still walking"/"wrong building" test
+   * fixtures that never ran through a real walk). Same shape as
+   * `EmployeeTraining.tickTraining`'s own mid-course cancellation; the
+   * caller (TickPipeline.ts) refunds and reports both into one
+   * `TickReport.trainingCancellations` array.
+   */
+  trainingCancelled: TrainingCancellation[];
 }
 
 /**
@@ -145,7 +160,7 @@ interface LocomotionResult {
  * read-only mirror — MoveTo.ts's syncItineraryMirrors) does not move.
  */
 export function tickLocomotion(state: GameState, emitter?: EventEmitter): LocomotionResult {
-  const result: LocomotionResult = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [] };
+  const result: LocomotionResult = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [], trainingCancelled: [] };
 
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
@@ -278,6 +293,38 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     if (emp.itinerary !== itinerary) break;
 
     if (!ok) {
+      // Stranded walk-in (#1203): an `enter_building` arrival step just
+      // failed for real — the school was demolished out from under this
+      // employee mid-walk, or was full the instant `enterBuilding` was
+      // called (Mount.ts's enterBuilding returns the same failure shape for
+      // both). Detected here, at the one call site that actually knows this
+      // employee's walk to this building just failed this tick, rather than
+      // inferred later from generic locomotion/position fields — see
+      // ArrivalGate.ts's git history for why that inference is unsound (it
+      // cannot tell a genuinely stranded employee from one still mid-route,
+      // and misfired on synthetic test fixtures besides). Left uncancelled,
+      // pendingTrainingState would stay set forever: isEnrolledInTraining
+      // reads it as "still enrolled", permanently blocking both a future
+      // enrolment and rest, and the fee is never refunded.
+      const step = leg.onArrive;
+      if (step.kind === 'enter_building' && emp.pendingTrainingState != null
+        && emp.pendingTrainingState.buildingId === step.buildingId) {
+        const pending = emp.pendingTrainingState;
+        emp.pendingTrainingState = null;
+        result.trainingCancelled.push({
+          employeeId: emp.id,
+          employeeName: emp.name,
+          skill: pending.skill,
+          buildingId: pending.buildingId,
+          refund: pending.fee,
+        });
+        emitter?.emit('employee:training_cancelled', {
+          employeeId: emp.id,
+          skill: pending.skill,
+          buildingId: pending.buildingId,
+          refund: pending.fee,
+        });
+      }
       clearItineraryOnFailure(state, emp);
       break;
     }

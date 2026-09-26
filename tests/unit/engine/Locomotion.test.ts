@@ -549,6 +549,47 @@ describe('tickLocomotion', () => {
     expect(employee.itinerary).toBeNull();
   });
 
+  // #1203: a training enrolment's walk-in whose target school was demolished
+  // while the employee was still en route must not strand pendingTrainingState
+  // forever (isEnrolledInTraining reads it as "still enrolled", permanently
+  // blocking rest and a future enrolment, with the fee never refunded).
+  // Detected here — at the exact tick the `enter_building` arrival step
+  // itself fails — rather than inferred after the fact from generic
+  // position/locomotion fields (ArrivalGate.ts used to infer it there; that
+  // inference could not tell a genuinely stranded employee from one still
+  // mid-route and misfired on synthetic fixtures, so the detection moved to
+  // this call site instead).
+  it('cancels and refunds a training walk-in whose target school no longer exists when enter_building fails (#1203)', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    // Building id 999 deliberately absent from state.buildings.buildings —
+    // demolished out from under this employee's walk.
+    employee.pendingTrainingState = { buildingId: 999, skill: 'blasting', ticksRemaining: 50, fee: 500 };
+    employee.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 1, destZ: 0,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: 1, z: 0 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    const result = tickLocomotion(state);
+
+    expect(employee.pendingTrainingState).toBeNull();
+    expect(employee.itinerary).toBeNull();
+    expect(result.trainingCancelled).toHaveLength(1);
+    expect(result.trainingCancelled[0]).toMatchObject({
+      employeeId: employee.id,
+      skill: 'blasting',
+      buildingId: 999,
+      refund: 500,
+    });
+  });
+
   // #1178: with destinationX/Z now a read-only mirror rather than a second
   // movement source, "no itinerary" alone (regardless of destinationX/Z)
   // is the whole no-op condition — this boundary case (both null too) still
