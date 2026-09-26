@@ -22,7 +22,7 @@ import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDri
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
-import { tickLocomotion, openMovementTrails, handleAgentOccupancyBlock } from '../../../src/core/engine/Locomotion.js';
+import { tickLocomotion, openMovementTrails } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
@@ -1388,6 +1388,12 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     expect(moveTo(state, employee.id, { x: 10, z: 0 }).success).toBe(true);
+    // A real, alive employee — tickLocomotion's own reconcileAgentOccupancy
+    // sweep (run every tick before the movement loop) releases any occupant
+    // that doesn't correspond to a real, alive employee/vehicle, so a merely
+    // synthetic id here would be freed out from under this fixture before
+    // the mover ever reaches it.
+    const { employee: blockerEmployee } = hireEmployee(state.employees, 'driller', rng, 15, 0);
 
     // Pre-plant an occupant holding the cell two steps ahead of the mover
     // (AGENT_WALK_SPEED is 2 — a full tick's unobstructed hop would land
@@ -1395,7 +1401,7 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     // rather than via rebuildAgentOccupancy so this test isolates the
     // single-hop stop from the rebuild path entirely.
     const occupancy = new AgentOccupancy();
-    const blocker: Occupant = { kind: 'employee', id: 999 };
+    const blocker: Occupant = { kind: 'employee', id: blockerEmployee.id };
     expect(occupancy.tryMove(blocker, 2, 0)).toBe(true);
     state.agentOccupancy = occupancy;
 
@@ -1430,22 +1436,5 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     // change ordinary, uncontested movement.
     expect(employee.x).toBe(AGENT_WALK_SPEED);
     expect(employee.z).toBe(0);
-  });
-
-  it('handleAgentOccupancyBlock is still an unimplemented skeleton stub', () => {
-    const state = buildFlatNavGridState(20, 5);
-    state.agentOccupancyEnabled = true;
-    const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    const leg = {
-      mode: 'foot' as const, vehicleId: null, destX: 5, destZ: 0,
-      arrival: 'exact' as const, onArrive: { kind: 'none' as const }, estTicks: 3,
-    };
-    const result = { moved: [], arrived: [], stuck: [], abandoned: [], vehiclesMoved: [], trainingCancelled: [] };
-
-    expect(() => handleAgentOccupancyBlock(
-      state, employee, { kind: 'employee', id: employee.id }, leg, { x: 1, z: 0 },
-      new AgentOccupancy(), result,
-    )).toThrow('not implemented');
   });
 });

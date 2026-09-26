@@ -466,7 +466,20 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // as the entity's real position; only the abandon check below additionally
   // fires on it.
   if (outcome.pathFound) {
-    emp.vehicleWaitingTicks = 0;
+    // #1206: a hop this very tick that ran into another occupant
+    // (outcome.blockedByOccupant) must NOT reset the wait counter —
+    // findPath keeps reporting a genuine route to the destination for as
+    // long as the blocker sits on it (the terrain itself is never at
+    // fault), so `outcome.pathFound` reads true on every single tick of a
+    // head-on hold, occupancy block or not. Zeroing the counter here
+    // unconditionally wiped handleAgentOccupancyBlock's own escalation
+    // ladder (reroute/sidestep/destination-spread/abandon) back to 0 every
+    // tick before it could ever cross AGENT_OCCUPANCY_WAIT_TICKS, latching
+    // two agents blocking each other in place forever with no escalation
+    // ever firing.
+    if (!(occupancyActive && outcome.blockedByOccupant)) {
+      emp.vehicleWaitingTicks = 0;
+    }
     const fromX = emp.x;
     const fromZ = emp.z;
 
@@ -597,9 +610,11 @@ function controllingEmployee(state: GameState, occupant: Occupant): Employee | u
  * `occupancy.cellOfOccupant` at the call site — see `advanceLeg`).
  *
  * The ladder, in order, once `AGENT_OCCUPANCY_WAIT_TICKS` have elapsed:
- * 1. a one-shot reroute avoiding every occupied cell (unless the blocked hop
- *    IS the leg's own destination — no point routing "around" the one cell
- *    that has to be reached);
+ * 1. a one-shot reroute avoiding every occupied cell (unless the leg's own
+ *    destination cell is ITSELF currently held by another occupant — no
+ *    point routing "around" every occupied cell when one of them is the very
+ *    cell that has to be reached; a route to an occupied destination can
+ *    never be found no matter how many times it retries);
  * 2. failing that, a deterministic sideways step when the blocker is itself
  *    stuck and this requester's controlling employee outranks (has the
  *    numerically higher id than) the blocker's — the lower id always holds
@@ -613,7 +628,7 @@ function controllingEmployee(state: GameState, occupant: Occupant): Employee | u
  *    `handleOccupancyBlock` already has for vehicles, unchanged, now
  *    reachable for a foot agent too.
  */
-export function handleAgentOccupancyBlock(
+function handleAgentOccupancyBlock(
   state: GameState,
   emp: Employee,
   mover: Occupant,
@@ -637,9 +652,28 @@ export function handleAgentOccupancyBlock(
 
   const speed = isDrive ? getVehicleDefByTier(vehicle!.type, vehicle!.tier).speed : AGENT_WALK_SPEED;
   const requiredClearance = isDrive ? vehicleRequiredClearanceCells(vehicle!) : undefined;
-  const isBlockedHopTheDestination = blockedStep.x === leg.destX && blockedStep.z === leg.destZ;
+  // Whether the leg's own destination cell is currently held by SOME OTHER
+  // occupant — not merely whether THIS tick's blocked hop happens to be it.
+  // A mover several cells away from its destination can be blocked at an
+  // entirely different, intermediate cell (another agent standing in the
+  // corridor between here and there) on the very tick its destination is
+  // already unreachable for an unrelated reason (someone else parked there,
+  // e.g. a prior tick's own destination-spread from a different mover — see
+  // "four employees dispatched to the identical..." below). Gating the
+  // reroute-skip on `blockedStep` alone missed that case entirely: the
+  // reroute attempt below marks every occupied cell — including the
+  // destination itself — impassable, so a route TO an occupied destination
+  // can never be found no matter how many times it retries, yet
+  // `isBlockedHopTheDestination` stayed false forever (the immediate hop
+  // that keeps tripping is the intermediate cell, never the destination),
+  // so the one thing that could actually resolve it — retargeting the
+  // destination itself (below) — never triggered either. Checked once per
+  // call via the occupancy ledger directly, which is authoritative for
+  // "is X held by someone other than me" regardless of which cell this
+  // tick's own hop got blocked on.
+  const destinationHeldByOther = !occupancy.isFreeFor(mover, leg.destX, leg.destZ);
 
-  if (!isBlockedHopTheDestination) {
+  if (!destinationHeldByOther) {
     const reroute = findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
     if (reroute.found) {
       const outcome = advanceAlongPath({
@@ -711,14 +745,30 @@ export function handleAgentOccupancyBlock(
   // unshared cell (never a board/enter_building arrival, which must reach
   // the one specific vehicle/building cell it names) can have its target
   // relocated out from under it.
-  const needsExactUnsharedCell = isBlockedHopTheDestination && leg.arrival !== 'adjacent'
+  const needsExactUnsharedCell = destinationHeldByOther && leg.arrival !== 'adjacent'
     && (leg.onArrive.kind === 'none' || leg.onArrive.kind === 'effect');
   if (needsExactUnsharedCell) {
     const spread = findNearestFreeCellForAgent(state, mover, leg.destX, leg.destZ);
     if (spread) {
       leg.destX = spread.x;
       leg.destZ = spread.z;
-      emp.vehicleWaitingTicks = 0;
+      // Deliberately NOT resetting `vehicleWaitingTicks` here (unlike the
+      // reroute/sidestep branches above, both of which just moved the
+      // mover for real): a retarget alone is not a resolution, only a new
+      // target for the SAME still-blocked leg. Resetting the counter would
+      // force a fresh AGENT_OCCUPANCY_WAIT_TICKS-tick wait before the
+      // ladder gets to try anything at all against the new destination —
+      // even a reroute around an obstacle already known, from this very
+      // tick, to sit on the direct route to it. With several movers
+      // converging on the same crowded target and each retarget only
+      // costing a few ticks to resolve once actually attempted, that
+      // compounded, repeatedly-reset wait was enough on its own to blow
+      // through a generous tick budget while every OTHER mover (whose own
+      // reroute never needed to detour around anything) resolved in one
+      // step — reproduced live via this file's own "four employees
+      // dispatched to the identical exact target cell" test, where the
+      // slowest of the four never moved a single cell in 40 ticks despite
+      // a real route around the blocker existing the entire time.
       return 'blocked';
     }
   }
