@@ -8,9 +8,7 @@ import type { Employee } from '../entities/Employee.js';
 import { planItinerary, buildBoardLeg, hasFreeSeatFor } from './PlanItinerary.js';
 import { leaveBuildingIfInside } from './Mount.js';
 import { isMounted } from '../entities/EmployeeLocomotion.js';
-import { getBuildingDef, getBuildingPeopleCapacity } from '../entities/Building.js';
-import { findBuildingApproachCell, isOnBuildingRing } from '../nav/BuildingApproach.js';
-import type { Itinerary } from './Itinerary.js';
+import { getBuildingPeopleCapacity } from '../entities/Building.js';
 import { t } from '../i18n/I18n.js';
 
 type MoveResult = { success: true } | { success: false; error: string };
@@ -49,17 +47,29 @@ export function moveTo(
 /**
  * Walk to a building's ring and go inside it (#1202): the itinerary's last
  * leg ends on the approach cell nearest the employee
- * (`findBuildingApproachCell`) with an `enter_building` arrival step. A
+ * (`findBuildingApproachCell`, via planItinerary's own 'rest' goal
+ * resolution — PlanItinerary.ts) with an `enter_building` arrival step. A
  * building that takes no people is refused up front; one that is full when
  * the employee arrives refuses them there, leaving them on foot on its ring.
  * An employee in a vehicle is refused too — they alight first, since an
  * enter step is taken on foot and the vehicle they would park would stand on
  * the very cell they need.
+ *
+ * Shared by both callers that walk an employee into a building unseen: the
+ * training-enrolment walk (EmployeeTraining.ts) and the rest-travel walk
+ * (RestActionHelpers.ts's `beginRestTravel`, #1204) — both route through the
+ * same 'rest' planItinerary goal (see that goal's own doc comment for why the
+ * name is not building-type-specific: it means "enter this building", not
+ * "rest here").
  */
 export function moveTo(
   state: GameState,
   employeeId: number,
   target: { buildingId: number },
+  // `allowUnreachable` (#1204): threaded through to planItinerary — the same
+  // best-effort-route opt-in `beginRestTravel` already uses for the (x, z)
+  // overload above.
+  opts?: { allowUnreachable?: boolean },
 ): MoveResult;
 export function moveTo(
   state: GameState,
@@ -83,17 +93,24 @@ export function moveTo(
     }
     if (isMounted(employee.locomotion)) return { success: false, error: t('move_to.alight_first') };
 
-    const def = getBuildingDef(building.type, building.tier);
-    // Already on the ring: nothing to walk, the enter step alone — applied
-    // by the locomotion tick like any other arrival.
-    const itinerary = isOnBuildingRing(building, def, employee.x, employee.z)
-      ? standingItinerary(employee)
-      : planToCell(state, employee, findBuildingApproachCell(state.navGrid, building, def, employee.x, employee.z));
+    // Delegates to planItinerary's own 'rest' goal resolution (#1204) rather
+    // than a second, parallel findBuildingApproachCell + manual itinerary
+    // build — that goal already resolves to the ring approach cell and (via
+    // buildFootOnlyItinerary) sets the enter_building arrival step itself,
+    // including the "already on the ring" case (a zero-distance foot leg that
+    // arrives, and so applies its enter step, the same tick).
+    const itinerary = planItinerary(state, employee, { kind: 'rest', buildingId: building.id }, 'exact', { allowUnreachable: opts?.allowUnreachable ?? false });
     const last = itinerary?.legs[itinerary.legs.length - 1];
-    if (!itinerary || !last || last.mode !== 'foot' || last.onArrive.kind !== 'none') {
+    if (!itinerary || !last || last.mode !== 'foot' || (last.onArrive.kind !== 'none' && last.onArrive.kind !== 'enter_building')) {
       return { success: false, error: t('move_to.no_route_available') };
     }
-    last.onArrive = { kind: 'enter_building', buildingId: building.id };
+    // A caller reaching this point via some other goal shape that still
+    // produced 'none' (none does today — defensive) gets the same patch this
+    // branch always applied; a 'rest' goal's own foot leg already arrives
+    // pre-set to enter_building and is left untouched.
+    if (last.onArrive.kind === 'none') {
+      last.onArrive = { kind: 'enter_building', buildingId: building.id };
+    }
 
     employee.itinerary = itinerary;
     syncItineraryMirrors(employee);
@@ -136,24 +153,6 @@ export function moveTo(
   employee.itinerary = itinerary;
   syncItineraryMirrors(employee);
   return { success: true };
-}
-
-/** A reposition itinerary to `cell`, or null when the planner finds none. */
-function planToCell(state: GameState, employee: Employee, cell: { x: number; z: number }): Itinerary | null {
-  return planItinerary(state, employee, { kind: 'reposition', x: cell.x, z: cell.z }, 'exact');
-}
-
-/** A single zero-length foot leg on the employee's own cell — for an arrival step taken where they stand. */
-function standingItinerary(employee: Employee): Itinerary {
-  return {
-    legs: [{
-      mode: 'foot', vehicleId: null, destX: employee.x, destZ: employee.z,
-      arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 0,
-    }],
-    goal: { kind: 'reposition', x: employee.x, z: employee.z },
-    workTicks: 0,
-    estTotalTicks: 0,
-  };
 }
 
 /**

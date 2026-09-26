@@ -21,6 +21,8 @@ import { planItinerary, estimateLegDistance, findCheapestTransportItinerary, typ
 import type { Goal } from '../../../src/core/engine/Itinerary.js';
 import { AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
 import { octileHeuristic } from '../../../src/core/nav/Pathfinding.js';
+import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import { findBuildingApproachCell } from '../../../src/core/nav/BuildingApproach.js';
 
 const SEED = 42;
 
@@ -304,11 +306,23 @@ describe('planItinerary', () => {
     expect(itinerary).toBeNull();
   });
 
-  it("'rest' goal resolving against a real, existing building: single foot leg to its x/z, zero work ticks (mirrors 'reposition', exercising resolveGoal's building lookup on the success path)", () => {
+  // #1204: 'rest' used to resolve to the building's own (x, z) — its raw
+  // footprint origin, blocked on the NavGrid like every other building
+  // (BuildingApproach.ts's own doc comment) — with a plain {kind:'none'}
+  // arrival, which is the underlying bug behind #1204 (an employee resting
+  // visibly on the open ground in front of the living_quarters instead of
+  // disappearing inside it). The correct target is the building's ring
+  // approach cell (findBuildingApproachCell), and arrival must be
+  // {kind:'enter_building', buildingId} — mirroring the 'work' goal's own
+  // school-entry step #1202/#1203 already give the training walk.
+  it("'rest' goal resolving against a real, existing building: single foot leg to its ring APPROACH cell, ending in enter_building — not the building's own blocked (x, z) with a plain arrival (#1204)", () => {
     const state = makeState();
     const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
     const { success, building } = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
     expect(success).toBe(true);
+    const expectedApproach = findBuildingApproachCell(
+      state.navGrid, building!, getBuildingDef(building!.type, building!.tier), employee.x, employee.z,
+    );
 
     const goal: Goal = { kind: 'rest', buildingId: building!.id };
     const itinerary = planItinerary(state, employee, goal, 'exact');
@@ -317,9 +331,9 @@ describe('planItinerary', () => {
     expect(itinerary!.legs).toHaveLength(1);
     expect(itinerary!.legs[0]!.mode).toBe('foot');
     expect(itinerary!.legs[0]!.arrival).toBe('exact');
-    expect(itinerary!.legs[0]!.onArrive).toEqual({ kind: 'none' });
-    expect(itinerary!.legs[0]!.destX).toBe(building!.x);
-    expect(itinerary!.legs[0]!.destZ).toBe(building!.z);
+    expect(itinerary!.legs[0]!.onArrive).toEqual({ kind: 'enter_building', buildingId: building!.id });
+    expect(itinerary!.legs[0]!.destX).toBe(expectedApproach.x);
+    expect(itinerary!.legs[0]!.destZ).toBe(expectedApproach.z);
     expect(itinerary!.workTicks).toBe(0);
   });
 

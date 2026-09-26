@@ -186,6 +186,28 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(restAction!.targetX).not.toBe(farResult.building!.x);
   });
 
+  // #1204: beginRestTravel must thread the resolved living_quarters id
+  // through to moveTo(state, id, {buildingId}) so the employee disappears
+  // inside on arrival, instead of resting visibly on the open ground next to
+  // it — the itinerary's final arrival step is the tell: enter_building, not
+  // a plain reposition.
+  it('threads the resolved building id through beginRestTravel so the walk ends with an enter_building arrival step, not a plain reposition (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 20; // below the threshold of 25
+
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 0, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    tickNeedRestoration(state);
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.onArrive).toEqual({ kind: 'enter_building', buildingId: placed.building!.id });
+  });
+
   // #1013: computeEmployeeActivity must report actionType: 'rest' the
   // instant a warning-threshold employee starts walking to a living_quarters
   // — this is what lets EmployeePictograms.ts's pictogramKindFor distinguish
@@ -379,6 +401,30 @@ describe('tickCollapse (7.6)', () => {
     expect(restAction!.targetX).toBe(nearResult.building!.x);
     expect(restAction!.targetZ).toBe(nearResult.building!.z);
     expect(restAction!.targetX).not.toBe(farResult.building!.x);
+  });
+
+  // #1204: beginRestTravel must thread the resolved living_quarters id
+  // through to moveTo(state, id, {buildingId}) so a collapsed employee
+  // disappears inside on arrival, instead of resting visibly in the open —
+  // the itinerary's final arrival step is the tell: enter_building, not a
+  // plain reposition.
+  it('threads the resolved building id through beginRestTravel so the collapse walk ends with an enter_building arrival step (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.fatigue = 0;
+    employee.x = 0;
+    employee.z = 0;
+
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(placed.success).toBe(true);
+
+    tickCollapse(state);
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.onArrive).toEqual({ kind: 'enter_building', buildingId: placed.building!.id });
   });
 
   // ── Test 3 ──────────────────────────────────────────────────────────────────

@@ -377,12 +377,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 16",
-      "description": "#928: widened from `tick 6` -- see this cycle's own two extra tick-10/event pairs above for why.",
+      "command": "tick 40",
+      "description": "#928: widened from `tick 6` -- see this cycle's own two extra tick-10/event pairs above for why. #1204: widened again, 16 -> 40 -- completeRestForEmployee (RestActionHelpers.ts) now caps a rest taken too far from any living_quarters at NEED_REST_NO_BUILDING_CAP instead of unconditionally full-restoring via a distance-blind findNearestLivingQuarters lookup that ignored needRestSearchRadius entirely (the fix's own doc comment: 'not re-derived from the employee's current position'). This grid's living_quarters at (8,58) sits ~40 cells from the (20,20) drill site, past the 20-cell search radius, so the driller's fatigue-driven rests here now land in the degraded, capped branch and recur more often -- direct-traced (command mode): chargedCount reaches 4 by tick 224 (60 ticks after this step starts), not by the old tick 16 budget's tick 213; widened to 40 for margin.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 16"
+          "command": "tick 40"
         }
       ],
       "role": "setup",
@@ -503,6 +503,29 @@
           "type": "clickIfPresent",
           "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
           "timeoutMs": 2000
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "vehicle scrap 1",
+      "description": "#1204: this cycle's own drill_rig #1 used to end every run destroyed by the blast above -- parked at the (20,20) drill site the whole time, since the driller never had reason to leave before finishing all 4 charges. Widening the tick step above (#1204's own rest-cap fix, see that step's comment) now gives the driller's own fatigue an extra proactive rest round-trip that completes -- alighting the vehicle at the living_quarters ring, done for good once no more same-role work is claimable (hasClaimableSameRoleFollowUp) -- before the blast ever fires, so the truck survives it and sits idle at (11,57) instead. Every later cycle's own `vehicle buy` step asserts vehicleCount resets to exactly 1, so it is scrapped explicitly here rather than left to rely on the blast destroying it by coincidence. Scoped by [data-vtype=\"drill_rig\"] (this cycle's only vehicle, and its only drill_rig) rather than a runtime-assigned [data-vehicle-id], matching the shape-selector convention `.claude/rules/scenario-defs.md`/#654 established over a baked id.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"] .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player"

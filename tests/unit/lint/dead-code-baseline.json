@@ -75,7 +75,6 @@
     "src/core/engine/GameLoop.ts:seedTaskTimerFields",
     "src/core/engine/GameLoop.ts:selectBestActionForEmployee",
     "src/core/engine/GameLoop.ts:tickNeedRestoration",
-    "src/core/engine/ShiftCycle.ts:completeRestTick",
     "src/core/engine/ShiftCycle.ts:incrementWorkTick",
     "src/core/engine/TaskDispatch.ts:CancelActionResult",
     "src/core/engine/TaskDispatch.ts:DispatchRejectionReason",

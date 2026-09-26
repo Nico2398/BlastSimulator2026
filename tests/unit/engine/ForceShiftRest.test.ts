@@ -115,6 +115,29 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     expect(employee.destinationZ).not.toBe(employee.z);
   });
 
+  // #1204: finishForceRest's shared tail must thread the resolved
+  // living_quarters id through to beginRestTravel/moveTo(state, id,
+  // {buildingId}) so the employee disappears inside on arrival, instead of
+  // resting visibly on the open ring — the itinerary's final arrival step is
+  // the tell: enter_building, not a plain reposition.
+  it('threads the resolved building id through beginRestTravel so the walk ends with an enter_building arrival step (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 200;
+    employee.ticksWorked = WORK_DURATION_TICKS;
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const placed = placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 2);
+    expect(placed.success).toBe(true);
+
+    forceShiftRestIfNeeded(state, employee, [], []);
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.onArrive).toEqual({ kind: 'enter_building', buildingId: placed.building!.id });
+  });
+
   // #1013: computeEmployeeActivity must report actionType: 'rest' the
   // instant finishForceRest starts the walk — the same pictogram-
   // distinguishability bug NeedRestoration.test.ts's own #1013 tests pin for
@@ -612,6 +635,28 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     expect(employee.destinationX).not.toBe(employee.x);
     expect(employee.destinationZ).not.toBe(employee.z);
+  });
+
+  // #1204: mirrors the legacy forceShiftRestIfNeeded test above — finishForceRest's
+  // shared tail must thread the resolved living_quarters id through to
+  // beginRestTravel/moveTo(state, id, {buildingId}) here too, so the employee
+  // disappears inside on arrival instead of resting visibly on the open ring.
+  it('threads the resolved building id through beginRestTravel so the walk ends with an enter_building arrival step (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 402;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    const placed = placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.onArrive).toEqual({ kind: 'enter_building', buildingId: placed.building!.id });
   });
 
   // #1013: mirrors the legacy forceShiftRestIfNeeded test above — the

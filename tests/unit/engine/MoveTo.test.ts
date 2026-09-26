@@ -386,4 +386,63 @@ describe('moveTo — into a building (#1202)', () => {
     expect({ x: employee.x, z: employee.z }).toEqual({ x: 9, z: 10 });
     expect(employee.itinerary).not.toBeNull();
   });
+
+  // #1204: beginRestTravel is about to start routing a building-backed rest
+  // walk through this exact overload, `moveTo(state, id, {buildingId})` —
+  // the training call-site's own shape, no `opts` argument at all. This pins
+  // that refactor to a shared rest-goal planner never changes what today's
+  // one caller (enrolInTraining) gets: byte-identical target cell and
+  // enter_building step, called with the 2-arg shape exactly as it is today.
+  it('regression (#1204): called with no opts argument at all (the training call-site shape) produces the identical itinerary shape', () => {
+    const { state, school } = setupSchool();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+
+    const result = moveTo(state, employee.id, { buildingId: school.id });
+
+    expect(result.success).toBe(true);
+    const last = employee.itinerary!.legs[employee.itinerary!.legs.length - 1]!;
+    expect(last.mode).toBe('foot');
+    expect(last.onArrive).toEqual({ kind: 'enter_building', buildingId: school.id });
+    expect({ x: last.destX, z: last.destZ }).toEqual({ x: 9, z: 9 });
+  });
+});
+
+// #1204: rest-inside-building routing needs the same best-effort-route
+// opt-in beginRestTravel already uses for the (x, z) overload (#1178) — a
+// momentarily unreachable school/living_quarters still installs a retrying
+// itinerary instead of refusing the whole rest/enrolment outright.
+describe('moveTo — into a building with allowUnreachable (#1204)', () => {
+  /** A tier-1 driving_center far from the employee, separated by a solid wall. */
+  function setupUnreachableSchool() {
+    const state = createGame({ seed: SEED });
+    const school = placeBuilding(state.buildings, 'driving_center', 20, 2, 64, 64).building!;
+    const grid = makeFlatNavGrid(30, 10);
+    blockColumn(grid, 10); // seals off everything east of x=10 from the employee's side
+    state.navGrid = grid;
+    return { state, school };
+  }
+
+  it('WITHOUT allowUnreachable, a building unreachable right now is refused (baseline for the next test)', () => {
+    const { state, school } = setupUnreachableSchool();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 2);
+
+    const result = moveTo(state, employee.id, { buildingId: school.id });
+
+    expect(result.success).toBe(false);
+    expect(employee.itinerary).toBeNull();
+  });
+
+  it('WITH allowUnreachable:true, the identical unreachable-right-now building still installs a best-effort itinerary ending in enter_building', () => {
+    const { state, school } = setupUnreachableSchool();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 2);
+
+    const result = moveTo(state, employee.id, { buildingId: school.id }, { allowUnreachable: true });
+
+    expect(result.success).toBe(true);
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBeGreaterThan(0);
+    const last = legs[legs.length - 1]!;
+    expect(last.onArrive).toEqual({ kind: 'enter_building', buildingId: school.id });
+  });
 });
