@@ -1472,6 +1472,60 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     expect(blocker.z).toBe(1);
   });
 
+  it("#1259: destination-spreading onto the mover's own already-held cell still clears isMoveStuck instead of latching it from the wait leading up to it", () => {
+    // A blocker parked exactly ON the mover's leg destination, with no
+    // itinerary of its own — it never moves for the whole test, so
+    // `destinationHeldByOther` reads true from the very first blocked tick
+    // and handleAgentOccupancyBlock's ladder skips straight to step 3
+    // (destination-spreading), never reaching the reroute/sidestep steps.
+    const state = buildFlatNavGridState(5, 5);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 2, 2);
+    // One cell short of the blocker's held cell — findNearestFreeCell's own
+    // ring search around the leg's destination (2, 2) reaches the mover's
+    // own current cell (1, 2) at distance 1, the same distance as every
+    // other free ring cell, and it is scanned first — so the spread
+    // retargets the leg onto the exact cell the mover already stands on.
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 1, 2);
+
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 2, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: 2, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    // AGENT_OCCUPANCY_WAIT_TICKS of passive waiting flips isMoveStuck true
+    // (STUCK_THRESHOLD is far smaller) well before the ladder ever fires —
+    // exactly the state a genuinely resolved mover must not stay latched
+    // into. A couple more ticks let the spread actually retarget the leg and
+    // the next tick's now-instant arrival (isLegArrived true before
+    // advanceLeg is ever called, since the retargeted destination equals
+    // the mover's own position) apply its arrival step.
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 2; i++) {
+      tickLocomotion(state);
+    }
+
+    // The mover's own leg completed (onto its own held cell) instead of
+    // ever genuinely being stuck — before #1259's fix, this loop's
+    // isLegArrived-at-top-of-loop branch never ran advanceLeg for this
+    // "already there" arrival, so isMoveStuck/moveConsecutiveFailures never
+    // got the same reset an ordinary successful advance already receives,
+    // and stayed latched from the wait above forever.
+    expect(mover.isMoveStuck).toBe(false);
+    expect(mover.moveConsecutiveFailures).toBe(0);
+    // The blocker was never displaced — it held its ground the entire test,
+    // which is exactly why the destination stayed held and the spread (not
+    // a reroute around a mobile blocker) is what resolved this.
+    expect(blocker.x).toBe(2);
+    expect(blocker.z).toBe(2);
+  });
+
   it('with agentOccupancyEnabled false, movement is identical to the flag-absent baseline (regression pin)', () => {
     const state = buildFlatNavGridState(20, 5);
     state.agentOccupancyEnabled = false;

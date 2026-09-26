@@ -293,6 +293,31 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
       }
       if (outcome === 'blocked') break;
       if (!isLegArrived(emp.x, emp.z, leg)) break;
+    } else if (emp.isMoveStuck || emp.moveConsecutiveFailures > 0) {
+      // #1206/#1259: this leg was already arrived the instant it became
+      // current — a genuine zero-length leg, or handleAgentOccupancyBlock's
+      // own destination-spread (below) retargeting leg.destX/destZ onto the
+      // cell the agent is already standing on (its own held cell was itself
+      // among the free cells the spread's ring search considered). Either
+      // way this loop never calls advanceLeg for it, so the ordinary
+      // isStuck/consecutiveFailures reset that only ever runs inside
+      // advanceAlongPath's resetStuckState (on a genuine, non-oscillating
+      // advance) never fires. Left stale, a mover that spent
+      // AGENT_OCCUPANCY_WAIT_TICKS+ blocked before the spread resolved it —
+      // latching isMoveStuck true and consecutiveFailures at STUCK_THRESHOLD
+      // in the process — stays permanently misreported as stuck
+      // (`stuckEmployeeCount`, console-api.ts, reads isMoveStuck directly)
+      // even though this arrival is real forward progress and the action
+      // goes on to complete normally: reproduced live via
+      // ramp-foot-traffic.json, six employees dispatched into a
+      // RAMP_WIDTH=3 corridor at the identical exact target cell, where the
+      // slowest of the six arrives (via exactly this spread-onto-self path)
+      // with its action completing but isMoveStuck never clearing again for
+      // the rest of the run. Arriving — by any path — is never itself a
+      // stuck outcome; the same reset an ordinary successful advance already
+      // gets belongs here too.
+      emp.isMoveStuck = false;
+      emp.moveConsecutiveFailures = 0;
     }
 
     const ok = applyArrivalStep(state, emp, leg, itinerary, emitter);
