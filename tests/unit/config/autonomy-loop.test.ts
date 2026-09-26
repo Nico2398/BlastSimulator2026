@@ -24,7 +24,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { registeredHooks, runHook, type HookRegistry } from '../../helpers/claudeHooks';
-import { evaluateTemplate } from '../../helpers/actionsExpression';
+import { evaluateExpression, evaluateTemplate } from '../../helpers/actionsExpression';
 
 const require = createRequire(import.meta.url);
 
@@ -136,7 +136,6 @@ describe('entry points into the assignment queue', () => {
     (name) => {
       const text = workflow(name);
       expect(text).not.toContain(ASSIGN_ACTION);
-      expect(text).toContain(AUTO_MERGE_ACTION);
     }
   );
 });
@@ -557,92 +556,130 @@ describe('the entry points cannot race', () => {
     expect(concurrency).toContain('cancel-in-progress: false');
   });
 
-  // Arming auto-merge must stay outside that group. GitHub keeps one pending run
-  // per group and drops the rest, and a dropped arming run is a PR that never
-  // merges — which holds its issue and the whole queue behind it.
-  it('leaves auto-merge arming out of the group', () => {
+  // Waking the merge gate must stay outside that group. GitHub keeps one
+  // pending run per group and drops the rest, and a dropped wake-up is a PR
+  // nobody looks at again.
+  it('leaves the merge-gate wake-up out of the group', () => {
     const chain = workflow('auto-assign-next.yml');
-    const arm = chain.indexOf(AUTO_MERGE_ACTION);
-    const armJob = chain.slice(chain.indexOf('  arm-auto-merge:'), arm);
-    expect(arm).toBeGreaterThan(-1);
-    expect(armJob).not.toContain('agentic-assignment');
+    const wake = chain.slice(chain.indexOf('  wake-merge-gate:'), chain.indexOf('  chain-next-task:'));
+    expect(wake).toContain('createWorkflowDispatch');
+    expect(wake).not.toContain('agentic-assignment');
   });
 });
 
-// PR #430 was opened by the pipeline, fully verified, marked `READY TO MERGE`,
-// and then sat open with zero checks. Its author was `github-actions[bot]`, and
-// every `pull_request` workflow run a bot-authored PR raises is created and
-// immediately parked as `action_required`: CI never started and the auto-merge
-// step never ran. So the run that opens the PR arms auto-merge itself, in the
-// same job, on the branch it was told to build — the one moment that exists
-// whoever the PR ends up attributed to.
-describe('auto-merge does not depend on the PR author', () => {
-  /** Every workflow that can put a PR into auto-merge. */
-  const MERGING_WORKFLOWS = [
-    'claude-runner.yml',
-    'opencode-runner.yml',
-    'auto-assign-next.yml',
-    'agentic-auto-merge.yml',
+// The merge gate is the one thing that merges. Before parallel runs, three
+// places could merge a pipeline PR — the runner that opened it, the chain
+// workflow on the PR's own events, and the CI-completion sweep — each deciding
+// on one PR's head alone. That is exactly the merge that lands two
+// separately-green pull requests onto a `main` no channel has run: harmless
+// while one session ran at a time and nothing else moved `main`, and the
+// defining hazard once several do.
+describe('the merge gate is the only thing that merges', () => {
+  const GATE = 'agentic-auto-merge.yml';
+  const actionSource = readFileSync(join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8');
+
+  const everyFile = [
+    ...readdirSync(join(ROOT, '.github/workflows')).map((name) => `.github/workflows/${name}`),
+    ...readdirSync(join(ROOT, '.github/actions')).map((name) => `.github/actions/${name}/action.yml`),
+    ...readdirSync(join(ROOT, '.github/scripts')).map((name) => `.github/scripts/${name}`),
   ];
 
-  it.each(MERGING_WORKFLOWS)('%s arms auto-merge through the shared action', (name) => {
-    expect(workflow(name)).toContain(AUTO_MERGE_ACTION);
+  it('calls the merge endpoint from the gate action alone', () => {
+    const merging = everyFile.filter((file) =>
+      /pulls\.merge\(|gh pr merge|PUT \/repos\/\{owner\}\/\{repo\}\/pulls\/\{pull_number\}\/merge/.test(
+        readFileSync(join(ROOT, file), 'utf8')
+      )
+    );
+    expect(merging).toEqual(['.github/actions/agentic-auto-merge/action.yml']);
   });
 
-  // Releasing a parked run needs `actions: write`, and the merge itself has to
-  // raise a `pull_request: closed` event that the chain step reacts to — a merge
-  // performed with GITHUB_TOKEN raises none, so the queue stops at the merge.
-  it.each(MERGING_WORKFLOWS)('%s arms auto-merge with the PAT', (name) => {
-    const text = workflow(name);
+  // Native auto-merge lets GitHub merge whenever *its* requirements hold, which
+  // on this repository — no required checks — would be a merge the gate never
+  // judged, onto a `main` it never compared against.
+  it('never switches on GitHub native auto-merge anywhere', () => {
+    for (const file of everyFile) {
+      const text = readFileSync(join(ROOT, file), 'utf8');
+      expect(text, file).not.toContain('enablePullRequestAutoMerge');
+      expect(text, file).not.toMatch(/gh pr merge[^\n]*--auto/);
+    }
+  });
+
+  it('is reached from the gate workflow alone', () => {
+    const callers = readdirSync(join(ROOT, '.github/workflows')).filter((name) =>
+      workflow(name).includes(AUTO_MERGE_ACTION)
+    );
+    expect(callers).toEqual([GATE]);
+  });
+
+  // The lock. Job-level, because a workflow-level group is claimed before the
+  // job's `if:` resolves, so a skipped run (a red CI, a noop runner run) would
+  // evict a pending sweep that was going to merge — #572/#610 in another group.
+  it('holds the one `agentic-merge` lock at job level, queueing rather than cancelling', () => {
+    const text = workflow(GATE);
+    const beforeJobs = text.slice(0, text.indexOf('\njobs:'));
+    expect(beforeJobs).not.toMatch(/^concurrency:/m);
+    const job = text.slice(text.indexOf('\n  gate:'));
+    expect(job).toMatch(/concurrency:\s*\n\s*group: agentic-merge\s*\n\s*cancel-in-progress: false/);
+  });
+
+  it('merges with the PAT', () => {
+    const text = workflow(GATE);
     const block = text.slice(text.indexOf(AUTO_MERGE_ACTION));
     const token = /token:\s*\$\{\{\s*secrets\.(\w+)\s*\}\}/.exec(block);
     expect(token?.[1]).toBe('PAT_TOKEN_COPILOT_AUTOMATION');
   });
 
-  // The whole point of arming inside the runner: it is reached by the run that
-  // created the PR, not by an event the PR's author can suppress. Without
-  // `always()` an agent step that crashed after opening its PR leaves it unarmed.
-  it.each(['claude-runner.yml', 'opencode-runner.yml'])(
-    '%s arms the branch it was told to build, even when the agent step failed',
-    (name) => {
-      const text = workflow(name);
-      const start = text.indexOf('- name: Arm auto-merge');
-      const next = text.indexOf('\n      - name:', start);
-      const step = text.slice(start, next > -1 ? next : undefined);
-      expect(step).toContain(AUTO_MERGE_ACTION);
-      expect(step).toContain('head: ${{ steps.context.outputs.feature_branch }}');
-      expect(step).toMatch(/if:\s*always\(\)/);
-    }
-  );
-
-  // No clock anywhere in the path. Auto-merge is armed by the run that opens the
-  // PR and re-armed by `pull_request`; a PR that reaches neither is a manual
-  // dispatch, not a polled one.
-  it.each(MERGING_WORKFLOWS)('%s arms auto-merge on an event, never on a schedule', (name) => {
-    const text = workflow(name);
-    const triggers = text.slice(text.indexOf('\non:'), text.indexOf('\npermissions:'));
-    expect(triggers).not.toContain('schedule:');
-    expect(triggers).not.toContain('cron:');
+  // Every sweep reads every open PR, so the one pending sweep GitHub keeps is
+  // enough whichever one survives. A sweep scoped to one PR or one head would
+  // make a dropped sweep a PR nobody looks at again.
+  it('sweeps every open pull request, oldest first, and takes no scope from its caller', () => {
+    expect(actionSource).toMatch(/github\.rest\.pulls\.list, \{\s*\n\s*owner, repo, state: 'open', sort: 'created', direction: 'asc', per_page: 100/);
+    const inputs = actionSource.slice(actionSource.indexOf('\ninputs:'), actionSource.indexOf('\noutputs:'));
+    expect(inputs).toContain('token:');
+    expect(inputs).not.toMatch(/\n {2}(pr|head|merge_method):/);
   });
 
-  it('keeps the standalone auto-merge workflow reachable by hand', () => {
-    const sweep = workflow('agentic-auto-merge.yml');
-    const triggers = sweep.slice(sweep.indexOf('\non:'), sweep.indexOf('\npermissions:'));
-    expect(triggers).toContain('workflow_dispatch:');
-  });
-
-  // The author may appear in a log line or a comment — it is worth reporting.
-  // What must never appear is a branch taken on it.
+  // It may name the account in a log line; it must never branch on it.
   it('never selects a PR by the account that opened it', () => {
-    const code = readFileSync(
-      join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
-    )
+    const code = actionSource
       .split('\n')
       .filter((line) => !line.trim().startsWith('#') && !line.trim().startsWith('//'))
       .join('\n');
-
     expect(code).not.toMatch(/login\s*[=!]==/);
     expect(code).not.toMatch(/['"`]github-actions/);
+  });
+
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])('%s leaves merging to the gate', (name) => {
+    const text = workflow(name);
+    expect(text).not.toContain(AUTO_MERGE_ACTION);
+    expect(text).not.toContain('Arm auto-merge');
+  });
+
+  // A marker added after CI finished raises no CI event, so the PR's own events
+  // are what bring the gate back — as a dispatch, never as a merge decided on
+  // one head.
+  describe('auto-assign-next.yml wakes the gate on a pull request\'s own events', () => {
+    const chain = workflow('auto-assign-next.yml');
+    const wake = chain.slice(chain.indexOf('  wake-merge-gate:'), chain.indexOf('  chain-next-task:'));
+
+    it('dispatches the gate, and merges nothing itself', () => {
+      expect(wake).toContain('createWorkflowDispatch');
+      expect(wake).toContain(`workflow_id: '${GATE}'`);
+      expect(wake).not.toContain(AUTO_MERGE_ACTION);
+      expect(wake).toContain('github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}');
+    });
+
+    it('stays out of the assignment group, and never goes red on the PR head', () => {
+      expect(wake).not.toContain('agentic-assignment');
+      expect(wake).toContain('continue-on-error: true');
+    });
+
+    it('only asks about a marked or pipeline pull request that is not a draft', () => {
+      expect(wake).toContain("github.event.action != 'closed'");
+      expect(wake).toContain('!github.event.pull_request.draft');
+      expect(wake).toContain("contains(github.event.pull_request.body, 'READY TO MERGE')");
+      expect(wake).toContain("startsWith(github.event.pull_request.head.ref, 'pipeline/feature-')");
+    });
   });
 });
 
@@ -798,7 +835,6 @@ describe('a session recovers a run its own slot blocked, on its way out', () => 
       const text = workflow(name);
       const idx = text.indexOf(RECOVER_ACTION);
       expect(idx, `${name}: recovery step missing`).toBeGreaterThan(-1);
-      expect(text.indexOf('uses: ./.github/actions/agentic-auto-merge')).toBeLessThan(idx);
 
       // No further step after it — the whole tail end of the job is covered
       // by the time it runs, right as its hold on the concurrency slot ends.
@@ -904,235 +940,133 @@ describe('the runner-liveness predicate lives in one place', () => {
   });
 });
 
-// PR #434 was opened by the pipeline, fully verified, marked `READY TO MERGE`,
-// went green — and sat open. Both arming paths ran and both reported success:
-// the `enablePullRequestAutoMerge` mutation named its variable `$method`, which
-// @octokit/graphql rejects before the request leaves the runner, and the catch
-// block only recognised two error messages, so the throw became a warning in a
-// log nobody reads.
-describe('enabling auto-merge actually reaches GitHub', () => {
-  const source = readFileSync(
-    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
-  );
+// The gate's verdict, lifted out of the shipped action rather than copied.
+//
+// Its history is three failures in one function. PR #499 was green and marked
+// and sat open because a 10-minute settle poll called it stuck while its browser
+// shards still had 35 minutes to run — so nothing here waits on a clock, and a
+// head still reporting is `pending` until CI completing brings the sweep back.
+// A head with no runs at all is `pending` too, never a pass. And, since parallel
+// runs, green is not enough: a head that does not contain `main`'s tip is
+// brought up to date and tested again rather than merged.
+describe('the merge gate\'s verdict', () => {
+  const source = readFileSync(join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8');
+  const lift = (name: string) => {
+    const start = source.indexOf(`const ${name}`);
+    const end = source.indexOf('\n          };', start);
+    expect(start, `${name} not found`).toBeGreaterThan(-1);
+    return source.slice(start, end + '\n          };'.length);
+  };
 
-  // @octokit/graphql merges the variables object into its own request options,
-  // so a variable sharing a name with one of them is a hard throw:
-  // `[@octokit/graphql] "method" cannot be used as variable name`.
-  // From `NON_VARIABLE_OPTIONS` in @octokit/graphql.
-  const RESERVED = ['method', 'baseUrl', 'url', 'headers', 'query', 'mediaType', 'request'];
-
-  it('names no GraphQL variable after an @octokit/graphql request option', () => {
-    const declarations = source.match(/\$[A-Za-z_][A-Za-z0-9_]*\s*:\s*[A-Za-z[]/g) ?? [];
-    expect(declarations.length, 'no GraphQL variable declarations found').toBeGreaterThan(0);
-
-    for (const declaration of declarations) {
-      const name = /\$([A-Za-z_][A-Za-z0-9_]*)/.exec(declaration)?.[1] ?? '';
-      expect(RESERVED, `$${name} is an @octokit/graphql request option`).not.toContain(name);
-    }
-  });
-
-  // Same collision seen from the other side: the object handed to
-  // `github.graphql` is what octokit inspects, so its keys carry the rule too.
-  it('passes no GraphQL variable keyed by a request option', () => {
-    const call = source.slice(source.indexOf('await github.graphql('));
-    const variables = /\{([^{}]*)\}\s*\n\s*\);/.exec(call)?.[1] ?? '';
-    expect(variables, 'no variables object found on the graphql call').not.toBe('');
-
-    for (const key of variables.split(',').map((pair) => (pair.split(':')[0] ?? '').trim())) {
-      expect(RESERVED, `\`${key}\` is an @octokit/graphql request option`).not.toContain(key);
-    }
-  });
-
-  // The bug was survivable; the silence was not. A marked PR that ends neither
-  // armed nor merged holds its issue, and every assignment behind it.
-  it('fails the step when a marked PR ends neither armed nor merged', () => {
-    expect(source).toContain("core.setOutput('unarmed'");
-    expect(source).toMatch(/if \(unarmed\.length > 0\) \{\s*\n\s*core\.setFailed\(/);
-  });
-});
-
-// PR #499 was verified on every channel, marked, and green — and stayed open.
-// `main` requires no status check, so GitHub refuses native auto-merge outright
-// (`Pull request is in unstable status`) and the action always falls through to
-// merging the PR itself. That fallback read `unstable` as "wait", so it polled
-// for its whole 10-minute budget while the browser shards still had 35
-// minutes to run, then declared the PR stuck. Nothing swept it again, because
-// no `pull_request` event fires when checks finish.
-describe('deciding whether to merge a PR auto-merge refused', () => {
-  // Lifted out of the composite action's inline script, as above.
-  const source = readFileSync(
-    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
-  );
-  const start = source.indexOf('const mergeVerdict');
-  const end = source.indexOf('\n          };', start);
-  expect(start).toBeGreaterThan(-1);
-  expect(end).toBeGreaterThan(start);
-
-  const mergeVerdict = new Function(
-    `${source.slice(start, end + '\n          };'.length)} return mergeVerdict;`
-  )() as (
+  type Checks = { pending: number; failed: number; total: number };
+  const gateVerdict = new Function(`${lift('gateVerdict')} return gateVerdict;`)() as (
     state: string,
-    checks: { pending: number; failed: number; total: number }
+    checks: Checks,
+    behindBy: number | null
   ) => string;
 
-  const allReported = { pending: 0, failed: 0, total: 3 };
+  const green = { pending: 0, failed: 0, total: 3 };
   const running = { pending: 1, failed: 0, total: 3 };
   const red = { pending: 0, failed: 1, total: 3 };
   const nothingYet = { pending: 0, failed: 0, total: 0 };
 
-  it('merges once every run on the head has reported and none failed', () => {
-    expect(mergeVerdict('clean', allReported)).toBe('merge');
+  it('merges a green head that contains the base tip', () => {
+    expect(gateVerdict('clean', green, 0)).toBe('merge');
   });
 
-  // `unknown` is only "GitHub has not finished computing mergeability". It used
-  // to be polled out; the merge call answers it directly instead, so a state
-  // that says nothing about CI no longer stops a PR whose runs are all green.
-  it.each(['unknown', 'unstable', 'blocked', 'has_hooks'])(
-    'lets the merge call settle `%s` rather than polling it out',
+  // The rule parallel runs need: two PRs green alone can be red together.
+  it('brings a green head that is behind up to date instead of merging it', () => {
+    expect(gateVerdict('clean', green, 1)).toBe('update');
+    expect(gateVerdict('clean', green, 12)).toBe('update');
+  });
+
+  it('asks how far behind a green head is before deciding anything else', () => {
+    expect(gateVerdict('clean', green, null)).toBe('compare');
+  });
+
+  // `unknown` is only "GitHub has not finished computing mergeability" — the
+  // merge or update call itself answers that, so it stops nothing.
+  it.each(['unknown', 'unstable', 'blocked', 'has_hooks', 'clean'])(
+    'does not wait on `%s` once the channels are green',
     (state) => {
-      expect(mergeVerdict(state, allReported)).toBe('merge');
+      expect(gateVerdict(state, green, 0)).toBe('merge');
     }
   );
 
-  // The regression #499 died on: a state no amount of waiting resolves inside
-  // one job, because what it is waiting for is a browser job with half an hour
-  // left. The CI-completion sweep is what comes back for it.
-  it.each(['unstable', 'blocked', 'unknown', 'clean'])(
-    'defers `%s` to the CI-completion sweep while a run is still going',
-    (state) => {
-      expect(mergeVerdict(state, running)).toBe('pending');
-    }
-  );
-
-  // Absence of evidence is not a pass. A PR read in the second before its CI
-  // run is created has nothing failing and nothing running, and merging on that
-  // ships code no channel ever saw.
-  it.each(['clean', 'unknown', 'unstable'])(
-    'refuses to read `%s` with no run at all as a green head',
-    (state) => {
-      expect(mergeVerdict(state, nothingYet)).toBe('pending');
-    }
-  );
-
-  it.each(['unstable', 'blocked', 'unknown', 'clean'])(
-    'gives up immediately on `%s` once a run has failed',
-    (state) => {
-      expect(mergeVerdict(state, red)).toBe('stuck');
-    }
-  );
-
-  // Neither resolves on its own, so deferring them only defers a dead end.
-  it.each(['dirty', 'behind'])('gives up immediately on `%s`', (state) => {
-    expect(mergeVerdict(state, allReported)).toBe('stuck');
-    expect(mergeVerdict(state, running)).toBe('stuck');
+  it.each(['unstable', 'unknown', 'clean'])('waits on `%s` while a channel is still running', (state) => {
+    expect(gateVerdict(state, running, 0)).toBe('pending');
   });
 
-  // A PR waiting on CI is the normal state of a PR the pipeline just opened.
-  // Failing the step for it would cry wolf on every single run.
-  it('reports a PR waiting on its runs separately from one that is stuck', () => {
-    expect(source).toContain("core.setOutput('pending'");
-    expect(source).toMatch(/if \(verdict === 'pending'\) \{/);
-    const failure = source.slice(source.indexOf('if (unarmed.length > 0)'));
-    expect(failure).not.toContain('pending.length');
-  });
-});
-
-// #499's head replayed from the three workflow runs GitHub actually recorded
-// against `b2483b6`, at the two moments that decided its fate. Ids, paths and
-// conclusions are the real ones; only `status` moves between the two cases,
-// because that is the only thing that moved between 01:30 and 02:15.
-describe("reading #499's head the way the action now reads it", () => {
-  const source = readFileSync(
-    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
-  );
-  const start = source.indexOf('const RUN_FAILURES');
-  const end = source.indexOf('\n          };', source.indexOf('const checkState'));
-  expect(start).toBeGreaterThan(-1);
-  expect(end).toBeGreaterThan(start);
-
-  const verdictStart = source.indexOf('const mergeVerdict');
-  const mergeVerdict = new Function(
-    `${source.slice(verdictStart, source.indexOf('\n          };', verdictStart) + '\n          };'.length)} return mergeVerdict;`
-  )() as (state: string, checks: Checks) => string;
-
-  interface Checks { pending: number; failed: number; total: number }
-  interface Run { id: number; path: string; workflow_id: number; status: string; conclusion: string | null }
-
-  const buildCheckState = (runId: number, ownWorkflowRef: string) =>
-    new Function(
-      'context',
-      'process',
-      `${source.slice(start, end + '\n          };'.length)} return checkState;`
-    )(
-      { runId },
-      { env: { GITHUB_WORKFLOW_REF: ownWorkflowRef } }
-    ) as (runs: Run[]) => Checks;
-
-  const CI = { id: 31062936274, path: '.github/workflows/ci.yml', workflow_id: 254203664 };
-  const REVIEW = { id: 31062936235, path: '.github/workflows/claude-code-review.yml', workflow_id: 320501354 };
-  const CHAIN = { id: 31062936200, path: '.github/workflows/auto-assign-next.yml', workflow_id: 255968026 };
-
-  // 01:30:50 — the sweep runs inside `chain-next-task` itself, seconds after
-  // the PR opened. CI has 45 minutes left to run.
-  it('defers instead of burning ten minutes and calling the PR stuck', () => {
-    const checkState = buildCheckState(
-      CHAIN.id,
-      `Nico2398/BlastSimulator2026/.github/workflows/auto-assign-next.yml@refs/heads/main`
-    );
-
-    const checks = checkState([
-      { ...CI, status: 'in_progress', conclusion: null },
-      { ...REVIEW, status: 'completed', conclusion: 'skipped' },
-      { ...CHAIN, status: 'in_progress', conclusion: null },
-    ]);
-
-    // Its own run is not counted — that is the self-wait that would strand
-    // every PR — and `skipped` is not a failure.
-    expect(checks).toEqual({ pending: 1, failed: 0, total: 2 });
-    expect(mergeVerdict('unstable', checks)).toBe('pending');
+  it.each(['clean', 'unknown'])('reads `%s` with no run at all as pending, never green', (state) => {
+    expect(gateVerdict(state, nothingYet, 0)).toBe('pending');
   });
 
-  // 02:15:20 — CI completes, which is now itself the event that runs the sweep.
-  it('merges #499 on the CI-completion sweep', () => {
-    const checkState = buildCheckState(
-      99999999999,
-      `Nico2398/BlastSimulator2026/.github/workflows/agentic-auto-merge.yml@refs/heads/main`
-    );
-
-    const checks = checkState([
-      { ...CI, status: 'completed', conclusion: 'success' },
-      { ...REVIEW, status: 'completed', conclusion: 'skipped' },
-      { ...CHAIN, status: 'completed', conclusion: 'success' },
-    ]);
-
-    expect(checks).toEqual({ pending: 0, failed: 0, total: 3 });
-    expect(mergeVerdict('clean', checks)).toBe('merge');
+  it('hands a failed channel to the fail-safe', () => {
+    expect(gateVerdict('unstable', red, 0)).toBe('red');
   });
 
-  // `cancel-in-progress` is on the CI workflow, so a superseded run sits on the
-  // same head. Counting it would read a live green PR as permanently failed.
-  it('reads a superseded CI run as replaced, not as a failure', () => {
-    const checkState = buildCheckState(0, '');
-
-    const checks = checkState([
-      { ...CI, id: CI.id - 1, status: 'completed', conclusion: 'cancelled' },
-      { ...CI, status: 'completed', conclusion: 'success' },
-    ]);
-
-    expect(checks).toEqual({ pending: 0, failed: 0, total: 1 });
-    expect(mergeVerdict('clean', checks)).toBe('merge');
+  // A conflict is decided first: nothing else about the head matters until the
+  // base merges into it, and the agent is the only one who can make it.
+  it.each([
+    ['green', green],
+    ['running', running],
+    ['red', red],
+  ] as const)('reads a conflict as a conflict whatever the channels say (%s)', (_, checks) => {
+    expect(gateVerdict('dirty', checks, 3)).toBe('conflict');
   });
 
-  it('still calls a genuinely failed CI run stuck', () => {
-    const checkState = buildCheckState(0, '');
+  describe("reading #499's head the way the gate reads it", () => {
+    // `checkState`, run on the shared module it requires in production.
+    const ciHandback = require(join(ROOT, '.github/scripts/ci-handback.cjs'));
+    const checkState = new Function(
+      'RUN_FAILURES',
+      'latestPerWorkflow',
+      `${lift('checkState')} return checkState;`
+    )(ciHandback.RUN_FAILURES, ciHandback.latestPerWorkflow) as (runs: object[]) => Checks;
 
-    const checks = checkState([
-      { ...CI, status: 'completed', conclusion: 'failure' },
-      { ...REVIEW, status: 'completed', conclusion: 'skipped' },
-    ]);
+    const CI = { id: 31062936274, path: '.github/workflows/ci.yml', workflow_id: 254203664 };
+    const REVIEW = { id: 31062936235, path: '.github/workflows/claude-code-review.yml', workflow_id: 320501354 };
+    const CHAIN = { id: 31062936200, path: '.github/workflows/auto-assign-next.yml', workflow_id: 255968026 };
 
-    expect(checks).toEqual({ pending: 0, failed: 1, total: 2 });
-    expect(mergeVerdict('unstable', checks)).toBe('stuck');
+    // 01:30:50 — seconds after #499 opened, CI with 45 minutes left to run.
+    // `auto-assign-next.yml` is on the head too, and it is the run that asks
+    // the gate to look: counting it would make the gate wait on its own caller.
+    it('waits on CI and never on the machinery that woke it', () => {
+      const checks = checkState([
+        { ...CI, status: 'in_progress', conclusion: null },
+        { ...REVIEW, status: 'completed', conclusion: 'skipped' },
+        { ...CHAIN, status: 'in_progress', conclusion: null },
+      ]);
+      expect(checks).toEqual({ pending: 1, failed: 0, total: 2 });
+      expect(gateVerdict('unstable', checks, 0)).toBe('pending');
+    });
+
+    // 02:15:20 — CI completes, which is itself the event that runs the gate.
+    it('merges #499 once CI completes on a head containing main', () => {
+      const checks = checkState([
+        { ...CI, status: 'completed', conclusion: 'success' },
+        { ...REVIEW, status: 'completed', conclusion: 'skipped' },
+        { ...CHAIN, status: 'completed', conclusion: 'success' },
+      ]);
+      expect(checks).toEqual({ pending: 0, failed: 0, total: 2 });
+      expect(gateVerdict('clean', checks, 0)).toBe('merge');
+    });
+
+    it('reads a superseded CI run as replaced, not as a failure', () => {
+      const checks = checkState([
+        { ...CI, id: CI.id - 1, status: 'completed', conclusion: 'cancelled' },
+        { ...CI, status: 'completed', conclusion: 'success' },
+      ]);
+      expect(checks).toEqual({ pending: 0, failed: 0, total: 1 });
+    });
+
+    it('still reads a genuinely failed CI run as red', () => {
+      const checks = checkState([
+        { ...CI, status: 'completed', conclusion: 'failure' },
+        { ...REVIEW, status: 'completed', conclusion: 'skipped' },
+      ]);
+      expect(gateVerdict('unstable', checks, 0)).toBe('red');
+    });
   });
 });
 
@@ -1147,7 +1081,7 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
     join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
   );
   const start = source.indexOf('const REQUIRED_JOBS');
-  const end = source.indexOf('const method = ');
+  const end = source.indexOf('// How many of the base');
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
 
@@ -1252,75 +1186,365 @@ describe('REQUIRED_JOBS stays identical between scripts/lib/required-jobs.ts and
   });
 });
 
-// Every wait in this action was a guess at something an event already reports.
-// A sleeping runner is also the one state that cannot say what it is waiting
-// for, which is how #499's ten minutes of identical log lines ended in a wrong
+// Every wait in this path was once a guess at something an event reports. A
+// sleeping runner is also the one state that cannot say what it is waiting for,
+// which is how #499's ten minutes of identical log lines ended in a wrong
 // verdict rather than a useful one.
-describe('the auto-merge path holds no timer', () => {
-  const source = readFileSync(
-    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
-  );
+describe('the merge gate holds no timer', () => {
+  const source = readFileSync(join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8');
 
   it('never sleeps, polls, or reads the clock', () => {
     expect(source).not.toContain('setTimeout');
     expect(source).not.toContain('setInterval');
     expect(source).not.toContain('Date.now');
-    expect(source).not.toMatch(/settle/i);
+    expect(source).not.toMatch(/settle(?!Refusal)/i);
   });
 
-  // A sleep in the workflow around it would be the same mechanism moved one
-  // file out.
-  it.each(['agentic-auto-merge.yml', 'auto-assign-next.yml'])(
-    '%s waits on no clock either',
-    (name) => {
-      expect(workflow(name)).not.toMatch(/^\s*(run:\s*)?sleep\s/m);
-    }
-  );
+  it.each(['agentic-auto-merge.yml', 'auto-assign-next.yml'])('%s waits on no clock either', (name) => {
+    expect(workflow(name)).not.toMatch(/^\s*(run:\s*)?sleep\s/m);
+  });
 
-  // The merge request is the authority on whether a PR merges. Asking GitHub
-  // is what replaced polling until it looked like the answer was yes.
-  it('asks GitHub to merge rather than predicting that it would', () => {
-    expect(source).toContain('github.rest.pulls.merge(');
-    const attempt = source.slice(source.indexOf("if (verdict === 'stuck')"));
-    expect(attempt).toContain('github.rest.pulls.merge(');
+  // The merge and update requests are the authority on whether they succeed,
+  // and a refusal is settled on the PR's state afterwards — never on the words
+  // of the error (PR #434's refusal string fell through to a green step).
+  it('settles a refusal on the pull request\'s state, never on the error text', () => {
+    const settle = source.slice(source.indexOf('const settleRefusal'), source.indexOf('const candidates'));
+    expect(settle).toContain("now.mergeable_state === 'dirty'");
+    expect(settle).toContain('now.head.sha !== before.head.sha');
+    expect(settle).not.toMatch(/\.message\s*\.|test\(\s*error|\.includes\(\s*['"]/);
+  });
+
+  it('pins both writes to the head it judged', () => {
+    expect(source).toContain("github.request('PUT /repos/{owner}/{repo}/pulls/{pull_number}/update-branch'");
+    expect(source).toContain('expected_head_sha: pr.head.sha');
+    expect(source).toMatch(/github\.rest\.pulls\.merge\(\{\s*\n\s*owner, repo, pull_number: n, merge_method: 'squash', sha: pr\.head\.sha/);
   });
 });
 
-// The other half of the same failure: knowing that `unstable` means "come back
-// later" is worthless without an event that brings the sweep back. CI finishing
-// raises no `pull_request` event, so before this trigger existed the last word
-// on a PR was always spoken while its checks were still running.
-describe('the sweep that runs when the checks come in', () => {
-  const sweep = workflow('agentic-auto-merge.yml');
-  const triggers = sweep.slice(sweep.indexOf('\non:'), sweep.indexOf('\npermissions:'));
+// The gate wakes on events that can change a verdict, and on nothing else.
+// Its `if:` is evaluated here against the events GitHub sends, because a clause
+// that silently never matches is a PR that is silently never merged.
+describe('what wakes the merge gate', () => {
+  const gate = workflow('agentic-auto-merge.yml');
+  const triggers = gate.slice(gate.indexOf('\non:'), gate.indexOf('\npermissions:'));
+  const jobIf = (() => {
+    const job = gate.slice(gate.indexOf('\n  gate:'));
+    const start = job.indexOf('if: >-') + 'if: >-'.length;
+    return job.slice(start, job.indexOf('\n    runs-on:'));
+  })();
 
-  it('re-evaluates the PR when CI completes', () => {
-    expect(triggers).toMatch(/workflow_run:\s*\n\s*workflows:\s*\["CI"\]/);
+  const wakes = (github: Record<string, unknown>, enabled = 'true') =>
+    Boolean(evaluateExpression(jobIf, { github, vars: { AGENTIC_AUTO_MERGE_ENABLED: enabled } } as never));
+  const completed = (name: string, conclusion: string, display_title = 'x') => ({
+    event_name: 'workflow_run',
+    event: { workflow_run: { name, conclusion, display_title } },
+  });
+
+  it('listens to CI and to both runners completing, by the names they declare', () => {
+    expect(triggers).toMatch(/workflow_run:\s*\n\s*workflows:\s*\["CI", "Claude Pipeline", "OpenCode Pipeline"\]/);
     expect(triggers).toMatch(/types:\s*\[completed\]/);
-  });
-
-  // `workflows:` matches on the workflow's `name:`, not its filename, so a
-  // rename in ci.yml silently unhooks the only path that merges anything.
-  it('names the CI workflow as CI declares itself', () => {
-    const declared = /^name:\s*(.+)$/m.exec(workflow('ci.yml'))?.[1]?.trim();
-    expect(declared).toBe('CI');
-  });
-
-  it('sweeps the branch CI reported on, not every open PR', () => {
-    expect(sweep).toContain('head: ${{ github.event.workflow_run.head_branch }}');
-  });
-
-  // A red CI run has nothing to merge, and sweeping it only restates a red
-  // check as a red workflow. What it must not do is stay the last word:
-  // `agentic-ci-failure.yml` reacts to the same event with the opposite
-  // conclusion — see the block below.
-  it('skips the sweep when CI failed', () => {
-    expect(sweep).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(triggers).toContain('workflow_dispatch:');
+    expect(/^name:\s*(.+)$/m.exec(workflow('ci.yml'))?.[1]?.trim()).toBe('CI');
+    expect(/^name:\s*(.+)$/m.exec(workflow('claude-runner.yml'))?.[1]?.trim()).toBe('Claude Pipeline');
+    expect(/^name:\s*(.+)$/m.exec(workflow('opencode-runner.yml'))?.[1]?.trim()).toBe('OpenCode Pipeline');
   });
 
   it('stays off a clock', () => {
     expect(triggers).not.toContain('schedule:');
     expect(triggers).not.toContain('cron:');
+  });
+
+  it('looks when CI succeeds anywhere, and not when it fails', () => {
+    expect(wakes(completed('CI', 'success'))).toBe(true);
+    expect(wakes(completed('CI', 'failure'))).toBe(false);
+    expect(wakes(completed('CI', 'cancelled'))).toBe(false);
+  });
+
+  // Every comment in the repository creates a noop run in both runners, and
+  // each completes. Only a real session's end is worth a sweep.
+  it('looks when a real session ends, whatever its conclusion, and never on a noop run', () => {
+    expect(wakes(completed('Claude Pipeline', 'success', 'agentic-run issue-1203'))).toBe(true);
+    expect(wakes(completed('OpenCode Pipeline', 'failure', 'agentic-run pr-1251'))).toBe(true);
+    expect(wakes(completed('Claude Pipeline', 'skipped', 'agentic-noop'))).toBe(false);
+  });
+
+  it('looks when asked, and never while auto-merge is switched off', () => {
+    expect(wakes({ event_name: 'workflow_dispatch', event: {} })).toBe(true);
+    expect(wakes({ event_name: 'workflow_dispatch', event: {} }, 'false')).toBe(false);
+    expect(wakes(completed('CI', 'success'), '')).toBe(false);
+  });
+
+  // A dropped wake-up costs nothing while another is coming; the watchdog is
+  // for when none is.
+  it('is re-raised by the watchdog while a marked pull request is open', () => {
+    const watchdog = workflow('agentic-watchdog.yml');
+    const step = watchdog.slice(watchdog.indexOf('- name: Re-raise the merge gate'));
+    expect(step).toContain("workflow_id: 'agentic-auto-merge.yml'");
+    expect(step).toContain("line.trim() === 'READY TO MERGE'");
+    expect(step).not.toContain('pulls.merge');
+  });
+});
+
+// The gate's shipped script, run against a fake GitHub. The property that makes
+// parallel runs safe is checked directly: every pull request that merges lands
+// on exactly the `main` its channels ran against.
+describe('the merge gate end to end', () => {
+  const script = (() => {
+    const action = readFileSync(join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8');
+    const marker = 'script: |\n';
+    return action
+      .slice(action.indexOf(marker) + marker.length)
+      .split('\n')
+      .map((line) => line.replace(/^ {10}/, ''))
+      .join('\n');
+  })();
+
+  type Checks = 'green' | 'red' | 'running' | 'none';
+  interface FakePr {
+    number: number;
+    checks: Checks;
+    /** How many of `main`'s merges this head contains. Defaults to all of them. */
+    base?: number;
+    body?: string;
+    draft?: boolean;
+    head?: string;
+    conflicts?: boolean;
+    conflictsOnUpdate?: boolean;
+    mergeRefused?: boolean;
+    jobsMissing?: boolean;
+    gated?: boolean;
+  }
+  interface State extends Required<Omit<FakePr, 'head' | 'body'>> {
+    head: string;
+    body: string;
+    sha: string;
+    open: boolean;
+    merged: boolean;
+  }
+
+  const MARKED = 'Closes #1\n\nREADY TO MERGE';
+
+  function world(prs: FakePr[], main = 0) {
+    const w = {
+      main,
+      prs: new Map<number, State>(),
+      merges: [] as { number: number; testedAgainst: number; landedOn: number }[],
+      updates: [] as number[],
+    };
+    for (const pr of prs) {
+      w.prs.set(pr.number, {
+        base: main,
+        body: MARKED,
+        draft: false,
+        head: `pipeline/feature-${pr.number}-77`,
+        conflicts: false,
+        conflictsOnUpdate: false,
+        mergeRefused: false,
+        jobsMissing: false,
+        gated: false,
+        ...pr,
+        sha: `sha-${pr.number}-0`,
+        open: true,
+        merged: false,
+      });
+    }
+    return w;
+  }
+
+  async function gate(w: ReturnType<typeof world>) {
+    const out = { outputs: {} as Record<string, string>, failed: null as string | null, log: [] as string[] };
+    const toApi = (p: State) => ({
+      number: p.number,
+      draft: p.draft,
+      body: p.body,
+      state: p.open ? 'open' : 'closed',
+      merged: p.merged,
+      head: { ref: p.head, sha: p.sha },
+      base: { ref: 'main' },
+      user: { login: 'pipeline-user' },
+      mergeable_state: p.conflicts ? 'dirty' : 'clean',
+    });
+    const bySha = (sha: string) => [...w.prs.values()].find((p) => p.sha === sha)!;
+    const runsFor = (p: State) => {
+      const id = parseInt(p.sha.replace(/\D/g, ''), 10);
+      const ci = { path: '.github/workflows/ci.yml', workflow_id: 1, id, name: 'CI' };
+      const guard = { path: '.github/workflows/agentic-closing-keyword-guard.yml', workflow_id: 2, id: id + 1, name: 'guard' };
+      const gated = p.gated ? [{ ...guard, id: id + 2, workflow_id: 3, status: 'action_required', conclusion: 'action_required' }] : [];
+      switch (p.checks) {
+        case 'green':
+          return [{ ...ci, status: 'completed', conclusion: 'success' }, { ...guard, status: 'completed', conclusion: 'success' }, ...gated];
+        case 'red':
+          return [{ ...ci, status: 'completed', conclusion: 'failure' }, { ...guard, status: 'completed', conclusion: 'success' }];
+        case 'running':
+          return [{ ...ci, status: 'in_progress', conclusion: null }, ...gated];
+        default:
+          return [];
+      }
+    };
+    const refuse = (message: string, status: number) => Object.assign(new Error(message), { status });
+
+    const github: any = {
+      rest: {
+        pulls: {
+          list: async () => ({ data: [] }),
+          get: async ({ pull_number }: { pull_number: number }) => ({ data: toApi(w.prs.get(pull_number)!) }),
+          merge: async ({ pull_number, sha, merge_method }: { pull_number: number; sha: string; merge_method: string }) => {
+            const p = w.prs.get(pull_number)!;
+            expect(merge_method).toBe('squash');
+            if (sha !== p.sha) throw refuse('Head branch was modified', 409);
+            if (p.mergeRefused) throw refuse('Repository rule violations found', 405);
+            if (p.conflicts) throw refuse('Pull Request is not mergeable', 405);
+            w.merges.push({ number: p.number, testedAgainst: p.base, landedOn: w.main });
+            w.main += 1;
+            p.open = false;
+            p.merged = true;
+            return { data: { merged: true } };
+          },
+        },
+        actions: {
+          listWorkflowRunsForRepo: async () => ({ data: [] }),
+          listJobsForWorkflowRun: async () => ({ data: [] }),
+        },
+        repos: {
+          compareCommitsWithBasehead: async ({ basehead }: { basehead: string }) => {
+            const [baseRef, sha] = basehead.split('...');
+            expect(baseRef).toBe('main');
+            return { data: { behind_by: w.main - bySha(sha!).base } };
+          },
+        },
+      },
+      paginate: async (fn: unknown, params: Record<string, unknown>) => {
+        if (fn === github.rest.pulls.list) {
+          expect(params).toMatchObject({ state: 'open', sort: 'created', direction: 'asc' });
+          return [...w.prs.values()].filter((p) => p.open).sort((a, b) => a.number - b.number).map(toApi);
+        }
+        if (fn === github.rest.actions.listWorkflowRunsForRepo) return runsFor(bySha(params.head_sha as string));
+        if (fn === github.rest.actions.listJobsForWorkflowRun) {
+          const p = [...w.prs.values()].find((candidate) => runsFor(candidate).some((run) => run.id === params.run_id));
+          const shards = [1, 2].map((n) => ({ name: `Scenarios (interaction mode) — shard ${n}/2`, conclusion: 'success' }));
+          return p?.jobsMissing ? [{ name: 'Production build', conclusion: 'success' }] : [...shards, { name: 'Production build', conclusion: 'success' }];
+        }
+        throw new Error('unexpected paginate');
+      },
+      request: async (route: string, params: Record<string, unknown>) => {
+        if (route.startsWith('POST /repos/{owner}/{repo}/actions/runs/{run_id}/approve')) return { data: {} };
+        if (route === 'PUT /repos/{owner}/{repo}/pulls/{pull_number}/update-branch') {
+          const p = w.prs.get(params.pull_number as number)!;
+          if (params.expected_head_sha !== p.sha) throw refuse("expected head sha didn't match current head ref", 422);
+          if (p.conflictsOnUpdate) {
+            p.conflicts = true;
+            throw refuse('merge conflict between base and head', 422);
+          }
+          w.updates.push(p.number);
+          p.base = w.main;
+          p.sha = `sha-${p.number}-${w.main}`;
+          p.checks = 'running';
+          return { data: {} };
+        }
+        throw new Error(`unexpected request ${route}`);
+      },
+    };
+    const core = {
+      info: (m: string) => out.log.push(m),
+      warning: (m: string) => out.log.push(m),
+      setFailed: (m: string) => {
+        out.failed = m;
+      },
+      setOutput: (k: string, v: string) => {
+        out.outputs[k] = v;
+      },
+    };
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+    await new AsyncFunction('github', 'context', 'core', 'require', 'process', script)(
+      github,
+      { repo: { owner: 'Nico2398', repo: 'BlastSimulator2026' }, runId: 1 },
+      core,
+      require,
+      { env: { GITHUB_WORKSPACE: ROOT } }
+    );
+    return out;
+  }
+
+  // The hazard parallel runs create, and the reason the gate exists: #10 and
+  // #11 are each green against the same `main`. Merging both would put a tree
+  // on `main` that no channel ran. The gate merges one, brings the other up to
+  // date, and merges it only once CI has passed on top of the first.
+  it('lands every merge on exactly the main its channels ran against', async () => {
+    const w = world([
+      { number: 10, checks: 'green' },
+      { number: 11, checks: 'green' },
+    ]);
+
+    const first = await gate(w);
+    expect(first.failed).toBeNull();
+    expect(first.outputs.merged).toBe('10');
+    expect(first.outputs.updated).toBe('11');
+
+    // CI on #11's updated head reports green; that completion is the next wake.
+    w.prs.get(11)!.checks = 'green';
+    const second = await gate(w);
+    expect(second.outputs.merged).toBe('11');
+
+    expect(w.merges).toEqual([
+      { number: 10, testedAgainst: 0, landedOn: 0 },
+      { number: 11, testedAgainst: 1, landedOn: 1 },
+    ]);
+    for (const merge of w.merges) expect(merge.testedAgainst).toBe(merge.landedOn);
+  });
+
+  it('brings a green pull request that is behind up to date, and merges nothing', async () => {
+    const w = world([{ number: 10, checks: 'green', base: 0 }], 2);
+    const out = await gate(w);
+    expect(out.outputs.updated).toBe('10');
+    expect(out.outputs.merged).toBe('');
+    expect(w.merges).toEqual([]);
+  });
+
+  it('waits on a head that is still running, without failing', async () => {
+    const w = world([{ number: 10, checks: 'running', gated: true }]);
+    const out = await gate(w);
+    expect(out.outputs.pending).toBe('10');
+    expect(out.outputs.approved).toBe('1');
+    expect(out.failed).toBeNull();
+  });
+
+  it.each([
+    ['a red channel', { checks: 'red' as Checks }],
+    ['a conflict with main', { checks: 'green' as Checks, conflicts: true }],
+    ['an update that conflicts', { checks: 'green' as Checks, base: 0, conflictsOnUpdate: true }],
+  ])('hands %s back to the agent, and merges nothing', async (_, pr) => {
+    const w = world([{ number: 10, ...pr }], 1);
+    const out = await gate(w);
+    expect(out.outputs.handback).toBe('10');
+    expect(w.merges).toEqual([]);
+    expect(out.failed).toBeNull();
+  });
+
+  it('does not merge on a run-level success whose required jobs never ran (#615)', async () => {
+    const w = world([{ number: 10, checks: 'green', jobsMissing: true }]);
+    const out = await gate(w);
+    expect(out.outputs.stuck).toBe('10');
+    expect(w.merges).toEqual([]);
+    expect(out.failed).toContain('#10');
+  });
+
+  it('reports a refusal it cannot explain, loudly', async () => {
+    const w = world([{ number: 10, checks: 'green', mergeRefused: true }]);
+    const out = await gate(w);
+    expect(out.outputs.stuck).toBe('10');
+    expect(out.failed).toContain('unable to move');
+  });
+
+  it('skips a draft and fails loudly on a pipeline pull request that is neither marked nor draft', async () => {
+    const w = world([
+      { number: 10, checks: 'green', draft: true },
+      { number: 11, checks: 'green', body: 'Closes #11' },
+      { number: 12, checks: 'green', body: 'a human PR', head: 'feature/something' },
+    ]);
+    const out = await gate(w);
+    expect(w.merges).toEqual([]);
+    expect(out.failed).toContain('Neither marked nor draft: #11');
+    expect(out.failed).not.toContain('#12');
   });
 });
 
@@ -1408,8 +1632,24 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   // file emitted it, so the fail-safe reads channels, not one path.
   it('evaluates every channel on the head rather than ci.yml alone', () => {
     expect(failsafe).not.toContain("run.path === '.github/workflows/ci.yml'");
-    expect(failsafe).toContain('MACHINERY.has(run.path)');
-    expect(failsafe).toContain('latestPerWorkflow');
+    expect(failsafe).toContain('latestPerWorkflow(onHead)');
+  });
+
+  // The merge gate merges only a head that contains the base's tip, so a PR
+  // that conflicts with it is as stuck as a red one — and only an agent can
+  // resolve it. Asked only on a dispatch (the gate's, or a re-raise), and only
+  // on GitHub's own `dirty`, never on the word of whoever dispatched.
+  it('hands back a conflict with the base, on a dispatch and GitHub\'s own verdict', () => {
+    expect(failsafe).toContain("if (dispatchedLookup && pr.mergeable_state === 'dirty')");
+    expect(failsafe).toContain('github.rest.repos.getBranch');
+    expect(failsafe).toContain('conflict:${conflict.sha}');
+    expect(failsafe).toContain('git merge origin/${conflict.base}');
+    expect(failsafe).toContain('never rebase or force-push');
+  });
+
+  // The same conflict is one question; the base moving on is a new one.
+  it('asks about a conflict once per head and base', () => {
+    expect(failsafe).toContain("const asksAbout = conflict ? `${pr.head.sha} conflict:${conflict.sha}` : `run:${ciRunId}`;");
   });
 
   // Under GITHUB_TOKEN the comment is authored by `github-actions[bot]` and both
@@ -1588,11 +1828,10 @@ describe('a work branch belongs to exactly one run', () => {
   });
 
   it.each(['claude-runner.yml', 'opencode-runner.yml'])(
-    '%s hands that exact branch to rescue and to auto-merge',
+    '%s hands that exact branch to rescue',
     (name) => {
       const text = workflow(name);
       expect(text).toContain('branch: ${{ steps.context.outputs.feature_branch }}');
-      expect(text).toContain('head: ${{ steps.context.outputs.feature_branch }}');
     }
   );
 
@@ -1664,38 +1903,35 @@ describe('what may carry an agent mention', () => {
 // red and no session is left to read it. The fail-safe covers that on the CI
 // event; this sweep covers the case where the fail-safe declined because a
 // session was live, and the case of a dropped webhook.
-// PR #773's ending, made impossible. The sweep already refused to merge it —
-// it reads every run on the head and a failing `closing-keyword-guard` made the
-// verdict `stuck` — and then said so only by failing its own job, which is
-// announced to nobody. `agentic-ci-failure.yml` is the thing that hands a red PR
-// back to an agent, and nothing was calling it for a red that was not `ci.yml`'s.
-describe('auto-merge hands back what it refuses to merge', () => {
-  const autoMerge = workflow('agentic-auto-merge.yml');
-  const handback = autoMerge.slice(autoMerge.indexOf('- name: Hand an unmergeable marked PR back'));
+// PR #773's ending, made impossible. The sweep refused to merge it — it reads
+// every run on the head and a failing `closing-keyword-guard` made the verdict
+// red — and then said so only by failing its own job, which is announced to
+// nobody. `agentic-ci-failure.yml` is the thing that hands a red PR back to an
+// agent, and nothing was calling it for a red that was not `ci.yml`'s. With the
+// merge gate a conflict with `main` goes the same way: only an agent resolves one.
+describe('the merge gate hands back what it cannot merge', () => {
+  const gate = workflow('agentic-auto-merge.yml');
+  const handback = gate.slice(gate.indexOf('- name: Hand a red or conflicting marked PR back'));
 
-  it('dispatches the fail-safe for every marked PR it could not arm', () => {
+  it('dispatches the fail-safe for every red or conflicting marked PR', () => {
     expect(handback).toContain('createWorkflowDispatch');
     expect(handback).toContain("workflow_id: 'agentic-ci-failure.yml'");
-    expect(handback).toContain('steps.merge.outputs.unarmed');
+    expect(handback).toContain('steps.merge.outputs.handback');
   });
 
-  // The sweep calls `core.setFailed` on exactly these PRs, so a step without
-  // `always()` would never run on the case it exists for.
+  // The sweep calls `core.setFailed` on stuck PRs, so a step without
+  // `always()` would be skipped on exactly the runs that also carry a handback.
   it('runs even though the sweep step failed', () => {
-    expect(handback).toMatch(/if: always\(\) && steps\.merge\.outputs\.unarmed != ''/);
+    expect(handback).toMatch(/if: always\(\) && steps\.merge\.outputs\.handback != ''/);
   });
 
-  // A dispatch that raises no event wakes nobody — the same reason every other
-  // event-raising step in this tree carries the PAT.
   it('dispatches with the PAT', () => {
     expect(handback).toContain('github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}');
   });
 
-  // It decides nothing: the fail-safe re-applies its own guards, so a failed
-  // dispatch is a lost fast path, not a lost report — the watchdog re-raises.
-  it('never fails the job on the dispatch itself', () => {
-    expect(handback).toContain('core.warning');
-    expect(handback).not.toContain('core.setFailed');
+  // A handback that did not happen is a PR nobody is fixing.
+  it('fails the job when a dispatch could not be made', () => {
+    expect(handback).toMatch(/if \(failed\.length > 0\) \{\s*\n\s*core\.setFailed\(/);
   });
 });
 
@@ -1778,7 +2014,7 @@ describe('an agent that never started is not an agent that produced nothing', ()
 // reintroduces #773 in whichever reader drifted. Inline in the two workflows
 // because neither job checks out the repository; `ci-handback.cjs` is `.cjs`
 // for the same reason the nudge job's own script is inline.
-describe('the machinery list is one list, in four copies', () => {
+describe('the machinery list is one list, in three copies', () => {
   const MACHINERY = [
     'agentic-auto-merge.yml',
     'agentic-ci-failure.yml',
@@ -1795,7 +2031,6 @@ describe('the machinery list is one list, in four copies', () => {
   // itself `agentic-` and exempted itself from every reader at once.
   it.each([
     ['scripts/lib/workflow-verdict.ts', 'const MACHINERY_WORKFLOWS'],
-    ['.github/workflows/agentic-ci-failure.yml', 'const MACHINERY = new Set(['],
     ['.github/workflows/agentic-watchdog.yml', 'const MACHINERY = new Set(['],
     ['.github/scripts/ci-handback.cjs', 'const MACHINERY = new Set(['],
   ])('%s lists the same set, and never the closing-keyword guard', (path, marker) => {
@@ -1811,11 +2046,10 @@ describe('the machinery list is one list, in four copies', () => {
 // Unlike MACHINERY/MARKER, RUN_FAILURES had no pinning test proving its three
 // copies — `agentic-ci-failure.yml`'s nudge job, `agentic-watchdog.yml`'s
 // re-raise step, and `ci-handback.cjs`'s exported constant — stay identical.
-describe('the run-failure conclusions are one list, in three copies', () => {
+describe('the run-failure conclusions are one list, in two copies', () => {
   const RUN_FAILURES = ['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'];
 
   it.each([
-    ['.github/workflows/agentic-ci-failure.yml'],
     ['.github/workflows/agentic-watchdog.yml'],
     ['.github/scripts/ci-handback.cjs'],
   ])('%s lists the same run-failure conclusions', (path) => {
@@ -1826,6 +2060,21 @@ describe('the run-failure conclusions are one list, in three copies', () => {
     const block = text.slice(start, text.indexOf(']', start) + 1);
     const listed = [...block.matchAll(/'([\w-]+)'/g)].map((m) => m[1]);
     expect(listed.sort()).toEqual([...RUN_FAILURES].sort());
+  });
+});
+
+// The CI fail-safe and the merge gate both check the repository out, so neither
+// has a reason to carry its own copy of what counts as a channel or as red.
+describe('the fail-safe and the gate read channels through the shared module', () => {
+  it.each([
+    ['.github/workflows/agentic-ci-failure.yml'],
+    ['.github/actions/agentic-auto-merge/action.yml'],
+  ])('%s requires ci-handback.cjs and carries no list of its own', (path) => {
+    const text = readFileSync(join(ROOT, path), 'utf8');
+    expect(text).toContain('.github/scripts/ci-handback.cjs');
+    expect(text).toContain('latestPerWorkflow');
+    expect(text).not.toContain('const MACHINERY = new Set([');
+    expect(text).not.toContain('const RUN_FAILURES = ');
   });
 });
 
@@ -2084,10 +2333,9 @@ describe('a pipeline PR that is neither marked nor draft', () => {
     expect(skip).toContain('unmarked.push(n)');
   });
 
-  // Same reasoning as `unarmed`: nothing else is watching, so a warning in a
+  // Same reasoning as `stuck`: nothing else is watching, so a warning in a
   // log nobody reads is the same as saying nothing at all.
   it('fails the step rather than passing with a warning', () => {
-    expect(source).toContain("core.setOutput('unmarked'");
     expect(source).toMatch(/if \(unmarked\.length > 0\) \{\s*\n\s*core\.setFailed\(/);
   });
 

@@ -133,36 +133,15 @@ jobs:
             // the issue number is group 1 either way.
             const PIPELINE_HEAD = /^pipeline\/feature-(\d+)(?:-\d+)?$/;
 
-            // Kept in shape with `MACHINERY_WORKFLOWS` in `scripts/lib/workflow-verdict.ts`
-            // and with the watchdog's own copy: a workflow run on the head is a
-            // verification channel unless it is named here. Inline rather than
-            // imported because this job has no checkout, and pinned across all
-            // copies by `autonomy-loop.test.ts`.
-            const MACHINERY = new Set([
-              '.github/workflows/agentic-auto-merge.yml',
-              '.github/workflows/agentic-ci-failure.yml',
-              '.github/workflows/agentic-intake.yml',
-              '.github/workflows/agentic-trigger.yml',
-              '.github/workflows/agentic-watchdog.yml',
-              '.github/workflows/auto-assign-next.yml',
-              '.github/workflows/claude-runner.yml',
-              '.github/workflows/handle-failure.yml',
-              '.github/workflows/opencode-runner.yml',
-            ]);
-            const RUN_FAILURES = ['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'];
-
-            // One run per workflow, newest — `cancel-in-progress` leaves
-            // superseded runs on the same head forever, and counting those makes
-            // every pushed fix permanently red.
-            const latestPerWorkflow = (runs) => {
-              const latest = new Map();
-              for (const run of runs) {
-                if (MACHINERY.has(run.path)) continue;
-                const seen = latest.get(run.workflow_id);
-                if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
-              }
-              return [...latest.values()];
-            };
+            // What counts as a channel, which conclusions are red, and one run
+            // per workflow, newest — `cancel-in-progress` leaves superseded runs
+            // on the same head forever, and counting those makes every pushed
+            // fix permanently red. One module decides all three for every
+            // reader of a pull request's head: this fail-safe, the merge gate,
+            // and the scan below.
+            const { RUN_FAILURES, latestPerWorkflow } = require(
+              `${process.env.GITHUB_WORKSPACE}/.github/scripts/ci-handback.cjs`
+            );
 
             const dispatched = parseInt(process.env.DISPATCH_PR || '', 10);
             let pr;
@@ -240,8 +219,8 @@ jobs:
             // `[await-ci]` step reads it and loops. Commenting now would queue a
             // second runner on this pull request, and two sessions would push to
             // one branch. The check covers the whole runner job, not just its
-            // agent step, so a run in its rescue or auto-merge-arming steps
-            // still counts as live.
+            // agent step, so a run in its rescue or recovery steps still counts
+            // as live.
             //
             // **This work, not any work.** Several sessions can be live at once
             // (`AGENTIC_MAX_PARALLEL_RUNS`), and before runs carried their
@@ -286,11 +265,22 @@ jobs:
             const limit = Number.isInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : 3;
 
             // The event this workflow answers, identified. On the `workflow_run`
-            // path it is the run that woke us. On a dispatch — a human, or the
-            // watchdog re-raising a PR whose CI reported while a session was
-            // live — there is no such run, so the head's own latest CI run is
-            // found here, and it must actually be red: a dispatch is a request to
-            // look, never evidence.
+            // path it is the run that woke us. On a dispatch — a human, the
+            // merge gate, or the watchdog re-raising a PR whose CI reported
+            // while a session was live — there is no such run, so the head is
+            // read here, and it must actually be red or conflicting: a dispatch
+            // is a request to look, never evidence.
+            //
+            // **A conflict with the base is the same kind of failure.** The
+            // merge gate merges only a head that contains the base's tip, and
+            // with several sessions live the base moves under every open pull
+            // request. A PR that conflicts with it can neither be brought up to
+            // date by the gate nor merged, and before this nothing handed it to
+            // anyone: the gate went red, this fail-safe found every channel
+            // green and said "nothing to fix". Only a dispatch asks about it —
+            // the `workflow_run` path answers a CI run and nothing else — and
+            // `dirty` is GitHub's own verdict, read here rather than trusted
+            // from whoever dispatched.
             //
             // **Every channel on the head, not just `ci.yml`.** This used to look
             // up one workflow by path, so a red check any other workflow emitted
@@ -300,7 +290,11 @@ jobs:
             // emitted it.
             const dispatchedLookup = Number.isNaN(ciRunId);
             let redRuns = [];
-            if (dispatchedLookup) {
+            let conflict = null;
+            if (dispatchedLookup && pr.mergeable_state === 'dirty') {
+              const { data: base } = await github.rest.repos.getBranch({ owner, repo, branch: pr.base.ref });
+              conflict = { base: pr.base.ref, sha: base.commit.sha };
+            } else if (dispatchedLookup) {
               const onHead = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
                 owner, repo, head_sha: pr.head.sha, per_page: 100
               });
@@ -310,7 +304,7 @@ jobs:
                 return;
               }
               redRuns = channels.filter(
-                (run) => run.status === 'completed' && RUN_FAILURES.includes(run.conclusion)
+                (run) => run.status === 'completed' && RUN_FAILURES.has(run.conclusion)
               );
               if (redRuns.length === 0) {
                 const stillGoing = channels.filter((run) => run.status !== 'completed');
@@ -331,7 +325,9 @@ jobs:
             // ── Idempotency, and the brake ──
             // Both read off the PR's own comments, so no state is kept anywhere
             // else and nothing has to be cleaned up. The marker names the commit
-            // and the CI run the handback was raised for.
+            // and the CI run the handback was raised for — or, for a conflict,
+            // the commit and the base tip it conflicts with: the same conflict
+            // is one question, and the base moving on is a new one.
             //
             // **No clock anywhere in here.** Duration thresholds are the wrong
             // tool for this: a cooldown long enough for today's CI is a stall
@@ -345,7 +341,8 @@ jobs:
               owner, repo, issue_number: pr.number, per_page: 100
             });
             const nudges = comments.filter((comment) => (comment.body || '').includes(MARKER));
-            const askedAboutThisRun = nudges.some((comment) => (comment.body || '').includes(`run:${ciRunId}`));
+            const asksAbout = conflict ? `${pr.head.sha} conflict:${conflict.sha}` : `run:${ciRunId}`;
+            const askedAboutThisRun = nudges.some((comment) => (comment.body || '').includes(asksAbout));
 
             // Firing twice for the same run id means the same event arrived
             // twice — a redelivery, a re-request, or (now that
@@ -357,8 +354,11 @@ jobs:
             // `workflow_dispatch` is no longer, on its own, evidence that a
             // repeat is wanted. Only `force_retry` says that explicitly.
             const forceRetry = dispatchedLookup && process.env.FORCE_RETRY === 'true';
+            const asked = conflict
+              ? `the conflict of ${pr.head.sha.slice(0, 7)} with ${conflict.base} at ${conflict.sha.slice(0, 7)}`
+              : `CI run ${ciRunId}`;
             if (askedAboutThisRun && !forceRetry) {
-              core.info(`#${pr.number}: CI run ${ciRunId} was already handed back. Same event, not a new failure.`);
+              core.info(`#${pr.number}: ${asked} was already handed back. Same event, not a new failure.`);
               return;
             }
 
@@ -373,7 +373,7 @@ jobs:
             // never repeat a nudge for a run id already commented about.
             if (askedAboutThisRun) {
               core.info(
-                `#${pr.number}: CI run ${ciRunId} was handed back before and the head is still ` +
+                `#${pr.number}: ${asked} was handed back before and the head is still ` +
                 `${pr.head.sha.slice(0, 7)} with no session running — force_retry requested. Asking again.`
               );
             }
@@ -394,9 +394,11 @@ jobs:
                 core.warning(`Could not list the failing jobs of run ${red.id}: ${error.message}`);
               }
             }
-            const failureBlock = failures.length
-              ? failures.join('\n')
-              : '- (the failing jobs could not be listed — open the PR\'s Checks tab)';
+            const failureBlock = conflict
+              ? `- \`${pr.head.ref}\` conflicts with \`${conflict.base}\` at \`${conflict.sha.slice(0, 7)}\``
+              : failures.length
+                ? failures.join('\n')
+                : '- (the failing jobs could not be listed — open the PR\'s Checks tab)';
 
             if (nudges.length >= limit) {
               // The brake, and it must leave the queue moving. A draft takes the
@@ -417,12 +419,12 @@ jobs:
               await github.rest.issues.createComment({
                 owner, repo, issue_number: pr.number,
                 body: [
-                  '⛔ **CI is still red after ' + nudges.length + ' agent attempt(s).**',
+                  '⛔ **Still not mergeable after ' + nudges.length + ' agent attempt(s).**',
                   '',
                   'What is failing:',
                   failureBlock,
                   '',
-                  `The limit is \`AGENTIC_CI_FIX_ATTEMPT_LIMIT\` (${limit}). This pull request is now a draft, so auto-merge no longer considers it, and issue #${issueNumber} is labelled \`blocked\` — the queue moves on rather than waiting on a failure that is not converging.`,
+                  `The limit is \`AGENTIC_CI_FIX_ATTEMPT_LIMIT\` (${limit}), shared by red channels and conflicts with the base. This pull request is now a draft, so the merge gate no longer considers it, and issue #${issueNumber} is labelled \`blocked\` — the queue moves on rather than waiting on a failure that is not converging.`,
                   '',
                   '@Nico2398 — the failures above are the whole record. Fix them and mark the PR ready for review, or close it and put `ready` back on the issue.',
                   '',
@@ -451,31 +453,45 @@ jobs:
             }
 
             const attempt = nudges.length + 1;
+            const redBody = [
+              `${mention} — CI is red on this pull request and no agent session is running. Fix it.`,
+              '',
+              `This is CI-fix attempt ${attempt} of ${limit} on PR #${pr.number} (\`${pr.head.ref}\`, commit \`${pr.head.sha.slice(0, 7)}\`), which closes issue #${issueNumber}.`,
+              '',
+              '**What is failing:**',
+              failureBlock,
+              '',
+              '**What to do** — this is the `ci-fix` task type; load `agentic-pipeline-ci-fix` and follow it:',
+              '',
+              `1. Check out the existing \`${pr.head.ref}\` and \`git pull --no-rebase\` it — the merge gate may have merged \`${pr.base.ref}\` into it. Do **not** recreate it, and do not start a fresh TDD cycle — the work is already on it and this pull request is built on it.`,
+              '2. Read the failing job logs above before changing anything. A CI-only channel (interaction-mode `visual`, the production `build`) reports things a sandbox without a GPU cannot reproduce, so read the log and the FAIL screenshots in the run artifacts rather than assuming the failure is local.',
+              '3. Decide which side is wrong — the change or the expectation — and fix that side. A baked expectation updated to match broken behaviour is a silent regression.',
+              `4. Verify every channel the fix touches, commit, and push to \`${pr.head.ref}\`. Never \`[skip ci]\`, never rebase or force-push.`,
+              '5. Then **wait for CI to report** before ending the session: `npm run ci:await -- --pr ' + pr.number + '`. Green means done. Red means go back to step 2.',
+              '',
+              `The \`READY TO MERGE\` marker on this pull request stays as it is — the merge gate merges it once CI is green on a head that contains \`${pr.base.ref}\`, and that is what releases issue #${issueNumber} and starts the next task. If you cannot turn a channel green, say so in a comment, convert this pull request to a draft, and label issue #${issueNumber} \`blocked\`.`,
+            ];
+            const conflictBody = conflict && [
+              `${mention} — this pull request conflicts with \`${conflict.base}\` and no agent session is running on it. Resolve it.`,
+              '',
+              `This is attempt ${attempt} of ${limit} on PR #${pr.number} (\`${pr.head.ref}\`, commit \`${pr.head.sha.slice(0, 7)}\`), which closes issue #${issueNumber}. \`${conflict.base}\` is at \`${conflict.sha.slice(0, 7)}\`. Other work landed while this one was in flight; the merge gate merges a pull request only on top of the current \`${conflict.base}\`, and it cannot merge this one in for you.`,
+              '',
+              '**What to do** — this is the `ci-fix` task type, conflict variant; load `agentic-pipeline-ci-fix` and follow it:',
+              '',
+              `1. Check out the existing \`${pr.head.ref}\` and \`git pull --no-rebase\` it. Do **not** recreate it, and do not start a fresh TDD cycle.`,
+              `2. \`git fetch origin ${conflict.base}\` and \`git merge origin/${conflict.base}\`. Resolve every conflict so both sides' intent survives. Regenerate lockfiles and generated files with their tooling, never by hand. A conflict in a mirrored context file is resolved once and mirrored to all three runtime directories.`,
+              '3. Re-run the verification channels the merge touched — at least `npm run typecheck` and `npm run test`, plus `npm run validate:context` if any context file conflicted.',
+              `4. Commit the merge and push to \`${pr.head.ref}\`. Never \`[skip ci]\`, never rebase or force-push.`,
+              '5. Then **wait for CI to report** before ending the session: `npm run ci:await -- --pr ' + pr.number + '`. Green means done — the merge gate merges it. Red means fix it and push again.',
+              '',
+              `If the branch already merges cleanly when you look, the conflict was resolved before you arrived: go straight to step 5. If resolving it means choosing between two behaviours only a human can choose between, say so in a comment, convert this pull request to a draft, and label issue #${issueNumber} \`blocked\`.`,
+            ];
             await github.rest.issues.createComment({
               owner, repo, issue_number: pr.number,
-              body: [
-                `${mention} — CI is red on this pull request and no agent session is running. Fix it.`,
-                '',
-                `This is CI-fix attempt ${attempt} of ${limit} on PR #${pr.number} (\`${pr.head.ref}\`, commit \`${pr.head.sha.slice(0, 7)}\`), which closes issue #${issueNumber}.`,
-                '',
-                '**What is failing:**',
-                failureBlock,
-                '',
-                '**What to do** — this is the `ci-fix` task type; load `agentic-pipeline-ci-fix` and follow it:',
-                '',
-                `1. Check out the existing \`${pr.head.ref}\`. Do **not** recreate it, and do not start a fresh TDD cycle — the work is already on it and this pull request is built on it.`,
-                '2. Read the failing job logs above before changing anything. A CI-only channel (interaction-mode `visual`, the production `build`) reports things a sandbox without a GPU cannot reproduce, so read the log and the FAIL screenshots in the run artifacts rather than assuming the failure is local.',
-                '3. Decide which side is wrong — the change or the expectation — and fix that side. A baked expectation updated to match broken behaviour is a silent regression.',
-                `4. Verify every channel the fix touches, commit, and push to \`${pr.head.ref}\`. Never \`[skip ci]\`.`,
-                '5. Then **wait for CI to report** before ending the session: `npm run ci:await -- --pr ' + pr.number + '`. Green means done. Red means go back to step 2.',
-                '',
-                `The \`READY TO MERGE\` marker on this pull request stays as it is — auto-merge merges it the moment CI reports green, and that is what releases issue #${issueNumber} and starts the next task. If you cannot turn a channel green, say so in a comment, convert this pull request to a draft, and label issue #${issueNumber} \`blocked\`.`,
-                '',
-                `${MARKER} ${pr.head.sha} run:${ciRunId}`
-              ].join('\n')
+              body: [...(conflictBody || redBody), '', `${MARKER} ${pr.head.sha} ${conflict ? `conflict:${conflict.sha}` : `run:${ciRunId}`}`].join('\n')
             });
 
-            core.info(`#${pr.number}: asked ${mention} to fix CI (attempt ${attempt}/${limit}).`);
+            core.info(`#${pr.number}: asked ${mention} to ${conflict ? 'resolve a conflict with ' + conflict.base : 'fix CI'} (attempt ${attempt}/${limit}).`);
 
   # `nudge` above declines to comment while a runner session is live, because
   # that session's own `[await-ci]` step reads the verdict itself — but the
