@@ -1543,7 +1543,7 @@ describe('tickVehicle — sustained-stuck release for a vehicle-gated task insid
    * is permanently unreachable from the surface.
    */
   function buildCraterVoxelGrid(): VoxelGrid {
-    const grid = new VoxelGrid(20, 30, 30);
+    const grid = new VoxelGrid(20, 30);
     fillSolid(grid, SURFACE_Y);
     for (let z = CRATER_MIN_Z; z <= CRATER_MAX_Z; z++) {
       for (let x = CRATER_MIN_X; x <= CRATER_MAX_X; x++) {
@@ -1719,7 +1719,7 @@ describe('vehicle-gated stuck-abandon dispatch backoff (#1130)', () => {
 
   /** A fully walkable flat NavGrid, wide enough for a short reachable drive. */
   function buildFlatCtx(): GameContext {
-    const grid = new VoxelGrid(20, 2, 10);
+    const grid = new VoxelGrid(20, 10);
     for (let x = 0; x < 20; x++) {
       for (let z = 0; z < 10; z++) grid.setVoxel(x, 0, z, solidVoxel());
     }
@@ -2094,7 +2094,7 @@ describe('fast transport (#1093)', () => {
 
   /** A fully walkable flat NavGrid, wide enough for a genuinely distant on-foot order. */
   function buildFlatCtx(width: number): GameContext {
-    const grid = new VoxelGrid(width, 2, 10);
+    const grid = new VoxelGrid(width, 10);
     for (let x = 0; x < width; x++) {
       for (let z = 0; z < 10; z++) grid.setVoxel(x, 0, z, solidVoxel());
     }

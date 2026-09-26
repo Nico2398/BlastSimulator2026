@@ -29,7 +29,7 @@ function makeState() {
   const state = createGame({ seed: 1, mineType: 'desert' });
   // Give the state a real, non-null NavGrid so the assertion below verifies
   // actual object pass-through, not just a null default.
-  const grid = new VoxelGrid(4, 4, 4);
+  const grid = new VoxelGrid(4, 4);
   for (let z = 0; z < 4; z++)
     for (let x = 0; x < 4; x++)
       grid.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });

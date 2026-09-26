@@ -44,7 +44,7 @@ describe('MarchingCubesTables', () => {
       [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1],
     ];
     for (let config = 0; config < 256; config++) {
-      const grid = new VoxelGrid(2, 2, 2);
+      const grid = new VoxelGrid(2, 2);
       for (let i = 0; i < 8; i++) {
         if (!(config & (1 << i))) continue;
         const [x, y, z] = CORNER_OFFSETS[i]!;

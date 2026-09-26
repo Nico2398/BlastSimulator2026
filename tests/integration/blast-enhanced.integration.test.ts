@@ -124,7 +124,7 @@ describe('Blast enhanced', () => {
   // ── 2. Energy propagation ─────────────────────────────────────────────────
 
   it('energy propagates through rock, decreasing with distance', () => {
-    const grid = new VoxelGrid(15, 15, 15);
+    const grid = new VoxelGrid(15, 15);
     fillRegion(grid, 'cruite', 0, 14, 0, 14, 0, 14);
 
     const holeEnergy = calculateHoleEnergy({ explosiveId: 'boomite', amountKg: 8, stemmingM: 2 });
@@ -148,7 +148,7 @@ describe('Blast enhanced', () => {
   // ── 3. Mixed-rock blast ───────────────────────────────────────────────────
 
   it('blast on mixed rock clears voxels', () => {
-    const grid = new VoxelGrid(30, 15, 30);
+    const grid = new VoxelGrid(30, 30);
     // Left half cruite (soft, threshold 200), right half titanite (hard, threshold 4000)
     fillMultiRock(grid, 'cruite', 'titanite', 15, 5, 25, 0, 10, 5, 25);
 
@@ -174,7 +174,7 @@ describe('Blast enhanced', () => {
   // ── 4. Empty plan ─────────────────────────────────────────────────────────
 
   it('empty plan returns null blast result', () => {
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     // Holes exist but no charges or delays → validation fails
     const holes = createGridPlan({ x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     const plan = assembleBlastPlan(holes, {}, {});
@@ -185,7 +185,7 @@ describe('Blast enhanced', () => {
   // ── 5. Well-designed blast ────────────────────────────────────────────────
 
   it('well-designed blast produces good/perfect rating', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 30, 0, 12, 5, 30);
 
     // boomite 8kg (340E/kg × 8 = 2720E) on molite (threshold 500)
@@ -209,7 +209,7 @@ describe('Blast enhanced', () => {
   // ── 6. Overcharged blast ──────────────────────────────────────────────────
 
   it('overcharged blast on soft rock produces projections', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'cruite', 5, 30, 0, 12, 5, 30);
 
     // dynatomics 25kg (1300E/kg × 25 = 32500E) on cruite (threshold 200)
@@ -232,7 +232,7 @@ describe('Blast enhanced', () => {
   // ── 7. Undercharged blast ─────────────────────────────────────────────────
 
   it('undercharged blast on hard rock produces bad rating', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'titanite', 5, 30, 0, 12, 5, 30);
 
     // pop_rock 2kg (200E/kg × 2 = 400E) on titanite (threshold 4000)
@@ -256,7 +256,7 @@ describe('Blast enhanced', () => {
   // ── 8. Minimal energy ─────────────────────────────────────────────────────
 
   it('very small energy cracks very few or no voxels', () => {
-    const grid = new VoxelGrid(30, 15, 30);
+    const grid = new VoxelGrid(30, 30);
     fillRegion(grid, 'titanite', 5, 25, 0, 10, 5, 25);
 
     // pop_rock 0.5kg (minimum charge) on titanite (threshold 4000)
@@ -280,7 +280,7 @@ describe('Blast enhanced', () => {
   // ── 9. Fragmentation classification ───────────────────────────────────────
 
   it('rates how hard rock was hit by the energy that passed through it', () => {
-    const grid = new VoxelGrid(15, 15, 15);
+    const grid = new VoxelGrid(15, 15);
     fillRegion(grid, 'cruite', 0, 14, 0, 14, 0, 14);
 
     const field = createEnergyField(grid, {
@@ -297,7 +297,7 @@ describe('Blast enhanced', () => {
   });
 
   it('blast clears terrain voxels around charge', () => {
-    const grid = new VoxelGrid(30, 15, 30);
+    const grid = new VoxelGrid(30, 30);
     fillRegion(grid, 'cruite', 8, 20, 0, 8, 8, 20);
 
     // Verify voxels are solid before blast

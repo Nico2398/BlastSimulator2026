@@ -879,6 +879,16 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
 // checkFootprintPlacement directly, against the real generated ctx.grid.
 
 /**
+ * `makeGameContext`'s `ctx.grid` is real generated terrain (height-free,
+ * #1192) — `grid.sizeY` reads a fixed internal sentinel now, not a real
+ * bound. Before the height-free migration, this file's `new_game size:32`
+ * built a grid whose `sizeY` was `size` (32); real generated terrain never
+ * exceeds that (unchanged by the migration, byte-identical generation per
+ * #1190), so it's still the right ceiling for a full-column clear/set scan.
+ */
+const GRID_SIZE_Y = 32;
+
+/**
  * Force every column under `type`/`tier`'s footprint at (x,z) to a uniform
  * surface height on the real ctx.grid — the generated terrain at any given
  * coordinate isn't guaranteed flat OR uneven, so these tests carve a
@@ -893,7 +903,7 @@ function flattenFootprint(
   for (const [dx, dz] of def.footprint) {
     const cx = x + dx;
     const cz = z + dz;
-    for (let y = 0; y < grid.sizeY; y++) {
+    for (let y = 0; y < GRID_SIZE_Y; y++) {
       if (y < height) grid.setVoxel(cx, y, cz, rock);
       else grid.clearVoxel(cx, y, cz);
     }

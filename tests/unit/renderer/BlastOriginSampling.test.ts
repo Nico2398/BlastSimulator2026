@@ -10,10 +10,10 @@ import { getBlastOriginSurfaceY, boundingBoxXZ } from '../../../src/renderer/Bla
 
 /** Mirrors GameRenderer's private getTerrainSurfaceY: highest solid-voxel Y
  *  in the (clamped) column, or 0 if the column is empty. */
-function terrainSurfaceY(grid: VoxelGrid, x: number, z: number): number {
+function terrainSurfaceY(grid: VoxelGrid, x: number, z: number, height: number): number {
   const gx = Math.max(0, Math.min(grid.sizeX - 1, Math.floor(x)));
   const gz = Math.max(0, Math.min(grid.sizeZ - 1, Math.floor(z)));
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
+  for (let y = height - 1; y >= 0; y--) {
     const v = grid.getVoxel(gx, y, gz);
     if (v && v.density >= SOLID_VOXEL_DENSITY_THRESHOLD) return y + 1;
   }
@@ -40,7 +40,8 @@ describe('getBlastOriginSurfaceY', () => {
     // entirely inside the crater and would read back y=0 (the original bug —
     // the dust cloud/flash rendered buried underground). The fix keeps
     // widening the ring until it clears the crater edge.
-    const grid = new VoxelGrid(40, 10, 40);
+    const BASE_HEIGHT = 10;
+    const grid = new VoxelGrid(40, 40);
     const solidVoxel = {
       composition: { rocks: [{ rockId: 'sandite', coefficient: 1 }] },
       density: 1,
@@ -61,7 +62,7 @@ describe('getBlastOriginSurfaceY', () => {
     // minRadius=3: every offset ring up to r=6 stays inside the radius-10
     // crater (all density 0) — only the wider r=9 ring's diagonal offsets
     // reach outside it and find solid ground.
-    const y = getBlastOriginSurfaceY(grid, (x, z) => terrainSurfaceY(grid, x, z), 20, 20, 3);
+    const y = getBlastOriginSurfaceY(grid, (x, z) => terrainSurfaceY(grid, x, z, BASE_HEIGHT), 20, 20, 3);
     expect(y).toBe(1);
   });
 
@@ -73,7 +74,8 @@ describe('getBlastOriginSurfaceY', () => {
     // produces the solid height (1) if the function actually falls back to
     // getSurfaceY(cx, cz) after the ring loop exhausts — a buggy version that
     // returns 0 straight after the loop (no fallback) would report 0 here.
-    const grid = new VoxelGrid(10, 5, 10);
+    const BASE_HEIGHT = 5;
+    const grid = new VoxelGrid(10, 10);
     grid.setVoxel(5, 0, 5, {
       composition: { rocks: [{ rockId: 'sandite', coefficient: 1 }] },
       density: 1,
@@ -81,7 +83,7 @@ describe('getBlastOriginSurfaceY', () => {
       fractureModifier: 1,
     });
 
-    const y = getBlastOriginSurfaceY(grid, (x, z) => terrainSurfaceY(grid, x, z), 5, 5, 3);
+    const y = getBlastOriginSurfaceY(grid, (x, z) => terrainSurfaceY(grid, x, z, BASE_HEIGHT), 5, 5, 3);
     expect(y).toBe(1);
   });
 });

@@ -317,7 +317,7 @@ describe('buildingFootprintSurfaceY (#1007, corrected columns #1145)', () => {
   });
 
   it('still returns a sane finite value for a footprint flush against the grid boundary, sampled through the real clamping surface sampler', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(15, 4, 15, 0, undefined, 1);
     // Placed so 2 of its 4 own footprint cells (x=16) fall outside the
     // 16-wide grid (valid columns 0..15) — getSmoothTerrainSurfaceY clamps

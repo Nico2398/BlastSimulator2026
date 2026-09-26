@@ -51,7 +51,7 @@ function makeSolidVoxel(rockId = 'sandite'): import('../../../src/core/world/Vox
 const MULTI_CHUNK_SIZE_XZ = CHUNK_SIZE * 3;
 const MULTI_CHUNK_SIZE_Y = CHUNK_SIZE * 2;
 function fullySolidMultiChunkGrid(): VoxelGrid {
-  const grid = new VoxelGrid(MULTI_CHUNK_SIZE_XZ, MULTI_CHUNK_SIZE_Y, MULTI_CHUNK_SIZE_XZ);
+  const grid = new VoxelGrid(MULTI_CHUNK_SIZE_XZ, MULTI_CHUNK_SIZE_XZ);
   for (let x = 0; x < MULTI_CHUNK_SIZE_XZ; x++)
     for (let y = 0; y < MULTI_CHUNK_SIZE_Y; y++)
       for (let z = 0; z < MULTI_CHUNK_SIZE_XZ; z++)
@@ -87,7 +87,7 @@ function makeOverlayOptions(
 describe('TerrainMesh', () => {
   it('buildAll on empty grid adds no meshes', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     const tm = new TerrainMesh(scene, grid);
     tm.buildAll();
     expect(scene.children.length).toBe(0);
@@ -101,7 +101,7 @@ describe('TerrainMesh', () => {
     // whole site. Only the visible ground and the boundary/skirt walls are
     // emitted; nothing closes the bottom of the world.
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     for (let x = 0; x < 4; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 4; z++)
@@ -146,7 +146,7 @@ describe('TerrainMesh', () => {
 
     /** Terrain filled solid below `surfaceY`, air above — a flat site. */
     function flatSite(size: number, surfaceY: number): VoxelGrid {
-      const grid = new VoxelGrid(size, size, size);
+      const grid = new VoxelGrid(size, size);
       for (let x = 0; x < size; x++)
         for (let y = 0; y < surfaceY; y++)
           for (let z = 0; z < size; z++)
@@ -224,7 +224,7 @@ describe('TerrainMesh', () => {
 
   it('buildAll generates mesh when there is a solid/air boundary', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     // Fill bottom half solid, top half air — creates a flat surface at y=4
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
@@ -238,7 +238,7 @@ describe('TerrainMesh', () => {
 
   it('chunk meshes cast and receive shadows (#458 T5.1/CSM)', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 8; z++)
@@ -253,7 +253,7 @@ describe('TerrainMesh', () => {
 
   it('generated geometry has position and rock/ore attributes, no CPU vertex color (#458 T4.1/A18)', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 8; z++)
@@ -283,7 +283,7 @@ describe('TerrainMesh', () => {
 
   it('aOreId is -1 and aOreAmt is 0 when no corner carries ore', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
         for (let z = 0; z < 8; z++)
@@ -302,7 +302,7 @@ describe('TerrainMesh', () => {
 
   it('re-meshing a 16³ chunk completes in under 200ms', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     // Fill with varied densities to produce interesting surface
     for (let x = 0; x < 16; x++)
       for (let y = 0; y < 8; y++)
@@ -321,7 +321,7 @@ describe('TerrainMesh', () => {
     // 3 chunks along X (0..15, 16..31, 32..47), 1 along Y/Z. Solid bottom
     // half everywhere so every chunk has real geometry to compare identity against.
     function makeThreeChunkGrid(): VoxelGrid {
-      const grid = new VoxelGrid(48, 16, 16);
+      const grid = new VoxelGrid(48, 16);
       for (let x = 0; x < 48; x++)
         for (let y = 0; y < 8; y++)
           for (let z = 0; z < 16; z++)
@@ -405,7 +405,7 @@ describe('TerrainMesh', () => {
       // vertices, each a real test that both chunks compute the identical
       // interpolated crossing from the same shared VoxelGrid data.
       const scene = makeScene();
-      const grid = new VoxelGrid(32, 16, 16); // 2 chunks along x (16 each), 1 along y/z
+      const grid = new VoxelGrid(32, 16); // 2 chunks along x (16 each), 1 along y/z
       for (let x = 0; x < 32; x++) {
         for (let z = 0; z < 16; z++) {
           const surfaceY = 4 + (z % 5); // varies 4..8 with z
@@ -456,8 +456,8 @@ describe('TerrainMesh', () => {
 
   describe('the sealing halo is meshed as the neighbouring ground (#907)', () => {
     /** A one-chunk site filled to a fractional surface, so the crossing is not on a lattice line. */
-    function siteGrid(sizeY = 16, surfaceH = 6.4): VoxelGrid {
-      const grid = new VoxelGrid(16, sizeY, 16);
+    function siteGrid(_sizeY = 16, surfaceH = 6.4): VoxelGrid {
+      const grid = new VoxelGrid(16, 16);
       const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
       for (let x = 0; x < 16; x++) {
         for (let z = 0; z < 16; z++) {
@@ -553,7 +553,7 @@ describe('TerrainMesh', () => {
 
   describe('setVoxelColumnSurfaceHeight — mesh agrees with the write (#1143)', () => {
     it('every touched column\'s integer lattice node reports the exact written height', () => {
-      const grid = new VoxelGrid(16, 16, 16);
+      const grid = new VoxelGrid(16, 16);
       const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
       const height = 12.7;
 
@@ -652,7 +652,7 @@ describe('TerrainMesh', () => {
     const SIZE = 8;
 
     function flatGrid(): VoxelGrid {
-      const grid = new VoxelGrid(SIZE, 8, SIZE);
+      const grid = new VoxelGrid(SIZE, SIZE);
       for (let x = 0; x < SIZE; x++)
         for (let y = 0; y < SURFACE_Y; y++)
           for (let z = 0; z < SIZE; z++)
@@ -712,7 +712,7 @@ describe('TerrainMesh', () => {
       // geometry" above — a non-flat surface across a chunk seam, the case
       // most likely to be perturbed if a sampler were threaded unconditionally.
       function buildSeamGrid(): VoxelGrid {
-        const grid = new VoxelGrid(32, 16, 16);
+        const grid = new VoxelGrid(32, 16);
         for (let x = 0; x < 32; x++) {
           for (let z = 0; z < 16; z++) {
             const surfaceY = 4 + (z % 5);
@@ -799,7 +799,7 @@ describe('TerrainMesh', () => {
     it('a flat site with no blast is watertight to begin with (sanity baseline)', () => {
       const scene = makeScene();
       const size = 8;
-      const grid = new VoxelGrid(size, size, size);
+      const grid = new VoxelGrid(size, size);
       for (let x = 0; x < size; x++)
         for (let y = 0; y < 4; y++)
           for (let z = 0; z < size; z++)
@@ -813,7 +813,7 @@ describe('TerrainMesh', () => {
     it('stays watertight after a blast carves a crater right at the site edge', () => {
       const scene = makeScene();
       const size = 8;
-      const grid = new VoxelGrid(size, size, size);
+      const grid = new VoxelGrid(size, size);
       for (let x = 0; x < size; x++)
         for (let y = 0; y < 4; y++)
           for (let z = 0; z < size; z++)
@@ -839,7 +839,7 @@ describe('TerrainMesh', () => {
   describe('meshes (P2 — scene picking raycast targets)', () => {
     it('returns every built chunk mesh', () => {
       const scene = makeScene();
-      const grid = new VoxelGrid(8, 4, 8);
+      const grid = new VoxelGrid(8, 8);
       for (let x = 0; x < 8; x++)
         for (let y = 0; y < 4; y++)
           for (let z = 0; z < 8; z++)
@@ -853,7 +853,7 @@ describe('TerrainMesh', () => {
 
     it('is empty for an all-air grid', () => {
       const scene = makeScene();
-      const grid = new VoxelGrid(4, 4, 4);
+      const grid = new VoxelGrid(4, 4);
       const tm = new TerrainMesh(scene, grid);
       tm.buildAll();
       expect(tm.meshes).toEqual([]);
@@ -862,7 +862,7 @@ describe('TerrainMesh', () => {
 
     it('excludes empty (null) chunks from a partially-solid grid', () => {
       const scene = makeScene();
-      const grid = new VoxelGrid(32, 4, 8); // 2 chunks wide at CHUNK_SIZE=16, only one populated
+      const grid = new VoxelGrid(32, 8); // 2 chunks wide at CHUNK_SIZE=16, only one populated
       for (let x = 0; x < 16; x++)
         for (let y = 0; y < 4; y++)
           for (let z = 0; z < 8; z++)
@@ -879,7 +879,7 @@ describe('TerrainMesh', () => {
 
   it('material uses DoubleSide so terrain is visible from below', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     // Fill bottom half solid, top half air — creates mesh
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
@@ -898,7 +898,7 @@ describe('TerrainMesh', () => {
     // The material no longer keeps a uPlayRect: the site edge is drawn by
     // WorldBorderWall rather than shaded into the ground here.
     const scene = makeScene();
-    const grid = new VoxelGrid(8, 12, 20);
+    const grid = new VoxelGrid(8, 20);
     const tm = new TerrainMesh(scene, grid);
     expect(tm.sharedMaterial).toBeInstanceOf(TerrainMaterial);
     expect(tm.sharedMaterial.customUniforms['uPlayRect']).toBeUndefined();
@@ -911,14 +911,14 @@ describe('TerrainMesh', () => {
     const RECT = { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
 
     it('returns null for an interior column (owned neighbours on all four sides), regardless of sampler', () => {
-      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE));
       tm.setEdgeHeightSampler(() => 10);
       expect(skirtInternals(tm).boundarySkirtFloorY(8, 8, RECT, true, true, true, true)).toBeNull();
       tm.dispose();
     });
 
     it('returns null (full-depth fallback) when no sampler is installed, even at a true boundary column', () => {
-      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE));
       // The halo column rebuildChunk actually marches on the west side when
       // !hasWest is rect.minX - 1, not rect.minX itself — see the method's
       // own doc comment ("same coordinates rebuildChunk's xStart/... use").
@@ -927,7 +927,7 @@ describe('TerrainMesh', () => {
     });
 
     it("returns the sampled neighbour height minus SKIRT_VISIBILITY_MARGIN_M for a column bordering unclaimed land on exactly one side", () => {
-      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE));
       tm.setEdgeHeightSampler(() => 20);
       // x = rect.minX - 1 is the actual west halo column the march visits (see above).
       const floor = skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true);
@@ -936,7 +936,7 @@ describe('TerrainMesh', () => {
     });
 
     it("at a site corner (unclaimed on two sides), returns the minimum (deepest) of the two applicable sides' floors", () => {
-      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE));
       // West neighbour reads much deeper (lower cutoff) than north.
       tm.setEdgeHeightSampler((x) => (x < 0 ? 5 : 25));
       // (rect.minX - 1, rect.minZ - 1) is the actual corner halo cell both
@@ -947,7 +947,7 @@ describe('TerrainMesh', () => {
     });
 
     it('falls back to null (no cutoff) rather than returning NaN when the sampler reports an unusable value', () => {
-      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE));
       tm.setEdgeHeightSampler(() => NaN);
       const floor = skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true);
       expect(floor).toBeNull();
@@ -965,7 +965,7 @@ describe('TerrainMesh', () => {
     });
 
     it('returns false for a chunk that genuinely contains a surface (never a false positive)', () => {
-      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE);
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE);
       for (let x = 0; x < CHUNK_SIZE; x++)
         for (let y = 0; y < CHUNK_SIZE / 2; y++)
           for (let z = 0; z < CHUNK_SIZE; z++)
@@ -980,7 +980,7 @@ describe('TerrainMesh', () => {
       // Single chunk footprint (boundary on all four sides), 2 y-chunks tall
       // and solid throughout, so chunk cy=0 has no top surface of its own —
       // isolating the "boundary wall still needed" reason from "has a real surface".
-      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE);
       for (let x = 0; x < CHUNK_SIZE; x++)
         for (let y = 0; y < CHUNK_SIZE * 2; y++)
           for (let z = 0; z < CHUNK_SIZE; z++)
@@ -1017,7 +1017,7 @@ describe('TerrainMesh', () => {
       // same failure mode as the exact-multiple case above.
       const sizeXZ = CHUNK_SIZE * 3;
       const sizeY = CHUNK_SIZE + 4;
-      const grid = new VoxelGrid(sizeXZ, sizeY, sizeXZ);
+      const grid = new VoxelGrid(sizeXZ, sizeXZ);
       for (let x = 0; x < sizeXZ; x++)
         for (let y = 0; y < sizeY; y++)
           for (let z = 0; z < sizeXZ; z++)
@@ -1032,7 +1032,7 @@ describe('TerrainMesh', () => {
 
   describe('boundary/skirt walls without a sampler still march full depth (#560 fallback)', () => {
     function flatSiteLocal(size: number, surfaceY: number): VoxelGrid {
-      const grid = new VoxelGrid(size, size, size);
+      const grid = new VoxelGrid(size, size);
       for (let x = 0; x < size; x++)
         for (let y = 0; y < surfaceY; y++)
           for (let z = 0; z < size; z++)
@@ -1058,10 +1058,9 @@ describe('TerrainMesh', () => {
   describe('EdgeHeightSampler depth-limits the skirt (#560)', () => {
     const SIZE = 8;
     const SURFACE_Y = 30;
-    const DEEP_SIZE_Y = 40;
 
     function deepFlatSite(): VoxelGrid {
-      const grid = new VoxelGrid(SIZE, DEEP_SIZE_Y, SIZE);
+      const grid = new VoxelGrid(SIZE, SIZE);
       for (let x = 0; x < SIZE; x++)
         for (let y = 0; y < SURFACE_Y; y++)
           for (let z = 0; z < SIZE; z++)
@@ -1089,7 +1088,7 @@ describe('TerrainMesh', () => {
 
     it('a blast crater at the site edge stays closed (no see-through gap) with a sampler installed and the skirt depth-limited', () => {
       function flatSiteLocal(size: number, surfaceY: number): VoxelGrid {
-        const grid = new VoxelGrid(size, size, size);
+        const grid = new VoxelGrid(size, size);
         for (let x = 0; x < size; x++)
           for (let y = 0; y < surfaceY; y++)
             for (let z = 0; z < size; z++)
@@ -1157,7 +1156,7 @@ describe('TerrainMesh', () => {
       // ~= 22 - SKIRT_VISIBILITY_MARGIN_M = 20, comfortably above chunk
       // cy=0's own span (0..15).
       const scene = makeScene();
-      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE);
       for (let x = 0; x < CHUNK_SIZE; x++)
         for (let y = 0; y < CHUNK_SIZE * 2; y++)
           for (let z = 0; z < CHUNK_SIZE; z++)
@@ -1171,7 +1170,7 @@ describe('TerrainMesh', () => {
 
     it('a boundary chunk straddling the skirt cutoff is NOT skipped', () => {
       const scene = makeScene();
-      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE);
       for (let x = 0; x < CHUNK_SIZE; x++)
         for (let y = 0; y < CHUNK_SIZE * 2; y++)
           for (let z = 0; z < CHUNK_SIZE; z++)
@@ -1206,7 +1205,7 @@ describe('TerrainMesh', () => {
     // throughout, so there's no top-surface confound near the corner's own
     // deep cutoff.
     function tallCornerColumn(): VoxelGrid {
-      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE);
       for (let x = 0; x < CHUNK_SIZE; x++)
         for (let y = 0; y < CHUNK_SIZE * 2; y++)
           for (let z = 0; z < CHUNK_SIZE; z++)
@@ -1255,7 +1254,7 @@ describe('TerrainMesh', () => {
     it('a NaN sampler value falls back to full depth instead of propagating NaN into the emitted geometry', () => {
       const scene = makeScene();
       const size = 8;
-      const grid = new VoxelGrid(size, size, size);
+      const grid = new VoxelGrid(size, size);
       for (let x = 0; x < size; x++)
         for (let y = 0; y < 4; y++)
           for (let z = 0; z < size; z++)
@@ -1283,7 +1282,7 @@ describe('TerrainMesh', () => {
   // ─── #1188: vertical range no longer clamped to [0, ceil(sizeY/16)) ─────────
   describe('meshing is no longer clamped to the fixed [0, ceil(sizeY/16)) chunk range (#1188)', () => {
     it('a pit floor dug to y=-20 in an otherwise flat grid produces mesh vertices at that depth after buildAll', () => {
-      const grid = new VoxelGrid(16, 16, 16);
+      const grid = new VoxelGrid(16, 16);
       const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
       for (let x = 0; x < 16; x++) {
         for (let z = 0; z < 16; z++) {
@@ -1309,7 +1308,7 @@ describe('TerrainMesh', () => {
     });
 
     it('a spire built to y=40 above a sizeY=16 grid\'s old top produces mesh vertices at that height after buildAll', () => {
-      const grid = new VoxelGrid(16, 16, 16);
+      const grid = new VoxelGrid(16, 16);
       const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
       for (let x = 0; x < 16; x++) {
         for (let z = 0; z < 16; z++) {
@@ -1339,7 +1338,7 @@ describe('TerrainMesh', () => {
       // isolating the failure to cy=-1 (y=-16..-1) specifically — negative
       // chunks the old fixed-range loop never visits at all, whatever the key
       // packing does with them.
-      const grid = new VoxelGrid(16, 32, 16);
+      const grid = new VoxelGrid(16, 16);
       for (let x = 0; x < 16; x++) {
         for (let y = -16; y < -2; y++) {
           for (let z = 0; z < 16; z++) grid.setVoxel(x, y, z, makeSolidVoxel());
@@ -1388,8 +1387,8 @@ describe('TerrainMesh', () => {
     });
 
     it('two grids sharing the same real ground extent but different declared sizeY produce the same TerrainMaterial altitude height-range uniform', () => {
-      function buildFlatGrid(sizeY: number): VoxelGrid {
-        const grid = new VoxelGrid(16, sizeY, 16);
+      function buildFlatGrid(_sizeY: number): VoxelGrid {
+        const grid = new VoxelGrid(16, 16);
         const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
         for (let x = 0; x < 16; x++) {
           for (let z = 0; z < 16; z++) {
@@ -1419,7 +1418,7 @@ describe('TerrainMesh', () => {
 
   describe('gridHeightRange (#1188)', () => {
     it('returns the real ground [minY, maxY] across the grid, not [0, sizeY]', () => {
-      const grid = new VoxelGrid(16, 16, 16);
+      const grid = new VoxelGrid(16, 16);
       const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
       for (let x = 0; x < 16; x++) {
         for (let z = 0; z < 16; z++) {
@@ -1438,14 +1437,14 @@ describe('TerrainMesh', () => {
     });
 
     it('falls back to [0, 60] for a grid with no ground at all', () => {
-      const grid = new VoxelGrid(4, 4, 4);
+      const grid = new VoxelGrid(4, 4);
       expect(gridHeightRange(grid)).toEqual([0, 60]);
     });
   });
 
   describe('chunkVerticalSlabRange (#1188)', () => {
     it('returns the cy range covering the real ground extent within rect', () => {
-      const grid = new VoxelGrid(16, 16, 16);
+      const grid = new VoxelGrid(16, 16);
       const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
       for (let x = 0; x < 16; x++) {
         for (let z = 0; z < 16; z++) {
@@ -1461,7 +1460,7 @@ describe('TerrainMesh', () => {
     });
 
     it('returns null when rect has no ground at all', () => {
-      const grid = new VoxelGrid(16, 16, 16); // fully empty
+      const grid = new VoxelGrid(16, 16); // fully empty
       const tm = new TerrainMesh(new THREE.Scene(), grid);
       const range = tm.chunkVerticalSlabRange({ minX: 0, maxX: 16, minZ: 0, maxZ: 16 });
       expect(range).toBeNull();
@@ -1816,7 +1815,7 @@ describe('SurveyConfidenceOverlay', () => {
 describe('TerrainMesh.getSurveyOverlay', () => {
   it('returns a SurveyConfidenceOverlay instance', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     const tm = new TerrainMesh(scene, grid);
     const overlay = tm.getSurveyOverlay();
     expect(overlay).toBeInstanceOf(SurveyConfidenceOverlay);
@@ -1825,7 +1824,7 @@ describe('TerrainMesh.getSurveyOverlay', () => {
 
   it('is lazily created (multiple calls return same instance)', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     const tm = new TerrainMesh(scene, grid);
     const a = tm.getSurveyOverlay();
     const b = tm.getSurveyOverlay();
@@ -1835,7 +1834,7 @@ describe('TerrainMesh.getSurveyOverlay', () => {
 
   it('TerrainMesh.dispose disposes the survey overlay when it was created', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     const tm = new TerrainMesh(scene, grid);
     const overlay = tm.getSurveyOverlay();
     overlay.show(makeOverlayOptions({ points: [makeConfidencePoint(5, 5)] }));

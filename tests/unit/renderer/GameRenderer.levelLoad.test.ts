@@ -97,7 +97,7 @@ describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
     // that calls rebuildLandscapeMesh() a second time without going through
     // loadGame()'s clearAll() first (mirrors a campaign level swap), exactly
     // as the existing ambient-mesh test above exercises.
-    ctx.grid = new VoxelGrid(64, 64, 64);
+    ctx.grid = new VoxelGrid(64, 64);
     ctx.landscape = null;
     renderer.syncFromContext(ctx);
 

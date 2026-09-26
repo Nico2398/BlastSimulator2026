@@ -50,7 +50,7 @@ function heightField(x: number, z: number): number {
 
 /** A site generated from `heightField` exactly the way TerrainGen fills a real one. */
 function buildGrid(): VoxelGrid {
-  const grid = new VoxelGrid(SITE, 24, SITE);
+  const grid = new VoxelGrid(SITE, SITE);
   const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
   for (let x = 0; x < SITE; x++) {
     for (let z = 0; z < SITE; z++) {
@@ -252,7 +252,7 @@ describe('buildChunkMesh — ladder rung joins meet exactly when neighbourSteps 
       expect(meshB, `buildChunkMesh returned null for the ${stepB}m chunk`).not.toBeNull();
 
       const commonZSpan = 3 * stepB;
-      const grid = new VoxelGrid(4, 1, commonZSpan);
+      const grid = new VoxelGrid(4, commonZSpan);
       const seam = measureSeam([meshA!], [meshB!], grid, stepA, stepB);
 
       expect(seam.doubleCovered, `double-covered at ${JSON.stringify(seam.doubleCovered)}`).toEqual([]);
@@ -288,7 +288,7 @@ describe('buildChunkMesh — ladder rung joins meet exactly when neighbourSteps 
     expect(meshB).not.toBeNull();
 
     const commonZSpan = 3 * stepB;
-    const grid = new VoxelGrid(4, 1, commonZSpan);
+    const grid = new VoxelGrid(4, commonZSpan);
     const seam = measureSeam([meshA!], [meshB!], grid, stepA, stepB);
     expect(seam.sharedNodes).toBeGreaterThan(0);
     expect(seam.worstNormalAngle, `worst at ${seam.worstNormalAt}`).toBeGreaterThan(10);
@@ -360,7 +360,7 @@ describe('measureSeam generalizes to a step pair the codebase does not mesh toda
     // West edge (x = 0) is exactly the line the two sheets meet along, same
     // as the fine sheet's own extent. The z-bound is short of the sheets' own
     // z = 16, on purpose — see GRID_MAX_Z above.
-    const grid = new VoxelGrid(4, 1, GRID_MAX_Z);
+    const grid = new VoxelGrid(4, GRID_MAX_Z);
 
     const seam = measureSeam([fine], [coarse], grid, FINE_STEP_SYNTHETIC, COARSE_STEP_SYNTHETIC);
 

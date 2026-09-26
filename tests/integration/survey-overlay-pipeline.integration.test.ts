@@ -64,7 +64,7 @@ function makeCtx(
   if (overrides.tick !== undefined) {
     state.tickCount = overrides.tick;
   }
-  const grid = new VoxelGrid(32, 16, 32);
+  const grid = new VoxelGrid(32, 32);
   return makeEmptyGameContext({ state, grid, emitter: { on: vi.fn(), emit: vi.fn() } as any });
 }
 

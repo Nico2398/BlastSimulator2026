@@ -76,7 +76,7 @@ describe('NavMesh and pathfinding', () => {
     // 5×10×5 voxel grid, solid y=0..4, air above → every column's continuous
     // marching-cubes crossing sits at 4.5 (#1149 — not the bare integer 4
     // the topmost-solid-voxel index would give) → all walkable
-    const vg = new VoxelGrid(5, 10, 5);
+    const vg = new VoxelGrid(5, 5);
     fillSolid(vg, 4);
 
     const nav = NavGrid.buildNavGrid(vg, [], []);
@@ -100,7 +100,7 @@ describe('NavMesh and pathfinding', () => {
   });
 
   it('buildings mark footprint cells as blocked', () => {
-    const vg = new VoxelGrid(10, 10, 10);
+    const vg = new VoxelGrid(10, 10);
     fillSolid(vg, 4);
 
     const state = createBuildingState();
@@ -121,7 +121,7 @@ describe('NavMesh and pathfinding', () => {
   });
 
   it('findPath returns waypoints for reachable cells', () => {
-    const vg = new VoxelGrid(10, 10, 10);
+    const vg = new VoxelGrid(10, 10);
     fillSolid(vg, 4);
 
     const nav = NavGrid.buildNavGrid(vg, [], []);
@@ -141,7 +141,7 @@ describe('NavMesh and pathfinding', () => {
   });
 
   it('findPath returns empty for blocked destination', () => {
-    const vg = new VoxelGrid(5, 10, 5);
+    const vg = new VoxelGrid(5, 5);
     fillSolid(vg, 4);
 
     const nav = NavGrid.buildNavGrid(vg, [], []);
@@ -161,7 +161,7 @@ describe('NavMesh and pathfinding', () => {
 
   it('findPath routes around obstacles', () => {
     // 10×5×10 grid, flat solid terrain → NavGrid 10×10
-    const vg = new VoxelGrid(10, 5, 10);
+    const vg = new VoxelGrid(10, 10);
     fillSolid(vg, 4);
 
     const nav = NavGrid.buildNavGrid(vg, [], []);
@@ -189,7 +189,7 @@ describe('NavMesh and pathfinding', () => {
   });
 
   it('patchNavGrid updates cells after terrain change', () => {
-    const vg = new VoxelGrid(10, 10, 10);
+    const vg = new VoxelGrid(10, 10);
     fillSolid(vg, 4);
 
     const nav = NavGrid.buildNavGrid(vg, [], []);
@@ -218,7 +218,7 @@ describe('NavMesh and pathfinding', () => {
   });
 
   it('patchNavGrid corrects building cells after removal', () => {
-    const vg = new VoxelGrid(10, 10, 10);
+    const vg = new VoxelGrid(10, 10);
     fillSolid(vg, 4);
 
     const state = createBuildingState();
@@ -244,7 +244,7 @@ describe('NavMesh and pathfinding', () => {
   });
 
   it('computeSurfaceY returns continuous surface height above highest solid voxel', () => {
-    const vg = new VoxelGrid(5, 10, 5);
+    const vg = new VoxelGrid(5, 5);
     fillSolid(vg, 5); // solid y=0..5
 
     // The highest solid voxel is at y=5, surface sits at its top face, y=5.5
@@ -256,12 +256,12 @@ describe('NavMesh and pathfinding', () => {
     expect(NavGrid.computeSurfaceY(vg, 999, 999)).toBe(5.5);
 
     // All-air column returns NaN
-    const empty = new VoxelGrid(3, 10, 3);
+    const empty = new VoxelGrid(3, 3);
     expect(NavGrid.computeSurfaceY(empty, 1, 1)).toBeNaN();
   });
 
   it('drill holes marked as drill_hole cells', () => {
-    const vg = new VoxelGrid(10, 10, 10);
+    const vg = new VoxelGrid(10, 10);
     fillSolid(vg, 4);
 
     const holes = [{ id: 'DH1', x: 3, z: 3, depth: 5, diameter: 0.15 }];
@@ -318,7 +318,7 @@ describe('NavMesh and pathfinding', () => {
   // cliff. This is a `src/core/mining/Ramp.ts` change the skeleton commit
   // did not make — it is in scope for the implementer, not a follow-up.
   it('multi-level routing succeeds via a ramp built on realistic (elevated) terrain', () => {
-    const grid = new VoxelGrid(20, 30, 30);
+    const grid = new VoxelGrid(20, 30);
     fillSolid(grid, 22); // flat plateau, surface Y=22 — not flat-from-0
 
     // Before carving: uniformly flat, single bench everywhere, no ramp connections.
@@ -389,7 +389,7 @@ describe('NavMesh and pathfinding', () => {
   });
 
   it('multi-level routing returns found:false when no ramp connects two separated benches', () => {
-    const grid = new VoxelGrid(20, 30, 30);
+    const grid = new VoxelGrid(20, 30);
     // Upper bench: z=0..9, surface Y=22.
     for (let z = 0; z <= 9; z++) {
       for (let x = 0; x < grid.sizeX; x++) fillSolidColumn(grid, x, z, 22);
@@ -427,7 +427,7 @@ describe('NavMesh and pathfinding', () => {
     const RAMP_BAND_MIN_X = 9, RAMP_BAND_MAX_X = 11, RAMP_BAND_MAX_Z = 21;
 
     function buildCraterPlateau(): VoxelGrid {
-      const grid = new VoxelGrid(20, 30, 30);
+      const grid = new VoxelGrid(20, 30);
       fillSolid(grid, 22);
       for (let z = CRATER_MIN_Z; z <= CRATER_MAX_Z; z++) {
         for (let x = CRATER_MIN_X; x <= CRATER_MAX_X; x++) {
@@ -482,7 +482,7 @@ describe('NavMesh and pathfinding', () => {
     });
 
     it('same crater with NO ramp dug — findPath from surface to crater floor returns found:false', () => {
-      const grid = new VoxelGrid(20, 30, 30);
+      const grid = new VoxelGrid(20, 30);
       fillSolid(grid, 22);
       // Carve the full crater sheer, including the would-be ramp band —
       // no gradual descent exists anywhere on the crater's perimeter.
@@ -514,7 +514,7 @@ describe('NavMesh and pathfinding', () => {
   // per-column pits.
 
   function buildElevatedPlateau(): VoxelGrid {
-    const grid = new VoxelGrid(20, 30, 30);
+    const grid = new VoxelGrid(20, 30);
     fillSolid(grid, 22); // flat plateau, surface Y=22
     return grid;
   }
@@ -830,7 +830,7 @@ describe('NavMesh and pathfinding', () => {
 
   describe('fragment occupancy blocks foot pathfinding (#954)', () => {
     it('no foot-pathfind route enters a cell still occupied by an on-ground fragment', () => {
-      const vg = new VoxelGrid(10, 10, 10);
+      const vg = new VoxelGrid(10, 10);
       fillSolid(vg, 4);
       const nav = NavGrid.buildNavGrid(vg, [], []);
 
@@ -847,7 +847,7 @@ describe('NavMesh and pathfinding', () => {
     });
 
     it('once the fragment is hauled away, the direct route through that cell is restored', () => {
-      const vg = new VoxelGrid(10, 10, 10);
+      const vg = new VoxelGrid(10, 10);
       fillSolid(vg, 4);
       const nav = NavGrid.buildNavGrid(vg, [], []);
 
@@ -886,7 +886,7 @@ describe('NavMesh and pathfinding', () => {
      * "behind the building" start/goal pair the tests below use.
      */
     function buildFixture(): NavGrid {
-      const vg = new VoxelGrid(30, 10, 20);
+      const vg = new VoxelGrid(30, 20);
       fillSolid(vg, 4);
 
       const state = createBuildingState();

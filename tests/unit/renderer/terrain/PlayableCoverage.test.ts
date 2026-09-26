@@ -10,8 +10,8 @@ import {
 } from '../../../../src/renderer/terrain/PlayableCoverage.js';
 
 /** A single-chunk site, filled solid to `surfaceY` so the mesher has a surface to march. */
-function solidGrid(sizeX = 16, sizeZ = 16, sizeY = 16, surfaceY = 6): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+function solidGrid(sizeX = 16, sizeZ = 16, _sizeY = 16, surfaceY = 6): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeZ);
   const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
   for (let x = 0; x < sizeX; x++) {
     for (let z = 0; z < sizeZ; z++) {
@@ -27,7 +27,7 @@ function solidGrid(sizeX = 16, sizeZ = 16, sizeY = 16, surfaceY = 6): VoxelGrid 
  * grid's own bounding box.
  */
 function lShapedGrid(): VoxelGrid {
-  const grid = new VoxelGrid(16, 8, 16);
+  const grid = new VoxelGrid(16, 16);
   grid.addChunk(1, 1);
   return grid;
 }

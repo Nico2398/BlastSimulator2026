@@ -17,7 +17,7 @@ import { makeGameContext } from '../../helpers/gameContext.js';
 
 describe('getTerrainSurfaceY (#1007)', () => {
   it('returns the fractional marching-cubes crossing height, strictly below the old integer voxel-top height, for a clean solid-to-air column', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(3, 4, 3, 0, undefined, 1); // topmost solid at y=4, y=5 stays air (density 0)
 
     const columnTop = computeVoxelColumnSurfaceY(grid, 3, 3);
@@ -31,7 +31,7 @@ describe('getTerrainSurfaceY (#1007)', () => {
   });
 
   it('interpolates a non-half fractional crossing when the voxel above the topmost solid one is partially filled', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(3, 4, 3, compId, undefined, 1.0);
     grid.fillVoxel(3, 5, 3, compId, undefined, 0.3);
@@ -41,13 +41,13 @@ describe('getTerrainSurfaceY (#1007)', () => {
   });
 
   it('delegates exactly to getSmoothTerrainSurfaceY (same value for the same column)', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(3, 4, 3, 0, undefined, 1);
     expect(getTerrainSurfaceY(grid, 3, 3)).toBe(getSmoothTerrainSurfaceY(grid, 3, 3));
   });
 
   it('clamps an out-of-bounds (x, z) to the nearest edge column instead of throwing or returning NaN', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(-1, 0);
     grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
 
@@ -58,7 +58,7 @@ describe('getTerrainSurfaceY (#1007)', () => {
   });
 
   it('returns 0 for a column with no solid voxel at all (fully dug out) — regression guard', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     expect(getTerrainSurfaceY(grid, 3, 3)).toBe(0);
   });
 
