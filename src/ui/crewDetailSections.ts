@@ -65,6 +65,7 @@ export function describeActivity(activity: EmployeeActivity): string {
       ? t('ui.crew.task_walking_to', { task: t(ACTION_LABEL_KEY[activity.actionType]) })
       : t('ui.crew.task_walking');
     case 'idle': return t('ui.crew.task_idle');
+    case 'training': return t('ui.crew.task_training');
   }
 }
 

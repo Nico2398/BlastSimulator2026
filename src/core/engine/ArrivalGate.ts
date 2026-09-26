@@ -20,6 +20,12 @@ export interface ArrivalGateResult {
   /** Employee IDs whose task timer was started this tick because they arrived. */
   taskStarted: number[];
   /**
+   * Employee IDs whose training course was started this tick because they
+   * arrived at and entered the school (#1203). Empty until the implementer
+   * wires the enrolment walk-in through this gate.
+   */
+  trainingStarted: number[];
+  /**
    * Employee IDs who successfully boarded a vehicle this tick because they
    * arrived. Boarding itself now resolves inside tickLocomotion's own arrival
    * step (#1089) rather than here — always empty; kept on the shape so
@@ -56,6 +62,7 @@ export function tickArrivalGate(state: GameState, grid?: VoxelGrid): ArrivalGate
   const result: ArrivalGateResult = {
     restStarted: [],
     taskStarted: [],
+    trainingStarted: [],
     driversBoarded: [],
     boardingCancelled: [],
   };
