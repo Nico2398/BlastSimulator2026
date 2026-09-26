@@ -5,7 +5,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 /** Flat ground: solid up to `groundTop` inclusive, air above. */
 function flatGround(size = 20, groundTop = 4): VoxelGrid {
-  const grid = new VoxelGrid(size, size, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let y = 0; y <= groundTop; y++) {
       for (let x = 0; x < size; x++) {

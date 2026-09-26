@@ -26,7 +26,7 @@ function baseProgress(overrides: Partial<TaskProgressResult>): TaskProgressResul
 describe('applyTaskCompletion — level_ground (#1009)', () => {
   it('carves the ordered cells and reports voxelsCleared', () => {
     const state = createGame({ seed: SEED });
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     grid.setVoxel(3, 3, 3, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
@@ -68,7 +68,7 @@ describe('applyTaskCompletion — dig_ramp_segment ordering (#945, updated for #
    */
   function makeFixture() {
     const state = createGame({ seed: SEED });
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_digger, 1);

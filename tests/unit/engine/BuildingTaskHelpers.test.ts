@@ -31,7 +31,7 @@ describe('makeFootprintRegion', () => {
 
 describe('siteBoundsForGrid', () => {
   it('returns the grid own bounding box when a grid exists', () => {
-    const grid = new VoxelGrid(12, 8, 20);
+    const grid = new VoxelGrid(12, 20);
     expect(siteBoundsForGrid(grid)).toEqual({ width: 12, depth: 20, originX: 0, originZ: 0 });
   });
 
@@ -67,9 +67,9 @@ describe('levelBuildingFootprint (#1198)', () => {
   const ROCK_COMPOSITION = { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] };
   const { sizeX: OWN_SIZE_X, sizeZ: OWN_SIZE_Z } = getDefSize(getBuildingDef('driving_center', 1));
 
-  /** A 10x10 (30-tall) grid, every column flat at `height`. */
+  /** A 10x10 grid, every column flat at `height`. */
   function flatGrid(height: number): VoxelGrid {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = grid.palette.intern(ROCK_COMPOSITION);
     for (let z = 0; z < 10; z++) {
       for (let x = 0; x < 10; x++) setVoxelColumnSurfaceHeight(grid, x, z, height, compId);

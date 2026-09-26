@@ -184,11 +184,12 @@ function solidVoxel(): VoxelData {
 }
 
 describe('digVoxel', () => {
-  // 5 × 5 × 5 grid — large enough for all surface-Y scenarios
+  // 5 × 5 grid, GRID_HEIGHT tall — large enough for all surface-Y scenarios
+  const GRID_HEIGHT = 5;
   let grid: VoxelGrid;
 
   beforeEach(() => {
-    grid = new VoxelGrid(5, 5, 5);
+    grid = new VoxelGrid(5, 5);
   });
 
   it('returns success:true when digging a solid voxel', () => {
@@ -275,7 +276,7 @@ describe('digVoxel', () => {
 
     digVoxel(grid, 2, oldTop!, 2);
 
-    for (let y = oldTop!; y < grid.sizeY; y++) {
+    for (let y = oldTop!; y < GRID_HEIGHT; y++) {
       expect(grid.densityAt(2, y, 2), `density at y=${y} should be 0`).toBe(0);
     }
   });
@@ -307,13 +308,13 @@ describe('digVoxel', () => {
     const oldTop = computeVoxelColumnSurfaceY(grid, 2, 2);
     expect(oldTop).not.toBeNull();
     const aboveBefore: number[] = [];
-    for (let y = oldTop!; y < grid.sizeY; y++) aboveBefore.push(grid.densityAt(2, y, 2));
+    for (let y = oldTop!; y < GRID_HEIGHT; y++) aboveBefore.push(grid.densityAt(2, y, 2));
 
     digVoxel(grid, 2, 1, 2); // dig a buried, non-top voxel — the top never moves
 
     expect(computeVoxelColumnSurfaceY(grid, 2, 2)).toBe(oldTop);
     const aboveAfter: number[] = [];
-    for (let y = oldTop!; y < grid.sizeY; y++) aboveAfter.push(grid.densityAt(2, y, 2));
+    for (let y = oldTop!; y < GRID_HEIGHT; y++) aboveAfter.push(grid.densityAt(2, y, 2));
     expect(aboveAfter).toEqual(aboveBefore);
   });
 

@@ -13,6 +13,13 @@ import { Random } from '../../../src/core/math/Random.js';
 import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 /**
+ * The tutorial terrain's declared vertical extent (24×12×24) — a local bound
+ * for the ore-column scan below, since VoxelGrid no longer declares a height
+ * of its own.
+ */
+const TUTORIAL_TERRAIN_HEIGHT = 12;
+
+/**
  * Build the tutorial terrain used by Issue #327 tests:
  * desert preset, seed 42, dimensions 24×12×24.
  */
@@ -36,7 +43,7 @@ describe('Tutorial survey verification (Issue #327)', () => {
     let oreColumns = 0;
     for (let x = 8; x <= 12; x++) {
       for (let z = 8; z <= 12; z++) {
-        for (let y = 0; y < terrain.sizeY; y++) {
+        for (let y = 0; y < TUTORIAL_TERRAIN_HEIGHT; y++) {
           const voxel = terrain.getVoxel(x, y, z);
           if (voxel && Object.keys(voxel.oreDensities).length > 0) {
             oreColumns++;

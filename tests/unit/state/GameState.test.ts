@@ -425,7 +425,7 @@ describe('createGame — navGrid (task 6.10)', () => {
 describe('buildGameNavGrid (task 6.10)', () => {
   it('builds NavGrid from valid VoxelGrid', () => {
     const state = createGame({ seed: 42 });
-    const voxelGrid = new VoxelGrid(4, 4, 4);
+    const voxelGrid = new VoxelGrid(4, 4);
     // Fill every voxel with solid rock
     for (let z = 0; z < 4; z++) {
       for (let y = 0; y < 4; y++) {
@@ -442,21 +442,21 @@ describe('buildGameNavGrid (task 6.10)', () => {
 
   it('handles degenerate VoxelGrid (sizeX=0)', () => {
     const state = createGame({ seed: 42 });
-    const voxelGrid = new VoxelGrid(0, 5, 5);
+    const voxelGrid = new VoxelGrid(0, 5);
     expect(() => buildGameNavGrid(state, voxelGrid, [], [])).not.toThrow();
     expect(state.navGrid).toBeNull();
   });
 
   it('handles degenerate VoxelGrid (sizeZ=0)', () => {
     const state = createGame({ seed: 42 });
-    const voxelGrid = new VoxelGrid(5, 5, 0);
+    const voxelGrid = new VoxelGrid(5, 0);
     expect(() => buildGameNavGrid(state, voxelGrid, [], [])).not.toThrow();
     expect(state.navGrid).toBeNull();
   });
 
   it('produces correct NavGrid dimensions matching voxel grid', () => {
     const state = createGame({ seed: 42 });
-    const voxelGrid = new VoxelGrid(10, 5, 8);
+    const voxelGrid = new VoxelGrid(10, 8);
     // Fill every voxel with solid rock
     for (let z = 0; z < 8; z++) {
       for (let y = 0; y < 5; y++) {
@@ -473,7 +473,7 @@ describe('buildGameNavGrid (task 6.10)', () => {
 
   it('with buildings and drill holes, NavGrid reflects them', () => {
     const state = createGame({ seed: 42 });
-    const voxelGrid = new VoxelGrid(10, 5, 10);
+    const voxelGrid = new VoxelGrid(10, 10);
     // Fill every voxel with solid rock
     for (let z = 0; z < 10; z++) {
       for (let y = 0; y < 5; y++) {
@@ -518,7 +518,7 @@ describe('buildGameNavGrid (task 6.10)', () => {
   // state.logistics.fragments/state.vehicles.vehicles at rebuild time.
   it('reseeds fragment and vehicle occupancy from state on rebuild (#954)', () => {
     const state = createGame({ seed: 42 });
-    const voxelGrid = new VoxelGrid(10, 5, 10);
+    const voxelGrid = new VoxelGrid(10, 10);
     for (let z = 0; z < 10; z++) {
       for (let y = 0; y < 5; y++) {
         for (let x = 0; x < 10; x++) {
@@ -585,7 +585,7 @@ describe('createGame — applyStaffedComposition vehicle spawn placement (issue 
  * (0,0) and, with a climb limit in force, cannot walk off it.
  */
 function makePeakAtOriginGrid(size: number, groundTopY: number, peakTopY: number): VoxelGrid {
-  const grid = new VoxelGrid(size, peakTopY + 2, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const top = x === 0 && z === 0 ? peakTopY : groundTopY;
@@ -612,7 +612,7 @@ describe('snapAgentsToNavigableGround', () => {
 
   it('leaves every agent on ordinary flat terrain exactly where it spawned', () => {
     const state = createGame({ seed: 42, staffed: true });
-    const flat = new VoxelGrid(12, 4, 12);
+    const flat = new VoxelGrid(12, 12);
     for (let z = 0; z < 12; z++) {
       for (let x = 0; x < 12; x++) {
         for (let y = 0; y <= 1; y++) flat.setVoxel(x, y, z, solidVoxel());

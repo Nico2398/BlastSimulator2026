@@ -26,8 +26,8 @@ const RAMP_DIRECTIONS: RampVoxelType[] = [
   'ramp_north', 'ramp_south', 'ramp_east', 'ramp_west',
 ];
 
-function makeFilledGrid(sizeX: number, sizeY: number, sizeZ: number, fillUpToY: number): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+function makeFilledGrid(sizeX: number, sizeZ: number, fillUpToY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let y = 0; y < fillUpToY; y++) {
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
@@ -237,25 +237,25 @@ describe('BUILDING_DEFS catalog', () => {
 
 describe('getSurfaceY', () => {
   it('returns 0 for a fully empty column', () => {
-    const grid = new VoxelGrid(4, 8, 4);
+    const grid = new VoxelGrid(4, 4);
     expect(getSurfaceY(grid, 0, 0)).toBe(0);
     expect(getSurfaceY(grid, 2, 3)).toBe(0);
   });
 
   it('returns 1 when only the bottom voxel is solid', () => {
-    const grid = new VoxelGrid(4, 8, 4);
+    const grid = new VoxelGrid(4, 4);
     grid.setVoxel(0, 0, 0, { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     expect(getSurfaceY(grid, 0, 0)).toBe(1);
   });
 
   it('returns correct surface height when multiple layers are filled', () => {
-    const grid = makeFilledGrid(4, 8, 4, 5);
+    const grid = makeFilledGrid(4, 4, 5);
     expect(getSurfaceY(grid, 0, 0)).toBe(5);
     expect(getSurfaceY(grid, 3, 3)).toBe(5);
   });
 
   it('ignores air voxels (density=0) above solid ones', () => {
-    const grid = makeFilledGrid(4, 8, 4, 3);
+    const grid = makeFilledGrid(4, 4, 3);
     // Add a zero-density voxel above the solid surface — surface should still be 3
     grid.setVoxel(1, 3, 1, { composition: { rocks: [] }, density: 0, oreDensities: {}, fractureModifier: 1 });
     expect(getSurfaceY(grid, 1, 1)).toBe(3);

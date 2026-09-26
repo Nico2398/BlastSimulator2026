@@ -16,9 +16,9 @@ function voxel(
   return { composition: { rocks }, density: 1.0, oreDensities, fractureModifier: 1.0 };
 }
 
-/** A 4×4×4 grid of air, so tests place only the voxels they care about. */
+/** A 4×4 air grid, so tests place only the voxels they care about. */
 function emptyGrid(): VoxelGrid {
-  return new VoxelGrid(4, 4, 4);
+  return new VoxelGrid(4, 4);
 }
 
 function at(x: number, y: number, z: number, weight = 1): VoxelContribution {

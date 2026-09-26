@@ -20,9 +20,9 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
 const EVACUATION_SEED = 42;
 
-/** A flat, fully solid, fully walkable size×1×size NavGrid — every column passable. */
+/** A flat, fully solid, fully walkable size×size NavGrid — every column passable. */
 function flatWalkableGrid(size: number): NavGrid {
-  const vg = new VoxelGrid(size, 1, size);
+  const vg = new VoxelGrid(size, size);
   for (let x = 0; x < size; x++) {
     for (let z = 0; z < size; z++) {
       vg.setVoxel(x, 0, z, {

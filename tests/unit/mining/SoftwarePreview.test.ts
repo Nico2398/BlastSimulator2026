@@ -28,7 +28,7 @@ describe('SoftwarePreview — computeHoleContext', () => {
   });
 
   it('surface Y is 0 for a hole above an empty column', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     const holes = createGridPlan({ x: 2, z: 2 }, 1, 1, 3, 2, 0.1);
     const plan = assembleBlastPlan(holes, {}, {});
     const ctx = computeHoleContext(plan, grid);
@@ -41,7 +41,7 @@ describe('SoftwarePreview — computeHoleContext', () => {
   // below y = 0 must report the true (negative) surface, not the fallback 0
   // a bounded scan would wrongly produce.
   it('#1184: reports the true surface Y for a hole above a column whose surface sits below y = 0', () => {
-    const grid = new VoxelGrid(10, 5, 10);
+    const grid = new VoxelGrid(10, 10);
     grid.setVoxel(3, -5, 3, {
       composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
       density: 1.0,
@@ -118,7 +118,7 @@ describe('SoftwarePreview — getBlastBBox', () => {
   });
 
   it('#1186: a hole whose surface sits below y=0 gets a bbox that actually covers it, not pulled back toward y=0', () => {
-    const grid = new VoxelGrid(20, 5, 20);
+    const grid = new VoxelGrid(20, 20);
     for (let z = 5; z <= 15; z++) {
       for (let y = -14; y <= -8; y++) {
         for (let x = 5; x <= 15; x++) {
@@ -155,7 +155,7 @@ describe('SoftwarePreview — getBlastBBox', () => {
   });
 
   it('#1186: a hole at negative x on a westward-expanded site resolves via clampToGridColumn, not snapped to x=0', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(-1, 0);
     // Rock only at the negative-x column the hole is actually drilled at —
     // column x=0 (where the old hand-rolled clamp would wrongly snap to)

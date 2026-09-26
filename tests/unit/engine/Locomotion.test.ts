@@ -39,7 +39,7 @@ function solidVoxel() {
 /** A fully walkable flat NavGrid, wide enough for long straight drives. */
 function buildFlatNavGridState(sizeX: number, sizeZ: number): GameState {
   const state = createGame({ seed: SEED });
-  const vg = new VoxelGrid(sizeX, 2, sizeZ);
+  const vg = new VoxelGrid(sizeX, sizeZ);
   for (let x = 0; x < sizeX; x++) {
     for (let z = 0; z < sizeZ; z++) {
       vg.setVoxel(x, 0, z, solidVoxel());
@@ -61,7 +61,7 @@ function buildFlatNavGridState(sizeX: number, sizeZ: number): GameState {
  */
 function buildCorridorState(sizeX: number): GameState {
   const state = createGame({ seed: SEED });
-  const vg = new VoxelGrid(sizeX, 2, 5);
+  const vg = new VoxelGrid(sizeX, 5);
   for (let x = 0; x < sizeX; x++) {
     vg.setVoxel(x, 0, 1, solidVoxel());
     vg.setVoxel(x, 0, 2, solidVoxel());
@@ -87,7 +87,7 @@ function buildCorridorState(sizeX: number): GameState {
  */
 function buildRingCorridorState(sizeX: number): GameState {
   const state = createGame({ seed: SEED });
-  const vg = new VoxelGrid(sizeX, 2, 11);
+  const vg = new VoxelGrid(sizeX, 11);
   for (let x = 0; x < sizeX; x++) {
     for (const z of [1, 2, 3, 7, 8, 9]) {
       vg.setVoxel(x, 0, z, solidVoxel());

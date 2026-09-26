@@ -226,7 +226,7 @@ const BASE_PARAMS: EstimateSurveyParams = {
  * Seven y-levels (2–8) each contain a solid 'granite' voxel with gold=0.5.
  */
 function makeOreGrid(): VoxelGrid {
-  const grid = new VoxelGrid(11, 11, 11);
+  const grid = new VoxelGrid(11, 11);
   for (let y = 2; y <= 8; y++) {
     grid.setVoxel(5, y, 5, {
       composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
@@ -243,7 +243,7 @@ function makeOreGrid(): VoxelGrid {
  * Used to prove core_sample still returns only the centre column.
  */
 function makeFilledOreGrid(): VoxelGrid {
-  const grid = new VoxelGrid(11, 11, 11);
+  const grid = new VoxelGrid(11, 11);
   for (let x = 0; x < 11; x++) {
     for (let z = 0; z < 11; z++) {
       for (let y = 2; y <= 8; y++) {
@@ -265,7 +265,7 @@ function makeFilledOreGrid(): VoxelGrid {
  * Used for aerial radius and surface-detection tests.
  */
 function makeAerialGrid(): VoxelGrid {
-  const grid = new VoxelGrid(101, 10, 101);
+  const grid = new VoxelGrid(101, 101);
   for (let x = 0; x < 101; x++) {
     for (let z = 0; z < 101; z++) {
       grid.setVoxel(x, 5, z, {
@@ -409,7 +409,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
   it('empty grid (no ores) produces zero ore entries across all column estimates', () => {
     // A default VoxelGrid has oreDensities:{} for every voxel; no ore keys
     // should appear anywhere in the resulting estimates map.
-    const emptyGrid = new VoxelGrid(11, 11, 11);
+    const emptyGrid = new VoxelGrid(11, 11);
     const result = estimateSurveyResult(emptyGrid, BASE_PARAMS, new Random(12345));
     let totalOreEntries = 0;
     for (const colKey of Object.keys(result.estimates)) {
@@ -424,7 +424,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     // gold=0.5 fills the entire centre column across all y-levels; after seismic
     // smearing the column estimate should still be centred on 0.5.
     // baseError=0.15; tolerance = baseError×2 + 0.05 rounding buffer = 0.35
-    const grid = new VoxelGrid(11, 11, 11);
+    const grid = new VoxelGrid(11, 11);
     for (let y = 0; y < 11; y++) {
       grid.setVoxel(5, y, 5, {
         composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
@@ -444,7 +444,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     // gold=0.6 fills the entire centre column; core_sample applies noise
     // per-voxel and averages — the column estimate must remain close to 0.6.
     // baseError=0.05; tolerance = baseError×2 + 0.05 rounding buffer = 0.15
-    const grid = new VoxelGrid(11, 11, 11);
+    const grid = new VoxelGrid(11, 11);
     for (let y = 0; y < 11; y++) {
       grid.setVoxel(5, y, 5, {
         composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
@@ -495,7 +495,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
     // All y > 7 are air, so surface detection (scan top→down) finds y=7 as the
     // topmost solid → surfaceY = 8.  Aerial samples y=8 (air) and y=7 (silver).
     // The 'silver' ore key must therefore appear in estimates['50,50'].
-    const grid = new VoxelGrid(101, 10, 101);
+    const grid = new VoxelGrid(101, 101);
     grid.setVoxel(50, 7, 50, {
       composition: { rocks: [{ rockId: 'basalt', coefficient: 1.0 }] },
       density: 1,
@@ -528,7 +528,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
    * all — not a magnitude comparison.
    */
   function makeDepthWindowGrid(): VoxelGrid {
-    const grid = new VoxelGrid(11, 30, 11);
+    const grid = new VoxelGrid(11, 11);
     grid.setVoxel(5, 25, 5, {
       composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
       density: 1, oreDensities: { shally: 0.6 }, fractureModifier: 1.0,
@@ -565,7 +565,7 @@ describe('SurveyCalc — estimateSurveyResult', () => {
   });
 
   it('#1186: a survey centered on a site expanded west scans columns at negative x, not clamped to x >= 0', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(-1, 0);
     grid.setVoxel(-5, 3, 5, {
       composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },

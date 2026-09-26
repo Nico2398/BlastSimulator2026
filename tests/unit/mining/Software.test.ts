@@ -119,7 +119,7 @@ describe('Software — previewHoleDetails', () => {
   it('#1186: still returns a detail entry when the hole surface sits below y=0', () => {
     // Same 2x2 hole pattern/plan as makeTestPlan, just shifted 15 voxels down
     // so the surface (and every charge column) resolves to negative Y.
-    const grid = new VoxelGrid(30, 15, 30);
+    const grid = new VoxelGrid(30, 30);
     for (let z = 5; z <= 20; z++)
       for (let y = -15; y <= -7; y++)
         for (let x = 5; x <= 20; x++)

@@ -65,11 +65,10 @@ function solidVoxel(overrides?: Partial<VoxelData>): VoxelData {
 /** Build a VoxelGrid where every column has solid rock from y=0 to solidTopY (inclusive). */
 function makeSolidGrid(
   sizeX: number,
-  sizeY: number,
   sizeZ: number,
   solidTopY: number,
 ): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
       for (let y = 0; y <= solidTopY; y++) {
@@ -83,13 +82,12 @@ function makeSolidGrid(
 /** Build a VoxelGrid where only a specific column (cx, cz) has solid rock. */
 function makeSingleColumnGrid(
   sizeX: number,
-  sizeY: number,
   sizeZ: number,
   cx: number,
   cz: number,
   solidTopY: number,
 ): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let y = 0; y <= solidTopY; y++) {
     grid.setVoxel(cx, y, cz, solidVoxel());
   }
@@ -128,7 +126,7 @@ function makeBlastPlan(holes: DrillHole[]) {
 
 /** Standard test grid: 20 × 10 × 20, solid rock y=0..4. */
 function makeTestGrid(): VoxelGrid {
-  return makeSolidGrid(20, 10, 20, 4);
+  return makeSolidGrid(20, 20, 4);
 }
 
 /** Minimal FragmentData fixture resting on the ground at (x, z) (#954). */
@@ -159,7 +157,7 @@ function makeParkedVehicle(x: number, z: number): Vehicle {
 
 describe('NavGrid.computeSurfaceY', () => {
   it('returns the continuous marching-cubes crossing height for a column with solid rock (#1149)', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     // Rock at y=0..4, air above → the topmost solid voxel is y=4, but
     // computeSurfaceY now returns the fractional 0.5-density crossing
     // (computeVoxelColumnSurfaceHeight), not the bare integer index — a
@@ -169,34 +167,34 @@ describe('NavGrid.computeSurfaceY', () => {
   });
 
   it('returns NaN for a column with no rock (all air)', () => {
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     const y = NavGrid.computeSurfaceY(grid, 0, 0);
     expect(y).toBeNaN();
   });
 
   it('clamps out-of-bounds x coordinate to grid limits', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     // Column (-1, 0) should be clamped to (0, 0) — solid rock at y=4, crossing at 4.5 (#1149)
     const y = NavGrid.computeSurfaceY(grid, -5, 0);
     expect(y).toBe(4.5);
   });
 
   it('clamps out-of-bounds z coordinate to grid limits', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     // Column (0, 999) should be clamped to (0, 9) — solid rock at y=4, crossing at 4.5 (#1149)
     const y = NavGrid.computeSurfaceY(grid, 0, 999);
     expect(y).toBe(4.5);
   });
 
   it('returns NaN when clamped column still has no solid voxel', () => {
-    const grid = makeSingleColumnGrid(10, 10, 10, 5, 5, 4);
+    const grid = makeSingleColumnGrid(10, 10, 5, 5, 4);
     // Column (5,5) has rock; column (20,5) clamps to (9,5) which has no rock
     const y = NavGrid.computeSurfaceY(grid, 20, 5);
     expect(y).toBeNaN();
   });
 
   it('returns NaN for a column where density is below 0.5', () => {
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     // Set voxel at y=5 with density 0.3 (below the 0.5 threshold)
     grid.setVoxel(0, 5, 0, {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
@@ -215,21 +213,21 @@ describe('NavGrid.computeSurfaceY', () => {
 
 describe('NavGrid.buildNavGrid — dimensions', () => {
   it('creates a grid with width = voxelGrid.sizeX and height = voxelGrid.sizeZ', () => {
-    const grid = makeSolidGrid(15, 8, 25, 4);
+    const grid = makeSolidGrid(15, 25, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.width).toBe(15);
     expect(nav.height).toBe(25);
   });
 
   it('creates a grid with width = 1 and height = 1 for a minimal voxel grid', () => {
-    const grid = makeSolidGrid(1, 5, 1, 2);
+    const grid = makeSolidGrid(1, 1, 2);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.width).toBe(1);
     expect(nav.height).toBe(1);
   });
 
   it('populates every cell (non-empty cells array) for a small grid', () => {
-    const grid = makeSolidGrid(3, 5, 4, 2);
+    const grid = makeSolidGrid(3, 4, 2);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.cells.length).toBe(4); // height = sizeZ = 4
     for (let z = 0; z < 4; z++) {
@@ -240,7 +238,7 @@ describe('NavGrid.buildNavGrid — dimensions', () => {
 
 describe('NavGrid.buildNavGrid — cell type derivation', () => {
   it('marks all-air columns as void with Infinity moveCost', () => {
-    const grid = new VoxelGrid(5, 10, 5);
+    const grid = new VoxelGrid(5, 5);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const types = cellTypeMap(nav);
     for (let z = 0; z < 5; z++) {
@@ -252,7 +250,7 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
   });
 
   it('marks all-solid columns as walkable with moveCost 1.0', () => {
-    const grid = makeSolidGrid(5, 10, 5, 3);
+    const grid = makeSolidGrid(5, 5, 3);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     for (let z = 0; z < 5; z++) {
       for (let x = 0; x < 5; x++) {
@@ -263,7 +261,7 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
   });
 
   it('marks a column with a drill hole as drill_hole with moveCost 5.0', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const holes: DrillHole[] = [
       { id: 'H1', x: 3, z: 3, depth: 5, diameter: 0.15 },
     ];
@@ -274,7 +272,7 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
   });
 
   it('marks a column under a building footprint as blocked with Infinity moveCost', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
@@ -290,7 +288,7 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
   });
 
   it('leaves cells outside building footprint as walkable', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 80, active: true, occupantIds: [] },
     ];
@@ -302,7 +300,7 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
 
 describe('NavGrid.buildNavGrid — cell type priority', () => {
   it('gives void highest priority: void column stays void even with a drill hole', () => {
-    const grid = new VoxelGrid(10, 10, 10); // all air
+    const grid = new VoxelGrid(10, 10); // all air
     const holes: DrillHole[] = [
       { id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 },
     ];
@@ -313,7 +311,7 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
   });
 
   it('gives void highest priority: void column stays void even with a building', () => {
-    const grid = new VoxelGrid(10, 10, 10); // all air
+    const grid = new VoxelGrid(10, 10); // all air
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
@@ -323,7 +321,7 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
   });
 
   it('gives drill_hole priority over blocked (drill_hole > blocked)', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
@@ -338,7 +336,7 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
   });
 
   it('gives blocked priority over walkable (blocked > walkable)', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 3, z: 3, hp: 80, active: true, occupantIds: [] },
     ];
@@ -357,7 +355,7 @@ describe('NavGrid.buildNavGrid — cell type priority', () => {
 describe('NavGrid.buildNavGrid — ramp detection', () => {
   it('flat terrain produces no ramp cells', () => {
     // 5×5 grid all solid at Y=4 → all cells surfaceY=4 → all neighbors same → no ramp
-    const grid = makeSolidGrid(5, 10, 5, 4);
+    const grid = makeSolidGrid(5, 5, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const types = cellTypeMap(nav);
     for (let z = 0; z < 5; z++) {
@@ -377,7 +375,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     // delta between two integer-quantized columns is 1.0m, already past the
     // 0.5774m ceiling — ramps now only form on continuously graded terrain
     // (#1148/#1149), the same one buildRamp() itself carves.
-    const grid = new VoxelGrid(3, 10, 3);
+    const grid = new VoxelGrid(3, 3);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 3; z++) {
       for (let x = 0; x < 3; x++) setVoxelColumnSurfaceHeight(grid, x, z, 4.0, compId);
@@ -390,7 +388,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
   it('ramp NOT triggered when neighbour delta sits at or below the anti-noise floor (#1151)', () => {
     // Center 4.0m, south neighbour graded by half of NAV_RAMP_MIN_SLOPE_DELTA
     // — below the anti-noise floor, so it reads as flat, not a ramp.
-    const grid = new VoxelGrid(3, 10, 3);
+    const grid = new VoxelGrid(3, 3);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 3; z++) {
       for (let x = 0; x < 3; x++) setVoxelColumnSurfaceHeight(grid, x, z, 4.0, compId);
@@ -403,7 +401,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
   it('ramp cell has moveCost 1.8', () => {
     // Same in-band delta (IN_BAND_RAMP_DELTA) as the "ramp detected" case
     // above → ramp cell should have moveCost 1.8.
-    const grid = new VoxelGrid(3, 10, 3);
+    const grid = new VoxelGrid(3, 3);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 3; z++) {
       for (let x = 0; x < 3; x++) setVoxelColumnSurfaceHeight(grid, x, z, 4.0, compId);
@@ -415,7 +413,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
 
   it('ramp detected with an in-band height delta on each cardinal direction', () => {
     // North: center (2,2) at 4.0m, north neighbor (2,1) graded up by IN_BAND_RAMP_DELTA
-    const gridNorth = new VoxelGrid(5, 10, 5);
+    const gridNorth = new VoxelGrid(5, 5);
     const compIdNorth = gridNorth.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
       for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridNorth, x, z, 4.0, compIdNorth);
@@ -424,7 +422,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     expect(navNorth.cells[1]![2]!.type).toBe('ramp');
 
     // South: center (2,2) at 4.0m, south neighbor (2,3) graded up by IN_BAND_RAMP_DELTA
-    const gridSouth = new VoxelGrid(5, 10, 5);
+    const gridSouth = new VoxelGrid(5, 5);
     const compIdSouth = gridSouth.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
       for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridSouth, x, z, 4.0, compIdSouth);
@@ -433,7 +431,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     expect(navSouth.cells[3]![2]!.type).toBe('ramp');
 
     // West: center (2,2) at 4.0m, west neighbor (1,2) graded up by IN_BAND_RAMP_DELTA
-    const gridWest = new VoxelGrid(5, 10, 5);
+    const gridWest = new VoxelGrid(5, 5);
     const compIdWest = gridWest.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
       for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridWest, x, z, 4.0, compIdWest);
@@ -442,7 +440,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     expect(navWest.cells[2]![1]!.type).toBe('ramp');
 
     // East: center (2,2) at 4.0m, east neighbor (3,2) graded up by IN_BAND_RAMP_DELTA
-    const gridEast = new VoxelGrid(5, 10, 5);
+    const gridEast = new VoxelGrid(5, 5);
     const compIdEast = gridEast.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let z = 0; z < 5; z++)
       for (let x = 0; x < 5; x++) setVoxelColumnSurfaceHeight(gridEast, x, z, 4.0, compIdEast);
@@ -454,7 +452,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
   it('ramp does NOT override void', () => {
     // Cell (1,1) is void (all air), adjacent to height-diff column
     // void has higher priority than ramp
-    const grid = new VoxelGrid(3, 10, 3);
+    const grid = new VoxelGrid(3, 3);
     // Fill all columns solid to Y=4 first
     for (let z = 0; z < 3; z++)
       for (let x = 0; x < 3; x++)
@@ -472,7 +470,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
 
   it('ramp does NOT override drill_hole', () => {
     // Cell with both a drill hole and adjacent height diff → drill_hole wins
-    const grid = new VoxelGrid(3, 10, 3);
+    const grid = new VoxelGrid(3, 3);
     for (let z = 0; z < 3; z++)
       for (let x = 0; x < 3; x++)
         for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
@@ -489,7 +487,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
 
   it('ramp does NOT override blocked', () => {
     // Cell under a building footprint with adjacent height diff → blocked wins
-    const grid = new VoxelGrid(5, 10, 5);
+    const grid = new VoxelGrid(5, 5);
     for (let z = 0; z < 5; z++)
       for (let x = 0; x < 5; x++)
         for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
@@ -508,7 +506,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
   it('edge cell on flat terrain is walkable, not ramp', () => {
     // 1-wide column strip: edge cells have out-of-bounds neighbors
     // Clamping should not create false ramps on flat terrain
-    const grid = makeSolidGrid(1, 10, 5, 4);
+    const grid = makeSolidGrid(1, 5, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     for (let z = 0; z < 5; z++) {
       expect(nav.cells[z]![0]!.type).toBe('walkable');
@@ -524,7 +522,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
     const centerTop = 10;
     const bigDelta = 10; // 10m over a 1m cardinal run — far past NAV_MAX_SLOPE_RATIO (~0.5774)
     const neighborTop = centerTop - bigDelta;
-    const grid = new VoxelGrid(3, 15, 3);
+    const grid = new VoxelGrid(3, 3);
     for (let y = 0; y <= centerTop; y++) grid.setVoxel(1, y, 1, solidVoxel());
     for (let y = 0; y <= neighborTop; y++) grid.setVoxel(1, y, 2, solidVoxel());
     for (let z = 0; z < 3; z++) {
@@ -542,7 +540,7 @@ describe('NavGrid.buildNavGrid — ramp detection', () => {
 
 describe('NavGrid.buildNavGrid — surfaceY population (#953)', () => {
   it('populates NavCell.surfaceY with the column\'s computed surface Y', () => {
-    const grid = makeSolidGrid(5, 10, 5, 4);
+    const grid = makeSolidGrid(5, 5, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // Column (2,2) has solid rock y=0..4, air above → the continuous
     // marching-cubes crossing sits at 4.5, matching NavGrid.computeSurfaceY's
@@ -555,19 +553,19 @@ describe('NavGrid.buildNavGrid — surfaceY population (#953)', () => {
 
 describe('NavGrid.computeSurfaceY — continuous fractional metres, not the integer voxel index (#1149)', () => {
   it('equals computeVoxelColumnSurfaceHeight for a representative non-void column, not computeVoxelColumnSurfaceY\'s integer index', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     expect(NavGrid.computeSurfaceY(grid, 3, 3)).toBe(computeVoxelColumnSurfaceHeight(grid, 3, 3));
     // Sanity: the fractional value genuinely differs from the old integer contract.
     expect(NavGrid.computeSurfaceY(grid, 3, 3)).not.toBe(computeVoxelColumnSurfaceY(grid, 3, 3));
   });
 
   it('still returns NaN (the void sentinel) for a genuinely void/out-of-bounds column', () => {
-    const voidGrid = new VoxelGrid(10, 10, 10); // all air
+    const voidGrid = new VoxelGrid(10, 10); // all air
     expect(NavGrid.computeSurfaceY(voidGrid, 0, 0)).toBeNaN();
 
     // A single solid column queried far outside itself: the clamped column
     // still has no solid voxel, per makeSingleColumnGrid's own contract.
-    const single = makeSingleColumnGrid(10, 10, 10, 5, 5, 4);
+    const single = makeSingleColumnGrid(10, 10, 5, 5, 4);
     expect(NavGrid.computeSurfaceY(single, 20, 5)).toBeNaN();
   });
 
@@ -577,7 +575,7 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     // would read as identical. #1151 moves ramp gating onto the continuous
     // surfaceY delta (via isStepClimbable/NAV_RAMP_MIN_SLOPE_DELTA), which is
     // exactly what makes this real in-band grade visible.
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     const heightA = 4.1;
     const heightB = heightA + IN_BAND_RAMP_DELTA;
@@ -624,7 +622,7 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
     // site back to climbY would silently let a physically-too-steep sub-
     // voxel-graded step through, undetected by any test gating on the
     // integer field alone.
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     setVoxelColumnSurfaceHeight(grid, 3, 3, 4.02, compId);
     setVoxelColumnSurfaceHeight(grid, 4, 3, 4.85, compId);
@@ -673,8 +671,8 @@ describe('NavGrid.computeSurfaceY — continuous fractional metres, not the inte
  * `makeSolidGrid` — may be zero or negative: rock fills the 5 voxels
  * `[solidTopY - 4, solidTopY]`, not `[0, solidTopY]`.
  */
-function makeUniformSolidGridAt(sizeX: number, sizeY: number, sizeZ: number, solidTopY: number): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+function makeUniformSolidGridAt(sizeX: number, sizeZ: number, solidTopY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
       for (let y = solidTopY - 4; y <= solidTopY; y++) {
@@ -687,7 +685,7 @@ function makeUniformSolidGridAt(sizeX: number, sizeY: number, sizeZ: number, sol
 
 describe('NavGrid.buildNavGrid — ground at or below y = 0 (#1184)', () => {
   it('a column whose surface sits below y = 0 classifies as ground (not void) and is reachable', () => {
-    const grid = makeUniformSolidGridAt(10, 20, 10, -5); // uniform rock y=-9..-5 across the whole site
+    const grid = makeUniformSolidGridAt(10, 10, -5); // uniform rock y=-9..-5 across the whole site
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const cell = nav.cells[3]![3]!;
 
@@ -701,7 +699,7 @@ describe('NavGrid.buildNavGrid — ground at or below y = 0 (#1184)', () => {
   });
 
   it('a column whose surface sits exactly at y = 0 classifies as ground (not void) and is reachable', () => {
-    const grid = makeUniformSolidGridAt(10, 20, 10, 0); // uniform rock y=-4..0 across the whole site
+    const grid = makeUniformSolidGridAt(10, 10, 0); // uniform rock y=-4..0 across the whole site
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const cell = nav.cells[3]![3]!;
 
@@ -717,12 +715,12 @@ describe('NavGrid.buildNavGrid — ground at or below y = 0 (#1184)', () => {
 
 describe('NavGrid.computeMaxSurfaceY — no-ground signal and unclamped negative max (#1184)', () => {
   it('reports NaN (not -1) for an entirely off-site/empty grid, distinct from a real negative max', () => {
-    const emptyGrid = new VoxelGrid(0, 10, 0);
+    const emptyGrid = new VoxelGrid(0, 0);
     expect(Number.isNaN(NavGrid.computeMaxSurfaceY(emptyGrid))).toBe(true);
   });
 
   it('reports the true negative max surface Y for a site sitting entirely below y = 0, not clamped to -1', () => {
-    const grid = makeUniformSolidGridAt(10, 20, 10, -5); // uniform crossing at -4.5 everywhere
+    const grid = makeUniformSolidGridAt(10, 10, -5); // uniform crossing at -4.5 everywhere
     expect(NavGrid.computeMaxSurfaceY(grid)).toBeCloseTo(-4.5, 6);
   });
 });
@@ -794,7 +792,7 @@ describe('NavGrid.buildNavGrid — ramp detection after buildRamp() on elevated 
   it('produces at least one ramp-typed cell along a freshly carved ramp path', () => {
     // Flat plateau at surface Y=22 (not flat-from-0) — every column starts on the
     // same bench, so before carving there is no natural elevation cliff anywhere.
-    const grid = makeSolidGrid(20, 30, 30, 22);
+    const grid = makeSolidGrid(20, 30, 22);
     const beforeNav = NavGrid.buildNavGrid(grid, [], []);
     // Sanity: uniformly flat terrain has no ramp cells yet.
     for (let z = 0; z < 30; z++) {
@@ -830,7 +828,7 @@ describe('NavGrid.buildNavGrid — ramp detection after buildRamp() on elevated 
 
 describe('NavGrid.patchNavGrid — region isolation', () => {
   it('updates only cells within the specified region', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // All cells start as walkable
     expect(nav.cells[0]![0]!.type).toBe('walkable');
@@ -852,7 +850,7 @@ describe('NavGrid.patchNavGrid — region isolation', () => {
   });
 
   it('leaves cells outside the region unchanged', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // Record expected types before patch
     const beforeOutside = nav.cells[5]![5]!.type;
@@ -869,7 +867,7 @@ describe('NavGrid.patchNavGrid — region isolation', () => {
   });
 
   it('creates cells with all expected fields after region update', () => {
-    const grid = makeSolidGrid(8, 10, 8, 4);
+    const grid = makeSolidGrid(8, 8, 4);
     const holes: DrillHole[] = [
       { id: 'H1', x: 1, z: 1, depth: 5, diameter: 0.15 },
     ];
@@ -894,7 +892,7 @@ describe('NavGrid.patchNavGrid — region isolation', () => {
 
 describe('NavGrid.patchNavGrid — boundary conditions', () => {
   it('is a no-op when the region is empty (minX > maxX)', () => {
-    const grid = makeSolidGrid(5, 10, 5, 3);
+    const grid = makeSolidGrid(5, 5, 3);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const snapshot = cellTypeMap(nav);
 
@@ -907,7 +905,7 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
   });
 
   it('is a no-op when the region is empty (minZ > maxZ)', () => {
-    const grid = makeSolidGrid(5, 10, 5, 3);
+    const grid = makeSolidGrid(5, 5, 3);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const snapshot = cellTypeMap(nav);
 
@@ -919,7 +917,7 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
   });
 
   it('is a no-op for the sentinel empty region (minX=0, maxX=-1, minZ=0, maxZ=-1)', () => {
-    const grid = makeSolidGrid(5, 10, 5, 3);
+    const grid = makeSolidGrid(5, 5, 3);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     const snapshot = cellTypeMap(nav);
 
@@ -932,7 +930,7 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
   });
 
   it('clamps region that extends beyond grid bounds', () => {
-    const grid = makeSolidGrid(5, 10, 5, 3);
+    const grid = makeSolidGrid(5, 5, 3);
     const nav = NavGrid.buildNavGrid(grid, [], []);
 
     // Clear all rock in the grid so any patched cell becomes void
@@ -958,7 +956,7 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
   });
 
   it('clamps region partially out of bounds on one side', () => {
-    const grid = makeSolidGrid(5, 10, 5, 3);
+    const grid = makeSolidGrid(5, 5, 3);
     const nav = NavGrid.buildNavGrid(grid, [], []);
 
     // Clear column (0,0)
@@ -974,7 +972,7 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
   });
 
   it('recomputes move cost when cell type changes', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const holes: DrillHole[] = [
       { id: 'H1', x: 4, z: 4, depth: 5, diameter: 0.15 },
     ];
@@ -1004,7 +1002,7 @@ describe('NavGrid.patchNavGrid — boundary conditions', () => {
 
 describe('NavGrid.patchNavGrid — building footprint changes', () => {
   it('marks cells as blocked when a building is placed within the patch region', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // All cells start as walkable
     expect(nav.cells[3]![3]!.type).toBe('walkable');
@@ -1028,7 +1026,7 @@ describe('NavGrid.patchNavGrid — building footprint changes', () => {
   });
 
   it('leaves non-footprint cells walkable when building is placed', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // Building at (0,0) covers (0,0)-(1,1)
     const buildings: Building[] = [
@@ -1043,7 +1041,7 @@ describe('NavGrid.patchNavGrid — building footprint changes', () => {
   });
 
   it('reverts blocked cells after building is removed from the array', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     // Build with building present
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
@@ -1066,7 +1064,7 @@ describe('NavGrid.patchNavGrid — building footprint changes', () => {
 
 describe('NavGrid.patchNavGrid — drill hole changes', () => {
   it('marks cell as drill_hole when a drill hole is added within the patch region', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.cells[5]![5]!.type).toBe('walkable');
 
@@ -1082,7 +1080,7 @@ describe('NavGrid.patchNavGrid — drill hole changes', () => {
   });
 
   it('makes cell void when drill hole column rock is cleared and holes are still passed', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const holes: DrillHole[] = [
       { id: 'H1', x: 2, z: 2, depth: 5, diameter: 0.15 },
     ];
@@ -1101,7 +1099,7 @@ describe('NavGrid.patchNavGrid — drill hole changes', () => {
   });
 
   it('gives drill_hole priority over blocked when both overlap in a patched region', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 2, z: 2, hp: 80, active: true, occupantIds: [] },
     ];
@@ -1123,7 +1121,7 @@ describe('NavGrid.patchNavGrid — drill hole changes', () => {
 
 describe('NavGrid.patchNavGrid — multi-cell rectangular region', () => {
   it('updates every cell in a 3×3 rectangular region', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     // All cells are walkable initially
 
@@ -1150,7 +1148,7 @@ describe('NavGrid.patchNavGrid — multi-cell rectangular region', () => {
   });
 
   it('updates exactly 9 cells in a 3×3 region, no more, no fewer', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
 
     // Record initial state
@@ -1180,7 +1178,7 @@ describe('NavGrid.patchNavGrid — multi-cell rectangular region', () => {
 
 describe('NavGrid.patchNavGrid — full-grid equivalence', () => {
   it('produces the same result as buildNavGrid when patching the full grid', () => {
-    const grid = makeSolidGrid(15, 10, 15, 4);
+    const grid = makeSolidGrid(15, 15, 4);
     const buildings: Building[] = [
       { id: 1, type: 'management_office', tier: 1, x: 5, z: 5, hp: 80, active: true, occupantIds: [] },
     ];
@@ -1208,7 +1206,7 @@ describe('NavGrid.patchNavGrid — full-grid equivalence', () => {
 
 describe('NavGrid.patchNavGrid — ramp formation within patch', () => {
   it('detects ramp when terrain height changes within the patched region (#1151)', () => {
-    const grid = new VoxelGrid(5, 10, 5);
+    const grid = new VoxelGrid(5, 5);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     // Fill all columns to a flat continuous height of 4.0m
     for (let z = 0; z < 5; z++)
@@ -1235,7 +1233,7 @@ describe('NavGrid.patchNavGrid — ramp formation within patch', () => {
   });
 
   it('ramp detection in patch respects higher-priority classifications', () => {
-    const grid = new VoxelGrid(5, 10, 5);
+    const grid = new VoxelGrid(5, 5);
     for (let z = 0; z < 5; z++)
       for (let x = 0; x < 5; x++)
         for (let y = 0; y <= 4; y++) grid.setVoxel(x, y, z, solidVoxel());
@@ -1294,7 +1292,7 @@ describe('executeBlast — clearedRegion', () => {
 
   it('returns a non-null clearedRegion even when no voxels are cleared', () => {
     // Grid with no blastable rock (all air) → blast clears nothing
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const holes: DrillHole[] = [];
     addHole(holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
@@ -1877,7 +1875,7 @@ describe('NavGrid.findNearestSpawnCell', () => {
 
 describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
   it('addFragmentOccupant marks a cell occupied (fragmentOccupancy > 0)', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     expect(nav.cellAt(3, 3)!.fragmentOccupancy ?? 0).toBe(0);
 
@@ -1887,7 +1885,7 @@ describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
   });
 
   it('removeFragmentOccupant returns an occupied cell back to 0', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     nav.addFragmentOccupant(3, 3);
     expect(nav.cellAt(3, 3)!.fragmentOccupancy).toBeGreaterThan(0);
@@ -1898,7 +1896,7 @@ describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
   });
 
   it('addFragmentOccupant increments across multiple fragments sharing a cell', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
 
     nav.addFragmentOccupant(4, 4);
@@ -1909,7 +1907,7 @@ describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
   });
 
   it('removeFragmentOccupant floors at 0 — never goes negative when removed more times than added', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     nav.addFragmentOccupant(5, 5);
 
@@ -1921,7 +1919,7 @@ describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
   });
 
   it('addFragmentOccupant is a no-op outside the grid bounds — does not throw', () => {
-    const grid = makeSolidGrid(5, 10, 5, 4);
+    const grid = makeSolidGrid(5, 5, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
 
     expect(() => nav.addFragmentOccupant(999, 999)).not.toThrow();
@@ -1935,7 +1933,7 @@ describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
   });
 
   it('removeFragmentOccupant is a no-op outside the grid bounds — does not throw', () => {
-    const grid = makeSolidGrid(5, 10, 5, 4);
+    const grid = makeSolidGrid(5, 5, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
 
     expect(() => nav.removeFragmentOccupant(999, 999)).not.toThrow();
@@ -1955,7 +1953,7 @@ describe('NavGrid.addFragmentOccupant / removeFragmentOccupant (#954)', () => {
 
 describe('NavGrid.patchNavGrid — preserves vehicle/fragment occupancy (#954)', () => {
   it('preserves vehicleOccupied: true on a cell inside the patched region', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     nav.cellAt(4, 4)!.vehicleOccupied = true;
 
@@ -1967,7 +1965,7 @@ describe('NavGrid.patchNavGrid — preserves vehicle/fragment occupancy (#954)',
   });
 
   it('preserves fragmentOccupancy > 0 on a cell inside the patched region', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     nav.addFragmentOccupant(4, 4);
     const before = nav.cellAt(4, 4)!.fragmentOccupancy;
@@ -1980,7 +1978,7 @@ describe('NavGrid.patchNavGrid — preserves vehicle/fragment occupancy (#954)',
   });
 
   it('preserves both vehicleOccupied and fragmentOccupancy together across a patch that also changes cell type', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
     nav.cellAt(2, 2)!.vehicleOccupied = true;
     nav.addFragmentOccupant(2, 2);
@@ -2007,7 +2005,7 @@ describe('NavGrid.patchNavGrid — preserves vehicle/fragment occupancy (#954)',
 
 describe('NavGrid.buildNavGrid — occupancy seeding from groundFragments/vehicles (#954)', () => {
   it('seeds fragmentOccupancy on the cell under each ground fragment', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const fragments: FragmentData[] = [makeGroundFragment(1, 6, 6)];
 
     const nav = NavGrid.buildNavGrid(grid, [], [], fragments, []);
@@ -2018,7 +2016,7 @@ describe('NavGrid.buildNavGrid — occupancy seeding from groundFragments/vehicl
   });
 
   it('accumulates fragmentOccupancy when multiple fragments share a cell', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const fragments: FragmentData[] = [
       makeGroundFragment(1, 6, 6),
       makeGroundFragment(2, 6, 6),
@@ -2030,7 +2028,7 @@ describe('NavGrid.buildNavGrid — occupancy seeding from groundFragments/vehicl
   });
 
   it('seeds vehicleOccupied: true on the cell under a parked vehicle', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const vehicle = makeParkedVehicle(7, 7);
 
     const nav = NavGrid.buildNavGrid(grid, [], [], [], [vehicle]);
@@ -2041,7 +2039,7 @@ describe('NavGrid.buildNavGrid — occupancy seeding from groundFragments/vehicl
   });
 
   it('defaults to unoccupied when groundFragments/vehicles are omitted', () => {
-    const grid = makeSolidGrid(5, 10, 5, 4);
+    const grid = makeSolidGrid(5, 5, 4);
     const nav = NavGrid.buildNavGrid(grid, [], []);
 
     for (let z = 0; z < 5; z++) {
@@ -2100,7 +2098,7 @@ describe('isVehicleCurrentlyDriving (#1138)', () => {
 
 describe('NavGrid.buildNavGrid — a currently-driving vehicle does not mark its cell occupied (#1138)', () => {
   it('skips vehicleOccupied for a vehicle whose driver has a running itinerary, passed via the employees param', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const fleet = createVehicleState();
     const { vehicle } = purchaseVehicle(fleet, 'debris_hauler', 7, 7);
     const { employee: driver } = hireEmployee(createEmployeeState(), 'driller', new Random(1), 7, 7);
@@ -2119,7 +2117,7 @@ describe('NavGrid.buildNavGrid — a currently-driving vehicle does not mark its
   });
 
   it('still marks the cell occupied for the SAME vehicle once its driver has no itinerary (parked)', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const fleet = createVehicleState();
     const { vehicle } = purchaseVehicle(fleet, 'debris_hauler', 7, 7);
     const { employee: driver } = hireEmployee(createEmployeeState(), 'driller', new Random(1), 7, 7);
@@ -2140,7 +2138,7 @@ describe('NavGrid.buildNavGrid — a currently-driving vehicle does not mark its
 describe('clearance field (#1154)', () => {
   describe('buildNavGrid — flat open grid', () => {
     it('every walkable cell reads clearance === NAV_CLEARANCE_MAX_CELLS when nothing blocks the grid', () => {
-      const grid = makeSolidGrid(7, 10, 7, 4);
+      const grid = makeSolidGrid(7, 7, 4);
       const nav = NavGrid.buildNavGrid(grid, [], []);
       for (let z = 0; z < 7; z++) {
         for (let x = 0; x < 7; x++) {
@@ -2152,7 +2150,7 @@ describe('clearance field (#1154)', () => {
 
   describe('buildNavGrid — single blocked cell surrounded by open cells', () => {
     it('the blocked cell itself reads clearance === 0, its 8 immediate neighbours read 1, and a Chebyshev-distance-2 cell reads the capped value', () => {
-      const grid = makeSolidGrid(11, 10, 11, 4);
+      const grid = makeSolidGrid(11, 11, 4);
       clearColumn(grid, 5, 5, 4); // (5,5) becomes void — the lone obstacle
       const nav = NavGrid.buildNavGrid(grid, [], []);
 
@@ -2174,7 +2172,7 @@ describe('clearance field (#1154)', () => {
   describe('buildNavGrid — 1-cell-wide corridor between two blocked walls', () => {
     it('the corridor cell reads clearance === 1', () => {
       // x=1 and x=3 are void walls; x=2 is the 1-cell-wide corridor between them.
-      const grid = makeSolidGrid(5, 10, 7, 4);
+      const grid = makeSolidGrid(5, 7, 4);
       clearColumn(grid, 1, 3, 4);
       clearColumn(grid, 3, 3, 4);
       // Repeat the wall down every row so the interior corridor cell tested
@@ -2193,7 +2191,7 @@ describe('clearance field (#1154)', () => {
     it('edge columns read 1, the centre column reads the capped value', () => {
       expect(RAMP_WIDTH).toBe(3);
       // x=1 and x=5 are void walls; x=2,3,4 (width RAMP_WIDTH) is the corridor.
-      const grid = makeSolidGrid(7, 10, 7, 4);
+      const grid = makeSolidGrid(7, 7, 4);
       for (let z = 0; z < 7; z++) {
         clearColumn(grid, 1, z, 4);
         clearColumn(grid, 5, z, 4);
@@ -2208,7 +2206,7 @@ describe('clearance field (#1154)', () => {
 
   describe('patchNavGrid — clearance recompute is local: patch region + halo, not the whole grid', () => {
     it('updates clearance inside the patch, bleeds into the halo, and leaves cells beyond the halo untouched', () => {
-      const grid = makeSolidGrid(20, 10, 20, 4);
+      const grid = makeSolidGrid(20, 20, 4);
       const nav = NavGrid.buildNavGrid(grid, [], []);
 
       // Sanity: fully open grid, every cell at the cap.
@@ -2241,7 +2239,7 @@ describe('clearance field (#1154)', () => {
   describe('patchNavGrid — narrow-then-widen a corridor (blast narrows, then a later patch widens it back)', () => {
     it('clearance at the choke drops to 1 when narrowed, then recovers to 2 when widened back', () => {
       // x=1 and x=5 are void walls; x=2,3,4 is a RAMP_WIDTH-wide (3-cell) corridor.
-      const grid = makeSolidGrid(7, 10, 7, 4);
+      const grid = makeSolidGrid(7, 7, 4);
       for (let z = 0; z < 7; z++) {
         clearColumn(grid, 1, z, 4);
         clearColumn(grid, 5, z, 4);
@@ -2294,7 +2292,7 @@ describe('clearance field (#1154)', () => {
 
   describe('boundary — grid-edge cell is not penalized by a missing off-grid neighbour', () => {
     it('a corner cell of a fully open grid reads the same clearance cap as an interior cell', () => {
-      const grid = makeSolidGrid(5, 10, 5, 4);
+      const grid = makeSolidGrid(5, 5, 4);
       const nav = NavGrid.buildNavGrid(grid, [], []);
 
       const corner = nav.cellAt(0, 0)!.clearance;
@@ -2309,7 +2307,7 @@ describe('clearance field (#1154)', () => {
   describe('patchNavGrid — halo overwrite regression (#1154 code review)', () => {
     it('an unrelated nearby patch does not change the clearance of a wall-adjacent cell outside the patch', () => {
       // Permanent wall: void column at x=10.
-      const grid = makeSolidGrid(15, 10, 15, 4);
+      const grid = makeSolidGrid(15, 15, 4);
       clearColumn(grid, 10, 7, 4);
       const nav = NavGrid.buildNavGrid(grid, [], []);
 

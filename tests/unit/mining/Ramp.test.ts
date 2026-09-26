@@ -17,9 +17,10 @@ import {
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
-function fillGrid(grid: VoxelGrid) {
+/** `height` is the grid's own constructed height (the value it was built with via `new VoxelGrid`). */
+function fillGrid(grid: VoxelGrid, height: number) {
   for (let z = 0; z < grid.sizeZ; z++)
-    for (let y = 0; y < grid.sizeY; y++)
+    for (let y = 0; y < height; y++)
       for (let x = 0; x < grid.sizeX; x++)
         grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
 }
@@ -28,10 +29,11 @@ function fillGrid(grid: VoxelGrid) {
  * Scan a column top-down for the highest voxel with density >= 0.5 — same rule as
  * NavGrid.computeSurfaceY, kept independent here so the assertion below tests
  * observable behaviour (does the physical terrain change?) rather than reaching
- * into Ramp.ts's own computeColumnSurfaceY helper.
+ * into Ramp.ts's own computeColumnSurfaceY helper. `height` is the grid's own
+ * constructed height.
  */
-function localSurfaceY(grid: VoxelGrid, x: number, z: number): number {
-  for (let y = grid.sizeY - 1; y >= 0; y--) {
+function localSurfaceY(grid: VoxelGrid, x: number, z: number, height: number): number {
+  for (let y = height - 1; y >= 0; y--) {
     const voxel = grid.getVoxel(x, y, z);
     if (voxel && voxel.density >= 0.5) return y;
   }
@@ -45,8 +47,8 @@ function localSurfaceY(grid: VoxelGrid, x: number, z: number): number {
  * absolute-vs-relative-depth bug because its surface sits right where the ramp
  * carves anyway.
  */
-function makeElevatedGrid(sizeX: number, sizeY: number, sizeZ: number, surfaceY: number): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+function makeElevatedGrid(sizeX: number, sizeZ: number, surfaceY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
       for (let y = 0; y <= surfaceY; y++) {
@@ -59,12 +61,12 @@ function makeElevatedGrid(sizeX: number, sizeY: number, sizeZ: number, surfaceY:
 
 describe('Ramp building', () => {
   it('buildRamp modifies voxel grid to create a sloped passage', () => {
-    const grid = new VoxelGrid(20, 15, 20);
-    fillGrid(grid);
+    const grid = new VoxelGrid(20, 20);
+    fillGrid(grid, 15);
 
     // fillGrid fills the column solid from y=0 to the grid's top, so the column's
     // actual surface (not y=0) is where carving starts (step 0 → currentDepth 0).
-    const surfaceY = localSurfaceY(grid, 10, 10);
+    const surfaceY = localSurfaceY(grid, 10, 10, 15);
 
     // length:15/targetDepth:8 (ratio 0.533) — must stay under RAMP_CUT_SLOPE_RATIO
     // (#1152, ~0.566) or validateRampOrder now refuses the order before this
@@ -88,12 +90,12 @@ describe('Ramp building', () => {
   });
 
   it('ramp connects surface level to a lower elevation', () => {
-    const grid = new VoxelGrid(20, 15, 30);
-    fillGrid(grid);
+    const grid = new VoxelGrid(20, 30);
+    fillGrid(grid, 15);
 
     // fillGrid fills the column solid from y=0 to the grid's top, so the origin
     // column's real surface (not y=0) is where carving starts (step 0 → currentDepth 0).
-    const originSurfaceY = localSurfaceY(grid, 10, 5);
+    const originSurfaceY = localSurfaceY(grid, 10, 5, 15);
 
     // length:18/targetDepth:10 (ratio 0.556) — must stay under
     // RAMP_CUT_SLOPE_RATIO (#1152, ~0.566); length:15 (ratio 0.667) used to
@@ -118,8 +120,8 @@ describe('Ramp building', () => {
   });
 
   it('ramp building deducts cost from finances', () => {
-    const grid = new VoxelGrid(20, 15, 20);
-    fillGrid(grid);
+    const grid = new VoxelGrid(20, 20);
+    fillGrid(grid, 15);
 
     // length:15/targetDepth:8 (ratio 0.533) — see slope note on the first test above.
     const result = buildRamp(grid, {
@@ -131,8 +133,8 @@ describe('Ramp building', () => {
   });
 
   it('fails with insufficient funds', () => {
-    const grid = new VoxelGrid(20, 15, 20);
-    fillGrid(grid);
+    const grid = new VoxelGrid(20, 20);
+    fillGrid(grid, 15);
 
     // length:15/targetDepth:8 (ratio 0.533, under RAMP_CUT_SLOPE_RATIO) — must
     // stay under the slope cap so this order is refused for insufficient
@@ -150,9 +152,9 @@ describe('Ramp building', () => {
     // Surface at y=22 — not flat-from-0 — matching a real game map's terrain height,
     // where the buggy absolute-Y carving lands deep underground and never touches
     // the topmost solid voxel, so the column's surface never visibly drops.
-    const grid = makeElevatedGrid(20, 30, 30, 22);
+    const grid = makeElevatedGrid(20, 30, 22);
 
-    const originSurfaceBefore = localSurfaceY(grid, 10, 10);
+    const originSurfaceBefore = localSurfaceY(grid, 10, 10, 30);
     expect(originSurfaceBefore).toBe(22);
 
     const length = 15;
@@ -169,14 +171,14 @@ describe('Ramp building', () => {
     // back to that exact original height instead of leaving the hard,
     // fully-cleared voxel step the pre-#1151 rule produced. No drop at all
     // is the correct, un-buried outcome here.
-    const originSurfaceAfter = localSurfaceY(grid, 10, 10);
+    const originSurfaceAfter = localSurfaceY(grid, 10, 10, 30);
     const originDrop = originSurfaceBefore - originSurfaceAfter;
     expect(originDrop).toBe(0);
 
     // End column (last carved step, z = originZ + length - 1) — should have
     // dropped substantially further than the origin, consistent with targetDepth.
     const endZ = 10 + length - 1;
-    const endSurfaceAfter = localSurfaceY(grid, 10, endZ);
+    const endSurfaceAfter = localSurfaceY(grid, 10, endZ, 30);
     const endDrop = originSurfaceBefore - endSurfaceAfter;
     expect(endDrop).toBeGreaterThan(originDrop);
     expect(endDrop).toBeGreaterThanOrEqual(targetDepth - 3);
@@ -184,8 +186,8 @@ describe('Ramp building', () => {
   });
 
   it('does not affect surface height of columns far outside the ramp path', () => {
-    const grid = makeElevatedGrid(20, 30, 30, 22);
-    const farSurfaceBefore = localSurfaceY(grid, 2, 2);
+    const grid = makeElevatedGrid(20, 30, 22);
+    const farSurfaceBefore = localSurfaceY(grid, 2, 2, 30);
 
     // length:15/targetDepth:8 (ratio 0.533) — see slope note above.
     const result = buildRamp(grid, {
@@ -193,7 +195,7 @@ describe('Ramp building', () => {
     }, 50000);
 
     expect(result.success).toBe(true);
-    const farSurfaceAfter = localSurfaceY(grid, 2, 2);
+    const farSurfaceAfter = localSurfaceY(grid, 2, 2, 30);
     expect(farSurfaceAfter).toBe(farSurfaceBefore);
   });
 
@@ -202,12 +204,13 @@ describe('Ramp building', () => {
   // fractional crossing on that far column so a stray touch would be visible
   // even if it happened well above the flat surface index.
   it('a column entirely outside the ramp path is bit-for-bit unchanged at every Y', () => {
-    const grid = makeElevatedGrid(20, 30, 30, 22);
+    const HEIGHT = 30; // grid's own constructed height (makeElevatedGrid's dropped sizeY arg)
+    const grid = makeElevatedGrid(20, 30, 22);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     setVoxelColumnSurfaceHeight(grid, 2, 2, 22.5, compId);
 
     const farBefore: number[] = [];
-    for (let y = 0; y < grid.sizeY; y++) farBefore.push(grid.densityAt(2, y, 2));
+    for (let y = 0; y < HEIGHT; y++) farBefore.push(grid.densityAt(2, y, 2));
 
     // length:15/targetDepth:8 (ratio 0.533) — see slope note above.
     const result = buildRamp(grid, {
@@ -215,7 +218,7 @@ describe('Ramp building', () => {
     }, 50000);
 
     expect(result.success).toBe(true);
-    for (let y = 0; y < grid.sizeY; y++) {
+    for (let y = 0; y < HEIGHT; y++) {
       expect(grid.densityAt(2, y, 2), `density at y=${y} should be unchanged`).toBe(farBefore[y]);
     }
   });
@@ -244,8 +247,8 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
 
   for (const direction of ALL_DIRECTIONS) {
     it(`sequentially carving every segment reaches an identical final grid to buildRamp — direction ${direction}`, () => {
-      const gridDirect = makeElevatedGrid(40, 30, 40, 15);
-      const gridSegmented = makeElevatedGrid(40, 30, 40, 15);
+      const gridDirect = makeElevatedGrid(40, 40, 15);
+      const gridSegmented = makeElevatedGrid(40, 40, 15);
       const ramp: RampDef = { ...RAMP, direction };
 
       const directResult = buildRamp(gridDirect, ramp, 100000);
@@ -271,7 +274,7 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
   }
 
   it('a partial carve clears exactly the carved segments\' own declared cells, and leaves not-yet-applied segments solid', () => {
-    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const grid = makeElevatedGrid(40, 40, 15);
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
@@ -323,7 +326,7 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
   });
 
   it('carving a segment whose cells were already cleared externally reports voxelsCleared: 0 and does not throw', () => {
-    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const grid = makeElevatedGrid(40, 40, 15);
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
@@ -344,7 +347,7 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
   });
 
   it('a segment already cleared by an external caller before the segment is ever carved also reports voxelsCleared: 0', () => {
-    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const grid = makeElevatedGrid(40, 40, 15);
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
@@ -369,7 +372,7 @@ describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
 
 describe('carveRampSegment — post-carve renormalisation (#1148)', () => {
   function buildFractionalColumnFixture() {
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 2; y++) grid.fillVoxel(5, y, 5, compId, undefined, 1);
     // Genuine fractional crossing above the real top: y=3 is the real top
@@ -387,7 +390,8 @@ describe('carveRampSegment — post-carve renormalisation (#1148)', () => {
     });
 
     expect(result.voxelsCleared).toBe(1);
-    for (let y = 3; y < grid.sizeY; y++) {
+    const HEIGHT = 10; // buildFractionalColumnFixture's grid's own constructed height
+    for (let y = 3; y < HEIGHT; y++) {
       expect(grid.densityAt(5, y, 5), `density at y=${y} should be 0`).toBe(0);
     }
   });
@@ -430,7 +434,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
   const RAMP: Omit<RampDef, 'direction'> = { originX: 20, originZ: 20, length: 8, targetDepth: 6 };
 
   it('orders segments index 0..N-1 strictly from the topmost Y (globalMaxY) to the bottommost Y (globalMinY) — targetY strictly decreases across adjacent segments', () => {
-    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const grid = makeElevatedGrid(40, 40, 15);
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
@@ -445,7 +449,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
   });
 
   it('each segment spans exactly one absolute Y row — region.minY === region.maxY === targetY when non-null (a layer, not a column)', () => {
-    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const grid = makeElevatedGrid(40, 40, 15);
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
@@ -462,7 +466,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
   });
 
   it('every cell in a deeper segment sits strictly below every cell in the segment immediately above it', () => {
-    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const grid = makeElevatedGrid(40, 40, 15);
     const ramp: RampDef = { ...RAMP, direction: 'south' };
 
     const segments = defineRampSegments(grid, ramp);
@@ -480,7 +484,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
 
   it('a layer with zero solid cells (already cleared before defineRampSegments runs) still returns a segment with finite, in-range targetX/targetZ/targetY — region is null, the anchor is not', () => {
     const surfaceY = 15;
-    const grid = makeElevatedGrid(40, 30, 40, surfaceY);
+    const grid = makeElevatedGrid(40, 40, surfaceY);
     const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
 
     // The topmost row every column in the footprint could contribute
@@ -513,8 +517,8 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
   });
 
   it('the total cell count summed across all segments equals buildRamp\'s own voxelsCleared count for the same RampDef (final geometry is unchanged by the regrouping)', () => {
-    const gridDirect = makeElevatedGrid(40, 30, 40, 15);
-    const gridSegmented = makeElevatedGrid(40, 30, 40, 15);
+    const gridDirect = makeElevatedGrid(40, 40, 15);
+    const gridSegmented = makeElevatedGrid(40, 40, 15);
     // Deliberately not RAMP (length:8/targetDepth:6, ratio 0.75) — this test's
     // buildRamp call goes through validateRampOrder's new slope check
     // (#1152, cap ~0.566), unlike this describe's other, defineRampSegments-
@@ -557,7 +561,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
   }
 
   function makeSteppedGrid(): VoxelGrid {
-    const grid = new VoxelGrid(40, 30, 40);
+    const grid = new VoxelGrid(40, 40);
     for (let z = 0; z < 40; z++) {
       const s = surfaceYAt(z);
       for (let x = 0; x < 40; x++) {
@@ -630,7 +634,7 @@ describe('defineRampSegments — layered (bench) excavation order (#925)', () =>
   /** Per-column solid-to-`surfaceY` grid, one column per z (ramp runs south, so
    * every column along the ramp shares the same x band). */
   function makeGridFromSurfaceFn(fn: (z: number) => number): VoxelGrid {
-    const grid = new VoxelGrid(40, 30, 40);
+    const grid = new VoxelGrid(40, 40);
     for (let z = 0; z < 40; z++) {
       const s = fn(z);
       for (let x = 0; x < 40; x++) {
@@ -711,7 +715,7 @@ describe('defineRampSegments — constant-slope floor geometry (#1152)', () => {
   /** Column-by-z solid terrain, like the #1152 describe above's helper, kept
    * local to this describe so a bump/dip shape can be authored per test. */
   function makeGridFromSurfaceFn(fn: (z: number) => number): VoxelGrid {
-    const grid = new VoxelGrid(40, 30, 40);
+    const grid = new VoxelGrid(40, 40);
     for (let z = 0; z < 40; z++) {
       const s = fn(z);
       for (let x = 0; x < 40; x++) {
@@ -864,7 +868,7 @@ describe('Ramp — fill across terrain dips (#1172)', () => {
    * makeGridFromSurfaceFn, but the dip columns (steps 8-10) carry a distinct
    * rock composition from the ambient terrain (item 9). */
   function makeDipGrid(): VoxelGrid {
-    const grid = new VoxelGrid(40, 30, 40);
+    const grid = new VoxelGrid(40, 40);
     const ambientCompId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
     const dipCompId = grid.palette.intern({ rocks: [{ rockId: DIP_ROCK_ID, coefficient: 1.0 }] });
     for (let z = 0; z < 40; z++) {
@@ -1025,13 +1029,13 @@ describe('Ramp — fill across terrain dips (#1172)', () => {
 
   describe('isRampCellPending', () => {
     it('a fillTarget cell whose column is still below the target reports pending (true)', () => {
-      const grid = new VoxelGrid(10, 10, 10); // column (3,3) is entirely empty -> no ground (NaN height, #1184)
+      const grid = new VoxelGrid(10, 10); // column (3,3) is entirely empty -> no ground (NaN height, #1184)
       const cell = { x: 3, y: 5, z: 3, fillTarget: 5 };
       expect(isRampCellPending(grid, cell)).toBe(true);
     });
 
     it('a fillTarget cell whose column has already reached (or exceeded) the target reports not pending (false)', () => {
-      const grid = new VoxelGrid(10, 10, 10);
+      const grid = new VoxelGrid(10, 10);
       const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
       setVoxelColumnSurfaceHeight(grid, 3, 3, 5, compId);
 
@@ -1043,13 +1047,13 @@ describe('Ramp — fill across terrain dips (#1172)', () => {
     });
 
     it('a plain cut cell (no fillTarget) with solid rock still at that exact voxel reports pending (true) — matches today\'s densityAt(...) > 0 check', () => {
-      const grid = new VoxelGrid(10, 10, 10);
+      const grid = new VoxelGrid(10, 10);
       grid.setVoxel(3, 5, 3, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
       expect(isRampCellPending(grid, { x: 3, y: 5, z: 3 })).toBe(true);
     });
 
     it('a plain cut cell (no fillTarget) already cleared reports not pending (false)', () => {
-      const grid = new VoxelGrid(10, 10, 10); // never filled -> density 0
+      const grid = new VoxelGrid(10, 10); // never filled -> density 0
       expect(isRampCellPending(grid, { x: 3, y: 5, z: 3 })).toBe(false);
     });
   });
@@ -1107,7 +1111,7 @@ describe('Ramp — fill across terrain dips (#1172)', () => {
     // 8m below the line — far past SURFACE_BAND_HALF (1 voxel).
     const deepDipGround = lineAtDip - 8;
 
-    const grid = new VoxelGrid(40, 40, 40);
+    const grid = new VoxelGrid(40, 40);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
     for (let z = 0; z < 40; z++) {
       const step = z - originZ;
@@ -1530,7 +1534,7 @@ describe('computeRampSegmentCarveTarget (#946)', () => {
 describe('carveRampSegmentSlice (#946)', () => {
   /** 6 cells at distinct, individually addressable positions, all solid. */
   function makeSliceFixture(): { grid: VoxelGrid; cells: { x: number; y: number; z: number }[] } {
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const cells = [0, 1, 2, 3, 4, 5].map(i => ({ x: 5 + i, y: 3, z: 5 }));
     for (const cell of cells) {
       grid.setVoxel(cell.x, cell.y, cell.z, {
@@ -1618,7 +1622,7 @@ describe('carveRampSegmentSlice (#946)', () => {
   });
 
   it('driving a real segment through increasing elapsed fractions clears cells roughly proportionally, and exactly cells.length at 100%', () => {
-    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const grid = makeElevatedGrid(40, 40, 15);
     const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 8, targetDepth: 6 };
     const segments = defineRampSegments(grid, ramp);
     const segment = segments.find(s => s.cells.length >= 8)!;
@@ -1670,7 +1674,7 @@ describe('carveRampSegmentSlice (#946)', () => {
   it('a 40+ cell segment worked over 5 ticks emits terrain:updated once per tick that made progress, not once per voxel', () => {
     // A wide, long footprint so a single (topmost) layer spans the whole
     // corridor — RAMP_WIDTH(3) * length(20) gives plenty of headroom over 40.
-    const grid = makeElevatedGrid(60, 30, 60, 15);
+    const grid = makeElevatedGrid(60, 60, 15);
     const ramp: RampDef = { originX: 20, originZ: 20, direction: 'south', length: 20, targetDepth: 6 };
     const segments = defineRampSegments(grid, ramp);
     const segment = segments.find(s => s.cells.length >= 40)!;
@@ -1698,7 +1702,7 @@ describe('carveRampSegmentSlice (#946)', () => {
   });
 
   it('#1148: widens the emitted terrain:updated region\'s maxY to include renormalisation past the raw carved cell', () => {
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
     const X = 5, Z = 5, TOP_Y = 3;
     for (let y = 0; y <= TOP_Y; y++) grid.fillVoxel(X, y, Z, compId, undefined, 1);
