@@ -68,11 +68,20 @@ describe('entry points into the assignment queue', () => {
   // waits there. Filing one used to reach `agentic-assign` through intake,
   // which is how an issue created with the documented default labels started a
   // session the moment it existed.
+  //
+  // Intake does react to labels now — to keep `ready` honest — so what is
+  // pinned is that nothing it does can start anything: it never assigns, it
+  // writes only with GITHUB_TOKEN (which raises no event), and it never puts
+  // `ready` on an issue, only takes it off.
   it('starts nothing when an issue is filed or labelled', () => {
     const intake = workflow('agentic-intake.yml');
     expect(intake).not.toContain(ASSIGN_ACTION);
-    expect(intake).not.toContain('labeled');
     expect(intake).not.toMatch(/\n {2}assign:/);
+    expect(intake).not.toContain('PAT_TOKEN_COPILOT_AUTOMATION');
+    expect(intake).toContain('github-token: ${{ secrets.GITHUB_TOKEN }}');
+    expect(intake).not.toMatch(/addLabels\([^)]*rules\.READY/);
+    expect(intake).not.toContain('@claude');
+    expect(intake).not.toContain('@opencode');
   });
 
   // Every lifecycle label a run reaches for has to exist before it reaches for
@@ -82,8 +91,16 @@ describe('entry points into the assignment queue', () => {
   // everyone until somebody notices.
   it('keeps every lifecycle label a run applies defined', () => {
     const intake = workflow('agentic-intake.yml');
-    const defined = [...intake.matchAll(/ensureLabel\(\s*'([a-z-]+)'/g)].map((m) => m[1]);
-    expect(defined).toEqual(expect.arrayContaining(['agent-task', 'ready', 'paused']));
+    for (const name of ['AGENT_TASK', 'READY', 'IN_PROGRESS', 'BLOCKED', 'PAUSED', 'DONE']) {
+      expect(intake, name).toContain(`{ name: rules.${name},`);
+    }
+  });
+
+  // The two labels that make a promise say which definition they promise.
+  it('describes `ready` and `done` by the definitions they stand for', () => {
+    const intake = workflow('agentic-intake.yml');
+    expect(intake).toMatch(/name: rules\.READY,[^}]*Definition of Ready/);
+    expect(intake).toMatch(/name: rules\.DONE,[^}]*Definition of Done/);
   });
 
   it('starts a run from a human dispatching the trigger', () => {
@@ -173,10 +190,177 @@ describe('every entry point assigns under the configured parallel limit', () => 
   it('keeps every scope label defined, from the taxonomy the assigner reads', () => {
     const intake = workflow('agentic-intake.yml');
     expect(intake).toContain('.github/scripts/assignability.cjs');
-    expect(intake).toMatch(/for \(const \[scope, description\] of Object\.entries\(SCOPES\)\)/);
-    expect(intake).toContain('ensureLabel(`${SCOPE_PREFIX}${scope}`');
-    expect(intake.slice(0, intake.indexOf('Normalise lifecycle labels'))).toContain('actions/checkout@v4');
+    expect(intake).toContain('...Object.entries(rules.SCOPES).map(([scope, description]) => ({');
+    expect(intake).toContain('name: `${rules.SCOPE_PREFIX}${scope}`');
+    expect(intake.slice(0, intake.indexOf('Keep the labels honest'))).toContain('actions/checkout@v4');
     expect(intake).toMatch(/permissions:\s*\n\s*issues: write\s*\n\s*contents: read/);
+  });
+
+  // The form's Scope field is how a human filing through the UI meets the
+  // Definition of Ready. Its options are the taxonomy, exactly.
+  it('offers exactly the known scopes in the issue form', () => {
+    const rules = require(join(ROOT, '.github/scripts/assignability.cjs'));
+    const form = readFileSync(join(ROOT, '.github/ISSUE_TEMPLATE/agent-task.yml'), 'utf8');
+    const field = form.slice(form.indexOf('id: scope'), form.indexOf('id: blocked_by'));
+    const options = [...field.matchAll(/^\s+- scope:([a-z]+)$/gm)].map((m) => m[1]);
+    expect(options).toEqual(Object.keys(rules.SCOPES));
+    expect(field).toMatch(/multiple: true/);
+    expect(field).toMatch(/validations:\s*\n\s*required: true/);
+  });
+});
+
+// The Definition of Ready's checkable half, kept true on the labels themselves.
+// Run against a fake GitHub: the shipped intake script, every branch it has.
+describe('intake keeps `ready` honest', () => {
+  const intakeText = workflow('agentic-intake.yml');
+  const script = (() => {
+    const marker = 'script: |\n';
+    return intakeText
+      .slice(intakeText.indexOf(marker) + marker.length)
+      .split('\n')
+      .map((line) => line.replace(/^ {12}/, ''))
+      .join('\n');
+  })();
+  const jobIf = (() => {
+    const start = intakeText.indexOf('if: >-') + 'if: >-'.length;
+    return intakeText.slice(start, intakeText.indexOf('\n    runs-on:'));
+  })();
+
+  interface Run {
+    labels: string[];
+    comments: string[];
+    created: string[];
+    updated: string[];
+  }
+
+  async function intake(
+    action: string,
+    issue: { labels: string[]; body?: string; state?: string },
+    existingLabels: { name: string; color: string; description: string | null }[] = []
+  ): Promise<Run> {
+    const run: Run = { labels: [...issue.labels], comments: [], created: [], updated: [] };
+    const github: any = {
+      rest: {
+        issues: {
+          listLabelsForRepo: async () => ({ data: [] }),
+          createLabel: async ({ name }: { name: string }) => { run.created.push(name); },
+          updateLabel: async ({ name }: { name: string }) => { run.updated.push(name); },
+          addLabels: async ({ labels }: { labels: string[] }) => { run.labels.push(...labels); },
+          removeLabel: async ({ name }: { name: string }) => { run.labels = run.labels.filter((l) => l !== name); },
+          createComment: async ({ body }: { body: string }) => { run.comments.push(body); },
+        },
+      },
+      paginate: async () => existingLabels,
+    };
+    const core = { info: () => {}, warning: () => {} };
+    const context = {
+      repo: { owner: 'Nico2398', repo: 'BlastSimulator2026' },
+      payload: {
+        action,
+        issue: { number: 42, state: issue.state ?? 'open', body: issue.body ?? '', labels: issue.labels.map((name) => ({ name })) },
+      },
+    };
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+    await new AsyncFunction('github', 'context', 'core', 'require', 'process', script)(
+      github, context, core, require, { env: { GITHUB_WORKSPACE: ROOT } }
+    );
+    return run;
+  }
+
+  it('reacts only to the label events that can change whether `ready` is honest', () => {
+    const wakes = (action: string, label?: string) =>
+      Boolean(evaluateExpression(jobIf, { github: { event: { action, label: label ? { name: label } : null } } } as never));
+    expect(wakes('opened')).toBe(true);
+    expect(wakes('reopened')).toBe(true);
+    expect(wakes('labeled', 'ready')).toBe(true);
+    expect(wakes('labeled', 'scope:ui')).toBe(true);
+    expect(wakes('unlabeled', 'scope:ui')).toBe(true);
+    expect(wakes('unlabeled', 'agent-task')).toBe(true);
+    // The pipeline's own bookkeeping, which happens on every assignment.
+    expect(wakes('labeled', 'in-progress')).toBe(false);
+    expect(wakes('unlabeled', 'ready')).toBe(false);
+    expect(wakes('labeled', 'blocked')).toBe(false);
+    expect(wakes('labeled', 'paused')).toBe(false);
+  });
+
+  it('turns the form\'s Scope field into scope labels, and leaves the issue ready', async () => {
+    const run = await intake('opened', {
+      labels: ['agent-task', 'ready'],
+      body: '### Context\n\nwhy\n\n### Scope\n\nscope:ui, scope:console\n\n### Blocked by\n\n_No response_\n',
+    });
+    expect(run.labels).toEqual(['agent-task', 'ready', 'scope:ui', 'scope:console']);
+    expect(run.comments).toEqual([]);
+  });
+
+  it('reads nothing but the Scope field — a scope named in prose is not a declaration', async () => {
+    const run = await intake('opened', {
+      labels: ['agent-task', 'ready'],
+      body: '## Context\n\nThis touches scope:ui and scope:nav code.\n',
+    });
+    expect(run.labels).toEqual(['agent-task']);
+    expect(run.comments).toHaveLength(1);
+  });
+
+  it('takes `ready` off an issue that does not meet the Definition of Ready, and says what is missing', async () => {
+    const run = await intake('labeled', { labels: ['ready', 'scope:ui'] });
+    expect(run.labels).toEqual(['scope:ui']);
+    expect(run.comments).toHaveLength(1);
+    expect(run.comments[0]).toContain('<!-- agentic-definition-of-ready -->');
+    expect(run.comments[0]).toContain('`agent-task`');
+    expect(run.comments[0]).toContain('`scope:global`');
+  });
+
+  it('takes `ready` off when the last scope label comes off', async () => {
+    const run = await intake('unlabeled', { labels: ['agent-task', 'ready'] });
+    expect(run.labels).toEqual(['agent-task']);
+  });
+
+  it('takes `ready` off for a scope nobody knows', async () => {
+    const run = await intake('labeled', { labels: ['agent-task', 'ready', 'scope:naavmesh'] });
+    expect(run.labels).not.toContain('ready');
+    expect(run.comments[0]).toContain('scope:naavmesh');
+  });
+
+  it('leaves an issue that meets it alone', async () => {
+    const run = await intake('labeled', { labels: ['agent-task', 'ready', 'scope:nav'] });
+    expect(run.labels).toEqual(['agent-task', 'ready', 'scope:nav']);
+    expect(run.comments).toEqual([]);
+  });
+
+  it('never checks an issue that is not waiting in the queue', async () => {
+    const run = await intake('labeled', { labels: ['agent-task', 'scope:nav'] });
+    expect(run.comments).toEqual([]);
+    const closed = await intake('labeled', { labels: ['ready'], state: 'closed' });
+    expect(closed.labels).toEqual(['ready']);
+  });
+
+  it('drops a stale `done` from a reopened issue', async () => {
+    const run = await intake('reopened', { labels: ['agent-task', 'done', 'scope:ui'] });
+    expect(run.labels).toEqual(['agent-task', 'scope:ui']);
+  });
+
+  it('creates the labels that are missing and rewrites a description that drifted, nothing else', async () => {
+    const rules = require(join(ROOT, '.github/scripts/assignability.cjs'));
+    const run = await intake('opened', { labels: [] }, [
+      { name: 'agent-task', color: '1D76DB', description: 'A task for the autonomous pipeline' },
+      { name: 'ready', color: '0e8a16', description: 'Eligible for pipeline assignment' },
+    ]);
+    expect(run.updated).toEqual(['ready']);
+    expect(run.created).toEqual(expect.arrayContaining(['in-progress', 'done', ...Object.keys(rules.SCOPES).map((s: string) => `scope:${s}`)]));
+    expect(run.created).not.toContain('agent-task');
+  });
+});
+
+// The Definition of Done's checkable half, on the path that applies `done` to a
+// merged pull request's issue.
+describe('the merge chain leaves a closed issue meeting the Definition of Done', () => {
+  const chain = workflow('auto-assign-next.yml');
+  const close = chain.slice(chain.indexOf('- name: Close the completed issue'), chain.indexOf('- name: Checkout repository'));
+
+  it('closes it as completed, labels it `done`, and clears every other lifecycle label', () => {
+    expect(close).toContain("state: 'closed', state_reason: 'completed'");
+    expect(close).toContain("labels: ['done']");
+    expect(close).toContain("for (const stale of ['in-progress', 'ready', 'blocked', 'paused'])");
   });
 });
 

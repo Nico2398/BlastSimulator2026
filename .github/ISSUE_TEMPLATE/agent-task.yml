@@ -12,6 +12,13 @@ body:
         the specs already imply and records it in the pull request, so an unanswered
         corner is not a reason to hold the issue back.
 
+        This form files the issue `ready`, which is a promise that it meets the
+        Definition of Ready (the `agentic-issue-creation` skill): the outcome and how
+        to verify it are stated, every dependency is declared, and the Scope field
+        says which areas the change stays inside. Scope is what lets several runs work
+        at once without stepping on each other; an issue without one is taken back
+        out of the queue with a comment saying so.
+
   - type: textarea
     id: context
     attributes:
@@ -40,6 +47,36 @@ body:
       value: |
         - [ ] Criterion 1
         - [ ] Criterion 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: >
+        Every area the change will stay inside. Runs whose scopes do not overlap
+        can work at the same time. engine: src/core/engine, entities, state ·
+        nav: src/core/nav, src/core/mining · economy: src/core/economy, campaign,
+        scores · world: src/core/world, weather, events · ui: src/ui · renderer:
+        src/renderer, src/audio, 3D models · console: src/console · scenarios:
+        scripts/scenario-defs and the scenario runners · pipeline: workflows,
+        actions, .github/scripts, agents, agentic-* skills (runs alone) · global:
+        many areas at once (runs alone). A gameplay or dev skill takes the scope
+        of the code it documents; files every area touches, like balance.ts or
+        the locale files, need no scope of their own.
+      multiple: true
+      options:
+        - scope:engine
+        - scope:nav
+        - scope:economy
+        - scope:world
+        - scope:ui
+        - scope:renderer
+        - scope:console
+        - scope:scenarios
+        - scope:pipeline
+        - scope:global
     validations:
       required: true
 

@@ -99,9 +99,17 @@ jobs:
 
             const n = parseInt(closesMatch[1], 10);
             core.info(`Closing issue #${n} (referenced in merged PR body).`);
-            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
+            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed', state_reason: 'completed' });
+            // The Definition of Done (`agentic-autonomous-pipeline`): a closed
+            // issue carries `done` and nothing that says the work is still
+            // queued, owned, halted or waiting. The merge gate has already made
+            // the other half true — this PR merged only with CI green on a head
+            // containing `main`'s tip. Scope labels stay, as the record of what
+            // the change touched.
             await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] }).catch(() => {});
-            await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
+            for (const stale of ['in-progress', 'ready', 'blocked', 'paused']) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: stale }).catch(() => {});
+            }
             core.setOutput('issue', String(n));
 
       - name: Checkout repository

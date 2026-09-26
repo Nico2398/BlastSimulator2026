@@ -19,6 +19,7 @@
  */
 
 /** Lifecycle labels. The loop's state machine, `agentic-autonomous-pipeline`. */
+const AGENT_TASK = 'agent-task';
 const READY = 'ready';
 const IN_PROGRESS = 'in-progress';
 const BLOCKED = 'blocked';
@@ -73,10 +74,13 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  * guarantee that makes them impossible.
  *
  * Coarse on purpose. A finer grid buys little and invites mislabelling, and a
- * wrong label costs a conflict round while a missing one costs only
- * parallelism. Files every area touches — `balance.ts`, the locale files,
- * `main.ts`, `GameState.ts`, mirrored skills — belong to no scope; the gate is
- * what handles them.
+ * wrong label costs a conflict round. Files every area touches — `balance.ts`,
+ * the locale files, `main.ts`, `GameState.ts` — belong to no scope; the gate is
+ * what handles them. A change that genuinely spans many areas says so with
+ * `scope:global`, which runs alone.
+ *
+ * Every `ready` issue declares at least one scope: it is part of the
+ * Definition of Ready (`readinessVerdict` below, `agentic-issue-creation`).
  *
  * The descriptions are the label descriptions `agentic-intake.yml` creates, so
  * they stay under GitHub's 100-character limit.
@@ -92,16 +96,18 @@ const SCOPES = Object.freeze({
   console: 'Headless command surface: src/console',
   scenarios: 'Scenario definitions and runners: scripts/scenario-defs',
   pipeline: 'The agentic layer: workflows, actions, .github/scripts, agents, agentic-* skills. Runs alone',
+  global: 'Touches many areas at once — a cross-cutting refactor or rename. Runs alone',
 });
 
 /**
- * A scope that never runs beside anything. A change to the pipeline rewrites
+ * Scopes that never run beside anything. `global` says so outright: the
+ * change spans too much of the tree to share it. A change to the pipeline rewrites
  * the rules every live run is following — a workflow, an `agentic-*` skill, the
  * assignment rules in this very file — so it lands with nothing else in flight.
  * A `gameplay-*` or `dev-*` skill is not the pipeline: it takes the scope of
  * the code it documents.
  */
-const EXCLUSIVE_SCOPES = new Set(['pipeline']);
+const EXCLUSIVE_SCOPES = new Set(['pipeline', 'global']);
 
 /** Consecutive blocked runs, since the last pipeline merge, that stop the chain. */
 const DEFAULT_BLOCKED_CHAIN_LIMIT = 3;
@@ -226,6 +232,45 @@ const no = (reason, unreadable = false) => ({ assignable: false, reason, unreada
 const yes = () => ({ assignable: true, reason: 'no blocking condition found', unreadable: false });
 
 /**
+ * The Definition of Ready, as far as a machine can check it.
+ *
+ * `ready` is a promise: this issue is specified well enough to start, and the
+ * queue may hand it to an agent. `agentic-issue-creation` holds the whole
+ * definition — outcome, verification, declared dependencies, no open question —
+ * and most of it is judgment. This is the part that is not: the issue is a
+ * pipeline task (`agent-task`), and it declares the areas its diff will stay
+ * inside, every one from `SCOPES`. Without a scope the assigner cannot tell what
+ * the issue may run beside, and a typo would silently widen what runs at once.
+ *
+ * Read in two places with the same answer. `agentic-intake.yml` takes `ready`
+ * off an issue that fails it and says what is missing, so the label never
+ * claims more than it means; `labelVerdict` refuses it here, so an issue that
+ * slipped past intake still never reaches a session.
+ *
+ * @param {{labels?: string[]}} issue
+ * @returns {{ready: boolean, missing: string[]}}
+ */
+function readinessVerdict(issue) {
+  const labels = issue.labels || [];
+  const missing = [];
+  if (!labels.includes(AGENT_TASK)) {
+    missing.push(`it carries no \`${AGENT_TASK}\` label`);
+  }
+  const scopes = labels
+    .filter((label) => label.startsWith(SCOPE_PREFIX))
+    .map((label) => label.slice(SCOPE_PREFIX.length));
+  if (scopes.length === 0) {
+    missing.push('it carries no `scope:*` label saying which areas its change stays inside');
+  }
+  for (const scope of scopes) {
+    if (!Object.prototype.hasOwnProperty.call(SCOPES, scope)) {
+      missing.push(`\`${SCOPE_PREFIX}${scope}\` is not a known scope`);
+    }
+  }
+  return { ready: missing.length === 0, missing };
+}
+
+/**
  * Conditions readable off the candidate itself, before any dependency is fetched.
  *
  * @param {{number: number, state: string, labels: string[], isPullRequest?: boolean}} issue
@@ -255,6 +300,10 @@ function labelVerdict(issue) {
   // dropping `done` leaves both labels on. Assigning would re-do finished work.
   if (labels.has(DONE)) {
     return no('it is labelled `done`, which contradicts `ready`');
+  }
+  const readiness = readinessVerdict(issue);
+  if (!readiness.ready) {
+    return no(`it does not meet the Definition of Ready — ${readiness.missing.join('; ')}`);
   }
   return yes();
 }
@@ -617,12 +666,11 @@ async function strandedPauseVerdict(api, issue) {
  * What an issue claims when a run holds it: the scopes it declares, or the
  * whole repository.
  *
- * Fails closed three ways, and each costs parallelism, never safety:
- *   - no `scope:*` label at all — the whole backlog written before scopes
- *     existed, and anything filed without one — runs alone;
- *   - a label naming no known scope runs alone, so a typo cannot quietly widen
- *     what may run side by side;
- *   - an exclusive scope runs alone whatever else the issue declares.
+ * An exclusive scope runs alone whatever else the issue declares. The other
+ * two cases below cannot reach a candidate — the Definition of Ready refuses
+ * both — but a *live* run can carry them, having been assigned before scopes
+ * existed, so they fail closed here: a run whose scope is unknown claims the
+ * whole repository.
  *
  * @param {{labels?: string[]}} issue
  * @returns {{exclusive: boolean, scopes: string[], why: string|null}}
@@ -1010,6 +1058,7 @@ function resolveMention(raw) {
  */
 
 module.exports = {
+  AGENT_TASK,
   BLOCKED,
   DONE,
   IN_PROGRESS,
@@ -1031,6 +1080,7 @@ module.exports = {
   labelVerdict,
   maxParallelRuns,
   parseDependencies,
+  readinessVerdict,
   resolveMention,
   resumeTargetFor,
   scopeClaim,

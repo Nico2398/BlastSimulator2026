@@ -176,6 +176,26 @@ runs:
               core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it closed it.`);
             }
 
+            // The Definition of Done (`agentic-autonomous-pipeline`) for a
+            // deliverable that was not a diff: closed as completed, `done`, and
+            // nothing left saying the work is queued, halted or waiting. The run
+            // is meant to leave it that way; this makes a run that forgot a
+            // label unable to leave a closed issue claiming to be in the queue.
+            // A close as not planned is not done, and is left as the run left it.
+            if (finished.stateReason === 'completed') {
+              if (!finished.labels.includes(rules.DONE)) {
+                await github.rest.issues
+                  .addLabels({ owner, repo, issue_number: completed, labels: [rules.DONE] })
+                  .catch(() => {});
+              }
+              for (const stale of [rules.READY, rules.BLOCKED, rules.PAUSED]) {
+                if (!finished.labels.includes(stale)) continue;
+                await github.rest.issues
+                  .removeLabel({ owner, repo, issue_number: completed, name: stale })
+                  .catch(() => {});
+              }
+            }
+
             core.info(`Issue #${completed} closed without a PR — chaining directly.`);
           }
 
