@@ -21,18 +21,17 @@ import { OreVeinSampler } from './OreVeins.js';
 export const TERRAIN_GENERATOR_VERSION = 1;
 
 /**
- * Largest `sizeX`/`sizeY`/`sizeZ` a `TerrainConfig` may legitimately carry
+ * Largest `sizeX`/`sizeZ`/`datum` a `TerrainConfig` may legitimately carry
  * (#1181 review). Nothing in this codebase names an authoritative "biggest a
  * site can get" — site expansion (`PlayableArea`'s `claim`) is deliberately
  * unbounded in total extent, and `MAX_CLAIM_BRIDGE_CHUNKS` only limits how
  * far a single claim may bridge, not the site's eventual size — so this is a
  * defaulted, generous-but-bounded ceiling rather than a reused constant: the
  * biggest campaign level today is 160×160 (#458 D13), so 4096 leaves 25x
- * headroom for growth while still keeping `allocateChunk`'s
- * `CHUNK_SIZE * sizeY * CHUNK_SIZE` allocation and any `yLo..yHi` replay loop
- * bounded to a sane worst case. `decodeVoxelGrid` (VoxelGridCodec.ts) rejects
- * a save whose embedded generator identity exceeds this rather than
- * regenerating or clamping it, since a legitimate save can never carry one.
+ * headroom for growth while still keeping any `yLo..yHi` replay loop bounded
+ * to a sane worst case. `decodeVoxelGrid` (VoxelGridCodec.ts) rejects a save
+ * whose embedded generator identity exceeds this rather than regenerating or
+ * clamping it, since a legitimate save can never carry one.
  */
 export const MAX_TERRAIN_GEN_DIMENSION = 4096;
 
@@ -59,7 +58,8 @@ export function requireValidGenDimension(value: number, label: string): number {
 
 export interface TerrainConfig {
   sizeX: number;
-  sizeY: number;
+  /** The voxel Y the site centre's surface lands on. */
+  datum: number;
   sizeZ: number;
   seed: number;
   /**
@@ -96,9 +96,9 @@ export interface TerrainContext {
  * which genuinely must be the same instance — see LandscapeMap.ts).
  */
 export function buildTerrainContext(config: TerrainConfig): TerrainContext {
-  const { sizeX, sizeY, sizeZ, seed, climateBias, mixedRockHardness } = config;
+  const { sizeX, datum, sizeZ, seed, climateBias, mixedRockHardness } = config;
 
-  const worldGen = createWorldGenContext(seed, sizeX, sizeY, sizeZ, (fields) => (x, z) => {
+  const worldGen = createWorldGenContext(seed, sizeX, datum, sizeZ, (fields) => (x, z) => {
     const weights = selectBiomeWeights(fields.temperature(x, z), fields.humidity(x, z), climateBias, 1.0);
     return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
   });
@@ -188,8 +188,8 @@ function generateColumnRange(
  * attached source.
  */
 export function generateTerrain(config: TerrainConfig): VoxelGrid {
-  const { sizeX, sizeY, sizeZ } = config;
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const { sizeX, sizeZ } = config;
+  const grid = new VoxelGrid(sizeX, sizeZ);
   const terrain = buildTerrainContext(config);
   grid.attachChunkSource(createChunkSource(terrain, config));
   return grid;

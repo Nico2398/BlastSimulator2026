@@ -123,6 +123,9 @@ export const CHUNK_SIZE = 16;
 /** Voxels in one cubic CHUNK_SIZE**3 slab (#1182) — shared by every `VoxelSlab` typed-array allocation below. */
 const SLAB_VOLUME = CHUNK_SIZE ** 3;
 
+/** TODO(#1193): removed once this class drops sizeY-bounded bookkeeping. */
+const HEIGHT_FREE_SIZE_Y = 4096;
+
 /** Chunk index of a world coordinate. `>> 4` floors toward -inf, which is what signed coordinates need. */
 export function chunkIndexOf(worldCoord: number): number {
   return Math.floor(worldCoord) >> 4;
@@ -322,7 +325,14 @@ export class VoxelGrid {
    * caller keeps the same starting site, at the same coordinates, whether or
    * not its size divides by CHUNK_SIZE.
    */
-  constructor(sizeX: number, sizeY: number, sizeZ: number) {
+  constructor(sizeX: number, sizeZ: number);
+  /** TODO(#1193): kept only so tests can still declare a height. No production caller uses this after #1190. */
+  constructor(sizeX: number, sizeY: number, sizeZ: number);
+  constructor(sizeX: number, b: number, c?: number) {
+    const heightFree = c === undefined;
+    const sizeY = heightFree ? HEIGHT_FREE_SIZE_Y : b;
+    const sizeZ = heightFree ? b : c!;
+
     this.sizeY = sizeY;
     this.edits = new TerrainEdits();
     if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) return;
