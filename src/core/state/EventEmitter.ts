@@ -49,6 +49,10 @@ export interface GameEventMap {
   // Mount/alight (#1087)
   'employee:mounted': { employeeId: number; vehicleId: number };
   'employee:alighted': { employeeId: number; vehicleId: number };
+
+  // Enter/leave a building (#1202)
+  'employee:entered_building': { employeeId: number; buildingId: number };
+  'employee:left_building': { employeeId: number; buildingId: number };
 }
 
 type EventHandler<T> = (data: T) => void;

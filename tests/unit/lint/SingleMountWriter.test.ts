@@ -3,10 +3,12 @@
 // gameplay-vehicle-fleet's Invariants section promises three lint tests that
 // keep the writers singular. SingleVehicleMover.test.ts holds two of them
 // (a vehicle's x/z, and pathfinding from a vehicle's position). This is the
-// third: only src/core/engine/Mount.ts assigns `Vehicle.occupantIds` or
-// `Employee.locomotion`.
+// third: only src/core/engine/Mount.ts assigns an occupancy host's
+// `occupantIds` — `Vehicle.occupantIds` and, since #1202, `Building.occupantIds`
+// — or `Employee.locomotion`, whose `mounted` and `inside` variants are the
+// employee side of those two.
 //
-// Those two fields are one fact stored on both sides — invariant I1 requires
+// Those fields are one fact stored on both sides — invariant I1 requires
 // them to agree in both directions — so a second writer that updates one side
 // and forgets the other is exactly the desync I1 exists to catch at runtime.
 // This catches it at review time instead.
@@ -46,7 +48,7 @@ function mountWriteLines(file: string): number[] {
 
 const FILES = listTsFiles(join(ROOT, SCANNED_DIR)).map((f) => relative(ROOT, f).split(sep).join('/'));
 
-describe('repo-wide — occupantIds and locomotion have exactly one writer', () => {
+describe('repo-wide — occupantIds (vehicles and buildings) and locomotion have exactly one writer', () => {
   it('the pattern recognises every write shape it claims to', () => {
     for (const line of [
       'vehicle.occupantIds = [];',
@@ -54,6 +56,10 @@ describe('repo-wide — occupantIds and locomotion have exactly one writer', () 
       'v.occupantIds.splice(0, 1);',
       'vehicle.occupantIds.length = 0;',
       "employee.locomotion = { kind: 'on_foot' };",
+      "employee.locomotion = { kind: 'inside', buildingId };",
+      'building.occupantIds = building.occupantIds.filter(id => id !== employeeId);',
+      'building.occupantIds.push(employeeId);',
+      'host.occupantIds.push(employee.id);',
     ]) {
       expect(MOUNT_WRITE.test(line), line).toBe(true);
     }
@@ -62,6 +68,8 @@ describe('repo-wide — occupantIds and locomotion have exactly one writer', () 
       "if (employee.locomotion.kind === 'mounted') return;",
       'const driver = vehicle.occupantIds[0];',
       'occupantIds: [],',
+      "if (employee.locomotion.kind === 'inside') return;",
+      'for (const id of building.occupantIds) injure(id);',
     ]) {
       expect(MOUNT_WRITE.test(line), line).toBe(false);
     }
@@ -82,9 +90,9 @@ describe('repo-wide — occupantIds and locomotion have exactly one writer', () 
       violations.length === 0 ? '' :
         `${violations.length} mount-state write(s) outside ${SOLE_WRITER}:\n`
         + violations.map((v) => `  ${v}`).join('\n')
-        + '\n\nWho is in which vehicle is one fact stored on both sides, and invariant I1 requires'
-        + ' the two to agree (gameplay-vehicle-fleet, `vehicles` rule). Call Mount.board / Mount.alight'
-        + ' so both sides change together.',
+        + '\n\nWho is in which vehicle or building is one fact stored on both sides, and invariant I1'
+        + ' requires the two to agree (gameplay-vehicle-fleet, `vehicles` rule). Call Mount.board /'
+        + ' Mount.alight, or Mount.enterBuilding / Mount.leaveBuilding, so both sides change together.',
     ).toEqual([]);
   });
 });

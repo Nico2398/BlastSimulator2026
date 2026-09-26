@@ -24,6 +24,7 @@ import {
   type MapProjection,
 } from './miniMapLayers.js';
 import type { GameState } from '../core/state/GameState.js';
+import { isInsideBuilding } from '../core/entities/EmployeeLocomotion.js';
 import type { NavGrid } from '../core/nav/NavGrid.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './shell/LayoutRegistry.js';
 import { MINIMAP_WIDTH_PX, MINIMAP_HEIGHT_PX, MINIMAP_EDGE_OFFSET_PX } from './tokens.js';
@@ -231,7 +232,8 @@ export class MiniMap {
     // Draw crew
     ctx.fillStyle = COLOR_CREW;
     for (const e of state.employees.employees) {
-      if (!e.alive) continue;
+      // Inside a building (#1202): no body of their own on the ground to draw.
+      if (!e.alive || isInsideBuilding(e.locomotion)) continue;
       ctx.beginPath();
       ctx.arc(projectX(proj, e.x), projectZ(proj, e.z), 1.6, 0, Math.PI * 2);
       ctx.fill();

@@ -66,6 +66,7 @@ function placeRawBuilding(ctx: GameContext, type: BuildingType, tier: BuildingTi
     z,
     hp: def.maxHp,
     active: true,
+    occupantIds: [],
   });
   buildGameNavGrid(state, ctx.grid!, state.buildings.buildings, state.drillHoles);
 }

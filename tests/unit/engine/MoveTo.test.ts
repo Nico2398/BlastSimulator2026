@@ -17,6 +17,8 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { board, enterBuilding } from '../../../src/core/engine/Mount.js';
 import { moveTo, alightOnArrival } from '../../../src/core/engine/MoveTo.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
@@ -319,5 +321,69 @@ describe('alightOnArrival', () => {
     expect(() => alightOnArrival(employee)).not.toThrow();
     expect(() => alightOnArrival(undefined)).not.toThrow();
     expect(employee.itinerary).toBeNull();
+  });
+});
+
+describe('moveTo — into a building (#1202)', () => {
+  /** A tier-1 driving_center at (10, 10) — 2x2 footprint, blocked on the NavGrid like buildNavGrid would. */
+  function setupSchool() {
+    const state = createGame({ seed: SEED });
+    const school = placeBuilding(state.buildings, 'driving_center', 10, 10, 64, 64).building!;
+    const grid = makeFlatNavGrid(24, 24);
+    for (const [x, z] of [[10, 10], [11, 10], [10, 11], [11, 11]] as const) {
+      grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+    state.navGrid = grid;
+    return { state, school };
+  }
+
+  it('walks to a ring cell and ends with an enter_building step', () => {
+    const { state, school } = setupSchool();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+
+    expect(moveTo(state, employee.id, { buildingId: school.id }).success).toBe(true);
+
+    const last = employee.itinerary!.legs[employee.itinerary!.legs.length - 1]!;
+    expect(last.mode).toBe('foot');
+    expect(last.onArrive).toEqual({ kind: 'enter_building', buildingId: school.id });
+    expect({ x: last.destX, z: last.destZ }).toEqual({ x: 9, z: 9 });
+  });
+
+  it('an employee already on the ring gets a zero-length enter leg on their own cell', () => {
+    const { state, school } = setupSchool();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 9, 10);
+
+    expect(moveTo(state, employee.id, { buildingId: school.id }).success).toBe(true);
+
+    expect(employee.itinerary!.legs).toEqual([expect.objectContaining({
+      destX: 9, destZ: 10, estTicks: 0, onArrive: { kind: 'enter_building', buildingId: school.id },
+    })]);
+  });
+
+  it('refuses a building that takes no people, a missing building, and a mounted employee', () => {
+    const { state, school } = setupSchool();
+    const warehouse = placeBuilding(state.buildings, 'freight_warehouse', 16, 16, 64, 64).building!;
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2);
+
+    expect(moveTo(state, employee.id, { buildingId: warehouse.id }).success).toBe(false);
+    expect(moveTo(state, employee.id, { buildingId: 999 }).success).toBe(false);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    expect(board(state, vehicle.id, employee.id).success).toBe(true);
+    expect(moveTo(state, employee.id, { buildingId: school.id }).success).toBe(false);
+    expect(employee.itinerary).toBeNull();
+  });
+
+  it('any move ordered for an employee inside a building takes them out onto its ring first', () => {
+    const { state, school } = setupSchool();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 9, 10);
+    expect(enterBuilding(state, school.id, employee.id).success).toBe(true);
+
+    expect(moveTo(state, employee.id, { x: 2, z: 2 }).success).toBe(true);
+
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect(school.occupantIds).toEqual([]);
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: 9, z: 10 });
+    expect(employee.itinerary).not.toBeNull();
   });
 });

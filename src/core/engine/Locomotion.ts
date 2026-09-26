@@ -22,7 +22,7 @@ import {
   VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { board, alight } from './Mount.js';
+import { board, alight, enterBuilding } from './Mount.js';
 import { isDestinationOccupied, updateVehicleCellOccupancy } from './EntityMovementTick.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
@@ -855,6 +855,10 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, itinerary: 
     }
 
     return true;
+  }
+
+  if (step.kind === 'enter_building') {
+    return enterBuilding(state, step.buildingId, emp.id, emitter).success;
   }
 
   // step.kind === 'alight'

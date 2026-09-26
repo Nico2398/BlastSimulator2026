@@ -9,7 +9,7 @@ import { BUILDING_RUIN_MODEL_ID } from '../../../src/renderer/models/ModelIds.js
 import { loadedModelLibrary } from '../../helpers/models.js';
 
 function makeBuilding(id: number, type: Building['type'], x = 10, z = 10, hp = 100): Building {
-  return { id, type, tier: 1, x, z, hp, active: true };
+  return { id, type, tier: 1, x, z, hp, active: true, occupantIds: [] };
 }
 
 describe('BuildingMesh', () => {
@@ -68,7 +68,7 @@ describe('BuildingMesh', () => {
     const scene = new THREE.Scene();
     const bm = new BuildingMesh(scene);
     const x = 5, z = 8;
-    const building: Building = { id: 1, type: 'management_office', tier: 2, x, z, hp: 100, active: true };
+    const building: Building = { id: 1, type: 'management_office', tier: 2, x, z, hp: 100, active: true, occupantIds: [] };
     bm.addBuilding(building);
     const { sizeX, sizeZ } = getDefSize(getBuildingDef('management_office', 2));
     expect(sizeX).not.toBe(sizeZ); // 2x3 — proves the fix is not axis-symmetric by accident
@@ -90,7 +90,7 @@ describe('BuildingMesh', () => {
     // management_office T2 (2x3): exitPoint is [sizeX-1, 0] = [1, 0] — a
     // non-trivial (non-[0,0]) door offset, so the absolute position actually
     // depends on the footprint-centering fix rather than being 0 either way.
-    const building: Building = { id: 1, type: 'management_office', tier: 2, x, z, hp: 100, active: true };
+    const building: Building = { id: 1, type: 'management_office', tier: 2, x, z, hp: 100, active: true, occupantIds: [] };
     bm.addBuilding(building);
     const def = getBuildingDef('management_office', 2);
     const group = scene.children[0] as THREE.Group;

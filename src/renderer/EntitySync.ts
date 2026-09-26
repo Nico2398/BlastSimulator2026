@@ -4,7 +4,7 @@
 import type { GameState } from '../core/state/GameState.js';
 import type { Building } from '../core/entities/Building.js';
 import { getBuildingDef } from '../core/entities/Building.js';
-import { isMounted } from '../core/entities/Employee.js';
+import { isOccupyingHost } from '../core/entities/Employee.js';
 import type { BuildingMesh } from './BuildingMesh.js';
 import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
@@ -91,11 +91,12 @@ export function syncEntitySets(
   }
 
   if (characters) {
-    // Per-employee check against Locomotion (#1087) — a mounted employee
-    // gets no character mesh; x/z tracks the vehicle's own via
-    // syncDriverPosition (#922).
+    // Per-employee check against Locomotion (#1087) — an employee mounted in
+    // a vehicle (x/z tracks the vehicle's own via syncDriverPosition, #922)
+    // or inside a building (#1202) gets no character mesh, and so is never
+    // picked in the scene either; leaving brings the mesh back.
     for (const e of state.employees.employees) {
-      if (isMounted(e.locomotion)) {
+      if (isOccupyingHost(e.locomotion)) {
         if (renderedEmployeeIds.has(e.id)) {
           characters.removeEmployee(e.id);
           renderedEmployeeIds.delete(e.id);

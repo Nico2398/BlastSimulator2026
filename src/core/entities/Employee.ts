@@ -494,7 +494,7 @@ export function assignSkill(
 
 export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
-export { isMounted } from './EmployeeLocomotion.js';
+export { isOccupyingHost } from './EmployeeLocomotion.js';
 export type { NeedKey } from './EmployeeNeeds.js';
 export type { EmployeeWorkState } from './EmployeeNeeds.js';
 export { tickNeedGauges, getNeedMultiplier, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';

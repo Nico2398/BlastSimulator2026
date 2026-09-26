@@ -59,6 +59,26 @@ Both construction and demolition carry a cost.
 
 Employee travels to building, stays for fixed ticks (unavailable + paid salary). Training costs direct fee.
 
+## People Inside a Building
+
+An employee can be inside a building the way they ride a vehicle — one occupancy model, specified
+in `gameplay-vehicle-fleet` (State Model, and the Enter/Leave rows of its model table). What is
+building-specific:
+
+- **People capacity** — `getBuildingPeopleCapacity(type, tier)`. The four training buildings and
+  Living Quarters take people, and their `capacity` is that count (trainees, beds). Every other
+  type takes none. A type starts taking people by being added to `PEOPLE_HOLDING_TYPES`
+  (`Building.ts`), never by special-casing a caller.
+- **Entering** — from a cell on the building's ring (the one-cell band just outside its
+  footprint), on foot, while under capacity; a full building refuses the next one, who stays on
+  the ring. `moveTo(state, employeeId, { buildingId })` walks there and enters on arrival.
+- **Leaving** — onto the free ring cell nearest the one they entered from.
+- **While inside** — the employee holds no ground cell, is not drawn in the scene or on the
+  minimap, cannot be picked, and is still listed in the Crew panel.
+
+Occupants are stored on the building instance (`Building.occupantIds`) and saved with it; a save
+from before they existed loads with every building empty.
+
 ## Living Quarters Well-Being Effects
 
 | Tier | Description | Effect |
@@ -98,7 +118,8 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 ## Destruction Effects
 
 - Building destroyed → removed from grid immediately
-- Employees inside → injured
+- Employees inside → put out on its ring (any removal: destruction, demolition, an upgrade's
+  replace); a projection that destroys it injures them first
 - Stored contents lost; Explosive Warehouse detonation → secondary blast
 - Well-being, Safety, Ecology score penalties applied
 - Research Center destroyed while its enabling research task is in-flight and no other active Research Center remains → the in-flight task is cancelled and its cost refunded in full; a task still pending behind it in the queue is cancelled/refunded in turn once it reaches the head with no Research Center present. If another active Research Center still exists, the in-flight task is unaffected.
@@ -119,5 +140,5 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 
 `src/core/entities/Building.ts` declares `BuildingType`, `BuildingTier` and `BuildingDef`, and is the only authority on their fields — costs, `footprint` and the approach `entryPoint`/`exitPoint` offsets, `capacity`, `maxHp`, `scoreEffects`. Read that file before writing against them.
 
-Meanings the code does not state: `capacity` is role-specific (beds for Living Quarters, kg for a warehouse, vehicle slots for a depot); `nameKey` is an i18n key naming the tier-specific building name. Per-tier costs and thresholds live in `src/core/config/balance.ts`.
+Meanings the code does not state: `capacity` is role-specific (beds for Living Quarters, trainees for a training building, kg for a warehouse, vehicle slots for a depot) — how many people fit inside is `getBuildingPeopleCapacity`, not `capacity` read raw; `nameKey` is an i18n key naming the tier-specific building name. Per-tier costs and thresholds live in `src/core/config/balance.ts`.
 
