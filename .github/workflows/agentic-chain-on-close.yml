@@ -120,13 +120,14 @@ jobs:
           guard: closed_without_pr
           completed_issue: ${{ github.event.issue.number }}
           blocked_chain_limit: ${{ vars.AGENTIC_BLOCKED_CHAIN_LIMIT }}
+          max_parallel: ${{ vars.AGENTIC_MAX_PARALLEL_RUNS }}
 
       - name: Report auto-assign state
         run: |
           if [ "${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}" != "true" ]; then
             echo 'Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not "true").'
-          elif [ -n "${{ steps.assign.outputs.issue }}" ]; then
-            echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
+          elif [ -n "${{ steps.assign.outputs.issues }}" ]; then
+            echo "Assigned issue(s) ${{ steps.assign.outputs.issues }} to ${{ steps.assign.outputs.mention }}."
           elif [ "${{ steps.assign.outputs.halted }}" = "true" ]; then
             echo 'Cascade brake is engaged — the queue is parked. See the notice on the issue.'
           else

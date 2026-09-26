@@ -34,7 +34,7 @@ The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 
 ## READY TO MERGE
 
-The line goes into the body the PR is **created with** — the last line of `gh pr create --body` at the open-pr step, written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that puts a PR into auto-merge: the `agentic-auto-merge` action reads it, releases any workflow run parked as `action_required` on the PR head, and enables GitHub native auto-merge via a PAT token. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
+The line goes into the body the PR is **created with** — the last line of `gh pr create --body` at the open-pr step, written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that hands a PR to the merge gate: `agentic-auto-merge` reads it, releases any workflow run parked as `action_required` on the PR head, and merges the PR once every channel is green on a head that contains `main`'s tip — merging `main` into a green head that is behind, and handing a conflict back to an agent. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
 
 This is the **default**, skipped only in the three draft cases above. When skipping, post a comment naming the channel or blocker and the remedy — never a summary of how much work the run took:
 
@@ -48,13 +48,13 @@ A run that defaulted an open requirement keeps `READY TO MERGE` and records the 
 
 `READY TO MERGE` says **this run has nothing left to add**. It never says every check has already reported, and it is never withheld to wait for one.
 
-A marked PR whose runs are still going is the ordinary state of a PR the pipeline just opened. `agentic-auto-merge` reads it as `pending`, logs which runs it is waiting on, and stops — and the CI-completion sweep re-evaluates it when they report. Marking is what hands the PR to that machinery. Withholding the marker takes it away.
+A marked PR whose runs are still going is the ordinary state of a PR the pipeline just opened. The merge gate reads it as `pending`, logs which runs it is waiting on, and stops — and CI completing wakes the gate again when they report. Marking is what hands the PR to that machinery. Withholding the marker takes it away.
 
 So a channel this session cannot run but CI does — interaction-mode `visual`/`scenario` — is **covered**, and the PR ships marked; the interaction shards run on every pull request and are what reports on it. Only a channel no mechanism will ever report on is a draft case.
 
 ### Marked is not finished — the run stays until CI reports
 
-The sweep merges a green PR. **It does nothing at all with a red one**: `agentic-auto-merge.yml` declines to run when the CI run it reacts to concluded `failure`, because a failed run has nothing to merge. So a red CI on a marked PR is not reported to anyone by the merge machinery, and the watchdog passes the issue over precisely because a PR is linked to it.
+The merge gate merges a green PR. **It does not wake for a red one**: `agentic-auto-merge.yml` declines to run when the CI run it reacts to concluded `failure`, because a failed run has nothing to merge. So a red CI on a marked PR is not reported to anyone by the event that produced it, and the watchdog passes the issue over precisely because a PR is linked to it.
 
 PR #581 is what that cost. Every channel its session ran was green, the body was marked, and two interaction-mode shards were red in CI. Nothing merged, nothing chained, and issue #552 held `in-progress` with every assignment behind it, until a human looked.
 
@@ -100,7 +100,7 @@ Which machine runs a channel is never a reason to withhold the marker, and never
 
 ## Critical: NEVER use `[skip ci]` on PR branches
 
-`auto-assign-next.yml` (triggered on `pull_request: [synchronize]`) re-arms auto-merge when the marker arrives after the PR did. **Any commit with `[skip ci]` on a PR branch prevents that workflow from triggering.** It also suppresses the CI run auto-merge is waiting on, which nothing downstream can substitute for: the PR then sits armed and unmergeable until a human intervenes.
+`auto-assign-next.yml` (triggered on `pull_request: [synchronize]`) wakes the merge gate when the marker arrives after the PR did. **Any commit with `[skip ci]` on a PR branch prevents that workflow from triggering.** It also suppresses the CI run auto-merge is waiting on, which nothing downstream can substitute for: the PR then sits armed and unmergeable until a human intervenes.
 
 Rules:
 - **NEVER** include `[skip ci]` in any commit message on `pipeline/feature-*` branches

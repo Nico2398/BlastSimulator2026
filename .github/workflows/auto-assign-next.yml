@@ -1,22 +1,17 @@
 name: "Pipeline: assign next issue to the configured agent"
 
 on:
-  # `READY TO MERGE` normally arrives with the PR, so `opened` carries the happy
-  # path. The others are the ways it can arrive later, and each was a dead end: a
-  # body edited to add the line, a draft marked ready (auto-merge cannot be
-  # enabled on a draft, so the attempt at `opened` is discarded), a PR reopened
-  # after being closed. Auto-merge never being enabled means the PR never merges,
-  # and an issue whose PR never merges holds the assignment queue for as long as
-  # it stays open — the watchdog skips issues that have a linked PR.
-  # `agentic-auto-merge` is idempotent, so re-evaluating costs nothing.
+  # Two jobs on one trigger. `chain-next-task` reacts to a merge. `wake-merge-gate`
+  # reacts to everything else a pull request does, because `READY TO MERGE` can
+  # arrive after the PR did — a body edited to add the line, a draft marked
+  # ready, a PR reopened — and when CI has already finished by then, no CI event
+  # is coming to bring the merge gate back. Each was once a dead end: a marked,
+  # green PR that never merged, holding its issue and every assignment behind
+  # it, because the watchdog skips issues that have a linked PR.
   #
-  # This is the fast path and not the guarantee. These events never fire at all
-  # for a PR authored by `github-actions[bot]`, whose runs are parked as
-  # `action_required` — and none of them fires when CI finishes, which on this
-  # repository is the moment the PR becomes mergeable at all. Every one of them
-  # therefore runs while the checks are still in flight, and the action reports
-  # the PR as pending rather than holding a runner open for it.
-  # agentic-auto-merge.yml, on `workflow_run`, is what comes back afterwards.
+  # These events never fire at all for a PR authored by `github-actions[bot]`,
+  # whose runs are parked as `action_required`. The gate's own triggers — CI
+  # completing, a runner finishing — are what reach that PR.
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review, closed]
 
@@ -27,31 +22,48 @@ permissions:
   actions: write
 
 jobs:
-  # Arming and chaining are split because only one of them may be serialised.
-  # Assignment shares a repo-wide concurrency group with every other path into
-  # the queue; arming must not, because GitHub keeps one pending run per group
-  # and drops the rest, and a dropped arming run is a PR that never merges.
-  arm-auto-merge:
-    if: github.event.action != 'closed' && vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
+  # Waking the gate and chaining are split because only one of them may be
+  # serialised. Assignment shares a repo-wide concurrency group with every other
+  # path into the queue; the wake-up must not, because GitHub keeps one pending
+  # run per group and drops the rest, and a dropped wake-up is a PR nobody
+  # looks at again.
+  #
+  # It merges nothing itself. `agentic-auto-merge.yml` is the one workflow that
+  # merges, under its own lock, because a merge decided here — one PR at a
+  # time, on this PR's head alone — is exactly the merge that lands two
+  # separately-green PRs onto an untested `main`.
+  wake-merge-gate:
+    if: >-
+      github.event.action != 'closed' &&
+      vars.AGENTIC_AUTO_MERGE_ENABLED == 'true' &&
+      !github.event.pull_request.draft &&
+      (
+        contains(github.event.pull_request.body, 'READY TO MERGE') ||
+        startsWith(github.event.pull_request.head.ref, 'pipeline/feature-')
+      )
     runs-on: ubuntu-latest
     steps:
-      # Checked out because a composite action is read from the workspace, not
-      # from the API.
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          fetch-depth: 1
-
-      # The marker test, the gated-run release and the enable all live in the
-      # action, so this path and the sweep in agentic-auto-merge.yml cannot
-      # disagree about what "ready to merge" means.
-      - name: Enable auto-merge
+      # `continue-on-error`: this run sits on the PR head, and a red one would
+      # read to every reader of that head as a failing channel — even though
+      # this workflow is on the machinery list, a human reading the checks is
+      # not. A dispatch that did not happen is re-raised by the watchdog.
+      - name: Ask the merge gate to look
         continue-on-error: true
-        uses: ./.github/actions/agentic-auto-merge
+        uses: actions/github-script@v7
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event.action }}
         with:
-          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-          pr: ${{ github.event.pull_request.number }}
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'agentic-auto-merge.yml',
+              ref: context.payload.repository?.default_branch || 'main',
+              inputs: { reason: `pull request #${process.env.PR} ${process.env.ACTION}` }
+            });
+            core.info(`Asked the merge gate to look — #${process.env.PR} ${process.env.ACTION}.`);
 
   chain-next-task:
     if: github.event.pull_request.merged == true
@@ -87,9 +99,17 @@ jobs:
 
             const n = parseInt(closesMatch[1], 10);
             core.info(`Closing issue #${n} (referenced in merged PR body).`);
-            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed' });
+            await github.rest.issues.update({ owner, repo, issue_number: n, state: 'closed', state_reason: 'completed' });
+            // The Definition of Done (`agentic-autonomous-pipeline`): a closed
+            // issue carries `done` and nothing that says the work is still
+            // queued, owned, halted or waiting. The merge gate has already made
+            // the other half true — this PR merged only with CI green on a head
+            // containing `main`'s tip. Scope labels stay, as the record of what
+            // the change touched.
             await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: ['done'] }).catch(() => {});
-            await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'in-progress' }).catch(() => {});
+            for (const stale of ['in-progress', 'ready', 'blocked', 'paused']) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: stale }).catch(() => {});
+            }
             core.setOutput('issue', String(n));
 
       - name: Checkout repository
@@ -114,13 +134,14 @@ jobs:
           # run since it was written, with the PR number parsed away.
           reason: "auto-assigned from merged PR #${{ github.event.pull_request.number }}"
           completed_issue: ${{ steps.close-issue.outputs.issue }}
+          max_parallel: ${{ vars.AGENTIC_MAX_PARALLEL_RUNS }}
 
       - name: Report auto-assign state
         run: |
           if [ "${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}" != "true" ]; then
             echo 'Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not "true").'
-          elif [ -n "${{ steps.assign.outputs.issue }}" ]; then
-            echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
+          elif [ -n "${{ steps.assign.outputs.issues }}" ]; then
+            echo "Assigned issue(s) ${{ steps.assign.outputs.issues }} to ${{ steps.assign.outputs.mention }}."
           else
             echo "Nothing assigned — see the assign step for the reason."
           fi

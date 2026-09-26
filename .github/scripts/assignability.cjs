@@ -19,6 +19,7 @@
  */
 
 /** Lifecycle labels. The loop's state machine, `agentic-autonomous-pipeline`. */
+const AGENT_TASK = 'agent-task';
 const READY = 'ready';
 const IN_PROGRESS = 'in-progress';
 const BLOCKED = 'blocked';
@@ -52,6 +53,61 @@ const PAUSED = 'paused';
  * accident, and an unwalked graph is an unverified one.
  */
 const MAX_DEPENDENCY_NODES = 40;
+
+/**
+ * How many issues may hold `in-progress` at once when `AGENTIC_MAX_PARALLEL_RUNS`
+ * is unset or unusable. One is single flight — the pipeline as it ran before
+ * parallel runs existed, decision for decision.
+ */
+const DEFAULT_MAX_PARALLEL_RUNS = 1;
+
+/**
+ * Scope labels: what an issue declares its diff stays inside.
+ *
+ * Parallel runs are only as safe as the merge gate makes them — a pull request
+ * merges only when CI is green on a head that already contains `main`'s tip,
+ * whatever its labels say (`agentic-auto-merge`). Scopes are the throughput
+ * half: two runs in different areas rarely touch the same lines, so they rarely
+ * cost a conflict round. Measured on 384 merged pipeline PRs, pairs with
+ * disjoint `src/` scopes still shared a file 7% of the time — against 36% for
+ * any two adjacent PRs. A scope is a hint that makes collisions rare, never a
+ * guarantee that makes them impossible.
+ *
+ * Coarse on purpose. A finer grid buys little and invites mislabelling, and a
+ * wrong label costs a conflict round. Files every area touches — `balance.ts`,
+ * the locale files, `main.ts`, `GameState.ts` — belong to no scope; the gate is
+ * what handles them. A change that genuinely spans many areas says so with
+ * `scope:global`, which runs alone.
+ *
+ * Every `ready` issue declares at least one scope: it is part of the
+ * Definition of Ready (`readinessVerdict` below, `agentic-issue-creation`).
+ *
+ * The descriptions are the label descriptions `agentic-intake.yml` creates, so
+ * they stay under GitHub's 100-character limit.
+ */
+const SCOPE_PREFIX = 'scope:';
+const SCOPES = Object.freeze({
+  engine: 'Simulation core: src/core/engine, entities, state',
+  nav: 'Terrain surface and movement: src/core/nav, src/core/mining',
+  economy: 'Money and progression: src/core/economy, campaign, scores',
+  world: 'World generation and events: src/core/world, weather, events',
+  ui: 'Panels and screens: src/ui',
+  renderer: 'Drawing, sound and models: src/renderer, src/audio, assets/models',
+  console: 'Headless command surface: src/console',
+  scenarios: 'Scenario definitions and runners: scripts/scenario-defs',
+  pipeline: 'The agentic layer: workflows, actions, .github/scripts, agents, agentic-* skills. Runs alone',
+  global: 'Touches many areas at once — a cross-cutting refactor or rename. Runs alone',
+});
+
+/**
+ * Scopes that never run beside anything. `global` says so outright: the
+ * change spans too much of the tree to share it. A change to the pipeline rewrites
+ * the rules every live run is following — a workflow, an `agentic-*` skill, the
+ * assignment rules in this very file — so it lands with nothing else in flight.
+ * A `gameplay-*` or `dev-*` skill is not the pipeline: it takes the scope of
+ * the code it documents.
+ */
+const EXCLUSIVE_SCOPES = new Set(['pipeline', 'global']);
 
 /** Consecutive blocked runs, since the last pipeline merge, that stop the chain. */
 const DEFAULT_BLOCKED_CHAIN_LIMIT = 3;
@@ -176,6 +232,45 @@ const no = (reason, unreadable = false) => ({ assignable: false, reason, unreada
 const yes = () => ({ assignable: true, reason: 'no blocking condition found', unreadable: false });
 
 /**
+ * The Definition of Ready, as far as a machine can check it.
+ *
+ * `ready` is a promise: this issue is specified well enough to start, and the
+ * queue may hand it to an agent. `agentic-issue-creation` holds the whole
+ * definition — outcome, verification, declared dependencies, no open question —
+ * and most of it is judgment. This is the part that is not: the issue is a
+ * pipeline task (`agent-task`), and it declares the areas its diff will stay
+ * inside, every one from `SCOPES`. Without a scope the assigner cannot tell what
+ * the issue may run beside, and a typo would silently widen what runs at once.
+ *
+ * Read in two places with the same answer. `agentic-intake.yml` takes `ready`
+ * off an issue that fails it and says what is missing, so the label never
+ * claims more than it means; `labelVerdict` refuses it here, so an issue that
+ * slipped past intake still never reaches a session.
+ *
+ * @param {{labels?: string[]}} issue
+ * @returns {{ready: boolean, missing: string[]}}
+ */
+function readinessVerdict(issue) {
+  const labels = issue.labels || [];
+  const missing = [];
+  if (!labels.includes(AGENT_TASK)) {
+    missing.push(`it carries no \`${AGENT_TASK}\` label`);
+  }
+  const scopes = labels
+    .filter((label) => label.startsWith(SCOPE_PREFIX))
+    .map((label) => label.slice(SCOPE_PREFIX.length));
+  if (scopes.length === 0) {
+    missing.push('it carries no `scope:*` label saying which areas its change stays inside');
+  }
+  for (const scope of scopes) {
+    if (!Object.prototype.hasOwnProperty.call(SCOPES, scope)) {
+      missing.push(`\`${SCOPE_PREFIX}${scope}\` is not a known scope`);
+    }
+  }
+  return { ready: missing.length === 0, missing };
+}
+
+/**
  * Conditions readable off the candidate itself, before any dependency is fetched.
  *
  * @param {{number: number, state: string, labels: string[], isPullRequest?: boolean}} issue
@@ -205,6 +300,10 @@ function labelVerdict(issue) {
   // dropping `done` leaves both labels on. Assigning would re-do finished work.
   if (labels.has(DONE)) {
     return no('it is labelled `done`, which contradicts `ready`');
+  }
+  const readiness = readinessVerdict(issue);
+  if (!readiness.ready) {
+    return no(`it does not meet the Definition of Ready — ${readiness.missing.join('; ')}`);
   }
   return yes();
 }
@@ -564,6 +663,60 @@ async function strandedPauseVerdict(api, issue) {
 }
 
 /**
+ * What an issue claims when a run holds it: the scopes it declares, or the
+ * whole repository.
+ *
+ * An exclusive scope runs alone whatever else the issue declares. The other
+ * two cases below cannot reach a candidate — the Definition of Ready refuses
+ * both — but a *live* run can carry them, having been assigned before scopes
+ * existed, so they fail closed here: a run whose scope is unknown claims the
+ * whole repository.
+ *
+ * @param {{labels?: string[]}} issue
+ * @returns {{exclusive: boolean, scopes: string[], why: string|null}}
+ */
+function scopeClaim(issue) {
+  const declared = (issue.labels || [])
+    .filter((label) => label.startsWith(SCOPE_PREFIX))
+    .map((label) => label.slice(SCOPE_PREFIX.length));
+  if (declared.length === 0) {
+    return { exclusive: true, scopes: [], why: 'it carries no `scope:*` label' };
+  }
+  const unknown = declared.find((scope) => !Object.prototype.hasOwnProperty.call(SCOPES, scope));
+  if (unknown !== undefined) {
+    return { exclusive: true, scopes: declared, why: `\`${SCOPE_PREFIX}${unknown}\` is not a known scope` };
+  }
+  const alone = declared.find((scope) => EXCLUSIVE_SCOPES.has(scope));
+  if (alone !== undefined) {
+    return { exclusive: true, scopes: declared, why: `\`${SCOPE_PREFIX}${alone}\` always runs alone` };
+  }
+  return { exclusive: false, scopes: declared, why: null };
+}
+
+/** Whether two claims may not be held at the same time. */
+function claimsConflict(a, b) {
+  if (a.exclusive || b.exclusive) return true;
+  return a.scopes.some((scope) => b.scopes.includes(scope));
+}
+
+/**
+ * Why `claim` cannot start beside `holder`, for the log line that says so.
+ *
+ * @param {{exclusive: boolean, scopes: string[], why: string|null}} claim
+ * @param {{number: number, holds: string, claim: {exclusive: boolean, scopes: string[], why: string|null}}} holder
+ */
+function clashReason(claim, holder) {
+  if (holder.claim.exclusive) {
+    return `#${holder.number} (${holder.holds}) runs alone — ${holder.claim.why}`;
+  }
+  if (claim.exclusive) {
+    return `it runs alone — ${claim.why} — and #${holder.number} is ${holder.holds}`;
+  }
+  const shared = claim.scopes.filter((scope) => holder.claim.scopes.includes(scope));
+  return `${shared.map((scope) => `\`${SCOPE_PREFIX}${scope}\``).join(', ')} is held by #${holder.number} (${holder.holds})`;
+}
+
+/**
  * The full verdict on one candidate.
  *
  * @param {IssueApi} api
@@ -654,14 +807,36 @@ function resumeTargetFor(deliverable) {
 }
 
 /**
- * Picks the next assignable issue, or explains why there is none.
+ * Picks the issues to assign now, or explains why there are none.
  *
  * Selection order is the issue number, ascending: the oldest eligible task goes
  * first, and the order does not depend on when labels happened to be applied.
  *
+ * **Capacity.** At most `maxParallel` issues hold `in-progress` at once
+ * (`AGENTIC_MAX_PARALLEL_RUNS`, default 1). An issue keeps that label until its
+ * run is finished — merged, halted or closed — so the label is the count of live
+ * runs, and every assignment happens under the one `agentic-assignment`
+ * concurrency group, so nothing else adds to it while this reads it. At 1 this is
+ * single flight exactly as it always was: defer while anything is in progress,
+ * otherwise take the oldest assignable issue.
+ *
+ * **Scope.** Above 1, an issue starts beside the live runs only when its scope
+ * claim (`scopeClaim`) clashes with none of theirs. Every candidate declares its
+ * scopes — the Definition of Ready refuses one that does not — and
+ * `scope:global` or `scope:pipeline` claims the whole repository.
+ *
+ * **Its place in line.** An older issue that could run but for a scope clash
+ * *holds* its claim for the rest of the pass, so nothing younger that overlaps
+ * it starts first. Without that, a steady stream of small issues in one scope
+ * could keep an older one in the same scope waiting forever. No clock is
+ * involved: the hold lasts exactly as long as the clash does, and an older issue
+ * that runs alone holds everything, so the queue drains until it can run. Only an issue that is otherwise assignable holds a place — one waiting
+ * on a dependency does not, or a paused issue would hold the very scope its own
+ * blocker needs.
+ *
  * `completedIssue` is the issue whose own run fired this chain. It is exempt
- * from the single-flight check below — its labels are still the finishing run's
- * — and it is never the answer: see the loop for why that is decided on the
+ * from the in-progress count below — its labels are still the finishing run's —
+ * and it is never the answer: see the loop for why that is decided on the
  * number rather than on the rules.
  *
  * `unreadable` lists the candidates that were skipped because a fact about them
@@ -670,32 +845,54 @@ function resumeTargetFor(deliverable) {
  * the caller has to say so out loud instead of reporting an idle queue.
  *
  * @param {IssueApi} api
- * @param {{log?: (message: string) => void, completedIssue?: number|null}} options
- * @returns {Promise<{issue: object|null, reason: string,
+ * @param {{log?: (message: string) => void, completedIssue?: number|null, maxParallel?: number}} options
+ * @returns {Promise<{issue: object|null, issues: object[], reason: string,
  *                    unreadable: {number: number, reason: string}[]}>}
+ *   `issue` is the first of `issues`, or null.
  */
 async function selectNextAssignable(api, options = {}) {
   const log = options.log || (() => {});
   const completed = options.completedIssue ?? null;
+  const limit =
+    Number.isInteger(options.maxParallel) && options.maxParallel > 0
+      ? options.maxParallel
+      : DEFAULT_MAX_PARALLEL_RUNS;
+  const none = (reason, unreadable = []) => ({ issue: null, issues: [], reason, unreadable });
 
-  // --- Single flight: never let two agent sessions run at once ---
-  // An issue keeps `in-progress` until its run is finished, so any other one
-  // still carrying that label means a run is live. Defer either way, and never
-  // diagnose: from the labels alone a run forty seconds old is indistinguishable
-  // from one that died hours ago, and only `agentic-watchdog.yml` ages it.
-  const inProgress = await api.listIssuesByLabel(IN_PROGRESS);
-  for (const busy of inProgress) {
-    if (busy.number === completed) continue;
+  // --- Capacity: never more live runs than the limit ---
+  // An issue keeps `in-progress` until its run is finished, so every other one
+  // still carrying that label is a live run. Defer when they fill the limit,
+  // and never diagnose: from the labels alone a run forty seconds old is
+  // indistinguishable from one that died hours ago, and only
+  // `agentic-watchdog.yml` ages it.
+  const live = (await api.listIssuesByLabel(IN_PROGRESS)).filter((busy) => busy.number !== completed);
+  if (live.length >= limit) {
+    const names = live.map((busy) => `#${busy.number}`).join(', ');
+    const verb = live.length === 1 ? 'is' : 'are';
     log(
-      `#${busy.number} is in progress — deferring. Finishing that run re-enters this step.`
+      `${names} ${verb} in progress, filling the limit of ${limit} — deferring. ` +
+        'Finishing a run re-enters this step.'
     );
-    return { issue: null, reason: `#${busy.number} is still in progress`, unreadable: [] };
+    return none(`${names} ${verb} still in progress`);
   }
 
+  // A live run that claims the whole repository leaves no room beside it,
+  // whatever the limit. Said here, before the walk, so the log names the run
+  // rather than repeating it once per candidate.
+  const holders = live.map((busy) => ({ number: busy.number, holds: 'in progress', claim: scopeClaim(busy) }));
+  const alone = holders.find((holder) => holder.claim.exclusive);
+  if (alone) {
+    log(`#${alone.number} is in progress and runs alone — ${alone.claim.why}. Deferring.`);
+    return none(`#${alone.number} is in progress and runs alone`);
+  }
+
+  const capacity = limit - live.length;
   const ready = await api.listIssuesByLabel(READY);
   ready.sort((a, b) => a.number - b.number);
 
+  const picked = [];
   const unreadable = [];
+  let waited = 0;
   for (const issue of ready) {
     // --- The run that just ended never starts the next one ---
     // `completed` is the issue whose own halt, merge or close fired this chain.
@@ -730,10 +927,35 @@ async function selectNextAssignable(api, options = {}) {
       if (verdict.unreadable) unreadable.push({ number: issue.number, reason: verdict.reason });
       continue;
     }
-    return { issue, reason: verdict.reason, unreadable };
+
+    const claim = scopeClaim(issue);
+    const clash = holders.find((holder) => claimsConflict(claim, holder.claim));
+    if (clash) {
+      log(
+        `#${issue.number}: waits — ${clashReason(claim, clash)}. ` +
+          'It holds its place: nothing younger that overlaps it starts first.'
+      );
+      holders.push({ number: issue.number, holds: 'waiting ahead of it', claim });
+      waited += 1;
+      // A waiting issue that claims everything leaves nothing to find further on.
+      if (claim.exclusive) break;
+      continue;
+    }
+
+    picked.push(issue);
+    holders.push({ number: issue.number, holds: 'assigned in this pass', claim });
+    if (picked.length >= capacity || claim.exclusive) break;
   }
 
-  return { issue: null, reason: 'no assignable ready issue', unreadable };
+  if (picked.length > 0) {
+    return { issue: picked[0], issues: picked, reason: 'no blocking condition found', unreadable };
+  }
+  return none(
+    waited > 0
+      ? `no assignable ready issue can start beside the ${live.length} in progress`
+      : 'no assignable ready issue',
+    unreadable
+  );
 }
 
 /**
@@ -797,6 +1019,19 @@ function blockedChainLimit(raw) {
 }
 
 /**
+ * Reads the configured parallel-run limit. Anything but a positive integer
+ * falls back to single flight rather than opening the gate — the same rule
+ * every other limit in this layer follows, in the safe direction for this one.
+ *
+ * @param {string | undefined | null} raw
+ */
+function maxParallelRuns(raw) {
+  const text = (raw || '').trim();
+  const parsed = /^\d+$/.test(text) ? parseInt(text, 10) : NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_PARALLEL_RUNS;
+}
+
+/**
  * Resolves which agent an assignment comment addresses. An unrecognised value
  * fails the step loudly rather than silently picking a default — switching
  * agents is a one-variable change and a typo in it must not run the other one.
@@ -822,6 +1057,7 @@ function resolveMention(raw) {
  */
 
 module.exports = {
+  AGENT_TASK,
   BLOCKED,
   DONE,
   IN_PROGRESS,
@@ -829,7 +1065,11 @@ module.exports = {
   READY,
   BLOCKED_CHAIN_FALLBACK_WINDOW_MS,
   DEFAULT_BLOCKED_CHAIN_LIMIT,
+  DEFAULT_MAX_PARALLEL_RUNS,
+  EXCLUSIVE_SCOPES,
   MAX_DEPENDENCY_NODES,
+  SCOPE_PREFIX,
+  SCOPES,
   assessCandidate,
   blockedByFor,
   blockedChainLimit,
@@ -837,9 +1077,12 @@ module.exports = {
   dependencyVerdict,
   graphVerdict,
   labelVerdict,
+  maxParallelRuns,
   parseDependencies,
+  readinessVerdict,
   resolveMention,
   resumeTargetFor,
+  scopeClaim,
   selectNextAssignable,
   strandedPauseVerdict,
 };
