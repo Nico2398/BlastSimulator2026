@@ -44,7 +44,11 @@ const ROOT = resolve(import.meta.dirname, '..');
 /** Default ceiling: the share of changed lines allowed to sit inside a clone. */
 const DEFAULT_THRESHOLD = 10;
 
-/** Scanned scope, kept in step with `.jscpd.json`'s own `path`. */
+/**
+ * Scanned scope, kept in step with `.jscpd.json`'s own `path` and with the
+ * `qualimetry` script. It is also passed to jscpd positionally: on Windows jscpd
+ * resolves a config-file `path` to nothing, scans zero files, and passes.
+ */
 const SCOPE = ['src/', 'scripts/'];
 
 interface ChangedLines {
@@ -113,9 +117,11 @@ export function collectChangedLines(diffOutput: string): Map<string, ChangedLine
 function detectClones(): Clone[] {
   const out = mkdtempSync(join(tmpdir(), 'jscpd-diff-'));
   try {
+    // jscpd's own entry point through this Node binary: `npx` is a .cmd shim on
+    // Windows, which execFileSync cannot start without a shell (ENOENT).
     execFileSync(
-      'npx',
-      ['jscpd', '--config', '.jscpd.json', '--reporters', 'json', '--output', out, '--threshold', '100', '--silent'],
+      process.execPath,
+      [join(ROOT, 'node_modules/jscpd/bin/jscpd'), '--config', '.jscpd.json', ...SCOPE, '--reporters', 'json', '--output', out, '--threshold', '100', '--silent'],
       { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     );
     const report = JSON.parse(readFileSync(join(out, 'jscpd-report.json'), 'utf8')) as {
