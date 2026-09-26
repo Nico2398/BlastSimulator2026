@@ -54,11 +54,19 @@ inputs:
       back to 3 rather than disabling the brake.
     required: false
     default: ""
+  max_parallel:
+    description: >
+      How many issues may hold `in-progress` at once, from
+      AGENTIC_MAX_PARALLEL_RUNS. Every free slot is filled on every call, with
+      issues whose scopes clash with none in flight. Anything but a positive
+      integer falls back to 1, single flight.
+    required: false
+    default: ""
 
 outputs:
-  issue:
-    description: "Issue number that was assigned, empty when nothing was assigned."
-    value: ${{ steps.assign.outputs.issue }}
+  issues:
+    description: "Space-separated issue numbers assigned by this call, empty when nothing was assigned."
+    value: ${{ steps.assign.outputs.issues }}
   mention:
     description: "Resolved agent mention (@claude or @opencode)."
     value: ${{ steps.assign.outputs.mention }}
@@ -79,6 +87,7 @@ runs:
         ASSIGN_GUARD: ${{ inputs.guard }}
         COMPLETED_ISSUE: ${{ inputs.completed_issue }}
         BLOCKED_CHAIN_LIMIT: ${{ inputs.blocked_chain_limit }}
+        MAX_PARALLEL: ${{ inputs.max_parallel }}
       with:
         github-token: ${{ inputs.token }}
         script: |
@@ -94,7 +103,7 @@ runs:
           const log = (message) => core.info(message);
           const api = createIssueApi(github, { owner, repo, log });
 
-          core.setOutput('issue', '');
+          core.setOutput('issues', '');
           core.setOutput('halted', 'false');
 
           // --- Resolve which agent answers the assignment comment ---
@@ -246,13 +255,20 @@ runs:
             );
           }
 
-          // --- Pick the next assignable issue ---
-          const { issue, reason: why, unreadable } = await rules.selectNextAssignable(api, {
+          // --- Pick the issues to assign ---
+          // Every free slot, not just one: with `AGENTIC_MAX_PARALLEL_RUNS`
+          // above 1 an entry point that assigned a single issue would leave the
+          // rest of the capacity idle until the next event. At 1 this picks at
+          // most one, exactly as before.
+          const maxParallel = rules.maxParallelRuns(process.env.MAX_PARALLEL);
+          core.info(`At most ${maxParallel} issue(s) may be in progress at once (AGENTIC_MAX_PARALLEL_RUNS).`);
+          const { issues: picked, reason: why, unreadable } = await rules.selectNextAssignable(api, {
             log,
             completedIssue: completed,
+            maxParallel,
           });
 
-          if (!issue) {
+          if (picked.length === 0) {
             // An unread queue is not an empty queue. On 17 Aug 2026 the GraphQL
             // read behind `deliverableFor` answered 503 for every candidate;
             // all three dispatches that day ended green on "Nothing assigned",
@@ -269,92 +285,103 @@ runs:
             return;
           }
 
-          const n = issue.number;
-          await github.rest.issues.removeLabel({
-            owner, repo, issue_number: n, name: rules.READY
-          }).catch(() => {});
-          // `paused` said "a run stopped here and put the issue back in the
-          // queue". It has just been picked up, so the statement is no longer
-          // true — and left on, it would be counted a second time by the cascade
-          // brake and chained from a second time by handle-failure.yml.
-          await github.rest.issues.removeLabel({
-            owner, repo, issue_number: n, name: rules.PAUSED
-          }).catch(() => {});
-          await github.rest.issues.addLabels({
-            owner, repo, issue_number: n, labels: [rules.IN_PROGRESS]
-          });
-
-          // Cached from `assessCandidate`, which already read it to decide the
-          // issue was assignable at all. A paused pull request means a previous
-          // run left finished work on a branch, and this assignment has to send
-          // the new run to that branch — the default instructions below would
-          // have it build a fresh one from `main` and silently abandon the work.
-          const resume = rules.resumeTargetFor(await api.deliverableFor(n));
-          if (resume) {
-            core.info(
-              `#${n} resumes from pull request #${resume.number}` +
-              (resume.head ? ` on \`${resume.head}\`` : '') + '.'
-            );
+          const assigned = [];
+          for (const issue of picked) {
+            await assign(issue.number);
+            assigned.push(issue.number);
+            // Written after every assignment, not once at the end: a later
+            // assignment that throws must not hide the ones already made.
+            core.setOutput('issues', assigned.join(' '));
           }
 
-          const resumeBlock = resume
-            ? [
-                '',
-                `**▶ THIS RUN RESUMES PULL REQUEST #${resume.number} — DO NOT START OVER.**`,
-                '',
-                `A previous run on this issue stopped on a dependency, saved what it had finished, and left it on ${resume.head ? `\`${resume.head}\`` : `pull request #${resume.number}'s head branch`}. That dependency has since landed, which is why this issue is assignable again.`,
-                '',
-                `1. Read pull request #${resume.number} first — its body states what is already done and what remains. Read the issue thread too, but the pull request is the authority on where the work stopped.`,
-                `2. Check out that pull request's head branch and continue on it. Create no \`pipeline/tests-*\`, \`pipeline/impl-*\` or \`pipeline/feature-*\` branch for this issue: the branch already exists, its commits are the work, and building a new one from \`main\` throws that work away.`,
-                `3. Finish only what the pull request says remains, plus whatever the landed dependency now makes possible. Re-verify every channel at the end — the earlier run's results were recorded against an older \`main\`.`,
-                `4. When it is done, push to that same branch, mark pull request #${resume.number} ready for review, remove its \`paused\` label, and add \`READY TO MERGE\` on a line of its own as a new comment **and** in the body. Do not open a second pull request.`,
-                '',
-                'If the remaining work turns out to be unrelated to what that branch holds, say so on the pull request and continue on the branch anyway — a second pull request against one issue makes the issue unassignable to everyone.',
-              ]
-            : [];
+          async function assign(n) {
+            await github.rest.issues.removeLabel({
+              owner, repo, issue_number: n, name: rules.READY
+            }).catch(() => {});
+            // `paused` said "a run stopped here and put the issue back in the
+            // queue". It has just been picked up, so the statement is no longer
+            // true — and left on, it would be counted a second time by the cascade
+            // brake and chained from a second time by handle-failure.yml.
+            await github.rest.issues.removeLabel({
+              owner, repo, issue_number: n, name: rules.PAUSED
+            }).catch(() => {});
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: n, labels: [rules.IN_PROGRESS]
+            });
 
-          // The comment IS the trigger. It must carry the whole assignment:
-          // which agent answers, what to build, and how the pipeline runs it.
-          // Identical for every agent apart from the mention on the first line.
-          const body = [
-            `${mention} — autonomous pipeline assignment for issue #${n} (${reason}).`,
-            '',
-            `**Task:** resolve issue #${n} end to end and open the pull request that closes it.`,
-            ...resumeBlock,
-            '',
-            '**▶ FIRST ACTION — hand this task to the `orchestrator` agent.**',
-            'Classification, planning, TDD, code review and PR creation are the orchestrator\'s job,',
-            'delegated to specialist sub-agents. Do not implement anything in this session directly,',
-            'and do not explore the codebase before the orchestrator has classified the task.',
-            '',
-            'The orchestrator then follows its own procedure:',
-            '',
-            `1. Classify the task and load the matching \`agentic-pipeline-*\` skill. The system itself is described in the \`agentic-autonomous-pipeline\` skill.`,
-            `2. Run the TDD cycle with branch isolation on \`pipeline/tests-${n}\` and \`pipeline/impl-${n}\` — the implementer never sees the tests.`,
-            `3. Cherry-pick the implementation onto \`pipeline/feature-${n}\`, then run code review, refactor and validation there.`,
-            '4. Run every verification channel the change touches. A renderer or UI change is not done until screenshots have been inspected; a player-facing flow is not done until an interaction-mode scenario proves a player can reach the goal by clicking.',
-            `5. Open the PR from \`pipeline/feature-${n}\` to \`main\`. Its body must contain \`Closes #${n}\`, plus \`READY TO MERGE\` on a line of its own. Open it as a draft without that line only when a channel stayed red, or when nothing will ever report on it — name the channel. A channel CI owns, like the interaction-mode scenario shards that run on every pull request, is covered by the marker rather than blocked by it: the marked PR waits on those jobs and merges on their result. **Never leave the PR non-draft and unmarked** — nothing in the pipeline comes back to add the marker, and the issue holds \`in-progress\` until a human notices. How many review findings, visual iterations or retries the run took does not decide PR status.`,
-            '',
-            'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
-            '',
-            `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule, for what to fix on the fly rather than file, and for the blockers that genuinely stop a run.`,
-            '',
-            `Something you find that is in the way of this task is not automatically a halt: fix it on the spot when it is small, and when it is not, file it and work around it behind a \`TODO(#<new issue>)\` bypass so this run still lands. Only a finding that makes the task impossible ends the run early — and then it \`pause\`s rather than blocks. Both procedures are in \`agentic-decision-autonomy\`.`,
-            '',
-            `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state, and there are four:`,
-            '',
-            `- a merged-ready PR that closes it;`,
-            `- \`paused\` — a dependency you filed is in the way, so the issue goes back to \`ready\` with that issue as its \`Blocked by\` and the \`paused\` label on top, and any partial work is saved on a draft PR labelled \`paused\`. The queue re-picks it on its own once the dependency lands;`,
-            `- \`blocked\` — a human has to answer something before the work can proceed at all. Comment what is missing;`,
-            `- or — when the deliverable is an answer or a command rather than a diff — issue #${n} closed and labelled \`done\`.`,
-            '',
-            `An issue left holding \`in-progress\` defers every later assignment until the watchdog sweeps it.`
-          ].join('\n');
+            // Cached from `assessCandidate`, which already read it to decide the
+            // issue was assignable at all. A paused pull request means a previous
+            // run left finished work on a branch, and this assignment has to send
+            // the new run to that branch — the default instructions below would
+            // have it build a fresh one from `main` and silently abandon the work.
+            const resume = rules.resumeTargetFor(await api.deliverableFor(n));
+            if (resume) {
+              core.info(
+                `#${n} resumes from pull request #${resume.number}` +
+                (resume.head ? ` on \`${resume.head}\`` : '') + '.'
+              );
+            }
 
-          await github.rest.issues.createComment({ owner, repo, issue_number: n, body });
+            const resumeBlock = resume
+              ? [
+                  '',
+                  `**▶ THIS RUN RESUMES PULL REQUEST #${resume.number} — DO NOT START OVER.**`,
+                  '',
+                  `A previous run on this issue stopped on a dependency, saved what it had finished, and left it on ${resume.head ? `\`${resume.head}\`` : `pull request #${resume.number}'s head branch`}. That dependency has since landed, which is why this issue is assignable again.`,
+                  '',
+                  `1. Read pull request #${resume.number} first — its body states what is already done and what remains. Read the issue thread too, but the pull request is the authority on where the work stopped.`,
+                  `2. Check out that pull request's head branch and continue on it. Create no \`pipeline/tests-*\`, \`pipeline/impl-*\` or \`pipeline/feature-*\` branch for this issue: the branch already exists, its commits are the work, and building a new one from \`main\` throws that work away.`,
+                  `3. Finish only what the pull request says remains, plus whatever the landed dependency now makes possible. Re-verify every channel at the end — the earlier run's results were recorded against an older \`main\`.`,
+                  `4. When it is done, push to that same branch, mark pull request #${resume.number} ready for review, remove its \`paused\` label, and add \`READY TO MERGE\` on a line of its own as a new comment **and** in the body. Do not open a second pull request.`,
+                  '',
+                  'If the remaining work turns out to be unrelated to what that branch holds, say so on the pull request and continue on the branch anyway — a second pull request against one issue makes the issue unassignable to everyone.',
+                ]
+              : [];
 
-          core.setOutput('issue', String(n));
-          core.info(`Assigned issue #${n} to ${mention}.`);
+            // The comment IS the trigger. It must carry the whole assignment:
+            // which agent answers, what to build, and how the pipeline runs it.
+            // Identical for every agent apart from the mention on the first line.
+            const body = [
+              `${mention} — autonomous pipeline assignment for issue #${n} (${reason}).`,
+              '',
+              `**Task:** resolve issue #${n} end to end and open the pull request that closes it.`,
+              ...resumeBlock,
+              '',
+              '**▶ FIRST ACTION — hand this task to the `orchestrator` agent.**',
+              'Classification, planning, TDD, code review and PR creation are the orchestrator\'s job,',
+              'delegated to specialist sub-agents. Do not implement anything in this session directly,',
+              'and do not explore the codebase before the orchestrator has classified the task.',
+              '',
+              'The orchestrator then follows its own procedure:',
+              '',
+              `1. Classify the task and load the matching \`agentic-pipeline-*\` skill. The system itself is described in the \`agentic-autonomous-pipeline\` skill.`,
+              `2. Run the TDD cycle with branch isolation on \`pipeline/tests-${n}\` and \`pipeline/impl-${n}\` — the implementer never sees the tests.`,
+              `3. Cherry-pick the implementation onto \`pipeline/feature-${n}\`, then run code review, refactor and validation there.`,
+              '4. Run every verification channel the change touches. A renderer or UI change is not done until screenshots have been inspected; a player-facing flow is not done until an interaction-mode scenario proves a player can reach the goal by clicking.',
+              `5. Open the PR from \`pipeline/feature-${n}\` to \`main\`. Its body must contain \`Closes #${n}\`, plus \`READY TO MERGE\` on a line of its own. Open it as a draft without that line only when a channel stayed red, or when nothing will ever report on it — name the channel. A channel CI owns, like the interaction-mode scenario shards that run on every pull request, is covered by the marker rather than blocked by it: the marked PR waits on those jobs and merges on their result. **Never leave the PR non-draft and unmarked** — nothing in the pipeline comes back to add the marker, and the issue holds \`in-progress\` until a human notices. How many review findings, visual iterations or retries the run took does not decide PR status.`,
+              '',
+              'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
+              '',
+              '`main` may move while this run works: other sessions can be live on other issues, and the merge gate merges `main` into an open pipeline branch before merging it. Merge `origin/main` into the feature branch just before opening the PR, and `git pull --no-rebase` before every later push to it. Never rebase or force-push it. `agentic-pipeline-finalization` and `agentic-pipeline-ci-fix` hold the steps.',
+              '',
+              `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule, for what to fix on the fly rather than file, and for the blockers that genuinely stop a run.`,
+              '',
+              `Something you find that is in the way of this task is not automatically a halt: fix it on the spot when it is small, and when it is not, file it and work around it behind a \`TODO(#<new issue>)\` bypass so this run still lands. Only a finding that makes the task impossible ends the run early — and then it \`pause\`s rather than blocks. Both procedures are in \`agentic-decision-autonomy\`.`,
+              '',
+              `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state, and there are four:`,
+              '',
+              `- a merged-ready PR that closes it;`,
+              `- \`paused\` — a dependency you filed is in the way, so the issue goes back to \`ready\` with that issue as its \`Blocked by\` and the \`paused\` label on top, and any partial work is saved on a draft PR labelled \`paused\`. The queue re-picks it on its own once the dependency lands;`,
+              `- \`blocked\` — a human has to answer something before the work can proceed at all. Comment what is missing;`,
+              `- or — when the deliverable is an answer or a command rather than a diff — issue #${n} closed and labelled \`done\`.`,
+              '',
+              `An issue left holding \`in-progress\` keeps its parallel-run slot, and its scope, until the watchdog sweeps it — with the default of one slot, that defers every later assignment.`
+            ].join('\n');
+
+            await github.rest.issues.createComment({ owner, repo, issue_number: n, body });
+
+            core.info(`Assigned issue #${n} to ${mention}.`);
+          }
 
           // --- Cascade brake report ---
           // Posted on the issue the chain stopped at, because a warning in a job

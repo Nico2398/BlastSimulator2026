@@ -648,6 +648,196 @@ describe('picking the next issue', () => {
 // dependency lands. What that costs is the open pull request holding the partial
 // work — which every other rule here reads as "a run is in flight, keep clear".
 // The `paused` label on the PR is what separates a handover from a collision.
+// `AGENTIC_MAX_PARALLEL_RUNS` above 1 lets several issues hold `in-progress`
+// at once. Two things decide which: how many slots are free, and whether an
+// issue's scope labels clash with any run already in flight. The merge gate is
+// what makes parallel runs safe; these rules are what keep them from colliding
+// often. Everything here fails toward running less at once — never toward
+// running two things that claim the same ground.
+describe('running several issues at once', () => {
+  const selectUpTo = (api: any, maxParallel: number, completedIssue: number | null = null) =>
+    rules.selectNextAssignable(api, { completedIssue, maxParallel });
+  const numbers = (result: { issues: { number: number }[] }) => result.issues.map((i) => i.number);
+
+  describe('reading the configured limit', () => {
+    it.each([
+      ['2', 2],
+      [' 3 ', 3],
+      ['1', 1],
+    ])('reads %p as %p', (raw, expected) => {
+      expect(rules.maxParallelRuns(raw)).toBe(expected);
+    });
+
+    // A limit that does not parse falls back to single flight — the one
+    // direction a misconfiguration may not push is towards more at once.
+    it.each([undefined, null, '', '0', '-2', 'abc', '2.5', '1e3'])('falls back to 1 on %p', (raw) => {
+      expect(rules.maxParallelRuns(raw)).toBe(1);
+    });
+  });
+
+  describe('what an issue claims', () => {
+    it('claims the scopes its labels declare', () => {
+      expect(rules.scopeClaim({ labels: ['ready', 'scope:ui', 'scope:console'] })).toEqual({
+        exclusive: false,
+        scopes: ['ui', 'console'],
+        why: null,
+      });
+    });
+
+    it('claims the whole repository without a scope label', () => {
+      const claim = rules.scopeClaim({ labels: ['ready', 'agent-task'] });
+      expect(claim.exclusive).toBe(true);
+      expect(claim.why).toContain('no `scope:*` label');
+    });
+
+    // A typo must not quietly widen what may run side by side.
+    it('claims the whole repository for a scope it does not know', () => {
+      const claim = rules.scopeClaim({ labels: ['scope:naavmesh'] });
+      expect(claim.exclusive).toBe(true);
+      expect(claim.why).toContain('scope:naavmesh');
+    });
+
+    // A pipeline change rewrites the rules the live runs follow.
+    it('runs `scope:pipeline` alone whatever else it declares', () => {
+      const claim = rules.scopeClaim({ labels: ['scope:ui', 'scope:pipeline'] });
+      expect(claim.exclusive).toBe(true);
+      expect(claim.why).toContain('scope:pipeline');
+    });
+
+    it('describes every scope within the label description limit', () => {
+      for (const [scope, description] of Object.entries(rules.SCOPES as Record<string, string>)) {
+        expect(description.length, scope).toBeLessThanOrEqual(100);
+        expect(scope).toMatch(/^[a-z]+$/);
+      }
+      expect([...rules.EXCLUSIVE_SCOPES]).toEqual(['pipeline']);
+    });
+  });
+
+  // The default is the pipeline as it always ran. Scope labels change nothing
+  // until the limit is raised.
+  it('stays single flight at the default limit, whatever the scopes say', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 30, labels: ['ready', 'scope:nav'] },
+    ]);
+    const result = await select(api);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('#20');
+  });
+
+  it('starts an issue beside a live run in another scope', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 30, labels: ['ready', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+
+  it('passes over an issue whose scope is in flight and takes the next one that fits', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 25, labels: ['ready', 'scope:ui'] },
+      { number: 30, labels: ['ready', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+
+  // Head-of-line: #25 waits on `ui`, and it holds `nav` too, so #30 — younger,
+  // in `nav` — may not start in front of it. #35 overlaps nothing and starts.
+  it('lets an older waiting issue hold every scope it claims', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 25, labels: ['ready', 'scope:ui', 'scope:nav'] },
+      { number: 30, labels: ['ready', 'scope:nav'] },
+      { number: 35, labels: ['ready', 'scope:economy'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 3))).toEqual([35]);
+  });
+
+  // An older unlabelled issue holds everything: the queue drains until it can
+  // run alone, rather than letting younger scoped work starve it.
+  it('drains the queue for an older issue that runs alone', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 25, labels: ['ready'] },
+      { number: 30, labels: ['ready', 'scope:nav'] },
+    ]);
+    const result = await selectUpTo(api, 3);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('can start beside');
+  });
+
+  it('starts nothing beside a live run that claims the whole repository', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress'] },
+      { number: 30, labels: ['ready', 'scope:nav'] },
+    ]);
+    const result = await selectUpTo(api, 3);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('#20');
+    expect(result.reason).toContain('runs alone');
+  });
+
+  it('fills every free slot with issues that do not clash with each other', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['ready', 'scope:ui'] },
+      { number: 21, labels: ['ready', 'scope:nav'] },
+      { number: 22, labels: ['ready', 'scope:ui'] },
+      { number: 23, labels: ['ready', 'scope:economy'] },
+      { number: 24, labels: ['ready', 'scope:world'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 3))).toEqual([20, 21, 23]);
+  });
+
+  it('assigns an issue that runs alone, and nothing beside it', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['ready'] },
+      { number: 21, labels: ['ready', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 3))).toEqual([20]);
+  });
+
+  it('defers when the live runs already fill the limit', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 21, labels: ['in-progress', 'scope:nav'] },
+      { number: 30, labels: ['ready', 'scope:economy'] },
+    ]);
+    const result = await selectUpTo(api, 2);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('#20');
+    expect(result.reason).toContain('#21');
+  });
+
+  it('does not count the run that fired the chain as live', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 21, labels: ['in-progress', 'scope:nav'] },
+      { number: 30, labels: ['ready', 'scope:ui'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2, 20))).toEqual([30]);
+  });
+
+  // Only an issue that could otherwise run holds a place. A paused issue
+  // holding its own scope would stop its own blocker from ever starting.
+  it('lets an issue waiting on a dependency hold nothing', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:nav'] },
+      { number: 25, labels: ['ready', 'paused', 'scope:ui'], body: '## Blocked by\n\n- #30\n' },
+      { number: 30, labels: ['ready', 'scope:ui'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+
+  it('keeps every other rule: a candidate with an open pull request is still skipped', async () => {
+    const api = fakeApi([
+      { number: 25, labels: ['ready', 'scope:ui'], pipelinePr: { number: 90, merged: false } },
+      { number: 30, labels: ['ready', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+});
+
 describe('resuming a paused run', () => {
   const pausedPr = (number: number, head?: string) => ({
     number,
@@ -2017,6 +2207,7 @@ describe('running the assign action end to end', () => {
       ASSIGN_GUARD: 'none',
       COMPLETED_ISSUE: '',
       BLOCKED_CHAIN_LIMIT: '',
+      MAX_PARALLEL: '',
       ...scenario.env,
     };
 
@@ -2043,7 +2234,7 @@ describe('running the assign action end to end', () => {
 
   it('assigns the oldest assignable issue and posts the trigger comment', async () => {
     const result = await run({ issues: [{ number: 30, labels: ['ready'] }, { number: 20, labels: ['ready'] }] });
-    expect(result.outputs.issue).toBe('20');
+    expect(result.outputs.issues).toBe('20');
     expect(result.labelled).toEqual([{ issue: 20, labels: ['in-progress'] }]);
     // `paused` comes off alongside `ready`: the issue has just been picked up,
     // so a run no longer stopped there. Removing a label that is not present is a
@@ -2054,6 +2245,39 @@ describe('running the assign action end to end', () => {
     ]);
     expect(result.comments[0]!.body).toContain('@claude');
     expect(result.comments[0]!.body).toContain('issue #20');
+  });
+
+  // Every free slot on one call, each with its own assignment comment — each
+  // comment is the trigger for its own session.
+  it('assigns every issue that fits when the limit allows several', async () => {
+    const result = await run({
+      issues: [
+        { number: 20, labels: ['in-progress', 'scope:ui'] },
+        { number: 25, labels: ['ready', 'scope:ui'] },
+        { number: 30, labels: ['ready', 'scope:nav'] },
+        { number: 35, labels: ['ready', 'scope:economy'] },
+      ],
+      env: { MAX_PARALLEL: '3' },
+    });
+    expect(result.failed).toBeNull();
+    expect(result.outputs.issues).toBe('30 35');
+    expect(result.labelled).toEqual([
+      { issue: 30, labels: ['in-progress'] },
+      { issue: 35, labels: ['in-progress'] },
+    ]);
+    expect(result.comments.map((comment) => comment.issue)).toEqual([30, 35]);
+    expect(result.comments[1]!.body).toContain('autonomous pipeline assignment for issue #35');
+  });
+
+  it('assigns one issue when the limit is unset, however many would fit', async () => {
+    const result = await run({
+      issues: [
+        { number: 30, labels: ['ready', 'scope:nav'] },
+        { number: 35, labels: ['ready', 'scope:economy'] },
+      ],
+    });
+    expect(result.outputs.issues).toBe('30');
+    expect(result.comments).toHaveLength(1);
   });
 
   // 17 Aug 2026: every candidate skipped on a 503, three dispatches in a row,
@@ -2067,7 +2291,7 @@ describe('running the assign action end to end', () => {
       ],
       unreadable: [554, 555],
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.failed).toContain('#554');
     expect(result.failed).toContain('could not be assessed');
   });
@@ -2076,7 +2300,7 @@ describe('running the assign action end to end', () => {
   // eligible is the normal resting state, and must stay a green no-op.
   it('stays green on a queue that is genuinely idle', async () => {
     const result = await run({ issues: [{ number: 554, labels: ['ready', 'blocked'] }] });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.failed).toBeNull();
     expect(result.log.join('\n')).toContain('Nothing assigned');
   });
@@ -2096,7 +2320,7 @@ describe('running the assign action end to end', () => {
         { number: 555, labels: ['ready'] },
       ],
     });
-    expect(result.outputs.issue).toBe('555');
+    expect(result.outputs.issues).toBe('555');
     expect(result.log.join('\n')).toContain('#610');
   });
 
@@ -2110,14 +2334,14 @@ describe('running the assign action end to end', () => {
       ],
       unreadable: [554],
     });
-    expect(result.outputs.issue).toBe('555');
+    expect(result.outputs.issues).toBe('555');
     expect(result.failed).toBeNull();
   });
 
   it('fails loudly on an unrecognised agent rather than picking one', async () => {
     const result = await run({ issues: [], env: { AGENTIC_AGENT: 'copilot' } });
     expect(result.failed).toContain('AGENTIC_AGENT');
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
   });
 
   // The whole point of the change: a run that ends `blocked` releases the queue
@@ -2132,7 +2356,7 @@ describe('running the assign action end to end', () => {
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-546' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('550');
+    expect(result.outputs.issues).toBe('550');
     expect(result.outputs.halted).toBe('false');
     // `blocked` means the run is over, so the two labels cannot both stand.
     expect(result.unlabelled).toContainEqual({ issue: 547, label: 'in-progress' });
@@ -2151,7 +2375,7 @@ describe('running the assign action end to end', () => {
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-546' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.labelled).toEqual([]);
     expect(result.log.join('\n')).toContain('#548');
   });
@@ -2167,7 +2391,7 @@ describe('running the assign action end to end', () => {
       events: { 900: [{ label: 'blocked', at: NOW }] },
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '900' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.log.join('\n')).toContain('never carried');
   });
 
@@ -2189,7 +2413,7 @@ describe('running the assign action end to end', () => {
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-540' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.outputs.halted).toBe('true');
     expect(result.comments.at(-1)?.body).toContain('Pipeline halted');
     // The one state the loop cannot leave on its own has to name its way out.
@@ -2243,7 +2467,7 @@ describe('running the assign action end to end', () => {
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-546' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('550');
+    expect(result.outputs.issues).toBe('550');
     expect(result.outputs.halted).toBe('false');
   });
 
@@ -2261,7 +2485,7 @@ describe('running the assign action end to end', () => {
     expect((await run(scenario)).outputs.halted).toBe('true');
 
     scenario.env!.BLOCKED_CHAIN_LIMIT = '4';
-    expect((await run(scenario)).outputs.issue).toBe('550');
+    expect((await run(scenario)).outputs.issues).toBe('550');
   });
 
   // Reading an unknown state as "safe to chain" is the one thing this step must
@@ -2272,7 +2496,7 @@ describe('running the assign action end to end', () => {
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '999' },
     });
     expect(result.failed).toContain('#999');
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
   });
 
   it('stops when the blocked label was already removed', async () => {
@@ -2284,7 +2508,7 @@ describe('running the assign action end to end', () => {
       events: blockedRun(547, NOW - 60_000),
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.log.join('\n')).toContain('no longer carries');
   });
 });

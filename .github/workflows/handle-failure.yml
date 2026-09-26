@@ -40,7 +40,7 @@ jobs:
       group: agentic-assignment
       cancel-in-progress: false
     outputs:
-      issue: ${{ steps.assign.outputs.issue }}
+      issues: ${{ steps.assign.outputs.issues }}
       mention: ${{ steps.assign.outputs.mention }}
       halted: ${{ steps.assign.outputs.halted }}
     steps:
@@ -71,6 +71,7 @@ jobs:
           guard: ${{ github.event.label.name == 'paused' && 'after_paused_run' || 'after_blocked_run' }}
           completed_issue: ${{ github.event.issue.number }}
           blocked_chain_limit: ${{ vars.AGENTIC_BLOCKED_CHAIN_LIMIT }}
+          max_parallel: ${{ vars.AGENTIC_MAX_PARALLEL_RUNS }}
 
   notify:
     if: always() && (github.event.label.name == 'blocked' || github.event.label.name == 'paused')
@@ -84,7 +85,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           AGENTIC_AGENT: ${{ vars.AGENTIC_AGENT }}
-          CHAINED_ISSUE: ${{ needs.chain.outputs.issue }}
+          CHAINED_ISSUES: ${{ needs.chain.outputs.issues }}
           CHAIN_HALTED: ${{ needs.chain.outputs.halted }}
           CHAIN_RESULT: ${{ needs.chain.result }}
           AUTO_ASSIGN: ${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}
@@ -94,7 +95,7 @@ jobs:
           script: |
             const raw = (process.env.AGENTIC_AGENT || '').trim().replace(/^@/, '').toLowerCase();
             const agent = raw === 'claude' ? 'Claude' : 'OpenCode';
-            const chained = process.env.CHAINED_ISSUE || '';
+            const chained = (process.env.CHAINED_ISSUES || '').split(/\s+/).filter(Boolean);
             const halted = process.env.CHAIN_HALTED === 'true';
             const autoAssign = process.env.AUTO_ASSIGN === 'true';
             const paused = process.env.HALT_LABEL === 'paused';
@@ -106,13 +107,13 @@ jobs:
             // from a queue that has actually stalled.
             const queue = halted
               ? '⛔ **The queue is parked.** Too many runs in a row have halted without merging since the last pipeline merge, so the chain stopped rather than working through the backlog. See the cascade-brake comment above.'
-              : chained
-                ? `➡️ **The pipeline has moved on to #${chained}.** This issue is not holding the queue.`
+              : chained.length > 0
+                ? `➡️ **The pipeline has moved on to ${chained.map((n) => `#${n}`).join(', ')}.** This issue is not holding the queue.`
                 : !autoAssign
                   ? '💤 **Auto-assign is off** (`AGENTIC_AUTO_ASSIGN_ENABLED`), so nothing was chained.'
                   : process.env.CHAIN_RESULT !== 'success'
                     ? `⚠️ **The chain step did not complete** (\`${process.env.CHAIN_RESULT}\`), so nothing was assigned and the queue state is unknown. Check this workflow run.`
-                    : '💤 **Nothing else was assignable**, so the queue is idle. It resumes on the next merged pipeline PR, on the next run that halts, or on a manual dispatch.';
+                    : '💤 **Nothing more could start.** No `ready` issue was assignable, or every one that was waits on a run already in flight (`AGENTIC_MAX_PARALLEL_RUNS`, scope labels). The queue resumes on the next merged pipeline PR, on the next run that halts, or on a manual dispatch.';
 
             // A pause is not a failure and must not read as one. Nothing is
             // being asked of a human here: the issue is already back at `ready`

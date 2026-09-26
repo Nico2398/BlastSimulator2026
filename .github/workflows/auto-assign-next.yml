@@ -114,13 +114,14 @@ jobs:
           # run since it was written, with the PR number parsed away.
           reason: "auto-assigned from merged PR #${{ github.event.pull_request.number }}"
           completed_issue: ${{ steps.close-issue.outputs.issue }}
+          max_parallel: ${{ vars.AGENTIC_MAX_PARALLEL_RUNS }}
 
       - name: Report auto-assign state
         run: |
           if [ "${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}" != "true" ]; then
             echo 'Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not "true").'
-          elif [ -n "${{ steps.assign.outputs.issue }}" ]; then
-            echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
+          elif [ -n "${{ steps.assign.outputs.issues }}" ]; then
+            echo "Assigned issue(s) ${{ steps.assign.outputs.issues }} to ${{ steps.assign.outputs.mention }}."
           else
             echo "Nothing assigned — see the assign step for the reason."
           fi

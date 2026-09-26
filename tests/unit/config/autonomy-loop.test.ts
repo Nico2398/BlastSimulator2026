@@ -141,6 +141,36 @@ describe('entry points into the assignment queue', () => {
   );
 });
 
+// Every path into the queue fills the free slots under the same limit. An entry
+// point that forgot the variable would still be safe — it falls back to one —
+// but it would quietly assign less than the others, and a chain that sometimes
+// fills two slots and sometimes one is a limit nobody configured.
+describe('every entry point assigns under the configured parallel limit', () => {
+  it.each(ASSIGNING_WORKFLOWS)('%s passes AGENTIC_MAX_PARALLEL_RUNS to the assigner', (name) => {
+    const text = workflow(name);
+    const block = text.slice(text.indexOf(ASSIGN_ACTION), text.indexOf(ASSIGN_ACTION) + 900);
+    expect(block).toContain('max_parallel: ${{ vars.AGENTIC_MAX_PARALLEL_RUNS }}');
+  });
+
+  it.each(ASSIGNING_WORKFLOWS)('%s reads every issue the assigner picked', (name) => {
+    const text = workflow(name);
+    expect(text).not.toMatch(/steps\.assign\.outputs\.issue\b(?!s)/);
+    expect(text).toContain('outputs.issues');
+  });
+
+  // A scope label a human picks from the UI has to exist, and has to name a
+  // scope the assigner knows — so intake reads the one taxonomy rather than
+  // carrying its own list of names.
+  it('keeps every scope label defined, from the taxonomy the assigner reads', () => {
+    const intake = workflow('agentic-intake.yml');
+    expect(intake).toContain('.github/scripts/assignability.cjs');
+    expect(intake).toMatch(/for \(const \[scope, description\] of Object\.entries\(SCOPES\)\)/);
+    expect(intake).toContain('ensureLabel(`${SCOPE_PREFIX}${scope}`');
+    expect(intake.slice(0, intake.indexOf('Normalise lifecycle labels'))).toContain('actions/checkout@v4');
+    expect(intake).toMatch(/permissions:\s*\n\s*issues: write\s*\n\s*contents: read/);
+  });
+});
+
 describe('assignment tokens', () => {
   // A comment posted with GITHUB_TOKEN triggers no workflow, so the assignment
   // comment reaches the agent's mention and starts nothing at all.

@@ -1,30 +1,36 @@
 name: "Pipeline: intake a filed issue"
 
-# Filing an issue records work; it never starts a run. Exactly three mechanisms
-# start an autonomous session, and each reacts to a run ending or a human asking:
+# Filing an issue records work; it never starts a run. Four mechanisms start an
+# autonomous session, and each reacts to a run ending or a human asking —
+# `agentic-autonomous-pipeline`'s github-loop reference lists them. None of them
+# is an issue being opened.
 #
-#   - `agentic-trigger.yml` — a human dispatching the workflow by hand.
-#   - `auto-assign-next.yml` — a merged pipeline pull request chaining to the
-#     next `ready` issue.
-#   - `handle-failure.yml` — a run that ended `blocked` chaining past itself,
-#     bounded by the cascade brake in `agentic-assign`.
-#
-# This workflow assigns nothing. It exists only to keep the lifecycle labels
-# usable by hand: it makes sure the label definitions exist so a human can pick
-# them from the GitHub UI, and it drops a stale `done` from a reopened issue.
-# An issue carrying `ready` waits in the queue until one of the two mechanisms
-# above reaches it — filing it, labelling it, or reopening it does not.
+# This workflow assigns nothing. It exists only to keep the labels usable by
+# hand: it makes sure the lifecycle and scope label definitions exist so a human
+# can pick them from the GitHub UI, and it drops a stale `done` from a reopened
+# issue. An issue carrying `ready` waits in the queue until an entry point
+# reaches it — filing it, labelling it, or reopening it does not.
 on:
   issues:
     types: [opened, reopened]
 
 permissions:
   issues: write
+  contents: read
 
 jobs:
   label:
     runs-on: ubuntu-latest
     steps:
+      # The scope taxonomy is read from `assignability.cjs`, the one place that
+      # decides what a scope means, so a label defined here can never name a
+      # scope the assigner does not know.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
       - name: Normalise lifecycle labels
         uses: actions/github-script@v7
         with:
@@ -56,6 +62,16 @@ jobs:
               'fbca04',
               'A run stopped here on a dependency; the queue returns to it when that dependency lands'
             );
+
+            // Scope labels say which area an issue's diff stays inside, and
+            // `AGENTIC_MAX_PARALLEL_RUNS` above 1 only runs issues side by side
+            // when their scopes differ. Defined, never applied: an issue with
+            // no scope label runs alone, which is safe, and a wrong one costs a
+            // conflict round, so labelling stays a deliberate act.
+            const { SCOPES, SCOPE_PREFIX } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/assignability.cjs`);
+            for (const [scope, description] of Object.entries(SCOPES)) {
+              await ensureLabel(`${SCOPE_PREFIX}${scope}`, 'c5def5', description);
+            }
 
             // Reopening is a human saying the work is not finished after all.
             // `done` no longer reflects reality, but re-entering the queue is
