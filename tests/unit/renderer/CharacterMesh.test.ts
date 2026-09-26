@@ -487,4 +487,40 @@ describe('CharacterMesh — model animation (real assets)', () => {
     expect(cm.getGroup(1)!.children).toEqual([inst.root]);
     cm.dispose();
   });
+
+  describe('walk trail (#1199)', () => {
+    it('follows the recorded route round a corner rather than the straight chord', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      const group = cm.getGroup(1)!;
+
+      emp.x = 4;
+      emp.z = 4;
+      emp.walkTrail = { points: [{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 4 }], relocated: false };
+      cm.update([emp], MOVE_TWEEN_DURATION_S / 2);
+
+      expect(group.position.x).toBeCloseTo(4);
+      expect(group.position.z).toBeCloseTo(0);
+      cm.dispose();
+    });
+
+    it('a relocation that is not a walk snaps to the new position', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      const group = cm.getGroup(1)!;
+
+      emp.x = 3;
+      emp.z = 2;
+      emp.walkTrail = { points: [{ x: 3, z: 2 }], relocated: false };
+      cm.update([emp], 0.01);
+
+      expect(group.position.x).toBe(3);
+      expect(group.position.z).toBe(2);
+      cm.dispose();
+    });
+  });
 });

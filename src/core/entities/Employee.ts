@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Employee system
 // Workers with roles, morale, union status, and injury tracking.
 
+import type { MovementTrail } from './MovementTrail.js';
 import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
@@ -188,6 +189,12 @@ export interface Employee {
    */
   moveHistoryX?: number | null;
   moveHistoryZ?: number | null;
+  /**
+   * Cells walked or driven since the current tick batch opened (#1199) —
+   * read by the renderer to draw the route actually taken. Transient: never
+   * saved, absent until Locomotion.ts's `openMovementTrails` runs.
+   */
+  walkTrail?: MovementTrail;
   /**
    * Grid cell another vehicle was parked on when this employee's current
    * drive leg last had to detour around it (#1166), or null when not

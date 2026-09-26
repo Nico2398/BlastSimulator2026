@@ -104,7 +104,11 @@ export class VehicleMesh {
       const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles, employees);
       const fromX = entry.group.position.x;
       const fromZ = entry.group.position.z;
-      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt);
+      // Follow the driven route (#1199) only while the vehicle renders at its
+      // own cell — a waiting-queue offset is a render-only shift, not a drive.
+      const onOwnCell = targetX === v.x && targetZ === v.z;
+      const trail = onOwnCell ? v.walkTrail : undefined;
+      const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt, trail);
       const status = computeVehicleStatus(v, vehicleState, resolveVehicleDriver(v, employees));
       this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt, status.kind);
       applyStateIndicator(entry.group, status.kind);

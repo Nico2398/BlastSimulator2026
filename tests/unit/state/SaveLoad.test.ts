@@ -1581,3 +1581,21 @@ describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1
     expect('reservedForActionId' in restoredVehicle).toBe(false);
   });
 });
+
+describe('serialize — walk trail is transient (#1199)', () => {
+  it('a save taken mid-walk carries no trail', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(42));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0, 1);
+    const trail = { points: [{ x: 0, z: 0 }, { x: 1, z: 0 }], relocated: false };
+    employee.walkTrail = trail;
+    vehicle.walkTrail = { ...trail, points: [...trail.points] };
+
+    const json = serialize(state);
+    expect(json).not.toContain('walkTrail');
+
+    const restored = deserialize(json);
+    expect(restored.employees.employees[0]!.walkTrail).toBeUndefined();
+    expect(restored.vehicles.vehicles[0]!.walkTrail).toBeUndefined();
+  });
+});
