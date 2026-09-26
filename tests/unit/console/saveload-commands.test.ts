@@ -198,12 +198,12 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
   // is touched, so a malformed voxels payload — as opposed to a genuine
   // version mismatch — must fail loadCommand cleanly with the distinct
   // world.terrain_save_corrupt copy, leaving ctx entirely untouched.
-  it('refuses to load a save whose voxels payload is malformed (gen.sizeY absurd), leaving ctx.state/ctx.grid/ctx.playableArea unchanged', () => {
+  it('refuses to load a save whose voxels payload is malformed (gen.datum absurd), leaving ctx.state/ctx.grid/ctx.playableArea unchanged', () => {
     const buildCtx = makeCtx();
     saveCommand(buildCtx, [], { slot: 'corrupt-dimension' });
     loadCommand(buildCtx, [], { slot: 'corrupt-dimension' }); // materializes ctx.state.world.voxels with a real gen
     expect(buildCtx.state!.world!.voxels).toBeDefined();
-    buildCtx.state!.world!.voxels!.gen.sizeY = 1e9;
+    buildCtx.state!.world!.voxels!.gen.datum = 1e9;
     buildCtx.grid = null; // keep the tampered payload — saveCommand only re-embeds voxels when ctx.grid is set
     saveCommand(buildCtx, [], { slot: 'corrupt-dimension' });
 
@@ -265,7 +265,7 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
     const corruptCtx = makeCtx();
     saveCommand(corruptCtx, [], { slot: 'msg-corrupt' });
     loadCommand(corruptCtx, [], { slot: 'msg-corrupt' });
-    corruptCtx.state!.world!.voxels!.gen.sizeY = 1e9;
+    corruptCtx.state!.world!.voxels!.gen.datum = 1e9;
     corruptCtx.grid = null;
     saveCommand(corruptCtx, [], { slot: 'msg-corrupt' });
     const corruptResult = loadCommand(makeCtx(), [], { slot: 'msg-corrupt' });

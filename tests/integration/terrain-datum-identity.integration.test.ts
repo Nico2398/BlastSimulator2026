@@ -49,7 +49,7 @@ const CASES: Case[] = [
       sizeX: 32, sizeZ: 32, datum: datumFromSizeY(20),
       seed: 42, climateBias: [0.7, -0.6],
     },
-    expectedHash: 'c73380071941a68ce3b5f1f06092e1aa65fcc69df09773e793ba2d418b6d5750',
+    expectedHash: '8a0c35f273975c1ceb2e861ee483d6a7c728e731ab2c79ef1c02acb2d1edf2e7',
   },
   {
     name: 'dusty_hollow',
@@ -57,7 +57,7 @@ const CASES: Case[] = [
       sizeX: 96, sizeZ: 96, datum: datumFromSizeY(40),
       seed: 1138, climateBias: [0.7, -0.6],
     },
-    expectedHash: 'ce507d57d3a265a404ec824a0444626a431dfa734581fa2e7e4007929a7d0e2d',
+    expectedHash: '577a77e6ac072f136844c9aaebae5063a30b3ec417e9915a92ff85fdb71dfbb1',
   },
   {
     name: 'grumpstone_ridge',
@@ -65,7 +65,7 @@ const CASES: Case[] = [
       sizeX: 128, sizeZ: 128, datum: datumFromSizeY(56),
       seed: 2277, climateBias: [-0.7, 0.1],
     },
-    expectedHash: '39b3f768019324e88d3cfddcce1c87fcc1ed5ad51adf7831aed9731985ec50fe',
+    expectedHash: '433c6c26194101d72b5a8ed7826d1db91faa83cbacca995dcd9fad3021e64a5d',
   },
   {
     name: 'treranium_depths',
@@ -73,7 +73,7 @@ const CASES: Case[] = [
       sizeX: 160, sizeZ: 160, datum: datumFromSizeY(64),
       seed: 3666, climateBias: [0.6, 0.7], mixedRockHardness: true,
     },
-    expectedHash: 'cfb72a9269f1032837b8b123aec79df0f2339e539d7070c67f9b7e12b624f351',
+    expectedHash: '064648ae9b121c581481bf579eccd851ad6bfca198e431318e7e999f1dddbec2',
   },
   {
     name: 'sandbox_default',
@@ -81,7 +81,7 @@ const CASES: Case[] = [
       sizeX: 64, sizeZ: 64, datum: datumFromSizeY(32),
       seed: 12345, climateBias: [0.7, -0.6],
     },
-    expectedHash: '17af763b7dca7620e4f6d93dba8b8265c90cebe18cfc320aca015fa66151ee70',
+    expectedHash: '877802432f9ae73a17fe762d60ac2d047202413e8df0d1fac1e406d6d23494f6',
   },
   {
     name: 'new_game_24',
@@ -89,7 +89,7 @@ const CASES: Case[] = [
       sizeX: 24, sizeZ: 24, datum: datumFromSizeY(24),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults, biome desert_badlands
     },
-    expectedHash: '63120b3f31a7ea53e2ba5ccda54a15fc9a754b19dc0792c04b0356640b69673b',
+    expectedHash: '66b3726c78503c56c5b0dd1c8ac82582322b0a71b1b48813b11f8607da540054',
   },
   {
     name: 'new_game_32',
@@ -97,7 +97,7 @@ const CASES: Case[] = [
       sizeX: 32, sizeZ: 32, datum: datumFromSizeY(32),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults
     },
-    expectedHash: '7edd255afd6cecdfd190963881e03f3e6dbef5a54c9876e89a8b51c2fa59bb1e',
+    expectedHash: 'b38f54f51593dea36f8b09ae6f075308902f4fee2c89b78001e6f244cc3567c0',
   },
   {
     name: 'new_game_48',
@@ -105,7 +105,7 @@ const CASES: Case[] = [
       sizeX: 48, sizeZ: 48, datum: datumFromSizeY(48),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults
     },
-    expectedHash: 'f9beba473e7ec37c1394d9679e4f47693a24a9a9457e9d8888007cb7545b0227',
+    expectedHash: '5133807d1bc7b1a44ed90e8f4096f2f896f58f4e364514963ecb4eb7b3d684d9',
   },
   {
     name: 'new_game_64',
@@ -113,7 +113,7 @@ const CASES: Case[] = [
       sizeX: 64, sizeZ: 64, datum: datumFromSizeY(64),
       seed: 42, climateBias: [0.7, -0.6], // new_game defaults
     },
-    expectedHash: 'c708fd6c6a9395bb2947be246797794a7afa8002350217cb0abf73ba81232057',
+    expectedHash: 'ae083e742dfb6f91b944e49cd94f4a32630753100fa84b8e2be96d6aa7411ad3',
   },
 ];
 

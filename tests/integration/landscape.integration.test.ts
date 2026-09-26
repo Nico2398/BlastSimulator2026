@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { createRunner, runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';
-import { ensureLandscape } from '../../src/console/commands/world.js';
-import { getBiome } from '../../src/core/world/BiomeCatalog.js';
+import { ensureLandscape, terrainConfigOf } from '../../src/console/commands/world.js';
 import { computeVoxelColumnSurfaceHeight } from '../../src/core/world/VoxelGrid.js';
 import { chunkSpanAt, type LandscapeChunkId, type LazyLandscapeMap } from '../../src/core/world/LandscapeMap.js';
 import type { Rect } from '../../src/core/world/WorldGen.js';
@@ -136,9 +135,8 @@ describe('Landscape/playable seam on a real level (#907)', () => {
     const ctx = engine.ctx;
     const grid = ctx.grid!;
     const state = ctx.state!;
-    const biome = getBiome(state.mineType)!;
-    const { sizeX, sizeY, sizeZ } = state.world!;
-    const handle = ensureLandscape(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ })!;
+    const config = terrainConfigOf(state)!;
+    const handle = ensureLandscape(ctx, config)!;
 
     const playable = new TerrainMesh(new THREE.Scene(), grid, state.mineType);
     playable.setEdgeHeightSampler((x, z) => handle.sampleColumn(x, z).height);
