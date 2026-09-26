@@ -443,7 +443,7 @@ export interface WorldState {
   /** North edge of the bounding box. 0 for a site that has never grown north. */
   minZ: number;
   /**
-   * The level's original width/depth — the generation datum every chunk,
+   * The level's original width/depth — the footprint baseline every chunk,
    * however late it is claimed, is generated against (#473 D3). Unlike
    * `sizeX`/`sizeZ` these never change.
    */

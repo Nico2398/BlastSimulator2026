@@ -23,10 +23,11 @@ export interface LevelDef {
   climateBias: readonly [number, number];
   /** Deterministic terrain seed. */
   terrainSeed: number;
-  /** Grid dimensions. */
+  /** Grid width. See `gridZ` below for depth. */
   gridX: number;
   /** The generation datum (voxel Y the site centre's surface lands on), authored directly per level (#1191). */
   datum: number;
+  /** Grid depth. See `gridX` above for width. */
   gridZ: number;
   /** Starting cash in dollars. */
   startingCash: number;

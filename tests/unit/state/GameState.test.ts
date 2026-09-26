@@ -69,7 +69,7 @@ describe('createWorldState (#1191)', () => {
     expect(world.gridReady).toBe(true);
   });
 
-  it('seeds baseSizeX/baseSizeZ from the initial sizeX/sizeZ (the generation datum for later expansion)', () => {
+  it('seeds baseSizeX/baseSizeZ from the initial sizeX/sizeZ (the footprint baseline for later expansion)', () => {
     const world = createWorldState(48, 26, 40, false);
     expect(world.baseSizeX).toBe(48);
     expect(world.baseSizeZ).toBe(40);
