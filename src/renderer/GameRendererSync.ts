@@ -45,7 +45,7 @@ export interface SyncDeps {
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
   pictograms: EmployeePictograms | null;
-  /** Optional: absent from existing GameRenderer.ts call sites until #1205's wiring lands there. */
+  /** "<inside>/<capacity>" labels above people-holding buildings; optional since not every SyncDeps caller (e.g. tests) builds one (#1205). */
   buildingOccupancyLabels?: BuildingOccupancyLabels | null;
   skybox: SkyboxWeather | null;
   clouds: CloudLayer | null;

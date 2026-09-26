@@ -71,16 +71,16 @@ function buildLabelMaterial(): Pick<OccupancyLabel, 'material' | 'canvas' | 'tex
   };
 }
 
-/** Redraw `canvas`'s background pill + "<inside>/<capacity>" text, styled distinctly when `full`. */
-function drawLabel(canvas: HTMLCanvasElement, texture: THREE.CanvasTexture, text: string, full: boolean): void {
+/** Redraw `canvas`'s background pill + "<inside>/<capacity>" text, styled distinctly when `isFull`. */
+function drawLabel(canvas: HTMLCanvasElement, texture: THREE.CanvasTexture, text: string, isFull: boolean): void {
   const ctx = canvas.getContext('2d');
   if (ctx === null) return; // Defensive: buildLabelMaterial() already ensured a real context before handing out this canvas.
   const w = canvas.width;
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = full ? FULL_BG_COLOR : NORMAL_BG_COLOR;
+  ctx.fillStyle = isFull ? FULL_BG_COLOR : NORMAL_BG_COLOR;
   ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = full ? FULL_TEXT_COLOR : NORMAL_TEXT_COLOR;
+  ctx.fillStyle = isFull ? FULL_TEXT_COLOR : NORMAL_TEXT_COLOR;
   ctx.font = `bold ${Math.round(h * 0.6)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -89,8 +89,8 @@ function drawLabel(canvas: HTMLCanvasElement, texture: THREE.CanvasTexture, text
 }
 
 /** Recolor the no-canvas flat-color fallback material to match full/normal state. */
-function recolorFallback(material: THREE.MeshBasicMaterial, full: boolean): void {
-  material.color.set(full ? FULL_FALLBACK_COLOR : NORMAL_FALLBACK_COLOR);
+function recolorFallback(material: THREE.MeshBasicMaterial, isFull: boolean): void {
+  material.color.set(isFull ? FULL_FALLBACK_COLOR : NORMAL_FALLBACK_COLOR);
 }
 
 /**
@@ -163,14 +163,14 @@ export class BuildingOccupancyLabels {
       if (label.inside !== inside || label.capacity !== capacity) {
         label.inside = inside;
         label.capacity = capacity;
-        const full = inside === capacity;
+        const isFull = inside === capacity;
         const text = t('building.occupancy', { inside, capacity });
         label.mesh.userData['occupancyText'] = text;
-        label.mesh.userData['full'] = full;
+        label.mesh.userData['isFull'] = isFull;
         if (label.canvas && label.texture) {
-          drawLabel(label.canvas, label.texture, text, full);
+          drawLabel(label.canvas, label.texture, text, isFull);
         } else {
-          recolorFallback(label.material, full);
+          recolorFallback(label.material, isFull);
         }
       }
     }

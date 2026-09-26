@@ -140,11 +140,11 @@ describe('BuildingOccupancyLabels', () => {
     const building = makeBuilding({ occupantIds: [1, 2] }); // 2 of 4 — not full
 
     labels.sync([building], getPositionAt(POS_A), getRoofYAt(2));
-    expect(labelFor(scene, building.id)!.userData['full']).toBe(false);
+    expect(labelFor(scene, building.id)!.userData['isFull']).toBe(false);
 
     building.occupantIds = [1, 2, 3, 4]; // 4 of 4 — full
     labels.sync([building], getPositionAt(POS_A), getRoofYAt(2));
-    expect(labelFor(scene, building.id)!.userData['full']).toBe(true);
+    expect(labelFor(scene, building.id)!.userData['isFull']).toBe(true);
 
     labels.dispose();
   });
@@ -159,9 +159,9 @@ describe('BuildingOccupancyLabels', () => {
 
     const fullLabel = labelFor(scene, full.id)!;
     const partialLabel = labelFor(scene, partial.id)!;
-    expect(fullLabel.userData['full']).toBe(true);
-    expect(partialLabel.userData['full']).toBe(false);
-    expect(fullLabel.userData['full']).not.toBe(partialLabel.userData['full']);
+    expect(fullLabel.userData['isFull']).toBe(true);
+    expect(partialLabel.userData['isFull']).toBe(false);
+    expect(fullLabel.userData['isFull']).not.toBe(partialLabel.userData['isFull']);
 
     labels.dispose();
   });
