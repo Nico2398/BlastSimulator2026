@@ -84,6 +84,43 @@ describe('HoverTag', () => {
     expect(root.textContent).toContain('Driller');
   });
 
+  it('shows the occupancy count for a people-holding building with some occupants (#1205)', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'driving_center', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; occupantIds: number[] } };
+    building.occupantIds = [1, 2];
+    const hover: PickResult = { entity: { kind: 'building', id: building.id, point: new THREE.Vector3(), distance: 1 }, terrain: null };
+
+    tag.update(hover, state);
+
+    // driving_center tier 1 has a 4-person capacity (getBuildingPeopleCapacity).
+    expect(root.textContent).toContain('2/4');
+  });
+
+  it('shows "0/<capacity>" for a people-holding building with zero occupants — the count is always shown, never hidden at zero (#1205)', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'driving_center', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; occupantIds: number[] } };
+    const hover: PickResult = { entity: { kind: 'building', id: building.id, point: new THREE.Vector3(), distance: 1 }, terrain: null };
+
+    tag.update(hover, state);
+
+    expect(root.textContent).toContain('0/4');
+  });
+
+  it('shows no occupancy segment for a building with no people capacity (a warehouse) — existing HP-only text unchanged (#1205)', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'freight_warehouse', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number; hp: number } };
+    const hover: PickResult = { entity: { kind: 'building', id: building.id, point: new THREE.Vector3(), distance: 1 }, terrain: null };
+
+    tag.update(hover, state);
+
+    expect(root.textContent).toContain(String(Math.round(building.hp)));
+    // No "<n>/<n>" occupancy segment is ever rendered for a capacity-0 type.
+    expect(root.textContent).not.toContain('/');
+  });
+
   it('hides when the hovered entity no longer exists in state', () => {
     const { tag, root } = makeTag();
     const state = makeState();

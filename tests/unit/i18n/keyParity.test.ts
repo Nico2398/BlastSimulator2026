@@ -380,8 +380,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // occupancy refusal and UI strings — employees.train_school_full,
     // ui.crew.training_walking, ui.crew.training_school_full and
     // ui.crew.task_training — both locales.
+    // Baseline is now 3526 (up from 3524): #1205 adds building.occupancy
+    // (the "<inside>/<capacity>" billboard label and HoverTag/SelectionBar
+    // text) and shell.selection.building_occupants (the SelectionBar's
+    // "Inside: <names>" occupant listing) — both locales translated.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3524);
+    expect(Object.keys(en).length).toBe(3526);
   });
 });
 
