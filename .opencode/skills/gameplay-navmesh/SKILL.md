@@ -75,7 +75,7 @@ NavGrid is **incrementally updated** — full rebuild too expensive.
 | Trigger | Region Updated |
 |---------|---------------|
 | Blast completes | All cells in blast AABB + 2-cell margin |
-| Building placed or demolished | Building footprint cells |
+| Building ordered, placed, upgraded, moved, cancelled, or demolished | Building footprint cells |
 | Vehicle parks or departs | Single cell |
 | Drill hole added | Single cell |
 | Ramp built | 1×4 footprint + adjacent cells |

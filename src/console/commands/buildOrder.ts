@@ -13,7 +13,6 @@ import {
   checkFootprintPlacement,
   type BuildingType,
   type BuildingTier,
-  type FootprintOccupant,
 } from '../../core/entities/Building.js';
 import type { PlannedBuilding } from '../../core/state/GameState.js';
 import { addExpense } from '../../core/economy/Finance.js';
@@ -21,9 +20,11 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
 import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../../core/config/balance.js';
+import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
+import { findBuildingApproachCell } from '../../core/nav/BuildingApproach.js';
 
 import { claimForAction, cellsInRect } from './siteExpansion.js';
-import { siteBounds } from './buildingHelpers.js';
+import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
 
 /** Payload carried by a queued `place_building` PendingAction (#556). */
 export interface PlaceBuildingActionPayload {
@@ -71,10 +72,7 @@ export function orderBuildingCommand(
   if (!claim.ok) return { success: false, output: claim.output! };
 
   const bounds = siteBounds(ctx);
-  const occupants: FootprintOccupant[] = [
-    ...state.buildings.buildings.map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
-    ...state.plannedBuildings.map(pb => ({ type: pb.type, tier: pb.tier, x: pb.x, z: pb.z })),
-  ];
+  const occupants = buildingFootprintOccupants(state);
   const check = checkFootprintPlacement(
     occupants, type, x, z, tier, bounds.width, bounds.depth, bounds.originX, bounds.originZ, ctx.grid ?? undefined,
   );
@@ -84,27 +82,8 @@ export function orderBuildingCommand(
   addExpense(state.finances, def.constructionCost, 'construction', `Build ${type} T${tier}`, state.tickCount);
 
   const buildingOrderId = state.nextPlannedBuildingId++;
-  const targetY = ctx.grid ? getSurfaceY(ctx.grid, x, z) : 0;
   const durationTicks = Math.ceil(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[tier]);
   const actionId = state.nextPendingActionId++;
-
-  // skipQualificationCheck (#556, mirrors dig_ramp_segment/drill_hole/
-  // charge_hole's #555/#553/#554 dispatch): a build order must queue
-  // silently even when the roster is empty — construction needs no skill
-  // and no vehicle (requiredSkill/requiredVehicleRole both null).
-  dispatchPendingAction(state, {
-    id: actionId,
-    type: 'place_building',
-    requiredSkill: null,
-    requiredVehicleRole: null,
-    targetX: x,
-    targetZ: z,
-    targetY,
-    payload: {
-      buildingOrderId, cost: def.constructionCost, footprint: def.footprint, durationTicks,
-    } satisfies PlaceBuildingActionPayload,
-    targetEmployeeId: null,
-  }, { skipQualificationCheck: true });
 
   // Claim the finished building's id now, not when the site completes: sites are
   // built in parallel and land in whatever order the crew reaches them, so
@@ -115,6 +94,40 @@ export function orderBuildingCommand(
     type, tier, x, z, actionId, cost: def.constructionCost,
   };
   state.plannedBuildings.push(plannedBuilding);
+
+  // The footprint blocks routing from the instant it is ordered (#1200),
+  // synchronously — before any tick runs — same as a finished building's
+  // footprint. Anyone caught standing on it is relocated off it first, so
+  // the approach-cell search below sees the already-blocked footprint.
+  emitFootprintOccupancyChanged(ctx, x, z, footprintX, footprintZ);
+  relocateFootprintOccupants(state, makeFootprintRegion(x, z, footprintX, footprintZ));
+
+  // The builder's own walk target is the footprint's approach-ring cell,
+  // not the raw order origin (#1200) — the origin cell is now blocked, so
+  // dispatching straight at it would send the crew to an impassable tile.
+  // The building itself is still constructed and finalized at the order's
+  // own (x, z) regardless of which ring cell this is (TaskCompletionEffects.ts
+  // keys off PlannedBuilding.x/z, not this action's target).
+  const approach = ctx.grid ? findBuildingApproachCell(state.navGrid, { x, z }, def, x, z) : { x, z };
+  const targetY = ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0;
+
+  // skipQualificationCheck (#556, mirrors dig_ramp_segment/drill_hole/
+  // charge_hole's #555/#553/#554 dispatch): a build order must queue
+  // silently even when the roster is empty — construction needs no skill
+  // and no vehicle (requiredSkill/requiredVehicleRole both null).
+  dispatchPendingAction(state, {
+    id: actionId,
+    type: 'place_building',
+    requiredSkill: null,
+    requiredVehicleRole: null,
+    targetX: approach.x,
+    targetZ: approach.z,
+    targetY,
+    payload: {
+      buildingOrderId, cost: def.constructionCost, footprint: def.footprint, durationTicks,
+    } satisfies PlaceBuildingActionPayload,
+    targetEmployeeId: null,
+  }, { skipQualificationCheck: true });
 
   return {
     success: true,

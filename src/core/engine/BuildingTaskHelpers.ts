@@ -15,6 +15,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { levelGroundRect } from '../mining/LevelGround.js';
 import { DEFAULT_GRID_SIZE } from '../config/balance.js';
+import { NavGrid } from '../nav/NavGrid.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
 export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
@@ -60,6 +61,19 @@ export function refreshLogisticsCapacity(state: GameState): void {
  * newly blocks routing: ordering, completing, upgrading or moving a
  * building (#1200).
  */
-export function relocateFootprintOccupants(_state: GameState, _region: BlastRegion): void {
-  throw new Error('not implemented');
+export function relocateFootprintOccupants(state: GameState, region: BlastRegion): void {
+  if (!state.navGrid) return;
+  for (const emp of state.employees.employees) {
+    if (!emp.alive) continue;
+    const cx = Math.round(emp.x);
+    const cz = Math.round(emp.z);
+    if (cx < region.minX || cx > region.maxX || cz < region.minZ || cz > region.maxZ) continue;
+    // avoidOccupancy: true — same fragment-/vehicle-occupancy rule foot
+    // travel obeys (#954) gates the cell relocated onto, so this sweep
+    // never "rescues" someone from a newly-blocked footprint straight into
+    // another occupied cell. See NavGrid.findNearestReachableCell's doc.
+    const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, emp.x, emp.z, true);
+    emp.x = nearest.x;
+    emp.z = nearest.z;
+  }
 }
