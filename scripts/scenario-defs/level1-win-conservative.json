@@ -997,6 +997,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 82,
+          "z": 36
+        },
+        {
           "type": "dragTiles",
           "x1": 82,
           "z1": 36,
@@ -1400,6 +1405,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 70,
+          "z": 24
         },
         {
           "type": "dragTiles",
