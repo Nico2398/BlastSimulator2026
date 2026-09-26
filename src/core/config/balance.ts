@@ -682,14 +682,6 @@ export const STUCK_THRESHOLD = 3;
 export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
 
 /**
- * Deprecated alias for `AGENT_OCCUPANCY_WAIT_TICKS` (#1206 rename — "vehicle"
- * became "agent" once the mechanism generalized to foot agents too). Kept so
- * existing test fixtures compile unchanged; implementer/test-writer migrate
- * callers off this name.
- */
-export const VEHICLE_OCCUPANCY_REROUTE_THRESHOLD = AGENT_OCCUPANCY_WAIT_TICKS;
-
-/**
  * Whether ground-cell occupancy is enforced for every agent, foot or vehicle
  * (#1206) — lands OFF; #1207 turns it on by default. `GameState.agentOccupancyEnabled`
  * reads this as its default, and the `debug occupancy on|off` console command

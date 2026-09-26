@@ -16,7 +16,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
-import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix, parseAgentOccupancyFlag } from './commandUtils.js';
+import { sanitizeFiniteOverride, staffedSuffix, parseStaffedAndOccupancyFlags } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { regionForColumns, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
@@ -417,21 +417,16 @@ export function newGameCommand(
   const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
   const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
 
-  const staffedFlag = parseStaffedFlag(named['staffed']);
-  if (staffedFlag.error) {
-    return { success: false, output: staffedFlag.error };
-  }
-
-  const agentOccupancyFlag = parseAgentOccupancyFlag(named['agent_occupancy']);
-  if (agentOccupancyFlag.error) {
-    return { success: false, output: agentOccupancyFlag.error };
+  const flags = parseStaffedAndOccupancyFlags(named);
+  if (flags.error) {
+    return { success: false, output: flags.error };
   }
 
   ctx.state = createGame({
     seed, mineType,
     ...(startingCash !== undefined ? { startingCash } : {}),
-    ...(staffedFlag.staffed ? { staffed: true } : {}),
-    ...(agentOccupancyFlag.agentOccupancy !== undefined ? { agentOccupancyEnabled: agentOccupancyFlag.agentOccupancy } : {}),
+    ...(flags.staffed ? { staffed: true } : {}),
+    ...(flags.agentOccupancy !== undefined ? { agentOccupancyEnabled: flags.agentOccupancy } : {}),
   });
   const datum = defaultDatumForSize(size);
   ctx.state.world = createWorldState(size, datum, size, true);
@@ -441,7 +436,7 @@ export function newGameCommand(
     success: true,
     output: t('world.new_game_success', {
       size, mineType, seed,
-      staffedSuffix: staffedSuffix(staffedFlag.staffed),
+      staffedSuffix: staffedSuffix(flags.staffed),
     }),
   };
 }

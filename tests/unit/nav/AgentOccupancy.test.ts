@@ -4,10 +4,6 @@
 // isOccupiedByOtherVehicle/nextGridStep/handleOccupancyBlock — vehicle vs.
 // vehicle, immediate next hop only) to every agent, foot or vehicle: one
 // ground cell holds at most one occupant, tracked by this O(1) two-way index.
-//
-// AgentOccupancy.ts is a stub that throws 'not implemented' at this (red)
-// phase — every test below is expected to fail for that reason, not from a
-// fixture bug.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -229,6 +225,29 @@ describe('reconcileAgentOccupancy', () => {
 
     expect(occupancy.holderOf(2, 3)).toBeNull();
     expect(occupancy.cellOfOccupant(emp(gone.id))).toBeNull();
+    // The still-live occupant's own cell is untouched.
+    expect(occupancy.cellOfOccupant(emp(stillHere.id))).toEqual({ x: 9, z: 9 });
+  });
+
+  it('releases a holder that was killed but stays present in state.employees.employees', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: killed } = hireEmployee(state.employees, 'driller', rng, 2, 3);
+    const { employee: stillHere } = hireEmployee(state.employees, 'driller', rng, 9, 9);
+
+    const occupancy = rebuildAgentOccupancy(state);
+    expect(occupancy.cellOfOccupant(emp(killed.id))).toEqual({ x: 2, z: 3 });
+
+    // Killed, not removed — `killEmployee` sets `alive: false` and leaves the
+    // entity in the roster array (Employee.ts), unlike the outright-removal
+    // case above.
+    killEmployee(state.employees, killed.id);
+    expect(state.employees.employees.some(e => e.id === killed.id)).toBe(true);
+
+    reconcileAgentOccupancy(state, occupancy);
+
+    expect(occupancy.holderOf(2, 3)).toBeNull();
+    expect(occupancy.cellOfOccupant(emp(killed.id))).toBeNull();
     // The still-live occupant's own cell is untouched.
     expect(occupancy.cellOfOccupant(emp(stillHere.id))).toEqual({ x: 9, z: 9 });
   });

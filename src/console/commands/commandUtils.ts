@@ -77,3 +77,20 @@ export function parseAgentOccupancyFlag(raw: string | undefined): { agentOccupan
   }
   return { agentOccupancy: parsed, error: null };
 }
+
+/**
+ * Parses `staffed:true|false` and `agent_occupancy:true|false` together —
+ * `new_game` and `sandbox start` read both named args identically, so this
+ * is the one place either error message surfaces from.
+ */
+export function parseStaffedAndOccupancyFlags(named: Record<string, string>):
+  | { staffed: boolean; agentOccupancy: boolean | undefined; error: null }
+  | { staffed: false; agentOccupancy: undefined; error: string } {
+  const staffedFlag = parseStaffedFlag(named['staffed']);
+  if (staffedFlag.error) return { staffed: false, agentOccupancy: undefined, error: staffedFlag.error };
+
+  const agentOccupancyFlag = parseAgentOccupancyFlag(named['agent_occupancy']);
+  if (agentOccupancyFlag.error) return { staffed: false, agentOccupancy: undefined, error: agentOccupancyFlag.error };
+
+  return { staffed: staffedFlag.staffed, agentOccupancy: agentOccupancyFlag.agentOccupancy, error: null };
+}

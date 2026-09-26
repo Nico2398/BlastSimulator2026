@@ -19,7 +19,7 @@ import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
-import { parseStaffedFlag, staffedSuffix, parseAgentOccupancyFlag } from './commandUtils.js';
+import { staffedSuffix, parseStaffedAndOccupancyFlags } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
@@ -63,14 +63,9 @@ export function sandboxCommand(
     return { success: false, output: t('sandbox.unknown_difficulty', { difficulty: requested.difficulty, valid }) };
   }
 
-  const staffedFlag = parseStaffedFlag(named['staffed']);
-  if (staffedFlag.error) {
-    return { success: false, output: staffedFlag.error };
-  }
-
-  const agentOccupancyFlag = parseAgentOccupancyFlag(named['agent_occupancy']);
-  if (agentOccupancyFlag.error) {
-    return { success: false, output: agentOccupancyFlag.error };
+  const flags = parseStaffedAndOccupancyFlags(named);
+  if (flags.error) {
+    return { success: false, output: flags.error };
   }
 
   const config = clampSandboxConfig(requested);
@@ -82,8 +77,8 @@ export function sandboxCommand(
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
-    ...(staffedFlag.staffed ? { staffed: true } : {}),
-    ...(agentOccupancyFlag.agentOccupancy !== undefined ? { agentOccupancyEnabled: agentOccupancyFlag.agentOccupancy } : {}),
+    ...(flags.staffed ? { staffed: true } : {}),
+    ...(flags.agentOccupancy !== undefined ? { agentOccupancyEnabled: flags.agentOccupancy } : {}),
   });
   ctx.state.world = createWorldState(level.gridX, level.datum, level.gridZ, true);
 
@@ -109,7 +104,7 @@ export function sandboxCommand(
       difficulty: config.difficulty,
       seed: config.seed,
       cash: level.startingCash.toLocaleString('en-US'),
-      staffedSuffix: staffedSuffix(staffedFlag.staffed),
+      staffedSuffix: staffedSuffix(flags.staffed),
     }),
   };
 }

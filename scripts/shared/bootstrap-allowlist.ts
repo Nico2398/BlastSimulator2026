@@ -182,11 +182,4 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // inert by the tutorial's own design, not a reachability gap a control
   // could close.
   'drill_plan grid rows:10 cols:5 spacing:1 depth:6 start:24,2',
-  // ramp-foot-traffic.json (#1206): `debug occupancy on` is the primary
-  // toggle for GameState.agentOccupancyEnabled at this skeleton phase —
-  // `new_game`/`sandbox start` don't thread an `agent_occupancy:` flag
-  // through yet (world.ts's own TODO(#1206)). A developer/debug-only
-  // toggle with no UI control and no business having one, same class as
-  // `employee assign_skill` above.
-  'debug occupancy',
 ];
