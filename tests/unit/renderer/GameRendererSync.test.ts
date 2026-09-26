@@ -47,7 +47,7 @@ function makeState(surveyResults: SurveyResult[]): GameState {
 
 describe('buildSurveyOverlayOptions()', () => {
   it('matches computeVoxelColumnSurfaceY for a fully-solid column', () => {
-    const grid = new VoxelGrid(20, 8, 20);
+    const grid = new VoxelGrid(20, 20);
     for (let y = 0; y <= 3; y++) {
       grid.fillVoxel(5, y, 5, 0, undefined, 1.0);
     }
@@ -63,7 +63,7 @@ describe('buildSurveyOverlayOptions()', () => {
   });
 
   it('uses the isSolidAt (density >= 0.5) threshold on a fractional-density band, not density > 0', () => {
-    const grid = new VoxelGrid(20, 8, 20);
+    const grid = new VoxelGrid(20, 20);
     grid.fillVoxel(5, 0, 5, 0, undefined, 1.0);
     grid.fillVoxel(5, 1, 5, 0, undefined, 1.0);
     grid.fillVoxel(5, 2, 5, 0, undefined, 1.0);
@@ -84,7 +84,7 @@ describe('buildSurveyOverlayOptions()', () => {
   });
 
   it('returns surfaceY 0 for a column with no solid voxel anywhere', () => {
-    const grid = new VoxelGrid(20, 8, 20);
+    const grid = new VoxelGrid(20, 20);
     // No fillVoxel calls on column (5,5) — stays air.
     const state = makeState([makeSurveyResult()]);
 
@@ -98,7 +98,7 @@ describe('buildSurveyOverlayOptions()', () => {
   });
 
   it('clamps an out-of-bounds survey column the same way computeVoxelColumnSurfaceY does', () => {
-    const grid = new VoxelGrid(20, 8, 20);
+    const grid = new VoxelGrid(20, 20);
     grid.fillVoxel(5, 0, 5, 0, undefined, 1.0);
     const state = makeState([
       makeSurveyResult({ centerX: 1000, centerZ: 1000, estimates: { '1000,1000': { sparkium: 0.5 } } }),
@@ -118,7 +118,7 @@ describe('buildSurveyOverlayOptions()', () => {
   });
 
   it('returns null when there are no survey results', () => {
-    const grid = new VoxelGrid(20, 8, 20);
+    const grid = new VoxelGrid(20, 20);
     const state = makeState([]);
     expect(buildSurveyOverlayOptions(state, grid)).toBeNull();
   });
@@ -128,7 +128,7 @@ describe('buildSurveyOverlayOptions()', () => {
   // genuinely surfacing at or below y = 0 must still sit one layer above its
   // true surface, not the no-ground fallback.
   it('#1184: sits one layer above a real surface at or below y = 0, not the no-ground fallback', () => {
-    const grid = new VoxelGrid(20, 8, 20);
+    const grid = new VoxelGrid(20, 20);
     grid.fillVoxel(5, -5, 5, 0, undefined, 1.0); // surface below y = 0
     grid.fillVoxel(6, 0, 6, 0, undefined, 1.0); // surface exactly at y = 0
     const state = makeState([

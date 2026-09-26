@@ -53,7 +53,7 @@ function makeFlatLandscapeMesh(y = 0, size = 40): THREE.Mesh {
 
 function makeSolidTerrain(sizeX = 8, sizeY = 4, sizeZ = 8): TerrainMesh {
   const scene = new THREE.Scene();
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let x = 0; x < sizeX; x++)
     for (let y = 0; y < sizeY; y++)
       for (let z = 0; z < sizeZ; z++)

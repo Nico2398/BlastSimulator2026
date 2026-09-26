@@ -27,7 +27,7 @@ interface Shot {
 
 /** A block of one rock, 21×11×21, surface at y=10. */
 function bench(rock: string): VoxelGrid {
-  const grid = new VoxelGrid(40, 20, 40);
+  const grid = new VoxelGrid(40, 40);
   for (let z = 5; z <= 25; z++) {
     for (let y = 0; y <= 10; y++) {
       for (let x = 5; x <= 25; x++) {

@@ -43,7 +43,7 @@ beforeEach(() => resetHoleIds());
 
 describe('Blast execution — integration', () => {
   it('well-designed plan on soft rock → fragments, good/perfect rating', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     // Fill with molite (tier 2, threshold=500) — medium rock. Extends 10
     // voxels below the drilled holes so the charge has real bedrock underneath
     // rather than the open air the blast-zone box's own BLAST_ZONE_RADIUS
@@ -72,7 +72,7 @@ describe('Blast execution — integration', () => {
   });
 
   it('overcharged blast on soft rock → projections, bad/catastrophic rating', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'cruite', 5, 25, 0, 10, 5, 25);
 
     // Overcharge: dynatomics (1300 E/kg) × 25kg on soft cruite (threshold 200)
@@ -92,7 +92,7 @@ describe('Blast execution — integration', () => {
   });
 
   it('undercharged blast on hard rock → mostly unaffected, bad rating', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     // Fill with titanite (tier 5, threshold=4000)
     fillRegion(grid, 'titanite', 5, 25, 0, 10, 5, 25);
 
@@ -114,7 +114,7 @@ describe('Blast execution — integration', () => {
   });
 
   it('terrain voxels are cleared after blast', () => {
-    const grid = new VoxelGrid(30, 15, 30);
+    const grid = new VoxelGrid(30, 30);
     fillRegion(grid, 'cruite', 8, 20, 0, 8, 8, 20);
 
     // Verify voxels are solid before blast
@@ -148,7 +148,7 @@ describe('Blast execution — integration', () => {
   });
 
   it('fragment ore densities match parent voxels', () => {
-    const grid = new VoxelGrid(30, 15, 30);
+    const grid = new VoxelGrid(30, 30);
     fillRegion(grid, 'cruite', 8, 20, 0, 8, 8, 20, 'blingite', 0.5);
 
     const holes = createGridPlan({ x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
@@ -171,7 +171,7 @@ describe('Blast execution — integration', () => {
   });
 
   it('returns null for invalid blast plan', () => {
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const holes = createGridPlan({ x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     // No charges → invalid
     const plan = assembleBlastPlan(holes, {}, {});

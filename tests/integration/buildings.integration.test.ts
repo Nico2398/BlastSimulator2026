@@ -9,7 +9,7 @@ import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
-import { makeGameContext } from '../helpers/gameContext.js';
+import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 import {
   createBuildingState,
   placeBuilding,
@@ -893,7 +893,7 @@ function flattenFootprint(
   for (const [dx, dz] of def.footprint) {
     const cx = x + dx;
     const cz = z + dz;
-    for (let y = 0; y < grid.sizeY; y++) {
+    for (let y = 0; y < GENERATED_TERRAIN_GRID_SIZE_Y; y++) {
       if (y < height) grid.setVoxel(cx, y, cz, rock);
       else grid.clearVoxel(cx, y, cz);
     }

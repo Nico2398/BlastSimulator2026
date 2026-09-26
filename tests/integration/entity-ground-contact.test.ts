@@ -32,6 +32,7 @@ import { CharacterMesh } from '../../src/renderer/CharacterMesh.js';
 import { GhostMesh } from '../../src/renderer/GhostMesh.js';
 import { placeBuilding, getBuildingDef } from '../../src/core/entities/Building.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
+import { GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 
 // ── Harness: drives the real production sync entry point ───────────────────
 
@@ -210,7 +211,7 @@ describe('every rendered entity rests on the terrain sampler through the real sy
     // suite's own segment-clearing setup.
     for (let z = 25; z <= 26; z++) {
       for (let x = 25; x <= 26; x++) {
-        for (let y = grid.sizeY - 1; y >= grid.sizeY - 3; y--) {
+        for (let y = GENERATED_TERRAIN_GRID_SIZE_Y - 1; y >= GENERATED_TERRAIN_GRID_SIZE_Y - 3; y--) {
           grid.clearVoxel(x, y, z);
         }
       }
@@ -231,7 +232,7 @@ describe('every rendered entity rests on the terrain sampler through the real sy
     for (const [dx, dz] of def.footprint) {
       const cx = building!.x + dx;
       const cz = building!.z + dz;
-      for (let y = grid.sizeY - 1; y >= 0; y--) {
+      for (let y = GENERATED_TERRAIN_GRID_SIZE_Y - 1; y >= 0; y--) {
         if (grid.densityAt(cx, y, cz) > 0) {
           grid.clearVoxel(cx, y, cz);
           break;

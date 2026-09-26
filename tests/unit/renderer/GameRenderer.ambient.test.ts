@@ -59,7 +59,7 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
     // branch that calls rebuildLandscapeMesh() a second time without going
     // through loadGame()'s clearAll() first (mirrors a campaign level swap).
     const { VoxelGrid } = await import('../../../src/core/world/VoxelGrid.js');
-    ctx.grid = new VoxelGrid(64, 64, 64);
+    ctx.grid = new VoxelGrid(64, 64);
     ctx.landscape = null;
     renderer.syncFromContext(ctx);
     const grassCountAfterSecond = sm.scene.children.filter((c) => c.name === 'vegetation-grass').length;

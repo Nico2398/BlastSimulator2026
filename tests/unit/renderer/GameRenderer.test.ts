@@ -297,7 +297,7 @@ describe('GameRenderer — camera framing', () => {
     renderer.syncFromContext(ctx);
     sm.cameraController.frameSite.mockClear();
 
-    ctx.grid = new VoxelGrid(24, 12, 24);
+    ctx.grid = new VoxelGrid(24, 24);
     renderer.syncFromContext(ctx);
 
     expect(sm.cameraController.frameSite).toHaveBeenCalled();

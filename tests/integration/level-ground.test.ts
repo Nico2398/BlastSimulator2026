@@ -20,7 +20,7 @@ import { levelGroundCommand } from '../../src/console/commands/mining/level.js';
 import type { MiningContext } from '../../src/console/commands/mining/types.js';
 import { PlayableArea } from '../../src/core/world/PlayableArea.js';
 import { terrainConfigOf } from '../../src/console/commands/world.js';
-import { makeGameContext } from '../helpers/gameContext.js';
+import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 
 const ROCK = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
 const BASE_HEIGHT = 15;
@@ -29,7 +29,7 @@ const BASE_HEIGHT = 15;
 function carveFlatRect(grid: VoxelGrid, minX: number, maxX: number, minZ: number, maxZ: number, height: number): void {
   for (let z = minZ; z <= maxZ; z++) {
     for (let x = minX; x <= maxX; x++) {
-      for (let y = 0; y < grid.sizeY; y++) {
+      for (let y = 0; y < GENERATED_TERRAIN_GRID_SIZE_Y; y++) {
         if (y <= height) grid.setVoxel(x, y, z, ROCK);
         else grid.clearVoxel(x, y, z);
       }

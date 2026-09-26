@@ -9,7 +9,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, MAX_TERRAIN_GEN_DIMENSION } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { generateTerrain } from '../../src/core/world/TerrainGen.js';
@@ -41,11 +41,19 @@ function makeScene(): THREE.Scene {
 }
 
 /**
+ * Height every makeOreGrid()/makeMultiOreGrid() fixture used to pass as the
+ * legacy 3-arg VoxelGrid ctor's middle argument — kept as a named height
+ * bound for `surveyResultsToConfidencePoints`'s own topmost-solid-voxel scan
+ * now that the height-free ctor's `grid.sizeY` always reads 4096 (#1192).
+ */
+const ORE_GRID_HEIGHT = 11;
+
+/**
  * Build a small test grid with known ore at a specific column.
  * 11×11×11 grid, with gold=0.5 at (5, *, 5) from y=2..8.
  */
 function makeOreGrid(): VoxelGrid {
-  const grid = new VoxelGrid(11, 11, 11);
+  const grid = new VoxelGrid(11, 11);
   for (let y = 2; y <= 8; y++) {
     grid.setVoxel(5, y, 5, {
       composition: { rocks: [{ rockId: 'granite', coefficient: 1.0 }] },
@@ -63,7 +71,7 @@ function makeOreGrid(): VoxelGrid {
  * Each column (x,*,z) for x,z in the given array has gold=0.5 at y=2..8.
  */
 function makeMultiOreGrid(positions: { x: number; z: number }[]): VoxelGrid {
-  const grid = new VoxelGrid(20, 11, 20);
+  const grid = new VoxelGrid(20, 20);
   for (const { x, z } of positions) {
     for (let y = 2; y <= 8; y++) {
       grid.setVoxel(x, y, z, {
@@ -131,6 +139,12 @@ function surveyResultsToConfidencePoints(
   surveys: SurveyResult[],
   grid: VoxelGrid,
   currentTick: number,
+  // Height-free VoxelGrid always reports sizeY=4096 (#1192) — every caller
+  // that built its own fixed-height fixture grid passes that grid's own
+  // known height here; a caller passing a generator-built terrain grid
+  // (whose real height isn't test-supplied) omits it and falls back to the
+  // grid's fixed internal height-free size, unaffected by this migration.
+  scanHeight: number = MAX_TERRAIN_GEN_DIMENSION,
 ): SurveyConfidencePoint[] {
   const points: SurveyConfidencePoint[] = [];
 
@@ -144,7 +158,7 @@ function surveyResultsToConfidencePoints(
 
       // Find surface Y (topmost solid voxel + 1)
       let surfaceY = 0;
-      for (let y = grid.sizeY - 1; y >= 0; y--) {
+      for (let y = scanHeight - 1; y >= 0; y--) {
         const voxel = grid.getVoxel(x, y, z);
         if (voxel && voxel.density > 0) {
           surfaceY = y + 1;
@@ -241,7 +255,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const survey = runSurveyOnGrid(grid, 'seismic', 5, 5);
 
     // Integration pipeline: survey results → confidence points
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, ORE_GRID_HEIGHT);
 
     // Should have points for columns in seismic radius (20) around (5,5)
     expect(points.length).toBeGreaterThan(0);
@@ -261,7 +275,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const grid = makeOreGrid();
     const survey = runSurveyOnGrid(grid, 'core_sample', 5, 5);
 
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, ORE_GRID_HEIGHT);
 
     // Core sample only samples the centre column
     const centerPoint = points.find(p => p.x === 5 && p.z === 5);
@@ -274,7 +288,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('converts an aerial survey result to confidence points within radius 30', () => {
     // Large grid needed for aerial radius (30 cells)
-    const grid = new VoxelGrid(101, 10, 101);
+    const GRID_HEIGHT = 10;
+    const grid = new VoxelGrid(101, 101);
     for (let x = 0; x < 101; x++) {
       for (let z = 0; z < 101; z++) {
         grid.setVoxel(x, 5, z, {
@@ -287,7 +302,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     }
 
     const survey = runSurveyOnGrid(grid, 'aerial', 50, 50);
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, GRID_HEIGHT);
 
     // All points must be within radius 30 of centre
     expect(points.length).toBeGreaterThan(0);
@@ -305,7 +320,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const grid = makeOreGrid();
     const survey = runSurveyOnGrid(grid, 'seismic', 5, 5);
 
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, ORE_GRID_HEIGHT);
 
     // The confidence in every point must match the survey confidence
     for (const p of points) {
@@ -321,8 +336,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     // Skill 5 survey
     const highSkillSurvey = runSurveyOnGrid(grid, 'seismic', 5, 5, 5);
 
-    const lowPoints = surveyResultsToConfidencePoints([lowSkillSurvey], grid, 50);
-    const highPoints = surveyResultsToConfidencePoints([highSkillSurvey], grid, 50);
+    const lowPoints = surveyResultsToConfidencePoints([lowSkillSurvey], grid, 50, ORE_GRID_HEIGHT);
+    const highPoints = surveyResultsToConfidencePoints([highSkillSurvey], grid, 50, ORE_GRID_HEIGHT);
 
     // Higher skill → higher confidence
     for (const p of highPoints) {
@@ -336,7 +351,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const grid = makeOreGrid();
     const survey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 1, 0);
 
-    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS);
+    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS, ORE_GRID_HEIGHT);
 
     // Exactly SURVEY_STALE_TICKS ticks elapsed → still fresh
     for (const p of points) {
@@ -348,7 +363,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const grid = makeOreGrid();
     const survey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 1, 0);
 
-    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS + 1);
+    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS + 1, ORE_GRID_HEIGHT);
 
     // More than SURVEY_STALE_TICKS ticks elapsed → stale
     for (const p of points) {
@@ -364,7 +379,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     // Survey 2: completed at tick 200 (recent if current=250)
     const newSurvey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 2, 200);
 
-    const points = surveyResultsToConfidencePoints([oldSurvey, newSurvey], grid, 250);
+    const points = surveyResultsToConfidencePoints([oldSurvey, newSurvey], grid, 250, ORE_GRID_HEIGHT);
 
     const hasFresh = points.some(p => p.fresh);
     const hasStale = points.some(p => !p.fresh);
@@ -385,7 +400,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const survey1 = runSurveyOnGrid(grid, 'core_sample', 3, 3, 1, 99, 1, 50);
     const survey2 = runSurveyOnGrid(grid, 'core_sample', 7, 7, 1, 99, 2, 60);
 
-    const points = surveyResultsToConfidencePoints([survey1, survey2], grid, 70);
+    const points = surveyResultsToConfidencePoints([survey1, survey2], grid, 70, ORE_GRID_HEIGHT);
 
     // Should have points for both locations
     const p1 = points.find(p => p.x === 3 && p.z === 3);
@@ -406,7 +421,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const survey2 = runSurveyOnGrid(grid, 'core_sample', 5, 5, 1, 99, 2, 60);
     const survey3 = runSurveyOnGrid(grid, 'core_sample', 8, 8, 1, 99, 3, 70);
 
-    const points = surveyResultsToConfidencePoints([survey1, survey2, survey3], grid, 80);
+    const points = surveyResultsToConfidencePoints([survey1, survey2, survey3], grid, 80, ORE_GRID_HEIGHT);
 
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show({ points, opacity: 0.5 });
@@ -459,7 +474,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('TerrainMesh.getSurveyOverlay returns a SurveyConfidenceOverlay linked to the scene', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     const tm = new TerrainMesh(scene, grid);
 
     const overlay = tm.getSurveyOverlay();
@@ -473,7 +488,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('TerrainMesh.getSurveyOverlay persists the overlay across TerrainMesh lifecycle', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     const tm = new TerrainMesh(scene, grid);
 
     const overlay = tm.getSurveyOverlay();
@@ -499,7 +514,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const survey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 1, 50);
 
     // Step 2: Convert to confidence points
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, ORE_GRID_HEIGHT);
 
     // Step 3: Create overlay and show
     const overlay = new SurveyConfidenceOverlay(scene);
@@ -531,7 +546,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
     // Core sample with skill 5 gives confidence ≈ 0.95
     const survey = runSurveyOnGrid(grid, 'core_sample', 5, 5, 5, 99, 1, 50);
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, ORE_GRID_HEIGHT);
 
     const overlay = new SurveyConfidenceOverlay(scene);
     overlay.show({ points, opacity: 0.6 });
@@ -561,7 +576,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     // Survey completed at tick 0
     const survey = runSurveyOnGrid(grid, 'core_sample', 5, 5, 3, 99, 1, 0);
     // Current tick is past stale threshold
-    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS + 10);
+    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS + 10, ORE_GRID_HEIGHT);
 
     // All points must be stale
     for (const p of points) {
@@ -593,7 +608,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('empty surveyResults produces zero confidence points', () => {
     const grid = makeOreGrid();
-    const points = surveyResultsToConfidencePoints([], grid, 50);
+    const points = surveyResultsToConfidencePoints([], grid, 50, ORE_GRID_HEIGHT);
 
     expect(points).toHaveLength(0);
   });
@@ -611,13 +626,13 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     };
 
     const grid = makeOreGrid();
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, ORE_GRID_HEIGHT);
 
     expect(points).toHaveLength(0);
   });
 
   it('survey on grid with no solid terrain at column produces surfaceY=0', () => {
-    const grid = new VoxelGrid(11, 11, 11);
+    const grid = new VoxelGrid(11, 11);
     // No solid voxels at all
 
     const survey: SurveyResult = {
@@ -631,7 +646,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
       confidence: 0.85,
     };
 
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, ORE_GRID_HEIGHT);
     const point = points.find(p => p.x === 5 && p.z === 5);
     expect(point).toBeDefined();
     expect(point!.surfaceY).toBe(0);
@@ -650,12 +665,12 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const overlay = new SurveyConfidenceOverlay(scene);
 
     // First show with survey1
-    const points1 = surveyResultsToConfidencePoints([survey1], grid, 50);
+    const points1 = surveyResultsToConfidencePoints([survey1], grid, 50, ORE_GRID_HEIGHT);
     overlay.show({ points: points1, opacity: 0.5 });
     const countAfterFirst = (overlayMesh(overlay).geometry.getAttribute('position') as THREE.BufferAttribute).count;
 
     // Second show with survey2 (different location)
-    const points2 = surveyResultsToConfidencePoints([survey2], grid, 60);
+    const points2 = surveyResultsToConfidencePoints([survey2], grid, 60, ORE_GRID_HEIGHT);
     overlay.show({ points: points2, opacity: 0.5 });
     const countAfterSecond = (overlayMesh(overlay).geometry.getAttribute('position') as THREE.BufferAttribute).count;
 
@@ -677,7 +692,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     // Stale survey at (3,3) with medium confidence
     const staleSurvey = runSurveyOnGrid(grid, 'core_sample', 3, 3, 2, 99, 2, 0);
 
-    const points = surveyResultsToConfidencePoints([freshSurvey, staleSurvey], grid, 250);
+    const points = surveyResultsToConfidencePoints([freshSurvey, staleSurvey], grid, 250, ORE_GRID_HEIGHT);
 
     const freshPoint = points.find(p => p.x === 5 && p.z === 5)!;
     const stalePoint = points.find(p => p.x === 3 && p.z === 3)!;
@@ -732,7 +747,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('surveys at negative world coordinates produce correct confidence points', () => {
     // Build a grid with origin at negative coordinates
-    const grid = new VoxelGrid(21, 10, 21);
+    const GRID_HEIGHT = 10;
+    const grid = new VoxelGrid(21, 21);
     // Place ore at column (5, 5) which would correspond to negative world coords
     // by shifting center to negative values
     for (let y = 2; y <= 8; y++) {
@@ -747,7 +763,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     // Survey at negative center — estimateSurveyResult uses grid coords,
     // but the overlay points should handle negative x, z values
     const survey = runSurveyOnGrid(grid, 'core_sample', 5, 5, 3, 99, 1, 50);
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, GRID_HEIGHT);
 
     // Should still produce points (the grid doesn't have negative indices,
     // but the survey at grid position 5,5 maps to world coords)
@@ -764,7 +780,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const survey1 = runSurveyOnGrid(grid, 'core_sample', 5, 5, 2, 99, 1, 50);
     const survey2 = runSurveyOnGrid(grid, 'core_sample', 5, 5, 4, 99, 2, 100);
 
-    const points = surveyResultsToConfidencePoints([survey1, survey2], grid, 150);
+    const points = surveyResultsToConfidencePoints([survey1, survey2], grid, 150, ORE_GRID_HEIGHT);
 
     // Both surveys should contribute points at (5,5)
     const centerPoints = points.filter(p => p.x === 5 && p.z === 5);
@@ -779,7 +795,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('overlay survives TerrainMesh.remeshRegion re-mesh while visible', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(8, 8, 8);
+    const GRID_HEIGHT = 8;
+    const grid = new VoxelGrid(8, 8);
     // Fill bottom half solid
     for (let x = 0; x < 8; x++)
       for (let y = 0; y < 4; y++)
@@ -796,7 +813,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
     // Set up overlay with real survey data
     const survey = runSurveyOnGrid(grid, 'core_sample', 4, 4, 3, 99, 1, 50);
-    const pointsBefore = surveyResultsToConfidencePoints([survey], grid, 50);
+    const pointsBefore = surveyResultsToConfidencePoints([survey], grid, 50, GRID_HEIGHT);
     const overlay = tm.getSurveyOverlay();
     overlay.show({ points: pointsBefore, opacity: 0.5 });
 
@@ -876,7 +893,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('overlapping seismic surveys from different centers produce combined confidence points', () => {
     // Large grid with ore covering two survey centers close enough to overlap
-    const grid = new VoxelGrid(40, 10, 40);
+    const GRID_HEIGHT = 10;
+    const grid = new VoxelGrid(40, 40);
     for (let x = 0; x < 40; x++) {
       for (let z = 0; z < 40; z++) {
         grid.setVoxel(x, 5, z, {
@@ -892,7 +910,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const surveyA = runSurveyOnGrid(grid, 'seismic', 15, 15, 2, 99, 1, 50, 100);
     const surveyB = runSurveyOnGrid(grid, 'seismic', 25, 15, 4, 99, 2, 60, 101);
 
-    const points = surveyResultsToConfidencePoints([surveyA, surveyB], grid, 70);
+    const points = surveyResultsToConfidencePoints([surveyA, surveyB], grid, 70, GRID_HEIGHT);
 
     // Should produce many points (both surveys cover large areas)
     expect(points.length).toBeGreaterThan(0);
@@ -911,7 +929,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   it('many survey points (50+) render without errors', () => {
     // Build a grid large enough for many survey points
-    const grid = new VoxelGrid(30, 10, 30);
+    const GRID_HEIGHT = 10;
+    const grid = new VoxelGrid(30, 30);
     for (let x = 0; x < 30; x++) {
       for (let z = 0; z < 30; z++) {
         grid.setVoxel(x, 5, z, {
@@ -925,7 +944,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
     const scene = makeScene();
     const survey = runSurveyOnGrid(grid, 'seismic', 15, 15, 3, 99, 1, 50);
-    const points = surveyResultsToConfidencePoints([survey], grid, 50);
+    const points = surveyResultsToConfidencePoints([survey], grid, 50, GRID_HEIGHT);
 
     // Seismic radius 20 on 30×30 grid should produce lots of points
     // (radius 20 disc centered at 15,15 on 30×30 grid)
@@ -1000,7 +1019,7 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     const overlay = tm.getSurveyOverlay();
 
     // At tick 50 — still fresh
-    const freshPoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 50);
+    const freshPoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 50, ORE_GRID_HEIGHT);
     overlay.show({ points: freshPoints, opacity: 0.5 });
 
     // All points should be fresh
@@ -1009,7 +1028,7 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     }
 
     // At tick 200 — stale
-    const stalePoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 200);
+    const stalePoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 200, ORE_GRID_HEIGHT);
     overlay.show({ points: stalePoints, opacity: 0.5 });
 
     for (const p of stalePoints) {
@@ -1021,7 +1040,7 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
 
   it('shows no overlay when no survey results exist (empty state)', () => {
     const scene = makeScene();
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     const tm = new TerrainMesh(scene, grid);
 
     const overlay = tm.getSurveyOverlay();
@@ -1079,7 +1098,7 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     expect(state.surveyResults.length).toBe(2);
 
     // Confidence points from both should be produced
-    const points = surveyResultsToConfidencePoints(state.surveyResults, grid, 150);
+    const points = surveyResultsToConfidencePoints(state.surveyResults, grid, 150, ORE_GRID_HEIGHT);
     const centerPoints = points.filter(p => p.x === 5 && p.z === 5);
     // Two surveys at same position = two confidence points
     expect(centerPoints.length).toBe(2);
@@ -1103,7 +1122,7 @@ describe('toggle-survey-overlay — tutorial path drives the render pipeline (#9
 
   function makeSurveyedGridAndState(): { scene: THREE.Scene; grid: VoxelGrid; state: GameState } {
     const scene = new THREE.Scene();
-    const grid = new VoxelGrid(20, 8, 20);
+    const grid = new VoxelGrid(20, 20);
     grid.fillVoxel(5, 0, 5, 0, undefined, 1.0);
     const state = createGame({ seed: 42, startingCash: 100_000 });
     state.surveyResults.push({

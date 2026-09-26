@@ -40,7 +40,7 @@ function makeCtx(): GameContext {
  * only the centre column.
  */
 function makeOreGrid(size = 30): VoxelGrid {
-  const grid = new VoxelGrid(size, 15, size);
+  const grid = new VoxelGrid(size, size);
   for (let y = 2; y <= 8; y++) {
     for (let x = 9; x <= 11; x++) {
       for (let z = 9; z <= 11; z++) {
@@ -515,7 +515,7 @@ describe('Survey system', () => {
   // ── Additional: column with no ore → zero-density estimate omitted ────────
 
   it('survey on a column with no ore produces no estimates', () => {
-    const grid = new VoxelGrid(30, 15, 30);
+    const grid = new VoxelGrid(30, 30);
     // No ore placed anywhere — grid is all air/empty
 
     const result = runSurveyOnGrid(grid, 'seismic', 15, 15);

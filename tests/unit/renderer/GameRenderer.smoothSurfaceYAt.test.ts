@@ -28,7 +28,7 @@ function makeMockSceneManager() {
 
 function makeCtx(seed = 42): MiningContext {
   const state = createGame({ seed, startingCash: 100_000 });
-  const grid = new VoxelGrid(32, 16, 32);
+  const grid = new VoxelGrid(32, 32);
   return makeEmptyGameContext({ state, grid });
 }
 
