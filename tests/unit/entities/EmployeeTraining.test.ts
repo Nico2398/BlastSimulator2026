@@ -88,6 +88,10 @@ function makeFlatNavGrid(width: number, height: number): NavGrid {
  */
 function setupSchool(type: BuildingType, tier: BuildingTier = 1, x = 10, z = 10) {
   const state = createGame({ seed: SEED });
+  // Tier 2/3 placement is research-gated (isTierUnlocked) — a fixture that
+  // wants a higher-tier school directly, without playing through research,
+  // unlocks it up front rather than placeBuilding silently refusing.
+  state.buildings.unlockedTiers[type] = tier;
   const school = placeBuilding(state.buildings, type, x, z, 64, 64, tier).building!;
   const grid = makeFlatNavGrid(32, 32);
   const def = getBuildingDef(type, tier);
@@ -197,7 +201,9 @@ describe('enrolInTraining — validation', () => {
   beforeEach(() => { ({ state } = makeStateWithOne()); });
 
   it('enrols at a school that teaches the skill: success, fee, and pendingTrainingState (not trainingState) set', () => {
-    const result = enrolInTraining(state, 1, makeBuilding({ type: 'geology_lab' }), 'geology');
+    const building = makeBuilding({ type: 'geology_lab' });
+    state.buildings.buildings.push(building);
+    const result = enrolInTraining(state, 1, building, 'geology');
     expectSuccess(result);
     expect(result.fee).toBeGreaterThan(0);
     const emp = state.employees.employees[0]!;
@@ -218,7 +224,9 @@ describe('enrolInTraining — validation', () => {
   });
 
   it('refuses an employee already enrolled — mid-walk (pendingTrainingState set)', () => {
-    const first = enrolInTraining(state, 1, makeBuilding({ id: 1, type: 'geology_lab' }), 'geology');
+    const building = makeBuilding({ id: 1, type: 'geology_lab' });
+    state.buildings.buildings.push(building);
+    const first = enrolInTraining(state, 1, building, 'geology');
     expectSuccess(first);
 
     const second = enrolInTraining(state, 1, makeBuilding({ id: 2, type: 'blasting_academy' }), 'blasting');

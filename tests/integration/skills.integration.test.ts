@@ -61,6 +61,20 @@ function tickUntilTaskSeeded(ctx: GameContext, empId: number): void {
   }
 }
 
+/**
+ * Tick until a training enrolment (#1203) has walked in and been promoted
+ * from `pendingTrainingState` into `trainingState` — enrolling only queues
+ * the walk via `moveTo`; the countdown itself starts once ArrivalGate
+ * confirms the employee has actually entered the school. Caps at 60 ticks so
+ * a genuine regression (arrival never firing) fails fast instead of hanging.
+ */
+function tickUntilTrainingStarted(ctx: GameContext, empId: number): void {
+  const emp = () => ctx.state!.employees.employees.find(e => e.id === empId)!;
+  for (let i = 0; i < 60 && emp().trainingState === null; i++) {
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 // ── Employee skills ──────────────────────────────────────────────────────────
 
 describe('Employee skills', () => {
@@ -299,6 +313,10 @@ describe('Employee skills', () => {
     expect(state.cash).toBeLessThan(cashBefore);
 
     const emp = () => state.employees.employees.find(e => e.id === empId)!;
+    // Enrolling only queues the walk to the school (#1203) — the countdown
+    // itself starts once ArrivalGate confirms they have actually entered it.
+    expect(emp().pendingTrainingState).not.toBeNull();
+    tickUntilTrainingStarted(ctx, empId);
     expect(emp().trainingState).not.toBeNull();
 
     // Run the course out through the real tick command, not tickTraining directly:
@@ -309,21 +327,26 @@ describe('Employee skills', () => {
     expect(emp().qualifications.some(q => q.category === 'driving.excavator')).toBe(true);
   });
 
-  it('employee train moves the employee to the training building (#410)', () => {
+  it('employee train walks the employee to the training building and inside it (#410, #1203)', () => {
     const state = ctx.state!;
     placeBuilding(state.buildings, 'driving_center', 5, 5, 32, 32, 1);
     const emp = () => state.employees.employees.find(e => e.id === empId)!;
     const before = { x: emp().x, z: emp().z };
-    const building = state.buildings.buildings.find(b => b.type === 'driving_center')!;
 
     const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'driving.excavator' });
     expect(result.success, result.output).toBe(true);
 
-    // The employee walks to the school, not left wherever they were hired.
-    // Lands one tile outside the footprint (not the raw origin corner, which
-    // sits on the building's own opaque base-box and renders occluded, #410).
-    expect(emp().x).toBe(building.x - 1);
-    expect(emp().z).toBe(building.z);
+    // Enrolling queues a walk (#1203) rather than teleporting next to the
+    // school (#410's old instant-relocation model) — the employee's own
+    // position has not jumped yet, an itinerary is in flight instead.
+    expect({ x: emp().x, z: emp().z }).toEqual(before);
+    expect(emp().itinerary).not.toBeNull();
+
+    tickUntilTrainingStarted(ctx, empId);
+
+    // Once ArrivalGate promotes them, they are inside the school — no body
+    // of their own in the world, and no longer at their hire-time position.
+    expect(emp().locomotion.kind).toBe('inside');
     expect(emp().x !== before.x || emp().z !== before.z).toBe(true);
   });
 
@@ -334,6 +357,7 @@ describe('Employee skills', () => {
     const before = emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel;
 
     expect(employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' }).success).toBe(true);
+    tickUntilTrainingStarted(ctx, empId);
     tickCommand(ctx, [String(emp().trainingState!.ticksRemaining)], {});
 
     expect(emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(before + 1);
