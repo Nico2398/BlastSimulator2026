@@ -629,6 +629,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 47,
+          "z": 22
+        },
+        {
           "type": "dragTiles",
           "x1": 45,
           "z1": 20,
@@ -1047,6 +1052,11 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 5,
+          "z": 45
         },
         {
           "type": "dragTiles",
@@ -1998,6 +2008,14 @@
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"spacing\"]",
           "value": 1
+        },
+        {
+          "type": "focusTile",
+          "x": 5,
+          "z": 5,
+          "distance": 45,
+          "yaw": 180,
+          "pitch": 60
         },
         {
           "type": "dragTiles",
@@ -3557,6 +3575,14 @@
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"spacing\"]",
           "value": 2
+        },
+        {
+          "type": "focusTile",
+          "x": 59,
+          "z": 59,
+          "distance": 45,
+          "yaw": 180,
+          "pitch": 60
         },
         {
           "type": "dragTiles",
