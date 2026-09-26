@@ -6,15 +6,21 @@
 // they cannot be held by anyone.
 
 import type { Employee, EmployeeState, SkillCategory, TrainingState } from './Employee.js';
+import { calculateSalary } from './Employee.js';
 import type { Building, BuildingType, BuildingTier } from './Building.js';
+import { getBuildingPeopleCapacity } from './Building.js';
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { alightIfMounted, leaveBuilding } from '../engine/Mount.js';
+import { moveTo } from '../engine/MoveTo.js';
+import { t } from '../i18n/I18n.js';
 import {
   TRAINING_BUILDING_SKILLS,
   TRAINING_BASE_TICKS,
   TRAINING_TIER_SPEED,
   TRAINING_BASE_FEE,
   TRAINING_LEVEL_COST_MULTIPLIER,
+  XP_THRESHOLDS,
 } from '../config/balance.js';
 
 export type ProficiencyLevel = 1 | 2 | 3 | 4 | 5;
@@ -41,17 +47,32 @@ export function schoolFor(skill: SkillCategory): BuildingType | null {
   return null;
 }
 
-/** Whether `employee` is currently enrolled in a course (mid-course, occupying a school seat). */
-export function isEnrolledInTraining(_employee: Employee): boolean {
-  throw new Error('not implemented');
+/**
+ * Whether `employee` is currently enrolled in a course — either walking to
+ * the school (`pendingTrainingState`) or already inside it, mid-course
+ * (`trainingState`). An absent `pendingTrainingState` (old saves, hand-built
+ * fixtures) reads the same as null — never fabricated into "enrolled".
+ */
+export function isEnrolledInTraining(employee: Employee): boolean {
+  return employee.trainingState !== null || (employee.pendingTrainingState ?? null) !== null;
 }
 
-/** Whether `building` has no free seat left to enrol another trainee. */
+/**
+ * Whether `building` has no free seat left to enrol another trainee —
+ * counting both who is already inside (`occupantIds`) and everyone already
+ * walking there (`pendingTrainingState`), so two enrolments claimed on the
+ * same tick can never together overshoot capacity even though neither has
+ * arrived yet.
+ */
 export function isSchoolFull(
-  _state: GameState,
-  _building: { id: number; type: BuildingType; tier: BuildingTier; occupantIds: readonly number[] },
+  state: GameState,
+  building: { id: number; type: BuildingType; tier: BuildingTier; occupantIds: readonly number[] },
 ): boolean {
-  throw new Error('not implemented');
+  const capacity = getBuildingPeopleCapacity(building.type, building.tier);
+  const walkingIn = state.employees.employees.filter(
+    e => (e.pendingTrainingState ?? null)?.buildingId === building.id,
+  ).length;
+  return building.occupantIds.length + walkingIn >= capacity;
 }
 
 /** One skill a school on site teaches, paired with the building that teaches it. */
@@ -150,19 +171,48 @@ export function startTraining(
  *
  * On success the employee is sent walking to the school rather than
  * teleported — enrolment queues the walk-in via `moveTo`; arrival, entry, and
- * the in-course occupancy are owned by the arrival gate and #1202's
- * occupancy/locomotion model. See planner notes for #1203 — this is a stub,
- * the walk/enter wiring is the implementer's job.
+ * the in-course occupancy are owned by ArrivalGate.tickArrivalGate and
+ * #1202's occupancy/locomotion model.
  */
-// TODO: implement
 export function enrolInTraining(
-  _state: GameState,
-  _employeeId: number,
-  _building: Building,
-  _skill: SkillCategory,
-  _emitter?: EventEmitter,
+  state: GameState,
+  employeeId: number,
+  building: Building,
+  skill: SkillCategory,
+  emitter?: EventEmitter,
 ): EnrolInTrainingResult {
-  throw new Error('not implemented');
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (!employee || !employee.alive) return { success: false, error: 'Employee not found or not alive' };
+  if (isEnrolledInTraining(employee)) return { success: false, error: 'Employee already in training' };
+  if (employee.injured) return { success: false, error: 'Injured employees cannot train' };
+  if (!trainableSkills(building.type).includes(skill)) {
+    return { success: false, error: `${building.type} does not teach ${skill}` };
+  }
+
+  const plan = planTraining(employee, skill, building.tier);
+  if (!plan) return { success: false, error: `Already at the highest proficiency in ${skill}` };
+
+  if (isSchoolFull(state, building)) {
+    return {
+      success: false,
+      error: t('employees.train_school_full', { buildingType: building.type, buildingId: building.id, skill }),
+    };
+  }
+
+  // The walk is taken on foot — a mounted employee alights first, mirroring
+  // moveTo's own building-target overload, which otherwise refuses a mounted
+  // employee outright rather than parking their vehicle for them.
+  alightIfMounted(state, employee, emitter);
+
+  const moveResult = moveTo(state, employeeId, { buildingId: building.id });
+  if (!moveResult.success) return { success: false, error: moveResult.error };
+
+  // Only the walk-in is queued here — arrival (moving this into
+  // `trainingState`) is ArrivalGate.tickArrivalGate's job, mirroring
+  // pendingRestDuration's claim-time/arrival-time split.
+  employee.pendingTrainingState = { buildingId: building.id, skill, ticksRemaining: plan.ticks, fee: plan.fee };
+
+  return { success: true, fee: plan.fee, plan };
 }
 
 /** One course that finished on this tick. */
@@ -191,12 +241,67 @@ export interface TrainingCancellation {
  * was charged and nothing changed. Also reports courses cancelled mid-way
  * (#1203 — the school teaching them was demolished), each refunding its fee.
  */
-// TODO: implement
 export function tickTraining(
-  _state: GameState,
-  _emitter?: EventEmitter,
+  state: GameState,
+  emitter?: EventEmitter,
 ): { completed: TrainingCompletion[]; cancelled: TrainingCancellation[] } {
-  throw new Error('not implemented');
+  const completed: TrainingCompletion[] = [];
+  const cancelled: TrainingCancellation[] = [];
+
+  for (const emp of state.employees.employees) {
+    if (!emp.trainingState) continue;
+
+    const trainingState = emp.trainingState;
+    const building = state.buildings.buildings.find(b => b.id === trainingState.buildingId);
+    if (!building) {
+      // The school was demolished out from under a mid-course trainee — the
+      // course never happened, so it is cancelled and fully refunded rather
+      // than ticked down or granting anything.
+      emp.trainingState = null;
+      cancelled.push({
+        employeeId: emp.id,
+        employeeName: emp.name,
+        skill: trainingState.skill,
+        buildingId: trainingState.buildingId,
+        refund: trainingState.fee,
+      });
+      emitter?.emit('employee:training_cancelled', {
+        employeeId: emp.id,
+        skill: trainingState.skill,
+        buildingId: trainingState.buildingId,
+        refund: trainingState.fee,
+      });
+      continue;
+    }
+
+    trainingState.ticksRemaining -= 1;
+    if (trainingState.ticksRemaining > 0) continue;
+
+    const skill = trainingState.skill;
+    emp.trainingState = null;
+    leaveBuilding(state, emp.id, emitter);
+
+    const existing = emp.qualifications.find(q => q.category === skill);
+    let level: ProficiencyLevel;
+    let isNew: boolean;
+    if (!existing) {
+      level = 1;
+      isNew = true;
+      emp.qualifications.push({ category: skill, proficiencyLevel: 1, xp: 0 });
+    } else {
+      isNew = false;
+      level = Math.min(MAX_PROFICIENCY, existing.proficiencyLevel + 1) as ProficiencyLevel;
+      existing.proficiencyLevel = level;
+      existing.xp = Math.max(existing.xp, XP_THRESHOLDS[level]);
+    }
+    // A better-qualified employee demands more pay.
+    emp.salary = calculateSalary(emp);
+
+    completed.push({ employeeId: emp.id, employeeName: emp.name, skill, level, isNew });
+    emitter?.emit('employee:trained', { employeeId: emp.id, skill, level, isNew });
+  }
+
+  return { completed, cancelled };
 }
 
 export type { TrainingState };

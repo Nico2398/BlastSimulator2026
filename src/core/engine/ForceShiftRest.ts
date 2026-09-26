@@ -16,6 +16,7 @@ import { releaseUnboardedTaskQueueVehicleReservations } from './EmployeeDispatch
 import { createRestPendingAction, resolveRestDestination, beginRestTravel, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidVehicleGatedWork, hasClaimableSameRoleFollowUp } from './VehicleReservation.js';
 import { isMidEvacuation } from './Evacuation.js';
+import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS } from '../config/balance.js';
@@ -60,6 +61,9 @@ export function forceShiftRestIfNeeded(
   _emitter?: EventEmitter,
 ): void {
   if (emp.restTicksRemaining !== null) return;
+  // Walking to, or already inside, a training course (#1203) — never
+  // redirected to a shift rest mid-course.
+  if (isEnrolledInTraining(emp)) return;
   // Already walking to a shift rest queued on a prior tick — without this,
   // ticksWorked stays >= WORK_DURATION_TICKS for the whole walk (it's only
   // reset on rest completion) and this would requeue a duplicate rest action
@@ -285,6 +289,9 @@ export function forceShiftRestIfNeededByPolicy(
   _emitter?: EventEmitter,
 ): void {
   if (emp.restTicksRemaining !== null) return;
+  // Walking to, or already inside, a training course (#1203) — never
+  // redirected to a shift rest mid-course.
+  if (isEnrolledInTraining(emp)) return;
   // Already walking to a queued rest — see forceShiftRestIfNeeded's own
   // comment on the same check (#437).
   if (emp.pendingRestDuration !== null) return;

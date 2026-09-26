@@ -269,7 +269,7 @@ export function employeeCommand(
         return { success: false, output: t('employees.train_insufficient_funds', { fee: plan.fee }) };
       }
 
-      const result = enrolInTraining(state, id, building, skill);
+      const result = enrolInTraining(state, id, building, skill, ctx.emitter);
       if (!result.success) return { success: false, output: result.error! };
 
       state.cash -= plan.fee;

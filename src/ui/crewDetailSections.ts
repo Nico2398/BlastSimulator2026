@@ -11,7 +11,7 @@ import { BASE_SALARIES } from '../core/entities/Employee.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { availableTrainingOffers, planTraining, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
+import { availableTrainingOffers, planTraining, isSchoolFull, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 
@@ -254,6 +254,17 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     return wrap;
   }
 
+  if (e.pendingTrainingState) {
+    // Walking to the school, not yet enrolled — distinct from the
+    // in-progress block above, which only shows once they've actually
+    // entered and the course countdown has started (#1203).
+    wrap.appendChild(well([el('span', {
+      text: t('ui.crew.training_walking'),
+      attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
+    })]));
+    return wrap;
+  }
+
   const offers = availableTrainingOffers(state.buildings.buildings);
   if (offers.length === 0) {
     wrap.appendChild(well([el('span', { text: t('ui.crew.training_no_school'), attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } })]));
@@ -271,6 +282,12 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
       info.append(
         el('span', { text: t(`course.${skill}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', { text: t('ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+      );
+      row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+    } else if (isSchoolFull(state, building)) {
+      info.append(
+        el('span', { text: `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        el('span', { text: t('ui.crew.training_school_full'), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
       );
       row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
     } else {

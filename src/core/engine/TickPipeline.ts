@@ -214,6 +214,12 @@ export function runTick(
   //     course never ends: the fee is charged and the qualification never
   //     arrives, which made every skill no role is hired with unobtainable.
   const { completed: trainingCompletions, cancelled: trainingCancellations } = tickTraining(state, emitter);
+  for (const cancellation of trainingCancellations) {
+    state.cash += cancellation.refund;
+    addIncome(state.finances, cancellation.refund, 'refund',
+      `Training cancelled: ${cancellation.employeeName} — ${cancellation.skill} (school destroyed)`,
+      state.tickCount);
+  }
 
   // 8c-2. Research Center queue — advance the head task's progress each tick,
   //       unlocking its target tier when it completes. If the enabling

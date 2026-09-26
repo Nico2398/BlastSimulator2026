@@ -44,8 +44,9 @@ export function pictogramKindFor(activity: EmployeeActivity): PictogramKind | nu
     case 'walking':
       return activity.actionType === 'rest' ? 'walking_to_rest' : 'walking';
     case 'training':
-      // TODO: implement — #1203 gives training its own pictogram once the
-      // in-school occupancy model lands; for now it renders no icon.
+      // No icon: an employee mid-course is inside the school building, whose
+      // occupancy model already hides their character mesh — nothing is
+      // rendered above them to hang a pictogram off of (#1203).
       return null;
   }
 }

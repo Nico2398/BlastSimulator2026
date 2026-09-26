@@ -122,7 +122,7 @@ export class CrewPanel extends PanelBase {
         const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).join(',');
         const activity = computeEmployeeActivity(e, state.vehicles);
         return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
-          + `:${e.trainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
+          + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
       })
       .join('|');
     const hireAffordable = ROLES.map(r => (state.cash < HIRING_COSTS[r] ? '0' : '1')).join('');
@@ -132,7 +132,7 @@ export class CrewPanel extends PanelBase {
   }
 
   private affordsAnyCourse(e: Employee, state: GameState): boolean {
-    if (e.trainingState || e.injured) return false;
+    if (e.trainingState || e.pendingTrainingState || e.injured) return false;
     return availableTrainingOffers(state.buildings.buildings).some(({ skill, building }) => {
       const plan = planTraining(e, skill, building.tier);
       return plan !== null && state.cash >= plan.fee;

@@ -11,7 +11,7 @@ import { findVehicleReservedForAction } from '../entities/Vehicle.js';
 import { reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { seedTaskTimerFields } from './ActionSelection.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { isMounted, mountedVehicleId, isInsideBuilding } from '../entities/EmployeeLocomotion.js';
 
 /** Summary of what the arrival gate started/cancelled on this tick. */
 export interface ArrivalGateResult {
@@ -93,6 +93,20 @@ export function tickArrivalGate(state: GameState, grid?: VoxelGrid): ArrivalGate
       emp.pendingRestNeedKey = null;
       result.restStarted.push(emp.id);
       workStarted = true;
+    }
+
+    // Training's own arrival promotion (#1203) — mirrors the
+    // pendingRestDuration -> restTicksRemaining promotion above, except the
+    // "entered" side effect (locomotion.kind === 'inside') already happened
+    // synchronously inside Locomotion.ts's own enter_building arrival step,
+    // the moment this employee's itinerary reached it. All that is left here
+    // is to promote the claim itself once that has genuinely happened.
+    if ((emp.pendingTrainingState ?? null) !== null
+      && isInsideBuilding(emp.locomotion)
+      && emp.locomotion.buildingId === emp.pendingTrainingState!.buildingId) {
+      emp.trainingState = emp.pendingTrainingState!;
+      emp.pendingTrainingState = null;
+      result.trainingStarted.push(emp.id);
     }
 
     if (emp.pendingTaskDuration !== null) {
