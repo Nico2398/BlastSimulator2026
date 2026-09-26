@@ -211,7 +211,7 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
 
 /** Set up a survey benchmark scenario: 80×20×80 voxel grid with seismic survey params. */
 function setupSurveyBenchmark(): { grid: VoxelGrid; params: EstimateSurveyParams; rng: Random } {
-  const grid = makeSolidGrid(80, 20, 80, 15);
+  const grid = makeSolidGrid(80, 80, 15);
   const params: EstimateSurveyParams = {
     id: 1,
     method: 'seismic',
