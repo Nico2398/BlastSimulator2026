@@ -82,11 +82,12 @@ export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | nu
 }
 
 /**
- * TODO(#1191): WorldState doesn't carry the datum yet, only sizeY. #1191
- * threads the datum through WorldState/levels directly and this goes away.
+ * `new_game`'s own size→datum convention, and the no-`state.world` degenerate
+ * load fallback; byte-identical formula to the deleted general conversion,
+ * now scoped to exactly these two call sites.
  */
-function datumFromSizeY(sizeY: number): number {
-  return Math.floor(sizeY * 0.55);
+function defaultDatumForSize(size: number): number {
+  return Math.floor(size * 0.55);
 }
 
 /**
@@ -94,25 +95,16 @@ function datumFromSizeY(sizeY: number): number {
  * `WorldState` — takes only the `WorldState` slice it reads, not the whole
  * `GameState`, since neither caller below needs anything else off it
  * (#1181 review). The one source of truth for "which WorldState fields feed
- * generation": `worldSizeParams` layers a `datum` on top for `TerrainConfig`,
- * `regenerateGridParams` layers its own dimension validation on top for a
- * no-voxels load fallback — each needing a different shape derived from the
- * same three fields, so neither can just call the other.
+ * generation": `regenerateGridParams` layers its own dimension validation on
+ * top for a no-voxels load fallback.
  */
-function worldGenerationFields(world: WorldState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+function worldGenerationFields(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean } {
   return {
     sizeX: world.baseSizeX,
-    sizeY: world.sizeY,
+    datum: world.datum,
     sizeZ: world.baseSizeZ,
     ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
   };
-}
-
-/** The size + hardness fields `TerrainConfig` needs, with the raw `sizeY` collapsed into its generation `datum`. */
-function worldSizeParams(world: WorldState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean } {
-  const base = worldGenerationFields(world);
-  const { sizeY, ...rest } = base;
-  return { ...rest, datum: datumFromSizeY(sizeY) };
 }
 
 /** The terrain config a game's grid was generated from — the datum every later chunk is generated against (#473 D3). */
@@ -123,7 +115,7 @@ export function terrainConfigOf(state: GameState): TerrainConfig | null {
   return {
     seed: state.seed,
     climateBias: biome.climateCenter,
-    ...worldSizeParams(state.world),
+    ...worldGenerationFields(state.world),
   };
 }
 
@@ -161,15 +153,15 @@ function terrainGenDatum(state: GameState): SerializedTerrainGen | undefined {
  * turns that into a clean `world.terrain_save_corrupt` refusal and rolls
  * `ctx` back.
  */
-function regenerateGridParams(state: GameState): { sizeX: number; sizeY: number; sizeZ: number; mixedRockHardness?: boolean } {
+function regenerateGridParams(state: GameState): { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean } {
   if (!state.world) {
-    return { sizeX: DEFAULT_GRID_SIZE, sizeY: DEFAULT_GRID_SIZE, sizeZ: DEFAULT_GRID_SIZE };
+    return { sizeX: DEFAULT_GRID_SIZE, datum: defaultDatumForSize(DEFAULT_GRID_SIZE), sizeZ: DEFAULT_GRID_SIZE };
   }
   const base = worldGenerationFields(state.world);
   return {
     ...base,
     sizeX: requireValidGenDimension(base.sizeX, 'world.baseSizeX'),
-    sizeY: requireValidGenDimension(base.sizeY, 'world.sizeY'),
+    datum: requireValidGenDimension(base.datum, 'world.datum'),
     sizeZ: requireValidGenDimension(base.sizeZ, 'world.baseSizeZ'),
   };
 }
@@ -219,7 +211,7 @@ export function regenerateGrid(
   ctx: GameContext,
   params: {
     seed: number; climateBias: readonly [number, number];
-    sizeX: number; sizeY: number; sizeZ: number;
+    sizeX: number; datum: number; sizeZ: number;
     mixedRockHardness?: boolean;
     /**
      * True only where this grid is a game's first (`new_game`, a campaign
@@ -232,8 +224,7 @@ export function regenerateGrid(
   },
 ): void {
   if (!ctx.state) return;
-  const { seed, climateBias, sizeX, sizeY, sizeZ, mixedRockHardness } = params;
-  const datum = datumFromSizeY(sizeY);
+  const { seed, climateBias, sizeX, datum, sizeZ, mixedRockHardness } = params;
   const config: TerrainConfig = {
     sizeX, datum, sizeZ, seed, climateBias,
     ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
@@ -377,9 +368,9 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     if (decodedGrid) {
       restoreGrid(ctx, decodedGrid);
     } else {
-      const { sizeX, sizeY, sizeZ, mixedRockHardness } = regenerateGridParams(state);
+      const { sizeX, datum, sizeZ, mixedRockHardness } = regenerateGridParams(state);
       regenerateGrid(ctx, {
-        seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ,
+        seed: state.seed, climateBias: biome.climateCenter, sizeX, datum, sizeZ,
         ...(mixedRockHardness !== undefined ? { mixedRockHardness } : {}),
       });
     }
@@ -424,10 +415,6 @@ export function newGameCommand(
   }
 
   const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
-  // sizeY defaults to the cubic size but can be given separately — levels at
-  // the larger campaign sizes (#458 T6.1/D13) are not cubic, and console
-  // testing at those aspect ratios shouldn't require a same-sized cube.
-  const sizeY = named['size_y'] ? parseInt(named['size_y'], 10) : size;
   const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
 
   const staffedFlag = parseStaffedFlag(named['staffed']);
@@ -440,13 +427,14 @@ export function newGameCommand(
     ...(startingCash !== undefined ? { startingCash } : {}),
     ...(staffedFlag.staffed ? { staffed: true } : {}),
   });
-  ctx.state.world = createWorldState(size, sizeY, size, true);
-  regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY, sizeZ: size, startingCrew: true });
+  const datum = defaultDatumForSize(size);
+  ctx.state.world = createWorldState(size, datum, size, true);
+  regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, datum, sizeZ: size, startingCrew: true });
 
   return {
     success: true,
     output: t('world.new_game_success', {
-      size, sizeY, mineType, seed,
+      size, mineType, seed,
       staffedSuffix: staffedSuffix(staffedFlag.staffed),
     }),
   };
@@ -551,7 +539,7 @@ export function terrainInfoCommand(
   return {
     success: true,
     output: [
-      `Site: ${w.sizeX}x${w.sizeY}x${w.sizeZ} from (${grid.minX}, ${grid.minZ})`,
+      `Site: ${w.sizeX}x${w.sizeZ} from (${grid.minX}, ${grid.minZ})`,
       `Level size: ${w.baseSizeX}x${w.baseSizeZ}`,
       `Claimed chunks: ${grid.chunkCount}`,
       `Mine type: ${ctx.state.mineType}`,

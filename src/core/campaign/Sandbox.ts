@@ -12,7 +12,7 @@
 
 import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { SCORE_DECAY_RATE, DEFAULT_GRID_SIZE, SANDBOX_GRID_DEPTH } from '../config/balance.js';
+import { SCORE_DECAY_RATE, DEFAULT_GRID_SIZE, SANDBOX_DATUM } from '../config/balance.js';
 import type { LevelDef } from './Level.js';
 
 /** Level id a sandbox site runs under. Deliberately not in the campaign catalog. */
@@ -137,7 +137,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     climateBias: biome.climateCenter,
     terrainSeed: clamped.seed,
     gridX: DEFAULT_GRID_SIZE,
-    gridY: SANDBOX_GRID_DEPTH,
+    datum: SANDBOX_DATUM,
     gridZ: DEFAULT_GRID_SIZE,
     startingCash: SANDBOX_DIFFICULTIES[clamped.difficulty].startingCash,
     availableExplosives: getAllExplosives().map(e => e.id),

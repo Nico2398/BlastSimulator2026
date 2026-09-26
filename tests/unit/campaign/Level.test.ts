@@ -12,7 +12,7 @@ describe('Level definition system (7.1)', () => {
     expect(level!.biome).toBe('desert_badlands');
     expect(level!.terrainSeed).toBeGreaterThan(0);
     expect(level!.gridX).toBeGreaterThan(0);
-    expect(level!.gridY).toBeGreaterThan(0);
+    expect(level!.datum).toBeGreaterThan(0);
     expect(level!.gridZ).toBeGreaterThan(0);
     expect(level!.startingCash).toBeGreaterThan(0);
     expect(level!.availableExplosives.length).toBeGreaterThan(0);
@@ -90,7 +90,7 @@ describe('Level definition system (7.1)', () => {
     expect(level!.biome).toBe('desert_badlands');
     expect(level!.terrainSeed).toBe(42);
     expect(level!.gridX).toBe(32);
-    expect(level!.gridY).toBe(20);
+    expect(level!.datum).toBe(11);
     expect(level!.gridZ).toBe(32);
     expect(level!.startingCash).toBe(340000);
     expect(level!.availableExplosives).toContain('pop_rock');
@@ -139,6 +139,13 @@ describe('Level definition system (7.1)', () => {
       state.campaign.activeLevelId = 'nonexistent_mine';
       expect(resolveContractPriceMultiplier(state)).toBe(1);
     });
+  });
+
+  it('every level carries its documented datum (#1191)', () => {
+    expect(getLevel('tutorial_pit')!.datum).toBe(11);
+    expect(getLevel('dusty_hollow')!.datum).toBe(22);
+    expect(getLevel('grumpstone_ridge')!.datum).toBe(30);
+    expect(getLevel('treranium_depths')!.datum).toBe(35);
   });
 
   it('tutorial_pit only has basic explosives', () => {

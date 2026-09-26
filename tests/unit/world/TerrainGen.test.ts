@@ -394,7 +394,7 @@ function levelTerrainConfig(levelId: string): TerrainConfig {
   if (!level) throw new Error(`levelTerrainConfig: no level ${levelId}`);
   return {
     sizeX: level.gridX,
-    datum: Math.floor(level.gridY * 0.55),
+    datum: level.datum,
     sizeZ: level.gridZ,
     seed: level.terrainSeed,
     climateBias: level.climateBias,
@@ -431,10 +431,14 @@ describe('TerrainGen — unclamped columns across every campaign level (#1189)',
   it('dusty_hollow genuinely exceeds its own old [1, sizeY - 1] band somewhere in the rect — or the exhaustive check above proves nothing', () => {
     const config = levelTerrainConfig('dusty_hollow');
     const { worldGen } = buildTerrainContext(config);
-    // The old (pre-#1190) sizeY-bounded band this level used to clamp into,
-    // computed from the level's own literal gridY rather than from config
-    // (which no longer carries a sizeY at all — datum is not a scan bound).
-    const oldSizeY = getAllLevels().find(l => l.id === 'dusty_hollow')!.gridY;
+    // The old (pre-#1190) sizeY-bounded band this level used to clamp into.
+    // dusty_hollow's old declared height (`gridY`, pre-#1191) was 40 — #1191
+    // dropped that field from `LevelDef` (dusty_hollow now authors `datum: 22`
+    // directly, the same Math.floor(40 * 0.55) result `gridY: 40` used to
+    // produce), so this is pinned to that same literal 40 rather than derived
+    // from the level (which no longer carries a sizeY-like field at all —
+    // datum is not a scan bound).
+    const oldSizeY = 40;
     let exceeds = false;
     for (let x = 0; x < config.sizeX && !exceeds; x++) {
       for (let z = 0; z < config.sizeZ && !exceeds; z++) {

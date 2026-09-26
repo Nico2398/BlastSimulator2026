@@ -434,7 +434,8 @@ export interface WorldState {
    * rather than `0 .. sizeX`.
    */
   sizeX: number;
-  sizeY: number;
+  /** The voxel Y the site centre's surface lands on — the generation datum. Invariant, like `baseSizeX`/`baseSizeZ` (#1191). */
+  datum: number;
   /** Depth of the site's live bounding box. See `sizeX`. */
   sizeZ: number;
   /** West edge of the bounding box. 0 for a site that has never grown west. */
@@ -442,7 +443,7 @@ export interface WorldState {
   /** North edge of the bounding box. 0 for a site that has never grown north. */
   minZ: number;
   /**
-   * The level's original width/depth — the generation datum every chunk,
+   * The level's original width/depth — the footprint baseline every chunk,
    * however late it is claimed, is generated against (#473 D3). Unlike
    * `sizeX`/`sizeZ` these never change.
    */
@@ -475,9 +476,9 @@ export interface SavedBlastPlan {
 }
 
 /** A world state for a site that starts as the square `sizeX × sizeZ` at the origin, before any expansion (#473). */
-export function createWorldState(sizeX: number, sizeY: number, sizeZ: number, gridReady: boolean): WorldState {
+export function createWorldState(sizeX: number, datum: number, sizeZ: number, gridReady: boolean): WorldState {
   return {
-    sizeX, sizeY, sizeZ,
+    sizeX, datum, sizeZ,
     minX: 0, minZ: 0,
     baseSizeX: sizeX, baseSizeZ: sizeZ,
     gridReady,

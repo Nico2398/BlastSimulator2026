@@ -1,7 +1,8 @@
 // Sandbox mode — through the real console runner and game loop
 //
 // #504: `sandbox start` collapsed to biome/difficulty/seed. Grid extents are
-// fixed (64x32x64) and starting cash comes from the named difficulty.
+// fixed (64x64, datum SANDBOX_DATUM) and starting cash comes from the named
+// difficulty.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -9,7 +10,7 @@ import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
 import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES } from '../../src/core/campaign/Sandbox.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_GRID_DEPTH, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
@@ -38,7 +39,7 @@ describe('sandbox mode', () => {
     expect(ctx.state).toBeTruthy();
     expect(ctx.grid).toBeTruthy();
     expect(ctx.state!.world).toMatchObject({
-      sizeX: DEFAULT_GRID_SIZE, sizeY: SANDBOX_GRID_DEPTH, sizeZ: DEFAULT_GRID_SIZE,
+      sizeX: DEFAULT_GRID_SIZE, datum: SANDBOX_DATUM, sizeZ: DEFAULT_GRID_SIZE,
     });
   });
 
@@ -104,15 +105,15 @@ describe('sandbox mode', () => {
     expect(result.success).toBe(true);
     expect(ctx.state!.cash).toBe(SANDBOX_DIFFICULTIES.hard.startingCash);
     expect(ctx.state!.world).toMatchObject({
-      sizeX: DEFAULT_GRID_SIZE, sizeY: SANDBOX_GRID_DEPTH, sizeZ: DEFAULT_GRID_SIZE,
+      sizeX: DEFAULT_GRID_SIZE, datum: SANDBOX_DATUM, sizeZ: DEFAULT_GRID_SIZE,
     });
   });
 
-  it('grid extent stays fixed at 64x32x64 regardless of a removed arg like size:', () => {
+  it('grid extent stays fixed at 64x64 (datum SANDBOX_DATUM) regardless of a removed arg like size:', () => {
     const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5 size:48');
     expect(result.success).toBe(true);
     expect(ctx.state!.world).toMatchObject({
-      sizeX: DEFAULT_GRID_SIZE, sizeY: SANDBOX_GRID_DEPTH, sizeZ: DEFAULT_GRID_SIZE,
+      sizeX: DEFAULT_GRID_SIZE, datum: SANDBOX_DATUM, sizeZ: DEFAULT_GRID_SIZE,
     });
   });
 

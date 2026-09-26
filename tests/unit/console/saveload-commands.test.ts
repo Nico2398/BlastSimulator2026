@@ -280,10 +280,10 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
 });
 
 // BlastSimulator2026 — loadGridForState's no-voxels fallback vs. a corrupted
-// world.baseSizeX/sizeY/baseSizeZ (#1218)
+// world.baseSizeX/datum/baseSizeZ (#1218)
 //
 // Before this fix, the no-voxels fallback (`regenerateGridParams`, world.ts)
-// read `state.world.baseSizeX`/`sizeY`/`baseSizeZ` straight off untrusted
+// read `state.world.baseSizeX`/`datum`/`baseSizeZ` straight off untrusted
 // parsed save JSON with no bounds check, then fed them into
 // `generateTerrain`/`buildGameNavGrid` — an absurd value (e.g. `1e9`) drove
 // `NavGrid.buildNavGrid`'s `width * height` column loop unbounded, hanging
@@ -299,7 +299,7 @@ describe('save/load — terrain generator identity + edit record (#1181)', () =>
 // to save it, exactly reproducing the pre-#1218 hang.
 describe("loadGridForState — no-voxels fallback rejects a corrupted world size field (#1218)", () => {
   /** Save a no-voxels state whose `world[field]` has been corrupted to `value`, under `slot`. */
-  function saveWithCorruptedWorldField(field: 'baseSizeX' | 'sizeY' | 'baseSizeZ', value: number, slot: string): void {
+  function saveWithCorruptedWorldField(field: 'baseSizeX' | 'datum' | 'baseSizeZ', value: number, slot: string): void {
     const buildCtx = makeCtx();
     (buildCtx.state!.world as unknown as Record<string, number>)[field] = value;
     buildCtx.grid = null; // no-voxels save — reproduces a pre-#1181-era save with no embedded voxels payload
@@ -331,9 +331,9 @@ describe("loadGridForState — no-voxels fallback rejects a corrupted world size
     expectRefusedAndUnchanged('huge-baseSizeX');
   });
 
-  it('refuses a no-voxels save with an absurdly large sizeY (1e9), leaving ctx unchanged', () => {
-    saveWithCorruptedWorldField('sizeY', 1e9, 'huge-sizeY');
-    expectRefusedAndUnchanged('huge-sizeY');
+  it('refuses a no-voxels save with an absurdly large datum (1e9), leaving ctx unchanged', () => {
+    saveWithCorruptedWorldField('datum', 1e9, 'huge-datum');
+    expectRefusedAndUnchanged('huge-datum');
   });
 
   it('refuses a no-voxels save with an absurdly large baseSizeZ (1e9), leaving ctx unchanged', () => {

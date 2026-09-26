@@ -52,20 +52,21 @@ describe('Console — world commands', () => {
       expect(ctx.state!.seed).toBe(42);
     });
 
-    it('defaults sizeY to the cubic size when size_y is omitted', () => {
+    it('derives datum from size via defaultDatumForSize (Math.floor(size * 0.55)) — no size_y named arg any more (#1191)', () => {
       newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '48' });
       expect(ctx.state!.world!.sizeX).toBe(48);
-      expect(ctx.state!.world!.sizeY).toBe(48);
       expect(ctx.state!.world!.sizeZ).toBe(48);
+      expect(ctx.state!.world!.datum).toBe(Math.floor(48 * 0.55));
+      expect(ctx.state!.world!.datum).toBe(26);
     });
 
-    it('breaks cubic when size_y is given explicitly (#458 T6.1/D13)', () => {
+    it('ignores a size_y named arg passed to new_game — it neither errors nor changes datum (#1191)', () => {
       const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '48', size_y: '20' });
       expect(result.success).toBe(true);
-      expect(result.output).toContain('48x20x48');
       expect(ctx.state!.world!.sizeX).toBe(48);
-      expect(ctx.state!.world!.sizeY).toBe(20);
       expect(ctx.state!.world!.sizeZ).toBe(48);
+      expect(ctx.state!.world!.datum).toBe(Math.floor(48 * 0.55));
+      expect(ctx.state!.world!.datum).not.toBe(20);
       expect(ctx.grid!.sizeX).toBe(48);
       expect(ctx.grid!.sizeZ).toBe(48);
     });
@@ -249,7 +250,7 @@ describe('Console — world commands', () => {
       ctx = makeGameContext({ mineType: 'mountain', seed: '99', size: '32' });
       const result = terrainInfoCommand(ctx, [], {});
       expect(result.success).toBe(true);
-      expect(result.output).toContain('32x32x32');
+      expect(result.output).toContain('32x32');
       expect(result.output).toContain('mountain');
     });
 

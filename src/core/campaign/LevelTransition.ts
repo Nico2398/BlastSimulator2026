@@ -96,7 +96,7 @@ export function createGameForLevel(
   };
 
   const newState = createGame(config);
-  newState.world = createWorldState(level.gridX, level.gridY, level.gridZ, false);
+  newState.world = createWorldState(level.gridX, level.datum, level.gridZ, false);
 
   return newState;
 }

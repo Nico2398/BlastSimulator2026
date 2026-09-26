@@ -89,7 +89,7 @@ describe('Campaign', () => {
     expect(level!.biome).toBe('desert_badlands');
     expect(level!.terrainSeed).toBe(1138);
     expect(level!.gridX).toBe(96);
-    expect(level!.gridY).toBe(40);
+    expect(level!.datum).toBe(22);
     expect(level!.gridZ).toBe(96);
     expect(level!.startingCash).toBe(50000);
     expect(level!.unlockThreshold).toBe(80000);
@@ -348,7 +348,7 @@ describe('Campaign', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('tutorial_pit');
-    expect(result.output).toContain('32×20×32');
+    expect(result.output).toContain('32×32');
     expect(result.output).toContain(`$${TUTORIAL_START_CASH.toLocaleString('en-US')}`);
 
     // State should be set up
@@ -358,7 +358,7 @@ describe('Campaign', () => {
     expect(ctx.state!.world).not.toBeNull();
     expect(ctx.state!.world!.gridReady).toBe(true);
     expect(ctx.state!.world!.sizeX).toBe(32);
-    expect(ctx.state!.world!.sizeY).toBe(20);
+    expect(ctx.state!.world!.datum).toBe(11);
     expect(ctx.state!.world!.sizeZ).toBe(32);
 
     // Grid should be generated

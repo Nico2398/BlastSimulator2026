@@ -72,18 +72,12 @@ describe('makeGameContext', () => {
     expect(ctx.grid!.sizeX).toBe(32);
   });
 
-  it('forwards `size` only, resizing the grid on all three axes (sizeY defaults to size when sizeY is not given, mirroring newGameCommand)', () => {
+  it('forwards `size` only, deriving datum from it via defaultDatumForSize (Math.floor(size * 0.55)) — the `sizeY` option is gone (#1191)', () => {
     const ctx = makeGameContext({ size: 16 });
     expect(ctx.grid!.sizeX).toBe(16);
     expect(ctx.grid!.sizeZ).toBe(16);
-    expect(ctx.state!.world!.sizeY).toBe(16);
-  });
-
-  it('forwards `sizeY` independently of `size`', () => {
-    const ctx = makeGameContext({ size: 16, sizeY: 8 });
-    expect(ctx.grid!.sizeX).toBe(16);
-    expect(ctx.grid!.sizeZ).toBe(16);
-    expect(ctx.state!.world!.sizeY).toBe(8);
+    expect(ctx.state!.world!.datum).toBe(Math.floor(16 * 0.55));
+    expect(ctx.state!.world!.datum).toBe(8);
   });
 
   it('forwards `cash`, overriding the STARTING_CASH default', () => {

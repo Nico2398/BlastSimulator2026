@@ -29,7 +29,13 @@ if (!treraniumDepths) {
   throw new Error("VoxelGridMemory.test.ts: campaign level 'treranium_depths' not found — has it been renamed?");
 }
 
-const BASE_SIZE_Y = treraniumDepths.gridY;
+// treranium_depths' old declared height (`gridY`, pre-#1191) — this suite's
+// own synthetic "declared height" fixture for proving memory scales with
+// real generation depth, not a dense model's declared one. #1191 dropped
+// `gridY` from `LevelDef` (treranium_depths now authors `datum: 35` directly,
+// the same Math.floor(64 * 0.55) result `gridY: 64` used to produce), so this
+// is pinned to that same literal 64 rather than derived from the level.
+const BASE_SIZE_Y = 64;
 const BASE_DATUM = Math.floor(BASE_SIZE_Y * 0.55);
 const TALL_DATUM = Math.floor((BASE_SIZE_Y * 4) * 0.55);
 

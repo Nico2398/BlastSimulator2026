@@ -79,13 +79,13 @@ export function sandboxCommand(
     scoreDecayRate: level.scoreDecayRate,
     ...(staffedFlag.staffed ? { staffed: true } : {}),
   });
-  ctx.state.world = createWorldState(level.gridX, level.gridY, level.gridZ, true);
+  ctx.state.world = createWorldState(level.gridX, level.datum, level.gridZ, true);
 
   regenerateGrid(ctx, {
     seed: config.seed,
     climateBias: level.climateBias,
     sizeX: level.gridX,
-    sizeY: level.gridY,
+    datum: level.datum,
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
     startingCrew: true,
@@ -98,7 +98,6 @@ export function sandboxCommand(
     success: true,
     output: t('sandbox.start_success', {
       gridX: level.gridX,
-      gridY: level.gridY,
       gridZ: level.gridZ,
       biome: config.biome,
       difficulty: config.difficulty,
