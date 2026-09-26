@@ -342,9 +342,13 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.fatigue = 25;
 
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    // #1204: completeRestForEmployee now resolves the building from the rest
+    // action's own buildingId rather than the employee's position — pass the
+    // placed building's id explicitly to exercise the with-building path.
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -356,9 +360,10 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     employee.fatigue = 25;
 
     state.buildings.unlockedTiers.living_quarters = 3; // tier 2+ requires research unlock
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 2);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 2);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -370,9 +375,10 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     employee.fatigue = 25;
 
     state.buildings.unlockedTiers.living_quarters = 3;
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 3);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 3);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -383,9 +389,10 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.fatigue = MAX_NEED_GAUGE;
 
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -423,9 +430,10 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     employee.restNeedKey = 'fatigue';
     employee.activeActionId = 777;
 
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.collapsing).toBe(false);
     expect(employee.restTicksRemaining).toBeNull();

@@ -23,6 +23,20 @@ import {
   NEED_REST_NO_BUILDING_CAP,
 } from '../../../src/core/config/balance.js';
 import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+
+/** A directly-editable flat, fully-walkable NavGrid (mirrors the identical helper used throughout the engine test suites, e.g. MoveTo.test.ts's setupSchool). */
+function makeFlatNavGrid(width: number, height: number): NavGrid {
+  const cells: NavCell[][] = [];
+  for (let z = 0; z < height; z++) {
+    const row: NavCell[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    }
+    cells.push(row);
+  }
+  return new NavGrid(width, height, cells);
+}
 
 /**
  * Rest/task timers are arrival-gated (#437): tickEmployees only queues
@@ -852,11 +866,27 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
       const rng = new Random(SEED);
       applyPolicy(state, { shiftMode: 'shift_8h' });
       state.buildings.unlockedTiers.living_quarters = 3;
-      // Co-located with the employee (0,0) so arrival resolves in one step
-      // (mirrors this file's own resolveArrival doc comment).
-      placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, tier);
+      // #1204: a forced rest now walks INTO the living_quarters (beginRestTravel
+      // routes through moveTo's {buildingId} overload, entering unseen on
+      // arrival) rather than merely repositioning to it, so a genuine NavGrid
+      // and a real ring cell are required for that walk to resolve at all —
+      // without one, moveTo's building-entry branch refuses (no route) and the
+      // employee never rests. The employee starts already ON the building's
+      // ring (one cell west of its footprint, valid regardless of tier: the
+      // footprint always grows east/south from (building.x, building.z)) so
+      // the walk-in is zero-length and still resolves in a single
+      // resolveArrival() call below, exactly like every other "co-located"
+      // fixture in this file.
+      const grid = makeFlatNavGrid(24, 24);
+      for (let z = 10; z <= 13; z++) {
+        for (let x = 10; x <= 14; x++) {
+          grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+        }
+      }
+      state.navGrid = grid;
+      placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100, tier);
 
-      const { employee } = hireEmployee(state.employees, 'driller', rng);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 9, 10);
       employee.activeActionId = 1100;
       employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
       employee.fatigue = 10;

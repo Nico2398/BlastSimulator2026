@@ -280,12 +280,21 @@ export function completeRestForEmployee(state: GameState, emp: Employee, needKey
  * A mounted employee always keeps the plain (x, z) call (a mounted rest never
  * enters a building — #1122), and so does the no-building rest-in-place case
  * (buildingId undefined) — both leave the mount-continuity handling below
- * untouched.
+ * untouched. A `buildingId` that no longer resolves to any building (demolished
+ * between claim and dispatch) falls back to the same plain (x, z) walk rather
+ * than leaving the employee with no itinerary at all — `moveTo`'s `{buildingId}`
+ * overload refuses outright (`move_to.building_not_found`) instead of ever
+ * installing a partial itinerary, so this is the one call site responsible for
+ * degrading that refusal into the ordinary reposition every other rest still
+ * gets.
  */
 export function beginRestTravel(state: GameState, emp: Employee, x: number, z: number, buildingId?: number): void {
   const wasMounted = isMounted(emp.locomotion);
-  const result = !wasMounted && buildingId !== undefined
+  const viaBuilding = !wasMounted && buildingId !== undefined
     ? moveTo(state, emp.id, { buildingId }, { allowUnreachable: true })
+    : undefined;
+  const result = viaBuilding?.success
+    ? viaBuilding
     : moveTo(state, emp.id, { x, z }, { allowUnreachable: true });
   if (wasMounted && result.success && !hasClaimableSameRoleFollowUp(state, emp)) {
     alightOnArrival(emp);
