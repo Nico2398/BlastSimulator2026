@@ -29,7 +29,7 @@ function rockVoxel(rockId: string): VoxelData {
 
 /** A cube of solid rock of one type. */
 function solidGrid(size: number, rockId = 'cruite'): VoxelGrid {
-  const grid = new VoxelGrid(size, size, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
@@ -40,15 +40,16 @@ function solidGrid(size: number, rockId = 'cruite'): VoxelGrid {
   return grid;
 }
 
-function wholeGrid(grid: VoxelGrid): BlastBox {
+/** `height` is the grid's own constructed height — callers pass what they built it with. */
+function wholeGrid(grid: VoxelGrid, height: number): BlastBox {
   return {
     minX: grid.minX, minY: 0, minZ: grid.minZ,
-    maxX: grid.maxX, maxY: grid.sizeY, maxZ: grid.maxZ,
+    maxX: grid.maxX, maxY: height, maxZ: grid.maxZ,
   };
 }
 
-function fieldOver(grid: VoxelGrid) {
-  return createEnergyField(grid, wholeGrid(grid));
+function fieldOver(grid: VoxelGrid, height: number) {
+  return createEnergyField(grid, wholeGrid(grid, height));
 }
 
 const CRUITE = getRock('cruite')!.energyAbsorption;   // 200
@@ -70,7 +71,7 @@ describe('EnergyPropagation — computeVoxelThreshold', () => {
   });
 
   it('a mixed voxel absorbs the coefficient-weighted blend', () => {
-    const grid = new VoxelGrid(3, 3, 3);
+    const grid = new VoxelGrid(3, 3);
     grid.setVoxel(1, 1, 1, {
       composition: { rocks: [
         { rockId: 'cruite', coefficient: 0.5 },
@@ -90,7 +91,7 @@ describe('EnergyPropagation — computeVoxelThreshold', () => {
   });
 
   it('air absorbs nothing', () => {
-    const grid = new VoxelGrid(3, 3, 3);
+    const grid = new VoxelGrid(3, 3);
     expect(computeVoxelThreshold(grid, 1, 1, 1)).toBe(0);
   });
 });
@@ -99,21 +100,21 @@ describe('EnergyPropagation — computeVoxelThreshold', () => {
 
 describe('EnergyPropagation — createEnergyField', () => {
   it('marks rock as non-air and records its threshold', () => {
-    const field = fieldOver(solidGrid(3));
+    const field = fieldOver(solidGrid(3), 3);
     expect(isAirAt(field, 1, 1, 1)).toBe(false);
     expect(thresholdAt(field, 1, 1, 1)).toBeCloseTo(CRUITE, 6);
   });
 
   it('marks empty voxels as air with no threshold', () => {
-    const grid = new VoxelGrid(3, 3, 3);
+    const grid = new VoxelGrid(3, 3);
     grid.setVoxel(1, 1, 1, rockVoxel('cruite'));
-    const field = fieldOver(grid);
+    const field = fieldOver(grid, 3);
     expect(isAirAt(field, 0, 0, 0)).toBe(true);
     expect(thresholdAt(field, 0, 0, 0)).toBe(0);
   });
 
   it('treats coordinates outside the box as air', () => {
-    const field = fieldOver(solidGrid(3));
+    const field = fieldOver(solidGrid(3), 3);
     expect(isAirAt(field, 99, 99, 99)).toBe(true);
     expect(effectiveAt(field, 99, 99, 99)).toBe(0);
   });
@@ -144,7 +145,7 @@ describe('EnergyPropagation — clampBoxToGrid', () => {
 
   it('#1186: energy seeded into a field entirely below y=0 propagates normally', () => {
     // Solid rock from y=-30..-11 (below the world's old y>=0 floor).
-    const grid = new VoxelGrid(7, 1, 7);
+    const grid = new VoxelGrid(7, 7);
     for (let z = 0; z < 7; z++) {
       for (let y = -30; y < -10; y++) {
         for (let x = 0; x < 7; x++) grid.setVoxel(x, y, z, rockVoxel('cruite'));
@@ -165,7 +166,7 @@ describe('EnergyPropagation — clampBoxToGrid', () => {
 
 describe('EnergyPropagation — seedEnergy', () => {
   it('energy below a voxel capacity is fully absorbed and never overflows', () => {
-    const field = fieldOver(solidGrid(5));
+    const field = fieldOver(solidGrid(5), 5);
     seedEnergy(field, [{ x: 2, y: 2, z: 2, energy: CRUITE * 0.5 }]);
 
     expect(effectiveAt(field, 2, 2, 2)).toBeCloseTo(CRUITE * 0.5, 3);
@@ -175,7 +176,7 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('energy beyond a voxel capacity saturates it and spreads outward', () => {
-    const field = fieldOver(solidGrid(7));
+    const field = fieldOver(solidGrid(7), 7);
     seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 20 }]);
 
     expect(effectiveAt(field, 3, 3, 3)).toBeCloseTo(CRUITE, 3);
@@ -184,7 +185,7 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('conserves energy — everything is either retained or accounted as dissipated', () => {
-    const field = fieldOver(solidGrid(9));
+    const field = fieldOver(solidGrid(9), 9);
     seedEnergy(field, [{ x: 4, y: 4, z: 4, energy: CRUITE * 200 }]);
 
     expect(totalEffective(field) + field.dissipated).toBeCloseTo(field.seeded, 0);
@@ -194,14 +195,14 @@ describe('EnergyPropagation — seedEnergy', () => {
     const grid = solidGrid(7);
     // Carve an open pit above the charge.
     for (let z = 0; z < 7; z++) for (let x = 0; x < 7; x++) grid.clearVoxel(x, 6, z);
-    const field = fieldOver(grid);
+    const field = fieldOver(grid, 7);
     seedEnergy(field, [{ x: 3, y: 5, z: 3, energy: CRUITE * 150 }]);
 
     expect(totalEffective(field) + field.dissipated).toBeCloseTo(field.seeded, 0);
   });
 
   it('energy decays with distance from the charge', () => {
-    const field = fieldOver(solidGrid(15));
+    const field = fieldOver(solidGrid(15), 15);
     seedEnergy(field, [{ x: 7, y: 7, z: 7, energy: CRUITE * 400 }]);
 
     const near = effectiveAt(field, 9, 7, 7);
@@ -210,7 +211,7 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('spreads symmetrically along every axis in uniform rock', () => {
-    const field = fieldOver(solidGrid(11));
+    const field = fieldOver(solidGrid(11), 11);
     seedEnergy(field, [{ x: 5, y: 5, z: 5, energy: CRUITE * 300 }]);
 
     const px = effectiveAt(field, 7, 5, 5);
@@ -226,7 +227,7 @@ describe('EnergyPropagation — seedEnergy', () => {
     const grid = solidGrid(11);
     // A solid air wall at x = 6, separating the charge from everything beyond.
     for (let z = 0; z < 11; z++) for (let y = 0; y < 11; y++) grid.clearVoxel(6, y, z);
-    const field = fieldOver(grid);
+    const field = fieldOver(grid, 11);
     seedEnergy(field, [{ x: 3, y: 5, z: 5, energy: CRUITE * 500 }]);
 
     expect(effectiveAt(field, 5, 5, 5)).toBeGreaterThan(0);
@@ -235,8 +236,8 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('hard rock keeps the blast tighter than soft rock for the same charge', () => {
-    const soft = fieldOver(solidGrid(15, 'cruite'));
-    const hard = fieldOver(solidGrid(15, 'titanite'));
+    const soft = fieldOver(solidGrid(15, 'cruite'), 15);
+    const hard = fieldOver(solidGrid(15, 'titanite'), 15);
     const charge = TITANITE * 8;
 
     seedEnergy(soft, [{ x: 7, y: 7, z: 7, energy: charge }]);
@@ -252,8 +253,8 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('a charge in air has nothing to work on', () => {
-    const grid = new VoxelGrid(5, 5, 5);
-    const field = fieldOver(grid);
+    const grid = new VoxelGrid(5, 5);
+    const field = fieldOver(grid, 5);
     seedEnergy(field, [{ x: 2, y: 2, z: 2, energy: 5000 }]);
 
     expect(totalEffective(field)).toBe(0);
@@ -261,7 +262,7 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('ignores non-finite, negative and out-of-box seeds', () => {
-    const field = fieldOver(solidGrid(5));
+    const field = fieldOver(solidGrid(5), 5);
     const seeds: EnergySeed[] = [
       { x: 2, y: 2, z: 2, energy: Number.NaN },
       { x: 2, y: 2, z: 2, energy: -500 },
@@ -274,7 +275,7 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('terminates well within the iteration guard', () => {
-    const field = fieldOver(solidGrid(15));
+    const field = fieldOver(solidGrid(15), 15);
     seedEnergy(field, [{ x: 7, y: 7, z: 7, energy: CRUITE * 1000 }]);
 
     expect(field.iterations).toBeGreaterThan(0);
@@ -282,8 +283,8 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('is deterministic — same input, same field', () => {
-    const a = fieldOver(solidGrid(9));
-    const b = fieldOver(solidGrid(9));
+    const a = fieldOver(solidGrid(9), 9);
+    const b = fieldOver(solidGrid(9), 9);
     const seeds = [{ x: 4, y: 4, z: 4, energy: CRUITE * 120 }];
 
     seedEnergy(a, seeds);
@@ -294,8 +295,8 @@ describe('EnergyPropagation — seedEnergy', () => {
   });
 
   it('two charges deposit more energy than one', () => {
-    const one = fieldOver(solidGrid(11));
-    const two = fieldOver(solidGrid(11));
+    const one = fieldOver(solidGrid(11), 11);
+    const two = fieldOver(solidGrid(11), 11);
 
     seedEnergy(one, [{ x: 4, y: 5, z: 5, energy: CRUITE * 60 }]);
     seedEnergy(two, [

@@ -39,7 +39,7 @@ describe('isDestinationOccupied (#954 follow-up fix)', () => {
 
   function buildFlatNavGridState(): GameState {
     const state = createGame({ seed: SEED });
-    const vg = new VoxelGrid(5, 5, 5);
+    const vg = new VoxelGrid(5, 5);
     for (let x = 0; x < 5; x++) {
       for (let z = 0; z < 5; z++) {
         vg.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
@@ -82,7 +82,7 @@ describe('isDestinationOccupied (#954 follow-up fix)', () => {
 describe('updateVehicleCellOccupancy', () => {
   function buildFlatNavGridState(): GameState {
     const state = createGame({ seed: VEHICLE_TICK_SEED });
-    const vg = new VoxelGrid(5, 5, 5);
+    const vg = new VoxelGrid(5, 5);
     for (let x = 0; x < 5; x++) {
       for (let z = 0; z < 5; z++) {
         vg.setVoxel(x, 0, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });

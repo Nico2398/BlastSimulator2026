@@ -15,7 +15,7 @@ import {
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
-import { makeGameContext } from '../../helpers/gameContext.js';
+import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../../helpers/gameContext.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -407,7 +407,7 @@ describe('NavGrid patching — blast', () => {
 
     const solidCount = (x: number, z: number): number => {
       let n = 0;
-      for (let y = 0; y < grid.sizeY; y++) if (grid.densityAt(x, y, z) > 0) n++;
+      for (let y = 0; y < GENERATED_TERRAIN_GRID_SIZE_Y; y++) if (grid.densityAt(x, y, z) > 0) n++;
       return n;
     };
 

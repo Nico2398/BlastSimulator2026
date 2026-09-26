@@ -322,7 +322,7 @@ describe('replayTerrainEdits — unit-level round trip', () => {
   it('replays a dig + add + fracture edit record onto a fresh grid to match the live grid voxel for voxel', () => {
     const cruiteComp: VoxelRockComposition = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
 
-    const live = new VoxelGrid(8, 8, 8);
+    const live = new VoxelGrid(8, 8);
     const rockCompId = live.palette.intern(cruiteComp);
     for (let y = 0; y <= 4; y++) live.fillVoxel(2, y, 2, rockCompId, undefined, 1);
     live.clearVoxel(2, 4, 2);
@@ -333,7 +333,7 @@ describe('replayTerrainEdits — unit-level round trip', () => {
     // real freshly generated grid looks like before the recorded edits below
     // were ever made), built directly rather than depending on the mutators'
     // own (still-unimplemented) auto-recording.
-    const fresh = new VoxelGrid(8, 8, 8);
+    const fresh = new VoxelGrid(8, 8);
     // A real generator interns every composition it paints into the grid it
     // is generating — mirror that here so `fresh`'s own palette assigns
     // `rockCompId` the same index `live`'s did (both are fresh palettes, and
@@ -360,11 +360,11 @@ describe('replayTerrainEdits — unit-level round trip', () => {
   });
 
   it('replaying an empty edit record onto a grid identical to the live baseline leaves it unchanged', () => {
-    const live = new VoxelGrid(4, 4, 4);
+    const live = new VoxelGrid(4, 4);
     const compId = live.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     live.fillVoxel(1, 1, 1, compId, undefined, 1);
 
-    const fresh = new VoxelGrid(4, 4, 4);
+    const fresh = new VoxelGrid(4, 4);
     fresh.fillVoxel(1, 1, 1, compId, undefined, 1);
 
     replayTerrainEdits(fresh, TerrainEdits.empty());
@@ -381,10 +381,10 @@ describe('replaySegmentsInRange — narrow-range replay of one column\'s edit se
     edits.recordDig(2, 2, 4, 4);
     edits.recordAdd(2, 2, 5, 7, cruiteComp, { blingite: 0.3 });
 
-    const viaFullReplay = new VoxelGrid(8, 8, 8);
+    const viaFullReplay = new VoxelGrid(8, 8);
     replayTerrainEdits(viaFullReplay, edits);
 
-    const viaRangeReplay = new VoxelGrid(8, 8, 8);
+    const viaRangeReplay = new VoxelGrid(8, 8);
     replaySegmentsInRange(viaRangeReplay, edits.segmentsAt(2, 2), 2, 2, 0, 7);
 
     for (let y = 0; y <= 7; y++) {
@@ -399,10 +399,10 @@ describe('replaySegmentsInRange — narrow-range replay of one column\'s edit se
     const edits = TerrainEdits.empty();
     edits.recordAdd(3, 3, 0, 9, cruiteComp);
 
-    const viaFullReplay = new VoxelGrid(10, 10, 10);
+    const viaFullReplay = new VoxelGrid(10, 10);
     replayTerrainEdits(viaFullReplay, edits);
 
-    const viaRangeReplay = new VoxelGrid(10, 10, 10);
+    const viaRangeReplay = new VoxelGrid(10, 10);
     replaySegmentsInRange(viaRangeReplay, edits.segmentsAt(3, 3), 3, 3, 4, 6);
 
     for (let y = 4; y <= 6; y++) {
@@ -418,10 +418,10 @@ describe('replaySegmentsInRange — narrow-range replay of one column\'s edit se
     const edits = TerrainEdits.empty();
     edits.recordAdd(5, 5, 2, 6, cruiteComp, undefined, bottomBoundary, topBoundary);
 
-    const viaFullReplay = new VoxelGrid(8, 8, 8);
+    const viaFullReplay = new VoxelGrid(8, 8);
     replayTerrainEdits(viaFullReplay, edits);
 
-    const viaRangeReplay = new VoxelGrid(8, 8, 8);
+    const viaRangeReplay = new VoxelGrid(8, 8);
     replaySegmentsInRange(viaRangeReplay, edits.segmentsAt(5, 5), 5, 5, 2, 6);
 
     for (let y = 2; y <= 6; y++) {
@@ -435,7 +435,7 @@ describe('replaySegmentsInRange — narrow-range replay of one column\'s edit se
     const edits = TerrainEdits.empty();
     edits.recordAdd(4, 4, 0, 9, cruiteComp);
 
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     // Pre-existing state the [4, 6] call must not disturb.
     const preCompId = grid.palette.intern({ rocks: [{ rockId: 'molite', coefficient: 1 }] });
     grid.fillVoxel(4, 0, 4, preCompId, undefined, 1.0);
@@ -458,7 +458,7 @@ describe('replaySegmentsInRange — narrow-range replay of one column\'s edit se
     const edits = TerrainEdits.empty();
     edits.recordAdd(6, 6, 0, 2, cruiteComp);
 
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     replaySegmentsInRange(grid, edits.segmentsAt(6, 6), 6, 6, 5, 9); // segment is [0,2], range is [5,9] — no overlap
 
     for (let y = 5; y <= 9; y++) {

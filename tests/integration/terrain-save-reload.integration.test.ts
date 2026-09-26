@@ -24,7 +24,7 @@ import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, MAX_TERRAIN_GEN_DIMENSION, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 
 const BLAST_ORIGIN_X = 20;
 const BLAST_ORIGIN_Z = 20;
@@ -97,7 +97,7 @@ function assertChunkMatchesVoxelForVoxel(a: VoxelGrid, b: VoxelGrid, cx: number,
 
   for (let x = rect!.minX; x < rect!.maxX; x++) {
     for (let z = rect!.minZ; z < rect!.maxZ; z++) {
-      for (let y = 0; y < b.sizeY; y++) {
+      for (let y = 0; y < MAX_TERRAIN_GEN_DIMENSION; y++) {
         const aDensity = a.densityAt(x, y, z);
         const bDensity = b.densityAt(x, y, z);
         expect(aDensity, `density mismatch at (${x},${y},${z}): reloaded=${aDensity} reference=${bDensity}`).toBe(bDensity);
@@ -150,7 +150,7 @@ describe('terrain save/reload against treranium_depths (#1181)', () => {
       // still shows the interleaved hard/soft strata bands, not a single
       // uniform rock the way a mixedRockHardness-less regeneration would.
       const rocksWithDepth = new Set<string>();
-      for (let y = 0; y < live.grid!.sizeY; y++) {
+      for (let y = 0; y < MAX_TERRAIN_GEN_DIMENSION; y++) {
         const rock = live.grid!.dominantRockAt(UNTOUCHED_COLUMN_X, y, UNTOUCHED_COLUMN_Z);
         if (rock) rocksWithDepth.add(rock);
       }

@@ -414,7 +414,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const cells = makeCells(8);
     fillCells(grid, cells);
 
@@ -450,7 +450,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const cells = makeCells(8);
     fillCells(grid, cells);
 
@@ -484,7 +484,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const cells = makeCells(4);
     fillCells(grid, cells);
 
@@ -522,7 +522,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'blaster', rng);
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const cells = makeCells(4);
     fillCells(grid, cells);
 

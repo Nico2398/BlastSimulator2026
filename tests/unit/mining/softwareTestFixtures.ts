@@ -6,9 +6,9 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan, type BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 
-/** A filled 30x15x30 grid with a 4x4 hole pattern, charged and sequenced. */
+/** A 30x30 grid filled solid from y=0..8 with a 4x4 hole pattern, charged and sequenced. */
 export function makeTestPlan(): { grid: VoxelGrid; plan: BlastPlan } {
-  const grid = new VoxelGrid(30, 15, 30);
+  const grid = new VoxelGrid(30, 30);
   for (let z = 5; z <= 20; z++)
     for (let y = 0; y <= 8; y++)
       for (let x = 5; x <= 20; x++)

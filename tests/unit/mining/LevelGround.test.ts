@@ -42,8 +42,8 @@ function internRock(grid: VoxelGrid): number {
  * computeVoxelColumnSurfaceHeight reads back `height` exactly (integer) or
  * closely (fractional), unlike a plain solid-block fill.
  */
-function makeFlatGrid(sizeX: number, sizeY: number, sizeZ: number, height: number): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+function makeFlatGrid(sizeX: number, sizeZ: number, height: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeZ);
   const compId = internRock(grid);
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) setVoxelColumnSurfaceHeight(grid, x, z, height, compId);
@@ -57,9 +57,9 @@ function makeFlatGrid(sizeX: number, sizeY: number, sizeZ: number, height: numbe
  * running through the middle of the grid, for "rect spans two benches" tests.
  */
 function makeSteppedGrid(
-  sizeX: number, sizeY: number, sizeZ: number, splitX: number, lowHeight: number, highHeight: number,
+  sizeX: number, sizeZ: number, splitX: number, lowHeight: number, highHeight: number,
 ): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const grid = new VoxelGrid(sizeX, sizeZ);
   const compId = internRock(grid);
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
@@ -71,21 +71,21 @@ function makeSteppedGrid(
 
 describe('computeLevelTargetY', () => {
   it('returns the minimum surface height across a rect with mixed column heights', () => {
-    const grid = makeSteppedGrid(20, 30, 20, 10, 8, 18);
+    const grid = makeSteppedGrid(20, 20, 10, 8, 18);
     const rect: LevelOrderDef = { minX: 0, maxX: 19, minZ: 0, maxZ: 5 };
 
     expect(computeLevelTargetY(grid, rect)).toBe(8);
   });
 
   it('returns the shared height on a perfectly flat rect', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const rect: LevelOrderDef = { minX: 2, maxX: 10, minZ: 2, maxZ: 10 };
 
     expect(computeLevelTargetY(grid, rect)).toBe(15);
   });
 
   it('is driven by the continuous (fractional) minimum height, not one floored to an integer', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 5, 5, 8.3, compId);
     const rect: LevelOrderDef = { minX: 2, maxX: 10, minZ: 2, maxZ: 10 };
@@ -98,7 +98,7 @@ describe('computeLevelTargetY', () => {
 
 describe('computeLevelColumns', () => {
   it('contributes zero columns for a rect already at target height', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const rect: LevelOrderDef = { minX: 2, maxX: 6, minZ: 2, maxZ: 6 };
     const targetY = computeLevelTargetY(grid, rect);
 
@@ -106,7 +106,7 @@ describe('computeLevelColumns', () => {
   });
 
   it('returns [] for a rect that is already perfectly flat in continuous terms', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const rect: LevelOrderDef = { minX: 3, maxX: 9, minZ: 3, maxZ: 9 };
     const targetY = computeLevelTargetY(grid, rect);
 
@@ -114,7 +114,7 @@ describe('computeLevelColumns', () => {
   });
 
   it('includes a column whose continuous height exceeds targetY though its integer floor matches (the literal defect)', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     // Two columns at 24.500, one at 24.622 — every column shares integer
     // floor 24, so the old Math.floor(height) === Math.floor(targetY)
@@ -137,7 +137,7 @@ describe('computeLevelColumns', () => {
     const lowHeight = 10;
     const highHeight = lowHeight + NAV_BENCH_HEIGHT;
     const splitX = 10;
-    const grid = makeSteppedGrid(20, 30, 10, splitX, lowHeight, highHeight);
+    const grid = makeSteppedGrid(20, 10, splitX, lowHeight, highHeight);
     const rect: LevelOrderDef = { minX: 0, maxX: 19, minZ: 0, maxZ: 9 };
 
     const targetY = computeLevelTargetY(grid, rect);
@@ -160,7 +160,7 @@ describe('computeLevelColumns', () => {
 
 describe('computeLevelVolume', () => {
   it('sums continuous (fractional) height deltas across columns, not integer-rounded ones', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 0, 0, 20.5, compId);
     setVoxelColumnSurfaceHeight(grid, 1, 0, 20.25, compId);
@@ -172,7 +172,7 @@ describe('computeLevelVolume', () => {
   });
 
   it('contributes zero for a column at or below targetY', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 0, 0, 10, compId);
 
@@ -180,7 +180,7 @@ describe('computeLevelVolume', () => {
   });
 
   it('returns 0 for an empty column list', () => {
-    const grid = makeFlatGrid(10, 30, 10, 12);
+    const grid = makeFlatGrid(10, 10, 12);
     expect(computeLevelVolume(grid, [], 10)).toBe(0);
   });
 });
@@ -204,13 +204,13 @@ describe('validateLevelOrder', () => {
   const BASE_RECT: LevelOrderDef = { minX: 0, maxX: 9, minZ: 0, maxZ: 9 };
 
   it('accepts a valid rect with sufficient cash', () => {
-    const flatGrid = makeFlatGrid(30, 30, 30, 15);
+    const flatGrid = makeFlatGrid(30, 30, 15);
     const result = validateLevelOrder(BASE_RECT, 1_000_000, flatGrid);
     expect(result.success).toBe(true);
   });
 
   it('reports zero cost and empty columns for a rect already flat in continuous terms', () => {
-    const flatGrid = makeFlatGrid(30, 30, 30, 15);
+    const flatGrid = makeFlatGrid(30, 30, 15);
     const result = validateLevelOrder(BASE_RECT, 1_000_000, flatGrid);
     expect(result.success).toBe(true);
     expect(result.cost).toBe(0);
@@ -218,7 +218,7 @@ describe('validateLevelOrder', () => {
   });
 
   it('computes a nonzero cost for a rect whose columns share an integer floor but differ fractionally (defect 1 regression)', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     for (let z = 0; z < 10; z++) {
       for (let x = 0; x < 10; x++) setVoxelColumnSurfaceHeight(grid, x, z, 20.5, compId);
@@ -232,21 +232,21 @@ describe('validateLevelOrder', () => {
   });
 
   it('rejects non-finite rect coordinates', () => {
-    const flatGrid = makeFlatGrid(30, 30, 30, 15);
+    const flatGrid = makeFlatGrid(30, 30, 15);
     const result = validateLevelOrder({ minX: NaN, maxX: 9, minZ: 0, maxZ: 9 }, 1_000_000, flatGrid);
     expect(result.success).toBe(false);
     expect(result.cost).toBe(0);
   });
 
   it('rejects inverted rect coordinates (minX > maxX)', () => {
-    const flatGrid = makeFlatGrid(30, 30, 30, 15);
+    const flatGrid = makeFlatGrid(30, 30, 15);
     const result = validateLevelOrder({ minX: 9, maxX: 0, minZ: 0, maxZ: 9 }, 1_000_000, flatGrid);
     expect(result.success).toBe(false);
     expect(result.cost).toBe(0);
   });
 
   it('rejects inverted rect coordinates (minZ > maxZ)', () => {
-    const flatGrid = makeFlatGrid(30, 30, 30, 15);
+    const flatGrid = makeFlatGrid(30, 30, 15);
     const result = validateLevelOrder({ minX: 0, maxX: 9, minZ: 9, maxZ: 0 }, 1_000_000, flatGrid);
     expect(result.success).toBe(false);
     expect(result.cost).toBe(0);
@@ -254,7 +254,7 @@ describe('validateLevelOrder', () => {
 
   it('rejects a rect exceeding MAX_LEVEL_GROUND_AREA', () => {
     // 21x20 = 420 > 400.
-    const bigGrid = makeFlatGrid(40, 30, 40, 15);
+    const bigGrid = makeFlatGrid(40, 40, 15);
     const result = validateLevelOrder({ minX: 0, maxX: 20, minZ: 0, maxZ: 19 }, 100_000_000, bigGrid);
     expect(result.success).toBe(false);
     expect(result.cost).toBe(0);
@@ -262,14 +262,14 @@ describe('validateLevelOrder', () => {
 
   it('accepts a rect exactly at MAX_LEVEL_GROUND_AREA (boundary)', () => {
     // 20x20 = 400 exactly.
-    const bigGrid = makeFlatGrid(40, 30, 40, 15);
+    const bigGrid = makeFlatGrid(40, 40, 15);
     const result = validateLevelOrder({ minX: 0, maxX: 19, minZ: 0, maxZ: 19 }, 100_000_000, bigGrid);
     expect(result.success).toBe(true);
   });
 
   it('rejects insufficient cash', () => {
     // A step ensures nonzero volume to clear, so a real cost is computed.
-    const steppedGrid = makeSteppedGrid(20, 30, 20, 10, 10, 20);
+    const steppedGrid = makeSteppedGrid(20, 20, 10, 10, 20);
     const result = validateLevelOrder({ minX: 0, maxX: 19, minZ: 0, maxZ: 9 }, 0, steppedGrid);
     expect(result.success).toBe(false);
     expect(result.cost).toBe(0);
@@ -278,7 +278,7 @@ describe('validateLevelOrder', () => {
 
 describe('carveLevelColumns', () => {
   it('carves every listed column down to targetY, reporting a nonzero cleared count', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const columns = [{ x: 5, z: 5 }, { x: 6, z: 5 }];
 
     const result = carveLevelColumns(grid, columns, 10);
@@ -288,7 +288,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('never raises a column already at or below targetY — zero contribution, height left untouched', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 0, 0, 8, compId); // already below the target
 
@@ -298,7 +298,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('carves a column fractionally proud of targetY down to exactly targetY (the literal bug fix)', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 0, 0, 24.622, compId);
 
@@ -308,7 +308,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('re-reads live height at carve time: a column already carved to target by something else contributes nothing (staleness guard)', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 0, 0, 24.622, compId);
     // Something else (e.g. a blast) already lowered it to the target before carveLevelColumns runs.
@@ -320,7 +320,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('emits terrain:updated exactly once when it clears at least one column', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const emitter = new EventEmitter();
     const handler = vi.fn();
     emitter.on('terrain:updated', handler);
@@ -330,7 +330,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('does not emit terrain:updated when nothing is cleared (empty column list)', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const emitter = new EventEmitter();
     const handler = vi.fn();
     emitter.on('terrain:updated', handler);
@@ -341,7 +341,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('is idempotent: calling it again on the same now-levelled columns clears nothing more', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
     const columns = [{ x: 5, z: 5 }, { x: 6, z: 5 }];
 
     const first = carveLevelColumns(grid, columns, 10);
@@ -357,7 +357,7 @@ describe('carveLevelColumns', () => {
   // has no vertical cap.
 
   it('emits a region spanning exactly the levelled rows: minY = floor(targetY), maxY = ceil(highest pre-carve height carved) (#1185)', () => {
-    const grid = new VoxelGrid(20, 30, 20);
+    const grid = new VoxelGrid(20, 20);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 5, 5, 18, compId);
     setVoxelColumnSurfaceHeight(grid, 6, 5, 12, compId);
@@ -375,7 +375,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('rounds a fractional targetY and a fractional pre-carve height outward (floor for minY, ceil for maxY) (#1185)', () => {
-    const grid = new VoxelGrid(20, 30, 20);
+    const grid = new VoxelGrid(20, 20);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 3, 3, 18.2, compId);
 
@@ -391,7 +391,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('a column already at target height (skipped by the staleness guard) does not widen the region\'s X/Z or Y bounds (#1185)', () => {
-    const grid = new VoxelGrid(20, 30, 20);
+    const grid = new VoxelGrid(20, 20);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 5, 5, 18, compId);
     setVoxelColumnSurfaceHeight(grid, 6, 5, 12, compId);
@@ -413,7 +413,7 @@ describe('carveLevelColumns', () => {
   });
 
   it('reports a negative minY/maxY when levelling terrain whose ground sits entirely below y = 0 (#1185)', () => {
-    const grid = new VoxelGrid(20, 30, 20);
+    const grid = new VoxelGrid(20, 20);
     const compId = internRock(grid);
     setVoxelColumnSurfaceHeight(grid, 2, 2, -5, compId);
     setVoxelColumnSurfaceHeight(grid, 3, 2, -12, compId);
@@ -437,7 +437,7 @@ describe('carveLevelColumns', () => {
 
 describe('levelGroundRect', () => {
   it('cuts every column in the rect down to the same continuous height as the lowest one, in a single call', () => {
-    const grid = makeSteppedGrid(20, 30, 20, 2, 10, 13);
+    const grid = makeSteppedGrid(20, 20, 2, 10, 13);
 
     const result = levelGroundRect(grid, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 });
 
@@ -452,7 +452,7 @@ describe('levelGroundRect', () => {
   });
 
   it('levels a column integer-flush with target but fractionally proud of it (the literal defect 1 bug) — full round trip', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = internRock(grid);
     for (let z = 0; z < 2; z++) {
       for (let x = 0; x < 2; x++) setVoxelColumnSurfaceHeight(grid, x, z, 24.5, compId);
@@ -472,7 +472,7 @@ describe('levelGroundRect', () => {
   });
 
   it('leaves already-level (continuous) ground untouched and reports nothing cleared', () => {
-    const grid = makeFlatGrid(20, 30, 20, 15);
+    const grid = makeFlatGrid(20, 20, 15);
 
     const result = levelGroundRect(grid, { minX: 4, maxX: 7, minZ: 4, maxZ: 7 });
 
@@ -483,7 +483,7 @@ describe('levelGroundRect', () => {
   });
 
   it('emits terrain:updated once when it carves, and not at all when it does not', () => {
-    const stepped = makeSteppedGrid(20, 30, 20, 2, 10, 13);
+    const stepped = makeSteppedGrid(20, 20, 2, 10, 13);
     const emitter = new EventEmitter();
     const handler = vi.fn();
     emitter.on('terrain:updated', handler);
@@ -497,7 +497,7 @@ describe('levelGroundRect', () => {
   });
 
   it('is idempotent — a second call on the same rect clears nothing more', () => {
-    const grid = makeSteppedGrid(20, 30, 20, 2, 10, 13);
+    const grid = makeSteppedGrid(20, 20, 2, 10, 13);
 
     const first = levelGroundRect(grid, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 });
     const second = levelGroundRect(grid, { minX: 0, maxX: 3, minZ: 0, maxZ: 1 });
@@ -519,7 +519,7 @@ describe('levelGroundRect', () => {
 describe('cost and duration scale linearly with volume', () => {
   const H = 20;
   const L = 10; // excess = 10 per full column
-  const grid = makeSteppedGrid(30, 30, 3, 1, L, H); // only column x=0 is low (splitX=1)
+  const grid = makeSteppedGrid(30, 3, 1, L, H); // only column x=0 is low (splitX=1)
   const row = 1;
 
   const rectA: LevelOrderDef = { minX: 0, maxX: 4, minZ: row, maxZ: row }; // 5 cols -> volume 4*10=40

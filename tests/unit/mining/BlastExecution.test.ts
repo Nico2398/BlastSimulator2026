@@ -44,7 +44,7 @@ beforeEach(() => resetHoleIds());
 
 describe('executeBlast — crater', () => {
   it('breaks through to the surface, so the blast leaves a visible crater', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
 
     // 2×3 grid, spacing 4, origin (12,12) — holes at x∈{12,16,20}, z∈{12,16}.
@@ -79,7 +79,7 @@ describe('executeBlast — crater', () => {
   it('leaves rock standing where the charge is buried too deep to break out', () => {
     // A single small charge at the bottom of a very deep hole: it breaks rock
     // around itself, but the burden above is far too thick to lift.
-    const grid = new VoxelGrid(40, 40, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 30, 5, 25);
 
     const holes = createGridPlan({ x: 15, z: 15 }, 1, 1, 4, 28, 0.15);
@@ -96,7 +96,7 @@ describe('executeBlast — crater', () => {
   });
 
   it('does not excavate voxels far outside the blast zone', () => {
-    const grid = new VoxelGrid(60, 15, 60);
+    const grid = new VoxelGrid(60, 60);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
     // Solid column far from the drill grid — outside the energy bbox
     // (BLAST_ZONE_RADIUS), so nothing should touch it.
@@ -122,7 +122,7 @@ describe('executeBlast — crater', () => {
     // Same 2×3 grid/plan as the plain crater test, just shifted 30 voxels
     // down so the surface and every hole resolve to negative Y — proving the
     // blast zone and energy field are no longer floored at y=0.
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, -30, -20, 5, 25, 'blingite', 0.2);
 
     const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
@@ -144,7 +144,7 @@ describe('executeBlast — crater', () => {
   });
 
   it('returns null and leaves terrain untouched for an invalid blast plan', () => {
-    const grid = new VoxelGrid(20, 10, 20);
+    const grid = new VoxelGrid(20, 20);
     const holes = createGridPlan({ x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     fillRegion(grid, 'cruite', 0, 19, 0, 5, 0, 19);
     const plan = assembleBlastPlan(holes, {}, {});
@@ -195,7 +195,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
    * the charge to seed into.
    */
   function buildCrustFixture() {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'molite', coefficient: 1.0 }] });
     fillRegion(grid, 'molite', 5, 25, 0, 9, 5, 25);
     for (let z = 5; z <= 25; z++) {
@@ -262,7 +262,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
    * stale (0.6, 0.4) values; the real wiring rewrites them to (0.75, 0.25).
    */
   function buildStaleResidueFixture() {
-    const grid = new VoxelGrid(30, 20, 30);
+    const grid = new VoxelGrid(30, 30);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'molite', coefficient: 1.0 }] });
     for (let z = 5; z <= 20; z++) {
       for (let x = 5; x <= 20; x++) {
@@ -305,7 +305,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
 describe('executeBlast — flooded holes (wetHoleIds, water-sensitive explosive)', () => {
   /** Same 2×3 grid/plan as the crater tests above, built fresh so the two sides of a dry/flooded comparison never share a mutated grid. */
   function buildCraterPlan(explosiveId: string) {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
     const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
@@ -357,7 +357,7 @@ describe('executeBlast — flooded holes (wetHoleIds, water-sensitive explosive)
 
 describe('buildBlastReport', () => {
   it('carries the tick, rating, and per-blast totals straight from the result', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
     const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
@@ -385,7 +385,7 @@ describe('buildBlastReport', () => {
   });
 
   it('estimates max projection distance as the 45°-launch range of the fastest projected fragment', () => {
-    const grid = new VoxelGrid(40, 20, 40);
+    const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
     const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);

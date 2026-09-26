@@ -1092,7 +1092,7 @@ function makeRampSegmentAction(cells: { x: number; y: number; z: number }[]): Pe
 
 /** Fresh solid VoxelGrid, large enough to hold every cell makeRampCells(n) produces. */
 function makeSolidGridForCells(cells: { x: number; y: number; z: number }[]): VoxelGrid {
-  const grid = new VoxelGrid(Math.max(20, cells.length + 2), 5, 5);
+  const grid = new VoxelGrid(Math.max(20, cells.length + 2), 5);
   for (const cell of cells) {
     grid.setVoxel(cell.x, cell.y, cell.z, {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
@@ -1289,7 +1289,7 @@ function makeLevelGroundAction(columns: { x: number; z: number }[], targetY: num
 
 /** A flat VoxelGrid where every column in `columns` has its surface set to `height`. */
 function makeLevelGridForColumns(columns: { x: number; z: number }[], height: number): VoxelGrid {
-  const grid = new VoxelGrid(Math.max(20, columns.length + 2), 20, 5);
+  const grid = new VoxelGrid(Math.max(20, columns.length + 2), 5);
   const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1.0 }] });
   for (const { x, z } of columns) {
     setVoxelColumnSurfaceHeight(grid, x, z, height, compId);

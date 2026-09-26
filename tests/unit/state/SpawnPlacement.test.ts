@@ -18,7 +18,7 @@ function solidVoxel(): VoxelData {
 
 /** Flat ground across the whole site — every authored spawn is sound here. */
 function makeFlatGrid(size: number, topY = 1): VoxelGrid {
-  const grid = new VoxelGrid(size, topY + 3, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       for (let y = 0; y <= topY; y++) grid.setVoxel(x, y, z, solidVoxel());
@@ -35,7 +35,7 @@ function makeFlatGrid(size: number, topY = 1): VoxelGrid {
  */
 function makeWalledSpawnGrid(size: number, wallZ: number): VoxelGrid {
   const wallTopY = 12;
-  const grid = new VoxelGrid(size, wallTopY + 3, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const isWall = z === wallZ && x < size - 1;
@@ -82,7 +82,7 @@ function walledSite(size = 32): ReturnType<typeof createGame> {
 /** Ridge wall running the full grid width (axis 'z') or depth (axis 'x'), one gap. */
 function makeAxisRidgeGrid(size: number, ridgeCoord: number, gapCoord: number, axis: 'x' | 'z'): VoxelGrid {
   const wallTopY = 12;
-  const grid = new VoxelGrid(size, wallTopY + 3, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const onRidge = axis === 'z' ? z === ridgeCoord : x === ridgeCoord;

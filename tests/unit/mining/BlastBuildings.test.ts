@@ -69,12 +69,12 @@ function makeBlastPlan(holes: DrillHole[]) {
 }
 
 /**
- * Standard test grid: 20 × 10 × 20 voxels.
+ * Standard test grid: 20 × 20 footprint.
  * Cruite rock fills y = 0–4 across the footprint region (x/z = 0–15),
  * so getColumnSurfaceY returns 5 at any in-region column.
  */
 function makeTestGrid(): VoxelGrid {
-  const grid = new VoxelGrid(20, 10, 20);
+  const grid = new VoxelGrid(20, 20);
   fillRegion(grid, 0, 15, 0, 4, 0, 15);
   return grid;
 }

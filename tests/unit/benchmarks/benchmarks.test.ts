@@ -81,11 +81,10 @@ function solidVoxel(overrides?: Partial<VoxelData>): VoxelData {
 /** Build a VoxelGrid where every column has solid rock from y=0 to solidTopY (inclusive). */
 function makeSolidGrid(
   sizeX: number,
-  sizeY: number,
   sizeZ: number,
   solidTopY: number,
 ): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
       for (let y = 0; y <= solidTopY; y++) {
@@ -107,6 +106,9 @@ function setupBenchmarkNavGrid(): NavGrid {
   return grid;
 }
 
+/** Declared height of the grid `setupThousandVoxelBlast` builds — the grid itself no longer carries a `sizeY` to read, so this is threaded explicitly to callers that need the box's upper bound. */
+const THOUSAND_VOXEL_GRID_HEIGHT = 15;
+
 /** Set up a VoxelGrid (10×15×10) with ~1100 solid voxels and 3 drill holes with charges. */
 function setupThousandVoxelBlast(): {
   grid: VoxelGrid;
@@ -115,7 +117,7 @@ function setupThousandVoxelBlast(): {
   depths: Record<string, number>;
   surfaceYs: Record<string, number>;
 } {
-  const grid = makeSolidGrid(10, 15, 10, 10);
+  const grid = makeSolidGrid(10, 10, 10);
   // Add 3 drill holes at center (DrillHole has no y field)
   const hole1: DrillHole = { id: 'h1', x: 4, z: 4, depth: 8, diameter: 0.1 };
   const hole2: DrillHole = { id: 'h2', x: 5, z: 5, depth: 8, diameter: 0.1 };
@@ -136,7 +138,7 @@ function setupThousandVoxelBlast(): {
 
 /** Set up a large 100×20×100 VoxelGrid with solid rock from y=0 to y=19. */
 function setup100x100VoxelGrid(): VoxelGrid {
-  return makeSolidGrid(100, 20, 100, 19);
+  return makeSolidGrid(100, 100, 19);
 }
 
 /** Set up a fresh game state with seed 42, 8× speed, 20 employees, and 5 pending actions. */
@@ -209,7 +211,7 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
 
 /** Set up a survey benchmark scenario: 80×20×80 voxel grid with seismic survey params. */
 function setupSurveyBenchmark(): { grid: VoxelGrid; params: EstimateSurveyParams; rng: Random } {
-  const grid = makeSolidGrid(80, 20, 80, 15);
+  const grid = makeSolidGrid(80, 80, 15);
   const params: EstimateSurveyParams = {
     id: 1,
     method: 'seismic',
@@ -345,7 +347,7 @@ describe('Performance Benchmarks', () => {
         Math.floor(hole.z),
       ));
       const box = clampBoxToGrid(
-        { minX: grid.minX, minY: 0, minZ: grid.minZ, maxX: grid.maxX, maxY: grid.sizeY, maxZ: grid.maxZ },
+        { minX: grid.minX, minY: 0, minZ: grid.minZ, maxX: grid.maxX, maxY: THOUSAND_VOXEL_GRID_HEIGHT, maxZ: grid.maxZ },
         grid,
       )!;
 
@@ -518,7 +520,7 @@ describe('Performance Benchmarks', () => {
       // 4x4 chunks (64m x 64m footprint), 2 y-chunks deep, solid to y=20 --
       // large enough to exercise multiple boundary AND interior chunks at
       // once, the shape #560's chunk-skip is meant to matter for.
-      const grid = new VoxelGrid(64, 32, 64);
+      const grid = new VoxelGrid(64, 64);
       for (let x = 0; x < 64; x++)
         for (let y = 0; y < 20; y++)
           for (let z = 0; z < 64; z++)

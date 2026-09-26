@@ -29,7 +29,7 @@ function rockVoxel(rockId: string): VoxelData {
 }
 
 function solidGrid(size: number, rockId = 'cruite'): VoxelGrid {
-  const grid = new VoxelGrid(size, size, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
@@ -40,10 +40,11 @@ function solidGrid(size: number, rockId = 'cruite'): VoxelGrid {
   return grid;
 }
 
-function wholeGrid(grid: VoxelGrid): BlastBox {
+/** `height` is the grid's own constructed height (the size it was built with) — VoxelGrid itself no longer declares one. */
+function wholeGrid(grid: VoxelGrid, height: number): BlastBox {
   return {
     minX: grid.minX, minY: 0, minZ: grid.minZ,
-    maxX: grid.maxX, maxY: grid.sizeY, maxZ: grid.maxZ,
+    maxX: grid.maxX, maxY: height, maxZ: grid.maxZ,
   };
 }
 
@@ -54,7 +55,7 @@ const CRUITE = getRock('cruite')!.energyAbsorption; // 200
 describe('VoxelFragmentation — energy pass', () => {
   it('a voxel that reached its threshold breaks', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 7));
     seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 3 }]);
 
     const result = identifyFragmentedVoxels(field, grid);
@@ -64,7 +65,7 @@ describe('VoxelFragmentation — energy pass', () => {
 
   it('a voxel that never reached its threshold survives', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 7));
     seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.6 }]);
 
     const result = identifyFragmentedVoxels(field, grid);
@@ -75,8 +76,8 @@ describe('VoxelFragmentation — energy pass', () => {
   it('a bigger charge breaks more rock', () => {
     const small = solidGrid(15);
     const big = solidGrid(15);
-    const smallField = createEnergyField(small, wholeGrid(small));
-    const bigField = createEnergyField(big, wholeGrid(big));
+    const smallField = createEnergyField(small, wholeGrid(small, 15));
+    const bigField = createEnergyField(big, wholeGrid(big, 15));
 
     seedEnergy(smallField, [{ x: 7, y: 7, z: 7, energy: CRUITE * 20 }]);
     seedEnergy(bigField, [{ x: 7, y: 7, z: 7, energy: CRUITE * 200 }]);
@@ -90,8 +91,8 @@ describe('VoxelFragmentation — energy pass', () => {
   it('hard rock resists a charge that shatters soft rock', () => {
     const soft = solidGrid(11, 'cruite');
     const hard = solidGrid(11, 'titanite');
-    const softField = createEnergyField(soft, wholeGrid(soft));
-    const hardField = createEnergyField(hard, wholeGrid(hard));
+    const softField = createEnergyField(soft, wholeGrid(soft, 11));
+    const hardField = createEnergyField(hard, wholeGrid(hard, 11));
     const charge = CRUITE * 40;
 
     seedEnergy(softField, [{ x: 5, y: 5, z: 5, energy: charge }]);
@@ -106,8 +107,8 @@ describe('VoxelFragmentation — energy pass', () => {
   it('returns voxels in a deterministic order', () => {
     const gridA = solidGrid(9);
     const gridB = solidGrid(9);
-    const fieldA = createEnergyField(gridA, wholeGrid(gridA));
-    const fieldB = createEnergyField(gridB, wholeGrid(gridB));
+    const fieldA = createEnergyField(gridA, wholeGrid(gridA, 9));
+    const fieldB = createEnergyField(gridB, wholeGrid(gridB, 9));
 
     seedEnergy(fieldA, [{ x: 4, y: 4, z: 4, energy: CRUITE * 50 }]);
     seedEnergy(fieldB, [{ x: 4, y: 4, z: 4, energy: CRUITE * 50 }]);
@@ -118,7 +119,7 @@ describe('VoxelFragmentation — energy pass', () => {
 
   it('the mask and the list agree', () => {
     const grid = solidGrid(9);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 9));
     seedEnergy(field, [{ x: 4, y: 4, z: 4, energy: CRUITE * 60 }]);
 
     const result = identifyFragmentedVoxels(field, grid);
@@ -137,7 +138,7 @@ describe('VoxelFragmentation — energy pass', () => {
 describe('VoxelFragmentation — cracking', () => {
   it('rock that took real energy but held together is recorded as cracked', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 7));
     seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.7 }]);
 
     const result = identifyFragmentedVoxels(field, grid);
@@ -148,7 +149,7 @@ describe('VoxelFragmentation — cracking', () => {
 
   it('cracked rock is weakened for the next blast', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 7));
     seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.7 }]);
 
     identifyFragmentedVoxels(field, grid);
@@ -158,7 +159,7 @@ describe('VoxelFragmentation — cracking', () => {
 
   it('rock that took almost nothing is left alone', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 7));
     seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 0.2 }]);
 
     const result = identifyFragmentedVoxels(field, grid);
@@ -169,7 +170,7 @@ describe('VoxelFragmentation — cracking', () => {
 
   it('a broken voxel is not also counted as cracked', () => {
     const grid = solidGrid(7);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 7));
     seedEnergy(field, [{ x: 3, y: 3, z: 3, energy: CRUITE * 5 }]);
 
     const result = identifyFragmentedVoxels(field, grid);
@@ -186,11 +187,11 @@ describe('VoxelFragmentation — unsupported rock', () => {
   it('rock left floating by the blast comes down with it', () => {
     // A 5×5×5 grid whose only rock is a lone block in the middle, plus an
     // anchored column at the edge so the fill has something to hold on to.
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     for (let y = 0; y < 5; y++) grid.setVoxel(0, y, 0, rockVoxel('cruite'));
     grid.setVoxel(2, 2, 2, rockVoxel('cruite'));
 
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 5));
     const result = identifyFragmentedVoxels(field, grid);
 
     // The floating block never took any energy, but nothing connects it to the
@@ -208,7 +209,7 @@ describe('VoxelFragmentation — unsupported rock', () => {
     for (let y = 0; y < 5; y++) {
       for (let z = 3; z <= 5; z++) for (let x = 3; x <= 5; x++) grid.clearVoxel(x, y, z);
     }
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 9));
     const result = identifyFragmentedVoxels(field, grid);
 
     // Still attached sideways, so nothing detaches.
@@ -217,7 +218,7 @@ describe('VoxelFragmentation — unsupported rock', () => {
 
   it('rock touching the box shell counts as anchored', () => {
     const grid = solidGrid(5);
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 5));
     const result = identifyFragmentedVoxels(field, grid);
 
     expect(result.fragmented).toHaveLength(0);
@@ -226,13 +227,13 @@ describe('VoxelFragmentation — unsupported rock', () => {
 
   it('an island cut off by a blast is detached, and the count is reported', () => {
     // Two rock columns joined by a single bridge voxel; blast the bridge.
-    const grid = new VoxelGrid(7, 7, 7);
+    const grid = new VoxelGrid(7, 7);
     for (let y = 0; y < 7; y++) grid.setVoxel(0, y, 3, rockVoxel('cruite'));
     grid.setVoxel(1, 3, 3, rockVoxel('cruite'));   // bridge
     grid.setVoxel(2, 3, 3, rockVoxel('cruite'));   // island
     grid.setVoxel(3, 3, 3, rockVoxel('cruite'));   // island
 
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 7));
     seedEnergy(field, [{ x: 1, y: 3, z: 3, energy: CRUITE * 1.2 }]);
 
     const result = identifyFragmentedVoxels(field, grid);
@@ -257,7 +258,7 @@ describe('VoxelFragmentation — unsupported rock', () => {
     // The floating voxel here, with no neighbour at all, was never at risk
     // from that — this test just pins that removing the fallback didn't
     // regress the isolated-voxel case either.
-    const grid = new VoxelGrid(7, 20, 7);
+    const grid = new VoxelGrid(7, 7);
     for (let z = 0; z < 7; z++) {
       for (let x = 0; x < 7; x++) {
         grid.setVoxel(x, 0, z, rockVoxel('cruite'));
@@ -291,6 +292,8 @@ describe('VoxelFragmentation — unsupported rock', () => {
 describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
   const ROOF_X = 4, ROOF_Z = 4;
   const COLUMN_X = 8, COLUMN_Z = 0;
+  /** buildFixture's grid is solidGrid(FIXTURE_GRID_SIZE) — the grid's own constructed height, since VoxelGrid no longer declares one. */
+  const FIXTURE_GRID_SIZE = 9;
 
   /**
    * A 9x9x9 solid grid with the arch/overhang fixture from "an arch whose
@@ -300,7 +303,7 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
    * top via setVoxelColumnSurfaceHeight.
    */
   function buildFixture() {
-    const grid = solidGrid(9);
+    const grid = solidGrid(FIXTURE_GRID_SIZE);
     for (let y = 0; y < 5; y++) {
       for (let z = 3; z <= 5; z++) for (let x = 3; x <= 5; x++) grid.clearVoxel(x, y, z);
     }
@@ -315,14 +318,14 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
     expect(grid.densityAt(COLUMN_X, oldTopY! + 1, COLUMN_Z)).toBeGreaterThan(0);
 
     const roofBefore: number[] = [];
-    for (let y = 0; y < grid.sizeY; y++) roofBefore.push(grid.densityAt(ROOF_X, y, ROOF_Z));
+    for (let y = 0; y < FIXTURE_GRID_SIZE; y++) roofBefore.push(grid.densityAt(ROOF_X, y, ROOF_Z));
 
     return { grid, compId, oldTopY: oldTopY!, roofBefore };
   }
 
   /** Fragments and clears the column's topmost voxel, mirroring BlastExecution's own identify -> toClear -> clearVoxel loop. */
   function fragmentAndClearTop(grid: VoxelGrid, oldTopY: number) {
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, FIXTURE_GRID_SIZE));
     seedEnergy(field, [{ x: COLUMN_X, y: oldTopY, z: COLUMN_Z, energy: CRUITE * 5 }]);
     const fragResult = identifyFragmentedVoxels(field, grid);
     expect(isFragmented(fragResult, field, COLUMN_X, oldTopY, COLUMN_Z)).toBe(true);
@@ -335,7 +338,7 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
     fragmentAndClearTop(grid, oldTopY);
     renormaliseVoxelColumnAfterCarve(grid, COLUMN_X, COLUMN_Z, oldTopY);
 
-    for (let y = 0; y < grid.sizeY; y++) {
+    for (let y = 0; y < FIXTURE_GRID_SIZE; y++) {
       expect(grid.densityAt(ROOF_X, y, ROOF_Z), `roof density at y=${y} should be unchanged`).toBe(roofBefore[y]!);
     }
   });
@@ -354,26 +357,27 @@ describe('VoxelFragmentation — post-carve renormalisation (#1148)', () => {
     const newTopY = computeVoxelColumnSurfaceY(grid, COLUMN_X, COLUMN_Z);
     expect(newTopY).not.toBeNull();
     expect(grid.densityAt(COLUMN_X, newTopY!, COLUMN_Z)).toBe(1);
-    for (let y = newTopY! + 1; y < grid.sizeY; y++) {
+    for (let y = newTopY! + 1; y < FIXTURE_GRID_SIZE; y++) {
       expect(grid.densityAt(COLUMN_X, y, COLUMN_Z), `density at y=${y} should be 0`).toBe(0);
     }
   });
 
   it('returns null and touches nothing when the column\'s exposed top never moved', () => {
-    const grid = solidGrid(7);
+    const gridSize = 7; // the grid's own constructed height, since VoxelGrid no longer declares one
+    const grid = solidGrid(gridSize);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     setVoxelColumnSurfaceHeight(grid, 3, 3, 5.5, compId);
     const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
 
     const before: number[] = [];
-    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(3, y, 3));
+    for (let y = 0; y < gridSize; y++) before.push(grid.densityAt(3, y, 3));
 
     // A carve that never reaches this column at all — the exposed top is
     // identical to oldTopY, so renormalisation must be a complete no-op.
     const touchedY = renormaliseVoxelColumnAfterCarve(grid, 3, 3, oldTopY);
 
     expect(touchedY).toBeNull();
-    for (let y = 0; y < grid.sizeY; y++) {
+    for (let y = 0; y < gridSize; y++) {
       expect(grid.densityAt(3, y, 3), `density at y=${y} should be unchanged`).toBe(before[y]!);
     }
   });

@@ -16,6 +16,7 @@ import {
   chunkIndexOf,
   clampChunkRectToTile,
   CHUNK_SIZE,
+  MAX_TERRAIN_GEN_DIMENSION,
   type VoxelChunkSource,
 } from '../../../src/core/world/VoxelGrid.js';
 import { generateTerrain, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
@@ -36,7 +37,7 @@ describe('VoxelGrid', () => {
   });
 
   it('set and get a voxel at specific coordinates', () => {
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     grid.setVoxel(3, 4, 5, {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] },
       density: 0.9,
@@ -52,7 +53,7 @@ describe('VoxelGrid', () => {
   });
 
   it('clearVoxel sets density to 0 and composition to empty', () => {
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     grid.setVoxel(1, 1, 1, {
       composition: { rocks: [{ rockId: 'grumpite', coefficient: 1.0 }] },
       density: 0.8,
@@ -66,7 +67,7 @@ describe('VoxelGrid', () => {
   });
 
   it('getRegion returns all voxels in a bounding box', () => {
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     grid.setVoxel(2, 2, 2, { composition: { rocks: [{ rockId: 'a', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     grid.setVoxel(3, 3, 3, { composition: { rocks: [{ rockId: 'b', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     grid.setVoxel(5, 5, 5, { composition: { rocks: [{ rockId: 'c', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
@@ -77,7 +78,7 @@ describe('VoxelGrid', () => {
   });
 
   it('isInBounds correctly rejects out-of-range coordinates', () => {
-    const grid = new VoxelGrid(10, 10, 10);
+    const grid = new VoxelGrid(10, 10);
     expect(grid.isInBounds(0, 0, 0)).toBe(true);
     expect(grid.isInBounds(9, 9, 9)).toBe(true);
     expect(grid.isInBounds(10, 0, 0)).toBe(false);
@@ -87,7 +88,7 @@ describe('VoxelGrid', () => {
   });
 
   it('grid correctly stores ore density per voxel', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     grid.setVoxel(1, 1, 1, {
       composition: { rocks: [{ rockId: 'stubite', coefficient: 1.0 }] },
       density: 0.7,
@@ -100,7 +101,7 @@ describe('VoxelGrid', () => {
   });
 
   it('unset voxels return empty default', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     const v = grid.getVoxel(0, 0, 0);
     expect(v!.density).toBe(0);
     expect(v!.composition.rocks.length).toBe(0);
@@ -292,14 +293,14 @@ describe('clampChunkRectToTile', () => {
 // remaining, and fully equivalent, guard.
 describe('VoxelGrid — clamps untrusted rects reaching addChunkWithRect (#609)', () => {
   it('addChunkWithRect clamps a corrupted rect into the chunk\'s own tile', () => {
-    const grid = new VoxelGrid(0, 4, 0); // empty shell, same starting point decodeVoxelGrid builds
+    const grid = new VoxelGrid(0, 0); // empty shell, same starting point decodeVoxelGrid builds
     grid.addChunkWithRect(0, 0, { minX: 0, minZ: 0, maxX: 1e12, maxZ: 1e12 });
 
     expect(grid.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
   });
 
   it('addChunkWithRect on an already-owned chunk also clamps, not just on first allocation', () => {
-    const grid = new VoxelGrid(16, 4, 16); // owns chunk (0,0) already, full tile
+    const grid = new VoxelGrid(16, 16); // owns chunk (0,0) already, full tile
     grid.addChunkWithRect(0, 0, { minX: -1e12, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
 
     expect(grid.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
@@ -359,7 +360,7 @@ describe('CompositionPalette', () => {
 
 describe('VoxelGrid direct accessors', () => {
   it('densityAt / isSolidAt / fractureAt / dominantRockAt / compositionAt / oresAt round-trip through setVoxel', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     grid.setVoxel(2, 2, 2, {
       composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
       density: 0.8,
@@ -375,13 +376,13 @@ describe('VoxelGrid direct accessors', () => {
   });
 
   it('isSolidAt is false below the 0.5 density threshold', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     grid.setVoxel(1, 1, 1, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] }, density: 0.4, oreDensities: {}, fractureModifier: 1 });
     expect(grid.isSolidAt(1, 1, 1)).toBe(false);
   });
 
   it('out-of-bounds accessors return safe defaults instead of throwing', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     expect(grid.densityAt(-1, 0, 0)).toBe(0);
     expect(grid.isSolidAt(99, 0, 0)).toBe(false);
     expect(grid.fractureAt(0, -1, 0)).toBe(1.0);
@@ -391,14 +392,14 @@ describe('VoxelGrid direct accessors', () => {
   });
 
   it('unset voxels have no ore entry (oresAt returns undefined, not an empty object)', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     expect(grid.oresAt(0, 0, 0)).toBeUndefined();
   });
 });
 
 describe('VoxelGrid direct mutators', () => {
   it('fillVoxel sets density to 1.0 with the given palette index and ores', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'stubite', coefficient: 1.0 }] });
     grid.fillVoxel(1, 1, 1, compId, { blingite: 0.3 });
     expect(grid.densityAt(1, 1, 1)).toBe(1.0);
@@ -407,25 +408,25 @@ describe('VoxelGrid direct mutators', () => {
   });
 
   it('fillVoxel with no ores leaves oresAt undefined', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'stubite', coefficient: 1.0 }] });
     grid.fillVoxel(1, 1, 1, compId);
     expect(grid.oresAt(1, 1, 1)).toBeUndefined();
   });
 
   it('fillVoxel out of bounds is a silent no-op', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     expect(() => grid.fillVoxel(99, 0, 0, 0)).not.toThrow();
   });
 
   it('setFractureAt overwrites the fracture modifier', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     grid.setFractureAt(1, 1, 1, 0.42);
     expect(grid.fractureAt(1, 1, 1)).toBe(0.42);
   });
 
   it('scaleFractureAt multiplies the existing fracture modifier in place', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     grid.setFractureAt(1, 1, 1, 1.0);
     grid.scaleFractureAt(1, 1, 1, 0.7);
     expect(grid.fractureAt(1, 1, 1)).toBeCloseTo(0.7, 10);
@@ -434,7 +435,7 @@ describe('VoxelGrid direct mutators', () => {
   });
 
   it('clearVoxel resets fractureAt to 1.0 and removes ores', () => {
-    const grid = new VoxelGrid(5, 5, 5);
+    const grid = new VoxelGrid(5, 5);
     grid.setVoxel(1, 1, 1, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] }, density: 1, oreDensities: { dirtite: 0.5 }, fractureModifier: 0.3 });
     grid.clearVoxel(1, 1, 1);
     expect(grid.fractureAt(1, 1, 1)).toBe(1.0);
@@ -444,7 +445,7 @@ describe('VoxelGrid direct mutators', () => {
 
 describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () => {
   it('reports the constructor size as the bounding box, even when it does not divide by CHUNK_SIZE', () => {
-    const grid = new VoxelGrid(24, 8, 24);
+    const grid = new VoxelGrid(24, 24);
     expect(grid.sizeX).toBe(24);
     expect(grid.sizeZ).toBe(24);
     expect(grid.minX).toBe(0);
@@ -455,13 +456,13 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
   });
 
   it('allocates one chunk per CHUNK_SIZE square of the starting site', () => {
-    expect(new VoxelGrid(32, 8, 32).chunkCount).toBe(4);
-    expect(new VoxelGrid(24, 8, 24).chunkCount).toBe(4);
-    expect(new VoxelGrid(16, 8, 16).chunkCount).toBe(1);
+    expect(new VoxelGrid(32, 32).chunkCount).toBe(4);
+    expect(new VoxelGrid(24, 24).chunkCount).toBe(4);
+    expect(new VoxelGrid(16, 16).chunkCount).toBe(1);
   });
 
   it('addChunk extends the bounding box westward with negative coordinates', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const rect = grid.addChunk(-1, 0);
     expect(rect).toEqual({ minX: -16, minZ: 0, maxX: 0, maxZ: 16 });
     expect(grid.minX).toBe(-16);
@@ -469,7 +470,7 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
   });
 
   it('stores and reads a voxel at a negative coordinate', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(-1, -1);
     grid.setVoxel(-5, 3, -5, {
       composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] },
@@ -482,7 +483,7 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
   });
 
   it('addChunk on a partially owned edge chunk promotes it to its full span', () => {
-    const grid = new VoxelGrid(24, 8, 24);
+    const grid = new VoxelGrid(24, 24);
     expect(grid.isChunkPartial(1, 1)).toBe(true);
     expect(grid.isInBounds(28, 0, 28)).toBe(false);
 
@@ -493,26 +494,26 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
   });
 
   it('addChunk on an already-full chunk reports nothing changed', () => {
-    const grid = new VoxelGrid(32, 8, 32);
+    const grid = new VoxelGrid(32, 32);
     expect(grid.addChunk(0, 0)).toBeNull();
   });
 
   it('a bounding-box column the site does not own reads as air, not as a bounds error', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(1, 1); // an L: (0,0) and (1,1), so (1,0) sits in the box unowned
     expect(grid.sizeX).toBe(32);
     expect(grid.containsColumn(20, 4)).toBe(false);
     expect(grid.densityAt(20, 4, 4)).toBe(0);
   });
 
-  it('reports an unowned-column read to an installed reporter, but NOT a legitimate in-column read past sizeY (#1182)', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+  it('reports an unowned-column read to an installed reporter, but NOT a legitimate in-column read at an unallocated y (#1182)', () => {
+    const grid = new VoxelGrid(16, 16);
     const misses: Array<[number, number, number]> = [];
     const previous = setVoxelBoundsReporter((x, y, z) => { misses.push([x, y, z]); });
     try {
       grid.densityAt(4, 4, 4);   // fully in-bounds — not reported
       grid.densityAt(-1, 4, 4);  // unowned column — reported
-      grid.densityAt(4, 99, 4);  // owned column, y past sizeY — a legitimate unallocated-slab read, NOT reported
+      grid.densityAt(4, 99, 4);  // owned column, y beyond any written slab — a legitimate unallocated-slab read, NOT reported
     } finally {
       setVoxelBoundsReporter(previous);
     }
@@ -520,9 +521,9 @@ describe('VoxelGrid — chunked storage and signed coordinates (#473 P0)', () =>
   });
 });
 
-describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column succeed without allocating unless non-air (#1182)', () => {
+describe('VoxelGrid — reads/writes at any y for an owned column succeed without allocating unless non-air (#1182)', () => {
   it('fillVoxel below y=0 on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(4, -10, 4, compId, { blingite: 0.4 }, 0.9);
     expect(grid.densityAt(4, -10, 4)).toBe(0.9);
@@ -530,9 +531,9 @@ describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column
     expect(grid.oresAt(4, -10, 4)).toEqual({ blingite: 0.4 });
   });
 
-  it('setVoxel above y = sizeY + 10 on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
-    const grid = new VoxelGrid(16, 8, 16);
-    grid.setVoxel(4, 8 + 10, 4, {
+  it('setVoxel well above the surface on an owned column round-trips through densityAt/compositionAt/oresAt', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.setVoxel(4, 18, 4, {
       composition: { rocks: [{ rockId: 'molite', coefficient: 1 }] },
       density: 0.6,
       oreDensities: { sparkium: 0.2 },
@@ -543,14 +544,15 @@ describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column
     expect(grid.oresAt(4, 18, 4)).toEqual({ sparkium: 0.2 });
   });
 
-  it('isInBounds still rejects y = -10 and y = sizeY + 10 for an otherwise-owned column (regression guard — already passes today)', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+  it('isInBounds rejects y = -10 and y = MAX_TERRAIN_GEN_DIMENSION, but accepts y = MAX_TERRAIN_GEN_DIMENSION - 1, for an otherwise-owned column', () => {
+    const grid = new VoxelGrid(16, 16);
     expect(grid.isInBounds(4, -10, 4)).toBe(false);
-    expect(grid.isInBounds(4, 8 + 10, 4)).toBe(false);
+    expect(grid.isInBounds(4, MAX_TERRAIN_GEN_DIMENSION, 4)).toBe(false);
+    expect(grid.isInBounds(4, MAX_TERRAIN_GEN_DIMENSION - 1, 4)).toBe(true);
   });
 
   it('a never-written slab above/below the declared height reads default air values without allocating', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const before = grid.slabCount(0, 0);
     expect(grid.densityAt(4, -10, 4)).toBe(0);
     expect(grid.fractureAt(4, -10, 4)).toBe(1.0);
@@ -560,7 +562,7 @@ describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column
   });
 
   it('writing explicit air into a never-touched slab does not allocate it; a non-air write allocates exactly one', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const airCompId = grid.palette.intern({ rocks: [] });
     const before = grid.slabCount(0, 0);
 
@@ -572,7 +574,7 @@ describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column
   });
 
   it('clearVoxel on an already-air, never-written voxel does not allocate', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const before = grid.slabCount(0, 0);
     grid.clearVoxel(4, 30, 4);
     expect(grid.slabCount(0, 0)).toBe(before);
@@ -581,7 +583,7 @@ describe('VoxelGrid — reads/writes at y outside [0, sizeY) for an owned column
 
 describe('VoxelGrid — dirty-chunk tracking (#473 D4)', () => {
   it('marks a chunk dirty on any write', () => {
-    const grid = new VoxelGrid(32, 8, 32);
+    const grid = new VoxelGrid(32, 32);
     grid.markChunkPristine(0, 0);
     grid.markChunkPristine(1, 0);
     grid.clearVoxel(20, 1, 1);
@@ -590,7 +592,7 @@ describe('VoxelGrid — dirty-chunk tracking (#473 D4)', () => {
   });
 
   it('markChunkPristine takes a chunk back out of the dirty set', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.setFractureAt(1, 1, 1, 0.5);
     expect(grid.isChunkDirty(0, 0)).toBe(true);
     grid.markChunkPristine(0, 0);
@@ -598,7 +600,7 @@ describe('VoxelGrid — dirty-chunk tracking (#473 D4)', () => {
   });
 
   it('markChunkDirty is a no-op for a chunk the site does not own', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.markChunkPristine(0, 0);
     grid.markChunkDirty(5, 5);
     expect(grid.dirtyChunks()).toEqual([]);
@@ -607,13 +609,13 @@ describe('VoxelGrid — dirty-chunk tracking (#473 D4)', () => {
 
 describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#560)', () => {
   it('returns {min:0, max:0} for a freshly claimed, ungenerated chunk', () => {
-    const grid = new VoxelGrid(32, 8, 32); // 2x2 chunks, sizeY=8 -> nSlabs=1
+    const grid = new VoxelGrid(32, 32); // 2x2 chunks -> nSlabs=1
     expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 0 });
     expect(grid.chunkDensityRange(1, 1, 0)).toEqual({ min: 0, max: 0 });
   });
 
   it('widens min/max to include fillVoxel, setVoxel, and clearVoxel writes into a given y-slab', () => {
-    const grid = new VoxelGrid(16, 8, 16); // 1 chunk, nSlabs=1
+    const grid = new VoxelGrid(16, 16); // 1 chunk, nSlabs=1
     expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 0 });
 
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
@@ -633,7 +635,7 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   });
 
   it('once a slab is observed mixed (min=0, max=1), a later write that would locally narrow it leaves the summary widened', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(5, 5, 5, compId); // density 1.0 -> widens the slab to {min:0, max:1}
     expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 1 });
@@ -669,21 +671,22 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   // exercise through a since-deleted bulk-restore method.
 
   it('returns null for an unowned chunk', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     expect(grid.chunkDensityRange(5, 5, 0)).toBeNull(); // chunk (5,5) was never claimed
   });
 
   it("returns {min:0, max:0} — not null — for a slab index past an OWNED column's declared height (#1182)", () => {
     // Under the old dense model, slab 1 of an 8-tall grid didn't exist at all
     // (nSlabs = ceil(8/16) = 1) and this returned null. Under cubic slabs, the
-    // column at (0,0) is owned regardless, so a read past sizeY answers the
-    // same honest "nothing written here" {0,0} an in-range unwritten slab would.
-    const grid = new VoxelGrid(16, 8, 16);
+    // column at (0,0) is owned regardless, so a read past its declared height
+    // answers the same honest "nothing written here" {0,0} an in-range
+    // unwritten slab would.
+    const grid = new VoxelGrid(16, 16);
     expect(grid.chunkDensityRange(0, 0, 1)).toEqual({ min: 0, max: 0 });
   });
 
   it('an allocated, fully-written slab reflects its two distinct writes\' real min/max — NOT the same {0,0} an unallocated slab reads back (#1182)', () => {
-    const grid = new VoxelGrid(16, 24, 16); // single full chunk (0,0), sizeY=24
+    const grid = new VoxelGrid(16, 16); // single full chunk (0,0)
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     // Fully touch the whole y=16..31 cubic slab (slab index 1) with a baseline
@@ -708,17 +711,17 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
 
 describe('VoxelGrid.allocatedCyRange — inclusive cy range of chunk (cx,cz)\'s allocated slabs (#1188)', () => {
   it('returns null for a column with no chunk allocated at all', () => {
-    const grid = new VoxelGrid(16, 8, 16); // only chunk (0,0) is claimed
+    const grid = new VoxelGrid(16, 16); // only chunk (0,0) is claimed
     expect(grid.allocatedCyRange(5, 5)).toBeNull(); // chunk (5,5) was never touched
   });
 
   it('returns null for an owned chunk with zero allocated slabs', () => {
-    const grid = new VoxelGrid(16, 8, 16); // chunk (0,0) exists, but nothing was ever written into it
+    const grid = new VoxelGrid(16, 16); // chunk (0,0) exists, but nothing was ever written into it
     expect(grid.allocatedCyRange(0, 0)).toBeNull();
   });
 
   it('returns the inclusive [min, max] cy range spanning exactly the allocated slabs, including a gap', () => {
-    const grid = new VoxelGrid(16, 48, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(2, 2, 2, compId, undefined, 1); // y=2 -> cy=0
     grid.fillVoxel(3, 40, 3, compId, undefined, 1); // y=40 -> cy=2, leaving cy=1 unallocated
@@ -728,7 +731,7 @@ describe('VoxelGrid.allocatedCyRange — inclusive cy range of chunk (cx,cz)\'s 
 
 describe('computeVoxelColumnSurfaceY', () => {
   it('finds the highest solid voxel in a column', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(3, 0, 3, 0, undefined, 1);
     grid.fillVoxel(3, 4, 3, 0, undefined, 1);
     expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(4);
@@ -738,21 +741,21 @@ describe('computeVoxelColumnSurfaceY', () => {
   // sit at 0 or below, so -1 can no longer double as both a sentinel and a
   // real answer.
   it('#1184: returns null (not -1) for a column with nothing solid in it', () => {
-    expect(computeVoxelColumnSurfaceY(new VoxelGrid(16, 8, 16), 3, 3)).toBeNull();
+    expect(computeVoxelColumnSurfaceY(new VoxelGrid(16, 16), 3, 3)).toBeNull();
   });
 
   it('clamps to the site edge rather than the origin once the site has grown west', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(-1, 0);
     grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
     expect(computeVoxelColumnSurfaceY(grid, -99, 0)).toBe(2);
   });
 
   it('#1184: null (no ground anywhere) is distinct from a real height of exactly 0 on an owned column', () => {
-    const emptyGrid = new VoxelGrid(0, 8, 0);
+    const emptyGrid = new VoxelGrid(0, 0);
     expect(computeVoxelColumnSurfaceY(emptyGrid, 3, 3)).toBeNull();
 
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(5, 0, 5, 0, undefined, 1); // a real, legitimate surface at y = 0
     expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(0);
   });
@@ -760,7 +763,7 @@ describe('computeVoxelColumnSurfaceY', () => {
 
 describe('computeVoxelColumnSurfaceHeight (#491)', () => {
   it('matches computeVoxelColumnSurfaceY\'s column, at the half-voxel crossing for a clean solid-to-air boundary', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(3, 0, 3, 0, undefined, 1);
     grid.fillVoxel(3, 4, 3, 0, undefined, 1); // topmost solid at y=4; y=5 stays air (density 0)
     expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(4);
@@ -770,7 +773,7 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
   });
 
   it('interpolates a fractional (non-half) crossing height when the voxel above the topmost solid one is partially filled', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(3, 4, 3, compId, undefined, 1.0);
     grid.fillVoxel(3, 5, 3, compId, undefined, 0.3);
@@ -784,21 +787,21 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
   // requirement in #559's root cause 3. NaN is the honest answer: "this
   // column has no data", distinguishable from a real (possibly zero) height.
   it('#559: answers NaN for a column outside every owned chunk, rather than clamping to the site edge', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(-1, 0);
     grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
     expect(Number.isNaN(computeVoxelColumnSurfaceHeight(grid, -99, 0))).toBe(true);
   });
 
   it('#559: still answers NaN for an out-of-grid column even when sizeX/sizeZ are non-empty (not just the empty-grid early return)', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(3, 4, 3, 0, undefined, 1);
     expect(Number.isNaN(computeVoxelColumnSurfaceHeight(grid, 99, 3))).toBe(true);
     expect(Number.isNaN(computeVoxelColumnSurfaceHeight(grid, 3, -99))).toBe(true);
   });
 
   it('#559: an in-bounds column right at the site edge still answers a real (non-NaN) height', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(15, 4, 15, 0, undefined, 1);
     expect(computeVoxelColumnSurfaceHeight(grid, 15, 15)).toBeCloseTo(4.5, 6);
   });
@@ -807,14 +810,14 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
   // legitimately be exactly 0 (or negative), so 0 can no longer double as
   // both the sentinel and a real answer.
   it('#1184: returns NaN (not 0) for a column with no solid voxel at all', () => {
-    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3))).toBe(true);
+    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 16), 3, 3))).toBe(true);
   });
 
   it('#1184: NaN (no ground anywhere) is distinct from a real height of exactly 0 on an owned column', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.fillVoxel(5, 0, 5, 0, undefined, 1); // a real, legitimate surface height of 0
     expect(computeVoxelColumnSurfaceHeight(grid, 5, 5)).toBeCloseTo(0.5, 6);
-    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3))).toBe(true);
+    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 16), 3, 3))).toBe(true);
   });
 });
 
@@ -822,8 +825,8 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
 //
 // computeVoxelColumnSurfaceY/computeVoxelColumnSurfaceHeight must resolve
 // column surfaces directly from the generator + edit record (O(edits in that
-// column)), not by scanning [0, sizeY) — so a natural surface below y = 0 or
-// far above the grid's declared sizeY resolves correctly, with no vertical
+// column)), not by scanning from y = 0 — so a natural surface below y = 0 or
+// far above the grid's declared height resolves correctly, with no vertical
 // clamp either direction.
 
 /**
@@ -855,21 +858,21 @@ class FlatChunkSource implements VoxelChunkSource {
 
 describe('VoxelGrid.generatorSurfaceHeightAt (#1184)', () => {
   it('delegates to the attached chunkSource.surfaceHeightAt', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, 7));
     expect(grid.generatorSurfaceHeightAt(3, 3)).toBe(7);
   });
 
   it('is undefined when no chunkSource is attached', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     expect(grid.generatorSurfaceHeightAt(3, 3)).toBeUndefined();
   });
 });
 
 describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no vertical cap (#1184)', () => {
   it('resolves a generator-only surface below y = 0, without scanning up from y = 0', () => {
-    const grid = new VoxelGrid(16, 8, 16); // sizeY = 8 — an old [0, sizeY) scan could never see y = -5
+    const grid = new VoxelGrid(16, 16); // an old scan from y = 0 could never see y = -5
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, -5));
 
@@ -877,8 +880,8 @@ describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no ve
     expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(-5, 6);
   });
 
-  it('resolves a generator-only surface far above the grid\'s declared sizeY, without an upper clamp', () => {
-    const grid = new VoxelGrid(16, 8, 16); // sizeY = 8 — an old [0, sizeY) scan could never see y = 1000
+  it('resolves a generator-only surface far above the grid\'s declared height, without an upper clamp', () => {
+    const grid = new VoxelGrid(16, 16); // an old bounded scan could never see y = 1000
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, 1000));
 
@@ -887,7 +890,7 @@ describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no ve
   });
 
   it('an added island above the generator surface, with an untouched air gap between, is the topmost solid — not floor(generatorSurfaceHeightAt)', () => {
-    const grid = new VoxelGrid(16, 20, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, 4));
     expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(4); // sanity: natural surface really is at y=4
@@ -900,7 +903,7 @@ describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no ve
   });
 
   it('digging out the generator\'s natural top exposes a lower top than generatorSurfaceHeightAt alone would suggest', () => {
-    const grid = new VoxelGrid(16, 20, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, 4));
     expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(4);
@@ -912,7 +915,7 @@ describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no ve
   });
 
   it('material added directly (contiguously) on top of generated rock reports the top of the added segment', () => {
-    const grid = new VoxelGrid(16, 20, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, 4));
     expect(computeVoxelColumnSurfaceY(grid, 5, 5)).toBe(4);
@@ -925,11 +928,11 @@ describe('computeVoxelColumnSurfaceY / computeVoxelColumnSurfaceHeight — no ve
   });
 
   it('an off-site column reports null, distinct from a real height of exactly 0 elsewhere on the same grid', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, 0));
 
-    expect(computeVoxelColumnSurfaceY(new VoxelGrid(0, 8, 0), 3, 3)).toBeNull();
+    expect(computeVoxelColumnSurfaceY(new VoxelGrid(0, 0), 3, 3)).toBeNull();
     expect(computeVoxelColumnSurfaceY(grid, 3, 3)).toBe(0);
   });
 });
@@ -948,7 +951,7 @@ function writeSolidColumn(grid: VoxelGrid, compId: number, x: number, z: number,
 
 describe('computeColumnRangeY (#1185)', () => {
   it('returns the floor/ceil span of ground across a rect with mixed column heights, skipping no-ground columns', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     writeSolidColumn(grid, compId, 2, 2, 3); // surface height 3.5 -> floor 3, ceil 4
     writeSolidColumn(grid, compId, 7, 7, 8); // surface height 8.5 -> floor 8, ceil 9
@@ -960,7 +963,7 @@ describe('computeColumnRangeY (#1185)', () => {
   });
 
   it('reports a negative minY/maxY for a rect whose ground sits entirely below y = 0, unclamped', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     writeSolidColumn(grid, compId, 1, 1, -6); // surface height -5.5 -> floor -6, ceil -5
     writeSolidColumn(grid, compId, 4, 4, -3); // surface height -2.5 -> floor -3, ceil -2
@@ -973,7 +976,7 @@ describe('computeColumnRangeY (#1185)', () => {
   });
 
   it('returns null when no column in the rect has any ground', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     // Ground exists elsewhere in the grid, but not inside this rect.
     writeSolidColumn(grid, compId, 8, 8, 4);
@@ -984,7 +987,7 @@ describe('computeColumnRangeY (#1185)', () => {
   });
 
   it('returns null for a rect entirely off-site (unowned columns)', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     writeSolidColumn(grid, compId, 5, 5, 4);
 
@@ -996,24 +999,24 @@ describe('computeColumnRangeY (#1185)', () => {
 
 describe('firstEmptyLayerAboveGround (#1184)', () => {
   it('is one layer above a grounded column even when that surface sits below y = 0', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new FlatChunkSource(compId, -5));
     expect(firstEmptyLayerAboveGround(grid, 3, 3)).toBe(-4);
   });
 
   it('returns the default fallbackY (0) for a no-ground column', () => {
-    expect(firstEmptyLayerAboveGround(new VoxelGrid(16, 8, 16), 3, 3)).toBe(0);
+    expect(firstEmptyLayerAboveGround(new VoxelGrid(16, 16), 3, 3)).toBe(0);
   });
 
   it('returns a caller-supplied fallbackY for a no-ground column', () => {
-    expect(firstEmptyLayerAboveGround(new VoxelGrid(16, 8, 16), 3, 3, -1)).toBe(-1);
+    expect(firstEmptyLayerAboveGround(new VoxelGrid(16, 16), 3, 3, -1)).toBe(-1);
   });
 });
 
 describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   it('rounds a column previously solid well above the target down to a fractional height', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 10; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
 
@@ -1023,7 +1026,7 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   });
 
   it('raises a column previously low (mostly air) up to a fractional height', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(3, 0, 3, compId, undefined, 1);
     grid.fillVoxel(3, 1, 3, compId, undefined, 1);
@@ -1037,7 +1040,7 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
     // The literal #1143 bug: a boolean-style carve down to an integer height
     // used to leave the readback at 24.5 (or some other stray fraction), not
     // the 24 that was actually written.
-    const grid = new VoxelGrid(16, 32, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 28; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
 
@@ -1047,7 +1050,7 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   });
 
   it('an integer target height round-trips to exactly that integer for a column previously lower', () => {
-    const grid = new VoxelGrid(16, 32, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(3, 0, 3, compId, undefined, 1);
 
@@ -1057,19 +1060,19 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   });
 
   it('leaves zero density above the touched band', () => {
-    const grid = new VoxelGrid(16, 20, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 15; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
 
     setVoxelColumnSurfaceHeight(grid, 3, 3, 8.4, compId);
 
-    for (let y = Math.ceil(8.4) + 2; y <= grid.sizeY - 1; y++) {
+    for (let y = Math.ceil(8.4) + 2; y <= 19; y++) {
       expect(grid.densityAt(3, y, 3), `density at y=${y} should be exactly 0`).toBe(0);
     }
   });
 
   it('leaves rock strictly below the touched band fully solid and untouched', () => {
-    const grid = new VoxelGrid(16, 20, 16);
+    const grid = new VoxelGrid(16, 16);
     const lowCompId = grid.palette.intern({ rocks: [{ rockId: 'grumpite', coefficient: 1 }] });
     const targetCompId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(3, 0, 3, lowCompId, undefined, 1);
@@ -1087,7 +1090,7 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   });
 
   it('two columns started in different states report identical computeVoxelColumnSurfaceHeight once written to the same fractional height', () => {
-    const grid = new VoxelGrid(16, 20, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     // Column A: previously solid well above the target.
     for (let y = 0; y <= 15; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
@@ -1105,7 +1108,7 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   });
 
   it('preserves a buried overhang/cavity below the touched band', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const crustCompId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     const rockCompId = grid.palette.intern({ rocks: [{ rockId: 'grumpite', coefficient: 1 }] });
     // Buried solid rock.
@@ -1131,7 +1134,7 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
   });
 
   it('a column outside the grid bounds is a silent no-op', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     expect(grid.containsColumn(99, 99)).toBe(false);
 
@@ -1143,7 +1146,7 @@ describe('setVoxelColumnSurfaceHeight (#1143)', () => {
 
 describe('setVoxelColumnSurfaceHeight — no vertical clamp (#1184)', () => {
   it('writes a negative target height without clamping it to 0', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     setVoxelColumnSurfaceHeight(grid, 3, 3, -5.3, compId);
@@ -1151,8 +1154,8 @@ describe('setVoxelColumnSurfaceHeight — no vertical clamp (#1184)', () => {
     expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(-5.3, 6);
   });
 
-  it('writes a target height far above the grid\'s declared sizeY without clamping it to sizeY - 1', () => {
-    const grid = new VoxelGrid(16, 16, 16); // sizeY = 16
+  it('writes a target height far above the grid\'s declared height without clamping it to an upper bound', () => {
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     setVoxelColumnSurfaceHeight(grid, 3, 3, 1000.2, compId);
@@ -1172,24 +1175,24 @@ describe('setVoxelColumnSurfaceHeight — no vertical clamp (#1184)', () => {
 
 describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
   it('returns null and touches nothing when the column\'s exposed top never moved', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     setVoxelColumnSurfaceHeight(grid, 3, 3, 5.5, compId);
     const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
 
     const before: number[] = [];
-    for (let y = 0; y < grid.sizeY; y++) before.push(grid.densityAt(3, y, 3));
+    for (let y = 0; y < 16; y++) before.push(grid.densityAt(3, y, 3));
 
     const touched = renormaliseVoxelColumnAfterCarve(grid, 3, 3, oldTopY);
 
     expect(touched).toBeNull();
-    for (let y = 0; y < grid.sizeY; y++) {
+    for (let y = 0; y < 16; y++) {
       expect(grid.densityAt(3, y, 3), `density at y=${y} should be unchanged`).toBe(before[y]!);
     }
   });
 
   it('SKIP branch: a plain fully solid new top is left as a hard step, no band manufactured', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 6; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
     const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
@@ -1209,7 +1212,7 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
   });
 
   it('REGRADE branch: reconstructs a genuine mid-band crossing exposed by the carve', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     const X = 3, Z = 3;
 
@@ -1238,9 +1241,9 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
 
     // A fresh, equivalent column written directly via setVoxelColumnSurfaceHeight
     // at the same height must read back identically, voxel by voxel.
-    const control = new VoxelGrid(16, 16, 16);
+    const control = new VoxelGrid(16, 16);
     setVoxelColumnSurfaceHeight(control, X, Z, height, compId);
-    for (let y = 0; y < grid.sizeY; y++) {
+    for (let y = 0; y < 16; y++) {
       expect(grid.densityAt(X, y, Z), `density at y=${y} should match a fresh write`)
         .toBeCloseTo(control.densityAt(X, y, Z), 6);
     }
@@ -1248,14 +1251,14 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
   });
 
   it('a column outside the grid bounds is a silent no-op', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     expect(grid.containsColumn(99, 99)).toBe(false);
     expect(() => renormaliseVoxelColumnAfterCarve(grid, 99, 99, 5)).not.toThrow();
     expect(renormaliseVoxelColumnAfterCarve(grid, 99, 99, 5)).toBeNull();
   });
 
   it('#1184: REGRADE branch reconstructs a genuine mid-band crossing below y = 0, not clamped toward 0', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     const X = 3, Z = 3;
 
@@ -1282,7 +1285,7 @@ describe('renormaliseVoxelColumnAfterCarve (#1148)', () => {
 
 describe('captureColumnTopsForCarve (#1148)', () => {
   it('captures one entry per distinct column, keyed by its pre-carve top', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 6; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
     const expectedOldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
@@ -1302,7 +1305,7 @@ describe('captureColumnTopsForCarve (#1148)', () => {
   });
 
   it('captures the PRE-carve top, not a re-read after an earlier cell\'s clear already moved it', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     for (let y = 0; y <= 6; y++) grid.fillVoxel(3, y, 3, compId, undefined, 1);
     const expectedOldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
@@ -1325,7 +1328,7 @@ describe('captureColumnTopsForCarve (#1148)', () => {
   });
 
   it('captures a distinct entry per column when cells span more than one column', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(3, 4, 3, compId, undefined, 1);
     grid.fillVoxel(5, 2, 5, compId, undefined, 1);
@@ -1339,7 +1342,7 @@ describe('captureColumnTopsForCarve (#1148)', () => {
   });
 
   it('returns an empty map for an empty cells array', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const columns = captureColumnTopsForCarve(grid, []);
     expect(columns.size).toBe(0);
   });
@@ -1347,7 +1350,7 @@ describe('captureColumnTopsForCarve (#1148)', () => {
 
 describe('renormaliseCarvedColumns (#1148)', () => {
   it('renormalises every captured column and returns the highest touched Y across all of them', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     // Column A: plain solid top at y=6, plus stray residue stranded at y=7
@@ -1382,7 +1385,7 @@ describe('renormaliseCarvedColumns (#1148)', () => {
   });
 
   it('returns null when none of the captured columns moved', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(3, 4, 3, compId, undefined, 1);
     const oldTopY = computeVoxelColumnSurfaceY(grid, 3, 3);
@@ -1395,14 +1398,14 @@ describe('renormaliseCarvedColumns (#1148)', () => {
   });
 
   it('returns null for an empty columns map', () => {
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     expect(renormaliseCarvedColumns(grid, new Map())).toBeNull();
   });
 });
 
 describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
   it('forEachSolid visits every solid voxel exactly once and skips air', () => {
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     grid.setVoxel(1, 1, 1, { composition: { rocks: [{ rockId: 'a', coefficient: 1 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     grid.setVoxel(2, 2, 2, { composition: { rocks: [{ rockId: 'b', coefficient: 1 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     const visited: Array<[number, number, number]> = [];
@@ -1413,7 +1416,7 @@ describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
   });
 
   it('forEachSolidInRegion only visits solid voxels within the given bounding box', () => {
-    const grid = new VoxelGrid(6, 6, 6);
+    const grid = new VoxelGrid(6, 6);
     grid.setVoxel(1, 1, 1, { composition: { rocks: [{ rockId: 'a', coefficient: 1 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     grid.setVoxel(5, 5, 5, { composition: { rocks: [{ rockId: 'b', coefficient: 1 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     const visited: Array<[number, number, number]> = [];
@@ -1422,16 +1425,16 @@ describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
   });
 
   it('forEachSolidInRegion on an empty box calls the callback zero times', () => {
-    const grid = new VoxelGrid(4, 4, 4);
+    const grid = new VoxelGrid(4, 4);
     let calls = 0;
     grid.forEachSolidInRegion({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, () => { calls++; });
     expect(calls).toBe(0);
   });
 
-  it('a solid voxel force-written at y = sizeY + 5 does not appear in forEachSolid — storage accepts the write, but iteration still respects [0, sizeY) (#1182)', () => {
-    const grid = new VoxelGrid(4, 4, 4);
+  it('a solid voxel force-written at y = MAX_TERRAIN_GEN_DIMENSION + 5 does not appear in forEachSolid — storage accepts the write, but iteration still respects the internal vertical cap (#1182)', () => {
+    const grid = new VoxelGrid(4, 4);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'a', coefficient: 1 }] });
-    grid.fillVoxel(1, 4 + 5, 1, compId, undefined, 1); // y=9, well past sizeY=4
+    grid.fillVoxel(1, MAX_TERRAIN_GEN_DIMENSION + 5, 1, compId, undefined, 1); // well past the internal cap
     const visited: Array<[number, number, number]> = [];
     grid.forEachSolid((x, y, z) => visited.push([x, y, z]));
     expect(visited).toEqual([]);
@@ -1479,7 +1482,7 @@ describe('VoxelGrid — edit recording (#1180)', () => {
   });
 
   it('fillVoxel with a solid density and compId records an added segment carrying that composition', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     grid.fillVoxel(3, 3, 3, compId, undefined, 1.0);
@@ -1491,20 +1494,20 @@ describe('VoxelGrid — edit recording (#1180)', () => {
   });
 
   it('setFractureAt updates grid.edits.fractureAt to the new modifier', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     grid.setFractureAt(1, 1, 1, 0.42);
     expect(grid.edits.fractureAt(1, 1, 1)).toBe(0.42);
   });
 
   it('scaleFractureAt updates grid.edits.fractureAt to the scaled modifier', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     grid.setFractureAt(1, 1, 1, 1.0);
     grid.scaleFractureAt(1, 1, 1, 0.5);
     expect(grid.edits.fractureAt(1, 1, 1)).toBeCloseTo(0.5, 10);
   });
 
   it('a no-op rewrite of the same fillVoxel value does not grow the edit record', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(2, 2, 2, compId, undefined, 1.0);
     const before = totalRecordedSegments(grid);
@@ -1515,7 +1518,7 @@ describe('VoxelGrid — edit recording (#1180)', () => {
   });
 
   it('a no-op rewrite of the same clearVoxel value does not grow the edit record', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(2, 2, 2, compId, undefined, 1.0);
     grid.clearVoxel(2, 2, 2);
@@ -1532,7 +1535,7 @@ describe('VoxelGrid — edit recording (#1180)', () => {
   });
 
   it('fillVoxel\'s fracture-reset-to-1 side effect purges the stale grid.edits fracture entry, not just the live field', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.fillVoxel(4, 4, 4, compId, undefined, 1.0);
     grid.scaleFractureAt(4, 4, 4, 0.5);
@@ -1545,7 +1548,7 @@ describe('VoxelGrid — edit recording (#1180)', () => {
   });
 
   it('withoutEditRecording suspends edit recording for mutators called inside the callback, but the writes themselves still happen', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     grid.withoutEditRecording(() => {
@@ -1559,13 +1562,13 @@ describe('VoxelGrid — edit recording (#1180)', () => {
   });
 
   it('withoutEditRecording returns the callback\'s own return value', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     const result = grid.withoutEditRecording(() => 42);
     expect(result).toBe(42);
   });
 
   it('edit recording resumes normally once withoutEditRecording returns', () => {
-    const grid = new VoxelGrid(8, 8, 8);
+    const grid = new VoxelGrid(8, 8);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
 
     grid.withoutEditRecording(() => { grid.fillVoxel(2, 2, 2, compId, undefined, 1.0); });
@@ -1629,14 +1632,14 @@ class DeterministicChunkSource implements VoxelChunkSource {
 
 describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
   it('a chunk nothing has ever read is never materialized, even once a source is attached', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new DeterministicChunkSource(compId));
     expect(grid.allocatedSlabCount).toBe(0);
   });
 
   it('densityAt/isSolidAt/compositionAt/oresAt/fractureAt at a negative depth on an owned column read stub-source values with no prior write', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new DeterministicChunkSource(compId));
 
@@ -1652,7 +1655,7 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
   });
 
   it('densityAt/isSolidAt/fractureAt never materialize a slab just to answer', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new DeterministicChunkSource(compId));
 
@@ -1665,7 +1668,7 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
   });
 
   it('compositionAt/oresAt/getVoxel DO materialize — slab count grows by exactly the distinct y-bands touched', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new DeterministicChunkSource(compId));
 
@@ -1686,7 +1689,7 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
   });
 
   it('dropChunk followed by a read reproduces identical values, including at a voxel that carries a recorded edit', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new DeterministicChunkSource(compId));
 
@@ -1734,11 +1737,11 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
     // Each grid interns the same single rock composition into its own fresh
     // palette, which deterministically assigns it the same index (1) in
     // both — the shared numeric compId `DeterministicChunkSource` needs.
-    const gridA = new VoxelGrid(32, 8, 16); // owns chunks (0,0) and (1,0)
+    const gridA = new VoxelGrid(32, 16); // owns chunks (0,0) and (1,0)
     const compIdA = gridA.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     gridA.attachChunkSource(new DeterministicChunkSource(compIdA));
 
-    const gridB = new VoxelGrid(32, 8, 16);
+    const gridB = new VoxelGrid(32, 16);
     const compIdB = gridB.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     gridB.attachChunkSource(new DeterministicChunkSource(compIdB));
     expect(compIdB).toBe(compIdA); // sanity: both fresh palettes assign the same index
@@ -1768,7 +1771,7 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
   });
 
   it('a grid with no chunk source attached behaves exactly as before #1183 — unwritten voxels read as plain air/default, nothing throws', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     expect(grid.densityAt(4, -50, 4)).toBe(0);
     expect(grid.isSolidAt(4, -50, 4)).toBe(false);
     expect(grid.compositionAt(4, -50, 4).rocks.length).toBe(0);
@@ -1778,7 +1781,7 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
   });
 
   it('negative chunk-y (cy) arithmetic resolves the correct band at very negative y (e.g. y = -200)', () => {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
     grid.attachChunkSource(new DeterministicChunkSource(compId));
 

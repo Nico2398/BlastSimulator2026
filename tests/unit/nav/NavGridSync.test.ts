@@ -29,8 +29,8 @@ function solidVoxel(overrides?: Partial<VoxelData>): VoxelData {
 }
 
 /** Build a VoxelGrid where every column has solid rock from y=0 to solidTopY (inclusive). */
-function makeSolidGrid(sizeX: number, sizeY: number, sizeZ: number, solidTopY: number): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+function makeSolidGrid(sizeX: number, sizeZ: number, solidTopY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeZ);
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
       for (let y = 0; y <= solidTopY; y++) {
@@ -53,9 +53,13 @@ function writeSolidColumn(grid: VoxelGrid, x: number, z: number, topY: number, d
   for (let y = topY - depth + 1; y <= topY; y++) grid.setVoxel(x, y, z, solidVoxel());
 }
 
-/** Full-height `terrain:updated` region covering the given X/Z bounds. */
-function fullHeightRegion(minX: number, maxX: number, minZ: number, maxZ: number, grid: VoxelGrid) {
-  return { minX, maxX, minY: 0, maxY: grid.sizeY - 1, minZ, maxZ };
+/**
+ * Full-height `terrain:updated` region covering the given X/Z bounds.
+ * `maxY` is the caller's grid's height minus one — threaded explicitly since
+ * the VoxelGrid itself no longer carries a `sizeY` to read.
+ */
+function fullHeightRegion(minX: number, maxX: number, minZ: number, maxZ: number, maxY: number) {
+  return { minX, maxX, minY: 0, maxY, minZ, maxZ };
 }
 
 const NO_BUILDINGS: Building[] = [];
@@ -63,7 +67,7 @@ const NO_HOLES: DrillHole[] = [];
 
 describe('subscribeNavGridToUpdates', () => {
   it('patches the NavGrid for the emitted region, reflecting the current VoxelGrid state', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);
     expect(nav.cells[3]![3]!.type).toBe('walkable');
 
@@ -75,7 +79,7 @@ describe('subscribeNavGridToUpdates', () => {
       navGrid: nav, grid, buildings: NO_BUILDINGS, drillHoles: NO_HOLES,
     }));
 
-    emitter.emit('terrain:updated', { region: fullHeightRegion(3, 3, 3, 3, grid) });
+    emitter.emit('terrain:updated', { region: fullHeightRegion(3, 3, 3, 3, 9) });
 
     // Same outcome NavGrid.patchNavGrid produces directly: the carved column
     // is now void, and its move cost reflects that.
@@ -93,9 +97,9 @@ describe('subscribeNavGridToUpdates', () => {
   });
 
   it('calls getTarget() fresh on every emit rather than caching the first result', () => {
-    const gridA = makeSolidGrid(6, 6, 6, 3);
+    const gridA = makeSolidGrid(6, 6, 3);
     const navA = NavGrid.buildNavGrid(gridA, NO_BUILDINGS, NO_HOLES);
-    const gridB = makeSolidGrid(6, 6, 6, 3);
+    const gridB = makeSolidGrid(6, 6, 3);
     const navB = NavGrid.buildNavGrid(gridB, NO_BUILDINGS, NO_HOLES);
 
     // Simulate a `new_game` reset: getTarget starts by returning A's pair,
@@ -108,7 +112,7 @@ describe('subscribeNavGridToUpdates', () => {
     subscribeNavGridToUpdates(emitter, () => current);
 
     for (let y = 0; y <= 3; y++) gridA.clearVoxel(2, y, 2);
-    emitter.emit('terrain:updated', { region: fullHeightRegion(2, 2, 2, 2, gridA) });
+    emitter.emit('terrain:updated', { region: fullHeightRegion(2, 2, 2, 2, 5) });
     expect(navA.cells[2]![2]!.type).toBe('void');
     // B is untouched by the first emit.
     expect(navB.cells[2]![2]!.type).toBe('walkable');
@@ -117,7 +121,7 @@ describe('subscribeNavGridToUpdates', () => {
     current = { navGrid: navB, grid: gridB, buildings: NO_BUILDINGS, drillHoles: NO_HOLES };
 
     for (let y = 0; y <= 3; y++) gridB.clearVoxel(4, y, 4);
-    emitter.emit('terrain:updated', { region: fullHeightRegion(4, 4, 4, 4, gridB) });
+    emitter.emit('terrain:updated', { region: fullHeightRegion(4, 4, 4, 4, 5) });
 
     // Second emit patched B — proves getTarget() was re-read, not cached
     // from the first call.
@@ -125,7 +129,7 @@ describe('subscribeNavGridToUpdates', () => {
   });
 
   it('patches the NavGrid identically when driven by nav:occupancy_changed instead of terrain:updated (#1161)', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);
     expect(nav.cells[3]![3]!.type).toBe('walkable');
 
@@ -141,7 +145,7 @@ describe('subscribeNavGridToUpdates', () => {
     // and must patch the NavGrid the same way — it exists to reach NavGrid
     // resync from an occupancy-only change that carved zero voxels, not to
     // skip the patch.
-    emitter.emit('nav:occupancy_changed', { region: fullHeightRegion(3, 3, 3, 3, grid) });
+    emitter.emit('nav:occupancy_changed', { region: fullHeightRegion(3, 3, 3, 3, 9) });
 
     expect(nav.cells[3]![3]!.type).toBe('void');
     expect(nav.cells[3]![3]!.moveCost).toBe(Infinity);
@@ -167,7 +171,7 @@ describe('subscribeNavGridToUpdates', () => {
   });
 
   it('two independent regions emitted in sequence each patch only their own area', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);
     expect(nav.cells[1]![1]!.type).toBe('walkable');
     expect(nav.cells[8]![8]!.type).toBe('walkable');
@@ -178,7 +182,7 @@ describe('subscribeNavGridToUpdates', () => {
     }));
 
     for (let y = 0; y <= 4; y++) grid.clearVoxel(1, y, 1);
-    emitter.emit('terrain:updated', { region: fullHeightRegion(1, 1, 1, 1, grid) });
+    emitter.emit('terrain:updated', { region: fullHeightRegion(1, 1, 1, 1, 9) });
 
     expect(nav.cells[1]![1]!.type).toBe('void');
     // The second region's column is still solid in the VoxelGrid, so it must
@@ -186,7 +190,7 @@ describe('subscribeNavGridToUpdates', () => {
     expect(nav.cells[8]![8]!.type).toBe('walkable');
 
     for (let y = 0; y <= 4; y++) grid.clearVoxel(8, y, 8);
-    emitter.emit('terrain:updated', { region: fullHeightRegion(8, 8, 8, 8, grid) });
+    emitter.emit('terrain:updated', { region: fullHeightRegion(8, 8, 8, 8, 9) });
 
     // Both regions are now correctly patched, and the first region's result
     // was not disturbed by the second, region-scoped emit.
@@ -195,7 +199,7 @@ describe('subscribeNavGridToUpdates', () => {
   });
 
   it('patches correctly from a region carrying negative/unusual minY-maxY — patchNavGrid only reads X/Z (#1185)', () => {
-    const grid = makeSolidGrid(10, 10, 10, 4);
+    const grid = makeSolidGrid(10, 10, 4);
     const nav = NavGrid.buildNavGrid(grid, NO_BUILDINGS, NO_HOLES);
     expect(nav.cells[3]![3]!.type).toBe('walkable');
 
@@ -219,7 +223,7 @@ describe('subscribeNavGridToUpdates', () => {
 
 describe('regionForColumns (#1185)', () => {
   it('derives minY/maxY from the real ground under the footprint, preserving the footprint X/Z bounds', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     writeSolidColumn(grid, 2, 2, 3); // surface height 3.5 -> floor 3, ceil 4
     writeSolidColumn(grid, 7, 7, 8); // surface height 8.5 -> floor 8, ceil 9
 
@@ -230,7 +234,7 @@ describe('regionForColumns (#1185)', () => {
   });
 
   it('reports a negative minY/maxY when the footprint sits entirely below y = 0 (the case #1184 exists to enable)', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     writeSolidColumn(grid, 3, 3, -8); // surface height -7.5 -> floor -8, ceil -7
 
     const footprint: BlastRegion = { minX: 3, maxX: 3, minZ: 3, maxZ: 3 };
@@ -240,7 +244,7 @@ describe('regionForColumns (#1185)', () => {
   });
 
   it('falls back to {minY:0, maxY:0} when the footprint rect has no ground anywhere', () => {
-    const grid = new VoxelGrid(10, 30, 10);
+    const grid = new VoxelGrid(10, 10);
     // No voxel ever written anywhere in the grid.
 
     const footprint: BlastRegion = { minX: 4, maxX: 5, minZ: 4, maxZ: 5 };

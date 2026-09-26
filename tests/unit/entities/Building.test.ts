@@ -596,10 +596,10 @@ describe('moveBuilding — exact error strings stay stable (#556 regression)', (
  * independent of the real terrain generator.
  */
 function makeVoxelGridWithHeights(
-  sizeX: number, sizeY: number, sizeZ: number,
+  sizeX: number, sizeZ: number,
   heightAt: (x: number, z: number) => number,
 ): VoxelGrid {
-  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  const grid = new VoxelGrid(sizeX, sizeZ);
   const rock = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
@@ -615,7 +615,7 @@ function makeVoxelGridWithHeights(
 describe('checkFootprintPlacement — terrain levelness (#1008)', () => {
   it('rejects a footprint spanning more than the tolerated height spread with "Uneven surface" when a voxelGrid is passed', () => {
     // management_office T1 (2x2) at (0,0) covers (0,0),(1,0),(0,1),(1,1) — one cell is two steps higher.
-    const vg = makeVoxelGridWithHeights(10, 8, 10, (x, z) => (x === 1 && z === 0) ? 5 : 3);
+    const vg = makeVoxelGridWithHeights(10, 10, (x, z) => (x === 1 && z === 0) ? 5 : 3);
 
     const result = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg);
 
@@ -624,7 +624,7 @@ describe('checkFootprintPlacement — terrain levelness (#1008)', () => {
   });
 
   it('accepts a footprint on uniformly flat ground when a voxelGrid is passed', () => {
-    const vg = makeVoxelGridWithHeights(10, 8, 10, () => 3);
+    const vg = makeVoxelGridWithHeights(10, 10, () => 3);
 
     const result = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg);
 
@@ -632,7 +632,7 @@ describe('checkFootprintPlacement — terrain levelness (#1008)', () => {
   });
 
   it('accepts a footprint on a one-level step — the slight slope the tolerance allows', () => {
-    const vg = makeVoxelGridWithHeights(10, 8, 10, (x, z) => (x === 1 && z === 0) ? 4 : 3);
+    const vg = makeVoxelGridWithHeights(10, 10, (x, z) => (x === 1 && z === 0) ? 4 : 3);
 
     const result = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg);
 
@@ -649,7 +649,7 @@ describe('checkFootprintPlacement — terrain levelness (#1008)', () => {
 
   it('reports "Out of bounds" even when the footprint is also uneven — bounds take priority over levelness', () => {
     // management_office T1 (2x2) at x=63 on a 64-wide grid overflows AND is uneven.
-    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 63 && z === 0) ? 5 : 3);
+    const vg = makeVoxelGridWithHeights(64, 64, (x, z) => (x === 63 && z === 0) ? 5 : 3);
 
     const result = checkFootprintPlacement([], 'management_office', 63, 0, 1, 64, 64, 0, 0, vg);
 
@@ -658,7 +658,7 @@ describe('checkFootprintPlacement — terrain levelness (#1008)', () => {
   });
 
   it('reports "Space is occupied" even when the footprint is also uneven — occupancy takes priority over levelness', () => {
-    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 1 && z === 1) ? 5 : 3);
+    const vg = makeVoxelGridWithHeights(64, 64, (x, z) => (x === 1 && z === 1) ? 5 : 3);
     const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 0, z: 0 }];
 
     const result = checkFootprintPlacement(occupants, 'management_office', 1, 1, 1, 64, 64, 0, 0, vg);
@@ -670,7 +670,7 @@ describe('checkFootprintPlacement — terrain levelness (#1008)', () => {
   it('rejects a tier-3 placement uneven only in the cells the larger tier adds beyond tier 1', () => {
     // management_office T1 is 2x2 at (0,0): cells (0,0),(1,0),(0,1),(1,1) — all flat.
     // T3 is 3x3: adds column x=2 and row z=2, including cell (2,2), which steps up.
-    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 2 && z === 2) ? 9 : 3);
+    const vg = makeVoxelGridWithHeights(64, 64, (x, z) => (x === 2 && z === 2) ? 9 : 3);
 
     const t1 = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg);
     expect(t1.valid).toBe(true); // T1's footprint never touches the uneven cell
@@ -684,7 +684,7 @@ describe('checkFootprintPlacement — terrain levelness (#1008)', () => {
 describe('placeBuilding — terrain levelness gate (#1008)', () => {
   it('refuses placement on ground steeper than the tolerance when a voxelGrid is passed', () => {
     const state = createBuildingState();
-    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 1 && z === 0) ? 5 : 3);
+    const vg = makeVoxelGridWithHeights(64, 64, (x, z) => (x === 1 && z === 0) ? 5 : 3);
 
     const result = placeBuilding(state, 'management_office', 0, 0, 64, 64, 1, 0, 0, undefined, vg);
 
@@ -695,7 +695,7 @@ describe('placeBuilding — terrain levelness gate (#1008)', () => {
 
   it('places successfully on flat ground when a voxelGrid is passed', () => {
     const state = createBuildingState();
-    const vg = makeVoxelGridWithHeights(64, 8, 64, () => 3);
+    const vg = makeVoxelGridWithHeights(64, 64, () => 3);
 
     const result = placeBuilding(state, 'management_office', 0, 0, 64, 64, 1, 0, 0, undefined, vg);
 
@@ -709,7 +709,7 @@ describe('moveBuilding — terrain levelness gate (#1008)', () => {
     const state = createBuildingState();
     placeBuilding(state, 'management_office', 0, 0, 64, 64);
     const id = state.buildings[0]!.id;
-    const vg = makeVoxelGridWithHeights(64, 8, 64, (x, z) => (x === 21 && z === 20) ? 5 : 3);
+    const vg = makeVoxelGridWithHeights(64, 64, (x, z) => (x === 21 && z === 20) ? 5 : 3);
 
     const result = moveBuilding(state, id, 20, 20, 64, 64, 0, 0, [], vg);
 
@@ -723,7 +723,7 @@ describe('moveBuilding — terrain levelness gate (#1008)', () => {
     const state = createBuildingState();
     placeBuilding(state, 'management_office', 0, 0, 64, 64);
     const id = state.buildings[0]!.id;
-    const vg = makeVoxelGridWithHeights(64, 8, 64, () => 3);
+    const vg = makeVoxelGridWithHeights(64, 64, () => 3);
 
     const result = moveBuilding(state, id, 20, 20, 64, 64, 0, 0, [], vg);
 

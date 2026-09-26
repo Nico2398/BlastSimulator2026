@@ -234,7 +234,7 @@ describe('reachability on a shifted grid', () => {
 describe('a real claimed-westward VoxelGrid drives a shifted NavGrid', () => {
   /** A 16 m site plus the chunk west of it, both floored with solid ground. */
   function claimedWestwardGrid(): VoxelGrid {
-    const grid = new VoxelGrid(16, 8, 16);
+    const grid = new VoxelGrid(16, 16);
     grid.addChunk(-1, 0);
     for (let x = -16; x < 16; x++) {
       for (let z = 0; z < 16; z++) {

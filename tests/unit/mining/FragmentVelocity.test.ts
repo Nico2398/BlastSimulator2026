@@ -21,7 +21,7 @@ import type { VoxelContribution } from '../../../src/core/mining/FragmentComposi
 
 /** Solid rock up to `top`, open air above — a flat bench with a free face up. */
 function bench(size = 15, top = 9): VoxelGrid {
-  const grid = new VoxelGrid(size, size, size);
+  const grid = new VoxelGrid(size, size);
   for (let z = 0; z < size; z++) {
     for (let y = 0; y <= top; y++) {
       for (let x = 0; x < size; x++) {
@@ -37,14 +37,20 @@ function bench(size = 15, top = 9): VoxelGrid {
   return grid;
 }
 
-function wholeGrid(grid: VoxelGrid): BlastBox {
-  return { minX: grid.minX, minY: 0, minZ: grid.minZ, maxX: grid.maxX, maxY: grid.sizeY, maxZ: grid.maxZ };
+/** `height` is the grid's own constructed height (the `size` bench() built it with, or the explicit height passed to `new VoxelGrid`). */
+function wholeGrid(grid: VoxelGrid, height: number): BlastBox {
+  return { minX: grid.minX, minY: 0, minZ: grid.minZ, maxX: grid.maxX, maxY: height, maxZ: grid.maxZ };
 }
 
 const CRUITE = getRock('cruite')!.energyAbsorption;
 
-function chargedField(grid: VoxelGrid, at: { x: number; y: number; z: number }, energy: number) {
-  const field = createEnergyField(grid, wholeGrid(grid));
+function chargedField(
+  grid: VoxelGrid,
+  at: { x: number; y: number; z: number },
+  energy: number,
+  height = 15,
+) {
+  const field = createEnergyField(grid, wholeGrid(grid, height));
   seedEnergy(field, [{ ...at, energy }]);
   return field;
 }
@@ -83,7 +89,7 @@ describe('FragmentVelocity — throwFractionForBlowout', () => {
 describe('FragmentVelocity — freeFaceDirection', () => {
   it('points up out of a flat bench', () => {
     const grid = bench();
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 15));
 
     const dir = freeFaceDirection(field, 7, 7, 7);
 
@@ -92,7 +98,7 @@ describe('FragmentVelocity — freeFaceDirection', () => {
 
   it('points sideways out of a vertical face', () => {
     // Rock only where x < 8, so the free face is the wall at x = 8.
-    const grid = new VoxelGrid(16, 16, 16);
+    const grid = new VoxelGrid(16, 16);
     for (let z = 0; z < 16; z++) {
       for (let y = 0; y < 16; y++) {
         for (let x = 0; x < 8; x++) {
@@ -103,7 +109,7 @@ describe('FragmentVelocity — freeFaceDirection', () => {
         }
       }
     }
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 16));
 
     const dir = freeFaceDirection(field, 5, 8, 8);
 
@@ -116,7 +122,7 @@ describe('FragmentVelocity — freeFaceDirection', () => {
 describe('FragmentVelocity — computeFragmentVelocity', () => {
   it('rock with no leftover energy is not thrown at all', () => {
     const grid = bench();
-    const field = createEnergyField(grid, wholeGrid(grid));
+    const field = createEnergyField(grid, wholeGrid(grid, 15));
 
     const v = computeFragmentVelocity({ x: 7, y: 7, z: 7 }, [source(7, 7, 7)], 1000, field, 1);
 
@@ -139,7 +145,7 @@ describe('FragmentVelocity — computeFragmentVelocity', () => {
 
   it('rock near the surface is thrown, rock buried deep only settles', () => {
     const grid = bench(21, 17);
-    const field = chargedField(grid, { x: 10, y: 8, z: 10 }, CRUITE * 3000);
+    const field = chargedField(grid, { x: 10, y: 8, z: 10 }, CRUITE * 3000, 21);
 
     const shallow = computeFragmentVelocity({ x: 10, y: 17, z: 10 }, [source(10, 17, 10)], 1000, field, 1);
     const deep = computeFragmentVelocity({ x: 10, y: 8, z: 10 }, [source(10, 8, 10)], 1000, field, 1);
