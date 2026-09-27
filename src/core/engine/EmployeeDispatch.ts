@@ -23,6 +23,7 @@ import { getVehicleReservation } from '../entities/Vehicle.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import type { ReachableSet } from '../nav/NavGridReachability.js';
 import { findHaulDepotApproach } from '../economy/HaulingTask.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS } from '../config/balance.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -273,16 +274,25 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
  * approach cell (findHaulDepotApproach, HaulingTask.ts) — the reference point
  * passed in is a neutral grid origin, not any one employee's position, since
  * this reflects what ground crew as a whole can reach, not one individual's
- * route. Returns null when there's no navGrid yet, or no active depot to
- * anchor from — both cases where the existing three-reason classification
- * runs unchanged (tickEmployees).
+ * route. `NAV_CLEARANCE_VEHICLE_CELLS` (not the employee default) because
+ * every action this feeds is vehicle-gated (haul_debris/fragment_debris need
+ * a debris_hauler/rock_fragmenter, never a walking employee) — a corridor
+ * wide enough for a person but too narrow for either vehicle would otherwise
+ * read as reachable while no vehicle could ever actually deliver through it.
+ * Returns null when there's no navGrid yet, or no active depot to anchor
+ * from — both cases where the existing three-reason classification runs
+ * unchanged (tickEmployees).
+ *
+ * Exported for `tests/unit/engine/EmployeeDispatch.test.ts`, which calls it
+ * standalone to check the returned set's shape in isolation (a real external
+ * caller — the earlier unexported version broke that suite, #1231 review).
  */
-function computeUnreachableTargets(state: GameState): ReachableSet | null {
+export function computeUnreachableTargets(state: GameState): ReachableSet | null {
   const navGrid = state.navGrid;
   if (navGrid === null) return null;
   const approach = findHaulDepotApproach(state, navGrid.originX, navGrid.originZ);
   if (approach === null) return null;
-  return NavGrid.computeClimbReachableSet(navGrid, approach.x, approach.z);
+  return NavGrid.computeClimbReachableSet(navGrid, approach.x, approach.z, NAV_CLEARANCE_VEHICLE_CELLS);
 }
 
 /**
