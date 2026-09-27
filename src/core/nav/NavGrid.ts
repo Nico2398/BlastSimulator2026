@@ -8,7 +8,7 @@ import {
   computeVoxelColumnSurfaceY,
   type VoxelGrid,
 } from '../world/VoxelGrid.js';
-import type { Building } from '../entities/Building.js';
+import type { FootprintOccupant } from '../entities/Building.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { BlastRegion, FragmentData } from '../mining/BlastExecution.js';
 import type { Vehicle } from '../entities/Vehicle.js';
@@ -274,7 +274,7 @@ export class NavGrid {
     voxelGrid: VoxelGrid,
     x: number,
     z: number,
-    buildings: Building[],
+    buildings: ReadonlyArray<FootprintOccupant>,
     drillHoles: DrillHole[],
   ): { voxelY: number; surfaceY: number; cellType: NavCellType } {
     const voxelY = computeVoxelColumnSurfaceY(voxelGrid, x, z) ?? NaN;
@@ -332,7 +332,7 @@ export class NavGrid {
    */
   static buildNavGrid(
     voxelGrid: VoxelGrid,
-    buildings: Building[],
+    buildings: ReadonlyArray<FootprintOccupant>,
     drillHoles: DrillHole[],
     groundFragments: FragmentData[] = [],
     vehicles: Vehicle[] = [],
@@ -395,7 +395,7 @@ export class NavGrid {
   static patchNavGrid(
     navGrid: NavGrid,
     voxelGrid: VoxelGrid,
-    buildings: Building[],
+    buildings: ReadonlyArray<FootprintOccupant>,
     drillHoles: DrillHole[],
     region: BlastRegion,
   ): void {
@@ -567,7 +567,7 @@ export class NavGrid {
     x: number,
     z: number,
     voxelGrid: VoxelGrid,
-    buildings: Building[],
+    buildings: ReadonlyArray<FootprintOccupant>,
     drillHoles: DrillHole[],
     surfaceY: number = NavGrid.computeSurfaceY(voxelGrid, x, z),
   ): NavCellType {

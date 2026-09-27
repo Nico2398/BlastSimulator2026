@@ -6,7 +6,10 @@ import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/BlastPlan.js';
 import type { BlastPlan, ValidationError } from '../../../core/mining/BlastPlan.js';
+import { getDefSize, getBuildingDef } from '../../../core/entities/Building.js';
 import type { MiningContext } from './types.js';
+import type { GameContext } from '../world.js';
+import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 
 export function requireGame(ctx: MiningContext): string | null {
   if (!ctx.state || !ctx.grid) return t('console.no_game_loaded');
@@ -85,7 +88,8 @@ export function cancelOutstandingChargeAction(state: GameState, holeId: string):
  * populated at order time the same way (#553) — the identical gap existed
  * for a cancelled drill order too.
  */
-export function releasePlannedHoleForCancelledAction(state: GameState, action: PendingAction): void {
+export function releasePlannedHoleForCancelledAction(ctx: GameContext, action: PendingAction): void {
+  const state = ctx.state!;
   // #555: a cancelled dig_ramp_segment keyed off rampId/segmentIndex, not
   // holeId — handled separately, same generic-cancel-path gap as
   // drill_hole/charge_hole above (the Operations panel's Work Queue cancel
@@ -117,7 +121,13 @@ export function releasePlannedHoleForCancelledAction(state: GameState, action: P
     const buildingOrderId = action.payload['buildingOrderId'];
     if (typeof buildingOrderId !== 'number') return;
     const idx = state.plannedBuildings.findIndex(pb => pb.id === buildingOrderId);
-    if (idx !== -1) state.plannedBuildings.splice(idx, 1);
+    if (idx === -1) return;
+    const [order] = state.plannedBuildings.splice(idx, 1);
+    // The footprint has been blocked since order time (#1200) — cancelling
+    // frees it back to its pre-order classification. No occupant relocation
+    // needed here: freeing a footprint never traps anyone.
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(order!.type, order!.tier));
+    emitFootprintOccupancyChanged(ctx, order!.x, order!.z, sizeX, sizeZ);
     return;
   }
 

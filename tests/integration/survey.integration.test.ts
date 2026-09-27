@@ -746,6 +746,21 @@ describe('Survey system — seismic building side effects', () => {
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
+    // #1200 moved the builder's own place_building walk target from the
+    // order's raw (x,z) to the footprint's approach-ring cell (now blocked
+    // from order time) — so the surveyor who did this construction parks on
+    // whichever ring cell sits nearest the footprint's own origin, not
+    // wherever the old post-completion "nearest reachable" sweep happened to
+    // land them. That cell can fall on the *wrong* side of this seed's single-
+    // file ramp staircase from the one the paragraph above was written
+    // against, making (14,12) provably unreachable rather than merely
+    // slower. Snap back to the resting cell the geometry above was tuned for
+    // (confirmed reachable to (14,12) by direct BFS over the post-build
+    // NavGrid) so this test still proves the HP effect, not #1200's own
+    // (already-covered-elsewhere) approach-cell change.
+    ctx.state!.employees.employees[0]!.x = 16;
+    ctx.state!.employees.employees[0]!.z = 14;
+
     surveyCommand(ctx as any, ['seismic'], { x: '14', z: '12' });
     resolveTick(60);
 
