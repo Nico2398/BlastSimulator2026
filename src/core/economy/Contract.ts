@@ -267,6 +267,28 @@ export function hasFillableOreSaleOffer(
 }
 
 /**
+ * True when `available` holds at least one `rubble_disposal` offer.
+ *
+ * Exists for the same reason `hasFillableOreSaleOffer` does (issue #1263
+ * CI-fix): `generateContracts` re-rolls the pool's contents every
+ * `REFRESH_INTERVAL` ticks, so which absolute tick first carries a
+ * `rubble_disposal` instance is a property of that RNG stream, not of the
+ * player's own path to this point in the tutorial. `tutorial-interactive.json`
+ * used to pin a fixed `tick N` pad to "wherever the offer happened to sit"
+ * against one traced trajectory, exactly the fragility #1042/#1048 already
+ * fixed for the analogous `ore_sale` wait (`fillableOreSaleOffered` below) —
+ * a fixed pad breaks the moment anything upstream re-times the run onto a
+ * different pool instance, which is what turning on `agent_occupancy:true`
+ * did to the tutorial's own crew-dispatch timing. No ore-quantity check is
+ * needed here (unlike the ore_sale sibling): `rubble_disposal` contracts
+ * carry `materialId: ''` and are fulfilled from raw `storedMassKg`, so mere
+ * presence in the pool is the whole condition to wait on.
+ */
+export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean {
+  return available.some(c => c.type === 'rubble_disposal');
+}
+
+/**
  * Find a contract in `pool` by `selector.id` if given, else by the first
  * entry matching `selector.type`/`selector.materialId` (either or both).
  * Null when no selector field is set (nothing to search for) or nothing in

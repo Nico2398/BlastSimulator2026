@@ -8,6 +8,7 @@ import {
   checkDeadlines,
   findContract,
   hasFillableOreSaleOffer,
+  hasRubbleDisposalOffer,
 } from '../../../src/core/economy/Contract.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
 
@@ -305,6 +306,31 @@ describe('Contract system', () => {
         offer({ id: 2, materialId: 'dirtite', quantityKg: 50 }),
       ];
       expect(hasFillableOreSaleOffer(pool, { dirtite: 60 })).toBe(true);
+    });
+  });
+
+  describe('hasRubbleDisposalOffer', () => {
+    it('is true when the pool holds a rubble_disposal offer', () => {
+      const rubble = offer({ type: 'rubble_disposal', materialId: '', quantityKg: 120 });
+      expect(hasRubbleDisposalOffer([rubble])).toBe(true);
+    });
+
+    it('is false on an empty pool', () => {
+      expect(hasRubbleDisposalOffer([])).toBe(false);
+    });
+
+    it('is false when the pool holds only other contract types', () => {
+      const pool = [offer({ type: 'ore_sale' }), offer({ id: 2, type: 'supply' })];
+      expect(hasRubbleDisposalOffer(pool)).toBe(false);
+    });
+
+    it('is true when any one of several offers is rubble_disposal', () => {
+      const pool = [
+        offer({ id: 1, type: 'ore_sale' }),
+        offer({ id: 2, type: 'rubble_disposal', materialId: '', quantityKg: 50 }),
+        offer({ id: 3, type: 'supply' }),
+      ];
+      expect(hasRubbleDisposalOffer(pool)).toBe(true);
     });
   });
 });
