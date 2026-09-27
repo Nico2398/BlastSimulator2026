@@ -76,6 +76,13 @@ export function emitFootprintRegionChanged(
   emitter.emit('nav:occupancy_changed', { region: regionForColumns(makeFootprintRegion(x, z, sizeX, sizeZ), grid) });
 }
 
+/** True when the (rounded) world cell (x, z) falls inside `region`'s bounding box. */
+function isInRegion(x: number, z: number, region: BlastRegion): boolean {
+  const cx = Math.round(x);
+  const cz = Math.round(z);
+  return cx >= region.minX && cx <= region.maxX && cz >= region.minZ && cz <= region.maxZ;
+}
+
 /**
  * Move every alive employee standing inside `region` (a footprint's world
  * cells) to the nearest reachable free cell — called whenever a footprint
@@ -87,12 +94,6 @@ export function emitFootprintRegionChanged(
  * vehicle has no per-tick writer and would otherwise be stranded on ground
  * that just turned solid.
  */
-function isInRegion(x: number, z: number, region: BlastRegion): boolean {
-  const cx = Math.round(x);
-  const cz = Math.round(z);
-  return cx >= region.minX && cx <= region.maxX && cz >= region.minZ && cz <= region.maxZ;
-}
-
 export function relocateFootprintOccupants(state: GameState, region: BlastRegion): void {
   if (!state.navGrid) return;
   for (const emp of state.employees.employees) {

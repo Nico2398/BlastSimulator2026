@@ -7,7 +7,7 @@
 // core-purity.md's "adding an exported function here means adding its unit
 // test in the mirrored tests/unit/ path" convention.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   makeFootprintRegion, siteBoundsForGrid, refreshLogisticsCapacity,
   levelBuildingFootprint, relocateFootprintOccupants,
@@ -310,12 +310,17 @@ describe('relocateFootprintOccupants — vehicles (#1270)', () => {
     expect(cell.vehicleOccupied).toBe(true);
   });
 
-  it('an unoccupied vehicle with no reachable cell nearby ends up wherever findNearestReachableCell\'s own fallback returns — unchanged behavior, not a new one', () => {
-    const state = makeFlatNavState();
+  it('calls findNearestReachableCell for a stranded vehicle even when the grid is fully sealed — the fallback path still runs, not skipped', () => {
     // Seal the ENTIRE grid, including the (0,0) anchor
     // `relocateFootprintOccupants` searches from — so findNearestReachableCell
-    // has nothing traversable to fall back to and returns the target
-    // coordinates unchanged (see its own doc comment).
+    // falls back to returning the vehicle's own (unchanged) coordinates (see
+    // its own doc comment). That return value is numerically identical to
+    // "the sweep never touched this vehicle at all", which a plain position
+    // assertion can't tell apart from a no-op implementation — so this test
+    // spies on the call itself: the fallback path running (and being
+    // *reached*, i.e. the vehicle's own cell passed the 'blocked' guard
+    // first) is the behavior under test, not the coincidental output value.
+    const state = makeFlatNavState();
     const nav = state.navGrid!;
     for (let z = 0; z < nav.height; z++) {
       for (let x = 0; x < nav.width; x++) {
@@ -326,11 +331,14 @@ describe('relocateFootprintOccupants — vehicles (#1270)', () => {
     }
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
-    const expected = NavGrid.findNearestReachableCell(nav, 0, 0, vehicle.x, vehicle.z, true);
+    const spy = vi.spyOn(NavGrid, 'findNearestReachableCell');
 
     relocateFootprintOccupants(state, REGION);
 
+    expect(spy).toHaveBeenCalledWith(nav, 0, 0, 2, 2, true);
+    const expected = spy.mock.results[0]!.value as { x: number; z: number };
     expect(vehicle.x).toBe(expected.x);
     expect(vehicle.z).toBe(expected.z);
+    spy.mockRestore();
   });
 });
