@@ -8,7 +8,7 @@
 import { isFootprintAction, type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
-import { octileHeuristic, findExactPath } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath, pathCrossesFragmentOccupancy } from '../nav/Pathfinding.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
@@ -149,6 +149,66 @@ export function estimateLegDistance(
 
   const path = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance });
   return path.found ? path.totalCost : null;
+}
+
+/**
+ * A foot leg's distance estimate, preferring a route that avoids every
+ * vehicle-occupied cell (the ordinary "walk around parked vehicles" default
+ * — see `estimateLegDistance`'s own doc comment on the `!isDestinationOccupied`
+ * convention every call site here already follows) but falling back to a
+ * route that may cross one when the vehicle-avoiding route doesn't exist at
+ * all (#1263).
+ *
+ * Without the fallback, a single parked vehicle sitting in the one
+ * climb-legal corridor out of a region (#1151's slope gate can leave exactly
+ * one) makes every foot-only work goal beyond it permanently "unreachable"
+ * here — silently: `buildFootOnlyItinerary`/`buildTransportRideItinerary`
+ * return null, the action just never gets an itinerary, and dispatch simply
+ * never offers it to anyone, forever, with no error and no stuck-abandon
+ * backoff to even name the cause. Confirmed live via sandbox-mode.json: two
+ * of four ordered `charge_hole` actions sat 'queued' with no holder for the
+ * full 3000-tick wait_until budget, their only route out of the crew's home
+ * plateau blocked by an unrelated, stationary parked vehicle nowhere near
+ * either hole.
+ *
+ * Safe to fall back to unconditionally rather than gating it behind
+ * `allowUnreachable` (unlike `resolveEffectiveDistance`'s octile-heuristic
+ * fallback just below, which fabricates a distance for a route that may not
+ * exist at all): a `false`-avoidVehicles route is a real, walkable path — the
+ * same one a drive leg already always plans with — not a heuristic guess,
+ * and the runtime's own per-hop `AgentOccupancy` check (`AgentAdvance.ts`)
+ * still negotiates a genuinely still-parked vehicle along the way exactly as
+ * it already does for every drive leg.
+ *
+ * Rejects the fallback route when it crosses fragment debris
+ * (`pathCrossesFragmentOccupancy`) rather than only a vehicle's cell: an
+ * `avoidVehicles: false` path is free to route through EITHER kind of
+ * occupancy (`isCellOccupied`, `NavGrid.ts`), and this fallback exists only
+ * to treat a stationary, never-dispatched VEHICLE as a soft obstacle, not to
+ * quietly relax the #954/#1090 guard that keeps a genuinely
+ * fragment-boxed-in employee reading as unreachable (`ActionSelection.test.ts`'s
+ * own regression test for that guard) — 'estimate' fidelity has no real
+ * waypoints to check and so never takes this fallback at all (its own
+ * `estimateLegDistance` branch already returns a heuristic distance
+ * unconditionally, never null).
+ */
+function estimateFootLegDistance(
+  state: GameState,
+  fidelity: PlanFidelity,
+  agentId: number,
+  fromX: number, fromZ: number,
+  toX: number, toZ: number,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+): number | null {
+  const avoidingVehicles = estimateLegDistance(
+    state, fidelity, agentId, fromX, fromZ, toX, toZ, !isDestinationOccupied(state, toX, toZ), requiredClearance,
+  );
+  if (avoidingVehicles !== null) return avoidingVehicles;
+  if (fidelity === 'estimate' || state.navGrid === null) return null;
+
+  const relaxed = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false, requiredClearance });
+  if (!relaxed.found || pathCrossesFragmentOccupancy(state.navGrid, relaxed.waypoints)) return null;
+  return relaxed.totalCost;
 }
 
 /**
@@ -397,7 +457,7 @@ function buildFootOnlyItinerary(
   workTicks: number,
   allowUnreachable: boolean,
 ): Itinerary | null {
-  const dist = estimateLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ, !isDestinationOccupied(state, targetX, targetZ));
+  const dist = estimateFootLegDistance(state, fidelity, employee.id, employee.x, employee.z, targetX, targetZ);
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, employee.x, employee.z, targetX, targetZ);
   if (effectiveDist === null) return null;
 
@@ -649,7 +709,7 @@ export function buildTransportRideItinerary(
   // Real remaining distance from wherever `alight` actually landed — not a
   // flat TRANSPORT_ALIGHT_FINISH_WALK_CELLS assumption — since a diagonal
   // waypoint step can be up to sqrt(2) cells from the target, not exactly 1.
-  const footDist = estimateLegDistance(state, fidelity, employee.id, alight.x, alight.z, resolved.targetX, resolved.targetZ, !isDestinationOccupied(state, resolved.targetX, resolved.targetZ));
+  const footDist = estimateFootLegDistance(state, fidelity, employee.id, alight.x, alight.z, resolved.targetX, resolved.targetZ);
   if (footDist === null) return null;
 
   const footLeg: Leg = {

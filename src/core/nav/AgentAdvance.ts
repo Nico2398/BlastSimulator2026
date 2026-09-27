@@ -318,12 +318,40 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     const isRealStep = hopTargetCellX !== Math.round(x) || hopTargetCellZ !== Math.round(z);
     if (input.occupancy && input.mover && isRealStep
       && !input.occupancy.isFreeFor(input.mover, hopTargetCellX, hopTargetCellZ)) {
-      // Stop the hop loop for this tick right here — do not skip ahead to a
-      // later hop, and do not attempt a partial move into the blocked cell.
-      // Whatever earlier hops this tick already committed (x/z, trail,
-      // committed, pathIndex) stand as they are.
-      blockedByOccupant = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
-      break;
+      const holder = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
+      // A foot leg already planned/executed to cross vehicle-occupied ground
+      // (`input.avoidVehicles === false`) is allowed to actually do so here
+      // too (#1263) — mirrors PlanItinerary.ts's static
+      // `!isDestinationOccupied` exemption (its own doc comment names exactly
+      // this case: "charging a hole a drill_rig is still parked on") and
+      // Locomotion.ts's matching corridor-block fallback (a single parked,
+      // never-dispatched vehicle sitting in the one climb-legal corridor out
+      // of a region — #1151's slope gate can leave exactly one — otherwise
+      // makes every cell beyond it foot-unreachable forever, confirmed live
+      // via sandbox-mode.json's seed 777 alpine_granite start: a blaster
+      // spawned on a single-exit terrain nub whose one climbable neighbour a
+      // parked, never-driven vehicle occupied for the whole run). Without a
+      // matching exemption here, this per-hop ground-cell check re-blocks a
+      // route the planner and the leg's own `avoidVehicles` flag already
+      // agreed was fine to run through a vehicle's cell for — at the
+      // destination, or (the corridor case) at any hop along the way — and
+      // `isMoveStuck` latches true forever on a leg nothing will ever
+      // un-stick. Scoped tight: only an employee (never a driving vehicle,
+      // which always plans `avoidVehicles: false` for an unrelated reason —
+      // see `Locomotion.ts`'s own doc comment — and still resolves
+      // vehicle-vs-vehicle contests through this same check unchanged)
+      // stepping onto a VEHICLE's cell (never another employee's, which
+      // stays exactly as blocked as before).
+      const exemptVehicleCrossing = input.avoidVehicles === false
+        && input.mover.kind === 'employee' && holder?.kind === 'vehicle';
+      if (!exemptVehicleCrossing) {
+        // Stop the hop loop for this tick right here — do not skip ahead to
+        // a later hop, and do not attempt a partial move into the blocked
+        // cell. Whatever earlier hops this tick already committed (x/z,
+        // trail, committed, pathIndex) stand as they are.
+        blockedByOccupant = holder;
+        break;
+      }
     }
 
     const beforeX = x;
@@ -363,7 +391,18 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     // a partial hop (budget ran out mid-way, below) hasn't reached
     // `hopTarget` yet and claims nothing this tick.
     if (input.occupancy && input.mover && reachedHop) {
-      input.occupancy.tryMove(input.mover, hopTargetCellX, hopTargetCellZ);
+      if (!input.occupancy.tryMove(input.mover, hopTargetCellX, hopTargetCellZ)) {
+        // The only way tryMove can fail here is the vehicle-crossing
+        // exemption above (#1263) — every other conflict already `break`s
+        // the loop before a hop is ever advanced. An employee sharing (or
+        // merely passing through) a vehicle's cell needs no ground-cell
+        // registration of its own there, mirroring how a mounted employee
+        // already holds none (rebuildAgentOccupancy's own doc comment,
+        // AgentOccupancy.ts). Release whatever cell the employee held before
+        // this hop so it doesn't stay falsely claimed once they've genuinely
+        // left it.
+        input.occupancy.release(input.mover);
+      }
     }
 
     const lastWaypoint = input.path.waypoints[input.path.waypoints.length - 1];
