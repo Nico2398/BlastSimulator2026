@@ -24,7 +24,7 @@ import type { LogisticsState } from '../economy/Logistics.js';
 import { createLogisticsState } from '../economy/Logistics.js';
 import type { BuildingState, BuildingType, BuildingTier, FootprintOccupant } from '../entities/Building.js';
 import { createBuildingState } from '../entities/Building.js';
-import { NavGrid } from '../nav/NavGrid.js';
+import { NavGrid, type NavCell } from '../nav/NavGrid.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { SerializedVoxels } from './VoxelGridCodec.js';
 import type { VehicleState } from '../entities/Vehicle.js';
@@ -653,25 +653,74 @@ export function buildGameNavGrid(
  * sub-cell position included: `findNearestNavigableCell` returns its own cell
  * back, so this is a no-op for every site whose spawn area is ordinary
  * terrain.
+ *
+ * Claims each snapped cell as it goes (#1263): every agent used to snap
+ * independently, so several agents whose authored spot was ALL off the same
+ * cliff — a real case, not a corner one; a staffed roster's fixed offsets and
+ * a sandbox/campaign origin both land agents on identical or
+ * climb-disconnected ground on ordinary seeds — converged on the exact same
+ * "nearest main-ground cell" and piled onto one tile. Harmless before
+ * per-ground-cell occupancy existed; with it uniform across every agent
+ * (#1206), two agents sharing a spawn cell is an invalid state from tick 0,
+ * and worse, a whole cluster of them squeezed into the one narrow corridor
+ * `findNearestNavigableCell` converges toward can permanently box each other
+ * in with no side passage to step into (confirmed live: ore-haul-dispatch's
+ * own seed 10 desert start, and sandbox-mode's seed 777 alpine_granite
+ * start, both piling multiple employees AND vehicles onto one or two single
+ * cells). Marking each claim on `NavCell.vehicleOccupied` — the same flag
+ * `findNearestNavigableCell(..., avoidOccupancy)` already reads — reuses the
+ * grid's own occupancy-avoidance search instead of a second one; the marks
+ * are scratch bookkeeping local to this call, reset to genuine vehicle
+ * occupancy before returning.
  */
 export function snapAgentsToNavigableGround(state: GameState): void {
   const navGrid = state.navGrid;
   if (!navGrid) return;
 
+  // Clear whatever buildNavGrid's own vehicle-marking pass set from each
+  // vehicle's RAW (pre-snap) position first — otherwise a vehicle whose own
+  // starting cell is genuinely fine reads as "occupied" by itself the moment
+  // its own candidacy is checked below, and gets pushed off it for no reason.
+  for (const vehicle of state.vehicles.vehicles) {
+    const cell = navGrid.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));
+    if (cell) cell.vehicleOccupied = false;
+  }
+
+  const claimed: NavCell[] = [];
+  const claim = (x: number, z: number): void => {
+    const cell = navGrid.cellAt(x, z);
+    if (cell) {
+      cell.vehicleOccupied = true;
+      claimed.push(cell);
+    }
+  };
+
   for (const employee of state.employees.employees) {
-    const snapped = NavGrid.findNearestNavigableCell(navGrid, Math.round(employee.x), Math.round(employee.z));
+    const snapped = NavGrid.findNearestNavigableCell(navGrid, Math.round(employee.x), Math.round(employee.z), true);
     if (snapped.x !== Math.round(employee.x) || snapped.z !== Math.round(employee.z)) {
       employee.x = snapped.x;
       employee.z = snapped.z;
     }
+    claim(snapped.x, snapped.z);
   }
 
   for (const vehicle of state.vehicles.vehicles) {
-    const snapped = NavGrid.findNearestNavigableCell(navGrid, Math.round(vehicle.x), Math.round(vehicle.z));
+    const snapped = NavGrid.findNearestNavigableCell(navGrid, Math.round(vehicle.x), Math.round(vehicle.z), true);
     if (snapped.x !== Math.round(vehicle.x) || snapped.z !== Math.round(vehicle.z)) {
       vehicle.x = snapped.x;
       vehicle.z = snapped.z;
     }
+    claim(snapped.x, snapped.z);
+  }
+
+  // The claims above are scratch bookkeeping — they cover employee cells too,
+  // which are never really "vehicle-occupied" — so clear all of them and
+  // re-mark only genuine vehicle occupancy at the final (possibly relocated)
+  // positions, mirroring buildNavGrid's own vehicle-marking pass.
+  for (const cell of claimed) cell.vehicleOccupied = false;
+  for (const vehicle of state.vehicles.vehicles) {
+    const cell = navGrid.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));
+    if (cell) cell.vehicleOccupied = true;
   }
 }
 
