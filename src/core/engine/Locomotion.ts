@@ -482,6 +482,15 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     committed: readCommitted(emp),
     ...readMoveHistory(emp),
     ...(occupancyActive ? { mover, occupancy: state.agentOccupancy } : {}),
+    // #1274: a board leg's own destination IS the target vehicle's own held
+    // cell by construction (buildBoardLeg in PlanItinerary.ts) — without this
+    // exemption the ordinary per-hop occupancy check above rejects the leg's
+    // final approach hop forever, and the walker abandons at
+    // MOVE_STUCK_ABANDON_TICKS trying to board a vehicle from any cell but
+    // the one it already stands on.
+    ...(occupancyActive && leg.onArrive.kind === 'board'
+      ? { exemptOccupant: { kind: 'vehicle', id: leg.onArrive.vehicleId } }
+      : {}),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
@@ -709,6 +718,11 @@ function handleAgentOccupancyBlock(
   const destinationHeldByOther = !occupancy.isFreeFor(mover, leg.destX, leg.destZ);
 
   if (!destinationHeldByOther) {
+    // (#1274) No `exemptOccupant` here: this branch only ever runs when
+    // `!destinationHeldByOther`, but a board leg's destination IS the target
+    // vehicle's own cell by construction — always self-held — so this branch
+    // is unreachable for a board leg in the first place. A latent coupling,
+    // not a gap to fill.
     const reroute = findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
     if (reroute.found) {
       const outcome = advanceAlongPath({
@@ -785,6 +799,15 @@ function handleAgentOccupancyBlock(
   if (needsExactUnsharedCell) {
     const spread = findNearestFreeCellForAgent(state, mover, leg.destX, leg.destZ);
     if (spread) {
+      // #1274: record the pre-spread destination once, on the FIRST spread
+      // only — the stable identity of "what chokepoint is this mover
+      // actually queued on", so buildWaitingByTarget (EventEngine.ts) can
+      // still cluster several movers converging on the same original target
+      // even after each one has since been individually retargeted.
+      if (leg.originalDestX == null) {
+        leg.originalDestX = leg.destX;
+        leg.originalDestZ = leg.destZ;
+      }
       leg.destX = spread.x;
       leg.destZ = spread.z;
       // Deliberately NOT resetting `vehicleWaitingTicks` here (unlike the

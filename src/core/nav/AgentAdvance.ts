@@ -328,12 +328,17 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     const isRealStep = hopTargetCellX !== Math.round(x) || hopTargetCellZ !== Math.round(z);
     if (input.occupancy && input.mover && isRealStep
       && !input.occupancy.isFreeFor(input.mover, hopTargetCellX, hopTargetCellZ)) {
-      // Stop the hop loop for this tick right here — do not skip ahead to a
-      // later hop, and do not attempt a partial move into the blocked cell.
-      // Whatever earlier hops this tick already committed (x/z, trail,
-      // committed, pathIndex) stand as they are.
-      blockedByOccupant = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
-      break;
+      const holder = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
+      const isExempt = !!holder && !!input.exemptOccupant
+        && holder.kind === input.exemptOccupant.kind && holder.id === input.exemptOccupant.id;
+      if (!isExempt) {
+        // Stop the hop loop for this tick right here — do not skip ahead to a
+        // later hop, and do not attempt a partial move into the blocked cell.
+        // Whatever earlier hops this tick already committed (x/z, trail,
+        // committed, pathIndex) stand as they are.
+        blockedByOccupant = holder;
+        break;
+      }
     }
 
     const beforeX = x;

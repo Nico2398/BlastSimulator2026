@@ -71,10 +71,19 @@ function buildWaitingByTarget(vehicles: readonly Vehicle[], employees: readonly 
     const leg = driver.itinerary?.legs[0];
     if (!leg || leg.mode !== 'drive') continue;
 
-    const key = `${leg.destX},${leg.destZ}`;
+    // #1274: cluster by the leg's PRE-SPREAD destination when it has one —
+    // Locomotion.ts's destination-spreading retargets a blocked drive leg's
+    // live destX/destZ to an individually-found free cell as soon as
+    // vehicleWaitingTicks crosses this same threshold, which would otherwise
+    // fracture several vehicles converging on one cell into singletons
+    // before this clustering pass ever sees them together.
+    const targetX = leg.originalDestX ?? leg.destX;
+    const targetZ = leg.originalDestZ ?? leg.destZ;
+
+    const key = `${targetX},${targetZ}`;
     const entry = waitingByTarget.get(key);
     if (entry) entry.count++;
-    else waitingByTarget.set(key, { targetX: leg.destX, targetZ: leg.destZ, count: 1 });
+    else waitingByTarget.set(key, { targetX, targetZ, count: 1 });
   }
   return waitingByTarget;
 }
