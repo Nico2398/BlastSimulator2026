@@ -1067,10 +1067,48 @@ function handleAgentOccupancyBlock(
       && isIdleParkedVehicle(blockerVehicle, state.employees.employees);
     const blockerIsStationaryBusyEmployee = blocker?.kind === 'employee'
       && blockerEmp !== undefined && isStationaryBusyEmployee(blockerEmp);
-    if (blockerIsIdleParkedVehicle || blockerIsStationaryBusyEmployee) {
+    if (blockerIsIdleParkedVehicle) {
       const crossing = findPathAvoidingOccupiedCells(
         state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
       );
+      if (crossing.found) {
+        return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
+      }
+    } else if (blockerIsStationaryBusyEmployee && state.navGrid) {
+      // #1283 dense-grid follow-up: a busy EMPLOYEE blocker (unlike a
+      // genuinely parked vehicle) sits inside a population that is itself
+      // packing the grid — at real-game density (33 employees on an 8x8
+      // hole grid, most idle-turned-resting on/near the hole tiles once
+      // charging finishes) `findPathAvoidingOccupiedCells`'s own
+      // avoid-every-OTHER-occupied-cell search, run from `emp`'s current
+      // position all the way to the leg's own (possibly far) destination,
+      // routinely has no choice but to thread a long, winding detour around
+      // dozens of other stationary employees to find the one route that
+      // happens to leave only this cell blocked — and that detour is itself
+      // real per-tick walking through territory just as densely held,
+      // immediately contested again by a DIFFERENT mover on the very next
+      // tick. Direct-traced via blast-execution-visual.json's own
+      // interaction-mode replay (33-employee/8x8/1m-spacing crew, #1283 CI
+      // regression): enabling this same avoid-all-but-one search for an
+      // employee blocker — correct for the single, deterministic corridor
+      // this fallback's own tests cover — left the last one or two
+      // redundant re-charge orders permanently unresolved thousands of
+      // ticks past a budget the unpatched code cleared in a few hundred,
+      // every other employee simultaneously mid-relocation the whole time.
+      // A direct path — `avoidVehicles: true` only, the same call the
+      // corridor-relocate branch above already uses for its own retry
+      // (`findPath` a few lines up) and exactly what plain `advanceLeg`
+      // routing already ignores employee occupancy for — crosses THIS one
+      // blocker without detouring around every other stationary employee to
+      // do it, matching the feature's own intent ("route straight through
+      // this one specific blocker's own cell") instead of re-planning the
+      // whole remaining leg through a crowd. Scoped to the employee-blocker
+      // case only; the vehicle branch above (#1263, already shipped, its
+      // own passing tests) is untouched.
+      const crossing = findPath(state.navGrid, {
+        agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
+        avoidVehicles: true, ...(requiredClearance !== undefined && { requiredClearance }),
+      });
       if (crossing.found) {
         return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
       }

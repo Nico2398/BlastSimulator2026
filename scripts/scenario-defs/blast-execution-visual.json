@@ -3309,14 +3309,14 @@
       "commandOutcome": "either"
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:100",
-      "description": "#947 CI-fix: drains H8's own final straggler retry above.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:250",
+      "description": "#947 CI-fix: drains H8's own final straggler retry above. #1283 CI-fix: widened 100 -> 250 -- the occupancy-crossing fix landed in this same issue (Locomotion.ts's busy-employee crossing fallback, scoped to a direct path rather than a full avoid-everyone-but-one search, #1283's own dense-grid follow-up) shifts this scenario's overall tick trajectory slightly; direct-traced (interaction mode, real click replay) this exact drain now completes at loop-tick 175 where it used to fit inside the old 100-tick budget, so 250 gives margin over the measured value, matching this file's own #1278 precedent for the identical reason one step above.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 100,
+          "maxTicks": 250,
           "timeoutMs": 30000
         }
       ],
