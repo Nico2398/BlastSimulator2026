@@ -387,8 +387,11 @@ describe('en.json / fr.json — key-set parity', () => {
     // Baseline is now 3530 (up from 3526): #1206 adds the `debug occupancy`
     // console command's status output and the agent_occupancy new_game/
     // sandbox flag's strings — both locales translated.
+    // Baseline is now 3531 (up from 3530): #1226 adds world.invalid_size,
+    // the refusal message for newGameCommand's `size` validation — both
+    // locales translated.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3530);
+    expect(Object.keys(en).length).toBe(3531);
   });
 });
 

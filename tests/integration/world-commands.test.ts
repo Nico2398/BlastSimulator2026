@@ -8,12 +8,13 @@ import {
   ensureLandscape,
 } from '../../src/console/commands/world.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
-import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION, DEFAULT_GRID_SIZE } from '../../src/core/config/balance.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { computeVoxelColumnSurfaceY, computeColumnRangeY, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import { MAX_TERRAIN_GEN_DIMENSION } from '../../src/core/world/TerrainGen.js';
 
 /**
  * Dig a pit at column (x, z) down from its current surface through
@@ -75,6 +76,85 @@ describe('Console — world commands', () => {
       const result = newGameCommand(ctx, [], { mine_type: 'moon' });
       expect(result.success).toBe(false);
       expect(result.output).toContain('Unknown mine type');
+    });
+
+    // #1226 — new_game's `size` named arg reached `regenerateGrid` →
+    // `generateTerrain` → the VoxelGrid constructor with no upper bound,
+    // whose chunk-allocation loop is proportional to size²: an absurd
+    // player-typed value hangs/OOMs the process instead of failing cleanly.
+    // Same defect shape as #1218 (the save-load path), fixed there via
+    // `requireValidGenDimension`; this is the console-input sibling.
+    //
+    // The two over-the-ceiling cases below have no fix in place yet, so
+    // unfixed code actually runs real (or unboundedly expensive) generation
+    // work here rather than failing fast — bounded with a tight per-test
+    // timeout so the Red phase fails/times out quickly instead of hanging
+    // the whole suite for minutes.
+    describe('size validation (#1226)', () => {
+      it('rejects an absurdly large size (1000000000) promptly, leaving ctx untouched', () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '1000000000' });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain('Invalid size');
+        expect(ctx.state).toBeNull();
+        expect(ctx.grid).toBeNull();
+      }, 3000);
+
+      it(`rejects a size one over the ceiling (MAX_TERRAIN_GEN_DIMENSION + 1 = ${MAX_TERRAIN_GEN_DIMENSION + 1}), leaving ctx untouched`, () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: String(MAX_TERRAIN_GEN_DIMENSION + 1) });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain('Invalid size');
+        expect(ctx.state).toBeNull();
+        expect(ctx.grid).toBeNull();
+      }, 3000);
+
+      it('rejects size:0, leaving ctx untouched', () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '0' });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain('Invalid size');
+        expect(ctx.state).toBeNull();
+        expect(ctx.grid).toBeNull();
+      });
+
+      it('rejects a negative size (-5), leaving ctx untouched', () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '-5' });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain('Invalid size');
+        expect(ctx.state).toBeNull();
+        expect(ctx.grid).toBeNull();
+      });
+
+      it('rejects a non-numeric size ("abc", parses to NaN) rather than propagating NaN downstream', () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: 'abc' });
+        expect(result.success).toBe(false);
+        expect(result.output).toContain('Invalid size');
+        expect(ctx.state).toBeNull();
+        expect(ctx.grid).toBeNull();
+      });
+
+      it('still succeeds for a legitimate in-range size (32) — no regression from validation', () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+        expect(result.success).toBe(true);
+        expect(ctx.state!.world!.sizeX).toBe(32);
+        expect(ctx.state!.world!.sizeZ).toBe(32);
+        expect(ctx.grid!.sizeX).toBe(32);
+        expect(ctx.grid!.sizeZ).toBe(32);
+      });
+
+      it('defaults to DEFAULT_GRID_SIZE and succeeds when no size named arg is given', () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42' });
+        expect(result.success).toBe(true);
+        expect(ctx.state!.world!.sizeX).toBe(DEFAULT_GRID_SIZE);
+        expect(ctx.state!.world!.sizeZ).toBe(DEFAULT_GRID_SIZE);
+      });
+
+      it('ignores an out-of-range size_y — it remains a dead arg, not read by newGameCommand at all', () => {
+        const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', size_y: '1000000000' });
+        expect(result.success).toBe(true);
+        expect(ctx.state!.world!.sizeX).toBe(32);
+        expect(ctx.state!.world!.sizeZ).toBe(32);
+        expect(ctx.grid!.sizeX).toBe(32);
+        expect(ctx.grid!.sizeZ).toBe(32);
+      });
     });
   });
 
