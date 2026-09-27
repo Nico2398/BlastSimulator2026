@@ -22,7 +22,7 @@ What lives where — one concept per file, same as the context layer:
 | `.github/scripts/*.cjs` | Decision rules read from the workspace (hence `actions/checkout` in every workflow that needs them), unit-tested against the source that ships |
 | `tests/unit/config/autonomy-loop.test.ts` | The enforcement. Triggers, tokens and guards are pinned here, because every one of them fails in silence |
 
-The system these files implement — entry points, labels, single flight, rescue, auto-merge, the cascade brake — is described in `agentic-autonomous-pipeline` and its `references/github-loop.md`. This skill is about *how to write* that layer, not what it does.
+The system these files implement — entry points, labels, parallel runs, rescue, the merge gate, the cascade brake — is described in `agentic-autonomous-pipeline` and its `references/github-loop.md`. This skill is about *how to write* that layer, not what it does.
 
 ## ▶ Rule 1 — No timer
 
@@ -40,7 +40,7 @@ What to reach for instead, in order of preference:
 
 1. **An event.** GitHub raises one for nearly everything worth reacting to. `workflow_run` on CI completing is what made auto-merge work: the moment the checks report is an event, not a time. If your reaction needs to happen "later", find the event that means later.
 2. **Identity.** "Have I already answered this?" is not a question about elapsed time. A workflow run has an id and a redelivered webhook carries the same one; a commit has a SHA. `agentic-ci-failure` writes the CI run id into its comment marker and answers each run once.
-3. **State you can read.** Is a run live? List the runs. Has CI reported? Read the runs on the head. Did a session settle its issue? Read the labels. `mergeVerdict` in `agentic-auto-merge` is state alone — failed is stuck, anything unreported is pending, and `total === 0` is pending rather than green.
+3. **State you can read.** Is a run live? List the runs. Has CI reported? Read the runs on the head. Did a session settle its issue? Read the labels. `gateVerdict` in `agentic-auto-merge` is state alone — failed is red, anything unreported is pending, `total === 0` is pending rather than green, and "is `main` in this head" is asked of the compare API rather than inferred.
 4. **A counter with a brake.** When something must be bounded, bound it by *attempts*, not by minutes: `AGENTIC_BLOCKED_CHAIN_LIMIT`, `AGENTIC_CI_FIX_ATTEMPT_LIMIT`. A counter is exact, visible in the artifacts it counts, and does not drift.
 5. **The job's own timeout.** When a wait genuinely has no natural end, let `timeout-minutes` be the bound rather than inventing a second one — and make reaching it *safe*: `[await-ci]` waits with no deadline because a killed job leaves no live runner run, which is precisely the state `agentic-ci-failure` picks up.
 
@@ -85,7 +85,7 @@ When you add a trigger, add it to `ASSIGNING_WORKFLOWS` or `NON_ASSIGNING_WORKFL
 
 - **A fact you could not read is not an absent fact.** A 500 from the PR list is `unknown`, and `unknown` blocks. Every rule in `assignability.cjs` works this way: an idle queue is recoverable, a run started on absent ground is not.
 - **An absence of evidence is never a pass.** `total === 0` runs on a head means nothing has reported, not that nothing failed.
-- **A warning in a job log is not somewhere anyone is watching.** When a state must not persist, fail the step so the Actions list shows red — `agentic-auto-merge` fails on a marked PR it could not arm, for exactly this reason. Better still, comment where a human is already looking.
+- **A warning in a job log is not somewhere anyone is watching.** When a state must not persist, fail the step so the Actions list shows red — `agentic-auto-merge` fails on a marked PR it cannot move, for exactly this reason. Better still, comment where a human is already looking.
 - **Every terminal outcome releases the queue.** A workflow that ends a run's life must leave the issue in a terminal state — merged and `done`, or `blocked` (which is itself an entry point, so the chain continues). A brake that parks work without releasing the issue converts one stalled PR into a stalled repository.
 - **`if: always()`** on any step whose whole purpose is to cover a crash, a timeout or a cancellation.
 
@@ -94,7 +94,7 @@ When you add a trigger, add it to `ASSIGNING_WORKFLOWS` or `NON_ASSIGNING_WORKFL
 Every workflow here can fire twice: webhooks redeliver, sweeps repeat, humans dispatch. Make the second run a no-op by construction.
 
 - Mark what you wrote with an HTML comment (`<!-- agentic-ci-failure -->`) and read it back before writing again. Include the identity of the thing you were answering — a run id, a SHA — so "again" is distinguishable from "still".
-- `--force` on `gh label create`, and treat "auto-merge already enabled" as success.
+- `--force` on `gh label create`; `expected_head_sha` on `update-branch` and `sha` on a merge, so a second attempt against a head that moved is a refusal rather than a write onto something unchecked.
 - Branch on **state, not on messages**. `agentic-auto-merge` re-reads the PR and decides from `mergeable_state` plus the runs, because a refusal string it did not recognise once fell through to a warning and a green step — and PR #434 sat unmerged while both arming paths reported success.
 - When reading workflow runs on a head: keep the newest run per `workflow_id` (`cancel-in-progress` leaves superseded runs behind, and a stale `cancelled` reads as red forever), skip the workflow the code itself is running in (or it waits on itself), and treat `skipped`/`neutral` as passes.
 

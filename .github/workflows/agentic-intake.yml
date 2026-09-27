@@ -1,31 +1,73 @@
 name: "Pipeline: intake a filed issue"
 
-# Filing an issue records work; it never starts a run. Exactly three mechanisms
-# start an autonomous session, and each reacts to a run ending or a human asking:
+# Filing an issue records work; it never starts a run. Four mechanisms start an
+# autonomous session, and each reacts to a run ending or a human asking —
+# `agentic-autonomous-pipeline`'s github-loop reference lists them. None of them
+# is an issue being opened or labelled.
 #
-#   - `agentic-trigger.yml` — a human dispatching the workflow by hand.
-#   - `auto-assign-next.yml` — a merged pipeline pull request chaining to the
-#     next `ready` issue.
-#   - `handle-failure.yml` — a run that ended `blocked` chaining past itself,
-#     bounded by the cascade brake in `agentic-assign`.
+# This workflow assigns nothing. It keeps three things true so the labels can be
+# trusted, by humans and by the assigner alike:
 #
-# This workflow assigns nothing. It exists only to keep the lifecycle labels
-# usable by hand: it makes sure the label definitions exist so a human can pick
-# them from the GitHub UI, and it drops a stale `done` from a reopened issue.
-# An issue carrying `ready` waits in the queue until one of the two mechanisms
-# above reaches it — filing it, labelling it, or reopening it does not.
+#   - Every lifecycle and scope label exists, with a description that names what
+#     it promises — `ready` the Definition of Ready, `done` the Definition of Done.
+#   - An issue filed through the "Agent Task" form carries the `scope:*` labels
+#     its filer picked in the form's Scope field. That is the filer's own
+#     declaration, read off the form, never inferred from the text.
+#   - `ready` sits only on an issue that meets the Definition of Ready's
+#     machine-checkable part (`readinessVerdict` in `assignability.cjs`). An issue
+#     that does not has `ready` taken off, with a comment naming what is missing,
+#     so the label never claims more than it means. The assigner refuses the same
+#     issue on the same verdict, so the two cannot disagree.
+#
+# Every write here uses GITHUB_TOKEN, deliberately: none of it may raise an event.
+# A label this workflow adds or removes must not re-enter it, and must never reach
+# `handle-failure.yml` or a runner. It also drops a stale `done` from a reopened
+# issue.
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened, reopened, labeled, unlabeled]
 
 permissions:
   issues: write
+  contents: read
 
 jobs:
   label:
+    # Only the label events that can change whether `ready` is honest: `ready`
+    # itself arriving, a scope or `agent-task` arriving or leaving. Everything
+    # else — `ready` leaving and `in-progress` arriving at assignment, `blocked`,
+    # `paused` — is the pipeline's own bookkeeping and none of this workflow's
+    # business.
+    if: >-
+      github.event.action == 'opened' ||
+      github.event.action == 'reopened' ||
+      (
+        github.event.action == 'labeled' &&
+        (
+          github.event.label.name == 'ready' ||
+          github.event.label.name == 'agent-task' ||
+          startsWith(github.event.label.name, 'scope:')
+        )
+      ) ||
+      (
+        github.event.action == 'unlabeled' &&
+        (
+          github.event.label.name == 'agent-task' ||
+          startsWith(github.event.label.name, 'scope:')
+        )
+      )
     runs-on: ubuntu-latest
     steps:
-      - name: Normalise lifecycle labels
+      # The label definitions, the scope taxonomy and the Definition of Ready are
+      # read from `assignability.cjs`, the one place that decides them, so this
+      # workflow can never hold a label the assigner reads differently.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      - name: Keep the labels honest
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -33,42 +75,96 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const n = context.payload.issue.number;
-            const reopened = context.payload.action === 'reopened';
-            const on = new Set(
-              (context.payload.issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name))
-            );
+            const action = context.payload.action;
+            const rules = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/assignability.cjs`);
+            const names = (labels) => (labels || []).map((l) => (typeof l === 'string' ? l : l.name));
 
-            // Ensures the two label definitions exist so a human picking them
-            // from the GitHub UI finds them there. Never applied automatically.
-            const ensureLabel = async (name, color, description) => {
-              await github.rest.issues.createLabel({ owner, repo, name, color, description })
-                .catch(() => {});
-            };
-            await ensureLabel('agent-task', '0e8a16', 'Atomic task for the autonomous pipeline');
-            await ensureLabel('ready', '1d76db', 'Waiting in the assignment queue');
-            // `paused` is applied by a run, not by a human picking it from the
-            // UI — but it has to *exist* before the first run reaches for it,
-            // and it is the one lifecycle label that also goes on pull requests,
-            // where `assignability.cjs` reads it as a handover rather than a
-            // collision. Defined here for the same reason as the other two.
-            await ensureLabel(
-              'paused',
-              'fbca04',
-              'A run stopped here on a dependency; the queue returns to it when that dependency lands'
+            // --- Every label the loop reads exists and says what it promises ---
+            // Colours are the ones these labels already carry, so this changes a
+            // description and never repaints a label a human is used to.
+            const wanted = [
+              { name: rules.AGENT_TASK, color: '1d76db', description: 'A task for the autonomous pipeline' },
+              { name: rules.READY, color: '0e8a16', description: 'Meets the Definition of Ready (agentic-issue-creation) and waits in the queue' },
+              { name: rules.IN_PROGRESS, color: 'fbca04', description: 'A pipeline run owns it; counts against AGENTIC_MAX_PARALLEL_RUNS' },
+              { name: rules.BLOCKED, color: 'd93f0b', description: 'Needs a human answer or intervention' },
+              { name: rules.PAUSED, color: 'fbca04', description: 'A run stopped here on a dependency; the queue returns to it when that dependency lands' },
+              { name: rules.DONE, color: 'a18bc6', description: 'Meets the Definition of Done (agentic-autonomous-pipeline)' },
+              ...Object.entries(rules.SCOPES).map(([scope, description]) => ({
+                name: `${rules.SCOPE_PREFIX}${scope}`, color: 'c5def5', description,
+              })),
+            ];
+            const existing = new Map(
+              (await github.paginate(github.rest.issues.listLabelsForRepo, { owner, repo, per_page: 100 }))
+                .map((label) => [label.name, label])
             );
+            for (const label of wanted) {
+              const have = existing.get(label.name);
+              try {
+                if (!have) {
+                  await github.rest.issues.createLabel({ owner, repo, ...label });
+                } else if ((have.description || '') !== label.description || have.color.toLowerCase() !== label.color) {
+                  await github.rest.issues.updateLabel({ owner, repo, ...label });
+                }
+              } catch (error) {
+                core.warning(`Label \`${label.name}\` could not be written: ${error.message}`);
+              }
+            }
+
+            // --- The form's Scope field becomes the issue's scope labels ---
+            // The "Agent Task" form asks which areas the change stays inside, and
+            // renders the answer under `### Scope`. Only on `opened`, and only
+            // what the filer picked — nothing is inferred from the rest of the
+            // body, which is the over-blocking heuristic this pipeline rejected.
+            const issue = context.payload.issue;
+            let labels = names(issue.labels);
+            if (action === 'opened') {
+              const section = /^###\s*Scope\s*$([\s\S]*?)(?=^###\s|(?![\s\S]))/m.exec(issue.body || '');
+              const picked = section
+                ? [...section[1].matchAll(/scope:([a-z]+)/g)].map((m) => `${rules.SCOPE_PREFIX}${m[1]}`)
+                : [];
+              const toAdd = [...new Set(picked)].filter((label) => !labels.includes(label));
+              if (toAdd.length > 0) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: toAdd });
+                labels = [...labels, ...toAdd];
+                core.info(`#${n}: applied ${toAdd.join(', ')} from the form's Scope field.`);
+              }
+            }
 
             // Reopening is a human saying the work is not finished after all.
             // `done` no longer reflects reality, but re-entering the queue is
             // still their call: they add `ready` back themselves.
-            if (reopened && on.has('done')) {
-              await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: 'done' })
+            if (action === 'reopened' && labels.includes(rules.DONE)) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: rules.DONE })
                 .catch(() => {});
-              on.delete('done');
+              labels = labels.filter((label) => label !== rules.DONE);
               core.info(`#${n}: reopened, dropped stale done.`);
             }
 
-            core.info(
-              on.has('ready')
-                ? `#${n}: carries ready and waits in the queue. Dispatch "Pipeline: run the configured agent on the next ready issue" to start it, or let a merged pipeline PR chain to it.`
-                : `#${n}: no ready label, so it is not in the queue.`
-            );
+            // --- `ready` means the Definition of Ready is met ---
+            if (issue.state !== 'open' || !labels.includes(rules.READY)) {
+              core.info(`#${n}: not open with \`ready\` — nothing to check.`);
+              return;
+            }
+            const readiness = rules.readinessVerdict({ labels });
+            if (readiness.ready) {
+              core.info(`#${n}: meets the Definition of Ready and waits in the queue.`);
+              return;
+            }
+
+            await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: rules.READY })
+              .catch(() => {});
+            const scopes = Object.keys(rules.SCOPES).map((scope) => `\`${rules.SCOPE_PREFIX}${scope}\``).join(', ');
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: n,
+              body: [
+                '<!-- agentic-definition-of-ready -->',
+                '**`ready` taken off: this issue does not meet the Definition of Ready yet.**',
+                '',
+                ...readiness.missing.map((what) => `- ${what}`),
+                '',
+                '`ready` is what puts an issue in the assignment queue, and the queue takes only issues that meet the Definition of Ready (the `agentic-issue-creation` skill). With several runs in flight, the assigner needs every issue to say which areas its change stays inside, so it knows what the issue may run beside.',
+                '',
+                `Add the missing labels — every scope the change stays inside, from ${scopes}; \`scope:global\` when it spans many areas at once — then add \`ready\` again.`,
+              ].join('\n'),
+            });
+            core.warning(`#${n}: took \`ready\` off — ${readiness.missing.join('; ')}.`);

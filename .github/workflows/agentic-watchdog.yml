@@ -19,7 +19,7 @@ jobs:
       # Checked out for the stranded-pause sweep below, which `require`s
       # `assignability.cjs` and `issue-api.cjs` from the workspace rather than
       # vendoring them into this YAML — same reasoning as `agentic-assign`. The
-      # other two sweeps in this job are `actions/github-script` reading nothing
+      # other sweeps in this job are `actions/github-script` reading nothing
       # from the workspace, so they do not need this on their own; they get it
       # for free from the job sharing one checkout.
       - name: Checkout repository
@@ -360,10 +360,48 @@ jobs:
 
             core.info(`Re-raised ${raised} red pipeline PR(s).`);
 
-      # The three sweeps above are the whole of this workflow: it reports lost
+      # The merge gate (`agentic-auto-merge.yml`) wakes on events — CI
+      # completing, a runner finishing, a marked PR's own events — and keeps one
+      # pending sweep, dropping the rest. A sweep reads every open PR, so a
+      # dropped one costs nothing while another is coming; this is for when
+      # none is: a webhook that never arrived, a sweep that failed on a
+      # transient read. A marked, green PR nobody looks at again holds its issue
+      # and its parallel-run slot, so it is asked about once an hour.
+      #
+      # Same shape as the re-raise above: it dispatches, and every decision —
+      # merge, bring up to date, hand back, wait — stays in the gate. It
+      # dispatches only when an open, non-draft PR carries the marker, so an
+      # idle repository raises nothing.
+      - name: Re-raise the merge gate while a marked PR is open
+        if: vars.AGENTIC_AUTO_MERGE_ENABLED == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const open = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            const marked = open.filter(
+              (pr) => !pr.draft && (pr.body || '').split(/\r?\n/).some((line) => line.trim() === 'READY TO MERGE')
+            );
+            if (marked.length === 0) {
+              core.info('No open marked pull request — the merge gate has nothing to look at.');
+              return;
+            }
+            await github.rest.actions.createWorkflowDispatch({
+              owner, repo,
+              workflow_id: 'agentic-auto-merge.yml',
+              ref: context.payload.repository?.default_branch || 'main',
+              inputs: { reason: `watchdog: ${marked.map((pr) => `#${pr.number}`).join(', ')} open and marked` }
+            });
+            core.info(`Re-raised the merge gate for ${marked.map((pr) => `#${pr.number}`).join(', ')}.`);
+
+      # The four sweeps above are the whole of this workflow: it reports lost
       # runs and releases the issues they were holding, it re-raises a red CI
-      # nobody is reading, and it flags a pause whose dependency will never
-      # land on its own. It never assigns.
+      # nobody is reading and a marked PR nobody merged, and it flags a pause
+      # whose dependency will never land on its own. It never assigns.
       #
       # That is not the same as never restarting the queue. The `blocked` label
       # either sweep applies is itself an entry point — `handle-failure.yml`

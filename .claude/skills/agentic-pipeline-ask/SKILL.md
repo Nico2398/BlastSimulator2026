@@ -29,4 +29,4 @@ Simple read-only analysis pipeline. No code changes. No exploration between step
 | Step | Action |
 |------|--------|
 | post | `gh pr comment <pr-url> --body "<answer>"` or `gh issue comment <issue-url> --body "<answer>"` |
-| release | `gh issue edit <N> --add-label done --remove-label in-progress` then `gh issue close <N>` — after the answer is posted, and only for an assigned issue |
+| release | `gh issue edit <N> --add-label done --remove-label in-progress` then `gh issue close <N> --reason completed` — after the answer is posted, and only for an assigned issue. That is the Definition of Done for a deliverable that is not a diff (`agentic-autonomous-pipeline`) |

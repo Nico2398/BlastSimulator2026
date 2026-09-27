@@ -404,9 +404,12 @@ The pipeline runs under Claude Code or OpenCode. One repository variable decides
 |---------------------|--------|--------|
 | `AGENTIC_AGENT` | `@claude`, `@opencode` (leading `@` and case optional; unset means `@opencode`) | Which agent the assignment comments address, and therefore which runner workflow starts |
 | `AGENTIC_AUTO_ASSIGN_ENABLED` | `true` / anything else | Whether a finished issue chains to the next `ready` one |
-| `AGENTIC_AUTO_MERGE_ENABLED` | `true` / anything else | Whether a PR whose body carries `READY TO MERGE` gets GitHub native auto-merge |
-| `AGENTIC_STALL_MINUTES` | minutes, default `240` | How long an issue may stay `in-progress` without a linked PR before the watchdog marks it `blocked` |
+| `AGENTIC_AUTO_MERGE_ENABLED` | `true` / anything else | Whether the merge gate runs: it merges a `READY TO MERGE` PR only when CI is green on a head containing `main`'s tip |
+| `AGENTIC_MAX_PARALLEL_RUNS` | positive integer, default `1` | How many issues may be in progress at once. Above 1, issues run side by side only when their `scope:*` labels do not overlap |
+| `AGENTIC_STALL_MINUTES` | minutes, default `420` | How long an issue may stay `in-progress` without a linked PR before the watchdog marks it `blocked` |
 | `CLAUDE_REVIEW_ENABLED` | `false` / anything else, default enabled | Whether opening or marking a hand-written PR ready-for-review triggers the automatic Claude Code review |
+
+The full list, with the brakes and limits, is in the `agentic-autonomous-pipeline` skill's `references/github-loop.md`.
 
 Set them under **Settings → Secrets and variables → Actions → Variables**. Switching agent is a one-value change; nothing else moves.
 
@@ -414,22 +417,27 @@ Required secrets: `PAT_TOKEN_COPILOT_AUTOMATION` (both agents — the loop dies 
 
 ### Trigger paths
 
-**`ready` is the whole handover, and only a human or an authoring agent puts it there.** Intake no longer defaults an unlabelled issue into the queue — filing one is not by itself enough. The "Agent Task" issue form applies `agent-task` + `ready` itself; an agent creating an issue does the same per `agentic-issue-creation` unless told otherwise; a plain issue (the web form's blank option, the API, a sentence typed on a phone) stays out of the queue until `ready` is added by hand. However it arrives, the issue joins the queue in number order once `ready` is on it, and the run that picks it up plans it, writes the tests, implements them, verifies the channels the change touches, and opens the pull request that closes it. Where the issue leaves a choice open, the run takes the default the specs imply and records it in the PR rather than waiting for an answer.
+**`ready` puts an issue in the queue, and it means the Definition of Ready.** The issue says what should be different and how to tell, declares what must land first, and carries `agent-task` plus the `scope:*` labels of the areas its change stays inside (`agentic-issue-creation` holds the whole definition). The "Agent Task" issue form asks for the scopes and files the issue `agent-task` + `ready`; an agent filing an issue does the same; a plain issue stays out of the queue until those labels are added by hand. `agentic-intake.yml` takes `ready` back off any issue without `agent-task` and a known scope, with a comment saying what is missing. The run that picks an issue up plans it, writes the tests, implements them, verifies the channels the change touches, and opens the pull request that closes it. Where the issue leaves a choice open, the run takes the default the specs imply and records it in the PR rather than waiting for an answer.
+
+Filing an issue or labelling it starts nothing. A run starts in exactly four ways:
 
 | Trigger | Result |
 |---------|--------|
-| **File an issue via the "Agent Task" form** | Labels it `agent-task` + `ready`, then assigns the oldest unblocked `ready` issue |
-| Add `ready` to an issue | Same — this is also how you resume a `blocked` one, or opt in a plain/free-form issue, with nothing to dispatch by hand |
-| A merged PR whose body says `Closes #N` | Closes `#N`, then assigns the next `ready` issue the same way |
-| Hourly watchdog | Sweeps stalled runs, and restarts the queue when the pipeline sits idle with issues waiting |
-| Run the **"Pipeline: run the configured agent on the next ready issue"** workflow | Forces the queue forward by hand |
-| Comment `@claude …` on an issue or PR | Runs `.github/workflows/claude-runner.yml` |
-| Comment `@opencode …` on an issue or PR | Runs `.github/workflows/opencode-runner.yml` |
+| Run the **"Pipeline: run the configured agent on the next ready issue"** workflow | Assigns the oldest assignable `ready` issues, filling every free slot |
+| A pipeline PR merges | Closes its issue as `done`, then fills the freed slot |
+| A run ends `blocked` or `paused` | Reports it on the issue, then fills the freed slot — unless too many runs in a row have halted |
+| A run closes its own issue `done` (an answer, not a diff) | Fills the freed slot |
+| Comment `@claude …` on an issue or PR | Runs `.github/workflows/claude-runner.yml` by hand |
+| Comment `@opencode …` on an issue or PR | Runs `.github/workflows/opencode-runner.yml` by hand |
 
-Only one agent session runs at a time, so an issue filed while another is live waits its turn instead of starting a second one.
+The hourly watchdog never assigns: it releases runs that died, re-raises a red CI or a marked PR nobody looked at, and flags a pause that can never resume.
+
+**`done` means the Definition of Done**: the issue is closed as completed, its pull request merged through the merge gate — or, for an answer, the answer is on the issue — and nothing is left saying it is queued or in flight (`agentic-autonomous-pipeline`).
+
+**Several runs at once.** Up to `AGENTIC_MAX_PARALLEL_RUNS` issues run side by side, each in its own session, and only when their scopes are disjoint; `scope:global` and `scope:pipeline` run alone. What keeps that safe is the merge gate, the one workflow that merges: a PR merges only when CI is green on a head that already contains `main`'s tip, a green PR that fell behind has `main` merged in and is tested again, and a PR that conflicts with `main` goes back to an agent.
 
 The assignment comment *is* the trigger, and it carries the whole assignment: the issue, the mandate to delegate to the `pipeline` orchestrator before anything else, the branch names, the verification expectation, and the PR conventions. Its wording is identical for both agents apart from the mention on the first line — so both runtimes read the same instructions. Both runners stay enabled regardless of `AGENTIC_AGENT`, so you can always summon the other one by hand.
 
 **Why the PAT matters:** GitHub does not trigger workflows from events created with `GITHUB_TOKEN`. An assignment comment posted with it wakes no runner, and a PR opened with it raises no `pull_request` event, so auto-merge and the next assignment never happen. Every comment and PR in the loop must come from `PAT_TOKEN_COPILOT_AUTOMATION`.
 
-Full architecture — branch isolation, cherry-pick, the halt conditions — lives in the `agentic-autonomous-pipeline` skill, which keeps the GitHub Actions loop itself (entry points, issue labels as state, single flight, rescue, watchdog) in `references/github-loop.md`.
+Full architecture — branch isolation, cherry-pick, the halt conditions — lives in the `agentic-autonomous-pipeline` skill, which keeps the GitHub Actions loop itself (entry points, issue labels as state, parallel runs and scopes, the merge gate, rescue, watchdog) in `references/github-loop.md`.

@@ -30,10 +30,11 @@ Simple command-execution pipeline. No code changes, no branch isolation.
   | `git branch -D` | `git branch -m <old> <backup>` (recoverable) |
 - When non-destructive alternative unavailable, confirm with invoker before executing. In non-interactive (GitHub Actions) mode, refuse with: "Destructive command blocked — requires human."
 - Post step includes command output (stdout/stderr)
+- A command that puts `ready` on an issue holds it to the Definition of Ready (`agentic-issue-creation`): add `agent-task` and the issue's `scope:*` labels in the same `gh issue edit`, or `agentic-intake.yml` takes `ready` straight back off. A command that labels an issue `done` holds it to the Definition of Done.
 
 ### Non-Agentic Steps
 
 | Step | Action |
 |------|--------|
 | post | `gh pr comment <pr-url> --body "<result>"` or `gh issue comment <issue-url> --body "<result>"` |
-| release | `gh issue edit <N> --add-label done --remove-label in-progress` then `gh issue close <N>` — after the result is posted, and only for an assigned issue |
+| release | `gh issue edit <N> --add-label done --remove-label in-progress` then `gh issue close <N> --reason completed` — after the result is posted, and only for an assigned issue. That is the Definition of Done for a deliverable that is not a diff (`agentic-autonomous-pipeline`) |

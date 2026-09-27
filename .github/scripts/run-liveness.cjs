@@ -86,6 +86,75 @@ function isTrustedAssignmentAuthor(user, trustedAuthorLogin) {
  */
 const LIVE_RUN_STATUSES = ['queued', 'in_progress', 'waiting', 'requested', 'pending'];
 
+/**
+ * The two workflows whose runs are agent sessions. Read by every liveness check
+ * through `runnerRuns` in `issue-api.cjs`, so no check can poll a narrower set.
+ */
+const RUNNER_WORKFLOWS = ['claude-runner.yml', 'opencode-runner.yml'];
+
+/**
+ * What a runner run is working on, read off its `run-name`.
+ *
+ * Both runner workflows name every run after the entity it acts on —
+ * `agentic-run issue-<N>`, `agentic-run pr-<N>`, `agentic-run manual` — and a
+ * trigger the job will skip `agentic-noop`. That name is the only identity a run
+ * carries in `listWorkflowRuns` (`display_title`), and it is what lets several
+ * sessions be live at once without each liveness check reading every one of them
+ * as its own: before `AGENTIC_MAX_PARALLEL_RUNS`, "any runner run is live" meant
+ * "this issue's run is live", because there could only be one.
+ *
+ * `null` means the title carries no identity this module recognises — a run that
+ * predates `run-name`, or a title somebody changed. Callers treat that as a run
+ * that could be working on anything.
+ *
+ * @param {string | null | undefined} title
+ * @returns {{kind: 'issue'|'pr', number: number} | {kind: 'noop'} | {kind: 'manual'} | null}
+ */
+function parseRunEntity(title) {
+  const text = (title || '').trim();
+  if (text === 'agentic-noop') return { kind: 'noop' };
+  if (text === 'agentic-run manual') return { kind: 'manual' };
+  const match = /^agentic-run (issue|pr)-(\d+)$/.exec(text);
+  return match ? { kind: match[1], number: parseInt(match[2], 10) } : null;
+}
+
+/**
+ * Whether a runner run may be working on any of `entities`.
+ *
+ * Fails toward yes, the polarity this whole module holds: a run that names one
+ * of them does, a noop run and a run naming a different entity do not, and a run
+ * whose identity cannot be read — a manual dispatch with no issue, a run from
+ * before `run-name` existed — might, so it counts. Reading such a run as "not
+ * mine" would let a handback or a recovery act underneath a live session.
+ *
+ * @param {{display_title?: string|null}} run
+ * @param {Array<{kind: 'issue'|'pr', number: number}>} entities
+ */
+function runConcerns(run, entities) {
+  const entity = parseRunEntity(run?.display_title);
+  if (entity === null || entity.kind === 'manual') return true;
+  if (entity.kind === 'noop') return false;
+  return entities.some((wanted) => wanted.kind === entity.kind && wanted.number === entity.number);
+}
+
+/**
+ * The first live runner run that may be working on any of `entities`, or null.
+ *
+ * @param {Array<{id: number, status: string, display_title?: string|null}>} runs
+ * @param {Array<{kind: 'issue'|'pr', number: number}>} entities
+ * @param {{excludeRunId?: number|null}} [options]
+ */
+function liveRunFor(runs, entities, { excludeRunId = null } = {}) {
+  return (
+    runs.find(
+      (run) =>
+        run.id !== excludeRunId &&
+        LIVE_RUN_STATUSES.includes(run.status) &&
+        runConcerns(run, entities)
+    ) || null
+  );
+}
+
 /** @returns {number|null} epoch ms, or null when unparseable. */
 function parseTimestamp(value) {
   const parsed = Date.parse(value);
@@ -103,7 +172,7 @@ function undetermined(issueNumber, reason, evidence) {
  *   issueNumber: number,
  *   assignmentComments: Array<{body: string, created_at: string, user?: {login?: string, type?: string}|null}>,
  *   assignmentCommentsUnknown?: boolean,
- *   workflowRuns: Array<{id: number, status: string, created_at: string}>,
+ *   workflowRuns: Array<{id: number, status: string, created_at: string, display_title?: string|null}>,
  *   workflowRunsUnknown?: boolean,
  *   now: number,
  *   graceWindowMinutes?: number,
@@ -131,13 +200,20 @@ function decideRunLiveness(input) {
       : DEFAULT_GRACE_WINDOW_MINUTES;
   const graceWindowMs = effectiveGraceWindowMinutes * 60 * 1000;
 
+  // Only this issue's own runs are evidence about it. With several sessions
+  // live at once, another issue's run says nothing about whether this one's
+  // was dropped — see `runConcerns` for the runs that cannot be told apart
+  // and therefore still count.
+  const candidateRuns = workflowRuns.filter(
+    (run) => run.id !== excludeRunId && runConcerns(run, [{ kind: 'issue', number: issueNumber }])
+  );
+
   // Step 0: a status GitHub is actively reporting is never second-guessed by
   // anything below — not assignment-comment existence, not age, not the
   // grace window. See #614. This must run before every other check: a
   // queued run's own status is authoritative even with no assignment
   // comment at all.
-  const candidateRuns = workflowRuns.filter((run) => run.id !== excludeRunId);
-  const liveRun = candidateRuns.find((run) => LIVE_RUN_STATUSES.includes(run.status));
+  const liveRun = liveRunFor(candidateRuns, [{ kind: 'issue', number: issueNumber }]);
   if (liveRun) {
     return {
       verdict: 'live',
@@ -266,5 +342,9 @@ module.exports = {
   DEFAULT_GRACE_WINDOW_MINUTES,
   ASSIGNMENT_COMMENT_PATTERN,
   LIVE_RUN_STATUSES,
+  RUNNER_WORKFLOWS,
   isTrustedAssignmentAuthor,
+  liveRunFor,
+  parseRunEntity,
+  runConcerns,
 };
