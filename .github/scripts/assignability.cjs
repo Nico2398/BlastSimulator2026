@@ -711,6 +711,28 @@ function claimsConflict(a, b) {
 }
 
 /**
+ * For every known scope, the live issue an issue declaring only that scope
+ * would clash with — or `null` when none does and the scope is free. The same
+ * clash rule the assigner applies, so an exclusive live run holds every scope
+ * and `scope:pipeline`/`scope:global` are free only when nothing is live.
+ * Capacity and waiting reservations are left out: this says what live runs
+ * hold, which is what the scope labels' colours show.
+ *
+ * @param {{number:number, labels:string[]}[]} live issues holding `in-progress`
+ * @returns {Record<string, number|null>}
+ */
+function scopeHolders(live) {
+  const held = live.map((issue) => ({ number: issue.number, claim: scopeClaim(issue) }));
+  return Object.fromEntries(
+    Object.keys(SCOPES).map((scope) => {
+      const probe = scopeClaim({ labels: [`${SCOPE_PREFIX}${scope}`] });
+      const holder = held.find((entry) => claimsConflict(probe, entry.claim));
+      return [scope, holder ? holder.number : null];
+    })
+  );
+}
+
+/**
  * Why `claim` cannot start beside `holder`, for the log line that says so.
  *
  * @param {{exclusive: boolean, scopes: string[], why: string|null}} claim
@@ -1094,6 +1116,7 @@ module.exports = {
   resolveMention,
   resumeTargetFor,
   scopeClaim,
+  scopeHolders,
   selectNextAssignable,
   strandedPauseVerdict,
 };

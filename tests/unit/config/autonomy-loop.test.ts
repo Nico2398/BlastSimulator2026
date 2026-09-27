@@ -28,6 +28,17 @@ import { evaluateExpression, evaluateTemplate } from '../../helpers/actionsExpre
 
 const require = createRequire(import.meta.url);
 
+/** The github-script body that follows the step named `step`, de-indented, and nothing after it. */
+function scriptAfter(text: string, step: string): string {
+  const from = text.indexOf('script: |\n', text.indexOf(step)) + 'script: |\n'.length;
+  const lines: string[] = [];
+  for (const line of text.slice(from).split('\n')) {
+    if (line.trim() !== '' && !line.startsWith(' '.repeat(12))) break;
+    lines.push(line.replace(/^ {12}/, ''));
+  }
+  return lines.join('\n');
+}
+
 const ROOT = join(import.meta.dirname, '../../..');
 const workflow = (name: string): string =>
   readFileSync(join(ROOT, '.github/workflows', name), 'utf8');
@@ -200,8 +211,8 @@ describe('every entry point assigns under the configured parallel limit', () => 
   it('keeps every scope label defined, from the taxonomy the assigner reads', () => {
     const intake = workflow('agentic-intake.yml');
     expect(intake).toContain('.github/scripts/assignability.cjs');
-    expect(intake).toContain('...Object.entries(rules.SCOPES).map(([scope, description]) => ({');
-    expect(intake).toContain('name: `${rules.SCOPE_PREFIX}${scope}`');
+    expect(intake).toContain('for (const [scope, description] of Object.entries(rules.SCOPES))');
+    expect(intake).toContain('const name = `${rules.SCOPE_PREFIX}${scope}`;');
     expect(intake.slice(0, intake.indexOf('Keep the labels honest'))).toContain('actions/checkout@v4');
     expect(intake).toMatch(/permissions:\s*\n\s*issues: write\s*\n\s*contents: read/);
   });
@@ -223,14 +234,7 @@ describe('every entry point assigns under the configured parallel limit', () => 
 // Run against a fake GitHub: the shipped intake script, every branch it has.
 describe('intake keeps `ready` honest', () => {
   const intakeText = workflow('agentic-intake.yml');
-  const script = (() => {
-    const marker = 'script: |\n';
-    return intakeText
-      .slice(intakeText.indexOf(marker) + marker.length)
-      .split('\n')
-      .map((line) => line.replace(/^ {12}/, ''))
-      .join('\n');
-  })();
+  const script = scriptAfter(intakeText, 'Keep the labels honest');
   const jobIf = (() => {
     const start = intakeText.indexOf('if: >-') + 'if: >-'.length;
     return intakeText.slice(start, intakeText.indexOf('\n    runs-on:'));
@@ -356,8 +360,90 @@ describe('intake keeps `ready` honest', () => {
       { name: 'ready', color: '0e8a16', description: 'Eligible for pipeline assignment' },
     ]);
     expect(run.updated).toEqual(['ready']);
-    expect(run.created).toEqual(expect.arrayContaining(['in-progress', 'done', ...Object.keys(rules.SCOPES).map((s: string) => `scope:${s}`)]));
+    expect(run.created).toEqual(expect.arrayContaining(['in-progress', 'done']));
     expect(run.created).not.toContain('agent-task');
+    // Scope labels belong to the `scope-colors` job, which paints them.
+    for (const scope of Object.keys(rules.SCOPES)) expect(run.created).not.toContain(`scope:${scope}`);
+  });
+});
+
+// A scope label's colour says whether a live run holds it, so the label list
+// shows which areas a new issue could start in. Display only: nothing reads it.
+describe('scope labels show which scopes a live run holds', () => {
+  const intakeText = workflow('agentic-intake.yml');
+  const job = intakeText.slice(intakeText.indexOf('\n  scope-colors:'));
+  const jobIf = job.slice(job.indexOf('if: >-') + 'if: >-'.length, job.indexOf('\n    runs-on:'));
+  const script = scriptAfter(job, 'Paint each scope label');
+  const rules = require(join(ROOT, '.github/scripts/assignability.cjs'));
+
+  async function paint(live: { number: number; labels: string[] }[], existing: { name: string; color: string; description: string }[] = []) {
+    const writes: { name: string; color: string; created: boolean }[] = [];
+    const github: any = {
+      rest: {
+        issues: {
+          listForRepo: 'listForRepo',
+          listLabelsForRepo: 'listLabelsForRepo',
+          createLabel: async ({ name, color }: any) => { writes.push({ name, color, created: true }); },
+          updateLabel: async ({ name, color }: any) => { writes.push({ name, color, created: false }); },
+        },
+      },
+      paginate: async (method: string, params: any) => {
+        if (method === 'listLabelsForRepo') return existing;
+        expect(params).toMatchObject({ labels: 'in-progress', state: 'open' });
+        return [
+          ...live.map((issue) => ({ number: issue.number, labels: issue.labels.map((name) => ({ name })) })),
+          { number: 999, pull_request: {}, labels: [{ name: 'in-progress' }] },
+        ];
+      },
+    };
+    const core = { info: () => {} };
+    const context = { repo: { owner: 'Nico2398', repo: 'BlastSimulator2026' } };
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+    await new AsyncFunction('github', 'context', 'core', 'require', 'process', script)(
+      github, context, core, require, { env: { GITHUB_WORKSPACE: ROOT } }
+    );
+    return Object.fromEntries(writes.map((w) => [w.name.slice('scope:'.length), w.color]));
+  }
+
+  it('repaints only on what changes what a live run holds', () => {
+    const wakes = (action: string, label?: string) =>
+      Boolean(evaluateExpression(jobIf, { github: { event: { action, label: label ? { name: label } : null } } } as never));
+    expect(wakes('labeled', 'in-progress')).toBe(true);
+    expect(wakes('unlabeled', 'in-progress')).toBe(true);
+    expect(wakes('labeled', 'scope:ui')).toBe(true);
+    expect(wakes('unlabeled', 'scope:ui')).toBe(true);
+    expect(wakes('closed')).toBe(true);
+    expect(wakes('opened')).toBe(false);
+    expect(wakes('labeled', 'ready')).toBe(false);
+    expect(wakes('labeled', 'blocked')).toBe(false);
+  });
+
+  it('paints a held scope and every scope clashing with it, the rest free', async () => {
+    const colors = await paint([{ number: 1283, labels: ['agent-task', 'in-progress', 'scope:nav', 'scope:engine'] }]);
+    expect(colors.nav).toBe('fbca04');
+    expect(colors.engine).toBe('fbca04');
+    // Runs alone, so it cannot start beside anything live.
+    expect(colors.pipeline).toBe('fbca04');
+    expect(colors.global).toBe('fbca04');
+    expect(colors.ui).toBe('c5def5');
+    expect(colors.scenarios).toBe('c5def5');
+  });
+
+  it('paints every scope held while an exclusive run is live', async () => {
+    const colors = await paint([{ number: 1230, labels: ['in-progress', 'scope:pipeline'] }]);
+    expect(Object.values(colors)).toEqual(Object.keys(rules.SCOPES).map(() => 'fbca04'));
+  });
+
+  it('frees every scope when nothing is live, and ignores pull requests', async () => {
+    const colors = await paint([]);
+    expect(Object.values(colors)).toEqual(Object.keys(rules.SCOPES).map(() => 'c5def5'));
+  });
+
+  it('writes nothing for a label already the right colour and description', async () => {
+    const existing = Object.entries(rules.SCOPES).map(([scope, description]) => ({
+      name: `scope:${scope}`, color: 'C5DEF5', description: description as string,
+    }));
+    expect(await paint([], existing)).toEqual({});
   });
 });
 
