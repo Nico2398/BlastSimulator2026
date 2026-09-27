@@ -22,7 +22,7 @@ export type RaycastForTile = (ndcX: number, ndcY: number) => { x: number; y: num
 /** Outcome of resolving a world tile to a screen (NDC) point. */
 export type ScreenTileResolution =
   | { resolved: true; ndc: { x: number; y: number; z: number } }
-  | { resolved: false };
+  | { resolved: false; reason?: 'grazing-angle-cycle' };
 
 /** Iteration cap for the convergence loop below, matching the previous window.__worldToScreen behaviour. */
 export const TILE_RESOLUTION_MAX_ITERATIONS = 5;
@@ -37,6 +37,44 @@ export const TILE_RESOLUTION_MAX_ITERATIONS = 5;
  * so it never mistakes two genuinely different terrain levels for a repeat.
  */
 const OSCILLATION_EPSILON = 0.25;
+
+/**
+ * Minimum number of distinct heights between two visits to the same height
+ * for a repeat to be classified as a grazing-angle cycle (period-3+) rather
+ * than the ordinary period-2 bench-edge oscillation.
+ */
+const GRAZING_CYCLE_MIN_SPAN = 3;
+// TODO(#1276): consumed by classifyUnresolvedReason once it is implemented.
+void GRAZING_CYCLE_MIN_SPAN;
+
+/**
+ * Blends a repeated height guess toward the new raycast hit, damped by how
+ * many times this height has already repeated — replaces the fixed 50/50
+ * blend for cycles the plain average cannot break.
+ */
+function dampedHeight(currentY: number, hitY: number, repeatCount: number): number {
+  // TODO(#1276): implement in the implementation phase.
+  void hitY;
+  void repeatCount;
+  return currentY;
+}
+
+/**
+ * Classifies why the convergence loop in resolveScreenPointForTile exhausted
+ * its iterations without resolving, from the span between a height's first
+ * appearance and its first repeat.
+ */
+function classifyUnresolvedReason(cycleSpanAtFirstRepeat: number | null): 'grazing-angle-cycle' | undefined {
+  // TODO(#1276): implement in the implementation phase.
+  void cycleSpanAtFirstRepeat;
+  return undefined;
+}
+
+// TODO(#1276): resolveScreenPointForTile wires these two in during the
+// implementation phase; referenced here so the skeleton typechecks clean
+// under noUnusedLocals/noUnusedParameters.
+void dampedHeight;
+void classifyUnresolvedReason;
 
 /**
  * Finds an NDC point that projects near (targetX, startY, targetZ) and whose
