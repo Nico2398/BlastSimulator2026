@@ -11,9 +11,10 @@ description: >
   the one pending slot before resolving to nothing.
 
   The issue that assignment was for is left `in-progress` with no session and
-  no PR. Because `selectNextAssignable`'s single-flight guard treats any
-  `in-progress` issue as a live run, the *whole queue* stops behind it, not
-  just that one issue — until `agentic-watchdog.yml`'s hourly sweep notices.
+  no PR. Because `selectNextAssignable` counts every `in-progress` issue as
+  a live run, holding a parallel-run slot and its scopes, the queue loses that
+  slot — and at the default of one slot the *whole queue* stops behind it —
+  until `agentic-watchdog.yml`'s hourly sweep notices.
 
   This runs at the tail of every session and asks the one question whose
   answer does not depend on a clock: is any *other* issue sitting
