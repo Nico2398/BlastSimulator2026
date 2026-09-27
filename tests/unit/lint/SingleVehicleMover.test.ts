@@ -37,9 +37,14 @@ const ASSIGNMENT_ALLOWLIST: Readonly<Record<string, string>> = {
   // occupant. See placeStartingCrew's own doc comment.
   'src/core/state/SpawnPlacement.ts': 'one-time starting-crew layout at world-gen, not per-tick movement',
   // One-time footprint-eviction snap (#1270): a building/footprint that just
-  // became a routing block relocates any vehicle caught inside it — parked,
-  // or carried along with a mounted employee it evicts — onto the nearest
-  // reachable free cell. Not a per-tick movement step; occupancy flags are
+  // became a routing block relocates any *parked* (unoccupied) vehicle caught
+  // inside it onto the nearest reachable free cell. A mounted vehicle needs
+  // no such write here — Locomotion.ts's per-tick sync already rewrites its
+  // position from its (separately relocated) occupant's every tick, so
+  // touching it a second time here, one tick early, only risks landing it on
+  // a cell this function's own reachability search cannot know is the last
+  // approach to something else (#1270's own regression, caught in
+  // building-destruction-visual). Occupancy flags for the parked case are
   // still kept in sync via updateVehicleCellOccupancy, the same helper
   // Locomotion.ts itself uses. See relocateFootprintOccupants's own doc
   // comment.

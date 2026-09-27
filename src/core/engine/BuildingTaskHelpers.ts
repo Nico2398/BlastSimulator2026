@@ -17,7 +17,6 @@ import { levelGroundRect } from '../mining/LevelGround.js';
 import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { regionForColumns } from '../nav/NavGridSync.js';
-import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
@@ -81,12 +80,12 @@ export function emitFootprintRegionChanged(
  * Move every alive employee standing inside `region` (a footprint's world
  * cells) to the nearest reachable free cell — called whenever a footprint
  * newly blocks routing: ordering, completing, upgrading or moving a
- * building (#1200). Also relocates vehicles caught in the same region: a
- * parked (unoccupied) vehicle is swept and relocated on its own, and a
- * vehicle a relocated employee is mounted in is carried to that same
- * employee's destination cell (#1270) — either way, a vehicle in the
- * footprint never becomes a permanently unreachable pathfinding
- * destination.
+ * building (#1200). Also sweeps parked (unoccupied) vehicles caught in the
+ * same region and relocates them the same way (#1270) — a mounted vehicle
+ * needs no such sweep, since the locomotion tick already rewrites its
+ * position from its (just-relocated) occupant's every tick; only a parked
+ * vehicle has no per-tick writer and would otherwise be stranded on ground
+ * that just turned solid.
  */
 export function relocateFootprintOccupants(state: GameState, region: BlastRegion): void {
   if (!state.navGrid) return;
@@ -102,31 +101,40 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
     const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, emp.x, emp.z, true);
     emp.x = nearest.x;
     emp.z = nearest.z;
-
-    // A mounted employee's vehicle rides along to the exact same cell —
-    // no independent findNearestReachableCell call for it, since its
-    // position is derived from its occupant's (the `vehicles` rule).
-    if (isMounted(emp.locomotion)) {
-      const vehicle = state.vehicles.vehicles.find((v) => v.id === mountedVehicleId(emp.locomotion));
-      if (vehicle) {
-        const prevX = Math.round(vehicle.x);
-        const prevZ = Math.round(vehicle.z);
-        vehicle.x = nearest.x;
-        vehicle.z = nearest.z;
-        updateVehicleCellOccupancy(state, vehicle, true, true, prevX, prevZ);
-      }
-    }
+    // A mounted employee's vehicle is deliberately left untouched here: the
+    // locomotion tick rewrites every mounted vehicle's position from its
+    // occupant's every tick (the `vehicles` rule's sole-writer invariant),
+    // so the vehicle self-corrects to this same cell on the very next tick
+    // without a second writer. Moving it here too — one tick early, via this
+    // function's own reachability search rather than the tick's normal
+    // sync — cost #1270 a regression: on a footprint tight enough to leave
+    // only one open cell adjacent to an unrelated nearby feature (a drill
+    // hole in `building-destruction-visual`), landing the vehicle on that
+    // one open cell sealed the hole off from every walker, permanently.
   }
 
   // Parked (unoccupied) vehicles caught in the footprint get their own
-  // relocation sweep. Processed one at a time, writing state immediately,
-  // so avoidOccupancy on a later vehicle's search sees an earlier one's
-  // already-updated cell as occupied.
+  // relocation sweep — but only when the footprint patch actually turned
+  // the vehicle's own cell into 'blocked'. A footprint's bounding box can
+  // cover a cell the patch protects from blocking (a drill_hole keeps its
+  // own type even when a building's box geometrically contains it — see
+  // NavGridSync's footprint-patch handling), and a vehicle parked there was
+  // never actually stranded. Relocating it anyway is not a no-op: the
+  // vehicle's own `vehicleOccupied` flag can turn the one open approach to
+  // that same protected cell into a dead end for `avoidVehicles` foot
+  // pathing (confirmed in `building-destruction-visual`, #1270 — a
+  // freight_warehouse footprint boxing in a drill hole on three sides moved
+  // the idle rock_digger parked on the hole onto the fourth, its only
+  // approach, sealing it off from every driller/blaster for the rest of the
+  // run). The employee loop above has no matching failure mode — an
+  // employee's own cell carries no pathfinding-blocking flag — so it is
+  // deliberately left on the plain bounding-box check.
   for (const vehicle of state.vehicles.vehicles) {
     if (vehicle.occupantIds.length > 0) continue;
     const vx = Math.round(vehicle.x);
     const vz = Math.round(vehicle.z);
     if (vx < region.minX || vx > region.maxX || vz < region.minZ || vz > region.maxZ) continue;
+    if (state.navGrid.cellAt(vx, vz)?.type !== 'blocked') continue;
     const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, vehicle.x, vehicle.z, true);
     vehicle.x = nearest.x;
     vehicle.z = nearest.z;

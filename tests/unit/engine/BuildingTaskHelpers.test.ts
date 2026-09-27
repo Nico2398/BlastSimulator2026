@@ -244,7 +244,7 @@ describe('relocateFootprintOccupants — vehicles (#1270)', () => {
     expect(cell.vehicleOccupied).toBe(true);
   });
 
-  it('moves a mounted employee\'s vehicle to the exact same destination cell as the employee, not a second independent pathfind', () => {
+  it('relocates a mounted employee but deliberately leaves their vehicle untouched — the locomotion tick is the vehicle\'s only mover', () => {
     const state = makeFlatNavState();
     blockRegion(state.navGrid!, REGION);
 
@@ -258,16 +258,48 @@ describe('relocateFootprintOccupants — vehicles (#1270)', () => {
 
     relocateFootprintOccupants(state, REGION);
 
-    // The employee was relocated (the pre-existing employee sweep) — and the
-    // vehicle they're mounted in must land on that EXACT same cell, not a
-    // second, independently-computed nearest-reachable-cell answer.
+    // The employee was relocated (the pre-existing employee sweep) — but the
+    // vehicle they're mounted in is left exactly where it was. Moving it here
+    // too, one tick early via this function's own reachability search rather
+    // than the locomotion tick's normal per-tick sync, is what caused #1270's
+    // own regression (building-destruction-visual: the vehicle landed on the
+    // one open cell that was a nearby drill hole's only remaining approach,
+    // sealing it off). The vehicle self-corrects to the employee's new cell
+    // on the very next tick regardless, via Locomotion.ts's per-tick write —
+    // the sole place a mounted vehicle's position ever changes.
     expect(employee.x === 2 && employee.z === 2).toBe(false);
-    expect(vehicle.x).toBe(employee.x);
-    expect(vehicle.z).toBe(employee.z);
+    expect(vehicle.x).toBe(2);
+    expect(vehicle.z).toBe(2);
+    expect(oldCell.vehicleOccupied).toBe(true);
+  });
 
-    const newCell = state.navGrid!.cellAt(Math.round(vehicle.x), Math.round(vehicle.z))!;
-    expect(oldCell.vehicleOccupied).toBe(false);
-    expect(newCell.vehicleOccupied).toBe(true);
+  it('leaves an unoccupied vehicle untouched when its cell falls inside the footprint\'s bounding box but the patch never actually blocked it (#1270 regression)', () => {
+    // A footprint's bounding box can geometrically contain a cell the patch
+    // protects from becoming 'blocked' — a drill_hole keeps its own type
+    // even when a building's box contains its coordinates (NavGridSync's
+    // footprint-patch handling). A vehicle parked there was never stranded,
+    // and relocating it anyway is not harmless: its `vehicleOccupied` flag
+    // can seal the hole's own only approach from every walker afterward
+    // (confirmed in building-destruction-visual — a freight_warehouse
+    // footprint boxing a drill hole on three sides moved the vehicle parked
+    // on the hole onto its fourth, sole approach).
+    const state = makeFlatNavState();
+    const nav = state.navGrid!;
+    // Region matches the vehicle's own cell — normally this alone would
+    // trigger relocation — but the cell keeps its 'drill_hole' type rather
+    // than being blocked by the (fake, unapplied) footprint patch.
+    const holeRegion: BlastRegion = { minX: 3, maxX: 3, minZ: 3, maxZ: 3 };
+    nav.cellAt(3, 3)!.type = 'drill_hole';
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 3, 3);
+    const cell = nav.cellAt(3, 3)!;
+    cell.vehicleOccupied = true;
+
+    relocateFootprintOccupants(state, holeRegion);
+
+    expect(vehicle.x).toBe(3);
+    expect(vehicle.z).toBe(3);
+    expect(cell.vehicleOccupied).toBe(true);
   });
 
   it('an unoccupied vehicle with no reachable cell nearby ends up wherever findNearestReachableCell\'s own fallback returns — unchanged behavior, not a new one', () => {
