@@ -19,7 +19,7 @@ import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDri
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY, AGENT_FREE_CELL_SEARCH_MAX_RADIUS } from '../../../src/core/config/balance.js';
-import { tickLocomotion, openMovementTrails } from '../../../src/core/engine/Locomotion.js';
+import { tickLocomotion, openMovementTrails, isStationaryBusyEmployee } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
@@ -1566,6 +1566,66 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     expect(blocker.z).toBe(2);
   });
 
+  // #1283: a genuinely BUSY (working/resting) employee — not idle, not
+  // isMoveStuck — parked mid-corridor deadlocks every other mover forever
+  // once agent occupancy is on, the same shape #1263 fixed for a parked
+  // vehicle blocker above: the full-avoidance reroute (step 1) always fails
+  // (no bypass exists in this genuine single-file corridor), the tie-break
+  // sidestep (step 2) never fires (the blocker isn't itself `isMoveStuck`),
+  // an idle blocker's own relocation (#1278) never applies (this blocker is
+  // busy, not idle), and the #1263 crossing fallback (step 2.5) only
+  // recognizes a parked, DRIVERLESS VEHICLE occupant — never an employee
+  // one. Every return falls through to the ordinary stuck escalation, and
+  // (unlike #1263's vehicle case) nothing today ever resolves it: the
+  // mover latches `isMoveStuck` once the wait threshold passes and stays
+  // that way for the rest of this test's own bounded run. The fix
+  // generalizes step 2.5 to also cross a busy employee blocker via the new
+  // `isStationaryBusyEmployee` predicate (Locomotion.ts).
+  it('crosses a busy employee blocking the corridor\'s only lane instead of deadlocking forever', () => {
+    const state = build1WideCorridorState(9, [2, 6]);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    // Stationary, genuinely BUSY blocker sitting on cell (4, 1) — an
+    // intermediate step along the route, never the mover's own destination
+    // — in the corridor's one and only lane. An `activeActionId` alone is
+    // enough for `employeeWorkState` to read 'working' (mirrors this
+    // file's own "#1259" fixture below); no itinerary/destination/rest is
+    // set, so it never moves on its own for the whole test.
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 4, 1);
+    blocker.activeActionId = 777;
+    expect(employeeWorkState(blocker)).toBe('working');
+    expect(blocker.isMoveStuck).toBe(false);
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 1);
+    expect(moveTo(state, mover.id, { x: 8, z: 1 }).success).toBe(true);
+
+    // Comfortably inside a single AGENT_OCCUPANCY_WAIT_TICKS wait cycle —
+    // nowhere near a full stuck/abandon cycle (MOVE_STUCK_ABANDON_TICKS is
+    // 30): a failure here shows up as the mover never arriving (or
+    // isMoveStuck latching true), never as an abandon within this bound.
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS + 15;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    let ticks = 0;
+    while (ticks < MAX_TICKS && mover.itinerary !== null) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+      ticks++;
+    }
+
+    expect(everAbandoned).toHaveLength(0);
+    expect(mover.itinerary).toBeNull();
+    expect(mover.isMoveStuck).toBe(false);
+    expect(mover.x).toBe(8);
+    expect(mover.z).toBe(1);
+
+    // The blocker itself was crossed, not relocated or disturbed — still
+    // busy, exactly where it started, holding the same active action.
+    expect(blocker.x).toBe(4);
+    expect(blocker.z).toBe(1);
+    expect(blocker.activeActionId).toBe(777);
+    expect(employeeWorkState(blocker)).toBe('working');
+  });
+
   it("#1259: destination-spreading onto the mover's own already-held cell still clears isMoveStuck instead of latching it from the wait leading up to it", () => {
     // A blocker parked exactly ON the mover's leg destination, with no
     // itinerary of its own — it never moves for the whole test, so
@@ -2144,5 +2204,190 @@ describe('tickLocomotion — agent occupancy destination-blocker relocation (#12
     expect(dist).toBeLessThanOrEqual(AGENT_FREE_CELL_SEARCH_MAX_RADIUS);
     expect(Number.isNaN(blocker.x)).toBe(false);
     expect(Number.isNaN(blocker.z)).toBe(false);
+  });
+});
+
+// ── #1283: crossing a busy (working/resting) EMPLOYEE blocker — dense-grid
+// variant plus a non-regression pin. Generalizes the #1263 parked-vehicle
+// crossing fallback (Locomotion.ts's step 2.5) to a second kind of
+// stationary occupant: a genuinely busy employee sitting on the only route
+// to a requester's destination, as opposed to an idle one (already
+// relocated by #1278) or a parked vehicle (already crossed by #1263).
+// Reproduces the real drill/charge grid's own multi-hole density (spacing
+// <=4) as two isolated single-file access lanes rather than a literal open
+// spacing-4 grid — flat, unwalled terrain 4 units between holes has ample
+// room to route around a single stationary blocker and so never forces the
+// "no alternate route" property this fix exists for; a deterministic
+// single-lane shape (mirroring this file's own manual-construction fixtures
+// above — "isolates ... tie-break sidestep", "radius widening in isolation")
+// guarantees it instead.
+describe('tickLocomotion — agent occupancy: crossing a busy employee blocker in a dense multi-hole grid (#1283)', () => {
+  /**
+   * Two isolated 1-wide corridor lanes stacked in z — rows 0-2 (lane at
+   * z=1) and rows 4-6 (lane at z=5), each shaped exactly like
+   * `build1WideCorridorState`'s own single lane, doubled — separated by a
+   * fully-blocked row 3 spanning every column so neither lane's own
+   * contest can ever leak into the other's via the shared end rooms (both
+   * rooms keep all three of THEIR OWN rows open, but rows 0-2 never
+   * connect to rows 4-6 once row 3 is sealed everywhere).
+   */
+  function buildTwoLaneCorridorState(width: number, corridorXRange: [number, number]): GameState {
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(width, 7);
+    const [lo, hi] = corridorXRange;
+    for (let x = lo; x <= hi; x++) {
+      grid.cells[0]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+      grid.cells[2]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+      grid.cells[4]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+      grid.cells[6]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+    for (let x = 0; x < width; x++) {
+      grid.cells[3]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+    state.navGrid = grid;
+    return state;
+  }
+
+  it('a mix of idle and busy blockers across two simultaneous dense-grid-style lanes: crosses the busy one, converges with none abandoned, no two movers ever share a cell', () => {
+    const state = buildTwoLaneCorridorState(9, [2, 6]);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    // Lane A (z=1): a busy employee, mid-drilling/charging — the #1283
+    // case this fix targets.
+    const { employee: busyBlocker } = hireEmployee(state.employees, 'driller', rng, 4, 1);
+    busyBlocker.activeActionId = 111;
+    expect(employeeWorkState(busyBlocker)).toBe('working');
+
+    // Lane B (z=5): an idle, finished occupant — the #1278/#1263 case
+    // already handled today, run concurrently to prove the new
+    // busy-employee crossing doesn't regress the pre-existing idle-blocker
+    // handling.
+    const { employee: idleBlocker } = hireEmployee(state.employees, 'driller', rng, 4, 5);
+    expect(employeeWorkState(idleBlocker)).toBe('idle');
+
+    const { employee: moverA } = hireEmployee(state.employees, 'driller', rng, 0, 1);
+    const { employee: moverB } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    expect(moveTo(state, moverA.id, { x: 8, z: 1 }).success).toBe(true);
+    expect(moveTo(state, moverB.id, { x: 8, z: 5 }).success).toBe(true);
+
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS + 15;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    let ticks = 0;
+    while (ticks < MAX_TICKS && (moverA.itinerary !== null || moverB.itinerary !== null)) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+      // The busy blocker is deliberately excluded from this check: crossing
+      // (unlike ordinary ledger-tracked occupancy) never claims the
+      // blocker's own cell, so a mover's rounded position can momentarily
+      // coincide with it mid-hop — exactly why this file's own #1263
+      // crossing fixture above never checks shared cells against ITS
+      // parked-vehicle blocker either. moverA/moverB/idleBlocker are all
+      // real, ledger-tracked occupants for whom a shared cell would be a
+      // genuine bug.
+      expectNoSharedCells([moverA, moverB, idleBlocker]);
+      ticks++;
+    }
+
+    expect(everAbandoned).toHaveLength(0);
+    expect(moverA.itinerary).toBeNull();
+    expect(moverA.x).toBe(8);
+    expect(moverA.z).toBe(1);
+    expect(moverA.isMoveStuck).toBe(false);
+    expect(moverB.itinerary).toBeNull();
+    expect(moverB.x).toBe(8);
+    expect(moverB.z).toBe(5);
+    expect(moverB.isMoveStuck).toBe(false);
+
+    // The busy blocker was crossed, not disturbed.
+    expect(busyBlocker.x).toBe(4);
+    expect(busyBlocker.z).toBe(1);
+    expect(busyBlocker.activeActionId).toBe(111);
+    expect(employeeWorkState(busyBlocker)).toBe('working');
+  });
+
+  // Non-regression pin: at a looser spacing where a genuine bypass route
+  // exists (buildRingCorridorState's own two-lane ring, joined at both
+  // ends — #1166's chokepoint shape), a busy blocker must resolve via the
+  // ordinary full-avoidance reroute (step 1) alone, never needing the new
+  // crossing fallback at all. Must hold both before and after this issue's
+  // fix — proves the new busy-employee crossing branch never fires when an
+  // avoiding route already exists, so it cannot regress the
+  // already-working case.
+  it('regression: a busy blocker with a genuine bypass route resolves via reroute alone, unaffected by the new crossing fallback', () => {
+    const state = buildRingCorridorState(12);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 6, 2);
+    blocker.activeActionId = 222;
+    expect(employeeWorkState(blocker)).toBe('working');
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 11, z: 2 }).success).toBe(true);
+
+    // Generous: the long way around (via the z=8 lane) costs several times
+    // the direct route's own tick count, well beyond a single
+    // AGENT_OCCUPANCY_WAIT_TICKS wait plus the reroute's own travel time —
+    // still far short of MOVE_STUCK_ABANDON_TICKS, since this must resolve
+    // via reroute alone, never the stuck/abandon escalation.
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS + 40;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    let ticks = 0;
+    while (ticks < MAX_TICKS && mover.itinerary !== null) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+      ticks++;
+    }
+
+    expect(everAbandoned).toHaveLength(0);
+    expect(mover.itinerary).toBeNull();
+    expect(mover.x).toBe(11);
+    expect(mover.z).toBe(2);
+    expect(mover.isMoveStuck).toBe(false);
+    // Resolved via the long way around, not a crossing — the blocker was
+    // never touched.
+    expect(blocker.x).toBe(6);
+    expect(blocker.z).toBe(2);
+  });
+});
+
+// ── #1283: `isStationaryBusyEmployee` in isolation — the predicate
+// `handleAgentOccupancyBlock`'s crossing fallback checks before treating a
+// stationary employee occupant as safe to cross, alongside the existing
+// `isIdleParkedVehicle`. Exported specifically so this can be tested
+// directly, ahead of the crossing branch itself being wired to call it.
+describe('isStationaryBusyEmployee', () => {
+  it("is true for a busy employee ('working': an activeActionId alone is enough per employeeWorkState)", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 5;
+    expect(employeeWorkState(employee)).toBe('working');
+    expect(isStationaryBusyEmployee(employee)).toBe(true);
+  });
+
+  it("is true for a resting employee ('resting') too", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.restTicksRemaining = 10;
+    expect(employeeWorkState(employee)).toBe('resting');
+    expect(isStationaryBusyEmployee(employee)).toBe(true);
+  });
+
+  it('is false for a freshly hired, genuinely idle employee', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    expect(employeeWorkState(employee)).toBe('idle');
+    expect(isStationaryBusyEmployee(employee)).toBe(false);
+  });
+
+  it('is false for a busy employee that is already isMoveStuck — the tie-break sidestep\'s own case, not this predicate\'s', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 5;
+    employee.isMoveStuck = true;
+    expect(isStationaryBusyEmployee(employee)).toBe(false);
   });
 });

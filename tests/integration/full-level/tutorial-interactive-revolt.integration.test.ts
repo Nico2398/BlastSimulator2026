@@ -128,11 +128,6 @@ function driveTutorialBuildingsToCompletion(engine: RunnerWithContext, maxTicks 
  */
 const INTERACTION_MODE_TICK_PADDING = 249;
 
-// TODO(#1283): migrate to agentOccupancyEnabled = true once the occupancy
-// dispatch deadlock on tightly-packed multi-hole drill/charge grids (spacing
-// <=4, e.g. this file's 3x3 spacing:4 tutorial grid) is fixed. With the flag
-// on, this scenario's `wait_until field:holeCount equals:9 max_ticks:400`
-// step deadlocks permanently instead of landing every hole.
 describe('tutorial-interactive.json — worker-revolt regression (#707)', () => {
   it(
     'does not trigger a worker_revolt before blast once interaction mode\'s ' +
@@ -159,6 +154,14 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // continuous policy, driving_center order (steps 0..drivingCenterIdx
       // inclusive).
       const preBuildResults = runSteps(engine, steps.slice(0, drivingCenterIdx + 1), outDir);
+
+      // #1283: this scenario's own step 0 (`campaign start ...
+      // agent_occupancy:true`) already turns the flag on for real gameplay,
+      // but an explicit `debug occupancy on` here makes that intent visible
+      // in the test itself and keeps it robust against the scenario JSON's
+      // own flag ever changing — before any drill/charge dispatch runs.
+      expect(runCommand(engine, 'debug occupancy on').success).toBe(true);
+      expect(engine.ctx.state!.agentOccupancyEnabled).toBe(true);
 
       // #556: confirming those two placements only queued construction
       // sites — drive both to completion (needs topped up so there's no
