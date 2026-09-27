@@ -67,7 +67,7 @@ Every AI solution wants to name branches its own way, and several create one bef
 Three rules make this hold under any solution:
 
 1. **Branch from `main` by name, never from `HEAD`.** `git checkout -b pipeline/tests-<label> main` is unaffected by whatever the harness checked out. Runners clone with `fetch-depth: 0` and materialise a local `main` first, because `git rev-parse main` fails when only `origin/main` exists — which is exactly what a PR-review-comment checkout leaves behind.
-2. **`branch-sanity` before every agent step.** `git branch --show-current` must match the expected pipeline branch; if it does not, check it out before continuing. This catches a harness that switched branches underneath the run.
+2. **`branch-sanity` before every agent step.** `git branch --show-current` must match the expected pipeline branch; if it does not, check it out before continuing. This catches a harness that switched branches underneath the run. When the test-writer and implementer phases are delegated in parallel, `branch-sanity` for each concurrently-delegated agent also confirms that agent's working directory is that branch's own dedicated worktree, not the main working directory or another agent's worktree — `git rev-parse --show-toplevel` (or `git worktree list`) matching the path assigned to that agent — so a collision between two agents fails loudly, naming the wrong directory before any edit happens, instead of silently interleaving their edits in one directory.
 3. **The PR head is always `pipeline/feature-<label>`.** Never open a PR from a harness branch, even when the harness offers to.
 4. **Every branch a run creates carries that run's id** (`<label>` = `<issue>-<runId>`), so no two runs on one issue ever contend for a name. #554 spent two six-hour budgets proving why: the second run rebuilt `pipeline/feature-554` from `main` while the first run's abandoned branch still held the name, and the rescue push was refused `non-fast-forward` with the whole run on it. `agentic-pipeline-tdd` holds the naming rule; everything that matches a branch accepts the bare name too, so nothing older stops being found.
 
@@ -94,6 +94,8 @@ main
 6. **Cherry-pick** the implementation commit onto `pipeline/feature-<label>`
 7. **Resolve conflicts** if the cherry-pick fails — a conflict resolver agent merges both sides and stages the result; on resolution failure the implementer re-runs
 8. **All subsequent quality gates** run on `pipeline/feature-<label>`
+
+**Delegating the test-writer and implementer phases in parallel (in one Agent-tool message) needs a dedicated worktree per branch, so their concurrent `git`/file-edit commands never land in the same working directory** — `agentic-pipeline-tdd` holds the procedure.
 
 ## ▶ Other sessions may be live
 
