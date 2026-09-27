@@ -384,8 +384,11 @@ describe('en.json / fr.json — key-set parity', () => {
     // (the "<inside>/<capacity>" billboard label and HoverTag/SelectionBar
     // text) and shell.selection.building_occupants (the SelectionBar's
     // "Inside: <names>" occupant listing) — both locales translated.
+    // Baseline is now 3530 (up from 3526): #1206 adds the `debug occupancy`
+    // console command's status output and the agent_occupancy new_game/
+    // sandbox flag's strings — both locales translated.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3526);
+    expect(Object.keys(en).length).toBe(3530);
   });
 });
 

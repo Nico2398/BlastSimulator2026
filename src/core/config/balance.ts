@@ -668,18 +668,26 @@ export function pathfindingNodeBudget(gridWidth: number, gridHeight: number): nu
 export const STUCK_THRESHOLD = 3;
 
 /**
- * Consecutive ticks a vehicle may sit `state: 'waiting'` behind another
- * vehicle occupying its next path cell before the engine attempts a
- * vehicle-avoiding reroute (avoidVehicles: true) — and, if none exists,
- * flips isMoveStuck the same way a genuine pathfinding failure already
- * does. Deliberately larger than STUCK_THRESHOLD (3, tuned for the rarer
- * "no path at all" failure): ordinary transient contention between two
- * moving vehicles must not false-positive into a reroute/stuck flip.
- * Matches TRAFFIC_JAM_MIN_TICKS's order of magnitude for "no longer a
- * transient wait" as its own named constant (different concept: this is a
- * single vehicle blocked mid-route, not several converging on one cell).
+ * Consecutive ticks any agent — foot or vehicle (#1206 generalizes this from
+ * vehicle-only) — may sit blocked behind another occupying its next path cell
+ * before the engine attempts an occupancy-avoiding reroute, and, if none
+ * exists, flips isMoveStuck the same way a genuine pathfinding failure
+ * already does. Deliberately larger than STUCK_THRESHOLD (3, tuned for the
+ * rarer "no path at all" failure): ordinary transient contention between two
+ * moving agents must not false-positive into a reroute/stuck flip. Matches
+ * TRAFFIC_JAM_MIN_TICKS's order of magnitude for "no longer a transient wait"
+ * as its own named constant (different concept: this is a single agent
+ * blocked mid-route, not several converging on one cell).
  */
-export const VEHICLE_OCCUPANCY_REROUTE_THRESHOLD = 10;
+export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
+
+/**
+ * Whether ground-cell occupancy is enforced for every agent, foot or vehicle
+ * (#1206) — lands OFF; #1207 turns it on by default. `GameState.agentOccupancyEnabled`
+ * reads this as its default, and the `debug occupancy on|off` console command
+ * overrides it per-session.
+ */
+export const AGENT_OCCUPANCY_ENABLED_DEFAULT = false;
 
 /** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
 export const AGENT_WALK_SPEED = 2;
@@ -761,7 +769,7 @@ export const STUCK_MORALE_PENALTY = 2;
  * exemption — that one only rescues an employee who also happens to qualify
  * for a rest trigger at the moment they get stuck; this rescues every
  * position-dependent claim. Deliberately well above STUCK_THRESHOLD (3) and
- * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD/TRAFFIC_JAM_MIN_TICKS's "no longer
+ * AGENT_OCCUPANCY_WAIT_TICKS/TRAFFIC_JAM_MIN_TICKS's "no longer
  * transient" order of magnitude (10) — a genuine, sustained impasse only,
  * not a blast or reroute a few ticks from resolving itself.
  */

@@ -31,7 +31,7 @@ import { Random } from '../../src/core/math/Random.js';
 import {
   TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
-  VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+  AGENT_OCCUPANCY_WAIT_TICKS,
   WORK_DURATION_TICKS,
   MOVE_STUCK_ABANDON_TICKS,
   ACTION_STARVATION_TICK_THRESHOLD,
@@ -1484,7 +1484,7 @@ describe('vehicle occupancy reroute / stuck escalation — end-to-end repro (iss
       const rig = engine.ctx.state!.vehicles.vehicles.find(v => v.id === 1)!;
       // #1138: "waiting"/isMoveStuck are read off the driving employee now.
       const rigDriver = resolveVehicleDriver(rig, engine.ctx.state!.employees.employees);
-      if (rigDriver && rigDriver.vehicleWaitingTicks >= VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 1 && !rigDriver.isMoveStuck) {
+      if (rigDriver && rigDriver.vehicleWaitingTicks >= AGENT_OCCUPANCY_WAIT_TICKS + 1 && !rigDriver.isMoveStuck) {
         sawUnescalatedOverThreshold = true;
       }
     }

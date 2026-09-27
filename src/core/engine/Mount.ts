@@ -120,6 +120,11 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   }
   employee.x = vehicle.x;
   employee.z = vehicle.z;
+  // #1206: a mounted employee holds no ground cell of their own — the
+  // vehicle they now ride claims one instead (AgentOccupancy.ts's own
+  // rebuild already excludes a mounted/inside employee; releasing here keeps
+  // the ledger in step mid-tick, without waiting for the next reconcile).
+  state.agentOccupancy?.release({ kind: 'employee', id: employeeId });
 
   // #1083's lifetime counter — every prior mover (requestBoardVehicle/
   // ArrivalGate.resolveBoarding, pre-#1089) incremented it on a successful
@@ -242,6 +247,9 @@ export function enterBuilding(state: GameState, buildingId: number, employeeId: 
   if (!admitOccupant(building, capacity, employee, { kind: 'inside', buildingId })) {
     return { success: false, error: t('building.full') };
   }
+  // #1206: same reasoning as `board`'s own release above — an employee inside
+  // a building holds no ground cell.
+  state.agentOccupancy?.release({ kind: 'employee', id: employeeId });
 
   emitter?.emit('employee:entered_building', { employeeId, buildingId });
   return { success: true };

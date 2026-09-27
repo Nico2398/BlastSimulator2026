@@ -58,6 +58,7 @@ import {
 } from './commands/campaign.js';
 import { sandboxCommand } from './commands/sandbox.js';
 import { stateCommand } from './commands/state.js';
+import { debugCommand } from './commands/debug.js';
 import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
@@ -291,6 +292,11 @@ export function createRunner(): RunnerWithContext {
   // --- State inspection (agent-friendly) ---
   runner.register('state', 'Dump game state as JSON (full|summary)', (args, named) =>
     stateCommand(ctx, args, named),
+  );
+
+  // --- Debug toggles ---
+  runner.register('debug', 'Debug toggles (occupancy status|on|off)', (args, named) =>
+    debugCommand(ctx, args, named),
   );
 
   // --- Save/Load (quick-save round trip; see saveload.ts) ---
