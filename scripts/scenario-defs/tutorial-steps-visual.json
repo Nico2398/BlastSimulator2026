@@ -21,12 +21,12 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:50000000",
+      "command": "campaign start level:tutorial_pit cash:50000000 agent_occupancy:true",
       "timeout": 90,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:50000000"
+          "command": "campaign start level:tutorial_pit cash:50000000 agent_occupancy:true"
         }
       ],
       "role": "setup",

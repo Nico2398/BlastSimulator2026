@@ -3,11 +3,11 @@
   "description": "Full economy pipeline: blast spawns fragments without instant payout, a debris_hauler hauls them into a freight_warehouse, and contract delivery pays out only from that stored inventory (issue #456).",
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:250000",
+      "command": "campaign start level:tutorial_pit cash:250000 agent_occupancy:true",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:250000"
+          "command": "campaign start level:tutorial_pit cash:250000 agent_occupancy:true"
         }
       ],
       "description": "#553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, and (see below) a rock_fragmenter/second driver to clear the oversized fragments this same charge always produced, on top of the original driver/debris_hauler/freight_warehouse shopping list.",
