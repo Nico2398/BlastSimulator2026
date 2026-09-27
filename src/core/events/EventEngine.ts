@@ -59,9 +59,10 @@ export interface TrafficAdvisory {
  * Shared clustering pass for detectTrafficJam and computeTrafficAdvisory
  * (#1138): a vehicle counts as "waiting on this cell" when its driving
  * employee's own `vehicleWaitingTicks` is at threshold and their current
- * itinerary leg is a drive leg — that leg's `destX`/`destZ` is the cell they
- * are queued on, replacing the deleted `Vehicle.state`/`.waitingTicks`/
- * `.targetX`/`.targetZ` fields.
+ * itinerary leg is a drive leg — the cell they are queued on is that leg's
+ * pre-spread destination when one was ever recorded, else its live one
+ * (`leg.originalDestX ?? leg.destX`, see the #1274 comment below), replacing
+ * the deleted `Vehicle.state`/`.waitingTicks`/`.targetX`/`.targetZ` fields.
  */
 function buildWaitingByTarget(vehicles: readonly Vehicle[], employees: readonly Employee[]): Map<string, TrafficAdvisory> {
   const waitingByTarget = new Map<string, TrafficAdvisory>();

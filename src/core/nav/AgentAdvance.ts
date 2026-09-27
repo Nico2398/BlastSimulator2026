@@ -329,8 +329,8 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     if (input.occupancy && input.mover && isRealStep
       && !input.occupancy.isFreeFor(input.mover, hopTargetCellX, hopTargetCellZ)) {
       const holder = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
-      const isExempt = !!holder && !!input.exemptOccupant
-        && holder.kind === input.exemptOccupant.kind && holder.id === input.exemptOccupant.id;
+      const isExempt = !!input.exemptOccupant
+        && input.occupancy.isFreeFor(input.exemptOccupant, hopTargetCellX, hopTargetCellZ);
       if (!isExempt) {
         // Stop the hop loop for this tick right here — do not skip ahead to a
         // later hop, and do not attempt a partial move into the blocked cell.
