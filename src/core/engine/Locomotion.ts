@@ -29,6 +29,7 @@ import {
   AGENT_FREE_CELL_SEARCH_MAX_RADIUS,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
+import { employeeWorkState } from './EmployeeDispatch.js';
 import { board, alight, enterBuilding } from './Mount.js';
 import { isDestinationOccupied, updateVehicleCellOccupancy } from './EntityMovementTick.js';
 import { interruptActiveAction } from './TaskDispatch.js';
@@ -674,6 +675,18 @@ function controllingEmployee(state: GameState, occupant: Occupant): Employee | u
 }
 
 /**
+ * True when `vehicle` is genuinely parked — nobody aboard driving it, and no
+ * drive leg currently in progress — as opposed to a live contest between two
+ * movers. Shared by `handleAgentOccupancyBlock`'s parked-vehicle crossing
+ * fallback and `relocateIdleDestinationBlocker` (#1278): both need exactly
+ * this "nobody to dispatch it out of the way on its own" test before treating
+ * a vehicle occupant as safe to relocate/cross rather than a busy blocker.
+ */
+function isIdleParkedVehicle(vehicle: Vehicle, employees: readonly Employee[]): boolean {
+  return vehicleDriverId(vehicle) === null && !isVehicleCurrentlyDriving(vehicle, employees);
+}
+
+/**
  * Generalizes `handleOccupancyBlock` (below) to any agent — foot or vehicle
  * (#1206) — via `AgentOccupancy` rather than the live vehicle-position scan
  * `isOccupiedByOtherVehicle` does. `mover` is the occupant identity of
@@ -824,6 +837,17 @@ function handleAgentOccupancyBlock(
   // tick's own hop got blocked on.
   const destinationHeldByOther = !occupancy.isFreeFor(mover, leg.destX, leg.destZ);
 
+  // #1278: before any reroute/sidestep/spread attempt, check whether whoever
+  // holds the destination cell is simply standing there idle (an employee
+  // with nothing queued, or a genuinely parked, driverless vehicle) — nobody
+  // this requester need contest with, just clear out of the way. Generalizes
+  // handleOccupancyBlock's own vehicle-only relocateDestinationBlocker
+  // (below) to any occupant kind, via AgentOccupancy rather than a live
+  // vehicle-position scan.
+  if (destinationHeldByOther && relocateIdleDestinationBlocker(state, occupancy, leg.destX, leg.destZ, result)) {
+    return 'blocked';
+  }
+
   if (!destinationHeldByOther) {
     // (#1274) No `exemptOccupant` here: this branch only ever runs when
     // `!destinationHeldByOther`, but a board leg's destination IS the target
@@ -916,8 +940,7 @@ function handleAgentOccupancyBlock(
     // rubble_disposal's own deadline (rng.nextInt(30, 100)) every time this
     // recurred.
     const blockerVehicle = blocker?.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === blocker!.id) : undefined;
-    if (blockerVehicle && vehicleDriverId(blockerVehicle) === null
-      && !isVehicleCurrentlyDriving(blockerVehicle, state.employees.employees)) {
+    if (blockerVehicle && isIdleParkedVehicle(blockerVehicle, state.employees.employees)) {
       const crossing = findPathAvoidingOccupiedCells(
         state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
       );
@@ -1162,19 +1185,48 @@ function relocateDestinationBlocker(
  * (or already in flight) so the caller can retry the block this same tick,
  * false when nothing there needs — or can be — relocated.
  */
-export function relocateIdleDestinationBlocker(
+function relocateIdleDestinationBlocker(
   state: GameState,
   occupancy: AgentOccupancy,
   destX: number,
   destZ: number,
   result: LocomotionResult,
 ): boolean {
-  void state;
-  void occupancy;
-  void destX;
-  void destZ;
-  void result;
-  throw new Error('not implemented');
+  const occupant = occupancy.holderOf(destX, destZ);
+  if (!occupant) return false;
+
+  if (occupant.kind === 'employee') {
+    const emp = state.employees.employees.find(e => e.id === occupant.id);
+    // Idle by this codebase's own classification (EmployeeDispatch.ts), and
+    // not collapsing: a collapsing employee also reads as 'idle' by that
+    // classification (no itinerary, no activeActionId) but is in a protected
+    // forced-rest state this codebase never disturbs elsewhere — leave it be.
+    if (!emp || emp.collapsing || employeeWorkState(emp) !== 'idle') return false;
+
+    const freeCell = findNearestFreeCellForAgent(state, occupant, emp.x, emp.z);
+    if (!freeCell) return false;
+
+    emp.x = freeCell.x;
+    emp.z = freeCell.z;
+    occupancy.tryMove(occupant, freeCell.x, freeCell.z);
+    result.moved.push(emp.id);
+    return true;
+  }
+
+  // occupant.kind === 'vehicle'
+  const vehicle = state.vehicles.vehicles.find(v => v.id === occupant.id);
+  if (!vehicle || !isIdleParkedVehicle(vehicle, state.employees.employees)) return false;
+
+  const freeCell = findNearestFreeCellForAgent(state, occupant, vehicle.x, vehicle.z);
+  if (!freeCell) return false;
+
+  // AgentOccupancy first (findNearestFreeCellForAgent already read against
+  // it), then the vehicle's own position/NavCell bookkeeping — mirrors the
+  // existing driverless-blocker relocation split (relocateDriverlessVehicle)
+  // rather than inventing a new vehicle-movement path.
+  occupancy.tryMove(occupant, freeCell.x, freeCell.z);
+  relocateDriverlessVehicle(state, vehicle, freeCell.x, freeCell.z, result);
+  return true;
 }
 
 /**

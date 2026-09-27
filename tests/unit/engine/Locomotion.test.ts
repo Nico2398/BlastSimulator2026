@@ -1577,6 +1577,17 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     const rng = new Random(SEED);
 
     const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 2, 2);
+    // #1278: relocateIdleDestinationBlocker now clears a genuinely idle
+    // occupant off the destination cell before the ladder ever reaches
+    // destination-spreading — a freshly hired employee reads idle by
+    // `employeeWorkState`, which would resolve this block a different way
+    // and never exercise the #1259 destination-spread-onto-self path this
+    // test is actually about. Marking the blocker busy (an activeActionId
+    // needs nothing more to exist than the field itself, per
+    // `employeeWorkState`'s own field-only check) keeps it ineligible for
+    // that relocation, exactly as it was for every tick of this test before
+    // #1278 existed.
+    blocker.activeActionId = 1;
     // One cell short of the blocker's held cell — findNearestFreeCell's own
     // ring search around the leg's destination (2, 2) reaches the mover's
     // own current cell (1, 2) at distance 1, the same distance as every

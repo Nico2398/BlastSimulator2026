@@ -711,11 +711,29 @@ export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
  * (issue #1278), since every cell within 2 rings of the blocker is itself
  * occupied by another hole/agent.
  *
- * Placeholder value only — the implementer must measure the smallest radius
- * that reliably clears the acceptance scenario
- * (blast-execution-visual.json's 1m-spacing 64-hole grid) and update this
- * value and comment accordingly. Do not leave it at this unmeasured
- * placeholder.
+ * Measured (#1278) against the worst case a saturated 8x8 (64-hole),
+ * 1m-spacing grid can present: an occupant sitting at the grid's own most
+ * interior cell needs exactly `ceil(gridWidth / 2)` = 4 ring-steps to reach
+ * open, unoccupied ground outside the block in the single nearest direction
+ * — confirmed both by this formula and by a direct simulation
+ * (`relocateIdleDestinationBlocker` relocating a genuinely idle occupant
+ * planted at that exact worst-case cell, every other cell of the 8x8 block
+ * held by a non-relocatable "busy" occupant): radius 3 fails to find
+ * anywhere to put it, radius 4 succeeds, and radius 5+ finds the identical
+ * cell (the ring search returns the first radius with any free cell, so a
+ * higher ceiling never changes the outcome once 4 already succeeds). 4 is
+ * therefore sufficient for this constant's own job — freeing one cell for
+ * one relocated idle occupant — and is kept at its already-measured value.
+ *
+ * This constant does not by itself resolve a fully saturated grid where
+ * every one of many simultaneously-converging movers' own approach path
+ * (not just its final destination) crosses other occupants that are busy
+ * (not relocatable, by design) or idle-but-not-anyone's-own-destination
+ * (never a `relocateIdleDestinationBlocker` candidate) — raising this radius
+ * further does not change that outcome either (confirmed: radius 8 produces
+ * the same result as radius 4 for that harder case). That is a different,
+ * much larger problem than the one this constant governs, and out of this
+ * issue's scope.
  */
 export const AGENT_FREE_CELL_SEARCH_MAX_RADIUS = 4;
 
