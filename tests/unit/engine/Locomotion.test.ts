@@ -18,7 +18,7 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
+import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY, AGENT_FREE_CELL_SEARCH_MAX_RADIUS } from '../../../src/core/config/balance.js';
 import { tickLocomotion, openMovementTrails } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
@@ -27,6 +27,7 @@ import { AgentOccupancy, type Occupant } from '../../../src/core/nav/AgentOccupa
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 import { isMounted } from '../../../src/core/entities/EmployeeLocomotion.js';
 import { detectTrafficJam } from '../../../src/core/events/EventEngine.js';
+import { employeeWorkState } from '../../../src/core/engine/EmployeeDispatch.js';
 
 const SEED = 42;
 
@@ -180,6 +181,31 @@ function cellKey(x: number, z: number): string {
 function expectNoSharedCells(agents: ReadonlyArray<{ id: number; x: number; z: number }>): void {
   const keys = agents.map(a => cellKey(a.x, a.z));
   expect(new Set(keys).size, `expected ${agents.length} distinct cells, got: ${JSON.stringify(agents.map(a => ({ id: a.id, x: a.x, z: a.z })))}`).toBe(keys.length);
+}
+
+/**
+ * Blocks every terrain cell within Chebyshev distance `1..radius` of
+ * (bx, bz) — except any cell listed in `exempt` — on a raw `NavGrid` built
+ * via `makeFlatNavGrid` (locally-indexed, origin (0,0)). Used by #1278's
+ * "blocker has no escape" fixtures to saturate a would-be relocation
+ * target's own neighbourhood with impassable terrain instead of dozens of
+ * hand-placed occupant fixtures: `findNearestFreeCell`'s ring search
+ * (Locomotion.ts) treats a `'blocked'` cell exactly like an occupied one, so
+ * this is an equivalent, far cheaper way to prove "nothing free nearby".
+ */
+function blockNeighbourhood(
+  grid: NavGrid, bx: number, bz: number, radius: number, exempt: ReadonlyArray<{ x: number; z: number }> = [],
+): void {
+  for (let dx = -radius; dx <= radius; dx++) {
+    for (let dz = -radius; dz <= radius; dz++) {
+      if (dx === 0 && dz === 0) continue;
+      const x = bx + dx;
+      const z = bz + dz;
+      if (exempt.some(e => e.x === x && e.z === z)) continue;
+      if (x < 0 || z < 0 || x >= grid.width || z >= grid.height) continue;
+      grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+  }
 }
 
 describe('tickLocomotion', () => {
@@ -1551,6 +1577,17 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     const rng = new Random(SEED);
 
     const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 2, 2);
+    // #1278: relocateIdleDestinationBlocker now clears a genuinely idle
+    // occupant off the destination cell before the ladder ever reaches
+    // destination-spreading — a freshly hired employee reads idle by
+    // `employeeWorkState`, which would resolve this block a different way
+    // and never exercise the #1259 destination-spread-onto-self path this
+    // test is actually about. Marking the blocker busy (an activeActionId
+    // needs nothing more to exist than the field itself, per
+    // `employeeWorkState`'s own field-only check) keeps it ineligible for
+    // that relocation, exactly as it was for every tick of this test before
+    // #1278 existed.
+    blocker.activeActionId = 1;
     // One cell short of the blocker's held cell — findNearestFreeCell's own
     // ring search around the leg's destination (2, 2) reaches the mover's
     // own current cell (1, 2) at distance 1, the same distance as every
@@ -1704,5 +1741,408 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
 
     expect(state.events.pendingEvent).not.toBeNull();
     expect(state.events.pendingEvent?.eventId).toBe('traffic_jam');
+  });
+});
+
+// ── #1278: destination-blocker relocation for IDLE occupants (agent
+// occupancy) — generalizes the vehicle-only relocateDestinationBlocker to
+// any idle occupant, foot or vehicle, squatting on another mover's exact
+// leg destination, via the new (currently `throw`ing) exported stub
+// `relocateIdleDestinationBlocker`. Every fixture below drives the real,
+// already-exported entry point (tickLocomotion) exactly as this file's own
+// existing occupancy suite above does — nothing here calls the stub
+// directly. `relocateIdleDestinationBlocker` is also not wired into
+// `handleAgentOccupancyBlock`'s ladder yet (skeleton phase): today, an idle
+// employee/vehicle blocker sitting exactly on a destination is never
+// relocated by anything, and (per `needsExactUnsharedCell`'s existing gate)
+// an ordinary exact/none-onArrive leg instead falls back to the PRE-EXISTING
+// destination-spread step, which frequently resolves by retargeting the
+// REQUESTER's own leg onto the free cell closest to the destination — which,
+// whenever the requester is already standing adjacent to the blocker (the
+// common case once a block has been waited out), is the requester's own
+// currently-held cell (see this file's own "#1259" fixture above). That
+// self-spread is a real settlement, not a crash, so most fixtures below fail
+// today via a clean, unmet expectation (the blocker never having moved, or
+// the requester having settled one cell short of its real target) rather
+// than via the stub's own thrown error.
+describe('tickLocomotion — agent occupancy destination-blocker relocation (#1278)', () => {
+  it('relocates an idle employee blocker off another mover\'s exact destination cell, letting the requester actually reach it', () => {
+    const state = buildFlatNavGridState(10, 10);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    // Idle blocker: hireEmployee's own defaults already read 'idle' (no
+    // active action, no itinerary, not resting/collapsing) — nothing further
+    // is set on it.
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    expect(employeeWorkState(blocker)).toBe('idle');
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    // Well under MOVE_STUCK_ABANDON_TICKS (30): one AGENT_OCCUPANCY_WAIT_TICKS
+    // wait, plus a handful of ticks for the ladder to actually resolve and the
+    // mover to close the last cell.
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    expect(TICK_BOUND).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
+
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    let relocatedAtTick: number | null = null;
+    for (let i = 0; i < TICK_BOUND; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+      if (relocatedAtTick === null && !(blocker.x === 4 && blocker.z === 2)) relocatedAtTick = i;
+    }
+
+    expect(relocatedAtTick, 'blocker never moved off (4,2)').not.toBeNull();
+    expect(relocatedAtTick!).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
+    // The requester actually reached the ORIGINAL destination, not a
+    // consolation cell nearby — the blocker moved, not the requester's target.
+    expect(state.agentOccupancy?.holderOf(4, 2)).toEqual({ kind: 'employee', id: mover.id });
+    expect(mover.x).toBe(4);
+    expect(mover.z).toBe(2);
+    expect(everAbandoned).toHaveLength(0);
+  });
+
+  it('boundary: a blocker with no free cell anywhere in its own neighbourhood is left in place, and the requester still resolves via the existing destination-spread fallback (regression pin)', () => {
+    // A raw, directly-editable NavGrid (mirrors this file's own
+    // blockColumn/openColumn fixtures) so every cell in the blocker's own
+    // AGENT_FREE_CELL_SEARCH_MAX_RADIUS neighbourhood can be sealed off,
+    // except a single one-cell opening the requester approaches through.
+    const grid = makeFlatNavGrid(21, 21);
+    const blockerX = 10;
+    const blockerZ = 10;
+    const moverStart = { x: blockerX - 1, z: blockerZ }; // one cell west — the only opening
+    blockNeighbourhood(grid, blockerX, blockerZ, AGENT_FREE_CELL_SEARCH_MAX_RADIUS, [moverStart]);
+
+    const state = createGame({ seed: SEED });
+    state.navGrid = grid;
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, blockerX, blockerZ);
+    expect(employeeWorkState(blocker)).toBe('idle');
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: blockerX, destZ: blockerZ,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: blockerX, z: blockerZ },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    for (let i = 0; i < TICK_BOUND; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+    }
+
+    // The blocker had nowhere to go — it never moved.
+    expect(blocker.x).toBe(blockerX);
+    expect(blocker.z).toBe(blockerZ);
+    // No exception, no corrupted position.
+    expect(Number.isNaN(blocker.x)).toBe(false);
+    expect(Number.isNaN(blocker.z)).toBe(false);
+    expect(Number.isNaN(mover.x)).toBe(false);
+    expect(Number.isNaN(mover.z)).toBe(false);
+    // The requester still resolved — via the pre-existing destination-spread
+    // fallback settling onto its own already-held approach cell (the only
+    // free-for-the-requester cell this fully-saturated neighbourhood has),
+    // exactly as it would with today's code. Never abandoned, never left
+    // permanently stuck.
+    expect(everAbandoned).toHaveLength(0);
+    expect(mover.isMoveStuck).toBe(false);
+  });
+
+  it('never relocates a busy blocker classified \'working\' — the requester resolves exactly as today\'s code already does (regression pin)', () => {
+    const state = buildFlatNavGridState(10, 10);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    blocker.activeActionId = 555;
+    blocker.taskTicksRemaining = 20;
+    expect(employeeWorkState(blocker)).toBe('working');
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    for (let i = 0; i < TICK_BOUND; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+    }
+
+    expect(blocker.x).toBe(4);
+    expect(blocker.z).toBe(2);
+    expect(everAbandoned).toHaveLength(0);
+    expect(mover.isMoveStuck).toBe(false);
+  });
+
+  it('never relocates a busy blocker classified \'traveling\' — the requester resolves exactly as today\'s code already does (regression pin)', () => {
+    const state = buildFlatNavGridState(10, 10);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    // itinerary/pendingTaskDuration stay null — a 'traveling' classification
+    // via the destinationX/Z mirror alone is enough (#1178: inert without an
+    // itinerary, so this blocker genuinely never moves on its own).
+    blocker.destinationX = 4;
+    blocker.destinationZ = 2;
+    expect(employeeWorkState(blocker)).toBe('traveling');
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    for (let i = 0; i < TICK_BOUND; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+    }
+
+    expect(blocker.x).toBe(4);
+    expect(blocker.z).toBe(2);
+    expect(everAbandoned).toHaveLength(0);
+    expect(mover.isMoveStuck).toBe(false);
+  });
+
+  it('never relocates a busy blocker classified \'resting\' — the requester resolves exactly as today\'s code already does (regression pin)', () => {
+    const state = buildFlatNavGridState(10, 10);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    blocker.restTicksRemaining = 20;
+    expect(employeeWorkState(blocker)).toBe('resting');
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    for (let i = 0; i < TICK_BOUND; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+    }
+
+    expect(blocker.x).toBe(4);
+    expect(blocker.z).toBe(2);
+    expect(everAbandoned).toHaveLength(0);
+    expect(mover.isMoveStuck).toBe(false);
+  });
+
+  it('never relocates a collapsing employee even though employeeWorkState still reads \'idle\' for it', () => {
+    const state = buildFlatNavGridState(10, 10);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 4, 2);
+    blocker.collapsing = true;
+    // employeeWorkState itself has no collapsing branch — it still reads
+    // 'idle' here, which is exactly why relocateIdleDestinationBlocker must
+    // check `collapsing` explicitly rather than relying on employeeWorkState
+    // alone to exclude this employee.
+    expect(employeeWorkState(blocker)).toBe('idle');
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    for (let i = 0; i < TICK_BOUND; i++) {
+      tickLocomotion(state);
+    }
+
+    expect(blocker.x).toBe(4);
+    expect(blocker.z).toBe(2);
+  });
+
+  it('vehicle parity: relocates an idle, driverless, unreserved vehicle blocker off a foot mover\'s exact destination, through handleAgentOccupancyBlock (not the vehicle-only handleOccupancyBlock)', () => {
+    const state = buildFlatNavGridState(10, 10);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 4, 2);
+    expect(vehicleDriverId(blocker)).toBeNull();
+    expect(getVehicleReservation(state.vehicles, blocker.id)).toBeNull();
+
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    expect(moveTo(state, mover.id, { x: 4, z: 2 }).success).toBe(true);
+
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    expect(TICK_BOUND).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
+
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    let relocatedAtTick: number | null = null;
+    for (let i = 0; i < TICK_BOUND; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+      if (relocatedAtTick === null && !(blocker.x === 4 && blocker.z === 2)) relocatedAtTick = i;
+    }
+
+    expect(relocatedAtTick, 'vehicle blocker never moved off (4,2)').not.toBeNull();
+    expect(relocatedAtTick!).toBeLessThan(MOVE_STUCK_ABANDON_TICKS);
+    expect(mover.x).toBe(4);
+    expect(mover.z).toBe(2);
+    expect(everAbandoned).toHaveLength(0);
+  });
+
+  // ── #1278's own core reproduction: extreme density at 1m spacing ──────────
+
+  /**
+   * Builds a `size x size`, 1-unit-spaced block of target cells anchored at
+   * (originX, originZ) and seeds an idle "finished" employee standing on
+   * every cell whose grid offset (dx, dz) is listed in `occupiedOffsets` —
+   * mirrors a finished driller crew left standing on the next hole (#1278's
+   * own reproduction shape). Shared by the bounded-tick fairness test and the
+   * radius-widening test below.
+   */
+  function seedDenseTargetGrid(
+    state: GameState,
+    rng: Random,
+    originX: number,
+    originZ: number,
+    size: number,
+    occupiedOffsets: ReadonlyArray<{ dx: number; dz: number }>,
+  ) {
+    const targets: Array<{ x: number; z: number }> = [];
+    for (let dx = 0; dx < size; dx++) {
+      for (let dz = 0; dz < size; dz++) {
+        targets.push({ x: originX + dx, z: originZ + dz });
+      }
+    }
+    const occupied = occupiedOffsets.map(({ dx, dz }) => hireEmployee(state.employees, 'driller', rng, originX + dx, originZ + dz).employee);
+    return { targets, occupied };
+  }
+
+  it('bounded-tick fairness: N employees dispatched at a dense 1m-spacing grid all eventually reach their own distinct target, none abandoned, no two ever share a cell', () => {
+    const state = buildFlatNavGridState(24, 24);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const ORIGIN_X = 5;
+    const ORIGIN_Z = 5;
+    const SIZE = 4; // 16 one-unit-spaced target cells
+    // 4 "finished drillers" already standing on 4 of the 16 holes.
+    const finishedOffsets = [{ dx: 0, dz: 0 }, { dx: 3, dz: 0 }, { dx: 0, dz: 3 }, { dx: 3, dz: 3 }];
+    const { targets, occupied: finished } = seedDenseTargetGrid(state, rng, ORIGIN_X, ORIGIN_Z, SIZE, finishedOffsets);
+    for (const emp of finished) expect(employeeWorkState(emp)).toBe('idle');
+
+    const finishedKeys = new Set(finished.map(e => cellKey(e.x, e.z)));
+    const remainingTargets = targets.filter(t => !finishedKeys.has(cellKey(t.x, t.z)));
+    expect(remainingTargets).toHaveLength(16 - finishedOffsets.length);
+
+    // A ring of distinct starting cells just outside the dense block —
+    // enough of them to give one to every remaining target.
+    const ringCells: Array<{ x: number; z: number }> = [];
+    for (let x = ORIGIN_X - 1; x <= ORIGIN_X + SIZE; x++) {
+      ringCells.push({ x, z: ORIGIN_Z - 1 });
+      ringCells.push({ x, z: ORIGIN_Z + SIZE });
+    }
+    for (let z = ORIGIN_Z; z < ORIGIN_Z + SIZE; z++) {
+      ringCells.push({ x: ORIGIN_X - 1, z });
+      ringCells.push({ x: ORIGIN_X + SIZE, z });
+    }
+    expect(ringCells.length).toBeGreaterThanOrEqual(remainingTargets.length);
+
+    const movers = remainingTargets.map((target, i) => {
+      const start = ringCells[i]!;
+      const { employee } = hireEmployee(state.employees, 'driller', rng, start.x, start.z);
+      expect(moveTo(state, employee.id, target).success).toBe(true);
+      return { employee, target };
+    });
+
+    // Budget reasoning: the ring sits at most SIZE+1 (5) cells from its
+    // nearest target at AGENT_WALK_SPEED (2/tick) — a handful of ticks of
+    // direct travel. Layered on that, up to 12 movers may each need one full
+    // AGENT_OCCUPANCY_WAIT_TICKS (10) wait before the ladder resolves their
+    // own contest — a fully serialized worst case is nowhere near
+    // 12 * (10 + a few), so 300 ticks is generous for genuine convergence
+    // while staying far under a scenario where every mover instead paid a
+    // full abandon-and-retry cycle (30-tick abandon threshold each) — that
+    // failure mode cannot hide inside this budget.
+    const TICK_BUDGET = 300;
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    const allAgents = [...finished, ...movers.map(m => m.employee)];
+    for (let i = 0; i < TICK_BUDGET; i++) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+      expectNoSharedCells(allAgents);
+    }
+
+    expect(everAbandoned).toHaveLength(0);
+    for (const { employee, target } of movers) {
+      expect(employee.itinerary, `employee #${employee.id} never arrived at (${target.x},${target.z})`).toBeNull();
+      expect(employee.x).toBe(target.x);
+      expect(employee.z).toBe(target.z);
+    }
+    for (const emp of finished) {
+      expect(emp.isMoveStuck).toBe(false);
+    }
+  });
+
+  it('radius widening in isolation: relocateIdleDestinationBlocker only succeeds because AGENT_FREE_CELL_SEARCH_MAX_RADIUS reaches past a fully-saturated radius-2 neighbourhood', () => {
+    const state = buildFlatNavGridState(30, 30);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const bx = 15;
+    const bz = 15;
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, bx, bz);
+    expect(employeeWorkState(blocker)).toBe('idle');
+
+    const moverStart = { x: bx - 1, z: bz };
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, moverStart.x, moverStart.z);
+    // Hand-built with an 'enter_building' onArrive (mirrors this file's own
+    // #1203 fixture, buildingId 999 deliberately absent — irrelevant here
+    // since the mover never actually arrives before the assertions run) so
+    // `needsExactUnsharedCell` reads false and the PRE-EXISTING
+    // destination-spread ladder step can never resolve this block by
+    // retargeting the mover elsewhere. The only thing that can possibly
+    // clear this block is relocateIdleDestinationBlocker itself — isolating
+    // AGENT_FREE_CELL_SEARCH_MAX_RADIUS's own effect from the already-working
+    // spread mechanism this file's other #1278 fixtures above exercise.
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: bx, destZ: bz,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: bx, z: bz },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    // Manual occupancy ledger (mirrors this file's own tie-break/two-cell
+    // fixtures above): every cell within Chebyshev distance 1-2 of the
+    // blocker is held by a real, alive filler employee — saturating the OLD,
+    // pre-#1278 radius-2 bound entirely — except the mover's own held cell —
+    // while radius 3-4 (AGENT_FREE_CELL_SEARCH_MAX_RADIUS) is left genuinely
+    // open, unheld, unblocked terrain.
+    const occupancy = new AgentOccupancy();
+    const moverOccupant: Occupant = { kind: 'employee', id: mover.id };
+    const blockerOccupant: Occupant = { kind: 'employee', id: blocker.id };
+    expect(occupancy.tryMove(moverOccupant, moverStart.x, moverStart.z)).toBe(true);
+    expect(occupancy.tryMove(blockerOccupant, bx, bz)).toBe(true);
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        if (dx === 0 && dz === 0) continue; // the blocker's own cell
+        if (dx === -1 && dz === 0) continue; // the mover's own held cell
+        const { employee: filler } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+        expect(occupancy.tryMove({ kind: 'employee', id: filler.id }, bx + dx, bz + dz)).toBe(true);
+      }
+    }
+    state.agentOccupancy = occupancy;
+
+    const TICK_BOUND = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    for (let i = 0; i < TICK_BOUND; i++) {
+      tickLocomotion(state);
+    }
+
+    expect(blocker.x === bx && blocker.z === bz, 'blocker never escaped the saturated radius-2 neighbourhood').toBe(false);
+    const dist = Math.max(Math.abs(blocker.x - bx), Math.abs(blocker.z - bz));
+    // Could only have landed at radius 3 or 4 — everything within radius 2
+    // was deliberately left with nowhere free.
+    expect(dist).toBeGreaterThanOrEqual(3);
+    expect(dist).toBeLessThanOrEqual(AGENT_FREE_CELL_SEARCH_MAX_RADIUS);
+    expect(Number.isNaN(blocker.x)).toBe(false);
+    expect(Number.isNaN(blocker.z)).toBe(false);
   });
 });

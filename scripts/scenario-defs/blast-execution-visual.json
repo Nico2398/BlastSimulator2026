@@ -3,22 +3,22 @@
   "description": "Visual verification of blast execution and effects: explosion animation, energy propagation visualization, fragment spawning, projection flyrock, Tier A projected vs Tier B collapse physics, and PHYSICS_FRAGMENT_CAP overflow fallback",
   "steps": [
     {
-      "command": "new_game seed:42 cash:3000000",
+      "command": "new_game seed:42 cash:4500000 agent_occupancy:true",
       "timeout": 40,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:3000000"
+          "command": "new_game seed:42 cash:4500000 agent_occupancy:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 3000000,
+          "cash": 4500000,
           "holeCount": 0
         }
       },
-      "description": " #553: cash bumped from $50,000 to $3,000,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits, and the 4th cycle restores its pre-#553 rows:8 cols:8 (64-hole) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts to stress the projectile-grouping path (#404) -- which a single driller/drill_rig takes over 1000 ticks to land door-to-door even at tight spacing:1."
+      "description": " #553: cash bumped from $50,000 to $3,000,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits, and the 4th cycle restores its pre-#553 rows:8 cols:8 (64-hole) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts to stress the projectile-grouping path (#404) -- which a single driller/drill_rig takes over 1000 ticks to land door-to-door even at tight spacing:1. #1278 migration: bumped $3,000,000 -> $4,500,000 -- under `agent_occupancy:true` cycle 4's 33-employee crew (8 working drillers + 24 charge-only relief) now spends real ticks waiting out/relocating around each other in this deliberately overpacked 8x8/1m-spacing grid (the fixture's whole point per #1278's own task framing), roughly 2x the pre-occupancy dispatch time for the same 64-hole drill+charge workload -- direct-traced (command mode, replaying this file's own exact command sequence): payroll alone for the wider 33-employee crew over that longer window drives cash from ~$1.7M (post cycle-3, pre cycle-4-hiring) down to a trough of roughly $380K by the time cycle 4's blast fires, where the old $3,000,000 start went bankrupt (cash < $5,000 for BANKRUPTCY_GRACE_TICKS, GameOverConditions.ts) around tick 1729, well before cycle 4 even finished charging. $4,500,000 keeps cash positive with margin through both remaining cycles; see the cycle-4 charge-drain `wait_until` step's own note for the paired tick-budget widening, and the removed wildcard-resweep steps' own note for why this is a real congestion cost, not merely a bigger bill for the same work."
     },
     {
       "command": "employee hire role:driller",
@@ -3274,15 +3274,16 @@
       "commandOutcome": "either"
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
-      "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some. #682 fix (real interaction-mode finding, live-diagnosed, not the reported overlay theory): `increased:[chargedCount]` dropped again -- it was only ever verified against command-mode runs, and does not hold in interaction mode on this seed. Live state dumps prove the 8 straggler clicks themselves are NOT blocked (orderedChargeCount genuinely climbs 0->7 across steps 130-137, one real order per click, so the buttons are clickable and reachable) -- interaction mode's real click-driven drilling pace simply saturates the grid (holeCount:62, chargedCount:62, orderedChargeCount:0) during step 129's own wait, before any straggler exists to charge, so every one of the 8 straggler clicks is a legitimate redundant re-order of an already-charged hole (harmless, matching this step's own `commandOutcome: either` reasoning) and chargedCount has nothing left to increase to. Command mode's own 53->61 trace is real and unaffected -- this is a genuine cross-mode pacing divergence (interaction mode's real click dispatch finishes the grid faster than command mode's bulk `tick`), not a bug in either mode, so the one shared `expect` block can only assert what holds in both: the drain itself completing.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:800",
+      "timeout": 125,
+      "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some. #682 fix (real interaction-mode finding, live-diagnosed, not the reported overlay theory): `increased:[chargedCount]` dropped again -- it was only ever verified against command-mode runs, and does not hold in interaction mode on this seed. Live state dumps prove the 8 straggler clicks themselves are NOT blocked (orderedChargeCount genuinely climbs 0->7 across steps 130-137, one real order per click, so the buttons are clickable and reachable) -- interaction mode's real click-driven drilling pace simply saturates the grid (holeCount:62, chargedCount:62, orderedChargeCount:0) during step 129's own wait, before any straggler exists to charge, so every one of the 8 straggler clicks is a legitimate redundant re-order of an already-charged hole (harmless, matching this step's own `commandOutcome: either` reasoning) and chargedCount has nothing left to increase to. Command mode's own 53->61 trace is real and unaffected -- this is a genuine cross-mode pacing divergence (interaction mode's real click dispatch finishes the grid faster than command mode's bulk `tick`), not a bug in either mode, so the one shared `expect` block can only assert what holds in both: the drain itself completing. #1278 migration: widened 400 -> 800 -- under `agent_occupancy:true` this same 34-hole drain (direct-traced, command mode) now takes 616 ticks, not the old budget's sub-400, because the tightly packed 33-employee/8x8/1m-spacing crew now pays real occupancy wait/relocate/reroute cost around each other instead of the old free pass-through; 800 gives margin over the measured value.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 60000
+          "maxTicks": 800,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
@@ -3327,111 +3328,8 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "#953: a repeat of the bulk charge order above, in place of the two per-hole stragglers this run originally pinned here. Dispatch ordering shifts with the climb gate, so *which* holes the first bulk order fails to reach is not stable — a wildcard re-order covers whichever ones are still uncharged, and costs nothing when there are none. Same `commandOutcome: either` tolerance as every other straggler in this tail (see #947).",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
-      "timeout": 120,
-      "description": "#953: drains the wildcard re-order above. Raised 100 -> 600 ticks: the holes that straggle are the ones dispatch reaches last, so the walk out to them is the long one — 100 ticks covered two named holes, not a wildcard's worth.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "#1201 CI-fix (real interaction-mode finding): H21 was still mid-drill when the wildcard re-order above fired, so it never received a charge order at all — not stuck, never ordered (the wait immediately above only drains charge orders already placed; it has no way to notice a hole that finishes drilling later). `wait_until field:orderedHoleCount equals:0` was tried and rejected here: cycle 4's own 8x8/spacing:1 grid genuinely never finishes drilling in command mode — #682's own comment on this cycle's charging sequence above already documents the permanent floor (a real, direct-probe-confirmed pathing deadlock for a handful of holes, unrelated to #1201) — so that wait times out and hard-fails the `scenario` channel instead. Root cause of the H21 miss specifically is a real, correct pacing shift from #1201's own fix: a drill_rig now genuinely detours around another parked drill_rig's cell in this tight grid instead of driving straight through it (the #954 regression #1201 restores), the same class of shift level1-win-efficient.json/vibration-budget.json already absorbed via updated expected values in this same PR. A second wildcard resweep, mirroring the one above (#953) and H8's own single-hole retry (#947), catches whichever hole is still mid-drill when the first resweep fires — the real time already spent draining that first resweep's own charge orders (the wait immediately above) is what lets a late driller finish drilling in the meantime, exactly as H8's own retry already relied on. `commandOutcome: either`: a no-op, harmless redundant re-order on any run where nothing is left uncharged, including every command-mode run, where this simply repeats the no-op the first resweep already was.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
-      "timeout": 120,
-      "description": "#1201 CI-fix: drains the second resweep above.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "#1252 (#1200) CI-fix (sandbox finding, same shape as H21's own #1201 finding above and H8's own #947 retry): H3 was still mid-drill when the SECOND wildcard resweep above fired, so it never received a charge order at all -- not stuck, never ordered (the wait immediately above only drains charge orders already placed; it has no way to notice a hole that finishes drilling later). Direct-traced (`createRunner`/`runCommand` replay of this file's own exact command sequence, command mode): H3 (7,5) finishes drilling mid-way through the second resweep's own drain wait, at tick 1018 of that step's up-to-600-tick budget, one tick too late for either of the two wildcard passes above to have caught it. Order-time footprint blocking (#1200) is not itself the direct cause here (no building order sits in this cycle's own command list) -- the mechanism is the same one #1200 shifts throughout this branch: dispatch timing across the whole file moved by enough that this particular driller/drill_rig pair now lands its hole one resweep later than before. A third wildcard resweep, mirroring the second (#1201) and first (#953) and H8's own single-hole retry (#947), catches whichever hole is still mid-drill when the second resweep fires. `commandOutcome: either`: a no-op, harmless redundant re-order on any run where nothing is left uncharged.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:100",
-      "description": "#1252 (#1200) CI-fix: drains the third resweep above. Sized like H8's own single-hole retry (#947, max_ticks:100) rather than a full wildcard's 600 -- by this point in the file at most one straggler (H3) is ever left uncharged, direct-traced.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 100,
-          "timeoutMs": 30000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
       "command": "sequence auto delay_step:25",
+      "description": "#1278 migration: the three wildcard `charge hole:*` resweeps that used to sit here (#953/#1201/#1252, each pairing a wholesale re-order with its own drain wait) are removed -- direct-traced (command mode, replaying this file's own exact command sequence under `agent_occupancy:true`): the named 34-hole straggler list plus its widened drain wait (see that step's own note) already reaches chargedCount:64/orderedChargeCount:0 on its own, before any of the three resweeps would fire. Removing them isn't just tidying: `charge hole:*` re-dispatches a charge_hole action for every ALREADY-charged hole too (no already-loaded guard, mining.ts) -- with 33 employees congesting this same 8x8/1m-spacing grid under real occupancy wait/relocate behavior, a wholesale re-order of 64 holes (most already done) cost roughly 1200 further ticks and ~$2.3M more payroll across the three resweeps in a direct A/B trace, which is what pushed cycle 4 into a real `worker_revolt` (and, before the cash bump on this file's own `new_game` step, bankruptcy) that the named-list-only trajectory never reaches. Left in place: the named per-hole list and its own H8 retry immediately above, which the same trace confirms are still genuinely needed (a real, if smaller, per-hole straggler set persists under occupancy) -- per issue #1278's own task framing, only proven-unnecessary insurance comes out; the rest stays.",
       "interaction": [
         {
           "type": "clickSelector",

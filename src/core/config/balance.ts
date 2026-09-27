@@ -704,6 +704,40 @@ export const STUCK_THRESHOLD = 3;
 export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
 
 /**
+ * Largest ring radius `findNearestFreeCell`'s ring-search loop (Locomotion.ts)
+ * will expand to before giving up. Replaces that loop's previously-hardcoded
+ * literal `2` — a flat cap of 2 rings (searching at most a 5x5 neighbourhood)
+ * can never find a free cell in a saturated 1m-spacing, high-density hole grid
+ * (issue #1278), since every cell within 2 rings of the blocker is itself
+ * occupied by another hole/agent.
+ *
+ * Measured (#1278) against the worst case a saturated 8x8 (64-hole),
+ * 1m-spacing grid can present: an occupant sitting at the grid's own most
+ * interior cell needs exactly `ceil(gridWidth / 2)` = 4 ring-steps to reach
+ * open, unoccupied ground outside the block in the single nearest direction
+ * — confirmed both by this formula and by a direct simulation
+ * (`relocateIdleDestinationBlocker` relocating a genuinely idle occupant
+ * planted at that exact worst-case cell, every other cell of the 8x8 block
+ * held by a non-relocatable "busy" occupant): radius 3 fails to find
+ * anywhere to put it, radius 4 succeeds, and radius 5+ finds the identical
+ * cell (the ring search returns the first radius with any free cell, so a
+ * higher ceiling never changes the outcome once 4 already succeeds). 4 is
+ * therefore sufficient for this constant's own job — freeing one cell for
+ * one relocated idle occupant — and is kept at its already-measured value.
+ *
+ * This constant does not by itself resolve a fully saturated grid where
+ * every one of many simultaneously-converging movers' own approach path
+ * (not just its final destination) crosses other occupants that are busy
+ * (not relocatable, by design) or idle-but-not-anyone's-own-destination
+ * (never a `relocateIdleDestinationBlocker` candidate) — raising this radius
+ * further does not change that outcome either (confirmed: radius 8 produces
+ * the same result as radius 4 for that harder case). That is a different,
+ * much larger problem than the one this constant governs, and out of this
+ * issue's scope.
+ */
+export const AGENT_FREE_CELL_SEARCH_MAX_RADIUS = 4;
+
+/**
  * Whether ground-cell occupancy is enforced for every agent, foot or vehicle
  * (#1206) — lands OFF; #1207 turns it on by default. `GameState.agentOccupancyEnabled`
  * reads this as its default, and the `debug occupancy on|off` console command
