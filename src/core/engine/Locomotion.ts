@@ -687,6 +687,23 @@ function isIdleParkedVehicle(vehicle: Vehicle, employees: readonly Employee[]): 
 }
 
 /**
+ * True when `emp` is a genuinely busy, stationary blocker — working or
+ * resting (#1283) — as opposed to idle or already `isMoveStuck`. Gives
+ * `handleAgentOccupancyBlock`'s step-2.5 parked-vehicle crossing fallback a
+ * second kind of stationary occupant it may cross, alongside
+ * `isIdleParkedVehicle` above.
+ *
+ * Exported (unlike `isIdleParkedVehicle`) so test-writer's red-phase tests
+ * can exercise this predicate directly ahead of `handleAgentOccupancyBlock`'s
+ * own crossing-guard being wired to call it (#1283, implementation phase).
+ */
+export function isStationaryBusyEmployee(emp: Employee): boolean {
+  void emp;
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/**
  * Generalizes `handleOccupancyBlock` (below) to any agent — foot or vehicle
  * (#1206) — via `AgentOccupancy` rather than the live vehicle-position scan
  * `isOccupiedByOtherVehicle` does. `mover` is the occupant identity of
