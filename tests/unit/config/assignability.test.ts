@@ -2389,6 +2389,51 @@ describe('running the assign action end to end', () => {
     expect(result.labelled.filter((l) => l.issue === 901)).toEqual([]);
   });
 
+  // 27 Sep 2026: PR #1251 closed #1200 and #1252. The merge chain settled the
+  // first; GitHub closed the second, and its close chain deferred to "the merge
+  // event carries the chain" — leaving #1252 closed and still `in-progress`.
+  it('settles an issue a merged pull request closed, then leaves the chain to the merge', async () => {
+    const result = await run({
+      issues: [
+        {
+          number: 1252,
+          state: 'closed',
+          stateReason: 'completed',
+          labels: ['agent-task', 'scope:scenarios', 'in-progress'],
+          closers: [{ number: 1251, merged: true }],
+        },
+        { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+      ],
+      events: { 1252: [{ label: 'in-progress', at: Date.now() - 60_000 }] },
+      env: { ASSIGN_GUARD: 'closed_without_pr', COMPLETED_ISSUE: '1252' },
+    });
+    expect(result.failed).toBeNull();
+    expect(result.labelled).toContainEqual({ issue: 1252, labels: ['done'] });
+    expect(result.unlabelled).toContainEqual({ issue: 1252, label: 'in-progress' });
+    // The merge event assigns; this path must not assign a second time.
+    expect(result.outputs.issues ?? '').toBe('');
+    expect(result.comments).toHaveLength(0);
+  });
+
+  it('leaves an issue whose pull request is still open as it is', async () => {
+    const result = await run({
+      issues: [
+        {
+          number: 1259,
+          state: 'closed',
+          stateReason: 'completed',
+          labels: ['agent-task', 'scope:engine', 'in-progress'],
+          closers: [{ number: 1260, merged: false }],
+        },
+      ],
+      events: { 1259: [{ label: 'in-progress', at: Date.now() - 60_000 }] },
+      env: { ASSIGN_GUARD: 'closed_without_pr', COMPLETED_ISSUE: '1259' },
+    });
+    expect(result.failed).toBeNull();
+    expect(result.labelled.filter((l) => l.issue === 1259)).toEqual([]);
+    expect(result.unlabelled.filter((u) => u.issue === 1259)).toEqual([]);
+  });
+
   // 17 Aug 2026: every candidate skipped on a 503, three dispatches in a row,
   // each ending green on "Nothing assigned — see the step above for the reason".
   // The Actions list showed three successes and issue #554 never got a session.
