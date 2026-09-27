@@ -901,7 +901,9 @@ window.__worldToScreen = (x, z) => {
   const onScreen = project(cx, startY, cz).z < 1;
   const result: ScreenTileResolution = resolveScreenPointForTile(project, raycastForTile, x, z, startY);
   if (!result.resolved) {
-    return { px: 0, py: 0, onScreen, tileConfirmed: false };
+    return result.reason === undefined
+      ? { px: 0, py: 0, onScreen, tileConfirmed: false }
+      : { px: 0, py: 0, onScreen, tileConfirmed: false, failureReason: result.reason };
   }
   // ndc is already pixel-quantized (project() rounds it above), so this
   // recovers exactly the integer pixel that was verified — Math.round only
