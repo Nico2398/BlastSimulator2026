@@ -7,7 +7,7 @@ import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
-import { hasFillableOreSaleOffer } from './core/economy/Contract.js';
+import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 
 export { createRunner };
@@ -84,6 +84,17 @@ export interface SerializableGameState {
    * upstream of it.
    */
   fillableOreSaleOffered: boolean;
+  /**
+   * True when `state.contracts.available` holds at least one
+   * `rubble_disposal` offer (issue #1263 CI-fix) — the condition-based wait
+   * a scenario polls before opening the Contracts panel for that offer's
+   * own Accept button, instead of a fixed tick count that only ever
+   * happened to land on a matching pool instance and is re-rolled by any
+   * timing change upstream of it. Mirrors `fillableOreSaleOffered` above,
+   * minus the ore-quantity check: `rubble_disposal` has no material to
+   * stock against, so mere presence in the pool is the whole condition.
+   */
+  rubbleDisposalOffered: boolean;
   /** Employees killed so far (state.damage.deathCount) — a blast's projections can kill anyone standing in the cleared columns; proves a fatality genuinely happened rather than being inferred from a flat employeeCount. */
   deathCount: number;
   /** Fleet-wide count of driver-boarding events (state.vehicles.driverBoardingCount). */
@@ -165,6 +176,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
+    rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,

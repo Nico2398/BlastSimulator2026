@@ -17,7 +17,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
-import { findPath, type PathResult } from '../nav/Pathfinding.js';
+import { findPath, pathCrossesFragmentOccupancy, type PathResult } from '../nav/Pathfinding.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { rebuildAgentOccupancy, reconcileAgentOccupancy, type Occupant, type AgentOccupancy } from '../nav/AgentOccupancy.js';
@@ -423,7 +423,12 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // legs avoid every occupied cell except when the destination itself is
   // occupied (boarding a vehicle sitting there, or charging a hole a
   // drill_rig is still parked on) — mirrors the old tickEmployeeMovement.
-  const avoidVehicles = isDrive ? false : !isDestinationOccupied(state, leg.destX, leg.destZ);
+  // `leg.crossesVehicles` (#1263 CI-fix) short-circuits this straight to
+  // `false` once the fallback below has ever granted this leg a
+  // vehicle-crossing route — see that field's own doc comment for why
+  // re-deriving this from the mover's own continuously-shifting position
+  // every tick, instead of deciding once, oscillates the mover forever.
+  let avoidVehicles = isDrive ? false : (leg.crossesVehicles ? false : !isDestinationOccupied(state, leg.destX, leg.destZ));
 
   // Snapped through NavGrid's own (nearest-cell, round-based) convention
   // rather than handed to findPath continuous (#1166): Pathfinding.ts's own
@@ -459,13 +464,45 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     else clearVehicleDetour(emp);
   }
 
-  const path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } = detourPath
+  let path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } = detourPath
     ?? (state.navGrid
       ? findPath(state.navGrid, {
           agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles,
           ...(isDrive && { requiredClearance: vehicleRequiredClearanceCells(vehicle!) }),
         })
       : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] });
+
+  // #1263: a foot leg's vehicle-avoiding route may not exist at all — a
+  // single parked vehicle sitting in the one climb-legal corridor out of a
+  // region (#1151's slope gate can leave exactly one) blocks every route out
+  // regardless of how far the leg's own destination is from it. Falls back
+  // to routing through it, mirroring PlanItinerary.ts's own
+  // `estimateFootLegDistance` fallback (same issue, planning side) — without
+  // this, a leg claimed on the strength of that fallback's distance still
+  // re-derives the stricter vehicle-avoiding route here every tick, finds it
+  // still doesn't exist, and never moves: `isMoveStuck` latches true forever
+  // on an action nothing will ever un-stick, since the destination itself
+  // (unlike the already-handled `!isDestinationOccupied` case above) is
+  // perfectly free. Rejects a relaxed route that crosses fragment debris
+  // (`pathCrossesFragmentOccupancy`) — same reasoning as
+  // `estimateFootLegDistance`'s own identical check: this fallback treats a
+  // stationary VEHICLE as a soft obstacle, not fragment occupancy, and must
+  // not quietly relax the #954/#1090 fragment-boxed-in guard.
+  if (!isDrive && avoidVehicles && !path.found && state.navGrid) {
+    const relaxed = findPath(state.navGrid, {
+      agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles: false,
+    });
+    if (relaxed.found && !pathCrossesFragmentOccupancy(state.navGrid, relaxed.waypoints)) {
+      path = relaxed;
+      avoidVehicles = false;
+      // Sticky for the rest of this leg's life (see `Leg.crossesVehicles`'s
+      // own doc comment, Itinerary.ts) — without this, the very next tick
+      // re-derives `avoidVehicles` fresh from the mover's new position above
+      // and can find the strict route "found" again from there, discarding
+      // this relaxed route's own in-flight RouteCommitment and oscillating.
+      leg.crossesVehicles = true;
+    }
+  }
 
   if (!occupancyActive && isDrive && state.navGrid && path.found) {
     const nextStep = nextGridStep(emp.x, emp.z, path.waypoints);
@@ -662,7 +699,20 @@ function controllingEmployee(state: GameState, occupant: Occupant): Employee | u
  *    this requester's controlling employee outranks (has the numerically
  *    higher id than) the blocker's — the lower id always holds its ground,
  *    so the pair can never both step aside into each other;
- * 3. failing either of the above — including whenever the destination itself
+ * 2.5. also reachable only inside step 1's branch, once both a reroute and a
+ *    sidestep have failed to resolve it (#1263): when the occupant actually
+ *    in the way is a vehicle with no driver and no drive in progress —
+ *    genuinely parked, not a live contest between two movers the way step
+ *    2's sidestep handles — a reroute that avoids every OTHER occupied cell
+ *    but is still willing to route straight through this one specific
+ *    blocker's own cell, crossing it directly on success. Generalizes the
+ *    existing foot-crosses-parked-vehicle exemption (`avoidVehicles ===
+ *    false`, `AgentAdvance.ts`) to any mover. Without this, a single parked
+ *    vehicle planted in the only cell of a genuine single-file corridor
+ *    blocks every route through it forever, since no full-avoidance reroute
+ *    ever avoids every occupied cell when the blocker never moves on its own
+ *    and there never was a second way around;
+ * 3. failing all of the above — including whenever the destination itself
  *    was held, which skips straight here — "destination spreading":
  *    retargeting the leg's own destination to the nearest free cell around
  *    it, but only for a leg whose arrival step actually needs an exact,
@@ -672,6 +722,62 @@ function controllingEmployee(state: GameState, occupant: Occupant): Employee | u
  *    `handleOccupancyBlock` already has for vehicles, unchanged, now
  *    reachable for a foot agent too.
  */
+/**
+ * Applies a successful reroute (full-avoidance, or a stationary-blocker
+ * crossing, #1263) path to `emp`/`mover`, resets the occupancy-wait counter,
+ * and reports the tick as having moved. Factored out of
+ * `handleAgentOccupancyBlock`'s reroute branch as its own function since the
+ * apply sequence (write back stuck-state, position, commitment, move
+ * history, and `result`) is identical regardless of which `PathResult` was
+ * found or whether a specific occupant's cell must stay passable while
+ * advancing through it.
+ */
+function applyReroutedAdvance(
+  state: GameState,
+  emp: Employee,
+  mover: Occupant,
+  isDrive: boolean,
+  vehicle: Vehicle | undefined,
+  speed: number,
+  leg: Leg,
+  path: PathResult,
+  occupancy: AgentOccupancy,
+  result: LocomotionResult,
+  crossableOccupant: Occupant | null = null,
+): LegMoveOutcome {
+  const outcome = advanceAlongPath({
+    x: emp.x, z: emp.z, walkSpeed: speed,
+    destinationX: leg.destX, destinationZ: leg.destZ,
+    consecutiveFailures: 0, isStuck: false,
+    path,
+    // A reroute (or a crossing) is trusted immediately, same reasoning as
+    // handleOccupancyBlock's own identical reset below.
+    committed: NULL_ROUTE_COMMITMENT,
+    moveHistoryX: null, moveHistoryZ: null,
+    mover, occupancy,
+    exemptOccupant: crossableOccupant,
+  });
+
+  emp.moveConsecutiveFailures = outcome.consecutiveFailures;
+  emp.isMoveStuck = outcome.isStuck;
+  emp.vehicleWaitingTicks = 0;
+  writeCommitted(emp, outcome.committed);
+  writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
+
+  const fromX = emp.x;
+  const fromZ = emp.z;
+  emp.x = outcome.x;
+  emp.z = outcome.z;
+  if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, isLegArrived(outcome.x, outcome.z, leg));
+  recordWalk(emp, vehicle, fromX, fromZ, outcome.trail);
+  result.moved.push(emp.id);
+  if (isDrive) {
+    result.moved.push(vehicle!.id);
+    result.vehiclesMoved.push(vehicle!.id);
+  }
+  return 'moved';
+}
+
 function handleAgentOccupancyBlock(
   state: GameState,
   emp: Employee,
@@ -725,36 +831,7 @@ function handleAgentOccupancyBlock(
     // not a gap to fill.
     const reroute = findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
     if (reroute.found) {
-      const outcome = advanceAlongPath({
-        x: emp.x, z: emp.z, walkSpeed: speed,
-        destinationX: leg.destX, destinationZ: leg.destZ,
-        consecutiveFailures: 0, isStuck: false,
-        path: reroute,
-        // A reroute is trusted immediately, same reasoning as
-        // handleOccupancyBlock's own identical reset below.
-        committed: NULL_ROUTE_COMMITMENT,
-        moveHistoryX: null, moveHistoryZ: null,
-        mover, occupancy,
-      });
-
-      emp.moveConsecutiveFailures = outcome.consecutiveFailures;
-      emp.isMoveStuck = outcome.isStuck;
-      emp.vehicleWaitingTicks = 0;
-      writeCommitted(emp, outcome.committed);
-      writeMoveHistory(emp, outcome.moveHistoryX, outcome.moveHistoryZ);
-
-      const fromX = emp.x;
-      const fromZ = emp.z;
-      emp.x = outcome.x;
-      emp.z = outcome.z;
-      if (isDrive) writeVehiclePosition(state, vehicle!, outcome.x, outcome.z, isLegArrived(outcome.x, outcome.z, leg));
-      recordWalk(emp, vehicle, fromX, fromZ, outcome.trail);
-      result.moved.push(emp.id);
-      if (isDrive) {
-        result.moved.push(vehicle!.id);
-        result.vehiclesMoved.push(vehicle!.id);
-      }
-      return 'moved';
+      return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, reroute, occupancy, result);
     }
 
     // Reroute failed — the deterministic tie-break sidestep: only when the
@@ -786,6 +863,65 @@ function handleAgentOccupancyBlock(
           result.vehiclesMoved.push(vehicle!.id);
         }
         return 'moved';
+      }
+    }
+
+    // Crossing a parked, driverless vehicle blocker (#1263): the
+    // full-avoidance reroute just above already proved no route exists that
+    // avoids every occupied cell — in a genuine single-file corridor with
+    // exactly one currently-occupied cell in the way (the only route in or
+    // out of a blast crater's access point, say), that fails identically no
+    // matter how many more times it's retried, and the tie-break sidestep
+    // just above only ever fires for a STUCK blocker (a live contest between
+    // two movers), never a parked one nobody is driving at all.
+    //
+    // Relocating the blocker instead (an earlier version of this fix, tried
+    // and rejected) does not work: `findNearestFreeCellForVehicle`/
+    // `findNearestReachableCell` both return the NEAREST free cell to the
+    // blocker's own position, which for a genuinely single-file corridor is
+    // just the next cell further along the SAME corridor — one relocation
+    // every `AGENT_OCCUPANCY_WAIT_TICKS` ticks nudges the blocker one cell at
+    // a time down the mover's own route rather than off it, direct-traced to
+    // never clear a multi-cell corridor at all within hundreds of ticks
+    // (confirmed live: economy-full-loop.json's storedMassKg never grew past
+    // its pre-block value even after 400 further ticks, where the unpatched
+    // baseline's own natural stuck/abandon/reassign recovery already reaches
+    // it by tick 286). A route-aware placement — find a cell off the route
+    // entirely, not merely the nearest free one — would need much more than
+    // this fallback's own scope justifies.
+    //
+    // Crossing instead: when the occupant in the way is a vehicle with no
+    // driver and no live drive in progress — genuinely parked, not a live
+    // contest, and with nobody to dispatch it out of the way on its own —
+    // find a route that avoids every OTHER occupied cell but is still willing
+    // to route straight through this one specific blocker's cell (this
+    // function's own `exemptOccupant` param, passed to
+    // `findPathAvoidingOccupiedCells`), and advance through it directly
+    // (`AdvanceAlongPathInput.exemptOccupant`, `AgentAdvance.ts` — the same
+    // field a `board` leg's own approach uses for #1274, here reused for the
+    // crossing case) rather than paying the full stuck ->
+    // MOVE_STUCK_ABANDON_TICKS ->
+    // ACTION_STUCK_BACKOFF_TICKS cost first. This generalizes the existing
+    // foot-crosses-parked-vehicle exemption (`avoidVehicles === false`,
+    // `AgentAdvance.ts`, also #1263) from foot movers to any mover crossing a
+    // confirmed-idle, driverless vehicle specifically — never another live,
+    // moving vehicle, and never an occupied-by-an-employee cell, both of
+    // which stay exactly as blocking as before. Confirmed via
+    // economy-full-loop.json (agent_occupancy:true): a debris_hauler's route
+    // funnelled through the blast crater's one access corridor cell,
+    // permanently held by a driverless rock_fragmenter whose driver (licensed
+    // for, and currently driving, both vehicles) had moved on to other work —
+    // the ~90-150+ tick recovery cost the ladder would otherwise pay exceeded
+    // rubble_disposal's own deadline (rng.nextInt(30, 100)) every time this
+    // recurred.
+    const blockerVehicle = blocker?.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === blocker!.id) : undefined;
+    if (blockerVehicle && vehicleDriverId(blockerVehicle) === null
+      && !isVehicleCurrentlyDriving(blockerVehicle, state.employees.employees)) {
+      const crossing = findPathAvoidingOccupiedCells(
+        state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
+      );
+      if (crossing.found) {
+        return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
       }
     }
   }
@@ -1263,6 +1399,12 @@ function findPathAvoidingOtherVehicles(state: GameState, emp: Employee, vehicle:
  * this reroute fires just as often right up against a fresh blast's own
  * fragment pile as that function's own vehicle-hauler case does. Marks are
  * reverted before returning.
+ *
+ * `exemptOccupant` (#1263) additionally leaves one specific occupant's own
+ * held cell unmarked — used by `handleAgentOccupancyBlock`'s parked-vehicle
+ * crossing fallback to search for a route that avoids every other occupant
+ * but is still willing to route straight through the one blocker a prior,
+ * unexempted call already proved has no way around.
  */
 function findPathAvoidingOccupiedCells(
   state: GameState,
@@ -1273,18 +1415,40 @@ function findPathAvoidingOccupiedCells(
   destX: number,
   destZ: number,
   requiredClearance: number | undefined,
+  exemptOccupant?: Occupant,
 ): PathResult {
   const grid = state.navGrid!;
   const occupancy = state.agentOccupancy!;
   const marked: Array<{ x: number; z: number; prev: boolean }> = [];
+  // A parked vehicle's own NavCell already carries a PERSISTENT
+  // `vehicleOccupied` flag of its own (set by `updateVehicleCellOccupancy`
+  // whenever it's stationary — independent of, and pre-dating, this
+  // function's own temporary marks above) — merely skipping the "add a mark"
+  // step for an exempted occupant above does nothing to that pre-existing
+  // flag, so a route through the exempted blocker's own cell still reads
+  // occupied and the search still fails to find it (#1263). Cleared the same
+  // way the marks above are: recorded here, restored in `finally`.
+  const exemptCleared: Array<{ x: number; z: number; prev: boolean }> = [];
 
   try {
     for (const held of occupancy.heldOccupants()) {
       if (held.occupant.kind === mover.kind && held.occupant.id === mover.id) continue;
+      if (exemptOccupant && held.occupant.kind === exemptOccupant.kind && held.occupant.id === exemptOccupant.id) continue;
       const cell = grid.cellAt(held.x, held.z);
       if (!cell || cell.vehicleOccupied) continue;
       marked.push({ x: held.x, z: held.z, prev: cell.vehicleOccupied });
       cell.vehicleOccupied = true;
+    }
+
+    if (exemptOccupant) {
+      const exemptCell = occupancy.cellOfOccupant(exemptOccupant);
+      if (exemptCell) {
+        const cell = grid.cellAt(exemptCell.x, exemptCell.z);
+        if (cell?.vehicleOccupied) {
+          exemptCleared.push({ x: exemptCell.x, z: exemptCell.z, prev: true });
+          cell.vehicleOccupied = false;
+        }
+      }
     }
 
     return withFragmentsUnmarked(state, grid, () => findPath(grid, {
@@ -1295,6 +1459,10 @@ function findPathAvoidingOccupiedCells(
     for (const mark of marked) {
       const cell = grid.cellAt(mark.x, mark.z);
       if (cell) cell.vehicleOccupied = mark.prev;
+    }
+    for (const cleared of exemptCleared) {
+      const cell = grid.cellAt(cleared.x, cleared.z);
+      if (cell) cell.vehicleOccupied = cleared.prev;
     }
   }
 }

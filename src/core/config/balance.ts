@@ -174,6 +174,28 @@ export const SPAWN_TILE_SPACING = 3;
 export const CREW_SPAWN_VEHICLE_SEPARATION = 3;
 
 /**
+ * Cells between any two agents — employee or vehicle — when
+ * `placeStartingCrew` fills employee cells in around the already-spaced
+ * vehicle picks (#1263). Below this, `climbConnectedCells`' own nearest-first
+ * BFS order hands every employee the closest still-free candidate, which in
+ * a narrow corridor is the cell immediately touching whichever agent placed
+ * just before it — the corridor itself never has room to space vehicles 3
+ * apart AND leave employees anywhere except shoulder to shoulder with them.
+ * Once ground-cell occupancy is uniform across every agent (#1206), that
+ * packs the whole roster single-file with nobody able to step aside for
+ * anybody else — confirmed live via ore-haul-dispatch's own seed 10 desert
+ * start, a permanent drill-dispatch stall from tick 0. Matches
+ * CREW_SPAWN_VEHICLE_SEPARATION: measured live, a gap of 2 still let a
+ * relocated agent's own route out oscillate around a neighbour 2 cells away
+ * on this same narrow terrain (an ordinary #1129 retrace tie, not a true
+ * deadlock, but real added ticks); 3 gave every agent, driller included, a
+ * clean run to its first task in the same repro. Still only a short extra
+ * walk to board — well inside the room `Mount.ts`'s "within 1 tile" leaves
+ * for a driver to close before boarding.
+ */
+export const CREW_SPAWN_AGENT_SEPARATION = 3;
+
+/**
  * How much longer than a straight line the starting crew's route to the
  * middle of the site may run before `placeStartingCrew` treats its authored
  * spawn as walled in and moves it (#1166). Measured across desert seeds:

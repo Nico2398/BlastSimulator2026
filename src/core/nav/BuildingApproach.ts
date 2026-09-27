@@ -87,13 +87,36 @@ function isRingCandidateType(cell: NavCell): boolean {
  * orders queued back to back (or one order whose own footprint completes the
  * wall) can strand a type-open ring cell in an isolated pocket, and a
  * type-only check hands a builder a destination they can never actually
- * reach. Falls back to the plain type-only nearest cell when the
- * main-region check finds nothing (e.g. a fresh map with no other footprint
- * yet to make the distinction matter), and to the building's raw (x, z) when
- * no NavGrid is built yet (mirrors the rest of the movement pipeline's own
- * no-NavGrid direct-line fallback) or when nothing on the ring is walkable
- * at all (fully boxed in) — the caller's own stuck-detection already handles
- * an unreachable destination.
+ * reach.
+ *
+ * Also prefers a ring cell no vehicle currently sits on (#1263). Unlike
+ * `findBuildingExitCell` (#1202), this used to accept a vehicle-occupied ring
+ * cell outright — harmless while `AgentOccupancy` (#1206/#1207) only barred
+ * vehicle-vs-vehicle movement, since a foot employee could still walk onto or
+ * through a parked vehicle's cell. Once ground-cell occupancy went uniform
+ * across every agent, foot included, that same cell became exclusively the
+ * vehicle's: an employee whose approach target resolves to it can find a
+ * route there (the destination-occupied exemption in `estimateLegDistance`
+ * still allows routing onto an occupied destination, for the genuine cases —
+ * boarding a vehicle, charging a hole a drill_rig sits on — that need to),
+ * but the final hop onto that exact cell is refused by `AgentOccupancy`
+ * every tick for as long as the vehicle never moves, which for an idle,
+ * driverless vehicle is forever. A building approach never actually needs
+ * that specific cell, only some free spot on the ring, so preferring a free
+ * one first removes the false dependency instead of tolerating a permanent
+ * stall (confirmed live: tutorial-interactive.json's own driller-contention
+ * repro under `agent_occupancy:true`, issue #1263 — an idle rock_digger
+ * parked on the one ring cell nearest a resting employee's approach
+ * direction stalled that employee's rest itinerary, and the drilling grind
+ * behind it, for the rest of the run).
+ *
+ * Falls back tier by tier — connected-and-free, then connected-only, then
+ * free-only, then plain type-open — so a genuinely boxed-in building (every
+ * ring cell either disconnected or vehicle-occupied) still gets an answer
+ * rather than none, same as before this cell tightened: the caller's own
+ * stuck-detection already handles a destination that turns out unreachable.
+ * Returns the building's raw (x, z) when no NavGrid is built yet, mirroring
+ * the rest of the movement pipeline's own no-NavGrid direct-line fallback.
  */
 export function findBuildingApproachCell(
   navGrid: NavGrid | null,
@@ -105,15 +128,22 @@ export function findBuildingApproachCell(
   if (!navGrid) return { x: building.x, z: building.z };
 
   const mainAnchor = findNearestNavigableCell(navGrid, building.x, building.z);
-  if (isTraversableCell(navGrid, mainAnchor.x, mainAnchor.z)) {
-    const mainRegion = computeClimbReachableSet(navGrid, mainAnchor.x, mainAnchor.z);
-    const reachable = nearestRingCell(navGrid, building, def, fromX, fromZ,
-      (x, z, cell) => isRingCandidateType(cell) && mainRegion.has(x, z));
-    if (reachable) return reachable;
-  }
+  const mainRegion = isTraversableCell(navGrid, mainAnchor.x, mainAnchor.z)
+    ? computeClimbReachableSet(navGrid, mainAnchor.x, mainAnchor.z)
+    : null;
 
-  const best = nearestRingCell(navGrid, building, def, fromX, fromZ, (_x, _z, cell) => isRingCandidateType(cell));
-  return best ?? { x: building.x, z: building.z };
+  const tiers: Array<(x: number, z: number, cell: NavCell) => boolean> = [
+    (x, z, cell) => isRingCandidateType(cell) && !cell.vehicleOccupied && !!mainRegion?.has(x, z),
+    (x, z, cell) => isRingCandidateType(cell) && !!mainRegion?.has(x, z),
+    (_x, _z, cell) => isRingCandidateType(cell) && !cell.vehicleOccupied,
+    (_x, _z, cell) => isRingCandidateType(cell),
+  ];
+
+  for (const accept of tiers) {
+    const found = nearestRingCell(navGrid, building, def, fromX, fromZ, accept);
+    if (found) return found;
+  }
+  return { x: building.x, z: building.z };
 }
 
 /**

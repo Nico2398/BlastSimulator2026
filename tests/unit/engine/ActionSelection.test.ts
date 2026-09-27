@@ -478,30 +478,31 @@ describe('estimateActionCost / resolveActionCost — vehicle-gated cost delegate
     expect(result).toBeNull();
   });
 
-  // Regression guard for the #954 occupancy livelock, now at the
-  // planItinerary delegation boundary (#1090) — the VEHICLE-occupancy case,
-  // mirrored against "returns null when an employee is boxed in by fragment
-  // occupancy..." above. #1090's own implementation threads a single
-  // `avoidVehicles` flag straight through to `findExactPath`
-  // (`estimateLegDistance`'s own doc comment), and that flag's underlying
-  // cell check (`isCellOccupied`, NavGrid.ts) treats vehicle- and
-  // fragment-occupancy as one combined obstacle everywhere `avoidVehicles` is
-  // consulted — deliberately, since a drive leg's own `avoidVehicles: false`
-  // must be free to route onto a FRAGMENT's cell too (driving up to haul or
-  // break it), not just a vehicle's. Splitting the two into independently
-  // controllable obstacles would have to thread a second flag through every
-  // `PathfindingRequest` call site rather than a change scoped to this
-  // planner, and `isDestinationOccupied`'s own doc comment holds the
-  // invariant a narrower fix must not break: resolveActionCost and an
-  // employee's own real foot travel (Locomotion.ts) "must agree" on
-  // reachability — an employee genuinely boxed in by parked vehicles on
-  // every neighbour cell is exactly as stuck in real movement (which applies
-  // this same combined avoidVehicles check) as this cost estimate correctly
-  // reports here. EntityMovementTick.ts's own stuck-abandon mechanism (#938)
-  // is what recovers an employee from a genuine livelock like this one, not
-  // a cost estimate that quietly disagrees with what the simulation would
-  // actually do.
-  it('returns null for an employee boxed in by VEHICLE occupancy on every neighbour cell, same as real foot travel would be stuck (#954, #1090)', () => {
+  // Was a regression guard for the #954 occupancy livelock at the
+  // planItinerary delegation boundary (#1090): an employee boxed in by
+  // VEHICLE occupancy on every neighbour cell used to read exactly as
+  // unreachable as one boxed in by fragment occupancy (the still-unchanged
+  // guard just above). #1263 deliberately supersedes that conclusion for the
+  // VEHICLE-occupancy case only: `estimateFootLegDistance` (PlanItinerary.ts)
+  // now falls back to a route that may cross a vehicle's cell when no
+  // vehicle-avoiding route exists at all, and Locomotion.ts's/
+  // AgentAdvance.ts's execution-side counterparts were updated to match —
+  // confirmed necessary live via sandbox-mode.json's seed 777
+  // alpine_granite start, where an employee spawned on a terrain nub whose
+  // one climbable neighbour a spawned-but-never-dispatched vehicle
+  // permanently occupied, stalling every charge_hole action beyond it for
+  // the full 3000-tick wait_until budget with no stuck-abandon backoff ever
+  // reached (nothing ever claimed the action to abandon). The invariant this
+  // guard was written to protect — resolveActionCost and Locomotion.ts "must
+  // agree" on reachability — still holds; the two were changed together, so
+  // they still agree, just on a new answer for this one case. Splitting
+  // vehicle- from fragment-occupancy stays exactly the combined
+  // `avoidVehicles` flag #1090 left at the pathfinding-request level (still
+  // too broad a change for one caller) — the distinction is drawn
+  // afterward, against the fallback route's own waypoints
+  // (`pathCrossesFragmentOccupancy`, Pathfinding.ts), which is why the
+  // fragment-occupancy guard just above is untouched by this change.
+  it('resolves a real cost for an employee boxed in by VEHICLE occupancy on every neighbour cell when a fragment-free route exists beyond them (#1263)', () => {
     const state = makeState(10, 10);
     const emp = makeEmployee(state, 5, 5);
     const offsets = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
@@ -513,7 +514,8 @@ describe('estimateActionCost / resolveActionCost — vehicle-gated cost delegate
 
     const result = resolveActionCost(state, emp, action);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.totalTicks).toBeGreaterThan(0);
   });
 });
 

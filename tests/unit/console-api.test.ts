@@ -93,7 +93,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'researchQueueLength', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
-  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'deathCount',
+  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'rubbleDisposalOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg', 'collectedOreTotal', 'dangerZoneClear',
@@ -375,6 +375,37 @@ describe('console-api', () => {
       s.collectedOre = { dirtite: 5000 };
 
       expect(serializeGameState(runner.ctx as MiningContext)!.fillableOreSaleOffered).toBe(false);
+    });
+
+    // rubbleDisposalOffered (#1263 CI-fix): the field a scenario waits on
+    // instead of padding a fixed number of ticks and hoping the random offer
+    // pool happens to hold a rubble_disposal instance — same fragility
+    // fillableOreSaleOffered above already fixed for ore_sale. No quantity
+    // check is needed here: rubble_disposal has no material to stock
+    // against, so mere presence in the pool is the whole condition.
+    it('reports rubbleDisposalOffered false on an empty pool', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      s.contracts.available = [];
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.rubbleDisposalOffered).toBe(false);
+    });
+
+    it('reports rubbleDisposalOffered false when the pool holds only other contract types', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      s.contracts.available = [makeOreSaleOffer('dirtite', 100)];
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.rubbleDisposalOffered).toBe(false);
+    });
+
+    it('reports rubbleDisposalOffered true once a rubble_disposal offer is in the pool', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      const rubble = { ...makeOreSaleOffer('', 120), type: 'rubble_disposal' as const };
+      s.contracts.available = [makeOreSaleOffer('gloomium', 100), rubble];
+
+      expect(serializeGameState(runner.ctx as MiningContext)!.rubbleDisposalOffered).toBe(true);
     });
 
     it('reports zero deathCount for a fresh game with no employees', () => {

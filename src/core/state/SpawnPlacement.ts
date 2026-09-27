@@ -8,6 +8,7 @@ import { findNearestNavigableCell } from '../nav/NavGridReachability.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import {
   CREW_SPAWN_VEHICLE_SEPARATION,
+  CREW_SPAWN_AGENT_SEPARATION,
   CREW_SPAWN_MAX_ROUTE_INFLATION,
   CREW_SPAWN_SEARCH_RADIUS,
   CREW_SPAWN_VEHICLE_MAX_ROUTE_INFLATION,
@@ -167,6 +168,36 @@ function* ringCells(origin: Cell, radius: number): Generator<Cell> {
 }
 
 /**
+ * Picks `count` employee cells from `candidates` (nearest-first BFS order),
+ * skipping the already-claimed `vehicleCells` and keeping every pick at
+ * least `separation` Chebyshev cells from every vehicle cell and every
+ * employee cell already picked. `separation` 0 degrades to the old
+ * distinct-cell-only behaviour (still skips exact vehicle-cell collisions,
+ * never checked against other employees at 0). Returns null when fewer than
+ * `count` candidates satisfy the constraint, so the caller can retry looser
+ * rather than seat only some of the roster.
+ */
+function fillEmployeeCells(
+  candidates: readonly Cell[],
+  vehicleCells: readonly Cell[],
+  count: number,
+  separation: number,
+): Cell[] | null {
+  const vehicleKeys = new Set(vehicleCells.map(key));
+  const employeeCells: Cell[] = [];
+  for (const candidate of candidates) {
+    if (employeeCells.length === count) break;
+    if (vehicleKeys.has(key(candidate))) continue;
+    const farEnough = separation <= 0 ? true
+      : vehicleCells.every(v => chebyshev(v, candidate) >= separation)
+        && employeeCells.every(e => chebyshev(e, candidate) >= separation);
+    if (!farEnough) continue;
+    employeeCells.push(candidate);
+  }
+  return employeeCells.length >= count ? employeeCells : null;
+}
+
+/**
  * The cell to gather the crew on: the one nearest where the level meant to
  * put it whose route to the site centre is not a detour. Falls back to the
  * least-inflated candidate found inside `CREW_SPAWN_SEARCH_RADIUS`, and to
@@ -322,7 +353,12 @@ function fixUnreachableVehicles(navGrid: NavGrid, employees: Employee[], vehicle
  *
  * Vehicles are kept `CREW_SPAWN_VEHICLE_SEPARATION` cells apart, preserving
  * what #591's spaced row was for: two vehicles close enough to tie on octile
- * cost let A* resolve a route onto the cell the other one blocks.
+ * cost let A* resolve a route onto the cell the other one blocks. Employees
+ * fill in around them kept `CREW_SPAWN_AGENT_SEPARATION` cells apart too
+ * (#1263) — see that constant's own doc comment for why the plain
+ * nearest-candidate fill this replaced could still pack a whole roster
+ * single-file down a narrow corridor once every ground cell is exclusive
+ * (#1206), even on a spawn this function already judged worth repositioning.
  */
 export function placeStartingCrew(state: GameState): boolean {
   const navGrid = state.navGrid;
@@ -369,16 +405,20 @@ export function placeStartingCrew(state: GameState): boolean {
     }
 
     if (vehicleCells.length >= vehicles.length) {
-      const taken = new Set(vehicleCells.map(key));
-      const employeeCells: Cell[] = [];
-      for (const candidate of candidates) {
-        if (employeeCells.length === employees.length) break;
-        if (taken.has(key(candidate))) continue;
-        taken.add(key(candidate));
-        employeeCells.push(candidate);
-      }
+      // Employees fill in around the spaced vehicle picks (#1263): kept
+      // CREW_SPAWN_AGENT_SEPARATION away from every vehicle AND every
+      // employee already placed, not just off the exact same cell — see
+      // CREW_SPAWN_AGENT_SEPARATION's own doc comment for why "distinct" was
+      // not enough. Falls back to the old distinct-cell-only fill (still
+      // guaranteed collision-free, just not gap-guaranteed) when the
+      // connected patch is too small to seat every employee with room to
+      // spare — a real, if rare, possibility on a tightly pocketed site —
+      // rather than abandoning the whole reposition and falling through to
+      // the naive independent per-agent snap this function exists to avoid.
+      const employeeCells = fillEmployeeCells(candidates, vehicleCells, employees.length, CREW_SPAWN_AGENT_SEPARATION)
+        ?? fillEmployeeCells(candidates, vehicleCells, employees.length, 0);
 
-      if (employeeCells.length >= employees.length) {
+      if (employeeCells && employeeCells.length >= employees.length) {
         employees.forEach((employee, i) => {
           const cell = employeeCells[i] as Cell;
           employee.x = cell.x;

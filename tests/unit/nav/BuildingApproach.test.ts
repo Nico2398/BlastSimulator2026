@@ -63,9 +63,26 @@ describe('findBuildingExitCell', () => {
     expect(findBuildingExitCell(null, SCHOOL, DEF, 3, 4)).toEqual({ x: 3, z: 4 });
   });
 
-  it('where the approach cell accepts an occupied cell, the exit cell does not', () => {
+  it('the approach cell and the exit cell both skip a vehicle-occupied ring cell (#1263)', () => {
     const g = grid({ '3,4': { vehicleOccupied: true } });
-    expect(findBuildingApproachCell(g, SCHOOL, DEF, 3, 4)).toEqual({ x: 3, z: 4 });
+    expect(findBuildingApproachCell(g, SCHOOL, DEF, 3, 4)).not.toEqual({ x: 3, z: 4 });
     expect(findBuildingExitCell(g, SCHOOL, DEF, 3, 4)).not.toEqual({ x: 3, z: 4 });
+  });
+});
+
+describe('findBuildingApproachCell', () => {
+  it('skips a ring cell a vehicle now stands on, taking the nearest free one (#1263)', () => {
+    const approach = findBuildingApproachCell(grid({ '3,4': { vehicleOccupied: true } }), SCHOOL, DEF, 3, 4);
+    expect(approach).toEqual({ x: 3, z: 3 });
+  });
+
+  it('falls back to a vehicle-occupied ring cell when nothing else on the ring is walkable at all', () => {
+    // Every ring cell except (3,4) is walled off; (3,4) itself is vehicle-occupied.
+    const overrides: Record<string, Partial<NavCell>> = { '3,4': { vehicleOccupied: true } };
+    for (const [x, z] of [[3, 3], [4, 3], [5, 3], [6, 3], [6, 4], [6, 5], [3, 5], [3, 6], [4, 6], [5, 6], [6, 6]] as const) {
+      overrides[`${x},${z}`] = { type: 'blocked', moveCost: Infinity };
+    }
+    const approach = findBuildingApproachCell(grid(overrides), SCHOOL, DEF, 3, 4);
+    expect(approach).toEqual({ x: 3, z: 4 });
   });
 });

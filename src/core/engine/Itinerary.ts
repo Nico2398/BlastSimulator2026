@@ -40,6 +40,44 @@ export interface Leg {
    */
   originalDestX?: number | null;
   originalDestZ?: number | null;
+  /**
+   * Set once `Locomotion.ts`'s `advanceLeg` has ever fallen back to a
+   * vehicle-crossing route for this leg (#1263's own foot-leg fallback,
+   * `avoidVehicles === false` because no avoiding route existed at all) —
+   * and, from then on, sticky: every later tick reuses `avoidVehicles:
+   * false` directly instead of re-deriving it from the mover's own current
+   * (continuously shifting) position.
+   *
+   * Without this, the fallback's own `!path.found` check is re-evaluated
+   * fresh every tick from wherever the mover has since walked to — and in a
+   * dense grid with several parked vehicles, a strict avoiding route can be
+   * findable from SOME intermediate cells along the relaxed route even
+   * though it never existed from the leg's own starting cell (the case the
+   * fallback exists for). The moment that happens the leg flips back to the
+   * strict route for one tick, `resolveTargetWaypoint`'s climb-check
+   * re-validates the in-flight `RouteCommitment` waypoint under the NEW
+   * `avoidVehicles: true` and finds it blocked (it was only ever legal
+   * because a vehicle sat there), discards it, and adopts the strict path's
+   * own very different target — then next tick, back at (or near) the
+   * position that made the strict route look findable a moment ago, flips
+   * again. `RouteCommitment`'s tie-epsilon guards two similarly-shaped
+   * routes of near-equal cost; it was never built to protect against two
+   * routes that disagree on which cells are even legal to stand on,
+   * oscillating the mover in place forever a few cells from the destination
+   * (confirmed live: blast-execution-visual.json's dense 8x8/1m-spacing
+   * grid, cycle 4 — 4 charge-relief employees permanently unable to land
+   * their own already-ordered charge, direct-traced motionless across a
+   * 9000-tick/3x-budget probe with zero further progress).
+   *
+   * Fixes it the same way `originalDestX`/`originalDestZ` above fixes
+   * #1274's own "recompute every tick" trap: decide once, from the leg's
+   * own start, and hold it — matching what `PlanItinerary.ts`'s
+   * `estimateFootLegDistance` already assumed when it costed this leg from
+   * a single fixed position at plan time. Optional/nullable so a
+   * fixture/caller predating this field keeps compiling unchanged (never
+   * true, so it behaves exactly like every leg before this fix).
+   */
+  crossesVehicles?: boolean;
 }
 
 /** What the itinerary is ultimately for. */

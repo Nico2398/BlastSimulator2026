@@ -232,6 +232,37 @@ export function isImpassable(
 }
 
 /**
+ * Whether any cell along `waypoints` is fragment-occupied (#1263). A caller
+ * that has deliberately planned or executed a foot route with
+ * `avoidVehicles: false` — to cross a single stationary, never-dispatched
+ * vehicle blocking the one route out of a region, see
+ * `PlanItinerary.ts`'s `estimateFootLegDistance` and `Locomotion.ts`'s
+ * matching runtime fallback — gets a route that may also cross fragment
+ * debris, since `isCellOccupied` (`NavGrid.ts`) treats vehicle- and
+ * fragment-occupancy as one combined obstacle wherever `avoidVehicles` is
+ * consulted: a drive leg's own `avoidVehicles: false` must stay free to
+ * route onto a fragment's cell too (driving up to haul or break it), so
+ * splitting the two into independently controllable obstacles would mean
+ * threading a second avoidance flag through every pathfinding call site
+ * rather than a change scoped to the one caller that actually needs the
+ * distinction — the exact tradeoff #1090 already weighed and rejected for
+ * this identical coupling (see `ActionSelection.test.ts`'s own doc comment
+ * on the vehicle-occupancy livelock guard this file's fallback must not
+ * quietly break). Checking the resulting route's own waypoints afterward,
+ * here, keeps that guard's own "genuinely fragment-blocked stays blocked"
+ * half intact without touching `isImpassable`/`PathRequest` at all: a
+ * fallback route that turns out to cross fragment debris is rejected by its
+ * caller exactly as before, and only a route that only ever needed to cross
+ * a VEHICLE'S cell is accepted.
+ */
+export function pathCrossesFragmentOccupancy(
+  grid: NavGrid,
+  waypoints: ReadonlyArray<{ x: number; z: number }>,
+): boolean {
+  return waypoints.some(wp => (grid.cellAt(wp.x, wp.z)?.fragmentOccupancy ?? 0) > 0);
+}
+
+/**
  * The connected run of clearance-insufficient cells touching (`x`, `z`) —
  * null when (`x`, `z`) already has sufficient clearance itself, so the
  * overwhelmingly common case (an ordinary open cell) costs nothing beyond
