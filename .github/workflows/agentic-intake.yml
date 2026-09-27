@@ -8,8 +8,8 @@ name: "Pipeline: intake a filed issue"
 # This workflow assigns nothing. It keeps three things true so the labels can be
 # trusted, by humans and by the assigner alike:
 #
-#   - Every lifecycle and scope label exists, with a description that names what
-#     it promises — `ready` the Definition of Ready, `done` the Definition of Done.
+#   - Every lifecycle label exists, with a description that names what it
+#     promises — `ready` the Definition of Ready, `done` the Definition of Done.
 #   - An issue filed through the "Agent Task" form carries the `scope:*` labels
 #     its filer picked in the form's Scope field. That is the filer's own
 #     declaration, read off the form, never inferred from the text.
@@ -19,13 +19,18 @@ name: "Pipeline: intake a filed issue"
 #     so the label never claims more than it means. The assigner refuses the same
 #     issue on the same verdict, so the two cannot disagree.
 #
+# A second job, `scope-colors`, owns the scope labels themselves: each is
+# painted by whether a live run holds it, so the label list shows at a glance
+# which areas a new issue could start in. Display only — the assigner reads the
+# labels on issues, never a label's colour.
+#
 # Every write here uses GITHUB_TOKEN, deliberately: none of it may raise an event.
 # A label this workflow adds or removes must not re-enter it, and must never reach
 # `handle-failure.yml` or a runner. It also drops a stale `done` from a reopened
 # issue.
 on:
   issues:
-    types: [opened, reopened, labeled, unlabeled]
+    types: [opened, reopened, closed, labeled, unlabeled]
 
 permissions:
   issues: write
@@ -89,9 +94,6 @@ jobs:
               { name: rules.BLOCKED, color: 'd93f0b', description: 'Needs a human answer or intervention' },
               { name: rules.PAUSED, color: 'fbca04', description: 'A run stopped here on a dependency; the queue returns to it when that dependency lands' },
               { name: rules.DONE, color: 'a18bc6', description: 'Meets the Definition of Done (agentic-autonomous-pipeline)' },
-              ...Object.entries(rules.SCOPES).map(([scope, description]) => ({
-                name: `${rules.SCOPE_PREFIX}${scope}`, color: 'c5def5', description,
-              })),
             ];
             const existing = new Map(
               (await github.paginate(github.rest.issues.listLabelsForRepo, { owner, repo, per_page: 100 }))
@@ -168,3 +170,65 @@ jobs:
               ].join('\n'),
             });
             core.warning(`#${n}: took \`ready\` off — ${readiness.missing.join('; ')}.`);
+
+  # Paints every scope label busy or free. It repaints all of them from the
+  # issues holding `in-progress` on every run, so a dropped or out-of-order
+  # event costs nothing beyond the next one, and no run needs to know what the
+  # last one wrote.
+  scope-colors:
+    # `in-progress` arriving or leaving, a scope changing on a live issue, or a
+    # live issue closing: the only events that change what a live run holds.
+    if: >-
+      github.event.action == 'closed' ||
+      (
+        (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+        (github.event.label.name == 'in-progress' || startsWith(github.event.label.name, 'scope:'))
+      )
+    runs-on: ubuntu-latest
+    # A newer repaint reads fresher state, so it replaces an older one rather
+    # than queueing behind it.
+    concurrency:
+      group: agentic-scope-colors
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      - name: Paint each scope label by whether a live run holds it
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const rules = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/assignability.cjs`);
+            const names = (labels) => (labels || []).map((l) => (typeof l === 'string' ? l : l.name));
+            // Free is the colour these labels always had; held is the colour of
+            // `in-progress`, the label on the issue that holds them.
+            const FREE = 'c5def5';
+            const HELD = 'fbca04';
+
+            const live = (await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, labels: rules.IN_PROGRESS, state: 'open', per_page: 100,
+            }))
+              .filter((issue) => !issue.pull_request)
+              .map((issue) => ({ number: issue.number, labels: names(issue.labels) }));
+            const holders = rules.scopeHolders(live);
+
+            const existing = new Map(
+              (await github.paginate(github.rest.issues.listLabelsForRepo, { owner, repo, per_page: 100 }))
+                .map((label) => [label.name, label])
+            );
+            for (const [scope, description] of Object.entries(rules.SCOPES)) {
+              const name = `${rules.SCOPE_PREFIX}${scope}`;
+              const holder = holders[scope];
+              const color = holder === null ? FREE : HELD;
+              const have = existing.get(name);
+              if (have && have.color.toLowerCase() === color && (have.description || '') === description) continue;
+              const write = have ? github.rest.issues.updateLabel : github.rest.issues.createLabel;
+              await write({ owner, repo, name, color, description });
+              core.info(`${name}: ${holder === null ? 'free' : `held — clashes with #${holder}`}.`);
+            }

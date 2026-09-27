@@ -852,6 +852,27 @@ describe('running several issues at once', () => {
 // promise is spent: an issue that does not meet it is never assigned, whatever
 // its `ready` label says. `agentic-intake.yml` takes the label off such an issue
 // with the same verdict; this is the half that holds when intake never ran.
+describe('which scopes a live run holds', () => {
+  const free = (holders: Record<string, number | null>) =>
+    Object.keys(holders).filter((scope) => holders[scope] === null);
+
+  it('frees every scope when nothing is live', () => {
+    expect(free(rules.scopeHolders([]))).toEqual(Object.keys(rules.SCOPES));
+  });
+
+  it('holds the live scopes and the ones that run alone, and names the holder', () => {
+    const holders = rules.scopeHolders([{ number: 1283, labels: ['in-progress', 'scope:nav', 'scope:engine'] }]);
+    expect(holders.nav).toBe(1283);
+    expect(holders.pipeline).toBe(1283);
+    expect(free(holders)).toEqual(['economy', 'world', 'ui', 'renderer', 'console', 'scenarios']);
+  });
+
+  it('holds every scope while an exclusive or unscoped run is live', () => {
+    expect(free(rules.scopeHolders([{ number: 1230, labels: ['in-progress', 'scope:pipeline'] }]))).toEqual([]);
+    expect(free(rules.scopeHolders([{ number: 7, labels: ['in-progress'] }]))).toEqual([]);
+  });
+});
+
 describe('the Definition of Ready', () => {
   it.each([
     [['agent-task', 'scope:ui'], []],
