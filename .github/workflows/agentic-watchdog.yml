@@ -270,7 +270,7 @@ jobs:
       # stall invisible. Issue #552 held the queue that way behind PR #581.
       #
       # `agentic-ci-failure.yml` is what handles that, on the CI-completion
-      # event. It declines while any agent session is live — a live session reads
+      # event. It declines while a session on that PR or its issue is live — it reads
       # its own verdict through `[await-ci]`, and a second comment would queue a
       # second runner onto one branch — and that decline is the case this step
       # covers: it re-raises the same event later by dispatching that workflow,

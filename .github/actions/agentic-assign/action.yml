@@ -39,7 +39,7 @@ inputs:
       "after_paused_run" — only chain when completed_issue is a run that ended `paused`:
       it stopped on a dependency it filed, put itself back in the queue behind that
       dependency, and the queue still has to move past it. Same cascade brake.
-      "none" — no extra precondition. Single-flight is enforced either way.
+      "none" — no extra precondition. The parallel-run cap is enforced either way.
     required: false
     default: "none"
   completed_issue:
@@ -167,7 +167,7 @@ runs:
             // The run is over, so `in-progress` cannot still be true. A run that
             // settles its own issue drops it, but one that was closed from
             // outside may not have — and left on a closed issue it is invisible
-            // to single flight, which lists open issues only, while still
+            // to the parallel-run count, which lists open issues only, while still
             // reading as a live run to anything that looks the issue up directly.
             if (finished.labels.includes(rules.IN_PROGRESS)) {
               await github.rest.issues
