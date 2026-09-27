@@ -113,12 +113,8 @@ describe('makeGameContext', () => {
     expect(() => makeGameContext({ mineType: 'not_a_real_mine_type' })).toThrow();
   });
 
-  it('matches newGameCommand\'s actual (non-throwing) behavior for a degenerate `size: 0` — an empty 0x0x0 grid, not a rejection', () => {
-    const ctx = makeGameContext({ size: 0 });
-    expect(ctx.state).not.toBeNull();
-    expect(ctx.grid).not.toBeNull();
-    expect(ctx.grid!.sizeX).toBe(0);
-    expect(ctx.grid!.sizeZ).toBe(0);
+  it('throws for a degenerate `size: 0`, because newGameCommand now refuses it via requireValidGenDimension (#1226) instead of building an empty 0x0x0 grid', () => {
+    expect(() => makeGameContext({ size: 0 })).toThrow(/Invalid size: 0/);
   });
 
   it('DEFAULT_GRID_SIZE (newGameCommand\'s own un-overridden default) differs from makeGameContext\'s no-arg default of 32', () => {
