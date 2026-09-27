@@ -31,7 +31,7 @@ export const TILE_RESOLUTION_MAX_ITERATIONS = 5;
  * Two heights within this many world units are the same guess, for oscillation
  * detection below. A real raycast repeat never lands back at machine precision —
  * mesh interpolation and floating-point noise put "the same" height a few
- * hundredths of a unit off its earlier visit — so the tolerance has to be wide
+ * tenths of a unit off its earlier visit — so the tolerance has to be wide
  * enough to catch that noise. It still stays well under one voxel level
  * (`BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD = 1` in src/core/config/balance.ts),
  * so it never mistakes two genuinely different terrain levels for a repeat.
