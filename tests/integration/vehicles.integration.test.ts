@@ -739,6 +739,11 @@ describe('Vehicle fleet', () => {
 
   describe('traffic jam event fires via tickCommand (#411)', () => {
     it('sets pendingEvent to traffic_jam once enough vehicles have waited long enough on a shared target', () => {
+      // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled
+      // flag — several vehicles converging on one shared target cell is
+      // exactly the multi-agent shape the flag governs (and the shape
+      // #1274's own leg.originalDestX/originalDestZ fix targets).
+      ctx.state!.agentOccupancyEnabled = true;
       // Anchor vehicle occupies the contended target cell. It never ticks
       // (task stays 'idle'), so it just blocks the cell for occupancy checks.
       vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
@@ -1414,6 +1419,10 @@ describe('Vehicle fleet', () => {
     });
 
     it('two licensed employees queued for the same vehicle role with only one free vehicle: only one boards at a time, the other claims it once released', () => {
+      // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled
+      // flag — two employees converging on the same shared vehicle is
+      // exactly the multi-agent shape the flag governs.
+      ctx.state!.agentOccupancyEnabled = true;
       const eid1 = hireOne(ctx, 'driller');
       employeeCommand(ctx, ['assign_skill', String(eid1)], { skill: 'driving.drill_rig', level: '1' });
       const rng = new Random(11);
