@@ -3078,7 +3078,7 @@
   "notification.order_blocked_no_staff": "{order} has no one to do it — the site has no employees yet.",
   "notification.order_blocked_no_vehicle": "{order} needs a {role} — none in the fleet yet.",
   "notification.order_blocked_no_driver": "{order} needs a {role} — nobody is licensed to drive one.",
-  "notification.order_blocked_target_unreachable": "{order} sits somewhere ground crew can't walk to — it needs a ramp or path connecting it before anyone can start.",
+  "notification.order_blocked_target_unreachable": "{order}'s target isn't reachable — no route connects it to the rest of the site.",
   "notification.pip.blocked_orders_label": "{count} BLOCKED",
   "notification.pip.blocked_orders_tip": "{count} order(s) queued with nobody able to do them yet",
   "shell.rail.blast": "Blast",

@@ -724,29 +724,32 @@ describe('Survey system — seismic building side effects', () => {
 
   it('applies -10 HP to a building within 5 cells of a completed seismic survey', () => {
     hireSurveyor();
-    // Building at (14,15), survey center at (14,12) → footprint-centre
-    // Euclidean distance ≈ 4.74 (within 5). #1008 moved the building off the
+    // Building at (14,15), survey center at (16,12) → footprint-centre
+    // Euclidean distance ≈ 3.6 (within 5). #1008 moved the building off the
     // original (21,15) — not flat on this seed's terrain once
     // checkFootprintPlacement enforces it — to this flat 3x3 bench, which
     // sits right in the middle of this seed's one steep ramp band (#458
     // T6.1/D14: bigger levels carry far more natural terrain relief than the
-    // old ones). #1197 moved the survey centre off that band's far side,
-    // (19,14): after the building completes, its own footprint corner
-    // (16,15 here) sits on the only diagonal step leaving the surveyor's
-    // resting cell, and #1197 correctly refuses to let that diagonal cut
-    // across it — with no orthogonal detour on this single-file ramp
-    // staircase, (19,14) becomes provably unreachable rather than merely
-    // slower. (14,12) sits on the *same* staircase the surveyor is already
-    // standing on (confirmed reachable by direct BFS over the post-build
-    // NavGrid), so the walk stays inside the one corridor #1197 leaves open,
-    // while still landing within the 5-cell damage radius this test proves.
+    // old ones). #1197 moved the survey centre once already for the same
+    // reason #1231 moves it again here: the surveyor's own post-construction
+    // resting cell is picked by findNearestReachableCell (TaskCompletionEffects
+    // — their own just-finished footprint turns 'blocked' underneath them),
+    // whose flood fill #1231 made correctly refuse a diagonal step that cuts
+    // between two blocked/void corners — the exact rule real findPath
+    // already enforced (#1197). That correctness fix shifts the resting cell
+    // by one, and the (14,12) target the flood fill previously (wrongly)
+    // called reachable from the OLD resting cell no longer resolves via real
+    // findPath from the NEW, correctly-computed one. (16,12) is reachable via
+    // real findPath from the resting cell #1231's fix now produces (confirmed
+    // live), while still landing within the 5-cell damage radius this test
+    // proves.
     const buildResult = buildCommand(ctx, ['living_quarters'], { at: '14,15' });
     expect(buildResult.success).toBe(true);
     resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
-    surveyCommand(ctx as any, ['seismic'], { x: '14', z: '12' });
+    surveyCommand(ctx as any, ['seismic'], { x: '16', z: '12' });
     resolveTick(60);
 
     expect(findBuilding(building.id).hp).toBe(hpBefore - 10);

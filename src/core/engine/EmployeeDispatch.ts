@@ -283,6 +283,12 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
  * from — both cases where the existing three-reason classification runs
  * unchanged (tickEmployees).
  *
+ * Known limitation: with 2+ active freight_warehouses in genuinely separate
+ * connected regions, anchoring from a single nearest-to-corner depot
+ * (findHaulDepotApproach) can misclassify a target only reachable via the
+ * OTHER depot's region as unreachable — untested and out of scope for #1231,
+ * left for whoever adds real multi-depot support.
+ *
  * Exported for `tests/unit/engine/EmployeeDispatch.test.ts`, which calls it
  * standalone to check the returned set's shape in isolation (a real external
  * caller — the earlier unexported version broke that suite, #1231 review).

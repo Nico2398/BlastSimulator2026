@@ -10,6 +10,7 @@ import type { NavGrid } from './NavGrid.js';
 import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
+import { isDiagonalCornerClear } from './Pathfinding.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
@@ -547,6 +548,17 @@ function ensureReachabilityScratch(size: number): void {
  * neighbour, mirroring `Pathfinding.isImpassable`'s own `avoidVehicles: true`
  * rule for foot travel — see `findNearestTraversableCell`'s own doc comment
  * for why entity-spawn placement (the only caller that passes true) needs it.
+ *
+ * Every diagonal step is also refused when it clips a blocked/void corner
+ * (#1197's `isDiagonalCornerClear`, imported from `Pathfinding.ts` rather
+ * than reimplemented — one predicate, shared) — unconditionally, regardless
+ * of `climbAware`, since real `findPath` routing refuses a corner-cut on
+ * every diagonal step it considers, climb-gated or not (#1231). Before this,
+ * this fill was strictly MORE permissive than `findPath`: it could report a
+ * cell reachable that no real route — climb-gated or plain — could actually
+ * resolve, which is exactly how a debris pocket whose only access requires an
+ * illegal corner-cut went un-flagged as `target_unreachable` and stranded a
+ * dispatched employee against it forever.
  */
 function floodFillReachable(
   navGrid: NavGrid,
@@ -585,6 +597,12 @@ function floodFillReachable(
       const neighbourCell = navGrid.cellAt(nx, nz);
       if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
+      // #1231: same corner-cut refusal findPath's own neighbour expansion
+      // applies (#1197) — a diagonal step whose two orthogonal neighbours are
+      // both blocked/void is never a real route regardless of climbAware.
+      // O(1) (two extra cellAt lookups), same cost class as the checks either
+      // side of it — see this function's own doc comment above.
+      if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(navGrid, x, z, nx, nz)) continue;
       if (climbAware && !isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
       if (!hasClearance(neighbourCell, requiredClearance)) continue;
       visitedArr[neighborIdx] = 1;
