@@ -3,12 +3,12 @@
   "description": "Chapter 5/2 (#484), superseded by #552's self-dispatching hauling/fragmenting: an undercharged blast leaves an oversized boulder that auto-dispatch routes to a crewed rock_fragmenter (fragment_debris PendingAction) rather than a debris_hauler (haul_debris) -- no player command or button picks which vehicle goes where any more, and there is no rejection to test either, since an oversized fragment simply never spawns a haul_debris action in the first place. A resulting sub-fragment is then hauled and stored automatically once a freight_warehouse exists. Buy/driver-assign purchases still go through real Vehicles-panel clicks; the break/haul actions themselves are proven by ticking forward and reading the automatic outcome.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:210000",
-      "description": "#553: cash bumped from $100,000 to $150,000 to cover the driller/drill_rig this file now needs (see below) on top of the original driver/debris_hauler/driver/rock_fragmenter/freight_warehouse shopping list. #697-followup: bumped again to $165,000 -- the earlier #697 fix (a `time pause`/`time resume` bracket around the two freight_warehouse build clicks) was built on a wrong diagnosis and did not hold in CI (still failed, same disabled-button error, PR #706). The real mechanism: the 'event choose 0' step right after the tick-28 charge block (below) deliberately chains up to three extra `tick 15` rounds in interaction mode only (its own `interaction` array, vs. command mode's single-command `event choose 0` with no ticks) to guarantee charging survives an event interruption -- #554-followup/#680's own fix for that. That makes interaction mode run up to 45 ticks further ahead of command mode by absolute tickCount, and every tick since then reads a different RNG draw (`Random(seed + tickCount)`), so a downstream `tick 30` block that command mode's own trace shows getting cut short by a mid-block event runs to completion instead in interaction mode -- 196 vs. 135 ticks by the freight_warehouse builds, sandbox-confirmed. Pausing around the builds changes nothing because the extra draw already happened during charging, well before the pause bracket starts; isPaused stays true throughout and tickCount is identical entering and leaving both build steps. Fix: a bigger cash cushion instead of a pause that was never the actual leak. Raised again, 165000 -> 210000 (#556). The 150000 -> 165000 bump above was for interaction mode’s own tick divergence (#697); the two warehouses are queued construction now, so the crew draws salary across the ticks that build them and interaction mode pays that on top of its own longer trajectory — CI went bankrupt before the haul, with the LevelEndScreen covering the panels the remaining steps click.",
+      "command": "new_game seed:42 cash:210000 agent_occupancy:true",
+      "description": "#1261: added `agent_occupancy:true` (batch A migration). #553: cash bumped from $100,000 to $150,000 to cover the driller/drill_rig this file now needs (see below) on top of the original driver/debris_hauler/driver/rock_fragmenter/freight_warehouse shopping list. #697-followup: bumped again to $165,000 -- the earlier #697 fix (a `time pause`/`time resume` bracket around the two freight_warehouse build clicks) was built on a wrong diagnosis and did not hold in CI (still failed, same disabled-button error, PR #706). The real mechanism: the 'event choose 0' step right after the tick-28 charge block (below) deliberately chains up to three extra `tick 15` rounds in interaction mode only (its own `interaction` array, vs. command mode's single-command `event choose 0` with no ticks) to guarantee charging survives an event interruption -- #554-followup/#680's own fix for that. That makes interaction mode run up to 45 ticks further ahead of command mode by absolute tickCount, and every tick since then reads a different RNG draw (`Random(seed + tickCount)`), so a downstream `tick 30` block that command mode's own trace shows getting cut short by a mid-block event runs to completion instead in interaction mode -- 196 vs. 135 ticks by the freight_warehouse builds, sandbox-confirmed. Pausing around the builds changes nothing because the extra draw already happened during charging, well before the pause bracket starts; isPaused stays true throughout and tickCount is identical entering and leaving both build steps. Fix: a bigger cash cushion instead of a pause that was never the actual leak. Raised again, 165000 -> 210000 (#556). The 150000 -> 165000 bump above was for interaction mode\u2019s own tick divergence (#697); the two warehouses are queued construction now, so the crew draws salary across the ticks that build them and interaction mode pays that on top of its own longer trajectory \u2014 CI went bankrupt before the haul, with the LevelEndScreen covering the panels the remaining steps click.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:210000"
+          "command": "new_game seed:42 cash:210000 agent_occupancy:true"
         }
       ],
       "role": "setup",
@@ -93,7 +93,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:18,19 diameter:0.089",
-      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (18,19)-(23,24) rectangle (5x5) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. diameter:0.089 added for the same reason interaction mode never needed it stated: the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone was keeping the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent, a $54 divergence on every downstream cash checkpoint below. Confirmed exact: adding the real default here reproduces interaction mode's own $108,622/$107,822/$82,822 figures precisely.",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (18,19)-(23,24) rectangle (5x5) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles \u2014 none are drilled yet, so holeCount stays 0 right after confirm. diameter:0.089 added for the same reason interaction mode never needed it stated: the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone was keeping the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent, a $54 divergence on every downstream cash checkpoint below. Confirmed exact: adding the real default here reproduces interaction mode's own $108,622/$107,822/$82,822 figures precisely.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -138,7 +138,7 @@
     },
     {
       "command": "tick 80",
-      "description": "#553: drain the ordered plan — the driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 18 for H4).",
+      "description": "#553: drain the ordered plan \u2014 the driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 18 for H4).",
       "interaction": [
         {
           "type": "command",
@@ -154,7 +154,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "All 4 holes have landed — none lost, none left ordered forever. cash drains from payroll/upkeep across the 80-tick wait; not pinned exactly since interaction mode's real wall-clock ticking (isPaused:false by default) can extend the drain beyond command mode's headless tick N (same class as this file's later tick-block checkpoints)."
+        "note": "All 4 holes have landed \u2014 none lost, none left ordered forever. cash drains from payroll/upkeep across the 80-tick wait; not pinned exactly since interaction mode's real wall-clock ticking (isPaused:false by default) can extend the drain beyond command mode's headless tick N (same class as this file's later tick-block checkpoints)."
       }
     },
     {
@@ -179,43 +179,15 @@
       }
     },
     {
-      "command": "tick 34",
-      "description": "#554-followup round 3 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command. #680 re-measured this trace: fixing the needs-drain misclassification (an employee routed toward a rest destination but not yet arrived now drains at the idle rate, not the working rate) changes when the driller's own hunger/fatigue first cross the warning threshold, which shifts a forced-rest cycle earlier into this charging window -- command mode's own deterministic trace now shows charging 4 holes takes exactly 28 ticks (tickCount 80 -> 108), up from the pre-#680 21. The real-time version let the game's own rAF-driven clock run for up to 2 real minutes, long enough for wellBeing to crash well below command mode's own trace and unlock a whole class of low-wellbeing-gated union events (union_strike_threat: `canFire: wellBeing < 35`, plus its own scripted follow-up) that kept firing faster than a fixed number of resolveEventIfPending calls could drain (round 2's attempt, chaining 4 resolves after the fact, was still not enough -- confirmed live). Round 3's own first attempt (a bare synchronous tick command, hard-checked right here) still came up short live -- a pending event mid-block halts events.ts's own tickCommand loop early (checks isPaused at the end of each iteration), the exact same interruption class level1-win-efficient.json hit and fixed the same way: the hard check moved off this step entirely (see the resolve/resume step below), command mode's own top-level `command` staying exactly `tick 28` so its already-correct deterministic trace is untouched. #1090-followup (sandbox-measured): re-measured 28 -> 34 -- VehicleContinuity.ts's deletion shifts dispatch/rest timing during the charging phase again (direct trace: chargedCount reaches 4 at tick 34 now, not 28), the same cash/timing-only recalibration shape as every fix above.",
+      "command": "wait_until field:chargedCount equals:4 max_ticks:300",
+      "timeout": 90,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 34"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "description": "#554-followup round 3: resolve whatever event interrupted the tick above, resume with a small tick to finish draining, then resolve again, repeated -- mirrors level1-win-efficient.json's own final fix for the identical interruption class, chained multiple times since a live run at 1 round still came up short (3/4, having improved from 2/4 with none). The hard chargedCount/orderedChargeCount check lives here now, after every resolve point, not on the tick step above. role:setup (not player) since this step's own interaction bundles command actions (the resume ticks) alongside the resolves -- checkStepActionAllowed rejects any command action on a player-marked step.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
-          "type": "resolveEventIfPending"
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 4,
+          "maxTicks": 300,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
@@ -225,7 +197,7 @@
           "orderedChargeCount": 0
         }
       },
-      "commandOutcome": "either"
+      "description": "#1261: replaced the fixed `tick 34` + trailing `event choose 0`(with hard equals check) pad with a single wait_until on chargedCount -- under agent_occupancy:true, direct-traced (command mode), this crew's own charging genuinely settles at tick 44 (not the pre-occupancy 34), a real timing shift from occupancy-aware dispatch/pathing, not a stall -- confirmed by raising max_ticks to 5000 first and observing convergence at 44 regardless (not a plateau). Generous 300-tick budget gives real margin over that measured 44 without masking a genuine future stall."
     },
     {
       "command": "sequence auto delay_step:25",
@@ -286,7 +258,7 @@
     },
     {
       "command": "fragments",
-      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens — otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
+      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments \u2014 this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens \u2014 otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
       "interaction": [
         {
           "type": "command",
@@ -307,7 +279,7 @@
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #2 (#553: #1 is now the driller hired at the top of this file) — will be crewed onto the debris_hauler.",
+      "description": "Employee #2 (#553: #1 is now the driller hired at the top of this file) \u2014 will be crewed onto the debris_hauler.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -364,7 +336,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Vehicle #2 (#553: #1 was the drill_rig bought at the top of this file, destroyed sitting inside its own hole's blast radius — see the blast step above) — a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
+      "description": "Vehicle #2 (#553: #1 was the drill_rig bought at the top of this file, destroyed sitting inside its own hole's blast radius \u2014 see the blast step above) \u2014 a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -448,7 +420,7 @@
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #3 (#553: #1 is now the driller, #2 the debris_hauler driver) — will be crewed onto the rock_fragmenter.",
+      "description": "Employee #3 (#553: #1 is now the driller, #2 the debris_hauler driver) \u2014 will be crewed onto the rock_fragmenter.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -471,7 +443,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "HIRING_COSTS.driver = 800 plus salary/maintenance drained by the tick 10 above. Not an exact-cash check: unlike a hire with no ticks in between, new_game runs with isPaused:false by default, so interaction mode's real wall-clock during the tick 10 step's click round-trip advances the sim beyond exactly 10 ticks — command mode has no such drift (no timers, only explicit tick N). decreased is the only cross-mode-robust check here."
+        "note": "HIRING_COSTS.driver = 800 plus salary/maintenance drained by the tick 10 above. Not an exact-cash check: unlike a hire with no ticks in between, new_game runs with isPaused:false by default, so interaction mode's real wall-clock during the tick 10 step's click round-trip advances the sim beyond exactly 10 ticks \u2014 command mode has no such drift (no timers, only explicit tick N). decreased is the only cross-mode-robust check here."
       }
     },
     {
@@ -487,7 +459,7 @@
     },
     {
       "command": "vehicle buy rock_fragmenter",
-      "description": "Vehicle #3 (#553: #1 was the drill_rig, destroyed by the blast; #2 is the debris_hauler) — a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
+      "description": "Vehicle #3 (#553: #1 was the drill_rig, destroyed by the blast; #2 is the debris_hauler) \u2014 a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -510,7 +482,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "rock_fragmenter tier-1 purchaseCost = 32000 (balance.ts) — decreased, not an exact value, since this step's baseline (hire2's real cash) already carries the previous step's real-time drift (see hire2's note)"
+        "note": "rock_fragmenter tier-1 purchaseCost = 32000 (balance.ts) \u2014 decreased, not an exact value, since this step's baseline (hire2's real cash) already carries the previous step's real-time drift (see hire2's note)"
       }
     },
     {
@@ -571,12 +543,12 @@
         "decreased": [
           "cash"
         ],
-        "note": "50 ticks of salary/maintenance drain since the last checkpoint — decreased, not an exact value; interaction mode's real wall-clock ticking (isPaused:false by default, no explicit pause in this file) advances the sim beyond exactly N ticks during every click round-trip, a drift command mode's headless tick N can't reproduce"
+        "note": "50 ticks of salary/maintenance drain since the last checkpoint \u2014 decreased, not an exact value; interaction mode's real wall-clock ticking (isPaused:false by default, no explicit pause in this file) advances the sim beyond exactly N ticks during every click round-trip, a drift command mode's headless tick N can't reproduce"
       }
     },
     {
       "command": "event choose 0",
-      "description": "#553: idempotent — a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block (sandbox-measured: a Book Club event fires around here on seed 42). A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
+      "description": "#553: idempotent \u2014 a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block (sandbox-measured: a Book Club event fires around here on seed 42). A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -633,7 +605,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) — decreased, not an exact value, since this step's baseline already carries every tick step's own drain, plus interaction mode's larger tick count from the event-retry chain (see the new_game step's description)"
+        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) \u2014 decreased, not an exact value, since this step's baseline already carries every tick step's own drain, plus interaction mode's larger tick count from the event-retry chain (see the new_game step's description)"
       }
     },
     {
@@ -715,7 +687,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "cash still drains from salary/fuel even though this batch stops early on a pending event; storedMassKg's own check moved past the event-resolve step below since the hauler hasn't had enough real elapsed ticks yet to complete its round trip. #953: the storedMassKg proof moved up to the wait_until step above — see its note. This step keeps the cash drain it was always about."
+        "note": "cash still drains from salary/fuel even though this batch stops early on a pending event; storedMassKg's own check moved past the event-resolve step below since the hauler hasn't had enough real elapsed ticks yet to complete its round trip. #953: the storedMassKg proof moved up to the wait_until step above \u2014 see its note. This step keeps the cash drain it was always about."
       }
     },
     {
@@ -746,12 +718,12 @@
         "increased": [
           "storedMassKg"
         ],
-        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check — storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. #1091-followup: the 'increased' proof moved back here from the wait_until step above — the itinerary rebuild's dispatch-cost reordering (#1090) now has buildingCount reach 2 well before the first haul lands (sandbox-confirmed storedMassKg still 0 there), and this tick-40 step is where the delivery is sandbox-confirmed to land (0 -> 3871.875 kg in one traced run). Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs — increased is the cross-mode-robust proof."
+        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check \u2014 storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. #1091-followup: the 'increased' proof moved back here from the wait_until step above \u2014 the itinerary rebuild's dispatch-cost reordering (#1090) now has buildingCount reach 2 well before the first haul lands (sandbox-confirmed storedMassKg still 0 there), and this tick-40 step is where the delivery is sandbox-confirmed to land (0 -> 3871.875 kg in one traced run). Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs \u2014 increased is the cross-mode-robust proof."
       }
     },
     {
       "command": "state full",
-      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass — checked on the 'tick 40' step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
+      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass \u2014 checked on the 'tick 40' step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
       "interaction": [
         {
           "type": "command",
