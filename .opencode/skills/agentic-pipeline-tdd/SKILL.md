@@ -134,6 +134,40 @@ inside of one of those steps that parallelises.
 | @test-writer | tests_branch | Yes |
 | @implementer | impl_branch | **No** — branch enforces this |
 
+### ▶ Parallel delegation needs a worktree per branch
+
+The test-writer and implementer steps are ordinarily sequential — the
+orchestrator switches branches between them, so only one of `pipeline/tests-<label>`
+and `pipeline/impl-<label>` is checked out in the main working directory at a time.
+**Delegating both in the same Agent-tool message** removes that ordering: both
+agents then run `git`/file-edit commands against whichever branch happens to be
+checked out, and their uncommitted edits interleave in one working directory
+under a single `HEAD` (issue #1230 — 11 implementer files and 2 test-writer files
+ended up uncommitted together this way; no data was lost only because someone
+inspected `git status` mid-run before either agent committed).
+
+**Sequential delegation needs no worktree.** The collision above is specifically
+a parallel-delegation hazard — a test-writer that finishes and commits before the
+implementer starts never shares a working directory with it.
+
+Before issuing a parallel delegation of the test-writer and implementer, the
+orchestrator:
+
+1. **Adds a worktree for every pipeline branch beyond the one already checked
+   out** in the main working directory: `git worktree add <path> <branch>` —
+   e.g. if `pipeline/tests-<label>` is checked out in the main working tree, add
+   a worktree for `pipeline/impl-<label>` (and vice versa).
+2. **Places the worktree as a sibling of the repo root**, outside the tracked
+   tree — e.g. `../pipeline-worktree-impl-<label>` — so nothing needs to be
+   gitignored and the worktree cannot collide with tracked files.
+3. **Tells each delegated agent, explicitly in its prompt/context, the absolute
+   directory it must operate in for every Bash call it makes** — its worktree
+   path, or the main working directory for the one agent not moved to a
+   worktree.
+4. **Removes the worktree** (`git worktree remove <path>`) once that branch's
+   work is committed and the orchestrator has cherry-picked what it needs onto
+   `pipeline/feature-<label>`, so worktrees don't accumulate across runs.
+
 ### Non-Agentic Steps
 
 > Assumes `main` base branch. Override via `base_branch` parameter.
