@@ -3397,6 +3397,40 @@
       }
     },
     {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
+      "description": "#1252 (#1200) CI-fix (sandbox finding, same shape as H21's own #1201 finding above and H8's own #947 retry): H3 was still mid-drill when the SECOND wildcard resweep above fired, so it never received a charge order at all -- not stuck, never ordered (the wait immediately above only drains charge orders already placed; it has no way to notice a hole that finishes drilling later). Direct-traced (`createRunner`/`runCommand` replay of this file's own exact command sequence, command mode): H3 (7,5) finishes drilling mid-way through the second resweep's own drain wait, at tick 1018 of that step's up-to-600-tick budget, one tick too late for either of the two wildcard passes above to have caught it. Order-time footprint blocking (#1200) is not itself the direct cause here (no building order sits in this cycle's own command list) -- the mechanism is the same one #1200 shifts throughout this branch: dispatch timing across the whole file moved by enough that this particular driller/drill_rig pair now lands its hole one resweep later than before. A third wildcard resweep, mirroring the second (#1201) and first (#953) and H8's own single-hole retry (#947), catches whichever hole is still mid-drill when the second resweep fires. `commandOutcome: either`: a no-op, harmless redundant re-order on any run where nothing is left uncharged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:100",
+      "description": "#1252 (#1200) CI-fix: drains the third resweep above. Sized like H8's own single-hole retry (#947, max_ticks:100) rather than a full wildcard's 600 -- by this point in the file at most one straggler (H3) is ever left uncharged, direct-traced.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 100,
+          "timeoutMs": 30000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
