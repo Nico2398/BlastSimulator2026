@@ -52,7 +52,7 @@ void GRAZING_CYCLE_MIN_SPAN;
  * many times this height has already repeated — replaces the fixed 50/50
  * blend for cycles the plain average cannot break.
  */
-function dampedHeight(currentY: number, hitY: number, repeatCount: number): number {
+export function dampedHeight(currentY: number, hitY: number, repeatCount: number): number {
   // TODO(#1276): implement in the implementation phase.
   void hitY;
   void repeatCount;
@@ -64,7 +64,7 @@ function dampedHeight(currentY: number, hitY: number, repeatCount: number): numb
  * its iterations without resolving, from the span between a height's first
  * appearance and its first repeat.
  */
-function classifyUnresolvedReason(cycleSpanAtFirstRepeat: number | null): 'grazing-angle-cycle' | undefined {
+export function classifyUnresolvedReason(cycleSpanAtFirstRepeat: number | null): 'grazing-angle-cycle' | undefined {
   // TODO(#1276): implement in the implementation phase.
   void cycleSpanAtFirstRepeat;
   return undefined;

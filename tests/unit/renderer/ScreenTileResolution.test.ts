@@ -11,6 +11,8 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveScreenPointForTile,
   TILE_RESOLUTION_MAX_ITERATIONS,
+  dampedHeight,
+  classifyUnresolvedReason,
   type ProjectToNDC,
   type RaycastForTile,
 } from '../../../src/renderer/ScreenTileResolution.js';
@@ -133,6 +135,13 @@ describe('resolveScreenPointForTile', () => {
     expect(result).toEqual({ resolved: false });
     expect(calls).toBeGreaterThan(0);
     expect(calls).toBeLessThanOrEqual(TILE_RESOLUTION_MAX_ITERATIONS);
+    // Regression pin (#1276): a genuine occlusion/miss (raycast never hits
+    // anything, so the loop never even sees a repeated height) must never be
+    // classified as a grazing-angle cycle — `reason` stays absent.
+    expect(result.resolved).toBe(false);
+    if (!result.resolved) {
+      expect(result.reason).toBeUndefined();
+    }
   });
 
   it('resolves correctly when the raycast hit lands exactly on the tile\'s lower boundary', () => {
@@ -187,8 +196,10 @@ describe('resolveScreenPointForTile', () => {
     const targetZ = 8;
     const startY = 0;
 
+    let calls = 0;
     const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
     const raycastForTile: RaycastForTile = (_ndcX, ndcY) => {
+      calls++;
       if (ndcY === 0) return { x: 2, z: 2, y: 10 }; // off-tile, reports the OTHER extreme
       if (ndcY === 10) return { x: 2, z: 2, y: 0 }; // off-tile, reports the first extreme back
       if (ndcY === 5) return { x: 8.5, z: 8.5, y: 5 }; // the damped average — the real target
@@ -204,6 +215,11 @@ describe('resolveScreenPointForTile', () => {
       resolved: true,
       ndc: { x: 8.5, y: 5, z: 0 },
     });
+    // Regression pin (#1276): repeatCount=1's damping must stay byte-identical
+    // to the old flat 50/50 blend for a period-2 cycle — same iteration count
+    // (3 raycasts: guess 0, guess 10, damped guess 5) as before dampedHeight
+    // existed, and no `reason` leaks onto a resolved:true outcome.
+    expect(calls).toBe(3);
   });
 
   it('damps a height ping-pong even when the "repeated" height carries realistic float noise (#1254)', () => {
@@ -255,5 +271,119 @@ describe('resolveScreenPointForTile', () => {
       ndc: { x: 10.5, y: 29.025, z: 0 },
     });
     expect(calls).toBe(4);
+  });
+
+  it('resolves a period-3 grazing-angle cycle once shrinking relaxation gets it within the tile (#1276)', () => {
+    // Target tile (5, 5): centre (5.5, 5.5). A grazing camera angle produces
+    // a 3-distinct-height cycle {0, 20, 10} before the loop's FIRST repeat
+    // (visiting 0 again) — too many distinct guesses for the flat 50/50
+    // blend (repeatCount=1) alone to land on the target within the old
+    // 5-iteration budget. This fixture assumes the wired implementation
+    // tracks one running repeatCount across every repeat detected in the
+    // loop (not per-height), so it shrinks 1/2 -> 1/3 -> 1/4 across
+    // successive repeats, per dampedHeight's contract:
+    //   iter0 guess 0  -> hit 20 (new)                       -> currentY=20
+    //   iter1 guess 20 -> hit 10 (new)                       -> currentY=10
+    //   iter2 guess 10 -> hit 0  (REPEAT #1 of height 0)      -> damped (10+0)/2=5
+    //   iter3 guess 5  -> hit 20 (REPEAT #2 of height 20)     -> damped 5+(20-5)/3=10
+    //   iter4 guess 10 -> hit 0  (REPEAT #3 of height 0)      -> damped 10+(0-10)/4=7.5
+    //   iter5 guess 7.5 -> ON-TILE hit, resolved.
+    // 6 raycasts total, within the widened maxIterations=8 budget (passed
+    // explicitly here rather than assumed from the export's own default,
+    // which the implementer may or may not have bumped yet).
+    const targetX = 5;
+    const targetZ = 5;
+    const startY = 0;
+
+    const near = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) < eps;
+
+    let calls = 0;
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
+    const raycastForTile: RaycastForTile = (_ndcX, ndcY) => {
+      calls++;
+      if (near(ndcY, 0)) return { x: 2, z: 2, y: 20 }; // off-tile
+      if (near(ndcY, 20)) return { x: 2, z: 2, y: 10 }; // off-tile
+      if (near(ndcY, 10)) return { x: 2, z: 2, y: 0 }; // off-tile, repeats height 0
+      if (near(ndcY, 5)) return { x: 2, z: 2, y: 20 }; // off-tile, repeats height 20
+      if (near(ndcY, 7.5)) return { x: 5.5, z: 5.5, y: 7.5 }; // on-tile: shrinking relaxation converged
+      return null;
+    };
+
+    const result = resolveScreenPointForTile(project, raycastForTile, targetX, targetZ, startY, 8);
+
+    expect(result).toEqual({
+      resolved: true,
+      ndc: { x: 5.5, y: 7.5, z: 0 },
+    });
+    expect(calls).toBe(6);
+  });
+
+  it('reports { resolved: false, reason: "grazing-angle-cycle" } when a period-3+ cycle never lands on the target even with damping (#1276)', () => {
+    // Same 3-distinct-height cycle and repeat/damping trace as the previous
+    // case, through repeatCount=3 (currentY settles at 7.5) — but here no
+    // raycast ever reports an on-tile hit at 7.5 or afterward (a genuinely
+    // occluded/terraced column, not merely a slow-to-converge one), so the
+    // loop exhausts the full maxIterations=8 budget still unresolved. The
+    // first repeat (of height 0) closed only after 3 distinct height
+    // guesses (0, 20, 10) — >= GRAZING_CYCLE_MIN_SPAN — so the failure must
+    // be classified as a grazing-angle cycle, not a generic occlusion miss.
+    const targetX = 5;
+    const targetZ = 5;
+    const startY = 0;
+
+    const near = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) < eps;
+
+    let calls = 0;
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
+    const raycastForTile: RaycastForTile = (_ndcX, ndcY) => {
+      calls++;
+      if (near(ndcY, 0)) return { x: 2, z: 2, y: 20 }; // off-tile
+      if (near(ndcY, 20)) return { x: 2, z: 2, y: 10 }; // off-tile
+      if (near(ndcY, 10)) return { x: 2, z: 2, y: 0 }; // off-tile, repeats height 0
+      if (near(ndcY, 5)) return { x: 2, z: 2, y: 20 }; // off-tile, repeats height 20
+      // No branch ever resolves 7.5 (or anything past it) onto the target
+      // tile — every further guess misses entirely (null), unlike the
+      // convergent fixture above.
+      return null;
+    };
+
+    const result = resolveScreenPointForTile(project, raycastForTile, targetX, targetZ, startY, 8);
+
+    expect(result).toEqual({ resolved: false, reason: 'grazing-angle-cycle' });
+    expect(calls).toBeLessThanOrEqual(8);
+  });
+});
+
+describe('dampedHeight', () => {
+  it('blends 50/50 toward the hit on the first repeat (repeatCount=1), matching the pre-#1276 flat blend exactly', () => {
+    expect(dampedHeight(10, 0, 1)).toBe(5);
+    expect(dampedHeight(3, 9, 1)).toBe(6);
+  });
+
+  it('shrinks the step to 1/(repeatCount+1) toward the hit on the second repeat (repeatCount=2)', () => {
+    // currentY + (hitY - currentY) / 3, i.e. a 1/3 step toward hitY instead
+    // of the flat 1/2 step repeatCount=1 uses.
+    expect(dampedHeight(5, 20, 2)).toBe(10);
+    expect(dampedHeight(1.5, 6, 2)).toBeCloseTo(3, 10);
+  });
+
+  it('keeps shrinking for a third repeat (repeatCount=3): 1/(repeatCount+1) = 1/4 toward the hit', () => {
+    expect(dampedHeight(10, 0, 3)).toBe(7.5);
+  });
+});
+
+describe('classifyUnresolvedReason', () => {
+  it('returns undefined when no repeat was ever detected (cycleSpanAtFirstRepeat is null)', () => {
+    expect(classifyUnresolvedReason(null)).toBeUndefined();
+  });
+
+  it('returns undefined for a period-2 cycle (span below GRAZING_CYCLE_MIN_SPAN=3)', () => {
+    expect(classifyUnresolvedReason(1)).toBeUndefined();
+    expect(classifyUnresolvedReason(2)).toBeUndefined();
+  });
+
+  it('returns "grazing-angle-cycle" once the span reaches GRAZING_CYCLE_MIN_SPAN=3 or beyond', () => {
+    expect(classifyUnresolvedReason(3)).toBe('grazing-angle-cycle');
+    expect(classifyUnresolvedReason(4)).toBe('grazing-angle-cycle');
   });
 });
