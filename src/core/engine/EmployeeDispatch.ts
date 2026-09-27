@@ -96,9 +96,25 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // EmployeeDispatchSteps.ts — nobody who is BOTH licensed for the role AND
   // holds action.requiredSkill, e.g. drill_hole needs driving.drill_rig AND
   // blasting on the same employee).
+  // Computed once per tickEmployees call, fresh from live state every time —
+  // never cached across ticks, so a pocket that becomes reachable later (a
+  // ramp connects it) clears on its own the very next classification pass
+  // (#1231).
+  const reachableTargets = computeUnreachableTargets(state);
+
   const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
+    // A dig_ramp_segment's target is legitimately climb-unreachable from
+    // above until the segment above it is dug — top-down excavation order,
+    // not a defect (#1231) — so it's exempt from the unreachable check below.
+    if (
+      reachableTargets !== null && action.type !== 'dig_ramp_segment'
+      && !reachableTargets.has(action.targetX, action.targetZ)
+    ) {
+      action.blockedReason = 'target_unreachable';
+      continue;
+    }
     // Shared shape between the vehicle-gated and plain branches below: an
     // action with no requiredSkill just needs a warm body from `emps`;
     // otherwise at least one of `emps` must hold the skill.
@@ -249,22 +265,24 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 }
 
 /**
- * Stub landing spot for #1231's `target_unreachable` blockedReason
- * classification: a debris-hauling PendingAction whose target cell sits
- * outside the ground crew's reachable region (behind #1197's diagonal-corner
- * cut) never makes progress, and nothing currently flags it. Will anchor
+ * `target_unreachable` blockedReason classification support (#1231): a
+ * debris-hauling PendingAction whose target cell sits outside the ground
+ * crew's reachable region (behind #1197's diagonal-corner cut) never makes
+ * progress, and nothing else flags it. Anchors
  * NavGrid.computeClimbReachableSet at the nearest active freight_warehouse's
- * approach cell (findHaulDepotApproach, HaulingTask.ts) so tickEmployees can
- * test each PendingAction's target against it once per call.
- *
- * TODO(implementer): wire this into tickEmployees's classification pass and
- * return the real reachable set instead of null.
+ * approach cell (findHaulDepotApproach, HaulingTask.ts) — the reference point
+ * passed in is a neutral grid origin, not any one employee's position, since
+ * this reflects what ground crew as a whole can reach, not one individual's
+ * route. Returns null when there's no navGrid yet, or no active depot to
+ * anchor from — both cases where the existing three-reason classification
+ * runs unchanged (tickEmployees).
  */
-export function computeUnreachableTargets(state: GameState): ReachableSet | null {
-  void NavGrid;
-  void findHaulDepotApproach;
-  void state;
-  return null;
+function computeUnreachableTargets(state: GameState): ReachableSet | null {
+  const navGrid = state.navGrid;
+  if (navGrid === null) return null;
+  const approach = findHaulDepotApproach(state, navGrid.originX, navGrid.originZ);
+  if (approach === null) return null;
+  return NavGrid.computeClimbReachableSet(navGrid, approach.x, approach.z);
 }
 
 /**
