@@ -894,8 +894,8 @@ describe('the merge gate is the only thing that merges', () => {
 // session's own trailing wrap-up comment among them) could silently cancel an
 // already-queued real assignment before its job ever started: zero job steps,
 // nothing to retry from, and the issue stuck `in-progress` deferring every
-// later assignment behind it (`selectNextAssignable`'s single-flight guard
-// treats any `in-progress` issue as a live run).
+// later assignment behind it (`selectNextAssignable` counts any `in-progress`
+// issue as a live run holding a parallel-run slot).
 describe('the runner concurrency group only admits a run the job will act on', () => {
   it.each(['claude-runner.yml', 'opencode-runner.yml'])(
     "%s's group mirrors its own job `if:`, and isolates everything else",

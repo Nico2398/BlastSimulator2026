@@ -277,7 +277,7 @@ runs:
         # Draft, and deliberately without `READY TO MERGE`: this PR is
         # unreviewed and unvalidated by definition. `Closes #N` records the PR
         # as closing the issue — and the head branch is `pipeline/feature-<N>`
-        # — so the watchdog and the single-flight check, which accept exactly
+        # — so the watchdog and the parallel-run count, which accept exactly
         # those two links and ignore mere mentions, see that the work exists.
         cat > /tmp/agentic-rescue-body.md <<EOF
         Closes #${ISSUE}
@@ -316,8 +316,8 @@ runs:
 
         # The branch is safe, but the run still did not finish the issue. Left
         # `in-progress` with a draft PR attached, the issue passes both the
-        # single-flight check and the watchdog's linked-PR skip — it would hold
-        # the queue for as long as the draft stays open, which is until somebody
+        # parallel-run count and the watchdog's linked-PR skip — it would hold
+        # its slot for as long as the draft stays open, which is until somebody
         # notices. `blocked` is the honest state: work preserved, human notified
         # by handle-failure.yml, queue released.
         escalate
