@@ -1,6 +1,6 @@
 {
   "name": "survey-overlay-lifecycle",
-  "description": "Survey confidence overlay lifecycle: fresh survey rendering → tick past stale threshold → new survey refreshes overlay → blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
+  "description": "Survey confidence overlay lifecycle: fresh survey rendering \u2192 tick past stale threshold \u2192 new survey refreshes overlay \u2192 blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
   "shots": [
     {
       "name": "overview",
@@ -36,11 +36,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow cash:200000",
+      "command": "campaign start level:dusty_hollow cash:200000 agent_occupancy:true",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:200000"
+          "command": "campaign start level:dusty_hollow cash:200000 agent_occupancy:true"
         }
       ],
       "role": "setup",
@@ -48,7 +48,8 @@
         "increased": [
           "worldSizeX"
         ]
-      }
+      },
+      "description": "#1261: added `agent_occupancy:true` to this campaign start. Known limitation (per #1261's own per-file plan): `campaignStartCommand` (src/console/commands/campaign.ts) does not yet parse `agent_occupancy:` -- a companion fix is landing separately on the impl branch (campaign.ts will call `parseStaffedAndOccupancyFlags(named)` instead of the narrower `parseStaffedFlag`, mirroring sandbox.ts/world.ts's existing pattern, and set `agentOccupancyEnabled` on the created state). Until that lands, running this file does NOT actually exercise occupancy -- this is a best-effort edit and the wait_until conversions below are verified structurally only. Final verification happens once the campaign.ts fix is merged in. Latent occupancy-contention risk worth flagging for that verification pass: both surveyors hired above are never fired and both surveyed tile (20,20), which the drill grid below reuses as its own `start:20,20` -- three separate crew members converging on the same tile/cluster is exactly the shape of contention this batch's own other files (blast-execution-visual.json, vibration-budget.json) found genuinely stalls a charge_hole action under occupancy (see issue #1278). Not fixed here without evidence occupancy is even active yet in this file; worth a real check once it is."
     },
     {
       "command": "time resume",
@@ -116,7 +117,7 @@
           "command": "employee assign_skill 1 skill:geology level:5"
         }
       ],
-      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step. Finding #15 class: the original command used positional args (`employee assign_skill 1 geology 5`) — assignSkillCommand requires the named form and silently rejected it ('Usage: employee assign_skill <id> skill:<category> level:1-5', never thrown), so this call and the one below failed on every run in this file's history. Fixed to the correct syntax.",
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step. Finding #15 class: the original command used positional args (`employee assign_skill 1 geology 5`) \u2014 assignSkillCommand requires the named form and silently rejected it ('Usage: employee assign_skill <id> skill:<category> level:1-5', never thrown), so this call and the one below failed on every run in this file's history. Fixed to the correct syntax.",
       "expect": {
         "equals": {
           "proficiencyTotal": 6
@@ -133,7 +134,7 @@
           "command": "employee assign_skill 2 skill:geology level:1"
         }
       ],
-      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for the Finding #15 class fix.",
+      "description": "Test-only bootstrap \u2014 see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for the Finding #15 class fix.",
       "role": "bootstrap"
     },
     {
@@ -158,7 +159,7 @@
     },
     {
       "command": "survey seismic x:20 z:20",
-      "description": "Survey 1/2, round 1. Two surveyors, so both round-1 surveys are worked in parallel (unlike Finding #16's single-employee case) — real run confirms both complete cleanly.",
+      "description": "Survey 1/2, round 1. Two surveyors, so both round-1 surveys are worked in parallel (unlike Finding #16's single-employee case) \u2014 real run confirms both complete cleanly.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -638,7 +639,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
-      "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper click precedes the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts). The (20,20)-(24,24) rectangle (4x4) computes round(4/3)+1=2 per axis, matching the declared 2x2. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
+      "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper click precedes the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts). The (20,20)-(24,24) rectangle (4x4) computes round(4/3)+1=2 per axis, matching the declared 2x2. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles \u2014 none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -677,53 +678,16 @@
       }
     },
     {
-      "command": "tick 50",
-      "description": "#553: drain the ordered plan in bounded tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). No staffed:true near-origin spawn here (campaign start), so this single driller/drill_rig takes longer than the usual 4-hole recipe. Sandbox-measured: all 4 holes land by cumulative +130 ticks post-drill_plan (50+50+30) -- trimmed from an earlier 5x50=250 padding that ran well-being (already at 6.2 before this block, with no Living Quarters anywhere in this file) to a sustained 0 long enough to trigger the #553-unrelated WORKER REVOLT game-over during the since-removed 4th chunk. `revolted` stays false through the trimmed sequence (command-mode traced).",
+      "command": "wait_until field:holeCount equals:4 max_ticks:400",
+      "description": "#1261: collapsed the 3-chunk fixed `tick 50`/`tick 50`/`tick 30` drilling pad into a single wait_until on holeCount. Structurally verified only (occupancy is not actually active yet in command mode -- see the campaign start step's own note).",
+      "timeout": 100,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 30",
-      "description": "Third and final chunk — all 4 holes have landed by cumulative +130 ticks post-drill_plan (command-mode traced).",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 30"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 4,
+          "maxTicks": 400,
+          "timeoutMs": 100000
         }
       ],
       "role": "setup",
@@ -760,55 +724,17 @@
       }
     },
     {
-      "command": "tick 15",
-      "description": "#554-followup round 2 (issue #586 CI): round 1's fix (3 rounds of tick 15 = 45 ticks, sized from a 43-tick command-mode measurement) still stalled in real interaction-mode CI -- root-caused via local reproduction to a genuine cross-mode divergence, not a timing race: the sole driller here collapses (fatigue hits its floor, tickNeedGauges/tickCollapse) partway through charging in interaction mode's own real trajectory, with no living_quarters anywhere in this file to shorten the recovery (NEED_REST_NO_BUILDING_DURATION_MULTIPLIER doubles it), stalling chargedCount at 1/4 for the remainder of the original 45-tick budget -- command mode's identical tick-for-tick trace does not hit the same collapse within that window. #554-followup round 3: a first attempt at 6 rounds (90 ticks) let all 4 holes charge by round 4 (60 ticks) but then burned 2 more rounds of pure dead padding (nothing left to charge) that pushed this file's already-thin wellBeing margin (no living_quarters anywhere, single driller/drill_rig, same class this file's own drilling-wait note above already trimmed padding to avoid) into a genuine worker_revolt during the trailing rounds -- the resulting level-end overlay then blocked the sequence step below. Trimmed to 4 rounds of tick 15 (60 ticks): comfortable margin over the measured collapse-and-recover-and-finish point, without the extra dead ticks that risked crossing REVOLT_TICKS=120 for no reason.",
+      "command": "wait_until field:chargedCount equals:4 max_ticks:300",
+      "description": "#1261: collapsed the 4-chunk fixed `tick 15` charging pad into a single wait_until on chargedCount, same reasoning as the drilling wait above.",
+      "timeout": 90,
       "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 4,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
       ],
       "role": "setup",
       "expect": {
@@ -821,7 +747,9 @@
     {
       "command": "event choose 0",
       "interaction": [
-        { "type": "resolveEventIfPending" }
+        {
+          "type": "resolveEventIfPending"
+        }
       ],
       "role": "player",
       "commandOutcome": "either"
