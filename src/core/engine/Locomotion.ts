@@ -687,6 +687,62 @@ function isIdleParkedVehicle(vehicle: Vehicle, employees: readonly Employee[]): 
 }
 
 /**
+ * True when `emp` is a genuinely busy, stationary blocker — working or
+ * resting (#1283) — as opposed to idle or already `isMoveStuck`. Gives
+ * `handleAgentOccupancyBlock`'s step-2.5 parked-vehicle crossing fallback a
+ * second kind of stationary occupant it may cross, alongside
+ * `isIdleParkedVehicle` above.
+ *
+ * Exported (unlike `isIdleParkedVehicle`) so test-writer's red-phase tests
+ * can exercise this predicate directly ahead of `handleAgentOccupancyBlock`'s
+ * own crossing-guard being wired to call it (#1283, implementation phase).
+ */
+export function isStationaryBusyEmployee(emp: Employee): boolean {
+  if (emp.isMoveStuck) return false;
+  const workState = employeeWorkState(emp);
+  return workState === 'working' || workState === 'resting';
+}
+
+/**
+ * Clears `emp`'s stuck-tracking counters after a teleport/relocation — the
+ * tie-break sidestep and `relocateIdleDestinationBlocker`'s fresh-start fix
+ * (#1278/#1283) both jump an employee to a new cell outside the normal
+ * step-by-step advance, and neither wants whatever wait/failure counters
+ * accumulated at the old cell to survive the jump.
+ */
+function resetStuckTracking(emp: Employee): void {
+  emp.vehicleWaitingTicks = 0;
+  emp.isMoveStuck = false;
+  emp.moveConsecutiveFailures = 0;
+}
+
+/**
+ * True while `emp`'s current leg is `relocateIdleDestinationBlocker`'s own
+ * `returnAfterRelocate` return trip (#1283 follow-up) — walking back to a
+ * cell it was displaced from, with no real claim on it any more
+ * (`Leg.neverSpread`'s own doc comment, Itinerary.ts, is the only thing that
+ * ever sets this field). Treated as inert everywhere this ladder decides
+ * whether a blocker is a genuine, contested "stuck" opponent
+ * (`corridorBlockerEmp`/`blockerEmp` below) or safe to relocate again
+ * (`relocateIdleDestinationBlocker`'s own idle-only guard): a return trip's
+ * own oscillation-based `isMoveStuck` can flip true well before this ladder's
+ * `AGENT_OCCUPANCY_WAIT_TICKS` gate even fires — in a genuinely single-file
+ * corridor the "nearest free cell" it is walking back to is the requester's
+ * very next hop, so the two face off exactly on top of each other — and
+ * without this exemption the tie-break sidestep below reads that as a live
+ * contest and sends the REAL requester stepping backward out of ITS OWN way
+ * instead, forever, since the very next relocation just re-queues an
+ * identical return trip one cell further down the same corridor (confirmed
+ * live via this file's own "a mix of idle and busy blockers across two
+ * simultaneous dense-grid-style lanes" test, #1283). A return trip is always
+ * safe to treat as inert: worst case it is relocated again (or never
+ * finishes returning), exactly as if `returnAfterRelocate` had been left off.
+ */
+function isOnReturnTripLeg(emp: Employee): boolean {
+  return emp.itinerary?.legs[0]?.neverSpread === true;
+}
+
+/**
  * Generalizes `handleOccupancyBlock` (below) to any agent — foot or vehicle
  * (#1206) — via `AgentOccupancy` rather than the live vehicle-position scan
  * `isOccupiedByOtherVehicle` does. `mover` is the occupant identity of
@@ -717,15 +773,18 @@ function isIdleParkedVehicle(vehicle: Vehicle, employees: readonly Employee[]): 
  *    sidestep have failed to resolve it (#1263): when the occupant actually
  *    in the way is a vehicle with no driver and no drive in progress —
  *    genuinely parked, not a live contest between two movers the way step
- *    2's sidestep handles — a reroute that avoids every OTHER occupied cell
- *    but is still willing to route straight through this one specific
- *    blocker's own cell, crossing it directly on success. Generalizes the
- *    existing foot-crosses-parked-vehicle exemption (`avoidVehicles ===
- *    false`, `AgentAdvance.ts`) to any mover. Without this, a single parked
- *    vehicle planted in the only cell of a genuine single-file corridor
- *    blocks every route through it forever, since no full-avoidance reroute
- *    ever avoids every occupied cell when the blocker never moves on its own
- *    and there never was a second way around;
+ *    2's sidestep handles — or (#1283) an employee genuinely busy working or
+ *    resting (also not a live contest, and not `isMoveStuck`) — a reroute
+ *    that avoids every OTHER occupied cell but is still willing to route
+ *    straight through this one specific blocker's own cell, crossing it
+ *    directly on success. Generalizes the existing
+ *    foot-crosses-parked-vehicle exemption (`avoidVehicles === false`,
+ *    `AgentAdvance.ts`) to any mover, and to this second stationary-occupant
+ *    kind. Without this, a single parked vehicle (or busy employee) planted
+ *    in the only cell of a genuine single-file corridor blocks every route
+ *    through it forever, since no full-avoidance reroute ever avoids every
+ *    occupied cell when the blocker never moves on its own and there never
+ *    was a second way around;
  * 3. failing all of the above — including whenever the destination itself
  *    was held, which skips straight here — "destination spreading":
  *    retargeting the leg's own destination to the nearest free cell around
@@ -898,7 +957,8 @@ function handleAgentOccupancyBlock(
     const corridorBlockerEmp = corridorOccupant?.kind === 'employee'
       ? state.employees.employees.find(e => e.id === corridorOccupant.id)
       : undefined;
-    if (corridorOccupant?.kind === 'employee' && !corridorBlockerEmp?.isMoveStuck
+    if (corridorOccupant?.kind === 'employee'
+      && (!corridorBlockerEmp?.isMoveStuck || (corridorBlockerEmp && isOnReturnTripLeg(corridorBlockerEmp)))
       && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, result, true)
       && state.navGrid) {
       const direct = findPath(state.navGrid, {
@@ -928,7 +988,7 @@ function handleAgentOccupancyBlock(
     // the pair can never both step aside at once).
     const blocker = occupancy.holderOf(blockedStep.x, blockedStep.z);
     const blockerEmp = blocker ? controllingEmployee(state, blocker) : undefined;
-    if (blockerEmp?.isMoveStuck && emp.id > blockerEmp.id) {
+    if (blockerEmp?.isMoveStuck && !isOnReturnTripLeg(blockerEmp) && emp.id > blockerEmp.id) {
       const freeCell = findNearestFreeCellForAgent(state, mover, emp.x, emp.z);
       if (freeCell) {
         const fromX = emp.x;
@@ -936,9 +996,7 @@ function handleAgentOccupancyBlock(
         emp.x = freeCell.x;
         emp.z = freeCell.z;
         occupancy.tryMove(mover, freeCell.x, freeCell.z);
-        emp.vehicleWaitingTicks = 0;
-        emp.isMoveStuck = false;
-        emp.moveConsecutiveFailures = 0;
+        resetStuckTracking(emp);
         writeCommitted(emp, NULL_ROUTE_COMMITMENT);
         writeMoveHistory(emp, null, null);
         if (isDrive) writeVehiclePosition(state, vehicle!, freeCell.x, freeCell.z, true);
@@ -990,9 +1048,13 @@ function handleAgentOccupancyBlock(
     // ACTION_STUCK_BACKOFF_TICKS cost first. This generalizes the existing
     // foot-crosses-parked-vehicle exemption (`avoidVehicles === false`,
     // `AgentAdvance.ts`, also #1263) from foot movers to any mover crossing a
-    // confirmed-idle, driverless vehicle specifically — never another live,
-    // moving vehicle, and never an occupied-by-an-employee cell, both of
-    // which stay exactly as blocking as before. Confirmed via
+    // confirmed-idle, driverless vehicle, or (#1283) a genuinely busy —
+    // working or resting, non-stuck — employee (`isStationaryBusyEmployee`
+    // below): never another live, moving vehicle or employee (a `traveling`
+    // occupant is a real contest, the tie-break sidestep's job), and never
+    // an idle employee (`relocateIdleDestinationBlocker`'s own case above,
+    // which moves it out of the way entirely rather than walking through
+    // it) — both stay exactly as blocking as before. Confirmed via
     // economy-full-loop.json (agent_occupancy:true): a debris_hauler's route
     // funnelled through the blast crater's one access corridor cell,
     // permanently held by a driverless rock_fragmenter whose driver (licensed
@@ -1001,10 +1063,52 @@ function handleAgentOccupancyBlock(
     // rubble_disposal's own deadline (rng.nextInt(30, 100)) every time this
     // recurred.
     const blockerVehicle = blocker?.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === blocker!.id) : undefined;
-    if (blockerVehicle && isIdleParkedVehicle(blockerVehicle, state.employees.employees)) {
+    const blockerIsIdleParkedVehicle = blockerVehicle !== undefined
+      && isIdleParkedVehicle(blockerVehicle, state.employees.employees);
+    const blockerIsStationaryBusyEmployee = blocker?.kind === 'employee'
+      && blockerEmp !== undefined && isStationaryBusyEmployee(blockerEmp);
+    if (blockerIsIdleParkedVehicle) {
       const crossing = findPathAvoidingOccupiedCells(
         state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
       );
+      if (crossing.found) {
+        return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
+      }
+    } else if (blockerIsStationaryBusyEmployee && state.navGrid) {
+      // #1283 dense-grid follow-up: a busy EMPLOYEE blocker (unlike a
+      // genuinely parked vehicle) sits inside a population that is itself
+      // packing the grid — at real-game density (33 employees on an 8x8
+      // hole grid, most idle-turned-resting on/near the hole tiles once
+      // charging finishes) `findPathAvoidingOccupiedCells`'s own
+      // avoid-every-OTHER-occupied-cell search, run from `emp`'s current
+      // position all the way to the leg's own (possibly far) destination,
+      // routinely has no choice but to thread a long, winding detour around
+      // dozens of other stationary employees to find the one route that
+      // happens to leave only this cell blocked — and that detour is itself
+      // real per-tick walking through territory just as densely held,
+      // immediately contested again by a DIFFERENT mover on the very next
+      // tick. Direct-traced via blast-execution-visual.json's own
+      // interaction-mode replay (33-employee/8x8/1m-spacing crew, #1283 CI
+      // regression): enabling this same avoid-all-but-one search for an
+      // employee blocker — correct for the single, deterministic corridor
+      // this fallback's own tests cover — left the last one or two
+      // redundant re-charge orders permanently unresolved thousands of
+      // ticks past a budget the unpatched code cleared in a few hundred,
+      // every other employee simultaneously mid-relocation the whole time.
+      // A direct path — `avoidVehicles: true` only, the same call the
+      // corridor-relocate branch above already uses for its own retry
+      // (`findPath` a few lines up) and exactly what plain `advanceLeg`
+      // routing already ignores employee occupancy for — crosses THIS one
+      // blocker without detouring around every other stationary employee to
+      // do it, matching the feature's own intent ("route straight through
+      // this one specific blocker's own cell") instead of re-planning the
+      // whole remaining leg through a crowd. Scoped to the employee-blocker
+      // case only; the vehicle branch above (#1263, already shipped, its
+      // own passing tests) is untouched.
+      const crossing = findPath(state.navGrid, {
+        agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
+        avoidVehicles: true, ...(requiredClearance !== undefined && { requiredClearance }),
+      });
       if (crossing.found) {
         return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, crossing, occupancy, result, blocker!);
       }
@@ -1281,7 +1385,13 @@ function relocateIdleDestinationBlocker(
     // not collapsing: a collapsing employee also reads as 'idle' by that
     // classification (no itinerary, no activeActionId) but is in a protected
     // forced-rest state this codebase never disturbs elsewhere — leave it be.
-    if (!emp || emp.collapsing || employeeWorkState(emp) !== 'idle') return false;
+    // A mid-return-trip occupant (#1283 follow-up, `isOnReturnTripLeg`) reads
+    // 'traveling', not 'idle' — accepted anyway: it has no real claim on
+    // wherever it currently stands either, so relocating it again (chaining
+    // it further along, cancelling its now-stale return in favour of a fresh
+    // one from the new spot) is exactly as safe as relocating a genuinely
+    // idle occupant.
+    if (!emp || emp.collapsing || (employeeWorkState(emp) !== 'idle' && !isOnReturnTripLeg(emp))) return false;
 
     const originX = emp.x;
     const originZ = emp.z;
@@ -1304,6 +1414,15 @@ function relocateIdleDestinationBlocker(
     // this file's own "bounded-tick fairness" dense-grid reproduction.
     writeCommitted(emp, NULL_ROUTE_COMMITMENT);
     writeMoveHistory(emp, null, null);
+    // A fresh start at the new cell (#1283 follow-up): without this, a
+    // corridor blocker relocated more than once in a row (each relocation
+    // one more cell down a genuinely single-file corridor, #1283's own
+    // "nudge forward" case) carries its PREVIOUS spot's already-accumulated
+    // `vehicleWaitingTicks` into the new one, so a handful of relocations in
+    // a row reaches `MOVE_STUCK_ABANDON_TICKS` purely from counters this
+    // teleport itself never actually waited through — abandoning a return
+    // trip nobody outside this ladder ever asked to be time-boxed at all.
+    resetStuckTracking(emp);
     if (returnAfterRelocate) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];
