@@ -367,10 +367,78 @@ describe('the merge chain leaves a closed issue meeting the Definition of Done',
   const chain = workflow('auto-assign-next.yml');
   const close = chain.slice(chain.indexOf('- name: Close the completed issue'), chain.indexOf('- name: Checkout repository'));
 
-  it('closes it as completed, labels it `done`, and clears every other lifecycle label', () => {
-    expect(close).toContain("state: 'closed', state_reason: 'completed'");
-    expect(close).toContain("labels: ['done']");
-    expect(close).toContain("for (const stale of ['in-progress', 'ready', 'blocked', 'paused'])");
+  const script = (() => {
+    const marker = 'script: |\n';
+    return close
+      .slice(close.indexOf(marker) + marker.length)
+      .split('\n')
+      .map((line) => line.replace(/^ {12}/, ''))
+      .join('\n');
+  })();
+
+  async function mergeChain(body: string, labels: Record<number, string[]>) {
+    const issues = new Map(
+      Object.entries(labels).map(([n, l]) => [Number(n), { state: 'open', stateReason: null as string | null, labels: [...l] }])
+    );
+    const outputs: Record<string, string> = {};
+    const github: any = {
+      rest: {
+        issues: {
+          update: async ({ issue_number, state, state_reason }: any) => {
+            Object.assign(issues.get(issue_number)!, { state, stateReason: state_reason });
+          },
+          addLabels: async ({ issue_number, labels: added }: any) => {
+            issues.get(issue_number)!.labels.push(...added);
+          },
+          removeLabel: async ({ issue_number, name }: any) => {
+            const found = issues.get(issue_number)!;
+            if (!found.labels.includes(name)) throw Object.assign(new Error('Label does not exist'), { status: 404 });
+            found.labels = found.labels.filter((l) => l !== name);
+          },
+        },
+      },
+    };
+    const core = { info: () => {}, setOutput: (key: string, value: string) => { outputs[key] = value; } };
+    const context = { repo: { owner: 'Nico2398', repo: 'BlastSimulator2026' }, payload: { pull_request: { body } } };
+    const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+    await new AsyncFunction('github', 'context', 'core', 'require', 'process', script)(
+      github, context, core, require, { env: {} }
+    );
+    return { issues, outputs };
+  }
+
+  // 27 Sep 2026: PR #1251 closed #1200 and #1252, and only the first was
+  // settled — #1252 stayed closed claiming `in-progress`.
+  it('closes every issue the PR names on a line of its own, each meeting the Definition of Done', async () => {
+    const { issues, outputs } = await mergeChain('Closes #1200\nCloses #1252\n\nREADY TO MERGE\n', {
+      1200: ['agent-task', 'scope:nav', 'ready', 'paused'],
+      1252: ['agent-task', 'scope:scenarios', 'in-progress'],
+    });
+    for (const n of [1200, 1252]) {
+      const found = issues.get(n)!;
+      expect(found).toMatchObject({ state: 'closed', stateReason: 'completed' });
+      expect(found.labels).toContain('done');
+      expect(found.labels).toContain('agent-task');
+      for (const stale of ['in-progress', 'ready', 'blocked', 'paused']) expect(found.labels).not.toContain(stale);
+    }
+    expect(issues.get(1200)!.labels).toContain('scope:nav');
+    expect(issues.get(1252)!.labels).toContain('scope:scenarios');
+    expect(outputs.issue).toBe('1200');
+  });
+
+  it('reads a prose mention as nothing', async () => {
+    const { issues } = await mergeChain('Closes #10\n\nThis also fixes #11 partially.\n', {
+      10: ['agent-task', 'in-progress'],
+      11: ['agent-task', 'ready'],
+    });
+    expect(issues.get(10)!.state).toBe('closed');
+    expect(issues.get(11)).toMatchObject({ state: 'open', labels: ['agent-task', 'ready'] });
+  });
+
+  it('closes nothing, and names no finished issue, when no line names one', async () => {
+    const { issues, outputs } = await mergeChain('A pull request that closes nothing.\n', { 10: ['agent-task', 'ready'] });
+    expect(issues.get(10)!.state).toBe('open');
+    expect(outputs.issue).toBe('');
   });
 });
 
