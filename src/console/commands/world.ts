@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -414,8 +414,13 @@ export function newGameCommand(
     return { success: false, output: t('world.unknown_mine_type', { mineType, valid }) };
   }
 
-  // TODO: implementer adds requireValidGenDimension validation here (#1226)
-  const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
+  const rawSize = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
+  let size: number;
+  try {
+    size = requireValidGenDimension(rawSize, 'size');
+  } catch {
+    return { success: false, output: t('world.invalid_size', { size: rawSize, max: MAX_TERRAIN_GEN_DIMENSION }) };
+  }
   const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
 
   const flags = parseStaffedAndOccupancyFlags(named);
