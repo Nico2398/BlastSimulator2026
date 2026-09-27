@@ -964,10 +964,10 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7109
+          "cash": -7121
         }
       },
-      "description": "#1151: re-baselined against a measured run -- cash -7127 -> -7109. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
+      "description": "#1151: re-baselined against a measured run -- cash -7127 -> -7109. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -7109 -> -7121. #1200 retargets the management_office builder (employee #1) at the footprint's approach-ring cell (19,5) instead of the raw order origin (20,5), from order time -- one tile closer to employee #1's own spawn, so the construction (claimed at tick 0) completes one tick sooner than before (direct-traced: activeActionId clears at tick 39 here, tick 40-41 on main pre-#1200). That frees employee #1 for reassignment one tick earlier, which lands a small, one-time -$12 shift in this window's own cash total (direct-traced against a git-worktree run of this same command sequence on main, pre-#1200: cash -21141 identical through tick 39, then -27966/-27991/... here vs -27960/-27979/... there, a bounded -$6 then -$12 gap that never grows past -$12 for the rest of the file) -- not a growing divergence, a single early reassignment's own incidental cost."
     },
     {
       "command": "event choose 0",
@@ -1125,7 +1125,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 65.3000000000001,
+          "safety": 66.2000000000001,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -1136,7 +1136,7 @@
           "cash": 0
         }
       },
-      "description": "#1151: re-baselined against a measured run -- safety 66.6500000000001 -> 65.3000000000001. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
+      "description": "#1151: re-baselined against a measured run -- safety 66.6500000000001 -> 65.3000000000001. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): safety re-measured 65.3000000000001 -> 66.2000000000001 -- same mechanism as the tick-45 cash checkpoint's own #1252 finding (employee #1 completes the management_office build one tick sooner, retargeted at the approach-ring cell (19,5) rather than the raw origin (20,5)) shifts the accumulated-exposure computation this score derives from by the same small, bounded amount."
     },
     {
       "command": "tick 15",
@@ -1196,7 +1196,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -70379,
+          "cash": -70391,
           "tickCount": 105,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1206,7 +1206,7 @@
         },
         "note": "confirmed via direct trace: `[tick 100] BANKRUPTCY! The mine is seized.` Funding the run for its shopping list did not save it and did not move the bankruptcy tick -- the spree ends on exactly $0, under the $5,000 BANKRUPTCY_THRESHOLD, so the 100-tick BANKRUPTCY_GRACE_TICKS window expires at tick 100 exactly as it did when the purchases overdrew. Payroll and upkeep against zero income do the killing now, which is a truer test than an overdraw no player could perform."
       },
-      "description": "#1151: re-baselined against a measured run -- cash -70397 -> -70379. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
+      "description": "#1151: re-baselined against a measured run -- cash -70397 -> -70379. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -70379 -> -70391 -- the same bounded -$12 shift the tick-45 checkpoint's own #1252 finding documents (employee #1's management_office build completing one tick sooner at the approach-ring cell) carries forward unchanged through this checkpoint; bankruptcy itself still fires at the same tick 100, unmoved."
     },
     {
       "command": "event choose 0",
@@ -1317,7 +1317,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 85.55000000000022,
+          "safety": 86.45000000000023,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1328,7 +1328,7 @@
           "cash": 0
         }
       },
-      "description": "#1151: re-baselined against a measured run -- safety 86.90000000000023 -> 85.55000000000022. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check."
+      "description": "#1151: re-baselined against a measured run -- safety 86.90000000000023 -> 85.55000000000022. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): safety re-measured 85.55000000000022 -> 86.45000000000023 -- same bounded shift as the tick-75 checkpoint's own #1252 finding, carried forward unchanged (the accumulated-exposure computation this score derives from stays offset by the same amount once shifted, until the score saturates at its own ceiling later in the file)."
     },
     {
       "command": "tick 15",

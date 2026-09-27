@@ -36,7 +36,7 @@ vi.mock('fs', async (importOriginal) => {
 // any variable a factory closes over must itself be declared through
 // vi.hoisted() — a plain `const` here would throw "Cannot access before
 // initialization" the moment the mocked module is imported.
-const { fakePageRef, initBrowserMock, executeInteractionActionsMock, suspendDrawingMock, waitOneFrameMock, captureFrameMock } = vi.hoisted(() => {
+const { fakePageRef, initBrowserMock, executeInteractionActionsMock, suspendDrawingMock, waitOneFrameMock, captureFrameMock, forceRenderFrameMock } = vi.hoisted(() => {
   const fakeBrowser = { close: vi.fn(async () => {}) };
   const fakePageRef: { current: { evaluate: ReturnType<typeof vi.fn<any[], Promise<undefined>>> } | null } = { current: null };
   return {
@@ -51,6 +51,7 @@ const { fakePageRef, initBrowserMock, executeInteractionActionsMock, suspendDraw
     suspendDrawingMock: vi.fn(async () => {}),
     waitOneFrameMock: vi.fn(async () => {}),
     captureFrameMock: vi.fn(async () => {}),
+    forceRenderFrameMock: vi.fn(async () => {}),
   };
 });
 
@@ -63,6 +64,7 @@ vi.mock('../../../scripts/shared/puppeteer-utils.js', () => ({
   DEFAULT_STEP_TIMEOUT: 60,
   captureFrame: captureFrameMock,
   suspendDrawing: suspendDrawingMock,
+  forceRenderFrame: forceRenderFrameMock,
 }));
 
 vi.mock('../../../scripts/shared/interaction-driver.js', () => {
@@ -76,11 +78,17 @@ vi.mock('../../../scripts/shared/interaction-driver.js', () => {
   };
 });
 
-import { runScenarioInteraction } from '../../../scripts/scenario-interaction-runner.js';
+import { runScenarioInteraction, type ShotDef } from '../../../scripts/scenario-interaction-runner.js';
 
 function blastStep(overrides: Partial<ScenarioStepDef> = {}): ScenarioStepDef {
   return { command: 'blast', role: 'player', description: 'fire the blast', ...overrides };
 }
+
+function genericStep(overrides: Partial<ScenarioStepDef> = {}): ScenarioStepDef {
+  return { command: 'tick 1', role: 'setup', description: 'advance time', ...overrides };
+}
+
+const shotsFixture: ShotDef[] = [{ name: 'overview', yaw: 0, pitch: 45 }];
 
 describe('runScenarioInteraction — skipBlastPlayback wiring (#761)', () => {
   beforeEach(() => {
@@ -160,5 +168,94 @@ describe('runScenarioInteraction — skipBlastPlayback wiring (#761)', () => {
       String(call[0]).includes('__skipBlastPlayback'),
     );
     expect(calledWithSkip).toBe(false);
+  });
+});
+
+describe('multi-angle shots camera sync (#1244)', () => {
+  beforeEach(() => {
+    fakePage = { evaluate: vi.fn(async () => undefined) };
+    fakePageRef.current = fakePage;
+    initBrowserMock.mockClear();
+    executeInteractionActionsMock.mockClear();
+    suspendDrawingMock.mockClear();
+    waitOneFrameMock.mockClear();
+    forceRenderFrameMock.mockClear();
+  });
+
+  it('calls forceRenderFrame after __cameraReset when the scenario defines shots', async () => {
+    await runScenarioInteraction(
+      'shots-fixture',
+      [genericStep()],
+      shotsFixture, 5173, undefined, 1, 200,
+      { width: 1280, height: 720 },
+      true, // enableScreenshots
+      '/tmp/screenshots',
+      false, // skipBlastPlayback
+    );
+
+    expect(forceRenderFrameMock).toHaveBeenCalled();
+
+    // Ordering is the actual regression being guarded against: __cameraReset
+    // must fire, then forceRenderFrame, then the next waitOneFrame — a real
+    // render between the reset and the frame that follows it.
+    const cameraResetCallIndex = fakePage.evaluate.mock.calls.findIndex(call =>
+      String(call[0]).includes('__cameraReset'),
+    );
+    expect(cameraResetCallIndex).toBeGreaterThanOrEqual(0);
+    const cameraResetOrder = fakePage.evaluate.mock.invocationCallOrder[cameraResetCallIndex]!;
+    const forceRenderOrder = forceRenderFrameMock.mock.invocationCallOrder[0]!;
+    const waitOneFrameOrderAfterReset = waitOneFrameMock.mock.invocationCallOrder.find(
+      order => order > cameraResetOrder,
+    );
+
+    expect(cameraResetOrder).toBeLessThan(forceRenderOrder);
+    expect(waitOneFrameOrderAfterReset).toBeDefined();
+    expect(forceRenderOrder).toBeLessThan(waitOneFrameOrderAfterReset!);
+  });
+
+  it('does not call forceRenderFrame when the scenario defines no shots', async () => {
+    await runScenarioInteraction(
+      'no-shots-fixture',
+      [genericStep()],
+      [], 5173, undefined, 1, 200,
+      { width: 1280, height: 720 },
+      true, // enableScreenshots
+      '/tmp/screenshots',
+      false, // skipBlastPlayback
+    );
+
+    expect(forceRenderFrameMock).not.toHaveBeenCalled();
+  });
+
+  it('does not call forceRenderFrame when screenshots are disabled', async () => {
+    await runScenarioInteraction(
+      'screenshots-disabled-fixture',
+      [genericStep()],
+      shotsFixture, 5173, undefined, 1, 200,
+      { width: 1280, height: 720 },
+      false, // enableScreenshots
+      '/tmp/screenshots',
+      false, // skipBlastPlayback
+    );
+
+    expect(forceRenderFrameMock).not.toHaveBeenCalled();
+    const calledCameraReset = fakePage.evaluate.mock.calls.some(call =>
+      String(call[0]).includes('__cameraReset'),
+    );
+    expect(calledCameraReset).toBe(false);
+  });
+
+  it('calls forceRenderFrame once per step that has shots, across multiple steps', async () => {
+    await runScenarioInteraction(
+      'two-step-shots-fixture',
+      [genericStep({ command: 'tick 1' }), genericStep({ command: 'tick 2' })],
+      shotsFixture, 5173, undefined, 1, 200,
+      { width: 1280, height: 720 },
+      true, // enableScreenshots
+      '/tmp/screenshots',
+      false, // skipBlastPlayback
+    );
+
+    expect(forceRenderFrameMock).toHaveBeenCalledTimes(2);
   });
 });

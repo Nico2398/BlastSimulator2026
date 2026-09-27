@@ -268,8 +268,18 @@ describe('console-api', () => {
       runner.runner.run('employee hire role:surveyor');
       runner.runner.run('employee hire role:surveyor');
       runner.runner.run('employee hire role:surveyor');
+      // One at a time, each ticked to completion before the next is ordered
+      // (#1200): a footprint blocks routing from the instant it's ordered,
+      // not just once built, so ordering all three at once would wall off
+      // the (0,0)-(1,1) pocket — and every ring cell still open on the third
+      // building's own footprint — before any builder ever got a chance to
+      // walk in. Building them one at a time keeps each one's approach ring
+      // reachable from outside at the moment it's ordered, same as a player
+      // would have to.
       runner.runner.run('build management_office at:2,0');
+      runner.runner.run('tick 150');
       runner.runner.run('build management_office at:0,2');
+      runner.runner.run('tick 150');
       runner.runner.run('build management_office at:2,2');
       runner.runner.run('tick 150');
       expect(runner.ctx.state!.plannedBuildings).toHaveLength(0);

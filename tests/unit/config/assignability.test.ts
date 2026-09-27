@@ -542,7 +542,7 @@ describe('picking the next issue', () => {
     expect((await select(api)).issue?.number).toBe(550);
   });
 
-  // Single flight. Two sessions would compete over the same `pipeline/*` branches.
+  // At the default limit of one: single flight, whatever the scopes say.
   it('assigns nothing while another issue is in progress', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress'] },
