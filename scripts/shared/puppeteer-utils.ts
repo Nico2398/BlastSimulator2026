@@ -388,17 +388,16 @@ export async function flushLandscape(page: Page): Promise<number> {
  * stale one (#1244).
  */
 export async function forceRenderFrame(page: Page): Promise<void> {
-  // TODO: implemented in TDD green phase
-  throw new Error('not implemented');
+  await page.evaluate(() => {
+    const w = window as unknown as { __renderFrame?: () => void };
+    w.__renderFrame?.();
+  });
 }
 
 export async function captureFrame(page: Page, path: string): Promise<void> {
   await waitForModels(page);
   await flushLandscape(page);
-  await page.evaluate(() => {
-    const w = window as unknown as { __renderFrame?: () => void };
-    w.__renderFrame?.();
-  });
+  await forceRenderFrame(page);
   await page.screenshot({ path, fullPage: false });
 }
 
