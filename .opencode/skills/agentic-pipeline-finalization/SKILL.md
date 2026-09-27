@@ -34,10 +34,12 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<label>` — `<label>` i
  5. @validator           → Full validation: typecheck → tests → build
                             if fail → @implementer (big loop)
  6. [verify-commit]      → final commit check before PR
-    [sync-main]          → merge the current `main` into the feature branch. Other
-                             sessions may have merged since the branch was cut;
-                             a conflict → @conflict-resolver, then [test-runner].
-                             Already up to date → nothing to do. Never rebase.
+    [sync-main]          → bring the feature branch up to date with the current `main`:
+                             merge it in, or rebase onto it and push with
+                             `--force-with-lease` (`agentic-autonomous-pipeline`).
+                             Other sessions may have merged since the branch was
+                             cut; a conflict → @conflict-resolver, then [test-runner].
+                             Already up to date → nothing to do.
  7. [open-pr]            → create PR from feature branch to main.
                              Evaluate draft/ready per `agentic-pipeline-pr-management` skill.
                              Carry every defaulted requirement into the body under
@@ -143,7 +145,7 @@ On RED, **one round**, counted per finalization invocation, and only while the l
 
 1. Read the failing jobs the script named. Fetch the log; for an interaction-mode failure read the FAIL screenshots in the run's artifacts. Never re-run the whole suite locally to "confirm" it — a sandbox without a GPU cannot reproduce that channel, and #581's session already proved a local run of those exact files times out on load contention.
 2. Decide which side is wrong, the change or the expectation, then delegate: `@fixer` for a test/expectation disagreement, `@implementer` for a defect in the change, `@visual-tester` when the failure is a rendering or click-reachability claim.
-3. Commit, `git pull --no-rebase origin pipeline/feature-<label>` — the merge gate may have merged `main` into it since the PR opened — then push. Never `[skip ci]` — `agentic-pipeline-pr-management` holds why. Never rebase or force-push.
+3. Commit and fetch — the merge gate may have merged `main` into the branch since the PR opened — then `git pull --no-rebase origin pipeline/feature-<label>` and push, or rebase onto `origin/main` and `git push --force-with-lease`. Never `[skip ci]` — `agentic-pipeline-pr-management` holds why. Never a bare `--force`.
 4. Run `[await-ci]` again. The script reads one run per workflow, newest first, so the run CI cancelled on the previous head does not count against you.
 
 Still red after that round, or red with the loop budget closed: **end the run with the pull request as it stands** — marker on, not a draft, the issue's labels untouched — and say so in the summary comment, naming the failing jobs. `agentic-ci-failure.yml` hands that red to a fresh session with a whole budget, bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`; because this session was live when the verdict landed, the watchdog's sweep is what raises it — `agentic-autonomous-pipeline`'s github-loop reference holds the path. The same fail-safe covers a session that dies before `[await-ci]` returns.

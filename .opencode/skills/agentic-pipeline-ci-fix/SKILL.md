@@ -39,9 +39,10 @@ The pull request already exists, its branch already carries the work, and its is
                        Pick by what the log says, not by which is cheapest.
  6. [verify]       → Every channel the fix touches, per the Verification Gate. Then commit.
                        Never `[skip ci]` — `agentic-pipeline-pr-management`.
- 7. [push]         → `git pull --no-rebase origin <head> && git push origin <head>`
+ 7. [push]         → `git pull --no-rebase origin <head> && git push origin <head>`, or
+                       rebase onto `origin/main` and `git push --force-with-lease`.
                        The merge gate may have merged `main` into the branch since the
-                       checkout. Never rebase, never force-push.
+                       checkout. Never a bare `--force`.
  8. [await-ci]     → `npm run ci:await -- --pr <number>`. RED → back to step 3.
                        GREEN → done: the merge gate takes the PR from here.
 ```
@@ -65,7 +66,7 @@ A conflict that can only be resolved by choosing between two behaviours is a dec
 | Open a second PR | The existing one closes the issue. A second PR from a second branch makes the issue unassignable and merges nothing |
 | Recreate the PR's head branch under a new name | Its commits are the deliverable and exist on `origin`. Rebuilding drops the reviewed work |
 | Remove or re-add `READY TO MERGE` | It is already there and it is already correct — the marker was never a claim about CI. The merge gate merges the PR once CI is green on a head containing `main` |
-| Rebase the branch or force-push it | The gate may have pushed a merge commit onto it, and a session reading this PR may hold it checked out. History on a pipeline branch only grows |
+| Force-push with a bare `--force`, or for anything but bringing the branch up to date with `main` | The gate may have pushed a merge commit onto it since your fetch. `--force-with-lease` refuses to discard it; `--force` does not. `agentic-autonomous-pipeline` holds the rule |
 | Touch the issue's labels on success | The merge releases the issue. Labelling it here would fight the chain |
 | Widen the fix beyond the failure | A red channel is the task. Anything else belongs in its own issue |
 | Post a comment containing `@claude` or `@opencode` | It would wake another session on this PR. The handback comment is the only one allowed to carry a mention |
