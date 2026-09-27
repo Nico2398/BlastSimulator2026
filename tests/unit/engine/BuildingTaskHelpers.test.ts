@@ -229,19 +229,27 @@ describe('relocateFootprintOccupants — vehicles (#1270)', () => {
     expect(newCell.vehicleOccupied).toBe(true);
   });
 
-  it('leaves a vehicle whose cell is outside the region completely untouched', () => {
+  it('leaves a vehicle whose cell is outside the region untouched while relocating one inside it — proves the sweep discriminates by region, not a no-op', () => {
     const state = makeFlatNavState();
     blockRegion(state.navGrid!, REGION);
 
-    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 7, 7);
-    const cell = state.navGrid!.cellAt(7, 7)!;
-    cell.vehicleOccupied = true;
+    const { vehicle: outside } = purchaseVehicle(state.vehicles, 'debris_hauler', 7, 7);
+    const outsideCell = state.navGrid!.cellAt(7, 7)!;
+    outsideCell.vehicleOccupied = true;
+
+    const { vehicle: inside } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    state.navGrid!.cellAt(2, 2)!.vehicleOccupied = true;
 
     relocateFootprintOccupants(state, REGION);
 
-    expect(vehicle.x).toBe(7);
-    expect(vehicle.z).toBe(7);
-    expect(cell.vehicleOccupied).toBe(true);
+    // The outside vehicle never moves...
+    expect(outside.x).toBe(7);
+    expect(outside.z).toBe(7);
+    expect(outsideCell.vehicleOccupied).toBe(true);
+    // ...while the inside one does — same sweep, same call, so the outside
+    // result above is the region check discriminating, not the loop being a
+    // no-op regardless of input.
+    expect(inside.x === 2 && inside.z === 2).toBe(false);
   });
 
   it('relocates a mounted employee but deliberately leaves their vehicle untouched — the locomotion tick is the vehicle\'s only mover', () => {

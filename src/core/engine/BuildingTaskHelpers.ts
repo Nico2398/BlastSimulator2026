@@ -87,13 +87,17 @@ export function emitFootprintRegionChanged(
  * vehicle has no per-tick writer and would otherwise be stranded on ground
  * that just turned solid.
  */
+function isInRegion(x: number, z: number, region: BlastRegion): boolean {
+  const cx = Math.round(x);
+  const cz = Math.round(z);
+  return cx >= region.minX && cx <= region.maxX && cz >= region.minZ && cz <= region.maxZ;
+}
+
 export function relocateFootprintOccupants(state: GameState, region: BlastRegion): void {
   if (!state.navGrid) return;
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
-    const cx = Math.round(emp.x);
-    const cz = Math.round(emp.z);
-    if (cx < region.minX || cx > region.maxX || cz < region.minZ || cz > region.maxZ) continue;
+    if (!isInRegion(emp.x, emp.z, region)) continue;
     // avoidOccupancy: true — same fragment-/vehicle-occupancy rule foot
     // travel obeys (#954) gates the cell relocated onto, so this sweep
     // never "rescues" someone from a newly-blocked footprint straight into
@@ -131,9 +135,9 @@ export function relocateFootprintOccupants(state: GameState, region: BlastRegion
   // deliberately left on the plain bounding-box check.
   for (const vehicle of state.vehicles.vehicles) {
     if (vehicle.occupantIds.length > 0) continue;
+    if (!isInRegion(vehicle.x, vehicle.z, region)) continue;
     const vx = Math.round(vehicle.x);
     const vz = Math.round(vehicle.z);
-    if (vx < region.minX || vx > region.maxX || vz < region.minZ || vz > region.maxZ) continue;
     if (state.navGrid.cellAt(vx, vz)?.type !== 'blocked') continue;
     const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, vehicle.x, vehicle.z, true);
     vehicle.x = nearest.x;
