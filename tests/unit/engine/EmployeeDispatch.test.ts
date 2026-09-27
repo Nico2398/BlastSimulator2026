@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { tickEmployees, employeeWorkState } from '../../../src/core/engine/EmployeeDispatch.js';
+import { tickEmployees, employeeWorkState, computeGroundCrewReachableSet } from '../../../src/core/engine/EmployeeDispatch.js';
 import { tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
 import { tickTaskProgress } from '../../../src/core/engine/TaskProgress.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
@@ -21,9 +21,11 @@ import { isRampSegmentClaimable } from '../../../src/core/engine/ActionSelection
 import {
   hireEmployee, assignSkill, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
-import type { PendingAction, PlannedRamp, RampSegmentTracker } from '../../../src/core/state/GameState.js';
+import type { PendingAction, PlannedRamp, RampSegmentTracker, BlockedOrderReason } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { findHaulDepotApproach } from '../../../src/core/economy/HaulingTask.js';
 import { landDrilledHole, type PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../../src/core/mining/ChargePlan.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -32,6 +34,8 @@ import {
   BASE_TASK_DURATION_TICKS,
   MAX_EMPLOYEE_TASK_QUEUE_DEPTH,
   NEED_HARD_THRESHOLDS,
+  NAV_CLEARANCE_VEHICLE_CELLS,
+  NAV_CLEARANCE_EMPLOYEE_CELLS,
 } from '../../../src/core/config/balance.js';
 
 /**
@@ -1163,6 +1167,310 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
 // and is covered directly in ActionSelection.test.ts; starvation now wins dispatch
 // purely through the normal cost-ranked pool, with no dedicated vehicle-gated
 // completion fast path to test here any more.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #1231 — target_unreachable: a blast can leave a debris (or ramp-segment,
+// etc.) PendingAction targeting a NavGrid region climb-disconnected from
+// where ground crew actually operate (anchored at the nearest active
+// freight_warehouse's approach cell, findHaulDepotApproach/
+// computeClimbReachableSet). Nobody can ever complete such an order — no
+// per-employee reachability screen (ActionSelection.ts) will ever pick it —
+// but before this feature nothing SAID so: blockedReason stayed null/some
+// unrelated reason forever, an invisible dead order. The classification pass
+// (tickEmployees) now stamps 'target_unreachable' on exactly these.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable classification (#1231)', () => {
+  const SEED = 42;
+
+  // Column WALL_X is fully 'blocked' across every row, 8-directionally
+  // disconnecting REGION_A (x < WALL_X, where the depot lives) from
+  // REGION_B (x > WALL_X, the debris pocket) — a single fully-blocked
+  // column disconnects both orthogonal AND diagonal movement (#1197's
+  // corner-cut fix means a diagonal step into a blocked cell is already
+  // rejected by the destination-cell check alone; NEIGHBOUR_OFFSETS_8 only
+  // ever steps ±1, so nothing can jump straight over the column either).
+  const WIDTH = 20;
+  const HEIGHT = 10;
+  const WALL_X = 8;
+  // Inside REGION_A, clear of the 4×4 freight_warehouse footprint placed at (1,1).
+  const REACHABLE_TARGET = { x: 6, z: 6 };
+  // Inside REGION_B — climb-disconnected from the depot's approach cell.
+  const UNREACHABLE_TARGET = { x: 15, z: 5 };
+
+  function makeWalledGrid(): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < HEIGHT; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < WIDTH; x++) {
+        const blocked = x === WALL_X;
+        row.push({ type: blocked ? 'blocked' : 'walkable', moveCost: blocked ? Infinity : 1.0, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(WIDTH, HEIGHT, cells);
+  }
+
+  /** State with a walled-off pocket and, optionally, an active freight_warehouse anchoring reachability. */
+  function makeStateWithPocket(withDepot: boolean): GameState {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeWalledGrid();
+    if (withDepot) {
+      const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);
+      if (!placed.success) throw new Error(`Setup: placeBuilding failed — ${placed.error}`);
+      placed.building!.active = true;
+    }
+    return state;
+  }
+
+  function makeHaulDebrisAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'haul_debris',
+      requiredSkill: null,
+      requiredVehicleRole: 'debris_hauler',
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { fragmentId: 1 },
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      queuedAtTick: 0,
+      ...overrides,
+    };
+  }
+
+  /** A debris_hauler-licensed employee plus an owned debris_hauler vehicle — fully staffed for haul_debris. */
+  function staffDebrisHauling(state: GameState): void {
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+  }
+
+  it('BlockedOrderReason includes target_unreachable (type surface)', () => {
+    const reason: BlockedOrderReason = 'target_unreachable';
+    expect(reason).toBe('target_unreachable');
+  });
+
+  describe('computeGroundCrewReachableSet', () => {
+    it('returns a reachable set that includes the depot side and excludes the walled-off pocket', () => {
+      const state = makeStateWithPocket(true);
+
+      const reachable = computeGroundCrewReachableSet(state, NAV_CLEARANCE_VEHICLE_CELLS);
+
+      expect(reachable).not.toBeNull();
+      expect(reachable!.has(REACHABLE_TARGET.x, REACHABLE_TARGET.z)).toBe(true);
+      expect(reachable!.has(UNREACHABLE_TARGET.x, UNREACHABLE_TARGET.z)).toBe(false);
+    });
+
+    it('returns null when no active freight_warehouse exists anywhere', () => {
+      const state = makeStateWithPocket(false);
+
+      expect(computeGroundCrewReachableSet(state, NAV_CLEARANCE_VEHICLE_CELLS)).toBeNull();
+    });
+
+    it('returns null when state.navGrid is null', () => {
+      const state = createGame({ seed: SEED });
+      state.navGrid = null;
+      const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);
+      if (placed.success) placed.building!.active = true;
+
+      expect(computeGroundCrewReachableSet(state, NAV_CLEARANCE_VEHICLE_CELLS)).toBeNull();
+    });
+  });
+
+  it('flags target_unreachable on a haul_debris order whose target sits in a NavGrid pocket disconnected from the depot', () => {
+    const state = makeStateWithPocket(true);
+    staffDebrisHauling(state);
+    const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('does NOT flag target_unreachable on a haul_debris order whose target is climb-reachable from the depot (no false positive)', () => {
+    const state = makeStateWithPocket(true);
+    staffDebrisHauling(state);
+    const action = makeHaulDebrisAction({ id: 1, targetX: REACHABLE_TARGET.x, targetZ: REACHABLE_TARGET.z });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+  });
+
+  it('never throws and never flags target_unreachable when there is no active freight_warehouse yet (early game)', () => {
+    const state = makeStateWithPocket(false);
+    // No depot, no employees, no vehicles — the earliest possible game state
+    // with a queued debris order already sitting in the pocket.
+    const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
+    state.pendingActions.push(action);
+
+    expect(() => tickEmployees(state)).not.toThrow();
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+  });
+
+  it('never throws and never flags target_unreachable when state.navGrid is null', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = null;
+    const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);
+    if (placed.success) placed.building!.active = true;
+    const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
+    state.pendingActions.push(action);
+
+    expect(() => tickEmployees(state)).not.toThrow();
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+  });
+
+  it('never flags target_unreachable on a dig_ramp_segment order, even when its target sits in the disconnected pocket (top-down excavation is exempt)', () => {
+    const state = makeStateWithPocket(true);
+    // Deliberately unstaffed AND unreachable, so every other blockedReason
+    // remains eligible to fire — the exclusion must hold regardless.
+    const action: PendingAction = {
+      id: 1, type: 'dig_ramp_segment', requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+      targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z, targetY: 0,
+      payload: {}, targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('precedence: target_unreachable wins over no_qualified_employee for a skill-gated (non-vehicle) order, and excludes it from result.unqualified', () => {
+    const state = makeStateWithPocket(true);
+    // No employees hired at all — nobody could ever hold 'blasting' either,
+    // so without the new gate this would classify no_qualified_employee.
+    const action: PendingAction = {
+      id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: null,
+      targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z, targetY: 0,
+      payload: {}, targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+    expect(result.unqualified).not.toContain(1);
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('precedence: target_unreachable wins over no_vehicle_in_fleet/no_licensed_driver for a vehicle-gated order', () => {
+    const state = makeStateWithPocket(true);
+    // No debris_hauler vehicle anywhere, nobody licensed — both
+    // no_vehicle_in_fleet and no_licensed_driver would otherwise apply.
+    const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+    expect(result.unqualified).not.toContain(1);
+  });
+
+  it('self-clears: once a previously-unreachable pocket connects to the depot side, a later tick drops target_unreachable', () => {
+    const state = makeStateWithPocket(true);
+    staffDebrisHauling(state);
+    const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+
+    // Punch a single-cell gate through the wall column, connecting REGION_A
+    // and REGION_B — simulates a later incremental NavGrid rebuild resolving
+    // the pocket (e.g. a subsequent blast clearing the choke point).
+    state.navGrid!.setCellAt(WALL_X, 5, { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+  });
+
+  // Per-action clearance (#1231 review round 3): a single-cell-wide corridor
+  // is wide enough for a walking employee (NAV_CLEARANCE_EMPLOYEE_CELLS = 1)
+  // but too narrow for either vehicle (NAV_CLEARANCE_VEHICLE_CELLS = 2). The
+  // classification pass must screen a vehicle-gated action against vehicle
+  // clearance and an on-foot action (requiredVehicleRole: null) against
+  // employee clearance — never the same set for both — or a genuinely
+  // walkable foot-order target gets wrongly stamped target_unreachable just
+  // because no vehicle could physically fit through the same corridor.
+  describe('per-action clearance: a foot order behind a vehicle-too-narrow corridor', () => {
+    const CORRIDOR_X = 8;
+
+    /**
+     * Every cell is 'walkable' — nothing is NavCell-type blocked — but the
+     * whole CORRIDOR_X column carries an explicit clearance of
+     * NAV_CLEARANCE_EMPLOYEE_CELLS (1), below NAV_CLEARANCE_VEHICLE_CELLS
+     * (2). Every other cell is left with clearance `undefined`, which
+     * hasClearance (NavGrid.ts) treats as "unconstrained" for hand-built
+     * fixtures that don't model clearance — so only the corridor column
+     * itself narrows the route. A full-height column (every z) rules out an
+     * #1197 diagonal-corner bypass around it, same as makeWalledGrid's
+     * fully-'blocked' wall above.
+     */
+    function makeCorridorGrid(): NavGrid {
+      const cells: NavCell[][] = [];
+      for (let z = 0; z < HEIGHT; z++) {
+        const row: NavCell[] = [];
+        for (let x = 0; x < WIDTH; x++) {
+          const cell: NavCell = { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false };
+          if (x === CORRIDOR_X) cell.clearance = NAV_CLEARANCE_EMPLOYEE_CELLS;
+          row.push(cell);
+        }
+        cells.push(row);
+      }
+      return new NavGrid(WIDTH, HEIGHT, cells);
+    }
+
+    it('does not flag a survey order beyond the corridor as target_unreachable, even though no vehicle could reach it', () => {
+      const state = createGame({ seed: SEED });
+      state.navGrid = makeCorridorGrid();
+      const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);
+      if (!placed.success) throw new Error(`Setup: placeBuilding failed — ${placed.error}`);
+      placed.building!.active = true;
+
+      // Sanity check on the fixture itself: the corridor really does split
+      // vehicle clearance from employee clearance at the depot's approach.
+      const approach = findHaulDepotApproach(state, state.navGrid.originX, state.navGrid.originZ)!;
+      const vehicleReachable = computeGroundCrewReachableSet(state, NAV_CLEARANCE_VEHICLE_CELLS)!;
+      const footReachable = computeGroundCrewReachableSet(state, NAV_CLEARANCE_EMPLOYEE_CELLS)!;
+      expect(approach).not.toBeNull();
+      expect(footReachable.has(UNREACHABLE_TARGET.x, UNREACHABLE_TARGET.z)).toBe(true);
+      expect(vehicleReachable.has(UNREACHABLE_TARGET.x, UNREACHABLE_TARGET.z)).toBe(false);
+
+      const action: PendingAction = {
+        id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+        targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z, targetY: 0,
+        payload: {}, targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+      };
+      state.pendingActions.push(action);
+
+      tickEmployees(state);
+
+      expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+    });
+
+    it('still flags a vehicle-gated haul_debris order beyond the same corridor as target_unreachable', () => {
+      const state = createGame({ seed: SEED });
+      state.navGrid = makeCorridorGrid();
+      const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);
+      if (!placed.success) throw new Error(`Setup: placeBuilding failed — ${placed.error}`);
+      placed.building!.active = true;
+      staffDebrisHauling(state);
+      const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
+      state.pendingActions.push(action);
+
+      tickEmployees(state);
+
+      expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+    });
+  });
+});
 
 
 describe('drill_hole actions — dispatch and landing (#553)', () => {
