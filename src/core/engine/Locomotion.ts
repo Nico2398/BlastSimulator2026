@@ -423,7 +423,12 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
   // legs avoid every occupied cell except when the destination itself is
   // occupied (boarding a vehicle sitting there, or charging a hole a
   // drill_rig is still parked on) — mirrors the old tickEmployeeMovement.
-  let avoidVehicles = isDrive ? false : !isDestinationOccupied(state, leg.destX, leg.destZ);
+  // `leg.crossesVehicles` (#1263 CI-fix) short-circuits this straight to
+  // `false` once the fallback below has ever granted this leg a
+  // vehicle-crossing route — see that field's own doc comment for why
+  // re-deriving this from the mover's own continuously-shifting position
+  // every tick, instead of deciding once, oscillates the mover forever.
+  let avoidVehicles = isDrive ? false : (leg.crossesVehicles ? false : !isDestinationOccupied(state, leg.destX, leg.destZ));
 
   // Snapped through NavGrid's own (nearest-cell, round-based) convention
   // rather than handed to findPath continuous (#1166): Pathfinding.ts's own
@@ -490,6 +495,12 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     if (relaxed.found && !pathCrossesFragmentOccupancy(state.navGrid, relaxed.waypoints)) {
       path = relaxed;
       avoidVehicles = false;
+      // Sticky for the rest of this leg's life (see `Leg.crossesVehicles`'s
+      // own doc comment, Itinerary.ts) — without this, the very next tick
+      // re-derives `avoidVehicles` fresh from the mover's new position above
+      // and can find the strict route "found" again from there, discarding
+      // this relaxed route's own in-flight RouteCommitment and oscillating.
+      leg.crossesVehicles = true;
     }
   }
 
