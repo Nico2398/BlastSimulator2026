@@ -136,7 +136,7 @@ inside of one of those steps that parallelises.
 
 ### ▶ Parallel delegation needs a worktree per branch
 
-Steps 9 (@test-writer) and 13 (@implementer) are ordinarily sequential — the
+The test-writer and implementer steps are ordinarily sequential — the
 orchestrator switches branches between them, so only one of `pipeline/tests-<label>`
 and `pipeline/impl-<label>` is checked out in the main working directory at a time.
 **Delegating both in the same Agent-tool message** removes that ordering: both
