@@ -36,6 +36,14 @@ const ASSIGNMENT_ALLOWLIST: Readonly<Record<string, string>> = {
   // here runs per tick, and nothing here moves a vehicle that has an
   // occupant. See placeStartingCrew's own doc comment.
   'src/core/state/SpawnPlacement.ts': 'one-time starting-crew layout at world-gen, not per-tick movement',
+  // One-time footprint-eviction snap (#1270): a building/footprint that just
+  // became a routing block relocates any vehicle caught inside it — parked,
+  // or carried along with a mounted employee it evicts — onto the nearest
+  // reachable free cell. Not a per-tick movement step; occupancy flags are
+  // still kept in sync via updateVehicleCellOccupancy, the same helper
+  // Locomotion.ts itself uses. See relocateFootprintOccupants's own doc
+  // comment.
+  'src/core/engine/BuildingTaskHelpers.ts': 'one-time footprint-eviction relocation, not per-tick movement',
 };
 
 /** Identifier prefixes commonly used for a Vehicle-typed local/parameter in this codebase. */
