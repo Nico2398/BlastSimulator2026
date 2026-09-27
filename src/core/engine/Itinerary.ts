@@ -78,6 +78,22 @@ export interface Leg {
    * true, so it behaves exactly like every leg before this fix).
    */
   crossesVehicles?: boolean;
+  /**
+   * Set on a leg installed to walk a relocated idle occupant back to the
+   * exact cell it just got displaced from (#1278 follow-up,
+   * `relocateIdleDestinationBlocker`'s own `returnAfterRelocate` — see that
+   * function's doc comment in Locomotion.ts). `handleAgentOccupancyBlock`'s
+   * destination-spread step reads this to skip retargeting the leg
+   * elsewhere: a return trip's whole point is reclaiming that ONE specific
+   * cell once it is free again, so accepting a "close enough" consolation
+   * cell instead — the very thing destination-spreading exists to do for an
+   * ordinary leg — would silently strand the relocated occupant somewhere
+   * other than where it started, with nothing left to send it home again.
+   * Optional/nullable so a fixture/caller predating this field keeps
+   * compiling unchanged (never true, so it behaves exactly like every leg
+   * before this fix).
+   */
+  neverSpread?: boolean;
 }
 
 /** What the itinerary is ultimately for. */

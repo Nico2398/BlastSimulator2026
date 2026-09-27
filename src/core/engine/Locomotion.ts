@@ -849,6 +849,67 @@ function handleAgentOccupancyBlock(
   }
 
   if (!destinationHeldByOther) {
+    // #1278 follow-up: the destination itself is free, but the exact cell
+    // this tick's own hop got blocked on (`blockedStep`) may be a corridor
+    // cell — not the destination — held by an idle occupant with nothing
+    // queued. `findPathAvoidingOccupiedCells` just below marks EVERY
+    // currently-held cell impassable, so at extreme density (a target grid
+    // small enough that its own free interior is fully walled in by
+    // already-arrived neighbours on every side) a full-avoidance route can
+    // fail to exist at all — no amount of retrying ever finds a path through
+    // a wall of occupied cells that never clears on its own. Relocating the
+    // one idle occupant actually in this tick's way — the same relocation
+    // `relocateIdleDestinationBlocker` already applies to a destination
+    // blocker, here applied to a corridor blocker instead — clears a single
+    // cell rather than requiring a whole route around the entire ring.
+    // Scoped to an EMPLOYEE occupant that is not itself `isMoveStuck`:
+    // - A vehicle blocker here is exactly step 2.5's own "genuinely parked,
+    //   nobody to dispatch it out of the way on its own" case just below,
+    //   which already rejected relocation in favour of crossing — relocating
+    //   first would reintroduce that already-rejected behaviour (see that
+    //   step's own doc comment) for every vehicle blocker before crossing
+    //   ever gets a chance.
+    // - A stuck employee blocker here is exactly the tie-break sidestep's
+    //   own scenario just below (a live contest between two movers,
+    //   `employeeWorkState` reading 'idle' regardless since it has no
+    //   `isMoveStuck` branch of its own) — relocating it here first would
+    //   pre-empt the sidestep's own higher-id-gives-way tie-break for every
+    //   stuck-vs-stuck contest, not just a genuinely inert corridor blocker.
+    //
+    // Deliberately does NOT `return 'blocked'` on a successful relocation:
+    // the relocated occupant's own return trip (`returnAfterRelocate: true`)
+    // re-approaches the very cell it just vacated, and ceding this whole
+    // tick would let it walk straight back before THIS requester ever
+    // advances into the newly-freed corridor cell — the two sides trading
+    // places forever, never any closer to either one's own real
+    // destination. Retried immediately with a DIRECT, non-avoidance path —
+    // mirrors `advanceLeg`'s own ordinary pathfinding, which ignores
+    // employee occupancy entirely and only failed this tick because this
+    // one per-hop step was blocked — rather than the wide-ranging
+    // `findPathAvoidingOccupiedCells` below: that search treats every OTHER
+    // currently-held ring cell as impassable too, and its own corner-cutting
+    // route around all of them at extreme density can pass uncomfortably
+    // close to a third, entirely unrelated mover's own walk. A direct route
+    // to the now-open corridor cell has no reason to detour anywhere near
+    // one. Both failure modes (the perpetual swap, and the too-close
+    // detour) were confirmed live via this file's own "bounded-tick
+    // fairness" dense-grid reproduction (#1278) while developing this fix.
+    const corridorOccupant = occupancy.holderOf(blockedStep.x, blockedStep.z);
+    const corridorBlockerEmp = corridorOccupant?.kind === 'employee'
+      ? state.employees.employees.find(e => e.id === corridorOccupant.id)
+      : undefined;
+    if (corridorOccupant?.kind === 'employee' && !corridorBlockerEmp?.isMoveStuck
+      && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, result, true)
+      && state.navGrid) {
+      const direct = findPath(state.navGrid, {
+        agentId: emp.id, fromX: emp.x, fromZ: emp.z, toX: leg.destX, toZ: leg.destZ,
+        avoidVehicles: true, ...(requiredClearance !== undefined && { requiredClearance }),
+      });
+      if (direct.found) {
+        return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, direct, occupancy, result);
+      }
+    }
+
     // (#1274) No `exemptOccupant` here: this branch only ever runs when
     // `!destinationHeldByOther`, but a board leg's destination IS the target
     // vehicle's own cell by construction — always self-held — so this branch
@@ -952,9 +1013,11 @@ function handleAgentOccupancyBlock(
 
   // "Destination spreading": only a leg whose arrival step needs an exact,
   // unshared cell (never a board/enter_building arrival, which must reach
-  // the one specific vehicle/building cell it names) can have its target
+  // the one specific vehicle/building cell it names), and is not itself a
+  // relocated occupant's own return trip (`leg.neverSpread`, #1278 follow-up
+  // — see that field's own doc comment, Itinerary.ts), can have its target
   // relocated out from under it.
-  const needsExactUnsharedCell = destinationHeldByOther && leg.arrival !== 'adjacent'
+  const needsExactUnsharedCell = destinationHeldByOther && leg.arrival !== 'adjacent' && !leg.neverSpread
     && (leg.onArrive.kind === 'none' || leg.onArrive.kind === 'effect');
   if (needsExactUnsharedCell) {
     const spread = findNearestFreeCellForAgent(state, mover, leg.destX, leg.destZ);
@@ -1179,11 +1242,27 @@ function relocateDestinationBlocker(
  * reroute, sidestep a stuck peer, or spread the destination, but never moves
  * an idle blocker off a cell nothing else is contesting for it.
  *
- * TODO(#1278): implement — relocate the idle occupant at (destX, destZ) to
- * its own nearest free cell (mirrors `relocateDestinationBlocker`'s
- * driver-vs-driverless split), returning true once a relocation was issued
- * (or already in flight) so the caller can retry the block this same tick,
- * false when nothing there needs — or can be — relocated.
+ * `returnAfterRelocate` (#1278 follow-up, default false): when true, an
+ * employee occupant relocated this way is immediately re-dispatched
+ * (`moveTo`, with `allowUnreachable: true` and the resulting leg marked
+ * `neverSpread` — see that field's own doc comment, Itinerary.ts) back
+ * toward the exact cell it just vacated. Scoped to the corridor-blocker call
+ * site alone (`handleAgentOccupancyBlock`'s own `blockedStep` case) rather
+ * than turned on for every caller: there, the relocated occupant already
+ * reached ITS OWN distinct target earlier in the very same dense-grid
+ * convergence (the extreme-density reproduction this follow-up fixes) and
+ * nothing else will ever walk it back once displaced. Left off (the
+ * default) for the original destination-blocker call site just below: there
+ * the relocated occupant may have no destination of its own at all (an
+ * employee hired with no itinerary, e.g. this file's own "relocates an idle
+ * employee blocker" test) — sending it back toward a cell it never had any
+ * claim to raced it back into the very cell the REQUESTER was still walking
+ * toward, stealing it out from under the requester's own arrival. `moveTo`
+ * degrades gracefully on refusal — the employee just stays at the free
+ * cell, no worse off than without this parameter. A vehicle occupant has no
+ * analog: `relocateDriverlessVehicle`'s teleport already matches the
+ * pre-#1278 driverless-blocker relocation's own no-return-trip precedent,
+ * regardless of this flag.
  */
 function relocateIdleDestinationBlocker(
   state: GameState,
@@ -1191,6 +1270,7 @@ function relocateIdleDestinationBlocker(
   destX: number,
   destZ: number,
   result: LocomotionResult,
+  returnAfterRelocate = false,
 ): boolean {
   const occupant = occupancy.holderOf(destX, destZ);
   if (!occupant) return false;
@@ -1203,6 +1283,8 @@ function relocateIdleDestinationBlocker(
     // forced-rest state this codebase never disturbs elsewhere — leave it be.
     if (!emp || emp.collapsing || employeeWorkState(emp) !== 'idle') return false;
 
+    const originX = emp.x;
+    const originZ = emp.z;
     const freeCell = findNearestFreeCellForAgent(state, occupant, emp.x, emp.z);
     if (!freeCell) return false;
 
@@ -1210,6 +1292,23 @@ function relocateIdleDestinationBlocker(
     emp.z = freeCell.z;
     occupancy.tryMove(occupant, freeCell.x, freeCell.z);
     result.moved.push(emp.id);
+    // A teleport, not a walked step — any route commitment/move-history left
+    // over from whatever this employee was doing right before it stood here
+    // idle (its own prior arrival, in the #1278 corridor-relocation case)
+    // must not survive the jump: `applyReroutedAdvance`'s own identical
+    // reset (elsewhere in this file) is why a genuine reroute never confuses
+    // `advanceAlongPath` this way, and a stale committed waypoint pointing at
+    // a destination this employee's OWN fresh return-itinerary (below) now
+    // ALSO targets silently stalled the return trip forever with no error,
+    // no stuck flag, and no wait-counter movement at all — confirmed live via
+    // this file's own "bounded-tick fairness" dense-grid reproduction.
+    writeCommitted(emp, NULL_ROUTE_COMMITMENT);
+    writeMoveHistory(emp, null, null);
+    if (returnAfterRelocate) {
+      moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
+      const returnLeg = emp.itinerary?.legs[0];
+      if (returnLeg) returnLeg.neverSpread = true;
+    }
     return true;
   }
 
@@ -1317,6 +1416,31 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
 }
 
 /**
+ * True when (x, z) is some OTHER employee's own live, exact-arrival leg
+ * destination right now — reserved for their pending arrival even though
+ * nothing holds it yet (#1278 follow-up). `findNearestFreeCellForAgent`
+ * excludes a cell like this from every relocation/spread/sidestep candidate
+ * it offers: without this, a "nearest free cell" search picking a
+ * currently-unheld cell has no way to know that cell is another mover's own
+ * uncontested, about-to-be-claimed target — landing a relocated or spread
+ * mover there squats on it, and once that OTHER mover's own leg later finds
+ * ITS destination newly held (by the squatter), it has no idle blocker to
+ * relocate (the squatter is busy, mid-transit) and no choice left but to
+ * spread ITS OWN leg elsewhere too, chaining the same displacement forward
+ * indefinitely — confirmed live via this file's own "bounded-tick fairness"
+ * dense-grid reproduction: a corridor-relocated mover's return trip
+ * transiently passed through a THIRD mover's still-unclaimed exact target,
+ * spreading that third mover permanently off its own distinct cell.
+ */
+function isReservedByAnotherExactLeg(state: GameState, mover: Occupant, x: number, z: number): boolean {
+  return state.employees.employees.some(e => {
+    if (mover.kind === 'employee' && e.id === mover.id) return false;
+    const leg = e.itinerary?.legs[0];
+    return !!leg && leg.arrival === 'exact' && leg.destX === x && leg.destZ === z;
+  });
+}
+
+/**
  * Generalizes `findNearestFreeCellForVehicle` (#1206) to any mover, via
  * `AgentOccupancy` freedom rather than a live vehicle-position scan — used by
  * `handleAgentOccupancyBlock`'s sidestep and destination-spreading steps.
@@ -1326,7 +1450,10 @@ function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x:
 function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX: number, originZ: number): { x: number; z: number } | null {
   const occupancy = state.agentOccupancy;
   if (!occupancy) return null;
-  return findNearestFreeCell(state.navGrid, originX, originZ, (x, z) => !occupancy.isFreeFor(mover, x, z));
+  return findNearestFreeCell(
+    state.navGrid, originX, originZ,
+    (x, z) => !occupancy.isFreeFor(mover, x, z) || isReservedByAnotherExactLeg(state, mover, x, z),
+  );
 }
 
 /**
