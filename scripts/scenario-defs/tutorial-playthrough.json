@@ -275,14 +275,18 @@
       }
     },
     {
-      "command": "tick 130",
+      "command": "wait_until field:holeCount equals:9 max_ticks:400",
+      "timeout": 180,
+      "description": "#1263: converted from a hand-measured `tick 130` pad to a real wait_until on holeCount -- this file predates the wait_until convention (#590) and its fixed pad was measured before agent_occupancy:true added driller/drill_rig contention delay to drilling, so 130 ticks landed one hole short (orderedHoleCount 1, holeCount 8) once occupancy was turned on for this step (issue #1263's own new occupancy flag). Direct trace confirms the single driller/drill_rig actually needs 131 ticks door-to-door to sink all 9 ordered holes under occupancy; max_ticks:400 gives real headroom instead of a number that merely happens to be long enough today.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 130"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 400,
+          "timeoutMs": 180000
         }
       ],
-      "description": "#553: the single driller/drill_rig sinks all 16 ordered holes. Sandbox-measured; the pad is what the step below asserts against, not a guess.",
       "role": "setup",
       "expect": {
         "equals": {
@@ -1146,14 +1150,18 @@
       }
     },
     {
-      "command": "tick 90",
+      "command": "wait_until field:holeCount equals:4 max_ticks:400",
+      "timeout": 180,
+      "description": "#1263: converted from a hand-measured `tick 90` pad to a real wait_until on holeCount, same reason as the first pattern's wait above -- this file predates the wait_until convention (#590). #953's own 60->90 bump was already chasing the same symptom (climb-limit multi-level routing between patterns costing more ticks than assumed) with a bigger fixed number, but the two-cycle cascade agent_occupancy:true adds upstream (the first pattern's own wait landing one hole short) pushed this second pattern's timing further still, so 90 stalled again (orderedHoleCount 1, not 0). Direct trace against the corrected first-pattern wait shows the second driller only needs 40 ticks door-to-door once the first pattern actually finishes on time -- max_ticks:400 gives real headroom rather than another number that merely happens to work today.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 90"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 4,
+          "maxTicks": 400,
+          "timeoutMs": 180000
         }
       ],
-      "description": "#953: raised 60 -> 90 -- the climb-limit gate makes the driller's ordinary route between the two patterns route via ramp-based multi-level pathing instead of a straight walk whenever the two patterns sit on different bench levels, which costs a few more ticks than the old straight-line estimate assumed; direct trace (npx tsx scripts/run-all-scenarios.ts tutorial-playthrough) confirmed 90 clears the fourth hole (H4) before the charge step below fires. #553: the driller and the drill_rig cross the pit from the first pattern at (15,15) to this one at (8,8) and sink all four holes. Sandbox-measured pad.",
       "role": "setup",
       "expect": {
         "equals": {
