@@ -704,6 +704,19 @@ export function isStationaryBusyEmployee(emp: Employee): boolean {
 }
 
 /**
+ * Clears `emp`'s stuck-tracking counters after a teleport/relocation — the
+ * tie-break sidestep and `relocateIdleDestinationBlocker`'s fresh-start fix
+ * (#1278/#1283) both jump an employee to a new cell outside the normal
+ * step-by-step advance, and neither wants whatever wait/failure counters
+ * accumulated at the old cell to survive the jump.
+ */
+function resetStuckTracking(emp: Employee): void {
+  emp.vehicleWaitingTicks = 0;
+  emp.isMoveStuck = false;
+  emp.moveConsecutiveFailures = 0;
+}
+
+/**
  * True while `emp`'s current leg is `relocateIdleDestinationBlocker`'s own
  * `returnAfterRelocate` return trip (#1283 follow-up) — walking back to a
  * cell it was displaced from, with no real claim on it any more
@@ -983,9 +996,7 @@ function handleAgentOccupancyBlock(
         emp.x = freeCell.x;
         emp.z = freeCell.z;
         occupancy.tryMove(mover, freeCell.x, freeCell.z);
-        emp.vehicleWaitingTicks = 0;
-        emp.isMoveStuck = false;
-        emp.moveConsecutiveFailures = 0;
+        resetStuckTracking(emp);
         writeCommitted(emp, NULL_ROUTE_COMMITMENT);
         writeMoveHistory(emp, null, null);
         if (isDrive) writeVehiclePosition(state, vehicle!, freeCell.x, freeCell.z, true);
@@ -1373,9 +1384,7 @@ function relocateIdleDestinationBlocker(
     // a row reaches `MOVE_STUCK_ABANDON_TICKS` purely from counters this
     // teleport itself never actually waited through — abandoning a return
     // trip nobody outside this ladder ever asked to be time-boxed at all.
-    emp.vehicleWaitingTicks = 0;
-    emp.isMoveStuck = false;
-    emp.moveConsecutiveFailures = 0;
+    resetStuckTracking(emp);
     if (returnAfterRelocate) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];
