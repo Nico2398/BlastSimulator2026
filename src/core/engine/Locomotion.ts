@@ -26,6 +26,7 @@ import {
   STUCK_MORALE_PENALTY,
   MOVE_STUCK_ABANDON_TICKS,
   AGENT_OCCUPANCY_WAIT_TICKS,
+  AGENT_FREE_CELL_SEARCH_MAX_RADIUS,
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { board, alight, enterBuilding } from './Mount.js';
@@ -1148,6 +1149,35 @@ function relocateDestinationBlocker(
 }
 
 /**
+ * Generalizes `relocateDestinationBlocker` (vehicle-only) to any idle
+ * (non-busy) occupant sitting on another mover's destination cell — foot or
+ * vehicle — via `AgentOccupancy` rather than a live vehicle-position scan
+ * (#1278). `handleAgentOccupancyBlock` has no such relocation today: it can
+ * reroute, sidestep a stuck peer, or spread the destination, but never moves
+ * an idle blocker off a cell nothing else is contesting for it.
+ *
+ * TODO(#1278): implement — relocate the idle occupant at (destX, destZ) to
+ * its own nearest free cell (mirrors `relocateDestinationBlocker`'s
+ * driver-vs-driverless split), returning true once a relocation was issued
+ * (or already in flight) so the caller can retry the block this same tick,
+ * false when nothing there needs — or can be — relocated.
+ */
+export function relocateIdleDestinationBlocker(
+  state: GameState,
+  occupancy: AgentOccupancy,
+  destX: number,
+  destZ: number,
+  result: LocomotionResult,
+): boolean {
+  void state;
+  void occupancy;
+  void destX;
+  void destZ;
+  void result;
+  throw new Error('not implemented');
+}
+
+/**
  * Direct repositioning for a driverless idle blocker (#689/#1087 follow-up):
  * no driver exists to drive it clear through the ordinary itinerary
  * machinery, and none is needed — an unreserved, driverless vehicle has no
@@ -1181,16 +1211,17 @@ function relocateDriverlessVehicle(state: GameState, blocker: Vehicle, x: number
 /**
  * Nearest walkable, unoccupied NavGrid cell adjacent to `blocker`'s current
  * position (#689) — an expanding ring search (immediate neighbours first,
- * then two cells out) so a blocker wedged against another obstacle still
- * finds somewhere to go. Returns null when nothing nearby qualifies.
+ * out to `AGENT_FREE_CELL_SEARCH_MAX_RADIUS` cells) so a blocker wedged
+ * against another obstacle still finds somewhere to go. Returns null when
+ * nothing nearby qualifies.
  */
 /**
  * Nearest walkable cell (ring search: immediate neighbours first, then two
  * cells out) around (originX, originZ) that `isBlocked` reports free —
  * shared core of `findNearestFreeCellForVehicle` (live vehicle-position scan)
  * and its #1206 generalization `findNearestFreeCellForAgent` (AgentOccupancy
- * freedom). Returns null when nothing within 2 cells qualifies, or there is
- * no NavGrid yet.
+ * freedom). Returns null when nothing within `AGENT_FREE_CELL_SEARCH_MAX_RADIUS`
+ * cells qualifies, or there is no NavGrid yet.
  */
 function findNearestFreeCell(
   grid: NavGrid | null,
@@ -1205,7 +1236,7 @@ function findNearestFreeCell(
   let best: { x: number; z: number } | null = null;
   let bestDistSq = Infinity;
 
-  for (let radius = 1; radius <= 2; radius++) {
+  for (let radius = 1; radius <= AGENT_FREE_CELL_SEARCH_MAX_RADIUS; radius++) {
     for (let x = bx - radius; x <= bx + radius; x++) {
       for (let z = bz - radius; z <= bz + radius; z++) {
         if (x === bx && z === bz) continue;

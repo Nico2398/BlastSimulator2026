@@ -704,6 +704,22 @@ export const STUCK_THRESHOLD = 3;
 export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
 
 /**
+ * Largest ring radius `findNearestFreeCell`'s ring-search loop (Locomotion.ts)
+ * will expand to before giving up. Replaces that loop's previously-hardcoded
+ * literal `2` — a flat cap of 2 rings (searching at most a 5x5 neighbourhood)
+ * can never find a free cell in a saturated 1m-spacing, high-density hole grid
+ * (issue #1278), since every cell within 2 rings of the blocker is itself
+ * occupied by another hole/agent.
+ *
+ * Placeholder value only — the implementer must measure the smallest radius
+ * that reliably clears the acceptance scenario
+ * (blast-execution-visual.json's 1m-spacing 64-hole grid) and update this
+ * value and comment accordingly. Do not leave it at this unmeasured
+ * placeholder.
+ */
+export const AGENT_FREE_CELL_SEARCH_MAX_RADIUS = 4;
+
+/**
  * Whether ground-cell occupancy is enforced for every agent, foot or vehicle
  * (#1206) — lands OFF; #1207 turns it on by default. `GameState.agentOccupancyEnabled`
  * reads this as its default, and the `debug occupancy on|off` console command
