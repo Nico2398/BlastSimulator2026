@@ -31,7 +31,10 @@ export function isDestinationOccupied(state: GameState, x: number, z: number): b
  * debris_hauler, rock_fragmenter etc. all block foot pathfinding identically
  * rather than needing a per-role branch. Guarded on state.navGrid since some
  * ticks may run before a navgrid exists (e.g. tests constructing a bare
- * GameState). Called from Locomotion.ts, the only writer of a vehicle's x/z.
+ * GameState). Called from Locomotion.ts, the per-tick writer of a vehicle's
+ * x/z, and from BuildingTaskHelpers.ts's relocateFootprintOccupants (#1270),
+ * the one-time writer that snaps a footprint-stranded vehicle onto its
+ * nearest reachable cell outside any tick.
  */
 export function updateVehicleCellOccupancy(
   state: GameState,

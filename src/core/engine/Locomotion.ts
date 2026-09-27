@@ -2,7 +2,10 @@
 // The only mover: walks every alive employee's current itinerary leg one
 // tick's worth of movement, and — for a mounted employee — writes their
 // vehicle's x/z from theirs. That write is the only place a vehicle's
-// position ever changes. Replaces tickVehicle + tickEmployeeMovement
+// position changes per tick; BuildingTaskHelpers.ts's
+// relocateFootprintOccupants (#1270) is a second, one-time writer, snapping
+// a vehicle stranded by a newly-blocked footprint onto the nearest reachable
+// cell outside any tick. Replaces tickVehicle + tickEmployeeMovement
 // (EntityMovementTick.ts) and VehicleOccupancyReroute.ts, whose reroute/
 // escalation logic is absorbed below. An employee with no itinerary does not
 // move (#1178, single-mover unification) — every walk goes through moveTo.
@@ -158,8 +161,9 @@ interface LocomotionResult {
 /**
  * The only mover. Walks every alive employee's current itinerary leg one
  * tick's worth of movement, and — for a mounted employee — writes their
- * vehicle's x/z from theirs. The only place a vehicle's position ever
- * changes. An employee with no itinerary (destinationX/Z, if set, is a
+ * vehicle's x/z from theirs. The only place a vehicle's position changes
+ * per tick (see this file's own header comment for the one-time exception).
+ * An employee with no itinerary (destinationX/Z, if set, is a
  * read-only mirror — MoveTo.ts's syncItineraryMirrors) does not move.
  */
 export function tickLocomotion(state: GameState, emitter?: EventEmitter): LocomotionResult {
