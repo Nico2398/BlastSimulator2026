@@ -2271,7 +2271,21 @@ describe('tickLocomotion — agent occupancy: crossing a busy employee blocker i
     expect(moveTo(state, moverA.id, { x: 8, z: 1 }).success).toBe(true);
     expect(moveTo(state, moverB.id, { x: 8, z: 5 }).success).toBe(true);
 
-    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS + 15;
+    // Budget reasoning: lane A (the busy blocker) crosses in a single
+    // AGENT_OCCUPANCY_WAIT_TICKS wait, well inside a much smaller budget than
+    // this. Lane B (the idle blocker) has no bypass either — a genuinely
+    // single-file corridor from x=2 to x=6 — so each time moverB catches back
+    // up to idleBlocker, `relocateIdleDestinationBlocker`'s corridor-blocker
+    // fallback can only push idleBlocker one cell further down the SAME
+    // corridor (the "nearest free cell" from a 1-wide lane is always the next
+    // cell along it), never off it, and each push costs its own full
+    // AGENT_OCCUPANCY_WAIT_TICKS wait before it fires. idleBlocker starts at
+    // x=4 and needs pushing past x=6 (into the 3-row room at x=7) before it
+    // can ever step off lane B's single row — 3 pushes, so up to
+    // 3*AGENT_OCCUPANCY_WAIT_TICKS of pure wait on top of the ordinary walk
+    // time, not the single-push budget a wide-open dense grid (where a
+    // relocated blocker usually has somewhere sideways to go) needs.
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS * 5;
     const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
     let ticks = 0;
     while (ticks < MAX_TICKS && (moverA.itinerary !== null || moverB.itinerary !== null)) {

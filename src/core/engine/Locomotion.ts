@@ -704,6 +704,32 @@ export function isStationaryBusyEmployee(emp: Employee): boolean {
 }
 
 /**
+ * True while `emp`'s current leg is `relocateIdleDestinationBlocker`'s own
+ * `returnAfterRelocate` return trip (#1283 follow-up) — walking back to a
+ * cell it was displaced from, with no real claim on it any more
+ * (`Leg.neverSpread`'s own doc comment, Itinerary.ts, is the only thing that
+ * ever sets this field). Treated as inert everywhere this ladder decides
+ * whether a blocker is a genuine, contested "stuck" opponent
+ * (`corridorBlockerEmp`/`blockerEmp` below) or safe to relocate again
+ * (`relocateIdleDestinationBlocker`'s own idle-only guard): a return trip's
+ * own oscillation-based `isMoveStuck` can flip true well before this ladder's
+ * `AGENT_OCCUPANCY_WAIT_TICKS` gate even fires — in a genuinely single-file
+ * corridor the "nearest free cell" it is walking back to is the requester's
+ * very next hop, so the two face off exactly on top of each other — and
+ * without this exemption the tie-break sidestep below reads that as a live
+ * contest and sends the REAL requester stepping backward out of ITS OWN way
+ * instead, forever, since the very next relocation just re-queues an
+ * identical return trip one cell further down the same corridor (confirmed
+ * live via this file's own "a mix of idle and busy blockers across two
+ * simultaneous dense-grid-style lanes" test, #1283). A return trip is always
+ * safe to treat as inert: worst case it is relocated again (or never
+ * finishes returning), exactly as if `returnAfterRelocate` had been left off.
+ */
+function isOnReturnTripLeg(emp: Employee): boolean {
+  return emp.itinerary?.legs[0]?.neverSpread === true;
+}
+
+/**
  * Generalizes `handleOccupancyBlock` (below) to any agent — foot or vehicle
  * (#1206) — via `AgentOccupancy` rather than the live vehicle-position scan
  * `isOccupiedByOtherVehicle` does. `mover` is the occupant identity of
@@ -918,7 +944,8 @@ function handleAgentOccupancyBlock(
     const corridorBlockerEmp = corridorOccupant?.kind === 'employee'
       ? state.employees.employees.find(e => e.id === corridorOccupant.id)
       : undefined;
-    if (corridorOccupant?.kind === 'employee' && !corridorBlockerEmp?.isMoveStuck
+    if (corridorOccupant?.kind === 'employee'
+      && (!corridorBlockerEmp?.isMoveStuck || (corridorBlockerEmp && isOnReturnTripLeg(corridorBlockerEmp)))
       && relocateIdleDestinationBlocker(state, occupancy, blockedStep.x, blockedStep.z, result, true)
       && state.navGrid) {
       const direct = findPath(state.navGrid, {
@@ -948,7 +975,7 @@ function handleAgentOccupancyBlock(
     // the pair can never both step aside at once).
     const blocker = occupancy.holderOf(blockedStep.x, blockedStep.z);
     const blockerEmp = blocker ? controllingEmployee(state, blocker) : undefined;
-    if (blockerEmp?.isMoveStuck && emp.id > blockerEmp.id) {
+    if (blockerEmp?.isMoveStuck && !isOnReturnTripLeg(blockerEmp) && emp.id > blockerEmp.id) {
       const freeCell = findNearestFreeCellForAgent(state, mover, emp.x, emp.z);
       if (freeCell) {
         const fromX = emp.x;
@@ -1309,7 +1336,13 @@ function relocateIdleDestinationBlocker(
     // not collapsing: a collapsing employee also reads as 'idle' by that
     // classification (no itinerary, no activeActionId) but is in a protected
     // forced-rest state this codebase never disturbs elsewhere — leave it be.
-    if (!emp || emp.collapsing || employeeWorkState(emp) !== 'idle') return false;
+    // A mid-return-trip occupant (#1283 follow-up, `isOnReturnTripLeg`) reads
+    // 'traveling', not 'idle' — accepted anyway: it has no real claim on
+    // wherever it currently stands either, so relocating it again (chaining
+    // it further along, cancelling its now-stale return in favour of a fresh
+    // one from the new spot) is exactly as safe as relocating a genuinely
+    // idle occupant.
+    if (!emp || emp.collapsing || (employeeWorkState(emp) !== 'idle' && !isOnReturnTripLeg(emp))) return false;
 
     const originX = emp.x;
     const originZ = emp.z;
@@ -1332,6 +1365,17 @@ function relocateIdleDestinationBlocker(
     // this file's own "bounded-tick fairness" dense-grid reproduction.
     writeCommitted(emp, NULL_ROUTE_COMMITMENT);
     writeMoveHistory(emp, null, null);
+    // A fresh start at the new cell (#1283 follow-up): without this, a
+    // corridor blocker relocated more than once in a row (each relocation
+    // one more cell down a genuinely single-file corridor, #1283's own
+    // "nudge forward" case) carries its PREVIOUS spot's already-accumulated
+    // `vehicleWaitingTicks` into the new one, so a handful of relocations in
+    // a row reaches `MOVE_STUCK_ABANDON_TICKS` purely from counters this
+    // teleport itself never actually waited through — abandoning a return
+    // trip nobody outside this ladder ever asked to be time-boxed at all.
+    emp.vehicleWaitingTicks = 0;
+    emp.isMoveStuck = false;
+    emp.moveConsecutiveFailures = 0;
     if (returnAfterRelocate) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];
