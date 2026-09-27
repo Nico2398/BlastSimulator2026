@@ -24,8 +24,14 @@ export type ScreenTileResolution =
   | { resolved: true; ndc: { x: number; y: number; z: number } }
   | { resolved: false; reason?: 'grazing-angle-cycle' };
 
-/** Iteration cap for the convergence loop below, matching the previous window.__worldToScreen behaviour. */
-export const TILE_RESOLUTION_MAX_ITERATIONS = 5;
+/**
+ * Iteration cap for the convergence loop below. A period-3 grazing-angle
+ * cycle spends its first 3 iterations just closing the cycle before any
+ * damping can begin, so the old budget of 5 left at most 2 damping attempts;
+ * 8 leaves up to 5, enough for the shrinking relaxation in dampedHeight to
+ * converge when the geometry allows it.
+ */
+export const TILE_RESOLUTION_MAX_ITERATIONS = 8;
 
 /**
  * Two heights within this many world units are the same guess, for oscillation
@@ -44,37 +50,35 @@ const OSCILLATION_EPSILON = 0.25;
  * than the ordinary period-2 bench-edge oscillation.
  */
 const GRAZING_CYCLE_MIN_SPAN = 3;
-// TODO(#1276): consumed by classifyUnresolvedReason once it is implemented.
-void GRAZING_CYCLE_MIN_SPAN;
 
 /**
  * Blends a repeated height guess toward the new raycast hit, damped by how
  * many times this height has already repeated — replaces the fixed 50/50
- * blend for cycles the plain average cannot break.
+ * blend for cycles the plain average cannot break. The first repeat still
+ * gets the flat 50/50 blend (unchanged from before, correct for period-2
+ * cycles); each subsequent repeat applies a shrinking correction so a
+ * longer cycle relaxes toward the hit instead of ping-ponging forever.
  */
 export function dampedHeight(currentY: number, hitY: number, repeatCount: number): number {
-  // TODO(#1276): implement in the implementation phase.
-  void hitY;
-  void repeatCount;
-  return currentY;
+  if (repeatCount <= 1) {
+    return (currentY + hitY) / 2;
+  }
+  return currentY + (hitY - currentY) / (repeatCount + 1);
 }
 
 /**
  * Classifies why the convergence loop in resolveScreenPointForTile exhausted
  * its iterations without resolving, from the span between a height's first
- * appearance and its first repeat.
+ * appearance and its first repeat. A span of 3 or more distinct heights
+ * before the first repeat is the signature of a period-3+ cycle, which only
+ * arises from a grazing camera-to-tile viewing angle.
  */
 export function classifyUnresolvedReason(cycleSpanAtFirstRepeat: number | null): 'grazing-angle-cycle' | undefined {
-  // TODO(#1276): implement in the implementation phase.
-  void cycleSpanAtFirstRepeat;
+  if (cycleSpanAtFirstRepeat !== null && cycleSpanAtFirstRepeat >= GRAZING_CYCLE_MIN_SPAN) {
+    return 'grazing-angle-cycle';
+  }
   return undefined;
 }
-
-// TODO(#1276): resolveScreenPointForTile wires these two in during the
-// implementation phase; referenced here so the skeleton typechecks clean
-// under noUnusedLocals/noUnusedParameters.
-void dampedHeight;
-void classifyUnresolvedReason;
 
 /**
  * Finds an NDC point that projects near (targetX, startY, targetZ) and whose
@@ -99,6 +103,8 @@ export function resolveScreenPointForTile(
   // of jumping straight back) the moment one repeats breaks that cycle,
   // without changing behaviour for the common case where each guess is new.
   const visitedHeights: number[] = [startY];
+  let repeatCount = 0;
+  let cycleSpanAtFirstRepeat: number | null = null;
 
   for (let i = 0; i < maxIterations; i++) {
     const ndc = project(targetX + 0.5, currentY, targetZ + 0.5);
@@ -109,12 +115,21 @@ export function resolveScreenPointForTile(
         return { resolved: true, ndc };
       }
       const seenBefore = visitedHeights.some((h) => Math.abs(h - hit.y) < OSCILLATION_EPSILON);
-      currentY = seenBefore ? (currentY + hit.y) / 2 : hit.y;
+      if (seenBefore) {
+        repeatCount++;
+        if (cycleSpanAtFirstRepeat === null) {
+          cycleSpanAtFirstRepeat = visitedHeights.length;
+        }
+        currentY = dampedHeight(currentY, hit.y, repeatCount);
+      } else {
+        currentY = hit.y;
+      }
       visitedHeights.push(currentY);
     }
     // A null hit (occlusion/miss) is never accepted as success; retry with the
     // same height in case a later projection clears the occlusion.
   }
 
-  return { resolved: false };
+  const reason = classifyUnresolvedReason(cycleSpanAtFirstRepeat);
+  return reason === undefined ? { resolved: false } : { resolved: false, reason };
 }
