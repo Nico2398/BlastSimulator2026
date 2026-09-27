@@ -196,7 +196,7 @@ export type PendingActionStatus = 'queued' | 'assigned' | 'in_progress';
  * Why a PendingAction currently has nobody able to perform it — surfaced as a
  * non-blocking player warning rather than cancelling the order (#1061).
  */
-export type BlockedOrderReason = 'no_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver';
+export type BlockedOrderReason = 'no_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable';
 
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {

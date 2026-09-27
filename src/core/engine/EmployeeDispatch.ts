@@ -20,6 +20,9 @@ import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { alightIfMounted } from './Mount.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
+import { NavGrid } from '../nav/NavGrid.js';
+import type { ReachableSet } from '../nav/NavGridReachability.js';
+import { findHaulDepotApproach } from '../economy/HaulingTask.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -243,6 +246,25 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   }
 
   return result;
+}
+
+/**
+ * Stub landing spot for #1231's `target_unreachable` blockedReason
+ * classification: a debris-hauling PendingAction whose target cell sits
+ * outside the ground crew's reachable region (behind #1197's diagonal-corner
+ * cut) never makes progress, and nothing currently flags it. Will anchor
+ * NavGrid.computeClimbReachableSet at the nearest active freight_warehouse's
+ * approach cell (findHaulDepotApproach, HaulingTask.ts) so tickEmployees can
+ * test each PendingAction's target against it once per call.
+ *
+ * TODO(implementer): wire this into tickEmployees's classification pass and
+ * return the real reachable set instead of null.
+ */
+export function computeUnreachableTargets(state: GameState): ReachableSet | null {
+  void NavGrid;
+  void findHaulDepotApproach;
+  void state;
+  return null;
 }
 
 /**
