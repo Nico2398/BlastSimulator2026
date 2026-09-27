@@ -145,8 +145,46 @@ runs:
               core.setFailed(`Issue #${completed}'s pull requests could not be read — not chaining on an unknown state.`);
               return;
             }
+            // The run is over, so `in-progress` cannot still be true. A run that
+            // settles its own issue drops it, but one that was closed from
+            // outside may not have — and left on a closed issue it is invisible
+            // to the parallel-run count, which lists open issues only, while still
+            // reading as a live run to anything that looks the issue up directly.
+            //
+            // The Definition of Done (`agentic-autonomous-pipeline`) on top: a
+            // close as completed carries `done` and nothing left saying the work
+            // is queued, halted or waiting. A close as not planned is not done,
+            // and is left as the run left it.
+            const settle = async () => {
+              if (finished.labels.includes(rules.IN_PROGRESS)) {
+                await github.rest.issues
+                  .removeLabel({ owner, repo, issue_number: completed, name: rules.IN_PROGRESS })
+                  .catch(() => {});
+                core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it is over.`);
+              }
+              if (finished.stateReason !== 'completed') return;
+              if (!finished.labels.includes(rules.DONE)) {
+                await github.rest.issues
+                  .addLabels({ owner, repo, issue_number: completed, labels: [rules.DONE] })
+                  .catch(() => {});
+              }
+              for (const stale of [rules.READY, rules.BLOCKED, rules.PAUSED]) {
+                if (!finished.labels.includes(stale)) continue;
+                await github.rest.issues
+                  .removeLabel({ owner, repo, issue_number: completed, name: stale })
+                  .catch(() => {});
+              }
+            };
+
             const carrier = finishedPrs.pipeline ?? finishedPrs.closers[0];
             if (carrier) {
+              // The merge chain settles the issue its PR names first, and GitHub
+              // closes every issue the PR names — so this is where the others
+              // arrive. PR #1251 closed #1200 and #1252, and #1252 was left
+              // closed still claiming `in-progress`. Only a merged deliverable
+              // has finished the work; an open one is still in flight.
+              const merged = [finishedPrs.pipeline, ...finishedPrs.closers].find((pr) => pr?.merged);
+              if (merged) await settle();
               core.info(`Issue #${completed} has pull request #${carrier.number} — the merge event carries the chain.`);
               return;
             }
@@ -164,37 +202,11 @@ runs:
               return;
             }
 
-            // The run is over, so `in-progress` cannot still be true. A run that
-            // settles its own issue drops it, but one that was closed from
-            // outside may not have — and left on a closed issue it is invisible
-            // to the parallel-run count, which lists open issues only, while still
-            // reading as a live run to anything that looks the issue up directly.
-            if (finished.labels.includes(rules.IN_PROGRESS)) {
-              await github.rest.issues
-                .removeLabel({ owner, repo, issue_number: completed, name: rules.IN_PROGRESS })
-                .catch(() => {});
-              core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it closed it.`);
-            }
-
-            // The Definition of Done (`agentic-autonomous-pipeline`) for a
-            // deliverable that was not a diff: closed as completed, `done`, and
-            // nothing left saying the work is queued, halted or waiting. The run
-            // is meant to leave it that way; this makes a run that forgot a
-            // label unable to leave a closed issue claiming to be in the queue.
-            // A close as not planned is not done, and is left as the run left it.
-            if (finished.stateReason === 'completed') {
-              if (!finished.labels.includes(rules.DONE)) {
-                await github.rest.issues
-                  .addLabels({ owner, repo, issue_number: completed, labels: [rules.DONE] })
-                  .catch(() => {});
-              }
-              for (const stale of [rules.READY, rules.BLOCKED, rules.PAUSED]) {
-                if (!finished.labels.includes(stale)) continue;
-                await github.rest.issues
-                  .removeLabel({ owner, repo, issue_number: completed, name: stale })
-                  .catch(() => {});
-              }
-            }
+            // A deliverable that was not a diff: the run is meant to leave the
+            // issue meeting the Definition of Done, and this makes a run that
+            // forgot a label unable to leave a closed issue claiming to be in
+            // the queue.
+            await settle();
 
             core.info(`Issue #${completed} closed without a PR — chaining directly.`);
           }

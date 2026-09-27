@@ -151,7 +151,7 @@ A red CI on an existing open PR is the other task shape that works this way, and
 
 **Both:** nothing is left saying the work is queued, owned, halted or waiting — no `ready`, `in-progress`, `blocked` or `paused`. The `scope:*` labels stay, as the record of what the change touched. An issue closed as not planned is never `done`.
 
-**What a machine holds, and what the run owes.** The merge gate holds the first line of the diff case. The merge chain (`auto-assign-next.yml`) closes the issue as completed, applies `done` and clears the other lifecycle labels; the close chain does the same for a run that closed its own issue as completed without a PR; `agentic-intake.yml` drops `done` from a reopened issue. Everything else is the run's to make true before it ends, and a reviewer's to check.
+**What a machine holds, and what the run owes.** The merge gate holds the first line of the diff case. The merge chain (`auto-assign-next.yml`) closes every issue the PR names on a `Closes #N` line of its own as completed, applies `done` and clears the other lifecycle labels; the close chain does the same for a run that closed its own issue as completed without a PR, and for any issue a merged PR closed that the merge chain did not name; `agentic-intake.yml` drops `done` from a reopened issue. Everything else is the run's to make true before it ends, and a reviewer's to check.
 
 ## ▶ Before ending: verify the issue, branch and PR agree
 
