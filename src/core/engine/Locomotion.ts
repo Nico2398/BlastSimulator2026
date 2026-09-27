@@ -698,9 +698,9 @@ function isIdleParkedVehicle(vehicle: Vehicle, employees: readonly Employee[]): 
  * own crossing-guard being wired to call it (#1283, implementation phase).
  */
 export function isStationaryBusyEmployee(emp: Employee): boolean {
-  void emp;
-  // TODO: implement
-  throw new Error('not implemented');
+  if (emp.isMoveStuck) return false;
+  const workState = employeeWorkState(emp);
+  return workState === 'working' || workState === 'resting';
 }
 
 /**
@@ -734,15 +734,18 @@ export function isStationaryBusyEmployee(emp: Employee): boolean {
  *    sidestep have failed to resolve it (#1263): when the occupant actually
  *    in the way is a vehicle with no driver and no drive in progress —
  *    genuinely parked, not a live contest between two movers the way step
- *    2's sidestep handles — a reroute that avoids every OTHER occupied cell
- *    but is still willing to route straight through this one specific
- *    blocker's own cell, crossing it directly on success. Generalizes the
- *    existing foot-crosses-parked-vehicle exemption (`avoidVehicles ===
- *    false`, `AgentAdvance.ts`) to any mover. Without this, a single parked
- *    vehicle planted in the only cell of a genuine single-file corridor
- *    blocks every route through it forever, since no full-avoidance reroute
- *    ever avoids every occupied cell when the blocker never moves on its own
- *    and there never was a second way around;
+ *    2's sidestep handles — or (#1283) an employee genuinely busy working or
+ *    resting (also not a live contest, and not `isMoveStuck`) — a reroute
+ *    that avoids every OTHER occupied cell but is still willing to route
+ *    straight through this one specific blocker's own cell, crossing it
+ *    directly on success. Generalizes the existing
+ *    foot-crosses-parked-vehicle exemption (`avoidVehicles === false`,
+ *    `AgentAdvance.ts`) to any mover, and to this second stationary-occupant
+ *    kind. Without this, a single parked vehicle (or busy employee) planted
+ *    in the only cell of a genuine single-file corridor blocks every route
+ *    through it forever, since no full-avoidance reroute ever avoids every
+ *    occupied cell when the blocker never moves on its own and there never
+ *    was a second way around;
  * 3. failing all of the above — including whenever the destination itself
  *    was held, which skips straight here — "destination spreading":
  *    retargeting the leg's own destination to the nearest free cell around
@@ -1007,9 +1010,13 @@ function handleAgentOccupancyBlock(
     // ACTION_STUCK_BACKOFF_TICKS cost first. This generalizes the existing
     // foot-crosses-parked-vehicle exemption (`avoidVehicles === false`,
     // `AgentAdvance.ts`, also #1263) from foot movers to any mover crossing a
-    // confirmed-idle, driverless vehicle specifically — never another live,
-    // moving vehicle, and never an occupied-by-an-employee cell, both of
-    // which stay exactly as blocking as before. Confirmed via
+    // confirmed-idle, driverless vehicle, or (#1283) a genuinely busy —
+    // working or resting, non-stuck — employee (`isStationaryBusyEmployee`
+    // below): never another live, moving vehicle or employee (a `traveling`
+    // occupant is a real contest, the tie-break sidestep's job), and never
+    // an idle employee (`relocateIdleDestinationBlocker`'s own case above,
+    // which moves it out of the way entirely rather than walking through
+    // it) — both stay exactly as blocking as before. Confirmed via
     // economy-full-loop.json (agent_occupancy:true): a debris_hauler's route
     // funnelled through the blast crater's one access corridor cell,
     // permanently held by a driverless rock_fragmenter whose driver (licensed
@@ -1018,7 +1025,11 @@ function handleAgentOccupancyBlock(
     // rubble_disposal's own deadline (rng.nextInt(30, 100)) every time this
     // recurred.
     const blockerVehicle = blocker?.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === blocker!.id) : undefined;
-    if (blockerVehicle && isIdleParkedVehicle(blockerVehicle, state.employees.employees)) {
+    const blockerIsIdleParkedVehicle = blockerVehicle !== undefined
+      && isIdleParkedVehicle(blockerVehicle, state.employees.employees);
+    const blockerIsStationaryBusyEmployee = blocker?.kind === 'employee'
+      && blockerEmp !== undefined && isStationaryBusyEmployee(blockerEmp);
+    if (blockerIsIdleParkedVehicle || blockerIsStationaryBusyEmployee) {
       const crossing = findPathAvoidingOccupiedCells(
         state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance, blocker!,
       );
