@@ -1139,7 +1139,7 @@ describe('detecting a stranded pause', () => {
   });
 
   // Distinct from `no-ready-label`: the dependency carries `ready` but a
-  // second label (`blocked`, `in-progress`, `done`) disqualifies it anyway,
+  // second label (`blocked`, `done`) disqualifies it anyway,
   // per `labelVerdict`.
   it('is stranded when the dependency carries `ready` but is disqualified by another label', async () => {
     const api = fakeApi([
@@ -1176,6 +1176,28 @@ describe('detecting a stranded pause', () => {
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 10, cause: 'closed-unmerged' })
     );
+  });
+
+  // The #1261/#1262 incident: #1278 was the dependency both pauses waited on,
+  // and a live run held it — the assigner had swapped its `ready` for
+  // `in-progress`. The sweep read the missing `ready` as `no-ready-label`,
+  // marked both pauses `blocked`, and tripped the cascade brake mid-run.
+  it('is not stranded when a live run holds the dependency (`in-progress`, no `ready`)', async () => {
+    const api = fakeApi([
+      { number: 10, labels: ['agent-task', 'in-progress', 'scope:engine'] },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
+    expect(verdict).toEqual({ stranded: false, blockers: [] });
+  });
+
+  it('is stranded when the dependency\'s run died and it was labelled `blocked`', async () => {
+    const api = fakeApi([
+      { number: 10, labels: ['agent-task', 'in-progress', 'blocked', 'scope:engine'] },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
+    ]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
+    expect(verdict?.stranded).toBe(true);
   });
 
   it('is stranded when the dependency carries no `ready` label', async () => {

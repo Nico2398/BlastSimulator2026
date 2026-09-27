@@ -525,7 +525,8 @@ async function blockerCyclesBackTo(api, blockerRoot, targetNumber) {
  * Determines whether a `paused`-labelled issue is stranded: every not-yet-landed
  * dependency it declares is unassignable for a reason the pipeline cannot
  * resolve on its own (no `ready` label, `ready` but disqualified by another
- * label, a cycle back to this issue, closed-unmerged, or unreadable).
+ * label, a cycle back to this issue, closed-unmerged, or unreadable). A
+ * dependency a live run holds (`in-progress`, not `blocked`) is healthy.
  *
  * @param {IssueApi} api
  * @param {{number:number, labels:string[]}} issue
@@ -598,7 +599,17 @@ async function strandedPauseVerdict(api, issue) {
     }
 
     if (dep.state === 'open') {
-      const hasReady = (dep.labels || []).includes(READY);
+      const depLabels = dep.labels || [];
+      // A live run owns it: the assigner swaps `ready` for `in-progress`, so
+      // the dependency lacks `ready` for exactly as long as it is being worked
+      // on. That is the healthiest state a dependency can be in. A run that
+      // died is the stalled-run sweep's to catch — it labels the dependency
+      // `blocked`, and the next pass here reports the pause as stranded.
+      if (depLabels.includes(IN_PROGRESS) && !depLabels.includes(BLOCKED)) {
+        stillOpen.push({ healthy: true });
+        continue;
+      }
+      const hasReady = depLabels.includes(READY);
       const label = labelVerdict(dep);
       if (!hasReady) {
         stillOpen.push({
@@ -612,7 +623,7 @@ async function strandedPauseVerdict(api, issue) {
       }
       if (!label.assignable) {
         // It carries `ready`, but another label disqualifies it (`blocked`,
-        // `in-progress`, `done`) — distinct from lacking `ready` altogether,
+        // `done`) — distinct from lacking `ready` altogether,
         // which is the more common and more actionable shape.
         stillOpen.push({
           blocker: { number, cause: 'ready-but-disqualified', reason: label.reason },
