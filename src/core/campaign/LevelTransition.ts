@@ -90,8 +90,6 @@ export function createGameForLevel(
   const level = getLevel(levelId);
   if (!level) return null;
 
-  void agentOccupancy; // TODO: thread agentOccupancy into GameConfig once implemented
-
   const config: GameConfig = {
     seed: level.terrainSeed,
     mineType: level.biome,
@@ -99,6 +97,7 @@ export function createGameForLevel(
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
     ...(staffed ? { staffed: true } : {}),
+    ...(agentOccupancy !== undefined ? { agentOccupancyEnabled: agentOccupancy } : {}),
   };
 
   const newState = createGame(config);
