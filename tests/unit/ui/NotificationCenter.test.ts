@@ -329,5 +329,31 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(message).toContain(t(ACTION_LABEL_KEY.drill_hole));
       expect(message).toContain(t('skill.blasting'));
     });
+
+    it('names the order type for target_unreachable (#1231), with a translated, non-generic body distinct from the other three reasons', () => {
+      // Red until the implementer adds
+      // `notification.order_blocked_target_unreachable` to en.json/fr.json —
+      // t() (I18n.ts) returns the bare key string unmodified (no
+      // interpolation attempted) when the key is missing, so `message` today
+      // is the literal string 'notification.order_blocked_target_unreachable'
+      // — it contains neither the translated order label nor any real
+      // wording, and it collides with none of the assertions below only
+      // because the key IS added (mirror the existing 3 reasons exactly).
+      const action = makeAction({
+        id: 1, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+        blockedReason: 'target_unreachable',
+      });
+      const message = buildBlockedOrderMessage(action);
+      expect(message).toContain(t(ACTION_LABEL_KEY.haul_debris));
+      // Never the raw untranslated key — that would mean the locale entry
+      // still doesn't exist (I18n.ts's own missing-key fallback).
+      expect(message).not.toBe('notification.order_blocked_target_unreachable');
+      expect(message).not.toContain('notification.order_blocked_target_unreachable');
+
+      const noVehicleMessage = buildBlockedOrderMessage(
+        makeAction({ id: 1, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', blockedReason: 'no_vehicle_in_fleet' }),
+      );
+      expect(message).not.toBe(noVehicleMessage);
+    });
   });
 });
