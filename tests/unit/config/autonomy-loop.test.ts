@@ -1916,7 +1916,10 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
     expect(failsafe).toContain('github.rest.repos.getBranch');
     expect(failsafe).toContain('conflict:${conflict.sha}');
     expect(failsafe).toContain('git merge origin/${conflict.base}');
-    expect(failsafe).toContain('never rebase or force-push');
+    // Bringing the branch up to date may rebase and force-push, but only with
+    // a lease: a bare --force would discard a merge the gate pushed meanwhile.
+    expect(failsafe).toContain('--force-with-lease');
+    expect(failsafe).toContain('never a bare \\`--force\\`');
   });
 
   // The same conflict is one question; the base moving on is a new one.

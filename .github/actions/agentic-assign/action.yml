@@ -394,7 +394,7 @@ runs:
               '',
               'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
               '',
-              '`main` may move while this run works: other sessions can be live on other issues, and the merge gate merges `main` into an open pipeline branch before merging it. Merge `origin/main` into the feature branch just before opening the PR, and `git pull --no-rebase` before every later push to it. Never rebase or force-push it. `agentic-pipeline-finalization` and `agentic-pipeline-ci-fix` hold the steps.',
+              '`main` may move while this run works: other sessions can be live on other issues, and the merge gate merges `main` into an open pipeline branch before merging it. Bring the feature branch up to date with `origin/main` just before opening the PR, and fetch before every later push to it: merge `main` in, or rebase onto it and push with `git push --force-with-lease`. Never a bare `--force`, and never force-push a branch another run owns. `agentic-autonomous-pipeline` holds the rule, `agentic-pipeline-finalization` and `agentic-pipeline-ci-fix` the steps.',
               '',
               `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule, for what to fix on the fly rather than file, and for the blockers that genuinely stop a run.`,
               '',
