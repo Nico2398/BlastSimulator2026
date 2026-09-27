@@ -18,9 +18,10 @@ export type Verdict = 'green' | 'red' | 'pending';
  * every pipeline PR. A skipped *required* job is a different matter, and it is
  * `required-jobs.ts`'s to refuse, not this verdict's.
  *
- * Kept in step with `RUN_FAILURES` in `.github/actions/agentic-auto-merge`: the
- * action decides whether the PR merges, this script decides whether the run
- * that opened it may end, and the two must not disagree about what red means.
+ * Kept in step with `RUN_FAILURES` in `.github/scripts/ci-handback.cjs`, which
+ * the merge gate and the CI fail-safe both read: the gate decides whether the
+ * PR merges, this script decides whether the run that opened it may end, and
+ * the two must not disagree about what red means.
  */
 export const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale']);
 
@@ -30,7 +31,7 @@ export const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'start
  * `agentic-auto-merge.yml` runs on `workflow_run`, so its own run carries the
  * head SHA of the CI run that woke it and shows up in this list. Counting it
  * would be circular twice over: it is pending until CI has been read, and it
- * fails the step on a marked PR it could not arm — which is a report about the
+ * fails the step on a marked PR it could not move — which is a report about the
  * merge, not about the code. The runners are here for the sharper version of
  * the same circularity: this script runs *inside* the runner job, so counting
  * that job's own run would make every wait pend until the 360-minute timeout.

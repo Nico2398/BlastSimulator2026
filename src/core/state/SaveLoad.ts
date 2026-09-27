@@ -17,6 +17,14 @@ import { SCORE_DECAY_RATE } from '../config/balance.js';
 export function serialize(state: GameState): string {
   return JSON.stringify(state, (key, value) => {
     if (key === 'navGrid') return undefined;
+    // agentOccupancy (#1206): never rebuilt per tick, only lazily on the
+    // first tick after enable (tickLocomotion). Its two Map fields have no
+    // own enumerable JSON-representable state — JSON.stringify would
+    // silently flatten them to `{}`, and reloading that plain object throws
+    // on the first call to any of its prototype methods. Drop it here like
+    // navGrid; deserialize always sets it back to `null` and the next tick
+    // rebuilds it from live state.
+    if (key === 'agentOccupancy') return undefined;
     // Render-only walk trail (#1199): transient, a save never carries one.
     if (key === 'walkTrail') return undefined;
     if (value instanceof Set) return { __type: 'Set', values: [...value] };
@@ -427,6 +435,24 @@ function migrateV23ToV24(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v24 -> v25 (#1203): Employee gained `pendingTrainingState` — the enrolment
+ * claim-time/arrival-time split `pendingRestDuration` already has. A pre-v25
+ * save has no enrolment walk in flight, so every employee missing the field
+ * gets `pendingTrainingState: null`. Mutates `obj` in place, matching every
+ * other migration block in `deserialize` below.
+ */
+function migrateV24ToV25(obj: Record<string, unknown>): Record<string, unknown> {
+  const employeesContainer = obj['employees'] as Record<string, unknown> | undefined;
+  const employeesList = employeesContainer?.['employees'] as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(employeesList)) return obj;
+
+  for (const e of employeesList) {
+    if (e['pendingTrainingState'] === undefined) e['pendingTrainingState'] = null;
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -665,10 +691,21 @@ export function deserialize(json: string): GameState {
     migrateV23ToV24(obj);
   }
 
+  // v24 -> v25: Employee.pendingTrainingState, nothing pending (#1203).
+  if ((obj['version'] as number) < 25) {
+    migrateV24ToV25(obj);
+  }
+
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The
   // loader is responsible for rebuilding a real one.
   (obj as Record<string, unknown>)['navGrid'] = null;
+
+  // #1206: agentOccupancy is never part of the JSON (see serialize's
+  // replacer) — always null here, regardless of what an older save happened
+  // to carry. tickLocomotion rebuilds it from live state the first tick it
+  // runs while agentOccupancyEnabled is true and agentOccupancy is null.
+  (obj as Record<string, unknown>)['agentOccupancy'] = null;
 
   return obj as unknown as GameState;
 }

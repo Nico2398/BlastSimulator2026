@@ -14,7 +14,7 @@ import { Random } from '../math/Random.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import type { TaskProgressLevelUp } from './TaskProgress.js';
-import type { TrainingCompletion } from '../entities/EmployeeTraining.js';
+import type { TrainingCompletion, TrainingCancellation } from '../entities/EmployeeTraining.js';
 import type { CancelledResearch } from '../entities/Building.js';
 import type { ArrivalGateResult } from './ArrivalGate.js';
 import type { Violation } from '../state/WorldInvariants.js';
@@ -89,6 +89,14 @@ export interface TickReport {
   mafiaExposed: boolean;
   needEvents: FiredEventReport[];
   trainingCompletions: TrainingCompletion[];
+  /**
+   * Courses cancelled this tick because the school teaching them was
+   * demolished mid-course (#1203), each already refunded. Optional: existing
+   * hand-built TickReport fixtures construct one without it — callers that
+   * care read it as `?? []`, matching the rest of this report's arrays when
+   * absent.
+   */
+  trainingCancellations?: TrainingCancellation[];
   researchCancelled: CancelledResearch | undefined;
   taskCompletions: Array<{ employeeId: number; report: TaskCompletionReport }>;
   stuckEmployees: number[];
@@ -205,7 +213,13 @@ export function runTick(
   // 8c. Training courses — advance and report completions. Without this the
   //     course never ends: the fee is charged and the qualification never
   //     arrives, which made every skill no role is hired with unobtainable.
-  const trainingCompletions = tickTraining(state.employees, emitter);
+  const { completed: trainingCompletions, cancelled: trainingCancellations } = tickTraining(state, emitter);
+  for (const cancellation of trainingCancellations) {
+    state.cash += cancellation.refund;
+    addIncome(state.finances, cancellation.refund, 'refund',
+      `Training cancelled: ${cancellation.employeeName} — ${cancellation.skill} (school destroyed)`,
+      state.tickCount);
+  }
 
   // 8c-2. Research Center queue — advance the head task's progress each tick,
   //       unlocking its target tier when it completes. If the enabling
@@ -267,6 +281,19 @@ export function runTick(
   // from vehicle.state.
   const vehiclePositionsAtTickStart = new Map(state.vehicles.vehicles.map(v => [v.id, { x: v.x, z: v.z }]));
   const movementResult = tickLocomotion(state, emitter);
+  // A training walk-in whose `enter_building` arrival step genuinely failed
+  // this tick (#1203 — the school was demolished mid-walk, or was full the
+  // instant the employee tried to enter) is refunded and reported the same
+  // way as tickTraining's own mid-course cancellation above — both land in
+  // one `trainingCancellations` array so console/tick.ts's existing
+  // reporting line covers both without change.
+  for (const cancellation of movementResult.trainingCancelled) {
+    state.cash += cancellation.refund;
+    addIncome(state.finances, cancellation.refund, 'refund',
+      `Training cancelled: ${cancellation.employeeName} — ${cancellation.skill} (never entered school)`,
+      state.tickCount);
+    trainingCancellations.push(cancellation);
+  }
   // #1115: the authoritative set of vehicles a genuine, occupant-validated
   // drive leg actually moved this tick — see checkI4VehicleMovedWithoutOccupant's
   // own doc comment (WorldInvariants.ts) for why I4 checks against this
@@ -333,6 +360,7 @@ export function runTick(
     mafiaExposed,
     needEvents,
     trainingCompletions,
+    trainingCancellations,
     researchCancelled,
     taskCompletions,
     stuckEmployees,

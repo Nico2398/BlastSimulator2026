@@ -86,3 +86,31 @@ describe('tick.ts — boardingCancelled lines', () => {
     expect(result.output).toContain('BOARDING CANCELLED: employee #4242 (vehicle_gone).');
   });
 });
+
+describe('tick.ts — trainingCancellations lines', () => {
+  it('pushes a course-cancelled line per cancelled training when the school was destroyed', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({
+      trainingCancellations: [
+        { employeeId: 7, employeeName: 'Jonas', skill: 'geology', buildingId: 3, refund: 250 },
+      ],
+    }));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain(
+      "Jonas's geology course was cancelled — school #3 was destroyed. $250 refunded."
+    );
+  });
+
+  it('does not push a course-cancelled line when trainingCancellations is undefined', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({}));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).not.toContain('course was cancelled');
+  });
+});

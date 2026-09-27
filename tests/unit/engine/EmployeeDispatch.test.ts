@@ -237,6 +237,41 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
     expect((employee as any).activeActionId).toBeNull();
   });
 
+  // #1203: an employee walking to enrol in training (pendingTrainingState
+  // set) has activeActionId === null and an itinerary in flight (installed by
+  // enrolInTraining's own moveTo call) — the exact shape the pre-existing
+  // "activeActionId === null && itinerary !== null" guard (#1089 regression
+  // fix, above `isMidEvacuation`) already exists to catch, so no dedicated
+  // pendingTrainingState guard is needed for the walking half of enrolment.
+  // This test pins that the existing guard really does cover it.
+  it('does not claim a pending action while walking to enrol in training (pendingTrainingState set, itinerary in flight) (#1203)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    employee.activeActionId = null;
+    employee.pendingTrainingState = { buildingId: 5, skill: 'blasting', ticksRemaining: 20, fee: 500 };
+    employee.itinerary = {
+      goal: { kind: 'reposition', x: 40, z: 40 },
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 40, destZ: 40,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 5 }, estTicks: 9,
+      }],
+      workTicks: 0,
+      estTotalTicks: 9,
+    };
+
+    const action = makePendingAction({ id: 10, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions).toHaveLength(1);
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.pendingTrainingState).not.toBeNull();
+  });
+
   // #1042: an employee mid-evacuation-drive (boarded a driverless vehicle,
   // driving it clear of a danger zone) has activeActionId === null and would
   // otherwise read as plainly idle to tickEmployees — mirrors the

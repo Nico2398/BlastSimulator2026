@@ -442,11 +442,41 @@
         }
       ],
       "role": "player",
-      "description": "#553: train-driller, click half -- the course is booked at the driving_center just built. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely.",
+      "description": "#553: train-driller, click half -- the course is booked at the driving_center just built. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building, so this step no longer asserts an immediate increase.",
       "expect": {
-        "increased": [
-          "trainingCount"
-        ]
+        "equals": {
+          "trainingCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 60000
+        },
+        {
+          "type": "focusTile",
+          "x": 6,
+          "z": 15,
+          "distance": 16
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "description": "(#1205) Pauses on the driller's arrival at the driving_center (trainingCount promoted from pendingTrainingState to 1, matching building-training-visual.json's own wait_until trainingCount==1 + focusTile + screenshot pattern) and screenshots the (6,15) pin this file builds the driving_center at while the course is genuinely mid-way -- the driving_center now holds one occupant of its 4-person capacity, the visual proof point for BuildingOccupancyLabels' billboard.",
+      "expect": {
+        "equals": {
+          "trainingCount": 1
+        },
+        "note": "The driller has walked to and entered the driving_center -- mesh hidden, course now ticking, one occupant of 4 inside. Screenshot taken right after arrival, for BuildingOccupancyLabels visual inspection (#1205)."
       }
     },
     {
@@ -517,11 +547,11 @@
         }
       ],
       "role": "player",
-      "description": "#555: train-digger, click half -- dig_ramp_segment work (the box-cut step below) now requires a driving.excavator licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely.",
+      "description": "#555: train-digger, click half -- dig_ramp_segment work (the box-cut step below) now requires a driving.excavator licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below. #816: no longer downstream of the set_policy mode:continuous construction livelock -- living_quarters/driving_center/freight_warehouse all complete for real now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts relocates a bystander stranded on a just-completed building's footprint; EmployeeDispatchSteps.ts lets an idle employee fall through to the open pool instead of freezing behind one permanently-unreachable queued entry), so this step succeeds genuinely. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount stays 0 until they actually arrive and enter the building, so this step no longer asserts an immediate increase.",
       "expect": {
-        "increased": [
-          "trainingCount"
-        ]
+        "equals": {
+          "trainingCount": 0
+        }
       }
     },
     {

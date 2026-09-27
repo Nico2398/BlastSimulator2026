@@ -16,7 +16,7 @@ import {
   canReleaseStrandedVehicleGatedAction, isActionPastStuckBackoff, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
-import { beginRestTravel } from './RestActionHelpers.js';
+import { beginRestTravel, resolveRestBuildingId } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, isLicensedForRole } from './VehicleReservation.js';
 import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
@@ -536,7 +536,7 @@ export function promoteActionToActive(state: GameState, employee: Employee, acti
     const [targetX, targetZ] = action.payload['buildingId'] === undefined
       ? [employee.x, employee.z]
       : [action.targetX, action.targetZ];
-    beginRestTravel(state, employee, targetX, targetZ);
+    beginRestTravel(state, employee, targetX, targetZ, resolveRestBuildingId(action.payload));
     if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
       const needKey = resolveRestNeedKey(action.payload);
       if (needKey !== null) {

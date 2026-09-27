@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -16,7 +16,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
-import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
+import { sanitizeFiniteOverride, staffedSuffix, parseStaffedAndOccupancyFlags } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
@@ -417,18 +417,25 @@ export function newGameCommand(
     return { success: false, output: t('world.unknown_mine_type', { mineType, valid }) };
   }
 
-  const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
+  const rawSize = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
+  let size: number;
+  try {
+    size = requireValidGenDimension(rawSize, 'size');
+  } catch {
+    return { success: false, output: t('world.invalid_size', { size: rawSize, max: MAX_TERRAIN_GEN_DIMENSION }) };
+  }
   const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
 
-  const staffedFlag = parseStaffedFlag(named['staffed']);
-  if (staffedFlag.error) {
-    return { success: false, output: staffedFlag.error };
+  const flags = parseStaffedAndOccupancyFlags(named);
+  if (flags.error) {
+    return { success: false, output: flags.error };
   }
 
   ctx.state = createGame({
     seed, mineType,
     ...(startingCash !== undefined ? { startingCash } : {}),
-    ...(staffedFlag.staffed ? { staffed: true } : {}),
+    ...(flags.staffed ? { staffed: true } : {}),
+    ...(flags.agentOccupancy !== undefined ? { agentOccupancyEnabled: flags.agentOccupancy } : {}),
   });
   const datum = defaultDatumForSize(size);
   ctx.state.world = createWorldState(size, datum, size, true);
@@ -438,7 +445,7 @@ export function newGameCommand(
     success: true,
     output: t('world.new_game_success', {
       size, mineType, seed,
-      staffedSuffix: staffedSuffix(staffedFlag.staffed),
+      staffedSuffix: staffedSuffix(flags.staffed),
     }),
   };
 }

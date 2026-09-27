@@ -43,6 +43,11 @@ export function pictogramKindFor(activity: EmployeeActivity): PictogramKind | nu
       return 'driving';
     case 'walking':
       return activity.actionType === 'rest' ? 'walking_to_rest' : 'walking';
+    case 'training':
+      // No icon: an employee mid-course is inside the school building, whose
+      // occupancy model already hides their character mesh — nothing is
+      // rendered above them to hang a pictogram off of (#1203).
+      return null;
   }
 }
 
@@ -71,23 +76,29 @@ const FALLBACK_COLOR: Record<PictogramKind, number> = {
  * distinct glyph per kind, which a flat color alone can't carry, so canvas
  * drawing stays the browser-context behaviour and a flat-color material
  * (still one shared instance per kind, matching the real glyph's color)
- * stands in wherever `document` doesn't exist.
+ * stands in wherever `document` doesn't exist. Some test workers do provide a
+ * `document` without the `canvas` npm package installed, in which case
+ * `getContext('2d')` returns null rather than `document` being undefined —
+ * checked here too, so the fallback still triggers on that path instead of
+ * drawGlyph crashing.
  */
 function buildIconMaterial(kind: PictogramKind): THREE.MeshBasicMaterial {
-  if (typeof document === 'undefined') {
-    return new THREE.MeshBasicMaterial({ color: FALLBACK_COLOR[kind], transparent: true, depthWrite: false });
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_SIZE;
+    canvas.height = CANVAS_SIZE;
+    const ctx = canvas.getContext('2d');
+    if (ctx !== null) {
+      drawGlyph(ctx, kind);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+
+      return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    }
   }
 
-  const canvas = document.createElement('canvas');
-  canvas.width = CANVAS_SIZE;
-  canvas.height = CANVAS_SIZE;
-  const ctx = canvas.getContext('2d')!;
-  drawGlyph(ctx, kind);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-
-  return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+  return new THREE.MeshBasicMaterial({ color: FALLBACK_COLOR[kind], transparent: true, depthWrite: false });
 }
 
 /** One shrinking "Z" glyph to place, in canvas-fraction coordinates (0-1 of CANVAS_SIZE). */

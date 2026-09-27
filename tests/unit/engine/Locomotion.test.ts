@@ -7,11 +7,8 @@
 // mounted employee — writes their vehicle's x/z from theirs. This is the sole
 // place a vehicle's position ever changes (gameplay-vehicle-fleet skill,
 // `vehicles` rule). tickVehicle/tickEmployeeMovement (EntityMovementTick.ts)
-// still exist at this (red) phase, so these tests exercise the NEW module
-// directly rather than through the old tick pipeline.
-//
-// Locomotion.ts is a stub that throws 'not implemented' at this phase — every
-// test below is expected to fail for that reason, not from a fixture bug.
+// still exist, so these tests exercise the NEW module directly rather than
+// through the old tick pipeline.
 
 import { describe, it, expect, vi } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -21,11 +18,12 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { AGENT_WALK_SPEED, VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
+import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
 import { tickLocomotion, openMovementTrails } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
+import { AgentOccupancy, type Occupant } from '../../../src/core/nav/AgentOccupancy.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 import { isMounted } from '../../../src/core/entities/EmployeeLocomotion.js';
 
@@ -152,6 +150,37 @@ function makeGeneralWorkAction(id: number): PendingAction {
   };
 }
 
+/**
+ * A genuinely one-cell-wide foot corridor (#1206), open into a small
+ * 3-row room at each end so an occupancy-aware walker actually has
+ * somewhere to step aside/wait rather than a single dead-end lane: rows
+ * z=0 and z=2 are blocked for the mid-range columns given by
+ * `corridorXRange`, leaving only z=1 walkable there, while every other
+ * column (the two end "rooms") keeps all three rows open.
+ */
+function build1WideCorridorState(width: number, corridorXRange: [number, number]): GameState {
+  const state = createGame({ seed: SEED });
+  const grid = makeFlatNavGrid(width, 3);
+  const [lo, hi] = corridorXRange;
+  for (let x = lo; x <= hi; x++) {
+    grid.cells[0]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    grid.cells[2]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+  }
+  state.navGrid = grid;
+  return state;
+}
+
+/** `x,z` rounded to the nearest grid cell — the same convention Locomotion.ts's own isOccupiedByOtherVehicle uses. */
+function cellKey(x: number, z: number): string {
+  return `${Math.round(x)},${Math.round(z)}`;
+}
+
+/** Fails when any two of `agents` round onto the same grid cell right now. */
+function expectNoSharedCells(agents: ReadonlyArray<{ id: number; x: number; z: number }>): void {
+  const keys = agents.map(a => cellKey(a.x, a.z));
+  expect(new Set(keys).size, `expected ${agents.length} distinct cells, got: ${JSON.stringify(agents.map(a => ({ id: a.id, x: a.x, z: a.z })))}`).toBe(keys.length);
+}
+
 describe('tickLocomotion', () => {
   it('advances a mounted employee at the vehicle\'s tiered speed, not AGENT_WALK_SPEED, and the vehicle tracks the employee\'s position', () => {
     const state = buildFlatNavGridState(20, 5);
@@ -238,7 +267,7 @@ describe('tickLocomotion', () => {
     }
   });
 
-  it('waits on a blocked drive leg, attempts exactly one reroute, then sets employee.isMoveStuck and stops the vehicle — scaled by VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, not an arbitrary iteration count', () => {
+  it('waits on a blocked drive leg, attempts exactly one reroute, then sets employee.isMoveStuck and stops the vehicle — scaled by AGENT_OCCUPANCY_WAIT_TICKS, not an arbitrary iteration count', () => {
     const state = buildCorridorState(5);
     const rng = new Random(SEED);
     const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
@@ -260,7 +289,7 @@ describe('tickLocomotion', () => {
     // moves out of the way on its own.
     purchaseVehicle(state.vehicles, 'drill_rig', 2, 2);
 
-    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
+    for (let i = 0; i < 1 + AGENT_OCCUPANCY_WAIT_TICKS + 2; i++) {
       tickLocomotion(state);
     }
 
@@ -312,7 +341,7 @@ describe('tickLocomotion', () => {
     purchaseVehicle(state.vehicles, 'drill_rig', 2, 2);
 
     const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
-    for (let i = 0; i < VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + MOVE_STUCK_ABANDON_TICKS + 5; i++) {
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS + 5; i++) {
       everAbandoned.push(...tickLocomotion(state).abandoned);
     }
 
@@ -363,7 +392,7 @@ describe('tickLocomotion', () => {
     purchaseVehicle(state.vehicles, 'drill_rig', 5, 2);
 
     // Generous ceiling: the detour is several times the direct distance at
-    // rock_digger speed, plus the one VEHICLE_OCCUPANCY_REROUTE_THRESHOLD
+    // rock_digger speed, plus the one AGENT_OCCUPANCY_WAIT_TICKS
     // wait before it starts. Loop exits on arrival rather than running the
     // budget out.
     const MAX_TICKS = 600;
@@ -474,7 +503,7 @@ describe('tickLocomotion', () => {
     expect(vehicleDriverId(blocker)).toBeNull();
     expect(getVehicleReservation(state.vehicles, blocker.id)).toBeNull();
 
-    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 5; i++) {
+    for (let i = 0; i < 1 + AGENT_OCCUPANCY_WAIT_TICKS + 5; i++) {
       tickLocomotion(state);
     }
 
@@ -547,6 +576,93 @@ describe('tickLocomotion', () => {
     expect(employee.x).toBe(1);
     expect(employee.z).toBe(0);
     expect(employee.itinerary).toBeNull();
+  });
+
+  // #1203: a training enrolment's walk-in whose target school was demolished
+  // while the employee was still en route must not strand pendingTrainingState
+  // forever (isEnrolledInTraining reads it as "still enrolled", permanently
+  // blocking rest and a future enrolment, with the fee never refunded).
+  // Detected here — at the exact tick the `enter_building` arrival step
+  // itself fails — rather than inferred after the fact from generic
+  // position/locomotion fields (ArrivalGate.ts used to infer it there; that
+  // inference could not tell a genuinely stranded employee from one still
+  // mid-route and misfired on synthetic fixtures, so the detection moved to
+  // this call site instead).
+  it('cancels and refunds a training walk-in whose target school no longer exists when enter_building fails (#1203)', () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    // Building id 999 deliberately absent from state.buildings.buildings —
+    // demolished out from under this employee's walk.
+    employee.pendingTrainingState = { buildingId: 999, skill: 'blasting', ticksRemaining: 50, fee: 500 };
+    employee.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 1, destZ: 0,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: 1, z: 0 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    const result = tickLocomotion(state);
+
+    expect(employee.pendingTrainingState).toBeNull();
+    expect(employee.itinerary).toBeNull();
+    expect(result.trainingCancelled).toHaveLength(1);
+    expect(result.trainingCancelled[0]).toMatchObject({
+      employeeId: employee.id,
+      skill: 'blasting',
+      buildingId: 999,
+      refund: 500,
+    });
+  });
+
+  // #1204: mirrors the #1203 training-demolition stranded-walk test above —
+  // a rest walk's own enter_building arrival step can fail the exact same
+  // way (the living_quarters demolished mid-walk, or filled by the time a
+  // queued rest is promoted). Left uncleared, pendingRestDuration would strand
+  // this employee "resting" forever (isMidCollapseOrForcedRest reads it as
+  // still mid-rest, permanently excluding them from claimActionsTargetedAtEmployee)
+  // with activeActionId still naming an action nothing will ever complete.
+  // Unlike training, rest has no fee — no refund/event is expected here, only
+  // the stale rest state and the stale pending action itself being cleared.
+  it("clears rest state and discards the stale action when a rest walk's enter_building step fails — building demolished mid-walk (#1204)", () => {
+    const state = buildFlatNavGridState(20, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    // Building id 999 deliberately absent from state.buildings.buildings —
+    // demolished out from under this employee's rest walk.
+    const actionId = state.nextPendingActionId++;
+    const restAction: PendingAction = {
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 1, targetZ: 0, targetY: 0,
+      payload: { buildingId: 999, needKey: 'fatigue', restDuration: 8 },
+      targetEmployeeId: employee.id, status: 'assigned', holderId: employee.id, queuedAtTick: 0,
+    };
+    state.pendingActions.push(restAction);
+    employee.activeActionId = actionId;
+    employee.pendingRestDuration = 8;
+    employee.pendingRestNeedKey = 'fatigue';
+    employee.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 1, destZ: 0,
+        arrival: 'exact', onArrive: { kind: 'enter_building', buildingId: 999 }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: 1, z: 0 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    expect(() => tickLocomotion(state)).not.toThrow();
+
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.itinerary).toBeNull();
+    expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
   });
 
   // #1178: with destinationX/Z now a read-only mirror rather than a second
@@ -856,7 +972,7 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
     // Stationary, unoccupied blocker directly on the straight-line route.
     purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
 
-    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
+    for (let i = 0; i < 1 + AGENT_OCCUPANCY_WAIT_TICKS + 2; i++) {
       tickLocomotion(state);
     }
 
@@ -878,7 +994,7 @@ describe('tickLocomotion — abandons on isStuck even when pathFound is true (#1
   // still ahead of it. A live vehicle merely parked on that current cell —
   // never actually in the way of the real next step — then read as
   // isOccupiedByOtherVehicle and blocked the drive leg outright, escalating
-  // to a full reroute after VEHICLE_OCCUPANCY_REROUTE_THRESHOLD ticks of
+  // to a full reroute after AGENT_OCCUPANCY_WAIT_TICKS ticks of
   // phantom waiting. Reproduced live via hauling-gate.json: a drill_rig
   // routed around a building's clearance-insufficient ring happened to round
   // onto a parked debris_hauler's cell partway through, costing 20+ ticks to
@@ -1171,5 +1287,268 @@ describe('tickLocomotion — walk trail across a tick batch (#1199)', () => {
     expect(moveTo(state, employee.id, { x: 15, z: 0 }).success).toBe(true);
     tickLocomotion(state);
     expect(employee.walkTrail).toBeUndefined();
+  });
+});
+
+// ── #1206: agent occupancy on foot — ground-cell reservation ──────────────
+//
+// AgentOccupancy.ts and Locomotion.ts's own `handleAgentOccupancyBlock`
+// generalize the vehicle-only occupancy check to every agent, foot or
+// vehicle: one ground cell holds at most one occupant. These tests exercise
+// that behavior end to end through the real `tickLocomotion`/`moveTo` path,
+// with `state.agentOccupancyEnabled` explicitly turned on.
+describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
+  it('two employees on crossing paths never share a cell across several ticks', () => {
+    const state = buildFlatNavGridState(10, 8);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    // Distances chosen so that, under today's unprotected movement (no
+    // occupancy check at all), both employees land exactly on the shared
+    // crossing cell (4, 2) at the same tick (tick 2): each closes half of
+    // an 8-cell gap to the crossing point at AGENT_WALK_SPEED (2/tick).
+    const { employee: a } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { employee: b } = hireEmployee(state.employees, 'driller', rng, 4, 6);
+    expect(moveTo(state, a.id, { x: 8, z: 2 }).success).toBe(true);
+    expect(moveTo(state, b.id, { x: 4, z: 0 }).success).toBe(true);
+
+    for (let i = 0; i < 6; i++) {
+      tickLocomotion(state);
+      expectNoSharedCells([a, b]);
+    }
+  });
+
+  it('a head-on meeting in a one-cell-wide corridor resolves — both employees arrive, no permanent deadlock', () => {
+    // x: 0-1 and 7-8 are 3-row rooms; x: 2-6 is the single-lane (z=1 only)
+    // corridor. Distance 8 between the two employees' starting cells is
+    // chosen for the same reason as the crossing-paths test above: under
+    // today's unprotected movement they land on the exact same cell (4, 1)
+    // at tick 2, deep inside the one-wide section.
+    const state = build1WideCorridorState(9, [2, 6]);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+    const { employee: a } = hireEmployee(state.employees, 'driller', rng, 0, 1);
+    const { employee: b } = hireEmployee(state.employees, 'driller', rng, 8, 1);
+    expect(moveTo(state, a.id, { x: 8, z: 1 }).success).toBe(true);
+    expect(moveTo(state, b.id, { x: 0, z: 1 }).success).toBe(true);
+
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS * 4;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && (a.itinerary !== null || b.itinerary !== null)) {
+      tickLocomotion(state);
+      expectNoSharedCells([a, b]);
+      ticks++;
+    }
+
+    expect(a.itinerary).toBeNull();
+    expect(b.itinerary).toBeNull();
+    expect(a.x).toBe(8);
+    expect(a.z).toBe(1);
+    expect(b.x).toBe(0);
+    expect(b.z).toBe(1);
+  });
+
+  it('four employees dispatched to the identical exact target cell end up on four distinct cells, none abandoned/stuck', () => {
+    const state = buildFlatNavGridState(12, 12);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: a } = hireEmployee(state.employees, 'driller', rng, 0, 5);
+    const { employee: b } = hireEmployee(state.employees, 'driller', rng, 10, 5);
+    const { employee: c } = hireEmployee(state.employees, 'driller', rng, 5, 0);
+    const { employee: d } = hireEmployee(state.employees, 'driller', rng, 5, 10);
+    const crew = [a, b, c, d];
+
+    for (const emp of crew) {
+      expect(moveTo(state, emp.id, { x: 5, z: 5 }).success).toBe(true);
+    }
+
+    const MAX_TICKS = 40;
+    for (let i = 0; i < MAX_TICKS; i++) {
+      tickLocomotion(state);
+    }
+
+    for (const emp of crew) {
+      expect(emp.isMoveStuck).toBe(false);
+    }
+    expectNoSharedCells(crew);
+  });
+
+  it('a two-cell tick stops before a held second cell instead of skipping over it', () => {
+    const state = buildFlatNavGridState(20, 5);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    expect(moveTo(state, employee.id, { x: 10, z: 0 }).success).toBe(true);
+    // A real, alive employee — tickLocomotion's own reconcileAgentOccupancy
+    // sweep (run every tick before the movement loop) releases any occupant
+    // that doesn't correspond to a real, alive employee/vehicle, so a merely
+    // synthetic id here would be freed out from under this fixture before
+    // the mover ever reaches it.
+    const { employee: blockerEmployee } = hireEmployee(state.employees, 'driller', rng, 15, 0);
+
+    // Pre-plant an occupant holding the cell two steps ahead of the mover
+    // (AGENT_WALK_SPEED is 2 — a full tick's unobstructed hop would land
+    // exactly here) directly via AgentOccupancy, constructed manually
+    // rather than via rebuildAgentOccupancy so this test isolates the
+    // single-hop stop from the rebuild path entirely.
+    const occupancy = new AgentOccupancy();
+    const blocker: Occupant = { kind: 'employee', id: blockerEmployee.id };
+    expect(occupancy.tryMove(blocker, 2, 0)).toBe(true);
+    state.agentOccupancy = occupancy;
+
+    tickLocomotion(state);
+
+    // Advanced exactly one cell — to (1, 0), the first, free cell — not two.
+    expect(employee.x).toBe(1);
+    expect(employee.z).toBe(0);
+  });
+
+  it('isolates handleAgentOccupancyBlock\'s tie-break sidestep: a mid-corridor blocker that is itself stuck yields to the higher-id agent', () => {
+    // x: 4-10 is a genuinely one-cell-wide (z=1 only) corridor — the ONLY
+    // lane through, so the reroute ladder step (step 1) can never find a
+    // path avoiding the blocker's held cell and must fail, leaving the
+    // tie-break sidestep (step 2) as the only way forward. The blocker
+    // sits well short of the mover's own destination, so this is not the
+    // destination-held case (step 3) either.
+    const state = build1WideCorridorState(15, [4, 10]);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    // Hired first, so EmployeeDispatch's own ascending-id convention gives
+    // it the LOWER id — handleAgentOccupancyBlock's tie-break has the
+    // higher-id side always give way, so this is the one that must hold
+    // its ground.
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 6, 1);
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 5, 1);
+    expect(mover.id).toBeGreaterThan(blocker.id);
+
+    // The blocker is itself stuck — simply outwaiting it would deadlock
+    // forever, which is exactly when the ladder is allowed to sidestep
+    // rather than keep waiting.
+    blocker.isMoveStuck = true;
+
+    // The mover's own leg destination is far past the corridor's far end —
+    // not the blocker's cell — so `destinationHeldByOther` reads false and
+    // the reroute/sidestep steps stay live (never skipped to step 3).
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 14, destZ: 1,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 9,
+      }],
+      goal: { kind: 'reposition', x: 14, z: 1 },
+      workTicks: 0,
+      estTotalTicks: 9,
+    } satisfies Itinerary;
+
+    // Occupancy ledger built directly (mirrors this file's own "a two-cell
+    // tick stops..." fixture above) so the mover is already sitting exactly
+    // one cell short of the blocker's held cell, with the single lane ahead
+    // occupied this very tick.
+    const occupancy = new AgentOccupancy();
+    const moverOccupant: Occupant = { kind: 'employee', id: mover.id };
+    const blockerOccupant: Occupant = { kind: 'employee', id: blocker.id };
+    expect(occupancy.tryMove(moverOccupant, 5, 1)).toBe(true);
+    expect(occupancy.tryMove(blockerOccupant, 6, 1)).toBe(true);
+    state.agentOccupancy = occupancy;
+
+    // Run exactly up to AGENT_OCCUPANCY_WAIT_TICKS: every tick before this
+    // one the mover's own hop onto (6, 1) is blocked and only the wait
+    // counter advances; the ladder itself only fires once the counter
+    // reaches the threshold.
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS; i++) {
+      tickLocomotion(state);
+    }
+
+    // The mover gave way — moved off (5, 1) onto a different free cell —
+    // while the blocker, untouched, still holds its own ground. Progress
+    // was made (the mover is not left waiting or abandoned) and the
+    // blocker was never displaced, which is the tie-break's whole point.
+    expect(mover.isMoveStuck).toBe(false);
+    expect(mover.x === 5 && mover.z === 1).toBe(false);
+    expect(occupancy.cellOfOccupant(moverOccupant)).not.toEqual({ x: 5, z: 1 });
+    expect(occupancy.holderOf(6, 1)).toEqual(blockerOccupant);
+    expect(blocker.x).toBe(6);
+    expect(blocker.z).toBe(1);
+  });
+
+  it("#1259: destination-spreading onto the mover's own already-held cell still clears isMoveStuck instead of latching it from the wait leading up to it", () => {
+    // A blocker parked exactly ON the mover's leg destination, with no
+    // itinerary of its own — it never moves for the whole test, so
+    // `destinationHeldByOther` reads true from the very first blocked tick
+    // and handleAgentOccupancyBlock's ladder skips straight to step 3
+    // (destination-spreading), never reaching the reroute/sidestep steps.
+    const state = buildFlatNavGridState(5, 5);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    const { employee: blocker } = hireEmployee(state.employees, 'driller', rng, 2, 2);
+    // One cell short of the blocker's held cell — findNearestFreeCell's own
+    // ring search around the leg's destination (2, 2) reaches the mover's
+    // own current cell (1, 2) at distance 1, the same distance as every
+    // other free ring cell, and it is scanned first — so the spread
+    // retargets the leg onto the exact cell the mover already stands on.
+    const { employee: mover } = hireEmployee(state.employees, 'driller', rng, 1, 2);
+
+    mover.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 2, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 1,
+      }],
+      goal: { kind: 'reposition', x: 2, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 1,
+    } satisfies Itinerary;
+
+    // AGENT_OCCUPANCY_WAIT_TICKS of passive waiting flips isMoveStuck true
+    // (STUCK_THRESHOLD is far smaller) well before the ladder ever fires —
+    // exactly the state a genuinely resolved mover must not stay latched
+    // into. A couple more ticks let the spread actually retarget the leg and
+    // the next tick's now-instant arrival (isLegArrived true before
+    // advanceLeg is ever called, since the retargeted destination equals
+    // the mover's own position) apply its arrival step.
+    for (let i = 0; i < AGENT_OCCUPANCY_WAIT_TICKS + 2; i++) {
+      tickLocomotion(state);
+    }
+
+    // The mover's own leg completed (onto its own held cell) instead of
+    // ever genuinely being stuck — before #1259's fix, this loop's
+    // isLegArrived-at-top-of-loop branch never ran advanceLeg for this
+    // "already there" arrival, so isMoveStuck/moveConsecutiveFailures never
+    // got the same reset an ordinary successful advance already receives,
+    // and stayed latched from the wait above forever.
+    expect(mover.isMoveStuck).toBe(false);
+    expect(mover.moveConsecutiveFailures).toBe(0);
+    // The blocker was never displaced — it held its ground the entire test,
+    // which is exactly why the destination stayed held and the spread (not
+    // a reroute around a mobile blocker) is what resolved this.
+    expect(blocker.x).toBe(2);
+    expect(blocker.z).toBe(2);
+  });
+
+  it('with agentOccupancyEnabled false, movement is identical to the flag-absent baseline (regression pin)', () => {
+    const state = buildFlatNavGridState(20, 5);
+    state.agentOccupancyEnabled = false;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    employee.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 12, destZ: 0,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 6,
+      }],
+      goal: { kind: 'reposition', x: 12, z: 0 },
+      workTicks: 0,
+      estTotalTicks: 6,
+    } satisfies Itinerary;
+
+    tickLocomotion(state);
+
+    // Identical outcome to this same fixture's un-flagged counterpart
+    // ("advances an on-foot employee with an itinerary foot leg at
+    // AGENT_WALK_SPEED" above): the flag being explicitly false must never
+    // change ordinary, uncontested movement.
+    expect(employee.x).toBe(AGENT_WALK_SPEED);
+    expect(employee.z).toBe(0);
   });
 });

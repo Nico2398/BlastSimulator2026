@@ -102,6 +102,10 @@ export const KNOWN_COMMANDS = [
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'level_ground', 'set_policy', 'terrain_info', 'help',
   'blast_plan', 'needs', 'save', 'load', 'sandbox',
+  // #1206: `debug occupancy (status|on|off)` — a developer-only toggle for
+  // GameState.agentOccupancyEnabled, alongside `new_game`/`sandbox start`'s
+  // own `agent_occupancy:true|false` flag.
+  'debug',
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */

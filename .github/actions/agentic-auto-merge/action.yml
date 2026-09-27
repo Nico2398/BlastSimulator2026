@@ -1,43 +1,44 @@
-name: 'Agentic auto-merge'
-description: 'Enables auto-merge on every open PR carrying the READY TO MERGE marker, whatever account authored it.'
+name: 'Agentic merge gate'
+description: >
+  The one place a pull request is merged. Sweeps every open pull request that
+  carries READY TO MERGE and merges one only when every channel on its head is
+  green AND that head already contains its base branch's tip, so the tree that
+  lands on `main` is a tree CI has already passed. A green head that is behind
+  gets `main` merged into it and goes back through CI; a head that conflicts
+  with `main` is handed back to the agent. Whatever account opened the PR.
+
+  Called only from `agentic-auto-merge.yml`, under its `agentic-merge`
+  concurrency group, which is what makes "up to date, then merge" hold: no two
+  sweeps can each find a different PR up to date with the same `main` and merge
+  both. The repository must be checked out — the machinery list is read from
+  `.github/scripts/ci-handback.cjs`.
 
 inputs:
   token:
-    description: 'PAT with contents, pull-requests and actions write. GITHUB_TOKEN cannot approve gated runs.'
+    description: 'PAT with contents, pull-requests and actions write. GITHUB_TOKEN cannot approve gated runs, and a merge it performs raises no event.'
     required: true
-  pr:
-    description: 'Restrict to a single PR number. Empty means use `head`, or every open PR.'
-    required: false
-    default: ''
-  head:
-    description: >
-      Restrict to the open PR opened from this head branch, e.g.
-      `pipeline/feature-404-18273645`. Exact ref: the caller knows its own run id,
-      so it can name the branch it just built.
-    required: false
-    default: ''
-  merge_method:
-    description: 'merge, squash or rebase.'
-    required: false
-    default: 'squash'
 
 outputs:
-  enabled:
-    description: 'Space-separated PR numbers that now have auto-merge enabled or were merged outright.'
-    value: ${{ steps.sweep.outputs.enabled }}
-  unarmed:
-    description: 'Space-separated PR numbers that carried the marker and are still neither armed nor merged.'
-    value: ${{ steps.sweep.outputs.unarmed }}
-  unmarked:
+  merged:
+    description: 'Space-separated PR numbers this sweep merged.'
+    value: ${{ steps.sweep.outputs.merged }}
+  updated:
+    description: 'Space-separated PR numbers that were green but behind, and had their base merged into them. CI runs again on each.'
+    value: ${{ steps.sweep.outputs.updated }}
+  handback:
     description: >-
-      Space-separated pipeline PR numbers that are neither marked nor draft —
-      runs that ended without saying whether their work ships.
-    value: ${{ steps.sweep.outputs.unmarked }}
+      Space-separated PR numbers with a red channel or a conflict with their
+      base. The caller dispatches `agentic-ci-failure.yml` for each, which owns
+      handing them back to the agent.
+    value: ${{ steps.sweep.outputs.handback }}
   pending:
     description: >-
-      Space-separated PR numbers that carry the marker and are still waiting on
-      checks. Not a failure: the CI-completion sweep re-evaluates each of them.
+      Space-separated PR numbers still waiting on checks. Not a failure: CI
+      completing is the event that brings the sweep back.
     value: ${{ steps.sweep.outputs.pending }}
+  stuck:
+    description: 'Space-separated PR numbers that are marked and cannot move for a reason no agent handback covers. The step fails on these.'
+    value: ${{ steps.sweep.outputs.stuck }}
   approved:
     description: 'Number of gated workflow runs released across the swept PRs.'
     value: ${{ steps.sweep.outputs.approved }}
@@ -45,18 +46,21 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Enable auto-merge on every marked PR
+    - name: Merge what is green on top of main, update what is behind
       id: sweep
       uses: actions/github-script@v7
-      env:
-        ONLY_PR: ${{ inputs.pr }}
-        ONLY_HEAD: ${{ inputs.head }}
-        MERGE_METHOD: ${{ inputs.merge_method }}
       with:
         github-token: ${{ inputs.token }}
         script: |
           const owner = context.repo.owner;
           const repo = context.repo.repo;
+
+          // What counts as a channel, and what counts as red, is decided once
+          // for every reader of a pull request's head — the CI fail-safe, the
+          // watchdog, and this gate.
+          const { RUN_FAILURES, latestPerWorkflow } = require(
+            `${process.env.GITHUB_WORKSPACE}/.github/scripts/ci-handback.cjs`
+          );
 
           // The marker decides, never the account. A pipeline PR is opened by
           // whichever identity the runner's token resolved to that day —
@@ -75,77 +79,49 @@ runs:
               .some((line) => line.trim() === 'READY TO MERGE');
           };
 
-          // Whether the PR can be merged now, decided on what the workflow runs
-          // on its head have actually reported — never on a clock.
-          //
-          // `mergeable_state` alone cannot answer it. `unstable` and `blocked`
-          // each cover both a check still running and a check that already
-          // failed, and `unknown` only means GitHub has not finished computing
-          // mergeability in the background. That last one used to be polled
-          // out; it no longer is, because the merge call below is the authority
-          // on whether a PR merges — attempting it answers directly what a poll
-          // could only guess at, and answers it in one request.
-          //
-          // So the state is consulted for the two things it alone knows —
-          // `dirty` and `behind`, neither of which resolves without a human or
-          // a branch update — and the runs decide the rest. A failure is stuck.
-          // Anything still running, or a head that has reported nothing at all,
-          // is `pending`: not a verdict this job can improve on by holding a
-          // runner open, since CI completing is itself the event that brings
-          // the sweep back.
-          //
-          // `total === 0` is deliberately not "nothing is failing, so merge".
-          // A PR read in the second before its CI run is created has no runs
-          // yet, and merging on that reads an absence of evidence as a pass.
-          const mergeVerdict = (state, checks) => {
-            if (checks.failed > 0) return 'stuck';
-            if (state === 'dirty' || state === 'behind') return 'stuck';
-            if (checks.pending > 0 || checks.total === 0) return 'pending';
-            return 'merge';
-          };
-
-          // `cancelled` and `stale` sit with the failures: a superseded run is
-          // dropped by the dedup below, so one that survives it is a run
-          // nothing is going to repeat. `skipped` and `neutral` are not
-          // failures — `claude-review` reports `skipped` on every pipeline PR.
-          const RUN_FAILURES = new Set([
-            'failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'
-          ]);
-
-          // The workflow file hosting this action, as `.github/workflows/x.yml`.
-          // GITHUB_WORKFLOW_REF is `owner/repo/.github/workflows/x.yml@ref`.
-          const ownWorkflow = (process.env.GITHUB_WORKFLOW_REF || '')
-            .split('@')[0].split('/').slice(2).join('/');
-
-          // Read from the workflow runs on the head rather than from check
-          // runs, because that is the same object the CI-completion trigger
-          // fires on: what this reads and what wakes the sweep cannot drift.
+          // What the channels on a head have reported: one run per workflow,
+          // newest, the pipeline's own machinery left out. Machinery matters
+          // here specifically: `auto-assign-next.yml` runs on the PR head for
+          // every `pull_request` event and dispatches this very sweep, so
+          // counting it would read the PR as pending on the run that asked for
+          // the look — and when CI had already finished, nothing would come
+          // back for it.
           const checkState = (runs) => {
-            const latest = new Map();
-
-            for (const run of runs) {
-              // This job is itself a run on this head when a `pull_request`
-              // event carried the action here, and so is any sibling of the
-              // same workflow. Count either and the sweep waits on itself:
-              // `pending` forever, on a PR whose real checks all passed.
-              if (run.id === context.runId) continue;
-              if (ownWorkflow && run.path === ownWorkflow) continue;
-
-              // `cancel-in-progress` leaves superseded runs on the same head.
-              // Only the newest run of each workflow states its current result.
-              const seen = latest.get(run.workflow_id);
-              if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
-            }
-
             let pending = 0;
             let failed = 0;
-
-            for (const run of latest.values()) {
+            const channels = latestPerWorkflow(runs);
+            for (const run of channels) {
               if (run.status !== 'completed') pending += 1;
               else if (RUN_FAILURES.has(run.conclusion)) failed += 1;
             }
+            return { pending, failed, total: channels.length };
+          };
 
-            return { pending, failed, total: latest.size };
+          // The gate, decided on state alone — never on a clock.
+          //
+          // `dirty` is a conflict with the base, and only an agent resolves one.
+          // A failed channel is the CI fail-safe's. Anything still running, or
+          // a head that has reported nothing at all, is pending: CI completing
+          // is itself the event that brings the sweep back. `total === 0` is
+          // deliberately not "nothing failed, so merge" — a PR read in the
+          // second before its CI run is created has no runs yet, and merging on
+          // that reads an absence of evidence as a pass.
+          //
+          // Then the rule that makes parallel runs safe: green is not enough.
+          // Two pull requests can each be green alone and red together — a
+          // rename and a new caller of the old name, a threshold and the
+          // scenario that pinned it — and GitHub would merge both. So a green
+          // head merges only when it already contains the base's tip (`merge`);
+          // one that is behind gets the base merged in and goes through CI again
+          // (`update`). `compare` means that question has not been asked yet.
+          // `mergeable_state` cannot answer it: with no required checks GitHub
+          // reports `clean` for a branch that is behind.
+          const gateVerdict = (state, checks, behindBy) => {
+            if (state === 'dirty') return 'conflict';
+            if (checks.failed > 0) return 'red';
+            if (checks.pending > 0 || checks.total === 0) return 'pending';
+            if (!Number.isInteger(behindBy)) return 'compare';
+            return behindBy > 0 ? 'update' : 'merge';
           };
 
           // A workflow run's own `conclusion` is `success` the moment every job
@@ -183,55 +159,82 @@ runs:
               .map((g) => g.jobNamePrefix);
           };
 
-          const method = (process.env.MERGE_METHOD || 'squash').toUpperCase();
-          const only = parseInt(process.env.ONLY_PR || '', 10);
-          const head = (process.env.ONLY_HEAD || '').trim();
-
-          // By number when a `pull_request` event named one, by head branch when
-          // a runner is arming the PR it just opened, everything open otherwise.
-          let candidates;
-          if (!Number.isNaN(only)) {
-            candidates = [(await github.rest.pulls.get({ owner, repo, pull_number: only })).data];
-          } else if (head) {
-            candidates = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', head: `${owner}:${head}`, per_page: 100
-            });
-            if (candidates.length === 0) {
-              core.info(`No open PR from ${head}. The run produced none, or it is not open yet.`);
+          // How many of the base's commits the head does not contain. `null`
+          // when the comparison could not be read, which never merges.
+          const behindBase = async (pr) => {
+            try {
+              const { data } = await github.rest.repos.compareCommitsWithBasehead({
+                owner, repo, basehead: `${pr.base.ref}...${pr.head.sha}`, per_page: 1
+              });
+              return data.behind_by;
+            } catch (error) {
+              core.warning(`#${pr.number}: could not compare its head with ${pr.base.ref} (${error.status ?? error.message}).`);
+              return null;
             }
-          } else {
-            candidates = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', per_page: 100
-            });
-          }
+          };
 
           // A pipeline run leaves its PR marked or draft; there is no third
           // state. `pipeline/feature-<N>` is the pipeline's own branch, so a
           // non-draft PR from one carrying no marker is a run that stopped
           // mid-sentence — #507 and #508 each said the marker "will follow once
-          // the CI jobs report", and nothing exists to bring it. This
-          // action skips an unmarked PR, `auto-assign-next` chains from a merge
-          // that never happens, and the watchdog skips any issue with a linked
-          // PR, so issue #504 held `in-progress` for a day with every
-          // assignment behind it waiting. This is the only place that sees it.
-          // The `-<runId>` tail is what makes a work branch unique per run (#554,
-          // run 166: two runs, one branch name, six hours lost on a refused push).
-          // Branches from before the convention carry no tail, so both match.
+          // the CI jobs report", and nothing exists to bring it. This gate
+          // skips an unmarked PR, `auto-assign-next` chains from a merge that
+          // never happens, and the watchdog skips any issue with a linked PR,
+          // so issue #504 held `in-progress` for a day with every assignment
+          // behind it waiting. This is the only place that sees it. The
+          // `-<runId>` tail is what makes a work branch unique per run (#554);
+          // branches from before the convention carry none, so both match.
           const PIPELINE_HEAD = /^pipeline\/feature-\d+(?:-[A-Za-z0-9._-]+)?$/;
 
-          const enabled = [];
-          const unarmed = [];
-          const unmarked = [];
+          const merged = [];
+          const updated = [];
+          const handback = [];
           const pending = [];
+          const stuck = [];
+          const unmarked = [];
           let approved = 0;
+
+          // A refused update or merge is judged on the PR's state afterwards,
+          // never on the wording of the error (PR #434: a refusal string this
+          // code did not recognise once fell through to a green step). A head
+          // that moved is its own new CI run's business; a conflict goes back
+          // to the agent; anything else is a state nothing here can repair.
+          const settleRefusal = async (before, what) => {
+            const n = before.number;
+            const { data: now } = await github.rest.pulls.get({ owner, repo, pull_number: n });
+            if (now.state !== 'open') {
+              core.info(`#${n}: ${what}, and it is ${now.merged ? 'merged' : now.state} now — nothing left to do.`);
+              return;
+            }
+            if (now.head.sha !== before.head.sha) {
+              core.info(`#${n}: ${what}, but its head moved to ${now.head.sha.slice(0, 7)} — that commit's own CI decides.`);
+              pending.push(n);
+              return;
+            }
+            if (now.mergeable_state === 'dirty') {
+              core.info(`#${n}: ${what} — it conflicts with ${now.base.ref}. Handing it back.`);
+              handback.push(n);
+              return;
+            }
+            core.warning(
+              `#${n}: ${what}, and the pull request reads \`${now.mergeable_state}\` — neither a conflict ` +
+              'nor a moved head. A protection rule or a missing token scope; it needs a look.'
+            );
+            stuck.push(n);
+          };
+
+          // Every open pull request, oldest first, every time. The group this
+          // runs under keeps one pending sweep and drops the rest, which is only
+          // harmless because every sweep reads everything: whichever one
+          // survives sees every PR as it stands when it starts. Oldest first so
+          // the order work lands in matches the order it was queued.
+          const candidates = await github.paginate(github.rest.pulls.list, {
+            owner, repo, state: 'open', sort: 'created', direction: 'asc', per_page: 100
+          });
 
           for (const summary of candidates) {
             const n = summary.number;
 
-            if (summary.state !== 'open') {
-              core.info(`#${n}: not open, skipping.`);
-              continue;
-            }
             if (summary.draft) {
               core.info(`#${n}: draft — a draft is the pipeline's way of saying a channel did not pass.`);
               continue;
@@ -250,16 +253,23 @@ runs:
               continue;
             }
 
-            core.info(`#${n}: marked READY TO MERGE by ${summary.user?.login} on ${summary.head.ref}.`);
+            // Read fresh: the listing predates every merge this sweep has
+            // already made, and `mergeable_state` is only on a single read.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: n });
+            if (pr.state !== 'open') {
+              core.info(`#${n}: ${pr.state} since the listing — skipping.`);
+              continue;
+            }
+            core.info(`#${n}: marked READY TO MERGE by ${pr.user?.login} on ${pr.head.ref}.`);
 
             // A PR opened with GITHUB_TOKEN gets its `pull_request` workflow
             // runs created and immediately parked as `action_required`: CI never
-            // starts, no check ever reports, and auto-merge waits on checks that
-            // will never arrive. Releasing them here is what makes the enable
-            // below mean something. Needs `actions: write` on the token — a
-            // failure is reported, not fatal, since the PR may have no gated run.
+            // starts, no check ever reports, and this gate waits on checks that
+            // will never arrive. Releasing them here is what makes the wait mean
+            // something. Needs `actions: write` on the token — a failure is
+            // reported, not fatal, since the PR may have no gated run.
             const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
-              owner, repo, head_sha: summary.head.sha, per_page: 100
+              owner, repo, head_sha: pr.head.sha, per_page: 100
             });
             const gated = runs.filter(
               (run) => run.status === 'action_required' || run.conclusion === 'action_required'
@@ -279,152 +289,125 @@ runs:
               }
             }
 
-            // `gh pr merge --auto` is idempotent and so is this: re-running over
-            // a PR that already has auto-merge enabled is the normal case on a
-            // sweep, and costs one rejected mutation.
-            //
-            // The variable is `$mergeMethod`, not `$method`: @octokit/graphql
-            // reserves its own request-option names — method, url, baseUrl,
-            // headers, query, request, mediaType — and throws
-            // `"method" cannot be used as variable name` before the mutation
-            // ever leaves the runner. That threw on every call, so auto-merge
-            // was never once enabled and PR #434 sat open, green and marked,
-            // while both arming paths reported success.
-            try {
-              await github.graphql(
-                `mutation($id: ID!, $mergeMethod: PullRequestMergeMethod!) {
-                   enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $mergeMethod }) {
-                     clientMutationId
-                   }
-                 }`,
-                { id: summary.node_id, mergeMethod: method }
+            const checks = checkState(runs);
+            let verdict = gateVerdict(pr.mergeable_state, checks, null);
+            let behind = null;
+            if (verdict === 'compare') {
+              behind = await behindBase(pr);
+              verdict = gateVerdict(pr.mergeable_state, checks, behind);
+            }
+
+            if (verdict === 'pending') {
+              core.info(
+                `#${n}: ` +
+                (checks.total === 0
+                  ? 'no channel has reported on this head yet'
+                  : `${checks.pending} of ${checks.total} channel(s) still going`) +
+                ' — CI completing brings this sweep back.'
               );
-              core.info(`#${n}: auto-merge enabled.`);
-              enabled.push(n);
+              pending.push(n);
               continue;
-            } catch (error) {
-              const message = error.message || '';
+            }
 
-              if (/already enabled/i.test(message)) {
-                core.info(`#${n}: auto-merge already enabled.`);
-                enabled.push(n);
-                continue;
-              }
+            if (verdict === 'conflict' || verdict === 'red') {
+              core.info(
+                `#${n}: ` +
+                (verdict === 'conflict'
+                  ? `conflicts with ${pr.base.ref}`
+                  : `${checks.failed} channel(s) failed on ${pr.head.sha.slice(0, 7)}`) +
+                ' — handing it to the CI fail-safe, which owns putting it back in front of the agent.'
+              );
+              handback.push(n);
+              continue;
+            }
 
-              // Every other refusal is decided on the PR's state, never on the
-              // wording of the error. GitHub refuses auto-merge on a PR that has
-              // nothing left to wait for and on a repository with the feature
-              // switched off, and those two messages used to be the only ones
-              // that reached the merge below — so the one failure nobody had
-              // predicted, the `$method` throw above, fell through to a warning
-              // and a green step. A message this action does not recognise now
-              // costs a wait, not a stalled queue.
-              core.info(`#${n}: auto-merge refused (${message}) — merging it here instead.`);
+            if (verdict === 'compare') {
+              core.warning(`#${n}: green, but whether it contains ${pr.base.ref}'s tip could not be read. Not merging on an unread fact.`);
+              stuck.push(n);
+              continue;
+            }
 
-              // Read fresh: `summary` predates the gated-run release above, and
-              // on a sweep it can be minutes old.
-              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: n });
-              const checks = await checkState(runs);
-              const verdict = mergeVerdict(pr.mergeable_state, checks);
-
-              // Runs still in flight is the normal state of a PR the pipeline
-              // just opened, and with the interaction shards on every PR they
-              // stay that way for a quarter of an hour. Holding a runner open for that is the
-              // bug this path used to have. CI completing is an event; it
-              // brings the sweep back on its own.
-              if (verdict === 'pending') {
-                core.info(
-                  `#${n}: \`${pr.mergeable_state}\`, ` +
-                  (checks.total === 0
-                    ? 'no workflow run has reported on this head yet'
-                    : `${checks.pending} of ${checks.total} workflow run(s) still going`) +
-                  ' — the CI-completion sweep re-evaluates it once they report.'
-                );
-                pending.push(n);
-                continue;
-              }
-
-              if (verdict === 'stuck') {
-                const detail = checks.failed > 0
-                  ? `${checks.failed} workflow run(s) failed`
-                  : `the PR reads \`${pr.mergeable_state}\``;
-                core.warning(
-                  `#${n}: auto-merge unavailable (${message}) and ${detail} — it needs a look.`
-                );
-                unarmed.push(n);
-                continue;
-              }
-
-              // Every run reported and none failed -- but that is a run-level
-              // fact, and #615 merged on exactly that fact while its
-              // interaction job had silently skipped. Ask the CI run's own
-              // jobs before asking GitHub to merge.
-              const missing = await missingRequiredJobs(runs);
-              if (missing.length > 0) {
-                core.warning(
-                  `#${n}: every workflow run reported success, but the required job(s) ` +
-                  `${missing.join(', ')} did not fully run — treating as stuck ` +
-                  'rather than merging on an absence of evidence (#615).'
-                );
-                unarmed.push(n);
-                continue;
-              }
-
-              // Every run reported, none failed, and every required job
-              // actually ran. Whether GitHub agrees the PR is mergeable is now
-              // its call to make, not something to poll for: this request
-              // either merges or names what stopped it.
+            if (verdict === 'update') {
+              // The merge commit this pushes is authored under the PAT, so it
+              // raises `pull_request: synchronize` and CI runs on the result.
+              // `expected_head_sha` makes it a no-op on a head that moved since
+              // the read above, rather than a merge onto something unchecked.
               try {
-                await github.rest.pulls.merge({
-                  owner, repo, pull_number: n, merge_method: method.toLowerCase()
+                await github.request('PUT /repos/{owner}/{repo}/pulls/{pull_number}/update-branch', {
+                  owner, repo, pull_number: n, expected_head_sha: pr.head.sha
                 });
-                core.info(`#${n}: merged directly — auto-merge unavailable and every run had reported.`);
-                enabled.push(n);
-              } catch (mergeError) {
-                core.warning(
-                  `#${n}: every workflow run passed but GitHub refused the merge: ${mergeError.message}. ` +
-                  'A conflict, a required review, or a protection rule — none of which clear on their own.'
+                core.info(
+                  `#${n}: green, but ${behind} commit(s) behind ${pr.base.ref} — merged ${pr.base.ref} into it. ` +
+                  'CI runs again on the result, and its completion brings this sweep back.'
                 );
-                unarmed.push(n);
+                updated.push(n);
+              } catch (error) {
+                await settleRefusal(pr, `bringing it up to date with ${pr.base.ref} was refused (${error.message})`);
               }
+              continue;
+            }
+
+            // Every channel green on a head that contains the base's tip -- but
+            // that is a run-level fact, and #615 merged on exactly that fact
+            // while its interaction job had silently skipped. Ask the CI run's
+            // own jobs before asking GitHub to merge.
+            const missing = await missingRequiredJobs(runs);
+            if (missing.length > 0) {
+              core.warning(
+                `#${n}: every channel reported success, but the required job(s) ` +
+                `${missing.join(', ')} did not fully run — not merging on an absence of evidence (#615).`
+              );
+              stuck.push(n);
+              continue;
+            }
+
+            // The merge request is the authority on whether a PR merges, and
+            // `sha` pins it to the head this sweep just judged: a push that
+            // lands between the read and the merge makes it refuse rather than
+            // merge a commit no channel has seen.
+            try {
+              await github.rest.pulls.merge({
+                owner, repo, pull_number: n, merge_method: 'squash', sha: pr.head.sha
+              });
+              core.info(`#${n}: merged — every channel green on a head containing ${pr.base.ref}'s tip.`);
+              merged.push(n);
+            } catch (error) {
+              await settleRefusal(pr, `the merge was refused (${error.message})`);
             }
           }
 
-          core.setOutput('enabled', enabled.join(' '));
-          core.setOutput('unarmed', unarmed.join(' '));
-          core.setOutput('unmarked', unmarked.join(' '));
+          core.setOutput('merged', merged.join(' '));
+          core.setOutput('updated', updated.join(' '));
+          core.setOutput('handback', handback.join(' '));
           core.setOutput('pending', pending.join(' '));
+          core.setOutput('stuck', stuck.join(' '));
           core.setOutput('approved', String(approved));
-          core.info(
-            enabled.length === 0
-              ? 'No PR carried the marker in a mergeable state.'
-              : `Auto-merge covers PR(s): ${enabled.map((n) => `#${n}`).join(', ')}.`
-          );
-          if (pending.length > 0) {
-            core.info(
-              `Waiting on checks, re-evaluated when CI reports: ${pending.map((n) => `#${n}`).join(', ')}.`
-            );
-          }
 
-          // Said out loud for the same reason as `unarmed` below: an unmarked
+          const list = (numbers) => numbers.map((number) => `#${number}`).join(', ');
+          core.info(merged.length === 0 ? 'Nothing merged.' : `Merged: ${list(merged)}.`);
+          if (updated.length > 0) core.info(`Brought up to date, CI running again: ${list(updated)}.`);
+          if (pending.length > 0) core.info(`Waiting on checks: ${list(pending)}.`);
+          if (handback.length > 0) core.info(`Red or conflicting, handed to the CI fail-safe: ${list(handback)}.`);
+
+          // Said out loud for the same reason as `stuck` below: an unmarked
           // pipeline PR is not waiting on anything, it is stranded, and only a
           // human can tell which it should have been. Red here rather than a
           // warning in a log nobody reads.
           if (unmarked.length > 0) {
             core.setFailed(
-              `Neither marked nor draft: ${unmarked.map((n) => `#${n}`).join(', ')}. ` +
+              `Neither marked nor draft: ${list(unmarked)}. ` +
               'Each is a pipeline PR whose run ended without saying whether its work ships. ' +
               'Add READY TO MERGE, or convert it to a draft naming the channel that stopped it.'
             );
           }
 
-          // A marked PR that ends neither armed nor merged holds its issue, and
-          // the queue behind it, for as long as it stays open. Nothing else is
-          // watching, so this is the last place it can be said out loud: the
-          // step goes red rather than passing with a warning nobody reads.
-          if (unarmed.length > 0) {
+          // A marked PR that can neither merge, update, wait nor be handed back
+          // holds its issue, and its parallel-run slot, for as long as it stays
+          // open. Nothing else is watching, so the step goes red rather than
+          // passing with a warning nobody reads.
+          if (stuck.length > 0) {
             core.setFailed(
-              `Marked READY TO MERGE but neither armed nor merged: ${unarmed.map((n) => `#${n}`).join(', ')}. ` +
+              `Marked READY TO MERGE and unable to move: ${list(stuck)}. ` +
               'Each warning above names the PR state that stopped it.'
             );
           }

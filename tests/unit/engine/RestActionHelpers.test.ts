@@ -12,8 +12,9 @@ import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   deductRestCost, findNearestBuildingOfType, completeRestForEmployee, beginRestTravel,
   createRestPendingAction, isMidClaimedTaskExecution, restRoundTripWorthwhile, resolveRestDestination,
-  resolveBuildingApproach,
+  resolveBuildingApproach, isRestBuildingFull, resolveRestBuildingId,
 } from '../../../src/core/engine/RestActionHelpers.js';
+import { getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import {
   NEED_REST_COSTS, NEED_REST_NO_BUILDING_CAP, MAX_NEED_GAUGE,
   BUILDING_REPLENISH_RATES, NEED_REST_DURATIONS, AGENT_WALK_SPEED,
@@ -179,6 +180,143 @@ describe('findNearestBuildingOfType — active-zone exclusion (#557)', () => {
 
     expect(found?.id).toBe(near.building!.id);
   });
+
+  // #1204: a living_quarters at (or over) capacity is skipped by the search —
+  // mirrors isSchoolFull's own exclusion for the training building (#1203) —
+  // so a resting employee is routed to the next nearest building with an
+  // actual free bed, rather than walking to one that will refuse them on
+  // arrival.
+  it('skips a full living quarters and returns the next nearest one with a free bed (#1204)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    const near = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(near.success).toBe(true);
+    near.building!.occupantIds = Array.from(
+      { length: getBuildingPeopleCapacity('living_quarters', 1) },
+      (_, i) => -(i + 1), // synthetic ids — only the count matters here
+    );
+    const far = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100, 1);
+    expect(far.success).toBe(true);
+
+    const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(found?.id).toBe(far.building!.id);
+  });
+
+  it('returns null when every living quarters is full (#1204)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    const only = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(only.success).toBe(true);
+    only.building!.occupantIds = Array.from(
+      { length: getBuildingPeopleCapacity('living_quarters', 1) },
+      (_, i) => -(i + 1),
+    );
+
+    const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(found).toBeNull();
+  });
+});
+
+// #1204: isRestBuildingFull gates the rest flow's "is there room to walk in"
+// check the same way isSchoolFull (EmployeeTraining.ts) gates enrolment
+// (#1203) — occupantIds already inside PLUS everyone already walking there
+// (pendingRestDuration !== null, targeting this building via their active
+// rest action's own payload.buildingId) must together reach capacity before
+// the building counts as full, so two rest walks claimed the same tick can
+// never together overshoot it even though neither has arrived yet.
+describe('isRestBuildingFull (#1204)', () => {
+  const SEED = 42;
+
+  /** A rest PendingAction naming `buildingId`, self-claimed by `employeeId`, with the employee mid-walk (pendingRestDuration set). */
+  function pushWalkingRestAction(state: ReturnType<typeof createGame>, employeeId: number, actionId: number, buildingId: number): void {
+    state.pendingActions.push({
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { buildingId, needKey: 'fatigue', restDuration: 8 },
+      targetEmployeeId: employeeId, status: 'assigned', holderId: employeeId, queuedAtTick: 0,
+    });
+  }
+
+  it('false when occupancy plus in-flight walkers is below capacity', () => {
+    const state = createGame({ seed: SEED });
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    const capacity = getBuildingPeopleCapacity('living_quarters', 1);
+    building.occupantIds = Array.from({ length: capacity - 1 }, (_, i) => -(i + 1));
+
+    expect(isRestBuildingFull(state, building)).toBe(false);
+  });
+
+  it('true when occupancy plus in-flight walkers exactly reaches capacity (boundary)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    const capacity = getBuildingPeopleCapacity('living_quarters', 1);
+    building.occupantIds = Array.from({ length: capacity - 1 }, (_, i) => -(i + 1));
+
+    const { employee: walker } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    walker.pendingRestDuration = 8;
+    walker.activeActionId = 900;
+    pushWalkingRestAction(state, walker.id, 900, building.id);
+
+    expect(isRestBuildingFull(state, building)).toBe(true);
+  });
+
+  it('does not count a walker whose active rest action names a DIFFERENT building (boundary)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const other = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100, 1);
+    expect(other.success).toBe(true);
+    const building = placed.building!;
+    const capacity = getBuildingPeopleCapacity('living_quarters', 1);
+    building.occupantIds = Array.from({ length: capacity - 1 }, (_, i) => -(i + 1));
+
+    const { employee: walker } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    walker.pendingRestDuration = 8;
+    walker.activeActionId = 901;
+    pushWalkingRestAction(state, walker.id, 901, other.building!.id); // walking to the OTHER building
+
+    expect(isRestBuildingFull(state, building)).toBe(false);
+  });
+
+  it('does not count a walker who has already arrived (pendingRestDuration null) even if their prior action still names this building (rejection)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+    const capacity = getBuildingPeopleCapacity('living_quarters', 1);
+    building.occupantIds = Array.from({ length: capacity - 1 }, (_, i) => -(i + 1));
+
+    const { employee: arrived } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    arrived.pendingRestDuration = null; // already arrived — no longer "in flight"
+    arrived.restTicksRemaining = 5;
+    arrived.activeActionId = 902;
+    pushWalkingRestAction(state, arrived.id, 902, building.id);
+
+    expect(isRestBuildingFull(state, building)).toBe(false);
+  });
+});
+
+// #1204: resolveRestBuildingId mirrors the equivalent payload-carried
+// buildingId lookup #1203 added for the training flow.
+describe('resolveRestBuildingId (#1204)', () => {
+  it('returns the numeric buildingId when present', () => {
+    expect(resolveRestBuildingId({ buildingId: 42 })).toBe(42);
+  });
+
+  it('returns undefined when the payload carries no buildingId key (boundary — no-building rest)', () => {
+    expect(resolveRestBuildingId({})).toBeUndefined();
+  });
+
+  it('returns undefined when buildingId is present but not a number (rejection — malformed payload)', () => {
+    expect(resolveRestBuildingId({ buildingId: 'not-a-number' })).toBeUndefined();
+  });
 });
 
 // #945: completeRestForEmployee's with-building path used to apply
@@ -204,9 +342,13 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.fatigue = 25;
 
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    // #1204: completeRestForEmployee now resolves the building from the rest
+    // action's own buildingId rather than the employee's position — pass the
+    // placed building's id explicitly to exercise the with-building path.
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -218,9 +360,10 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     employee.fatigue = 25;
 
     state.buildings.unlockedTiers.living_quarters = 3; // tier 2+ requires research unlock
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 2);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 2);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -232,9 +375,10 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     employee.fatigue = 25;
 
     state.buildings.unlockedTiers.living_quarters = 3;
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 3);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 3);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -245,9 +389,10 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.fatigue = MAX_NEED_GAUGE;
 
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.fatigue).toBe(MAX_NEED_GAUGE);
   });
@@ -285,14 +430,39 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     employee.restNeedKey = 'fatigue';
     employee.activeActionId = 777;
 
-    placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 1);
+    expect(placed.success).toBe(true);
 
-    completeRestForEmployee(state, employee, 'fatigue');
+    completeRestForEmployee(state, employee, 'fatigue', placed.building!.id);
 
     expect(employee.collapsing).toBe(false);
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.restNeedKey).toBeNull();
     expect(employee.activeActionId).toBeNull();
+  });
+
+  // #1204: a buildingId naming a building that has since been demolished
+  // must not crash completion — it degrades to the same no-building capped
+  // path used when no living_quarters exists at all, even though a DIFFERENT
+  // living_quarters happens to be nearest the employee's own position. Proves
+  // completeRestForEmployee resolves the named building itself rather than
+  // falling back to a nearest-by-position search the instant the id fails to
+  // resolve.
+  it('a buildingId resolving to a demolished/nonexistent building falls back to the no-building degraded path rather than crashing (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.fatigue = 25;
+
+    // A DIFFERENT, still-active living_quarters right at the employee's own
+    // position — a nearest-by-position fallback would find this one and
+    // grant a full restore; the named (missing) building must win instead.
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+    expect(state.buildings.buildings.some(b => b.id === 999)).toBe(false);
+
+    expect(() => completeRestForEmployee(state, employee, 'fatigue', 999)).not.toThrow();
+
+    expect(employee.fatigue).toBe(NEED_REST_NO_BUILDING_CAP);
   });
 });
 
@@ -504,6 +674,49 @@ describe('beginRestTravel (#1118)', () => {
     const finalLeg = legs[legs.length - 1]!;
     expect(finalLeg.mode).toBe('drive');
     expect(finalLeg.onArrive).toEqual({ kind: 'none' });
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  // #1204: when a buildingId is given, the walk must route through
+  // moveTo(state, emp.id, {buildingId}, opts) — the same {kind:'enter_building'}
+  // arrival step #1202/#1203 already give the training walk — rather than a
+  // plain x/z reposition ending in {kind:'none'}, so the employee disappears
+  // inside the living_quarters instead of resting visibly on its ring.
+  it('called with a buildingId naming a real, existing living_quarters: routes through the {buildingId} moveTo path — final leg is enter_building, not a plain reposition (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const placed = placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100, 1);
+    expect(placed.success).toBe(true);
+    const building = placed.building!;
+
+    beginRestTravel(state, employee, building.x, building.z, building.id);
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    expect(legs.length).toBeGreaterThan(0);
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.onArrive).toEqual({ kind: 'enter_building', buildingId: building.id });
+    expect(employee.pendingActionType).toBe('rest');
+  });
+
+  // #1204: a buildingId that no longer resolves to any building (demolished
+  // between claim and dispatch) must not crash the walk — it degrades to the
+  // ordinary x/z reposition the no-buildingId case already uses, exactly like
+  // the pre-#1204 behavior for every call.
+  it('called with a buildingId that resolves to no existing building: falls back to a plain x/z walk instead of throwing (#1204)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    expect(state.buildings.buildings.some(b => b.id === 999)).toBe(false);
+
+    expect(() => beginRestTravel(state, employee, 8, 9, 999)).not.toThrow();
+
+    expect(employee.itinerary).not.toBeNull();
+    const legs = employee.itinerary!.legs;
+    const lastLeg = legs[legs.length - 1]!;
+    expect(lastLeg.destX).toBe(8);
+    expect(lastLeg.destZ).toBe(9);
     expect(employee.pendingActionType).toBe('rest');
   });
 });

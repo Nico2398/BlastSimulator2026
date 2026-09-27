@@ -245,7 +245,7 @@ describe('combining GitHub relationships with the body section', () => {
   });
 
   it('blocks a candidate whose relationships could not be read', async () => {
-    const api = fakeApi([{ number: 20, labels: ['ready'], relationshipsUnknown: true }]);
+    const api = fakeApi([{ number: 20, labels: ['ready', 'agent-task', 'scope:engine'], relationshipsUnknown: true }]);
     const result = await select(api);
     expect(result.issue).toBeNull();
   });
@@ -253,7 +253,7 @@ describe('combining GitHub relationships with the body section', () => {
   it('blocks when a dependency of a dependency cannot report its relationships', async () => {
     const api = fakeApi([
       { number: 10, state: 'closed', stateReason: 'completed', relationshipsUnknown: true },
-      { number: 20, labels: ['ready'], blockedBy: [10] },
+      { number: 20, labels: ['ready', 'agent-task', 'scope:engine'], blockedBy: [10] },
     ]);
     const verdict = await rules.graphVerdict(api, await api.getIssue(20));
     expect(verdict.assignable).toBe(false);
@@ -263,9 +263,9 @@ describe('combining GitHub relationships with the body section', () => {
   // The pipeline predates the feature, so an API that does not offer it at all
   // must degrade to the body section rather than stalling the queue forever.
   it('falls back to the body when the API has no relationships at all', async () => {
-    const bare = fakeApi([{ number: 20, labels: ['ready'], body: '## Blocked by\n\n- #547\n' }]) as any;
+    const bare = fakeApi([{ number: 20, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #547\n' }]) as any;
     delete bare.declaredBlockedBy;
-    bare.getIssue = async (n: number) => (n === 547 ? issue({ number: 547 }) : issue({ number: 20, labels: ['ready'], body: '## Blocked by\n\n- #547\n' }));
+    bare.getIssue = async (n: number) => (n === 547 ? issue({ number: 547 }) : issue({ number: 20, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #547\n' }));
     const result = await select(bare);
     expect(result.issue).toBeNull();
   });
@@ -275,8 +275,8 @@ describe('combining GitHub relationships with the body section', () => {
   it('refuses an issue blocked only by a relationship', async () => {
     const api = fakeApi([
       { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
-      { number: 548, labels: ['ready'], blockedBy: [547] },
-      { number: 550, labels: ['ready'] },
+      { number: 548, labels: ['ready', 'agent-task', 'scope:engine'], blockedBy: [547] },
+      { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api)).issue?.number).toBe(550);
   });
@@ -284,7 +284,7 @@ describe('combining GitHub relationships with the body section', () => {
 
 describe('conditions readable off the candidate itself', () => {
   it('assigns an ordinary ready issue', () => {
-    expect(rules.labelVerdict(issue({ number: 1, labels: ['ready'] })).assignable).toBe(true);
+    expect(rules.labelVerdict(issue({ number: 1, labels: ['ready', 'agent-task', 'scope:engine'] })).assignable).toBe(true);
   });
 
   it.each([
@@ -404,7 +404,7 @@ describe('walking the whole dependency graph', () => {
     issue({ number, state: 'closed', stateReason: 'completed', body });
 
   it('assigns when every declared dependency has landed', async () => {
-    const api = fakeApi([closed(10), { number: 20, labels: ['ready'], body: '## Blocked by\n- #10\n' }]);
+    const api = fakeApi([closed(10), { number: 20, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n- #10\n' }]);
     const verdict = await rules.graphVerdict(api, await api.getIssue(20));
     expect(verdict.assignable).toBe(true);
   });
@@ -416,7 +416,7 @@ describe('walking the whole dependency graph', () => {
     const api = fakeApi([
       { number: 5 },
       closed(10, '## Blocked by\n- #5\n'),
-      { number: 20, labels: ['ready'], body: '## Blocked by\n- #10\n' },
+      { number: 20, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
     const verdict = await rules.graphVerdict(api, await api.getIssue(20));
     expect(verdict.assignable).toBe(false);
@@ -426,7 +426,7 @@ describe('walking the whole dependency graph', () => {
   // A typo in a `Blocked by` line used to read as "no dependency" and start the
   // run anyway. A dependency that cannot be verified is unmet, not absent.
   it('refuses when a declared dependency cannot be read', async () => {
-    const api = fakeApi([{ number: 20, labels: ['ready'], body: '## Blocked by\n- #999\n' }]);
+    const api = fakeApi([{ number: 20, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n- #999\n' }]);
     const verdict = await rules.graphVerdict(api, await api.getIssue(20));
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain('#999');
@@ -442,7 +442,7 @@ describe('walking the whole dependency graph', () => {
   });
 
   it('ignores a self-reference', async () => {
-    const api = fakeApi([{ number: 20, labels: ['ready'], body: '## Blocked by\n- #20\n' }]);
+    const api = fakeApi([{ number: 20, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n- #20\n' }]);
     const verdict = await rules.graphVerdict(api, await api.getIssue(20));
     expect(verdict.assignable).toBe(true);
   });
@@ -453,7 +453,7 @@ describe('walking the whole dependency graph', () => {
     const chain = Array.from({ length: size }, (_, index) =>
       closed(100 + index, `## Blocked by\n- #${101 + index}\n`)
     );
-    const api = fakeApi([...chain, { number: 20, labels: ['ready'], body: '## Blocked by\n- #100\n' }]);
+    const api = fakeApi([...chain, { number: 20, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n- #100\n' }]);
     const verdict = await rules.graphVerdict(api, await api.getIssue(20));
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain(String(rules.MAX_DEPENDENCY_NODES));
@@ -463,16 +463,16 @@ describe('walking the whole dependency graph', () => {
 describe('picking the next issue', () => {
   it('picks the oldest assignable ready issue', async () => {
     const api = fakeApi([
-      { number: 30, labels: ['ready'] },
-      { number: 20, labels: ['ready'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:engine'] },
+      { number: 20, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api)).issue?.number).toBe(20);
   });
 
   it('skips a blocked issue and takes the next one', async () => {
     const api = fakeApi([
-      { number: 20, labels: ['ready', 'blocked'] },
-      { number: 30, labels: ['ready'] },
+      { number: 20, labels: ['ready', 'agent-task', 'blocked', 'scope:engine'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api)).issue?.number).toBe(30);
   });
@@ -482,16 +482,16 @@ describe('picking the next issue', () => {
   // commits on it. Both deliverable arms must catch it.
   it('skips an issue whose pipeline pull request is open', async () => {
     const api = fakeApi([
-      { number: 547, labels: ['ready'], pipelinePr: { number: 566, merged: false } },
-      { number: 548, labels: ['ready'] },
+      { number: 547, labels: ['ready', 'agent-task', 'scope:engine'], pipelinePr: { number: 566, merged: false } },
+      { number: 548, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api)).issue?.number).toBe(548);
   });
 
   it('skips an issue an open pull request closes', async () => {
     const api = fakeApi([
-      { number: 547, labels: ['ready'], closers: [{ number: 566, merged: false }] },
-      { number: 548, labels: ['ready'] },
+      { number: 547, labels: ['ready', 'agent-task', 'scope:engine'], closers: [{ number: 566, merged: false }] },
+      { number: 548, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api)).issue?.number).toBe(548);
   });
@@ -501,21 +501,21 @@ describe('picking the next issue', () => {
   // appears in neither arm and must not block. PR #567's own body cites half
   // the backlog — under the mention predicate that PR froze it.
   it('assigns an issue an open pull request merely mentions', async () => {
-    const api = fakeApi([{ number: 548, labels: ['ready'] }]);
+    const api = fakeApi([{ number: 548, labels: ['ready', 'agent-task', 'scope:engine'] }]);
     expect((await select(api)).issue?.number).toBe(548);
   });
 
   it('assigns an issue whose pull request was closed without merging', async () => {
     // A closed-unmerged PR is a rejected deliverable: deliverableFor reports
     // neither arm, so the issue is assignable again.
-    const api = fakeApi([{ number: 547, labels: ['ready'] }]);
+    const api = fakeApi([{ number: 547, labels: ['ready', 'agent-task', 'scope:engine'] }]);
     expect((await select(api)).issue?.number).toBe(547);
   });
 
   it('skips an issue whose pull requests could not be read', async () => {
     const api = fakeApi([
-      { number: 547, labels: ['ready'], deliverableUnknown: true },
-      { number: 548, labels: ['ready'] },
+      { number: 547, labels: ['ready', 'agent-task', 'scope:engine'], deliverableUnknown: true },
+      { number: 548, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api)).issue?.number).toBe(548);
   });
@@ -525,8 +525,8 @@ describe('picking the next issue', () => {
   it('assigns nothing when every candidate waits on the unmerged run', async () => {
     const api = fakeApi([
       { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
-      { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
-      { number: 549, labels: ['ready'], body: '## Blocked by\n\n- #548\n' },
+      { number: 548, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #547\n' },
+      { number: 549, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #548\n' },
     ]);
     const result = await select(api);
     expect(result.issue).toBeNull();
@@ -536,8 +536,8 @@ describe('picking the next issue', () => {
   it('assigns the unblocked issue in that batch', async () => {
     const api = fakeApi([
       { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
-      { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
-      { number: 550, labels: ['ready'], body: '## Blocked by\n\nNone\n' },
+      { number: 548, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #547\n' },
+      { number: 550, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\nNone\n' },
     ]);
     expect((await select(api)).issue?.number).toBe(550);
   });
@@ -546,7 +546,7 @@ describe('picking the next issue', () => {
   it('assigns nothing while another issue is in progress', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress'] },
-      { number: 30, labels: ['ready'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     const result = await select(api);
     expect(result.issue).toBeNull();
@@ -558,7 +558,7 @@ describe('picking the next issue', () => {
   it('does not defer against the issue it is chaining from', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress'] },
-      { number: 30, labels: ['ready'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api, 20)).issue?.number).toBe(30);
   });
@@ -571,14 +571,14 @@ describe('picking the next issue', () => {
   // have been written yet.
   it('never chains back to the issue whose own run fired it', async () => {
     const api = fakeApi([
-      { number: 1090, labels: ['ready', 'paused'], pipelinePr: { number: 1116, merged: false, labels: ['paused'] } },
-      { number: 1125, labels: ['ready'] },
+      { number: 1090, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], pipelinePr: { number: 1116, merged: false, labels: ['paused'] } },
+      { number: 1125, labels: ['ready', 'agent-task', 'scope:engine'] },
     ]);
     expect((await select(api, 1090)).issue?.number).toBe(1125);
   });
 
   it('leaves the queue idle rather than re-picking the issue that just halted', async () => {
-    const api = fakeApi([{ number: 1090, labels: ['ready', 'paused'] }]);
+    const api = fakeApi([{ number: 1090, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] }]);
     const result = await select(api, 1090);
     expect(result.issue).toBeNull();
   });
@@ -596,8 +596,8 @@ describe('picking the next issue', () => {
     it('names the candidates it could not assess', async () => {
       const result = await select(
         fakeApi([
-          { number: 554, labels: ['ready'], deliverableUnknown: true },
-          { number: 555, labels: ['ready'], deliverableUnknown: true },
+          { number: 554, labels: ['ready', 'agent-task', 'scope:engine'], deliverableUnknown: true },
+          { number: 555, labels: ['ready', 'agent-task', 'scope:engine'], deliverableUnknown: true },
         ])
       );
       expect(result.issue).toBeNull();
@@ -612,8 +612,8 @@ describe('picking the next issue', () => {
       const result = await select(
         fakeApi([
           { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
-          { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
-          { number: 549, labels: ['ready', 'blocked'] },
+          { number: 548, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #547\n' },
+          { number: 549, labels: ['ready', 'agent-task', 'blocked', 'scope:engine'] },
         ])
       );
       expect(result.issue).toBeNull();
@@ -622,7 +622,7 @@ describe('picking the next issue', () => {
 
     it('reports an unreadable dependency too', async () => {
       const result = await select(
-        fakeApi([{ number: 554, labels: ['ready'], body: '## Blocked by\n\n- #553\n' }])
+        fakeApi([{ number: 554, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #553\n' }])
       );
       expect(result.issue).toBeNull();
       expect(result.unreadable[0]).toMatchObject({ number: 554 });
@@ -632,8 +632,8 @@ describe('picking the next issue', () => {
     it('reports nothing unreadable when an issue is assigned', async () => {
       const result = await select(
         fakeApi([
-          { number: 554, labels: ['ready'], deliverableUnknown: true },
-          { number: 555, labels: ['ready'] },
+          { number: 554, labels: ['ready', 'agent-task', 'scope:engine'], deliverableUnknown: true },
+          { number: 555, labels: ['ready', 'agent-task', 'scope:engine'] },
         ])
       );
       expect(result.issue?.number).toBe(555);
@@ -648,6 +648,257 @@ describe('picking the next issue', () => {
 // dependency lands. What that costs is the open pull request holding the partial
 // work — which every other rule here reads as "a run is in flight, keep clear".
 // The `paused` label on the PR is what separates a handover from a collision.
+// `AGENTIC_MAX_PARALLEL_RUNS` above 1 lets several issues hold `in-progress`
+// at once. Two things decide which: how many slots are free, and whether an
+// issue's scope labels clash with any run already in flight. The merge gate is
+// what makes parallel runs safe; these rules are what keep them from colliding
+// often. Everything here fails toward running less at once — never toward
+// running two things that claim the same ground.
+describe('running several issues at once', () => {
+  const selectUpTo = (api: any, maxParallel: number, completedIssue: number | null = null) =>
+    rules.selectNextAssignable(api, { completedIssue, maxParallel });
+  const numbers = (result: { issues: { number: number }[] }) => result.issues.map((i) => i.number);
+
+  describe('reading the configured limit', () => {
+    it.each([
+      ['2', 2],
+      [' 3 ', 3],
+      ['1', 1],
+    ])('reads %p as %p', (raw, expected) => {
+      expect(rules.maxParallelRuns(raw)).toBe(expected);
+    });
+
+    // A limit that does not parse falls back to single flight — the one
+    // direction a misconfiguration may not push is towards more at once.
+    it.each([undefined, null, '', '0', '-2', 'abc', '2.5', '1e3'])('falls back to 1 on %p', (raw) => {
+      expect(rules.maxParallelRuns(raw)).toBe(1);
+    });
+  });
+
+  describe('what an issue claims', () => {
+    it('claims the scopes its labels declare', () => {
+      expect(rules.scopeClaim({ labels: ['ready', 'scope:ui', 'scope:console'] })).toEqual({
+        exclusive: false,
+        scopes: ['ui', 'console'],
+        why: null,
+      });
+    });
+
+    it('claims the whole repository without a scope label', () => {
+      const claim = rules.scopeClaim({ labels: ['ready', 'agent-task'] });
+      expect(claim.exclusive).toBe(true);
+      expect(claim.why).toContain('no `scope:*` label');
+    });
+
+    // A typo must not quietly widen what may run side by side.
+    it('claims the whole repository for a scope it does not know', () => {
+      const claim = rules.scopeClaim({ labels: ['scope:naavmesh'] });
+      expect(claim.exclusive).toBe(true);
+      expect(claim.why).toContain('scope:naavmesh');
+    });
+
+    // A pipeline change rewrites the rules the live runs follow.
+    it('runs `scope:pipeline` alone whatever else it declares', () => {
+      const claim = rules.scopeClaim({ labels: ['scope:ui', 'scope:pipeline'] });
+      expect(claim.exclusive).toBe(true);
+      expect(claim.why).toContain('scope:pipeline');
+    });
+
+    it('describes every scope within the label description limit', () => {
+      for (const [scope, description] of Object.entries(rules.SCOPES as Record<string, string>)) {
+        expect(description.length, scope).toBeLessThanOrEqual(100);
+        expect(scope).toMatch(/^[a-z]+$/);
+      }
+      expect([...rules.EXCLUSIVE_SCOPES]).toEqual(['pipeline', 'global']);
+    });
+
+    // Runs alone is now something an issue says, not something it forgets to
+    // say: an unscoped issue does not meet the Definition of Ready at all.
+    it('runs `scope:global` alone', () => {
+      const claim = rules.scopeClaim({ labels: ['scope:global'] });
+      expect(claim.exclusive).toBe(true);
+      expect(claim.why).toContain('scope:global');
+    });
+  });
+
+  // The default is the pipeline as it always ran. Scope labels change nothing
+  // until the limit is raised.
+  it('stays single flight at the default limit, whatever the scopes say', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    const result = await select(api);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('#20');
+  });
+
+  it('starts an issue beside a live run in another scope', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+
+  it('passes over an issue whose scope is in flight and takes the next one that fits', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:ui'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+
+  // Head-of-line: #25 waits on `ui`, and it holds `nav` too, so #30 — younger,
+  // in `nav` — may not start in front of it. #35 overlaps nothing and starts.
+  it('lets an older waiting issue hold every scope it claims', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:ui', 'scope:nav'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:economy'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 3))).toEqual([35]);
+  });
+
+  // An older unlabelled issue holds everything: the queue drains until it can
+  // run alone, rather than letting younger scoped work starve it.
+  it('drains the queue for an older issue that runs alone', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:global'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    const result = await selectUpTo(api, 3);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('can start beside');
+  });
+
+  it('starts nothing beside a live run that claims the whole repository', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    const result = await selectUpTo(api, 3);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('#20');
+    expect(result.reason).toContain('runs alone');
+  });
+
+  it('fills every free slot with issues that do not clash with each other', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['ready', 'agent-task', 'scope:ui'] },
+      { number: 21, labels: ['ready', 'agent-task', 'scope:nav'] },
+      { number: 22, labels: ['ready', 'agent-task', 'scope:ui'] },
+      { number: 23, labels: ['ready', 'agent-task', 'scope:economy'] },
+      { number: 24, labels: ['ready', 'agent-task', 'scope:world'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 3))).toEqual([20, 21, 23]);
+  });
+
+  it('assigns an issue that runs alone, and nothing beside it', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['ready', 'agent-task', 'scope:global'] },
+      { number: 21, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 3))).toEqual([20]);
+  });
+
+  it('defers when the live runs already fill the limit', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 21, labels: ['in-progress', 'scope:nav'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:economy'] },
+    ]);
+    const result = await selectUpTo(api, 2);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('#20');
+    expect(result.reason).toContain('#21');
+  });
+
+  it('does not count the run that fired the chain as live', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui'] },
+      { number: 21, labels: ['in-progress', 'scope:nav'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:ui'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2, 20))).toEqual([30]);
+  });
+
+  // Only an issue that could otherwise run holds a place. A paused issue
+  // holding its own scope would stop its own blocker from ever starting.
+  it('lets an issue waiting on a dependency hold nothing', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:nav'] },
+      { number: 25, labels: ['ready', 'agent-task', 'paused', 'scope:ui'], body: '## Blocked by\n\n- #30\n' },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:ui'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+
+  it('keeps every other rule: a candidate with an open pull request is still skipped', async () => {
+    const api = fakeApi([
+      { number: 25, labels: ['ready', 'agent-task', 'scope:ui'], pipelinePr: { number: 90, merged: false } },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
+  });
+});
+
+// `ready` is a promise that the issue is specified well enough to start, and
+// with parallel runs that includes saying which areas it will touch. The
+// machine-checkable part of the Definition of Ready is enforced where the
+// promise is spent: an issue that does not meet it is never assigned, whatever
+// its `ready` label says. `agentic-intake.yml` takes the label off such an issue
+// with the same verdict; this is the half that holds when intake never ran.
+describe('the Definition of Ready', () => {
+  it.each([
+    [['agent-task', 'scope:ui'], []],
+    [['agent-task', 'scope:ui', 'scope:console', 'ready'], []],
+    [['agent-task', 'scope:global'], []],
+  ])('is met by %j', (labels, missing) => {
+    expect(rules.readinessVerdict({ labels })).toEqual({ ready: true, missing });
+  });
+
+  it('names every missing part at once', () => {
+    const verdict = rules.readinessVerdict({ labels: ['ready'] });
+    expect(verdict.ready).toBe(false);
+    expect(verdict.missing).toHaveLength(2);
+    expect(verdict.missing[0]).toContain('agent-task');
+    expect(verdict.missing[1]).toContain('scope:*');
+  });
+
+  // A typo in a scope label must not read as a scope.
+  it('is not met by a scope it does not know', () => {
+    const verdict = rules.readinessVerdict({ labels: ['agent-task', 'scope:ui', 'scope:naavmesh'] });
+    expect(verdict.ready).toBe(false);
+    expect(verdict.missing).toEqual(['`scope:naavmesh` is not a known scope']);
+  });
+
+  it.each([
+    ['no scope label', ['ready', 'agent-task']],
+    ['no agent-task label', ['ready', 'scope:ui']],
+    ['an unknown scope', ['ready', 'agent-task', 'scope:naavmesh']],
+  ])('keeps an issue with %s out of every assignment, and takes the next one', async (_, labels) => {
+    const api = fakeApi([
+      { number: 20, labels },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    const result = await select(api);
+    expect(result.issue?.number).toBe(30);
+    // Ineligible, not unreadable: nothing here says the queue went unread.
+    expect(result.unreadable).toEqual([]);
+  });
+
+  it('says why in the skip reason', () => {
+    const verdict = rules.labelVerdict(issue({ number: 20, labels: ['ready', 'agent-task'] }));
+    expect(verdict.assignable).toBe(false);
+    expect(verdict.reason).toContain('Definition of Ready');
+    expect(verdict.unreadable).toBe(false);
+  });
+});
+
 describe('resuming a paused run', () => {
   const pausedPr = (number: number, head?: string) => ({
     number,
@@ -658,7 +909,7 @@ describe('resuming a paused run', () => {
 
   it('does not refuse an issue whose only open PR is the paused handover', async () => {
     const api = fakeApi([
-      { number: 20, labels: ['ready', 'paused'], pipelinePr: pausedPr(99) },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], pipelinePr: pausedPr(99) },
     ]);
     const { issue } = await select(api);
     expect(issue?.number).toBe(20);
@@ -668,10 +919,10 @@ describe('resuming a paused run', () => {
   // blocker is still open stays out, exactly as it would without the pause.
   it('still holds a paused issue back while its dependency is open', async () => {
     const api = fakeApi([
-      { number: 10, labels: ['ready'] },
+      { number: 10, labels: ['ready', 'agent-task', 'scope:engine'] },
       {
         number: 20,
-        labels: ['ready', 'paused'],
+        labels: ['ready', 'agent-task', 'paused', 'scope:engine'],
         body: '## Blocked by\n- #10\n',
         pipelinePr: pausedPr(99),
       },
@@ -685,7 +936,7 @@ describe('resuming a paused run', () => {
       { number: 10, state: 'closed', closers: [{ number: 11, merged: true }] },
       {
         number: 20,
-        labels: ['ready', 'paused'],
+        labels: ['ready', 'agent-task', 'paused', 'scope:engine'],
         body: '## Blocked by\n- #10\n',
         pipelinePr: pausedPr(99),
       },
@@ -698,7 +949,7 @@ describe('resuming a paused run', () => {
   // issue is a live run, and #547's collision reasoning is unchanged.
   it('still refuses an issue whose open PR is not a handover', async () => {
     const api = fakeApi([
-      { number: 20, labels: ['ready'], pipelinePr: { number: 99, merged: false } },
+      { number: 20, labels: ['ready', 'agent-task', 'scope:engine'], pipelinePr: { number: 99, merged: false } },
     ]);
     const { issue, reason } = await select(api);
     expect(issue).toBeNull();
@@ -711,7 +962,7 @@ describe('resuming a paused run', () => {
     const api = fakeApi([
       {
         number: 20,
-        labels: ['ready', 'paused'],
+        labels: ['ready', 'agent-task', 'paused', 'scope:engine'],
         pipelinePr: pausedPr(99),
         closers: [{ number: 100, merged: false }],
       },
@@ -724,7 +975,7 @@ describe('resuming a paused run', () => {
   // block, never as a handover to push commits onto.
   it('treats an open PR whose labels could not be read as live, not paused', async () => {
     const api = fakeApi([
-      { number: 20, labels: ['ready', 'paused'], pipelinePr: { number: 99, merged: false } },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], pipelinePr: { number: 99, merged: false } },
     ]);
     const { issue } = await select(api);
     expect(issue).toBeNull();
@@ -739,7 +990,7 @@ describe('resuming a paused run', () => {
     const api = fakeApi([
       {
         number: 758,
-        labels: ['ready'],
+        labels: ['ready', 'agent-task', 'scope:engine'],
         closers: [
           { number: 740, merged: false, labels: ['paused'], head: 'pipeline/feature-730-32642264036' },
         ],
@@ -759,7 +1010,7 @@ describe('resuming a paused run', () => {
     const api = fakeApi([
       {
         number: 730,
-        labels: ['ready', 'paused'],
+        labels: ['ready', 'agent-task', 'paused', 'scope:engine'],
         pipelinePr: { number: 740, merged: false, labels: ['enhancement'] },
       },
     ]);
@@ -837,8 +1088,8 @@ describe('detecting a stranded pause', () => {
   };
 
   it('is not evaluated on an issue that does not carry `paused`', async () => {
-    const { api, calls } = spy([{ number: 20, labels: ['ready'] }]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready'] });
+    const { api, calls } = spy([{ number: 20, labels: ['ready', 'agent-task', 'scope:engine'] }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'scope:engine'] });
     expect(verdict).toBeFalsy();
     expect(calls.getIssue).toBe(0);
     expect(calls.declaredBlockedBy).toBe(0);
@@ -847,10 +1098,10 @@ describe('detecting a stranded pause', () => {
   // The false-positive guard: an ordinary pause, still healthily waiting.
   it('is not stranded when the declared dependency is open, ready, and does not cycle back', async () => {
     const api = fakeApi([
-      { number: 10, labels: ['ready'] },
-      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      { number: 10, labels: ['ready', 'agent-task', 'scope:engine'] },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(false);
   });
 
@@ -864,17 +1115,17 @@ describe('detecting a stranded pause', () => {
     const api = fakeApi([
       {
         number: 1103,
-        labels: ['ready'],
+        labels: ['ready', 'agent-task', 'scope:engine'],
         body:
           '## Blocked by\n\nNone — this is standalone debugging work. It is filed as a dependency of #1089 only because the branch is shared.\n',
       },
       {
         number: 1089,
-        labels: ['ready', 'paused'],
+        labels: ['ready', 'agent-task', 'paused', 'scope:engine'],
         body: '## Blocked by\n- #1103\n',
       },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 1089, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 1089, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(false);
     expect(verdict?.blockers).toEqual([]);
   });
@@ -882,8 +1133,8 @@ describe('detecting a stranded pause', () => {
   // A paused issue with no declared dependency at all — no relationship, no
   // body section, or an explicit `None` — has nothing to strand on.
   it('is not stranded when there are zero declared dependencies', async () => {
-    const api = fakeApi([{ number: 20, labels: ['ready', 'paused'], body: '' }]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const api = fakeApi([{ number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '' }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict).toEqual({ stranded: false, blockers: [] });
   });
 
@@ -892,10 +1143,10 @@ describe('detecting a stranded pause', () => {
   // per `labelVerdict`.
   it('is stranded when the dependency carries `ready` but is disqualified by another label', async () => {
     const api = fakeApi([
-      { number: 10, labels: ['ready', 'blocked'] },
-      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      { number: 10, labels: ['ready', 'agent-task', 'blocked', 'scope:engine'] },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 10, cause: 'ready-but-disqualified' })
@@ -909,18 +1160,18 @@ describe('detecting a stranded pause', () => {
   it('is not stranded when the dependency is itself an open, unmerged pull request', async () => {
     const api = fakeApi([
       { number: 10, isPullRequest: true, state: 'open' },
-      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(false);
   });
 
   it('is stranded when the dependency is itself a closed, unmerged pull request', async () => {
     const api = fakeApi([
       { number: 10, isPullRequest: true, state: 'closed', prMergedAt: null },
-      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 10, cause: 'closed-unmerged' })
@@ -930,9 +1181,9 @@ describe('detecting a stranded pause', () => {
   it('is stranded when the dependency carries no `ready` label', async () => {
     const api = fakeApi([
       { number: 10, labels: [] },
-      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 10, cause: 'no-ready-label' })
@@ -951,18 +1202,18 @@ describe('detecting a stranded pause', () => {
     const api = fakeApi([
       {
         number: blockerNum,
-        labels: ['ready'],
+        labels: ['ready', 'agent-task', 'scope:engine'],
         body: `## Blocked by\n- #${pausedNum}\n`,
       },
       {
         number: pausedNum,
-        labels: ['ready', 'paused'],
+        labels: ['ready', 'agent-task', 'paused', 'scope:engine'],
         body: `## Blocked by\n- #${blockerNum}\n`,
       },
     ]);
     const verdict = await rules.strandedPauseVerdict(api, {
       number: pausedNum,
-      labels: ['ready', 'paused'],
+      labels: ['ready', 'agent-task', 'paused', 'scope:engine'],
     });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
@@ -978,9 +1229,9 @@ describe('detecting a stranded pause', () => {
         stateReason: 'completed',
         closers: [{ number: 11, merged: false }],
       },
-      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 10, cause: 'closed-unmerged' })
@@ -988,8 +1239,8 @@ describe('detecting a stranded pause', () => {
   });
 
   it('fails closed when the dependency cannot be read at all', async () => {
-    const api = fakeApi([{ number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #999\n' }]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const api = fakeApi([{ number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #999\n' }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 999, cause: 'unreadable' })
@@ -1005,10 +1256,10 @@ describe('detecting a stranded pause', () => {
   // choosing between), not to the unreadable node buried inside its graph.
   it("is stranded when the dependency's own dependency graph hits an unreadable node", async () => {
     const api = fakeApi([
-      { number: 10, labels: ['ready'], body: '## Blocked by\n- #999\n' },
-      { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+      { number: 10, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n- #999\n' },
+      { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
     ]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(
       expect.objectContaining({ number: 10, cause: 'unreadable' })
@@ -1016,8 +1267,8 @@ describe('detecting a stranded pause', () => {
   });
 
   it("fails closed when the paused issue's own dependency relationships could not be read", async () => {
-    const api = fakeApi([{ number: 20, labels: ['ready', 'paused'], relationshipsUnknown: true }]);
-    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+    const api = fakeApi([{ number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], relationshipsUnknown: true }]);
+    const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
     expect(verdict?.stranded).toBe(true);
     expect(verdict?.blockers).toContainEqual(expect.objectContaining({ cause: 'unreadable' }));
   });
@@ -1028,9 +1279,9 @@ describe('detecting a stranded pause', () => {
     it('is stranded off a dependency declared only through the GitHub relationship', async () => {
       const api = fakeApi([
         { number: 10, labels: [] },
-        { number: 20, labels: ['ready', 'paused'], blockedBy: [10] },
+        { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], blockedBy: [10] },
       ]);
-      const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+      const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
       expect(verdict?.stranded).toBe(true);
       expect(verdict?.blockers).toContainEqual(expect.objectContaining({ number: 10 }));
     });
@@ -1038,9 +1289,9 @@ describe('detecting a stranded pause', () => {
     it('is stranded off a dependency declared only through the body section', async () => {
       const api = fakeApi([
         { number: 10, labels: [] },
-        { number: 20, labels: ['ready', 'paused'], body: '## Blocked by\n- #10\n' },
+        { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], body: '## Blocked by\n- #10\n' },
       ]);
-      const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'paused'] });
+      const verdict = await rules.strandedPauseVerdict(api, { number: 20, labels: ['ready', 'agent-task', 'paused', 'scope:engine'] });
       expect(verdict?.stranded).toBe(true);
       expect(verdict?.blockers).toContainEqual(expect.objectContaining({ number: 10 }));
     });
@@ -1117,7 +1368,7 @@ describe('the cascade brake', () => {
     const api = fakeApi(
       [
         blockedAt(1, lastMergeAt + HOUR),
-        { number: 2, labels: ['ready', 'paused'], pausedAt: lastMergeAt + 2 * HOUR },
+        { number: 2, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], pausedAt: lastMergeAt + 2 * HOUR },
       ],
       { lastMergeAt }
     );
@@ -1146,7 +1397,7 @@ describe('the cascade brake', () => {
   it('does not count the paused pull request that carries a handover', async () => {
     const api = fakeApi(
       [
-        { number: 1, labels: ['ready', 'paused'], pausedAt: lastMergeAt + HOUR },
+        { number: 1, labels: ['ready', 'agent-task', 'paused', 'scope:engine'], pausedAt: lastMergeAt + HOUR },
         {
           number: 99,
           labels: ['paused'],
@@ -2017,6 +2268,7 @@ describe('running the assign action end to end', () => {
       ASSIGN_GUARD: 'none',
       COMPLETED_ISSUE: '',
       BLOCKED_CHAIN_LIMIT: '',
+      MAX_PARALLEL: '',
       ...scenario.env,
     };
 
@@ -2042,8 +2294,8 @@ describe('running the assign action end to end', () => {
   const NOW = Date.now();
 
   it('assigns the oldest assignable issue and posts the trigger comment', async () => {
-    const result = await run({ issues: [{ number: 30, labels: ['ready'] }, { number: 20, labels: ['ready'] }] });
-    expect(result.outputs.issue).toBe('20');
+    const result = await run({ issues: [{ number: 30, labels: ['ready', 'agent-task', 'scope:engine'] }, { number: 20, labels: ['ready', 'agent-task', 'scope:engine'] }] });
+    expect(result.outputs.issues).toBe('20');
     expect(result.labelled).toEqual([{ issue: 20, labels: ['in-progress'] }]);
     // `paused` comes off alongside `ready`: the issue has just been picked up,
     // so a run no longer stopped there. Removing a label that is not present is a
@@ -2056,18 +2308,77 @@ describe('running the assign action end to end', () => {
     expect(result.comments[0]!.body).toContain('issue #20');
   });
 
+  // Every free slot on one call, each with its own assignment comment — each
+  // comment is the trigger for its own session.
+  it('assigns every issue that fits when the limit allows several', async () => {
+    const result = await run({
+      issues: [
+        { number: 20, labels: ['in-progress', 'scope:ui'] },
+        { number: 25, labels: ['ready', 'agent-task', 'scope:ui'] },
+        { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+        { number: 35, labels: ['ready', 'agent-task', 'scope:economy'] },
+      ],
+      env: { MAX_PARALLEL: '3' },
+    });
+    expect(result.failed).toBeNull();
+    expect(result.outputs.issues).toBe('30 35');
+    expect(result.labelled).toEqual([
+      { issue: 30, labels: ['in-progress'] },
+      { issue: 35, labels: ['in-progress'] },
+    ]);
+    expect(result.comments.map((comment) => comment.issue)).toEqual([30, 35]);
+    expect(result.comments[1]!.body).toContain('autonomous pipeline assignment for issue #35');
+  });
+
+  it('assigns one issue when the limit is unset, however many would fit', async () => {
+    const result = await run({
+      issues: [
+        { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
+        { number: 35, labels: ['ready', 'agent-task', 'scope:economy'] },
+      ],
+    });
+    expect(result.outputs.issues).toBe('30');
+    expect(result.comments).toHaveLength(1);
+  });
+
+  // The Definition of Done for a deliverable that was not a diff: the run
+  // closed its issue as completed, and the close chain makes sure it reads
+  // `done` with nothing left claiming it is queued, halted or waiting.
+  it('leaves an issue a run closed as completed meeting the Definition of Done', async () => {
+    const result = await run({
+      issues: [
+        { number: 900, state: 'closed', stateReason: 'completed', labels: ['agent-task', 'scope:ui', 'in-progress', 'ready', 'paused'] },
+      ],
+      events: { 900: [{ label: 'in-progress', at: Date.now() - 60_000 }] },
+      env: { ASSIGN_GUARD: 'closed_without_pr', COMPLETED_ISSUE: '900' },
+    });
+    expect(result.failed).toBeNull();
+    expect(result.labelled).toContainEqual({ issue: 900, labels: ['done'] });
+    const removed = result.unlabelled.filter((u) => u.issue === 900).map((u) => u.label);
+    expect(removed).toEqual(expect.arrayContaining(['in-progress', 'ready', 'paused']));
+  });
+
+  it('does not call an issue closed as not planned done', async () => {
+    const result = await run({
+      issues: [{ number: 901, state: 'closed', stateReason: 'not_planned', labels: ['agent-task', 'scope:ui', 'in-progress'] }],
+      events: { 901: [{ label: 'in-progress', at: Date.now() - 60_000 }] },
+      env: { ASSIGN_GUARD: 'closed_without_pr', COMPLETED_ISSUE: '901' },
+    });
+    expect(result.labelled.filter((l) => l.issue === 901)).toEqual([]);
+  });
+
   // 17 Aug 2026: every candidate skipped on a 503, three dispatches in a row,
   // each ending green on "Nothing assigned — see the step above for the reason".
   // The Actions list showed three successes and issue #554 never got a session.
   it('fails the step when the queue could not be read', async () => {
     const result = await run({
       issues: [
-        { number: 554, labels: ['ready'] },
-        { number: 555, labels: ['ready'] },
+        { number: 554, labels: ['ready', 'agent-task', 'scope:engine'] },
+        { number: 555, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       unreadable: [554, 555],
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.failed).toContain('#554');
     expect(result.failed).toContain('could not be assessed');
   });
@@ -2075,8 +2386,8 @@ describe('running the assign action end to end', () => {
   // The other half of the same rule: a queue that was read and holds nothing
   // eligible is the normal resting state, and must stay a green no-op.
   it('stays green on a queue that is genuinely idle', async () => {
-    const result = await run({ issues: [{ number: 554, labels: ['ready', 'blocked'] }] });
-    expect(result.outputs.issue).toBe('');
+    const result = await run({ issues: [{ number: 554, labels: ['ready', 'agent-task', 'blocked', 'scope:engine'] }] });
+    expect(result.outputs.issues).toBe('');
     expect(result.failed).toBeNull();
     expect(result.log.join('\n')).toContain('Nothing assigned');
   });
@@ -2089,14 +2400,14 @@ describe('running the assign action end to end', () => {
       issues: [
         {
           number: 554,
-          labels: ['ready'],
+          labels: ['ready', 'agent-task', 'scope:engine'],
           pipelinePr: { number: 610, merged: false },
           pipelineBranch: 'pipeline/feature-554-32056002769',
         },
-        { number: 555, labels: ['ready'] },
+        { number: 555, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
     });
-    expect(result.outputs.issue).toBe('555');
+    expect(result.outputs.issues).toBe('555');
     expect(result.log.join('\n')).toContain('#610');
   });
 
@@ -2105,19 +2416,19 @@ describe('running the assign action end to end', () => {
   it('assigns past a candidate it could not read', async () => {
     const result = await run({
       issues: [
-        { number: 554, labels: ['ready'] },
-        { number: 555, labels: ['ready'] },
+        { number: 554, labels: ['ready', 'agent-task', 'scope:engine'] },
+        { number: 555, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       unreadable: [554],
     });
-    expect(result.outputs.issue).toBe('555');
+    expect(result.outputs.issues).toBe('555');
     expect(result.failed).toBeNull();
   });
 
   it('fails loudly on an unrecognised agent rather than picking one', async () => {
     const result = await run({ issues: [], env: { AGENTIC_AGENT: 'copilot' } });
     expect(result.failed).toContain('AGENTIC_AGENT');
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
   });
 
   // The whole point of the change: a run that ends `blocked` releases the queue
@@ -2126,13 +2437,13 @@ describe('running the assign action end to end', () => {
     const result = await run({
       issues: [
         { number: 547, labels: ['blocked', 'in-progress'], pipelinePr: { number: 566, merged: false } },
-        { number: 550, labels: ['ready'] },
+        { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       events: blockedRun(547, NOW - 60_000),
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-546' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('550');
+    expect(result.outputs.issues).toBe('550');
     expect(result.outputs.halted).toBe('false');
     // `blocked` means the run is over, so the two labels cannot both stand.
     expect(result.unlabelled).toContainEqual({ issue: 547, label: 'in-progress' });
@@ -2144,14 +2455,14 @@ describe('running the assign action end to end', () => {
     const result = await run({
       issues: [
         { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
-        { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
-        { number: 549, labels: ['ready'], body: '## Blocked by\n\n- #548\n' },
+        { number: 548, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #547\n' },
+        { number: 549, labels: ['ready', 'agent-task', 'scope:engine'], body: '## Blocked by\n\n- #548\n' },
       ],
       events: blockedRun(547, NOW - 60_000),
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-546' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.labelled).toEqual([]);
     expect(result.log.join('\n')).toContain('#548');
   });
@@ -2162,12 +2473,12 @@ describe('running the assign action end to end', () => {
     const result = await run({
       issues: [
         { number: 900, labels: ['blocked'] },
-        { number: 550, labels: ['ready'] },
+        { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       events: { 900: [{ label: 'blocked', at: NOW }] },
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '900' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.log.join('\n')).toContain('never carried');
   });
 
@@ -2179,7 +2490,7 @@ describe('running the assign action end to end', () => {
         { number: 541, labels: ['blocked'] },
         { number: 543, labels: ['blocked'] },
         { number: 547, labels: ['blocked'] },
-        { number: 550, labels: ['ready'] },
+        { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       events: {
         ...blockedRun(541, NOW - 3 * 60_000),
@@ -2189,7 +2500,7 @@ describe('running the assign action end to end', () => {
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-540' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.outputs.halted).toBe('true');
     expect(result.comments.at(-1)?.body).toContain('Pipeline halted');
     // The one state the loop cannot leave on its own has to name its way out.
@@ -2205,7 +2516,7 @@ describe('running the assign action end to end', () => {
         { number: 541, labels: ['blocked'] },
         { number: 543, labels: ['blocked'] },
         { number: 547, labels: ['blocked'] },
-        { number: 550, labels: ['ready'] },
+        { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       events: {
         ...blockedRun(541, NOW - 3 * 60_000),
@@ -2233,7 +2544,7 @@ describe('running the assign action end to end', () => {
         { number: 541, labels: ['blocked'] },
         { number: 543, labels: ['blocked'] },
         { number: 547, labels: ['blocked'] },
-        { number: 550, labels: ['ready'] },
+        { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       events: {
         ...blockedRun(541, NOW - 5 * 3_600_000),
@@ -2243,7 +2554,7 @@ describe('running the assign action end to end', () => {
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-546' } }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('550');
+    expect(result.outputs.issues).toBe('550');
     expect(result.outputs.halted).toBe('false');
   });
 
@@ -2252,7 +2563,7 @@ describe('running the assign action end to end', () => {
       issues: [
         { number: 543, labels: ['blocked'] },
         { number: 547, labels: ['blocked'] },
-        { number: 550, labels: ['ready'] },
+        { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       events: { ...blockedRun(543, NOW - 2 * 60_000), ...blockedRun(547, NOW - 60_000) },
       mergedPipelinePrs: [{ merged_at: new Date(NOW - 3_600_000).toISOString(), head: { ref: 'pipeline/feature-540' } }],
@@ -2261,30 +2572,30 @@ describe('running the assign action end to end', () => {
     expect((await run(scenario)).outputs.halted).toBe('true');
 
     scenario.env!.BLOCKED_CHAIN_LIMIT = '4';
-    expect((await run(scenario)).outputs.issue).toBe('550');
+    expect((await run(scenario)).outputs.issues).toBe('550');
   });
 
   // Reading an unknown state as "safe to chain" is the one thing this step must
   // never do, so an unreadable issue fails the job instead.
   it('fails rather than chaining from an issue it cannot read', async () => {
     const result = await run({
-      issues: [{ number: 550, labels: ['ready'] }],
+      issues: [{ number: 550, labels: ['ready', 'agent-task', 'scope:engine'] }],
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '999' },
     });
     expect(result.failed).toContain('#999');
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
   });
 
   it('stops when the blocked label was already removed', async () => {
     const result = await run({
       issues: [
         { number: 547, labels: [] },
-        { number: 550, labels: ['ready'] },
+        { number: 550, labels: ['ready', 'agent-task', 'scope:engine'] },
       ],
       events: blockedRun(547, NOW - 60_000),
       env: { ASSIGN_GUARD: 'after_blocked_run', COMPLETED_ISSUE: '547' },
     });
-    expect(result.outputs.issue).toBe('');
+    expect(result.outputs.issues).toBe('');
     expect(result.log.join('\n')).toContain('no longer carries');
   });
 });

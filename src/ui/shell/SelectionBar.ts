@@ -13,6 +13,7 @@ import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { describeStatus } from '../fleetDetailSections.js';
+import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
 /** Bottom offset of the bar, matching its `bottom:` inline style below. */
 const SELECTION_BAR_BOTTOM_OFFSET_PX = 22;
@@ -24,6 +25,13 @@ const SELECTION_BAR_PADDING_Y_PX = 10;
 const SELECTION_BAR_ROOT_GAP_PX = 14;
 /** Identity block min-width, matching its inline style below. */
 const SELECTION_BAR_IDENTITY_MIN_WIDTH_PX = 110;
+/**
+ * Sub-text line max-width — bounds a building's occupant-name list (#1205)
+ * to a single truncated line instead of wrapping and growing the bar past
+ * its fixed declared height (selectionBarBounds() above never accounts for
+ * multi-line sub-text).
+ */
+const SELECTION_BAR_SUB_MAX_WIDTH_PX = 220;
 /** Identity block right padding (before its border), matching its inline style below. */
 const SELECTION_BAR_IDENTITY_PADDING_RIGHT_PX = 12;
 /** Identity block right border, matching its inline style below. */
@@ -109,7 +117,7 @@ export class SelectionBar {
     this.titleEl = el('div');
     this.titleEl.style.cssText = 'font:600 12px/1.2 var(--bsx-font-ui);color:var(--bsx-text-primary)';
     this.subEl = el('div', { className: 'bsx-mono' });
-    this.subEl.style.cssText = 'font-size:10px;color:var(--bsx-text-muted)';
+    this.subEl.style.cssText = `font-size:10px;color:var(--bsx-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${SELECTION_BAR_SUB_MAX_WIDTH_PX}px`;
     identity.append(this.titleEl, this.subEl);
 
     this.actionsEl = el('div');
@@ -153,7 +161,19 @@ export class SelectionBar {
       case 'building': {
         const b = state.buildings.buildings.find(x => x.id === entity.id);
         if (!b) return null;
-        return { title: t(`building.${b.type}.t${b.tier}.name`), sub: `#${b.id} · HP ${Math.round(b.hp)}` };
+        let sub = `#${b.id} · HP ${Math.round(b.hp)}`;
+        const capacity = getBuildingPeopleCapacity(b.type, b.tier);
+        if (capacity > 0) {
+          sub += ` · ${t('building.occupancy', { inside: b.occupantIds.length, capacity })}`;
+          if (b.occupantIds.length > 0) {
+            const names = b.occupantIds
+              .map(id => state.employees.employees.find(e => e.id === id)?.name)
+              .filter((name): name is string => name !== undefined)
+              .join(', ');
+            if (names) sub += ` · ${t('shell.selection.building_occupants', { names })}`;
+          }
+        }
+        return { title: t(`building.${b.type}.t${b.tier}.name`), sub };
       }
       case 'vehicle': {
         const v = state.vehicles.vehicles.find(x => x.id === entity.id);

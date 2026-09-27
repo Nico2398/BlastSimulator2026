@@ -24,6 +24,8 @@ import { isOversized } from '../mining/BlastCalc.js';
 // — every edge is a function called from inside another function's body,
 // never evaluated at module-load time.
 import { findHaulDepotApproach } from '../economy/HaulingTask.js';
+import { getBuildingDef } from '../entities/Building.js';
+import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
 export type PlanFidelity = 'estimate' | 'exact';
 
@@ -69,10 +71,15 @@ function resolveGoal(state: GameState, employee: Employee, goal: Goal, actionHin
     return { targetX: goal.x, targetZ: goal.z, requiredVehicleRole: null, workTicks: 0, actionId: null };
   }
 
-  // 'rest'
+  // 'rest' (#1204): resolves to the building's ring approach cell — an
+  // employee entering a building goes in on foot from its ring, never
+  // straight onto its own (blocked) footprint origin — mirroring #1203's
+  // identical resolution for the training-enrolment walk.
   const building = state.buildings.buildings.find(b => b.id === goal.buildingId);
   if (!building) return null;
-  return { targetX: building.x, targetZ: building.z, requiredVehicleRole: null, workTicks: 0, actionId: null };
+  const def = getBuildingDef(building.type, building.tier);
+  const approach = findBuildingApproachCell(state.navGrid, building, def, employee.x, employee.z);
+  return { targetX: approach.x, targetZ: approach.z, requiredVehicleRole: null, workTicks: 0, actionId: null };
 }
 
 /**
@@ -400,7 +407,10 @@ function buildFootOnlyItinerary(
     destX: targetX,
     destZ: targetZ,
     arrival: 'exact',
-    onArrive: { kind: 'none' },
+    // #1204: a rest goal's foot leg ends by entering the living_quarters it
+    // targets, unseen for the whole stay, instead of resting visibly on its
+    // ring — mirrors #1203's identical enter_building step for training.
+    onArrive: goal.kind === 'rest' ? { kind: 'enter_building', buildingId: goal.buildingId } : { kind: 'none' },
     estTicks: cellsToTravelTicks(effectiveDist, AGENT_WALK_SPEED),
   };
 

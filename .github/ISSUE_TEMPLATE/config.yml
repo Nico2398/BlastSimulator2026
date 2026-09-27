@@ -1,6 +1,9 @@
 # A free-form issue is a valid pipeline input — form, API, or a sentence typed
 # from a phone — and underspecification is resolved by the run rather than
-# bounced back to the filer. Nothing labels an issue on arrival, and no issue
-# event starts a run: add `ready` to put it in the queue, then dispatch
-# "Pipeline: run the configured agent on the next ready issue" to start it.
+# bounced back to the filer. No issue event starts a run. To put a free-form
+# issue in the queue, give it `agent-task` and the `scope:*` labels for the
+# areas it will touch, then `ready` — the Definition of Ready's checkable part
+# (`agentic-issue-creation`); `agentic-intake.yml` takes `ready` back off an
+# issue without them, with a comment saying what is missing. Dispatch "Pipeline:
+# run the configured agent on the next ready issue" to start the queue.
 blank_issues_enabled: true

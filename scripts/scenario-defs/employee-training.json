@@ -19,6 +19,29 @@
       }
     },
     {
+      "command": "set_policy mode:continuous",
+      "description": "(#1203) #1203's arrival-gated training turned this file's fixed `tick N` pads into `wait_until` waits on real walk time, lengthening the runway (two schools' worth of walk-there-train-walk-back, plus the drilling grind) enough that the driller's own fatigue-driven wellBeing now bottoms out and ends in a worker revolt before the blast step. A site policy's revision only takes effect once applied (forceShiftRestIfNeededByPolicy, ForceShiftRest.ts), and this policy's own rest destination is any living_quarters tier or resting in place if none exists (dest.worthwhile) -- no living_quarters is ever built in this file, so this alone is what lets the crew take a proactive rest at all through the grind ahead. Left at SITE_POLICY_DEFAULT_THRESHOLD (60, no explicit fatigue: override, unlike tutorial-interactive.json's own #1151 fix at 75): the dedicated builder's own place_building work is protected mid-execution (PROTECTED_MID_EXECUTION_ACTION_TYPES) but not its walk there, and a threshold as aggressive as 75 sent it back for rest often enough that the blasting_academy build never landed inside this step's own 300-tick wait budget -- confirmed live. Applied before any training/build step so nothing above depends on which toolbar panel this leaves open (every later step already re-clicks its own panel explicitly).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {
@@ -153,7 +176,7 @@
     },
     {
       "command": "employee train 1 skill:driving.excavator",
-      "description": "Real click path: open the employee detail panel, confirm the excavator course is genuinely offered and clickable (#479's own concern -- \"if this control is missing or disabled with a school standing, the licence belongs to nobody\"), then enrol.",
+      "description": "Real click path: open the employee detail panel, confirm the excavator course is genuinely offered and clickable (#479's own concern -- \"if this control is missing or disabled with a school standing, the licence belongs to nobody\"), then enrol. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -178,24 +201,45 @@
           "cash"
         ],
         "equals": {
+          "trainingCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "description": "(#1203) The driller built this school itself just above, so it is standing right next to it -- but arrival is still a real walk, not a teleport, so this waits for trainingState to be promoted from pendingTrainingState on entry rather than assuming enrolment itself started the course.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
           "trainingCount": 1
         }
       }
     },
     {
-      "command": "tick 20",
-      "description": "TRAINING_BASE_TICKS(20) * TRAINING_LEVEL_COST_MULTIPLIER[1](1) * TRAINING_TIER_SPEED[1](1) -- the exact course length for a Tier-1 driving_center's first level.",
+      "command": "wait_until field:trainingCount equals:0 max_ticks:300",
+      "description": "(#1203) Replaces a fixed `tick 20` pad that assumed instant relocation. The course itself is still exactly TRAINING_BASE_TICKS(20) * TRAINING_LEVEL_COST_MULTIPLIER[1](1) * TRAINING_TIER_SPEED[1](1) from arrival, but arrival itself now takes a variable number of walk ticks, so this waits for the course to actually land rather than guessing an offset from the enrol command.",
+      "timeout": 95,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
-        ],
         "equals": {
           "trainingCount": 0,
           "qualificationCount": 3
@@ -216,7 +260,7 @@
     },
     {
       "command": "employee train 1 skill:driving.drill_rig",
-      "description": "#553: driving.drill_rig belongs to no hiring role either (ROLE_STARTING_QUALIFICATION) -- same parity gap as driving.excavator above, and now load-bearing: without this licence the driller can never staff the drill_rig bought above, so drill_hole's vehicle gate (#550) never claims. No toolbar click here (unlike the excavator step above): the employees panel is already open and employee #1's row already expanded from that step (CrewPanel's `expandedId` is a plain instance field, untouched by the intervening `tick`/`event choose` steps), and ToolRail's tab button is a toggle (UIManager.togglePanel: clicking the tab for the panel that is already active calls hideAllPanels() instead of reopening it) -- re-clicking `[data-panel=\"employees\"]` here closed the panel outright (display:none on #bs-employee-panel), leaving the train button attached to the DOM but zero-sized, which is what `clickSelector \"...bs-train-btn[data-skill=\\\"driving.drill_rig\\\"]\" failed: element has zero size (0x0)` actually meant.",
+      "description": "#553: driving.drill_rig belongs to no hiring role either (ROLE_STARTING_QUALIFICATION) -- same parity gap as driving.excavator above, and now load-bearing: without this licence the driller can never staff the drill_rig bought above, so drill_hole's vehicle gate (#550) never claims. No toolbar click here (unlike the excavator step above): the employees panel is already open and employee #1's row already expanded from that step (CrewPanel's `expandedId` is a plain instance field, untouched by the intervening `tick`/`event choose` steps), and ToolRail's tab button is a toggle (UIManager.togglePanel: clicking the tab for the panel that is already active calls hideAllPanels() instead of reopening it) -- re-clicking `[data-panel=\"employees\"]` here closed the panel outright (display:none on #bs-employee-panel), leaving the train button attached to the DOM but zero-sized, which is what `clickSelector \"...bs-train-btn[data-skill=\\\"driving.drill_rig\\\"]\" failed: element has zero size (0x0)` actually meant. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount stays 0 until they actually arrive and enter the building.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -233,24 +277,45 @@
           "cash"
         ],
         "equals": {
+          "trainingCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "description": "(#1203) Waits for the driller to walk back into the driving_center and have trainingState promoted from pendingTrainingState, rather than assuming enrolment itself started the course.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
           "trainingCount": 1
         }
       }
     },
     {
-      "command": "tick 20",
-      "description": "Same course length as the excavator licence above -- both are a Tier-1 driving_center's first level.",
+      "command": "wait_until field:trainingCount equals:0 max_ticks:300",
+      "description": "(#1203) Replaces a fixed `tick 20` pad that assumed instant relocation. Same course length as the excavator licence above (Tier-1 driving_center's first level), counted from arrival rather than from the enrol command.",
+      "timeout": 95,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
-        ],
         "equals": {
           "trainingCount": 0,
           "qualificationCount": 4
@@ -342,7 +407,7 @@
     },
     {
       "command": "employee train 1 skill:blasting",
-      "description": "Chuck Miner already holds blasting at Rookie (a driller's own ROLE_STARTING_QUALIFICATION) -- this course promotes it, the same control used for a brand-new licence above.",
+      "description": "Chuck Miner already holds blasting at Rookie (a driller's own ROLE_STARTING_QUALIFICATION) -- this course promotes it, the same control used for a brand-new licence above. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount stays 0 until they actually arrive and enter the building.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -363,47 +428,40 @@
           "cash"
         ],
         "equals": {
+          "trainingCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:trainingCount equals:1 max_ticks:300",
+      "description": "(#1203) blasting_academy sits at (5,15), a longer walk than the driving_center trainings above -- this waits for arrival and trainingState to be promoted from pendingTrainingState, rather than assuming enrolment itself started the course.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
           "trainingCount": 1
         }
       }
     },
     {
-      "command": "tick 32",
-      "description": "TRAINING_BASE_TICKS(20) * TRAINING_LEVEL_COST_MULTIPLIER[2](1.6) * TRAINING_TIER_SPEED[1](1) = 32 -- the exact course length to promote level 1 to 2.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 32"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "note": "The promotion still takes exactly 32 ticks, but a random event now falls due inside this block (#556: the two schools are built rather than placed, so every beat below them sits ~90 ticks later and draws differently), and a pending event refuses the rest of the `tick`. The course is asserted complete after the event is resolved, two steps down."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "wait_until field:trainingCount equals:0 max_ticks:120",
-      "description": "Finish the promotion the event above cut short (#556). A waitUntil rather than a hand-measured pad: the course itself is still exactly 32 ticks, but events now fall due inside the window and each one stops the clock until it is resolved, so what the block has to wait on is the course landing, not a tick budget.",
+      "command": "wait_until field:trainingCount equals:0 max_ticks:300",
+      "description": "(#1203) Replaces the old `tick 32` + `event choose 0` pair that assumed instant relocation -- the promotion itself is still exactly TRAINING_BASE_TICKS(20) * TRAINING_LEVEL_COST_MULTIPLIER[2](1.6) * TRAINING_TIER_SPEED[1](1) = 32 ticks from arrival, and a pending event auto-resolves inside this wait (runWaitUntil/interaction-executor's own waitUntil loop) exactly as the old hand-written tick+event-choose pair did.",
       "timeout": 95,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "trainingCount",
           "equals": 0,
-          "maxTicks": 120,
+          "maxTicks": 300,
           "timeoutMs": 90000
         }
       ],

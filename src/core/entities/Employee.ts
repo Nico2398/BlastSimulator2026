@@ -99,6 +99,17 @@ export interface Employee {
   z: number;
   qualifications: SkillQualification[];
   trainingState: TrainingState | null;
+  /**
+   * Course to start once the employee arrives at the school and enters it
+   * (#1203), or null when no enrolment is pending. Set alongside the walk-in
+   * itinerary by `enrolInTraining`; consumed on arrival, which moves it into
+   * `trainingState`. Mirrors `pendingRestDuration`'s claim-time/arrival-time
+   * split. Optional: many existing call sites and test fixtures construct an
+   * Employee directly without it, and old saves predate the field —
+   * `isEnrolledInTraining`/arrival handling treat an absent value the same as
+   * null (no enrolment pending) instead of fabricating one.
+   */
+  pendingTrainingState?: TrainingState | null;
   /** ID of the PendingAction currently claimed by this employee, or null if idle. */
   activeActionId: number | null;
   fatigue: number;   // 0-100
@@ -204,6 +215,11 @@ export interface Employee {
    * blocker, and a blocker on a chokepoint livelocks the driver in front of
    * it. Held only while that cell is genuinely still occupied; cleared by
    * Locomotion.ts the moment it frees up or the leg completes.
+   *
+   * Also latched by `handleAgentOccupancyBlock`'s tie-break sidestep (#1206)
+   * for a foot leg detouring around another agent's held cell — the same
+   * latch, not a vehicle-only one despite the field's name (kept for its 27
+   * dependent call sites).
    */
   vehicleDetourX?: number | null;
   vehicleDetourZ?: number | null;
@@ -256,10 +272,13 @@ export interface Employee {
    */
   itinerary: Itinerary | null;
   /**
-   * Consecutive ticks a mounted-but-not-yet-departed employee has spent
-   * waiting on their vehicle (e.g. a seat reserved but the drive leg not yet
-   * startable) — #1089's mirror of moveConsecutiveFailures for the
-   * vehicle-wait case tickLocomotion will own.
+   * Consecutive ticks the employee has spent stalled waiting on something
+   * other than a path failure — originally a mounted-but-not-yet-departed
+   * employee waiting on their vehicle (e.g. a seat reserved but the drive leg
+   * not yet startable, #1089's mirror of moveConsecutiveFailures for the
+   * vehicle-wait case), and since (#1206) also incremented for a foot agent
+   * stalled by `handleAgentOccupancyBlock`'s occupancy ladder. Kept under its
+   * original name (27 dependent call sites) despite covering both cases.
    */
   vehicleWaitingTicks: number;
 }
@@ -312,6 +331,7 @@ export function hireEmployee(
     // proficiency from here.
     qualifications: [{ category: ROLE_STARTING_QUALIFICATION[role], proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
+    pendingTrainingState: null,
     activeActionId: null,
     fatigue: 100,
     collapsing: false,
@@ -508,9 +528,10 @@ export { tickNeedGauges, getNeedMultiplier, replenishNeed, needsMoraleEffect, ch
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
 export { computeXpPerTick } from './EmployeeXpRules.js';
 export type {
-  ProficiencyLevel, TrainingPlan, StartTrainingResult, TrainingCompletion,
+  ProficiencyLevel, TrainingPlan, EnrolInTrainingResult, TrainingCompletion, TrainingCancellation,
 } from './EmployeeTraining.js';
 export {
   MAX_PROFICIENCY, trainableSkills, isTrainingBuilding, schoolFor,
   planTraining, startTraining, enrolInTraining, tickTraining,
+  isEnrolledInTraining, isSchoolFull,
 } from './EmployeeTraining.js';

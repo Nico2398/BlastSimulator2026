@@ -508,7 +508,7 @@
     {
       "command": "employee train 1 skill:driving.excavator",
       "timeout": 30,
-      "description": "#555: train-digger, click half: driving.excavator course booked at the driving_center built above -- dig_ramp_segment work (the box-cut step below) now requires this licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training itself takes real ticks (TRAINING_BASE_TICKS, balance.ts) -- command mode has no implicit clock between steps, so the wait is its own step right below, mirroring train-driller's own click/wait split above. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center completes for real and place_building's root-cause livelock is fixed, so this succeeds genuinely.",
+      "description": "#555: train-digger, click half: driving.excavator course booked at the driving_center built above -- dig_ramp_segment work (the box-cut step below) now requires this licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training itself takes real ticks (TRAINING_BASE_TICKS, balance.ts) -- command mode has no implicit clock between steps, so the wait is its own step right below, mirroring train-driller's own click/wait split above. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center completes for real and place_building's root-cause livelock is fixed, so this succeeds genuinely. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building, so this step no longer asserts an immediate increase; the wait below covers arrival and course completion.",
       "role": "player",
       "interaction": [
         {
@@ -529,9 +529,9 @@
         }
       ],
       "expect": {
-        "increased": [
-          "trainingCount"
-        ]
+        "equals": {
+          "trainingCount": 0
+        }
       }
     },
     {

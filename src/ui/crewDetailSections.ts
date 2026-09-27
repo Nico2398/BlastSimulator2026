@@ -11,7 +11,7 @@ import { BASE_SALARIES } from '../core/entities/Employee.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { availableTrainingOffers, planTraining, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
+import { availableTrainingOffers, planTraining, isSchoolFull, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 
@@ -65,6 +65,7 @@ export function describeActivity(activity: EmployeeActivity): string {
       ? t('ui.crew.task_walking_to', { task: t(ACTION_LABEL_KEY[activity.actionType]) })
       : t('ui.crew.task_walking');
     case 'idle': return t('ui.crew.task_idle');
+    case 'training': return t('ui.crew.task_training');
   }
 }
 
@@ -74,6 +75,21 @@ function microLabel(text: string): HTMLElement {
 
 function well(children: (Node | null | undefined)[]): HTMLElement {
   return el('div', { className: 'bsx-well', attrs: { style: 'padding:9px 10px;display:flex;flex-direction:column;gap:6px' }, children });
+}
+
+/**
+ * A training-offer row that cannot be started right now — already at max
+ * proficiency, or the school is full (#1203) — rendered as a title + reason
+ * line with a disabled Train button. Both callers in makeTrainingSection
+ * differ only in the title text and the reason line's i18n key/params.
+ */
+function renderLockedTrainingRow(row: HTMLElement, titleText: string, reasonKey: string, reasonParams?: Record<string, string | number>): void {
+  const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
+  info.append(
+    el('span', { text: titleText, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+    el('span', { text: t(reasonKey, reasonParams), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+  );
+  row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
 }
 
 // ── HIRED / LOCATION ──
@@ -253,6 +269,17 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     return wrap;
   }
 
+  if (e.pendingTrainingState) {
+    // Walking to the school, not yet enrolled — distinct from the
+    // in-progress block above, which only shows once they've actually
+    // entered and the course countdown has started (#1203).
+    wrap.appendChild(well([el('span', {
+      text: t('ui.crew.training_walking'),
+      attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' },
+    })]));
+    return wrap;
+  }
+
   const offers = availableTrainingOffers(state.buildings.buildings);
   if (offers.length === 0) {
     wrap.appendChild(well([el('span', { text: t('ui.crew.training_no_school'), attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro)' } })]));
@@ -264,16 +291,14 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   for (const { skill, building } of offers) {
     const plan = planTraining(e, skill, building.tier);
     const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px' } });
-    const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
 
     if (!plan) {
-      info.append(
-        el('span', { text: t(`course.${skill}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-        el('span', { text: t('ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
-      );
-      row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) });
+    } else if (isSchoolFull(state, building)) {
+      renderLockedTrainingRow(row, `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, 'ui.crew.training_school_full');
     } else {
       anyOffered = true;
+      const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
       info.append(
         el('span', { text: `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', {

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { requireGame, noEmployeesMessage, parseStaffedFlag } from '../../../src/console/commands/commandUtils.js';
+import { requireGame, noEmployeesMessage, parseStaffedFlag, parseAgentOccupancyFlag, parseStaffedAndOccupancyFlags } from '../../../src/console/commands/commandUtils.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../../src/console/commands/world.js';
 import { makeEmptyGameContext } from '../../helpers/gameContext.js';
@@ -109,5 +109,56 @@ describe('parseStaffedFlag', () => {
 
     expect(result.error).not.toBeNull();
     expect(result.error).toContain('nope');
+  });
+});
+
+describe('parseAgentOccupancyFlag', () => {
+  it('returns agentOccupancy:undefined, error:null when raw is undefined (flag omitted)', () => {
+    expect(parseAgentOccupancyFlag(undefined)).toEqual({ agentOccupancy: undefined, error: null });
+  });
+
+  it('returns agentOccupancy:true, error:null for raw "true"', () => {
+    expect(parseAgentOccupancyFlag('true')).toEqual({ agentOccupancy: true, error: null });
+  });
+
+  it('returns agentOccupancy:false, error:null for raw "false"', () => {
+    expect(parseAgentOccupancyFlag('false')).toEqual({ agentOccupancy: false, error: null });
+  });
+
+  it('returns the exact English error message for an unrecognized value', () => {
+    const result = parseAgentOccupancyFlag('maybe');
+    expect(result.agentOccupancy).toBeUndefined();
+    expect(result.error).toBe('Invalid agent_occupancy value: "maybe". Use agent_occupancy:true or agent_occupancy:false.');
+  });
+
+  it('returns a French-translated error message under locale fr, differing from the English literal', () => {
+    setLocale('fr');
+
+    const result = parseAgentOccupancyFlag('maybe');
+
+    expect(result.agentOccupancy).toBeUndefined();
+    expect(result.error).not.toBeNull();
+    expect(result.error).not.toBe('Invalid agent_occupancy value: "maybe". Use agent_occupancy:true or agent_occupancy:false.');
+  });
+});
+
+describe('parseStaffedAndOccupancyFlags', () => {
+  it('returns staffed:false, agentOccupancy:undefined, error:null when both flags are omitted', () => {
+    expect(parseStaffedAndOccupancyFlags({})).toEqual({ staffed: false, agentOccupancy: undefined, error: null });
+  });
+
+  it('combines both flags when both are given', () => {
+    expect(parseStaffedAndOccupancyFlags({ staffed: 'true', agent_occupancy: 'false' }))
+      .toEqual({ staffed: true, agentOccupancy: false, error: null });
+  });
+
+  it('surfaces the staffed error and never reaches agent_occupancy parsing when staffed is invalid', () => {
+    const result = parseStaffedAndOccupancyFlags({ staffed: 'maybe', agent_occupancy: 'also-invalid' });
+    expect(result.error).toBe('Invalid staffed value: "maybe". Use staffed:true or staffed:false.');
+  });
+
+  it('surfaces the agent_occupancy error when staffed is valid but agent_occupancy is not', () => {
+    const result = parseStaffedAndOccupancyFlags({ staffed: 'true', agent_occupancy: 'maybe' });
+    expect(result.error).toBe('Invalid agent_occupancy value: "maybe". Use agent_occupancy:true or agent_occupancy:false.');
   });
 });

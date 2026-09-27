@@ -41,7 +41,7 @@ Every merged finding gets exactly one disposition, decided at `merge-findings` o
 | Step | Action |
 |------|--------|
 | merge-findings | Deduplicate and merge all reviewer outputs → pass/fail, and disposition each finding `fix` / `file` / `drop` per the table above |
-| followup | File every `file` finding per `agentic-issue-creation` — duplicate check first, labels by its confidence table — then one `gh pr comment` listing what was filed, in the format `agentic-pipeline-finalization` gives. It runs after @reviewer for the same reason it runs last there: the numbers do not exist until the issues are filed, so no earlier comment can carry them. Nothing dispositioned `file` → skip both. |
+| followup | File every `file` finding per `agentic-issue-creation` — duplicate check first, `agent-task` and the finding's `scope:*` labels always, `ready` only when its Definition of Ready holds — then one `gh pr comment` listing what was filed, in the format `agentic-pipeline-finalization` gives. It runs after @reviewer for the same reason it runs last there: the numbers do not exist until the issues are filed, so no earlier comment can carry them. Nothing dispositioned `file` → skip both. |
 
 ### Review Output Format
 

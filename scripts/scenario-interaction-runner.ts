@@ -23,6 +23,7 @@ import {
   DEFAULT_STEP_TIMEOUT,
   captureFrame,
   suspendDrawing,
+  forceRenderFrame,
 } from './shared/puppeteer-utils.js';
 import { checkGoal, gameState, InteractionFailure } from './shared/interaction-driver.js';
 import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
@@ -229,6 +230,7 @@ export async function runScenarioInteraction(
               }
               if (shots.length > 0) {
                 await page.evaluate(() => (window as any).__cameraReset());
+                await forceRenderFrame(page);
                 await waitOneFrame(page);
               }
             }

@@ -376,8 +376,22 @@ describe('en.json / fr.json — key-set parity', () => {
     // mount.not_on_foot, mount.too_far_to_enter,
     // mount.building_takes_no_people, mount.not_inside,
     // move_to.building_not_found and move_to.alight_first — both locales.
+    // Baseline is now 3524 (up from 3520): #1203 adds the training walk-in's
+    // occupancy refusal and UI strings — employees.train_school_full,
+    // ui.crew.training_walking, ui.crew.training_school_full and
+    // ui.crew.task_training — both locales.
+    // Baseline is now 3526 (up from 3524): #1205 adds building.occupancy
+    // (the "<inside>/<capacity>" billboard label and HoverTag/SelectionBar
+    // text) and shell.selection.building_occupants (the SelectionBar's
+    // "Inside: <names>" occupant listing) — both locales translated.
+    // Baseline is now 3530 (up from 3526): #1206 adds the `debug occupancy`
+    // console command's status output and the agent_occupancy new_game/
+    // sandbox flag's strings — both locales translated.
+    // Baseline is now 3531 (up from 3530): #1226 adds world.invalid_size,
+    // the refusal message for newGameCommand's `size` validation — both
+    // locales translated.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3520);
+    expect(Object.keys(en).length).toBe(3531);
   });
 });
 

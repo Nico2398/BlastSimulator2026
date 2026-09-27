@@ -8,14 +8,18 @@
 import type { Employee, EmployeeState, SkillCategory, TrainingState } from './Employee.js';
 import { calculateSalary } from './Employee.js';
 import type { Building, BuildingType, BuildingTier } from './Building.js';
+import { getBuildingPeopleCapacity } from './Building.js';
+import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { alightIfMounted, leaveBuilding } from '../engine/Mount.js';
+import { moveTo } from '../engine/MoveTo.js';
+import { t } from '../i18n/I18n.js';
 import {
   TRAINING_BUILDING_SKILLS,
   TRAINING_BASE_TICKS,
   TRAINING_TIER_SPEED,
   TRAINING_BASE_FEE,
   TRAINING_LEVEL_COST_MULTIPLIER,
-  TRAINING_RELOCATION_OFFSET,
   XP_THRESHOLDS,
 } from '../config/balance.js';
 
@@ -41,6 +45,34 @@ export function schoolFor(skill: SkillCategory): BuildingType | null {
     if (trainableSkills(type).includes(skill)) return type;
   }
   return null;
+}
+
+/**
+ * Whether `employee` is currently enrolled in a course — either walking to
+ * the school (`pendingTrainingState`) or already inside it, mid-course
+ * (`trainingState`). An absent `pendingTrainingState` (old saves, hand-built
+ * fixtures) reads the same as null — never fabricated into "enrolled".
+ */
+export function isEnrolledInTraining(employee: Employee): boolean {
+  return employee.trainingState !== null || (employee.pendingTrainingState ?? null) !== null;
+}
+
+/**
+ * Whether `building` has no free seat left to enrol another trainee —
+ * counting both who is already inside (`occupantIds`) and everyone already
+ * walking there (`pendingTrainingState`), so two enrolments claimed on the
+ * same tick can never together overshoot capacity even though neither has
+ * arrived yet.
+ */
+export function isSchoolFull(
+  state: GameState,
+  building: { id: number; type: BuildingType; tier: BuildingTier; occupantIds: readonly number[] },
+): boolean {
+  const capacity = getBuildingPeopleCapacity(building.type, building.tier);
+  const walkingIn = state.employees.employees.filter(
+    e => (e.pendingTrainingState ?? null)?.buildingId === building.id,
+  ).length;
+  return building.occupantIds.length + walkingIn >= capacity;
 }
 
 /** One skill a school on site teaches, paired with the building that teaches it. */
@@ -102,12 +134,9 @@ export function planTraining(
   };
 }
 
-export interface StartTrainingResult {
-  success: boolean;
-  fee?: number;
-  plan?: TrainingPlan;
-  error?: string;
-}
+export type EnrolInTrainingResult =
+  | { success: true; fee: number; plan: TrainingPlan }
+  | { success: false; error: string };
 
 /**
  * Begin training an employee at a building.
@@ -136,57 +165,52 @@ export function startTraining(
  * Enrol an employee on the next course in a skill at a specific school.
  *
  * Validates what `startTraining` alone cannot: that the building teaches this
- * skill, and that there is a level left to gain. Deducting the fee is the
- * caller's job — this module does not touch cash.
+ * skill, that there is a level left to gain, and (#1203) that the school has
+ * a free seat. Deducting the fee is the caller's job — this module does not
+ * touch cash.
  *
- * On success the employee is relocated to the building — otherwise they stay
- * wherever they were dispatched last while a course "trains" them in place,
- * which is what left an enrolled employee's sprite standing in the pit while
- * their qualification changed.
- *
- * This relocation is an instant teleport, not a queued walk — intentionally
- * NOT gated on navmesh arrival like survey/rest/boarding/hauling (#437).
- * That gating would replace this existing, intentional teleport-not-walk
- * design (#410) with a walk, which is a larger behavioral change than #437
- * asked for; out of scope here.
- *
- * Placed one tile outside the footprint, adjacent to the entry point corner
- * (`building.x`/`building.z`), rather than exactly on that corner: the raw
- * origin coordinate sits on the building's own opaque base-box footprint, so
- * a character placed there renders fully occluded from every external camera
- * angle (#410).
- *
- * The offset moves in `-x` unless that would leave the grid — a school sitting
- * at the `x === 0` edge (a legal placement) offsets in `+x` instead, so the
- * employee never lands off-grid (#410).
+ * On success the employee is sent walking to the school rather than
+ * teleported — enrolment queues the walk-in via `moveTo`; arrival, entry, and
+ * the in-course occupancy are owned by ArrivalGate.tickArrivalGate and
+ * #1202's occupancy/locomotion model.
  */
 export function enrolInTraining(
-  state: EmployeeState,
+  state: GameState,
   employeeId: number,
-  building: { id: number; type: BuildingType; tier: BuildingTier; x: number; z: number },
+  building: Building,
   skill: SkillCategory,
-): StartTrainingResult {
-  const emp = state.employees.find(e => e.id === employeeId);
-  if (!emp || !emp.alive) return { success: false, error: 'Employee not found or not alive' };
-  if (emp.trainingState !== null) return { success: false, error: 'Employee already in training' };
-  if (emp.injured) return { success: false, error: 'Injured employees cannot train' };
+  emitter?: EventEmitter,
+): EnrolInTrainingResult {
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (!employee || !employee.alive) return { success: false, error: 'Employee not found or not alive' };
+  if (isEnrolledInTraining(employee)) return { success: false, error: 'Employee already in training' };
+  if (employee.injured) return { success: false, error: 'Injured employees cannot train' };
   if (!trainableSkills(building.type).includes(skill)) {
     return { success: false, error: `${building.type} does not teach ${skill}` };
   }
 
-  const plan = planTraining(emp, skill, building.tier);
+  const plan = planTraining(employee, skill, building.tier);
   if (!plan) return { success: false, error: `Already at the highest proficiency in ${skill}` };
 
-  const started = startTraining(state, employeeId, building.id, skill, plan.ticks, plan.fee);
-  if (!started.success) return { success: false, ...(started.error ? { error: started.error } : {}) };
+  if (isSchoolFull(state, building)) {
+    return {
+      success: false,
+      error: t('employees.train_school_full', { buildingType: building.type, buildingId: building.id, skill }),
+    };
+  }
 
-  // One tile outside the footprint, adjacent to the entry corner — see doc
-  // comment above for why the raw origin corner is unusable, and why the
-  // offset direction flips at the grid edge.
-  emp.x = building.x - TRAINING_RELOCATION_OFFSET >= 0
-    ? building.x - TRAINING_RELOCATION_OFFSET
-    : building.x + TRAINING_RELOCATION_OFFSET;
-  emp.z = building.z;
+  // The walk is taken on foot — a mounted employee alights first, mirroring
+  // moveTo's own building-target overload, which otherwise refuses a mounted
+  // employee outright rather than parking their vehicle for them.
+  alightIfMounted(state, employee, emitter);
+
+  const moveResult = moveTo(state, employeeId, { buildingId: building.id });
+  if (!moveResult.success) return { success: false, error: moveResult.error };
+
+  // Only the walk-in is queued here — arrival (moving this into
+  // `trainingState`) is ArrivalGate.tickArrivalGate's job, mirroring
+  // pendingRestDuration's claim-time/arrival-time split.
+  employee.pendingTrainingState = { buildingId: building.id, skill, ticksRemaining: plan.ticks, fee: plan.fee };
 
   return { success: true, fee: plan.fee, plan };
 }
@@ -201,25 +225,61 @@ export interface TrainingCompletion {
   isNew: boolean;
 }
 
+/** One course cancelled mid-course (#1203) — the school it was taught at was demolished. */
+export interface TrainingCancellation {
+  employeeId: number;
+  employeeName: string;
+  skill: SkillCategory;
+  buildingId: number;
+  refund: number;
+}
+
 /**
  * Tick every employee in training. On completion the qualification is granted at
  * Rookie level, or raised one level when already held — a course that left an
  * existing qualification untouched made proficiency unobtainable, since the fee
- * was charged and nothing changed.
+ * was charged and nothing changed. Also reports courses cancelled mid-way
+ * (#1203 — the school teaching them was demolished), each refunding its fee.
  */
 export function tickTraining(
-  state: EmployeeState,
+  state: GameState,
   emitter?: EventEmitter,
-): TrainingCompletion[] {
+): { completed: TrainingCompletion[]; cancelled: TrainingCancellation[] } {
   const completed: TrainingCompletion[] = [];
+  const cancelled: TrainingCancellation[] = [];
 
-  for (const emp of state.employees) {
+  for (const emp of state.employees.employees) {
     if (!emp.trainingState) continue;
-    emp.trainingState.ticksRemaining -= 1;
-    if (emp.trainingState.ticksRemaining > 0) continue;
 
-    const skill = emp.trainingState.skill;
+    const trainingState = emp.trainingState;
+    const building = state.buildings.buildings.find(b => b.id === trainingState.buildingId);
+    if (!building) {
+      // The school was demolished out from under a mid-course trainee — the
+      // course never happened, so it is cancelled and fully refunded rather
+      // than ticked down or granting anything.
+      emp.trainingState = null;
+      cancelled.push({
+        employeeId: emp.id,
+        employeeName: emp.name,
+        skill: trainingState.skill,
+        buildingId: trainingState.buildingId,
+        refund: trainingState.fee,
+      });
+      emitter?.emit('employee:training_cancelled', {
+        employeeId: emp.id,
+        skill: trainingState.skill,
+        buildingId: trainingState.buildingId,
+        refund: trainingState.fee,
+      });
+      continue;
+    }
+
+    trainingState.ticksRemaining -= 1;
+    if (trainingState.ticksRemaining > 0) continue;
+
+    const skill = trainingState.skill;
     emp.trainingState = null;
+    leaveBuilding(state, emp.id, emitter);
 
     const existing = emp.qualifications.find(q => q.category === skill);
     let level: ProficiencyLevel;
@@ -241,7 +301,7 @@ export function tickTraining(
     emitter?.emit('employee:trained', { employeeId: emp.id, skill, level, isNew });
   }
 
-  return completed;
+  return { completed, cancelled };
 }
 
 export type { TrainingState };

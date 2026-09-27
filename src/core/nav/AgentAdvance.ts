@@ -7,6 +7,7 @@
 import { advanceAgent, recordStuckFailure, resetStuckState, type AgentState } from './AgentMovement.js';
 import { isStepClimbable, type NavGrid } from './NavGrid.js';
 import { isImpassable, directLineWalk } from './Pathfinding.js';
+import type { Occupant, AgentOccupancy } from './AgentOccupancy.js';
 
 /** A pre-resolved path — either from Pathfinding.findPath or synthesized directly. */
 export interface AgentPath {
@@ -48,6 +49,16 @@ export interface AdvanceAlongPathInput {
    */
   moveHistoryX?: number | null;
   moveHistoryZ?: number | null;
+  /**
+   * This agent's own occupant identity (#1206), passed through to the
+   * ground-cell occupancy check the caller performs against `occupancy`.
+   * Optional/nullable so a fixture/caller predating the occupancy feature
+   * keeps compiling unchanged — omitting it disables the check entirely,
+   * matching AGENT_OCCUPANCY_ENABLED_DEFAULT's off-by-default landing.
+   */
+  mover?: Occupant | null;
+  /** The shared ground-cell occupancy index (#1206), or null/omitted when the feature is off. */
+  occupancy?: AgentOccupancy | null;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -80,6 +91,16 @@ interface AdvanceAlongPathOutcome {
    * renderer's trail and never saves it.
    */
   trail: Array<{ x: number; z: number }>;
+  /**
+   * The occupant this tick's advance was blocked by (#1206), or null when
+   * nothing blocked it (occupancy checking off, or no conflict this tick).
+   * Optional, like `RouteCommitment`'s own `fromX`/`fromZ` (#1129): a test
+   * fixture built before this field existed keeps compiling and reads as "no
+   * occupancy block" — the occupancy-checking logic itself is implementer's
+   * job, this field only stabilizes the outcome shape for both branches
+   * meanwhile.
+   */
+  blockedByOccupant?: Occupant | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +220,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       moveHistoryX: input.x,
       moveHistoryZ: input.z,
       trail: [],
+      blockedByOccupant: null,
     };
   }
 
@@ -220,6 +242,10 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
   let committed = input.committed ?? NULL_ROUTE_COMMITMENT;
   let isPathComplete = false;
   const trail: Array<{ x: number; z: number }> = [];
+  // Set only when the occupancy check below (#1206) stops the hop loop early
+  // — stays null for the whole tick when the feature is off (input.occupancy/
+  // input.mover absent) or nothing blocked this tick's hops.
+  let blockedByOccupant: Occupant | null = null;
 
   // Both of findPath's sources (the A* reconstruction and the direct-line
   // fallback) emit waypoints[0] as the agent's own (floor-rounded) starting
@@ -276,6 +302,30 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     const adoptedFresh = resolved.target.x === freshTarget.x && resolved.target.z === freshTarget.z;
 
     const hopTarget = resolved.target;
+
+    // Ground-cell occupancy (#1206) — off entirely (zero behaviour change)
+    // when the caller passes no mover/occupancy, which is the switch-off
+    // default. Checked against the rounded grid cell each side's ledger key
+    // is built from (AgentOccupancy.rebuildAgentOccupancy uses the same
+    // Math.round convention), not the hop's raw continuous target — the
+    // ledger only ever holds one occupant per integer cell. A hop that
+    // doesn't actually change grid cell (the agent already standing on
+    // `hopTarget`'s cell — e.g. a "hold the line" commitment re-targeting its
+    // own current cell) needs no check: nothing about that hop contests
+    // another occupant's cell.
+    const hopTargetCellX = Math.round(hopTarget.x);
+    const hopTargetCellZ = Math.round(hopTarget.z);
+    const isRealStep = hopTargetCellX !== Math.round(x) || hopTargetCellZ !== Math.round(z);
+    if (input.occupancy && input.mover && isRealStep
+      && !input.occupancy.isFreeFor(input.mover, hopTargetCellX, hopTargetCellZ)) {
+      // Stop the hop loop for this tick right here — do not skip ahead to a
+      // later hop, and do not attempt a partial move into the blocked cell.
+      // Whatever earlier hops this tick already committed (x/z, trail,
+      // committed, pathIndex) stand as they are.
+      blockedByOccupant = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
+      break;
+    }
+
     const beforeX = x;
     const beforeZ = z;
     const hopAdvance = advanceAgent({
@@ -308,6 +358,14 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     // completion test was index-based (walked past the last given waypoint)
     // and so never depended on hitting the exact destination value either.
     const reachedHop = hopAdvance.isPathComplete;
+
+    // Claim the landed cell (#1206) — only on a hop that actually arrived;
+    // a partial hop (budget ran out mid-way, below) hasn't reached
+    // `hopTarget` yet and claims nothing this tick.
+    if (input.occupancy && input.mover && reachedHop) {
+      input.occupancy.tryMove(input.mover, hopTargetCellX, hopTargetCellZ);
+    }
+
     const lastWaypoint = input.path.waypoints[input.path.waypoints.length - 1];
     const exhaustedFreshPath = !!lastWaypoint && hopTarget.x === lastWaypoint.x && hopTarget.z === lastWaypoint.z;
     const legComplete = reachedHop
@@ -392,6 +450,7 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     moveHistoryX: input.x,
     moveHistoryZ: input.z,
     trail,
+    blockedByOccupant,
   };
 }
 
