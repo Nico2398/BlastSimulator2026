@@ -59,6 +59,16 @@ export interface AdvanceAlongPathInput {
   mover?: Occupant | null;
   /** The shared ground-cell occupancy index (#1206), or null/omitted when the feature is off. */
   occupancy?: AgentOccupancy | null;
+  /**
+   * An occupant whose held cell must NOT block this leg's own approach —
+   * the vehicle a `board` leg's own `onArrive` step names. That cell is
+   * always self-held by construction (the leg's destination IS the
+   * vehicle's own position), so the ordinary per-hop occupancy check would
+   * otherwise reject the leg's own final approach hop forever (#1274).
+   * Null/omitted for every leg that isn't a board leg — zero behaviour
+   * change for every existing caller/fixture.
+   */
+  exemptOccupant?: Occupant | null;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -318,12 +328,17 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     const isRealStep = hopTargetCellX !== Math.round(x) || hopTargetCellZ !== Math.round(z);
     if (input.occupancy && input.mover && isRealStep
       && !input.occupancy.isFreeFor(input.mover, hopTargetCellX, hopTargetCellZ)) {
-      // Stop the hop loop for this tick right here — do not skip ahead to a
-      // later hop, and do not attempt a partial move into the blocked cell.
-      // Whatever earlier hops this tick already committed (x/z, trail,
-      // committed, pathIndex) stand as they are.
-      blockedByOccupant = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
-      break;
+      const holder = input.occupancy.holderOf(hopTargetCellX, hopTargetCellZ);
+      const isExempt = !!input.exemptOccupant
+        && input.occupancy.isFreeFor(input.exemptOccupant, hopTargetCellX, hopTargetCellZ);
+      if (!isExempt) {
+        // Stop the hop loop for this tick right here — do not skip ahead to a
+        // later hop, and do not attempt a partial move into the blocked cell.
+        // Whatever earlier hops this tick already committed (x/z, trail,
+        // committed, pathIndex) stand as they are.
+        blockedByOccupant = holder;
+        break;
+      }
     }
 
     const beforeX = x;

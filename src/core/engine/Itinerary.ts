@@ -28,6 +28,18 @@ export interface Leg {
   arrival: 'exact' | 'adjacent';
   onArrive: ArrivalStep;
   estTicks: number;
+  /**
+   * leg.destX/destZ before the FIRST destination-spread ever retargeted
+   * this leg (#1274) — null until a spread happens, then fixed for the
+   * leg's remaining life even across further spreads. The one stable
+   * identity of "what chokepoint is this mover actually queued on",
+   * independent of how many times it has since been individually
+   * relocated. Optional so a fixture/caller predating this field keeps
+   * compiling unchanged (same pattern as RouteCommitment's own
+   * fromX/fromZ/originX/originZ).
+   */
+  originalDestX?: number | null;
+  originalDestZ?: number | null;
 }
 
 /** What the itinerary is ultimately for. */

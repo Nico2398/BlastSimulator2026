@@ -1173,6 +1173,13 @@ describe('Vehicle fleet', () => {
 
     it('moveTo({vehicleId}) walks an on-foot driller to a rock_digger and boards it, resolved by tickLocomotion alone', () => {
       vehicleCommand(ctx, ['buy', 'rock_digger'], {});
+      // #1274: with agent-occupancy on, the vehicle's own cell is always
+      // self-held (its own future occupant hasn't boarded it yet), so the
+      // ordinary per-hop occupancy check in AgentAdvance.ts must not treat
+      // that as a blocker for THIS leg's own final approach hop — without
+      // the exemptOccupant fix below, the driller never completes the last
+      // hop onto the vehicle's cell and boarding deadlocks forever.
+      ctx.state!.agentOccupancyEnabled = true;
       const vehicle = ctx.state!.vehicles.vehicles[0]!;
       // Placed a few cells away from the vehicle's own spawn so a genuine
       // foot leg is required before boarding — not an instant same-cell board.
