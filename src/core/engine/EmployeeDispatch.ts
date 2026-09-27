@@ -23,7 +23,7 @@ import { getVehicleReservation } from '../entities/Vehicle.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import type { ReachableSet } from '../nav/NavGridReachability.js';
 import { findHaulDepotApproach } from '../economy/HaulingTask.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS } from '../config/balance.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -100,12 +100,20 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // Computed once per tickEmployees call, fresh from live state every time —
   // never cached across ticks, so a pocket that becomes reachable later (a
   // ramp connects it) clears on its own the very next classification pass
-  // (#1231).
-  const reachableTargets = computeUnreachableTargets(state);
+  // (#1231). Two variants, one per clearance: a vehicle-gated action needs
+  // NAV_CLEARANCE_VEHICLE_CELLS (the vehicle has to physically fit through
+  // every cell of the route), while an on-foot action only needs
+  // NAV_CLEARANCE_EMPLOYEE_CELLS — a corridor wide enough for a person but
+  // too narrow for a vehicle must not stamp a foot order (survey,
+  // place_building, rest, ...) as unreachable just because no vehicle could
+  // ever drive through it (#1231 review round 3).
+  const reachableForVehicle = computeGroundCrewReachableSet(state, NAV_CLEARANCE_VEHICLE_CELLS);
+  const reachableForFoot = computeGroundCrewReachableSet(state, NAV_CLEARANCE_EMPLOYEE_CELLS);
 
   const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
+    const reachableTargets = action.requiredVehicleRole !== null ? reachableForVehicle : reachableForFoot;
     // A dig_ramp_segment's target is legitimately climb-unreachable from
     // above until the segment above it is dug — top-down excavation order,
     // not a defect (#1231) — so it's exempt from the unreachable check below.
@@ -267,18 +275,27 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
 /**
  * `target_unreachable` blockedReason classification support (#1231): a
- * debris-hauling PendingAction whose target cell sits outside the ground
- * crew's reachable region (behind #1197's diagonal-corner cut) never makes
- * progress, and nothing else flags it. Anchors
- * NavGrid.computeClimbReachableSet at the nearest active freight_warehouse's
- * approach cell (findHaulDepotApproach, HaulingTask.ts) — the reference point
- * passed in is a neutral grid origin, not any one employee's position, since
- * this reflects what ground crew as a whole can reach, not one individual's
- * route. `NAV_CLEARANCE_VEHICLE_CELLS` (not the employee default) because
- * every action this feeds is vehicle-gated (haul_debris/fragment_debris need
- * a debris_hauler/rock_fragmenter, never a walking employee) — a corridor
- * wide enough for a person but too narrow for either vehicle would otherwise
- * read as reachable while no vehicle could ever actually deliver through it.
+ * PendingAction whose target cell sits outside the ground crew's reachable
+ * region (behind #1197's diagonal-corner cut) never makes progress, and
+ * nothing else flags it. Anchors NavGrid.computeClimbReachableSet at the
+ * nearest active freight_warehouse's approach cell (findHaulDepotApproach,
+ * HaulingTask.ts) — the reference point passed in is a neutral grid origin,
+ * not any one employee's position, since this reflects what ground crew as a
+ * whole can reach, not one individual's route. Returns a *reachable*-set —
+ * `.has(x, z)` true means the cell IS reachable at the given clearance — the
+ * name says so explicitly after review round 3 flagged the previous
+ * `computeUnreachableTargets` name as backwards.
+ *
+ * `clearance` must match the action family the caller is classifying:
+ * `NAV_CLEARANCE_VEHICLE_CELLS` for a vehicle-gated action (haul_debris/
+ * fragment_debris/dig_ramp_segment — the vehicle has to physically fit
+ * through every cell of the route) and `NAV_CLEARANCE_EMPLOYEE_CELLS` for an
+ * on-foot action (survey, place_building, rest, ...) — a corridor wide enough
+ * for a person but too narrow for a vehicle must not read as unreachable for
+ * a foot order just because no vehicle could ever drive through it (#1231
+ * review round 3). tickEmployees calls this once per clearance value, per
+ * tick, rather than once per action.
+ *
  * Returns null when there's no navGrid yet, or no active depot to anchor
  * from — both cases where the existing three-reason classification runs
  * unchanged (tickEmployees).
@@ -293,12 +310,12 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
  * standalone to check the returned set's shape in isolation (a real external
  * caller — the earlier unexported version broke that suite, #1231 review).
  */
-export function computeUnreachableTargets(state: GameState): ReachableSet | null {
+export function computeGroundCrewReachableSet(state: GameState, clearance: number): ReachableSet | null {
   const navGrid = state.navGrid;
   if (navGrid === null) return null;
   const approach = findHaulDepotApproach(state, navGrid.originX, navGrid.originZ);
   if (approach === null) return null;
-  return NavGrid.computeClimbReachableSet(navGrid, approach.x, approach.z, NAV_CLEARANCE_VEHICLE_CELLS);
+  return NavGrid.computeClimbReachableSet(navGrid, approach.x, approach.z, clearance);
 }
 
 /**
