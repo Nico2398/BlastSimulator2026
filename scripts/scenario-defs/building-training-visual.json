@@ -119,6 +119,12 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "cameraFocus",
+          "x": 10.5,
+          "z": 3.5,
+          "distance": 25
+        },
+        {
           "type": "pickTile",
           "x": 10,
           "z": 3

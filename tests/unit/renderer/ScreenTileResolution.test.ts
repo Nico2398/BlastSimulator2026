@@ -205,4 +205,55 @@ describe('resolveScreenPointForTile', () => {
       ndc: { x: 8.5, y: 5, z: 0 },
     });
   });
+
+  it('damps a height ping-pong even when the "repeated" height carries realistic float noise (#1254)', () => {
+    // Regression for #1254 (building-training-visual scenario step 4, tile
+    // (10, 3)): a real ping-pong on a grazing-angle camera never revisits the
+    // exact bit-pattern of a prior height guess — raycast/mesh-interpolation
+    // noise shifts each "repeat" by a few tenths. Trace modelled on the
+    // planner's capture: heights cycle near 31.36 -> 36.0 -> 26.5, and the
+    // second visit near 31.36 lands at 31.55 (off by 0.19), not bit-identical.
+    //
+    // OSCILLATION_EPSILON = 1e-6 is far tighter than that noise, so
+    // `seenBefore` never fires here, direct replacement keeps "replacing"
+    // instead of damping, and the loop ping-pongs through the whole 5-
+    // iteration budget without ever trying the damped midpoint (29.025)
+    // where the real target tile sits — it exhausts the budget unresolved.
+    //
+    // Once OSCILLATION_EPSILON is widened enough to treat 31.55 as a repeat
+    // of 31.36 (a real fix widens it to 0.25), the loop damps to
+    // (26.5 + 31.55) / 2 = 29.025 on iteration 2 and immediately raycasts the
+    // real target tile there.
+    const targetX = 10;
+    const targetZ = 3;
+    const startY = 31.36;
+
+    const near = (a: number, b: number, eps = 0.001) => Math.abs(a - b) < eps;
+
+    let calls = 0;
+    const project: ProjectToNDC = (x, y, _z) => ({ x, y, z: 0 });
+    const raycastForTile: RaycastForTile = (_ndcX, ndcY) => {
+      calls++;
+      if (near(ndcY, 31.36)) return { x: 2, z: 2, y: 36.0 }; // off-tile
+      if (near(ndcY, 36.0)) return { x: 2, z: 2, y: 26.5 }; // off-tile
+      if (near(ndcY, 26.5)) return { x: 2, z: 2, y: 31.55 }; // off-tile, near-repeat of 31.36 (+0.19 noise)
+      if (near(ndcY, 31.55)) return { x: 2, z: 2, y: 36.2 }; // off-tile, near-repeat of 36.0 (+0.2 noise)
+      if (near(ndcY, 36.2)) return { x: 2, z: 2, y: 26.8 }; // off-tile, near-repeat of 26.5 (+0.3 noise)
+      if (near(ndcY, 29.025)) return { x: 10.4, z: 3.6, y: 29.025 }; // damped midpoint -> on target tile
+      return null;
+    };
+
+    const result = resolveScreenPointForTile(project, raycastForTile, targetX, targetZ, startY);
+
+    // Desired (post-fix) behaviour: damping recognises the noisy repeat and
+    // resolves via the midpoint guess, on iteration 2 (4 raycasts total).
+    // Against today's 1e-6 epsilon this fails — the function instead returns
+    // { resolved: false } after exhausting all 5 iterations, so this
+    // assertion is red until OSCILLATION_EPSILON widens.
+    expect(result).toEqual({
+      resolved: true,
+      ndc: { x: 10.5, y: 29.025, z: 0 },
+    });
+    expect(calls).toBe(4);
+  });
 });
