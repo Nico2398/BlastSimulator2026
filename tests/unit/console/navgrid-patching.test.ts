@@ -14,10 +14,12 @@ import {
 } from '../../../src/console/commands/mining.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../../helpers/gameContext.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { isOnBuildingRing } from '../../../src/core/nav/BuildingApproach.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -506,6 +508,39 @@ describe('NavGrid patching — footprint blocking at order time (#1200)', () => 
     // where they were.
     expect(onOldFootprint.x).toBe(2);
     expect(onOldFootprint.z).toBe(0);
+  });
+
+  // #1270: a vehicle parked on a cell a footprint newly blocks is a stale,
+  // permanently unreachable pathfinding destination unless it is swept the
+  // same way `relocateFootprintOccupants` already sweeps bystander
+  // employees above.
+  it('relocates a vehicle parked on the footprint the instant it is newly ordered, immediately pathable with no extra tick (#1270)', () => {
+    const ctx = makeCtx();
+    const { vehicle } = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 2, 0);
+
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0' });
+    expect(result.success).toBe(true);
+
+    // No tick has run — the vehicle must already have been moved off the
+    // footprint that just closed over its own parked cell, the same instant
+    // guarantee the employee-bystander test above pins.
+    expect(vehicle.x === 2 && vehicle.z === 0).toBe(false);
+    const cell = ctx.state!.navGrid!.cellAt(Math.round(vehicle.x), Math.round(vehicle.z));
+    expect(cell).toBeTruthy();
+    expect(cell!.type).not.toBe('blocked');
+
+    // An idle driver can already path to the vehicle's NEW position, right
+    // now — no extra tick needed for the relocation to take effect.
+    const driver = ctx.state!.employees.employees.find(e => e.role === 'driver')!;
+    const path = findPath(ctx.state!.navGrid!, {
+      agentId: driver.id,
+      fromX: Math.round(driver.x),
+      fromZ: Math.round(driver.z),
+      toX: Math.round(vehicle.x),
+      toZ: Math.round(vehicle.z),
+      avoidVehicles: false,
+    });
+    expect(path.found).toBe(true);
   });
 
   it('refuses to order a building whose entire approach ring is already sealed by prior orders, with no side effects', () => {

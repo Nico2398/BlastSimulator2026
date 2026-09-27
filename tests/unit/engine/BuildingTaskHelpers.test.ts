@@ -10,12 +10,17 @@
 import { describe, it, expect } from 'vitest';
 import {
   makeFootprintRegion, siteBoundsForGrid, refreshLogisticsCapacity,
-  levelBuildingFootprint,
+  levelBuildingFootprint, relocateFootprintOccupants,
 } from '../../../src/core/engine/BuildingTaskHelpers.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { VoxelGrid, setVoxelColumnSurfaceHeight, computeVoxelColumnSurfaceHeight } from '../../../src/core/world/VoxelGrid.js';
 import { placeBuilding, getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
 import { DEFAULT_GRID_SIZE } from '../../../src/core/config/balance.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
+import type { BlastRegion } from '../../../src/core/mining/BlastExecution.js';
 
 const SEED = 42;
 
@@ -139,5 +144,153 @@ describe('levelBuildingFootprint (#1198)', () => {
 
     expect(result.voxelsCleared).toBe(0);
     expect(computeVoxelColumnSurfaceHeight(grid, OWN_SIZE_X, 0)).toBeCloseTo(15, 6);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// relocateFootprintOccupants — vehicles (#1270)
+//
+// A vehicle parked on a cell a footprint newly blocks is a stale,
+// permanently unreachable pathfinding destination unless it is swept off,
+// the same way this function already sweeps bystander employees. These
+// tests call `relocateFootprintOccupants` directly, per core-purity.md's
+// "adding an exported function here means adding its unit test in the
+// mirrored tests/unit/ path" convention.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('relocateFootprintOccupants — vehicles (#1270)', () => {
+  const VEHICLE_ROCK_COMPOSITION = { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] };
+  const REGION: BlastRegion = { minX: 2, maxX: 3, minZ: 2, maxZ: 3 };
+
+  /** A flat 10x10 walkable NavGrid, no buildings/drill holes, on a fresh GameState. */
+  function makeFlatNavState(): ReturnType<typeof createGame> {
+    const state = createGame({ seed: SEED });
+    const grid = new VoxelGrid(10, 10);
+    const compId = grid.palette.intern(VEHICLE_ROCK_COMPOSITION);
+    for (let z = 0; z < 10; z++) {
+      for (let x = 0; x < 10; x++) setVoxelColumnSurfaceHeight(grid, x, z, 10, compId);
+    }
+    state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+    return state;
+  }
+
+  /**
+   * Marks every cell of `region` 'blocked' directly on the NavGrid — the
+   * effect a footprint patch (order/upgrade/move/complete) has already had
+   * by the time `relocateFootprintOccupants` runs, without needing a full
+   * building-order fixture just to exercise this one pure sweep.
+   */
+  function blockRegion(nav: NavGrid, region: BlastRegion): void {
+    for (let z = region.minZ; z <= region.maxZ; z++) {
+      for (let x = region.minX; x <= region.maxX; x++) {
+        const cell = nav.cellAt(x, z)!;
+        cell.type = 'blocked';
+        cell.moveCost = Infinity;
+      }
+    }
+  }
+
+  function insideRegion(x: number, z: number, region: BlastRegion): boolean {
+    const cx = Math.round(x);
+    const cz = Math.round(z);
+    return cx >= region.minX && cx <= region.maxX && cz >= region.minZ && cz <= region.maxZ;
+  }
+
+  it('moves a parked, unoccupied vehicle off a newly-blocked footprint cell to the same cell findNearestReachableCell reports', () => {
+    const state = makeFlatNavState();
+    blockRegion(state.navGrid!, REGION);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    expect(vehicle.occupantIds).toEqual([]);
+
+    // Computed off the same (still-unmutated) NavGrid state
+    // `relocateFootprintOccupants` itself reads — the expected destination.
+    const expected = NavGrid.findNearestReachableCell(state.navGrid!, 0, 0, vehicle.x, vehicle.z, true);
+
+    relocateFootprintOccupants(state, REGION);
+
+    expect(vehicle.x).toBe(expected.x);
+    expect(vehicle.z).toBe(expected.z);
+    expect(insideRegion(vehicle.x, vehicle.z, REGION)).toBe(false);
+  });
+
+  it('flips vehicleOccupied off the vehicle\'s old cell and on for its new cell', () => {
+    const state = makeFlatNavState();
+    blockRegion(state.navGrid!, REGION);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    const oldCell = state.navGrid!.cellAt(2, 2)!;
+    oldCell.vehicleOccupied = true;
+
+    relocateFootprintOccupants(state, REGION);
+
+    const newCell = state.navGrid!.cellAt(Math.round(vehicle.x), Math.round(vehicle.z))!;
+    expect(oldCell.vehicleOccupied).toBe(false);
+    expect(newCell.vehicleOccupied).toBe(true);
+  });
+
+  it('leaves a vehicle whose cell is outside the region completely untouched', () => {
+    const state = makeFlatNavState();
+    blockRegion(state.navGrid!, REGION);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 7, 7);
+    const cell = state.navGrid!.cellAt(7, 7)!;
+    cell.vehicleOccupied = true;
+
+    relocateFootprintOccupants(state, REGION);
+
+    expect(vehicle.x).toBe(7);
+    expect(vehicle.z).toBe(7);
+    expect(cell.vehicleOccupied).toBe(true);
+  });
+
+  it('moves a mounted employee\'s vehicle to the exact same destination cell as the employee, not a second independent pathfind', () => {
+    const state = makeFlatNavState();
+    blockRegion(state.navGrid!, REGION);
+
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng, 2, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    vehicle.occupantIds = [employee.id];
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    const oldCell = state.navGrid!.cellAt(2, 2)!;
+    oldCell.vehicleOccupied = true;
+
+    relocateFootprintOccupants(state, REGION);
+
+    // The employee was relocated (the pre-existing employee sweep) — and the
+    // vehicle they're mounted in must land on that EXACT same cell, not a
+    // second, independently-computed nearest-reachable-cell answer.
+    expect(employee.x === 2 && employee.z === 2).toBe(false);
+    expect(vehicle.x).toBe(employee.x);
+    expect(vehicle.z).toBe(employee.z);
+
+    const newCell = state.navGrid!.cellAt(Math.round(vehicle.x), Math.round(vehicle.z))!;
+    expect(oldCell.vehicleOccupied).toBe(false);
+    expect(newCell.vehicleOccupied).toBe(true);
+  });
+
+  it('an unoccupied vehicle with no reachable cell nearby ends up wherever findNearestReachableCell\'s own fallback returns — unchanged behavior, not a new one', () => {
+    const state = makeFlatNavState();
+    // Seal the ENTIRE grid, including the (0,0) anchor
+    // `relocateFootprintOccupants` searches from — so findNearestReachableCell
+    // has nothing traversable to fall back to and returns the target
+    // coordinates unchanged (see its own doc comment).
+    const nav = state.navGrid!;
+    for (let z = 0; z < nav.height; z++) {
+      for (let x = 0; x < nav.width; x++) {
+        const cell = nav.cellAt(x, z)!;
+        cell.type = 'blocked';
+        cell.moveCost = Infinity;
+      }
+    }
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 2);
+    const expected = NavGrid.findNearestReachableCell(nav, 0, 0, vehicle.x, vehicle.z, true);
+
+    relocateFootprintOccupants(state, REGION);
+
+    expect(vehicle.x).toBe(expected.x);
+    expect(vehicle.z).toBe(expected.z);
   });
 });
