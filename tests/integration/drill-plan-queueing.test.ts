@@ -225,3 +225,78 @@ describe('drill_plan clear / remove — cancel in-flight drill_hole actions (#55
     expect(remainingActions.some(a => a.payload['holeId'] === third)).toBe(true);
   });
 });
+
+// #1278: agent-occupancy dispatch deadlock/worker-revolt at extreme density
+// (1m-spacing hole grids, several drillers/drill_rigs converging on
+// adjacent holes) — the same reproduction shape as
+// scripts/scenario-defs/blast-execution-visual.json, driven end to end
+// through the real console dispatch -> claim -> walk -> board -> drive ->
+// tick -> land pipeline (mirrors this file's own #553 suite above), rather
+// than through tickLocomotion/moveTo directly the way
+// tests/unit/engine/Locomotion.test.ts's own "#1278" suite does. Chosen over
+// inventing a new integration file per dev-testing-strategy's own
+// references/integration-suites.md: no listed suite's minimum-scenario table
+// names agent-occupancy/dense-grid convergence, and this file already owns
+// "N holes queued via drill_plan grid all eventually land, none lost" as its
+// own subject (see "every hole eventually lands..." above) — this is that
+// same claim under the one additional condition (agentOccupancyEnabled,
+// 1m spacing, more drillers than one crew) #1278 is about.
+describe('drill_plan grid — dense 1m-spacing grid under agent occupancy converges without a permanent stall (#1278)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('8 drillers/drill_rigs dispatched at an 8-hole, 1m-spacing grid all eventually land their own hole, none abandoned', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:48 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    // #1264/#1274's own inline convention (Locomotion.test.ts,
+    // entity-ground-contact.test.ts) — opt-in flag, off by default.
+    state.agentOccupancyEnabled = true;
+    // Setup-only affordability — hiring/purchasing the extra crew below is
+    // not the behavior under test.
+    state.cash = 1_000_000;
+
+    // 7 more drillers + drill_rigs beyond staffed:true's own single crew (1
+    // driller, 1 drill_rig) — several rigs converging on adjacent, 1m-spaced
+    // holes is what actually reproduces #1278's density; one lone crew never
+    // contends with itself.
+    for (let i = 0; i < 7; i++) {
+      const beforeCount = state.employees.employees.length;
+      expect(run('employee hire role:driller').success).toBe(true);
+      const hired = state.employees.employees[beforeCount]!;
+      expect(run(`employee assign_skill ${hired.id} skill:driving.drill_rig level:1`).success).toBe(true);
+      expect(run('vehicle buy drill_rig tier:1').success).toBe(true);
+    }
+
+    const planResult = run('drill_plan grid rows:2 cols:4 spacing:1 depth:8 start:20,20');
+    expect(planResult.success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(8);
+    expect(state.drillHoles).toHaveLength(0);
+
+    // Generous bound: 8 holes, 8 driller/drill_rig pairs available, at most a
+    // handful of AGENT_OCCUPANCY_WAIT_TICKS-scale contests to resolve on top
+    // of the real drilling work itself — nowhere near the ticks a genuine,
+    // unresolved deadlock would need (it would simply never drain
+    // plannedDrillHoles at all within this budget).
+    const MAX_TICKS = 400;
+    const tickOutputs: string[] = [];
+    for (let i = 0; i < MAX_TICKS && state.plannedDrillHoles.length > 0; i++) {
+      // Established staffed-roster drive-to-completion pattern (see
+      // entity-ground-contact.test.ts's own tickUntilGone/driveToCompletion) —
+      // fatigue never interrupts this run's own convergence question.
+      for (const emp of state.employees.employees) emp.fatigue = 100;
+      tickOutputs.push(run('tick 1').output);
+    }
+
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.drillHoles).toHaveLength(8);
+    // tick.ts's own "ACTION ABANDONED" line is the console-visible signal for
+    // exactly the stuck-claim-released-back-to-the-pool outcome
+    // result.abandoned reports at the unit level — never fired across a
+    // successful, fully-converged run.
+    expect(tickOutputs.some(output => output.includes('ACTION ABANDONED'))).toBe(false);
+  });
+});
