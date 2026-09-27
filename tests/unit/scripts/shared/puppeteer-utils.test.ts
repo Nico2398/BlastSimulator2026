@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Page } from 'puppeteer';
-import { CANVAS_READY_TIMEOUT_MS, resetOriginStorage } from '../../../../scripts/shared/puppeteer-utils.js';
+import { CANVAS_READY_TIMEOUT_MS, resetOriginStorage, forceRenderFrame } from '../../../../scripts/shared/puppeteer-utils.js';
 
 /** Minimal CDP-capable page double: records what was sent and whether it detached. */
 function fakePage(sendImpl?: (method: string, params: { storageTypes: string }) => Promise<void>) {
@@ -77,5 +77,27 @@ describe('resetOriginStorage', () => {
 
     await expect(resetOriginStorage(page, 5173)).rejects.toThrow('refused');
     expect(detach).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('forceRenderFrame (#1244)', () => {
+  it('calls page.evaluate once', async () => {
+    const fakeEvaluatePage = { evaluate: vi.fn(async () => undefined) } as unknown as Page;
+
+    await forceRenderFrame(fakeEvaluatePage);
+
+    expect(fakeEvaluatePage.evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it('reaches window.__renderFrame through the evaluated function', async () => {
+    // Not a DOM assertion (there is no real window here) — this pins the
+    // bridge name so a future rename of the window hook shows up as a
+    // failing test rather than a silent no-op in production.
+    const fakeEvaluatePage = { evaluate: vi.fn(async () => undefined) } as unknown as Page;
+
+    await forceRenderFrame(fakeEvaluatePage);
+
+    const [fn] = (fakeEvaluatePage.evaluate as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(String(fn)).toContain('__renderFrame');
   });
 });
