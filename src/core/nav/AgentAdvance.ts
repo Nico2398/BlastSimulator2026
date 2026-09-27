@@ -59,6 +59,18 @@ export interface AdvanceAlongPathInput {
   mover?: Occupant | null;
   /** The shared ground-cell occupancy index (#1206), or null/omitted when the feature is off. */
   occupancy?: AgentOccupancy | null;
+  /**
+   * A single occupant this hop is explicitly permitted to cross even though
+   * it still holds the cell (#1263) — set only by `Locomotion.ts`'s
+   * `handleAgentOccupancyBlock` once a full avoid-every-occupied-cell reroute
+   * has already proven no alternate route exists at all, and the occupant
+   * blocking the one remaining route is a driverless, not-currently-driving
+   * vehicle — parked, not a live contest, with nobody to dispatch it out of
+   * the way on its own. Scoped to one specific occupant identity, never "any
+   * vehicle", so an unrelated agent genuinely mid-move through some other
+   * cell along the route stays exactly as blocking as before.
+   */
+  crossableOccupant?: Occupant | null;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -344,7 +356,11 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       // stays exactly as blocked as before).
       const exemptVehicleCrossing = input.avoidVehicles === false
         && input.mover.kind === 'employee' && holder?.kind === 'vehicle';
-      if (!exemptVehicleCrossing) {
+      // A single, explicitly-named parked blocker this hop was told it may
+      // cross (#1263) — see `crossableOccupant`'s own doc comment above.
+      const exemptCrossableOccupant = !!input.crossableOccupant && !!holder
+        && holder.kind === input.crossableOccupant.kind && holder.id === input.crossableOccupant.id;
+      if (!exemptVehicleCrossing && !exemptCrossableOccupant) {
         // Stop the hop loop for this tick right here — do not skip ahead to
         // a later hop, and do not attempt a partial move into the blocked
         // cell. Whatever earlier hops this tick already committed (x/z,
@@ -392,13 +408,14 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     // `hopTarget` yet and claims nothing this tick.
     if (input.occupancy && input.mover && reachedHop) {
       if (!input.occupancy.tryMove(input.mover, hopTargetCellX, hopTargetCellZ)) {
-        // The only way tryMove can fail here is the vehicle-crossing
-        // exemption above (#1263) — every other conflict already `break`s
-        // the loop before a hop is ever advanced. An employee sharing (or
-        // merely passing through) a vehicle's cell needs no ground-cell
+        // The only way tryMove can fail here is one of the two crossing
+        // exemptions above (#1263) — every other conflict already `break`s
+        // the loop before a hop is ever advanced. A mover sharing (or merely
+        // passing through) another occupant's cell — a vehicle's, or a
+        // specifically-exempted parked blocker's — needs no ground-cell
         // registration of its own there, mirroring how a mounted employee
         // already holds none (rebuildAgentOccupancy's own doc comment,
-        // AgentOccupancy.ts). Release whatever cell the employee held before
+        // AgentOccupancy.ts). Release whatever cell the mover held before
         // this hop so it doesn't stay falsely claimed once they've genuinely
         // left it.
         input.occupancy.release(input.mover);

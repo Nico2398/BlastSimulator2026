@@ -1472,6 +1472,73 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     expect(blocker.z).toBe(1);
   });
 
+  // #1263: a genuinely single-lane vehicle corridor (buildCorridorState —
+  // clearance caps out at 2 only on the centre row, so a vehicle has exactly
+  // one passable lane with no lateral bypass) with a PARKED, DRIVERLESS
+  // vehicle sitting on an intermediate cell (never the leg's own destination)
+  // used to have no way forward at all once agent occupancy is on: the
+  // full-avoidance reroute (step 1) always fails (no bypass exists), the
+  // tie-break sidestep (step 2) never fires (the blocker isn't itself stuck —
+  // it's simply parked, nobody driving it), and destination-spreading (step
+  // 3) is skipped too (the blocker doesn't sit on the destination). Every
+  // return fell through to the stuck/abandon escalation, paying the full
+  // AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS +
+  // ACTION_STUCK_BACKOFF_TICKS cost (confirmed live: economy-full-loop.json's
+  // debris_hauler blocked by its own multi-role driver's parked
+  // rock_fragmenter) before a fresh dispatch ever found a different,
+  // reachable target — a recovery cost of ~90-150+ ticks that a tight
+  // contract deadline (Contract.ts's rubble_disposal, rng.nextInt(30, 100))
+  // can never fit inside. The new step 2.5 crosses a confirmed idle,
+  // driverless blocker directly instead, resolving in a handful of ticks.
+  it('crosses a parked, driverless vehicle blocking the corridor\'s only lane instead of paying the full stuck/abandon/backoff cost', () => {
+    const state = buildCorridorState(6);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+    const { employee: driver } = hireEmployee(state.employees, 'driller', rng, 0, 2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 2);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.itinerary = {
+      legs: [{
+        mode: 'drive', vehicleId: vehicle.id, destX: 5, destZ: 2,
+        arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+      }],
+      goal: { kind: 'reposition', x: 5, z: 2 },
+      workTicks: 0,
+      estTotalTicks: 5,
+    } satisfies Itinerary;
+
+    // Stationary, driverless, unreserved blocker sitting on cell (2, 2) — an
+    // intermediate step along the route, never the leg's own destination
+    // (5, 2) — in the corridor's one and only vehicle-passable lane.
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 2);
+    expect(vehicleDriverId(blocker)).toBeNull();
+    expect(getVehicleReservation(state.vehicles, blocker.id)).toBeNull();
+
+    const everAbandoned: Array<{ employeeId: number; actionId: number | null }> = [];
+    // Comfortably fewer ticks than a single stuck/abandon/backoff cycle would
+    // ever need (AGENT_OCCUPANCY_WAIT_TICKS + MOVE_STUCK_ABANDON_TICKS is
+    // already well over this) — the crossing must resolve inside the
+    // ordinary wait threshold plus a small margin for the drive itself, not
+    // after paying the full ladder.
+    const MAX_TICKS = AGENT_OCCUPANCY_WAIT_TICKS + 10;
+    let ticks = 0;
+    while (ticks < MAX_TICKS && driver.itinerary !== null) {
+      everAbandoned.push(...tickLocomotion(state).abandoned);
+      ticks++;
+    }
+
+    expect(everAbandoned).toHaveLength(0);
+    expect(driver.itinerary).toBeNull();
+    expect(driver.isMoveStuck).toBe(false);
+    expect(vehicle.x).toBe(5);
+    expect(vehicle.z).toBe(2);
+    // The blocker itself was crossed, not relocated — still parked exactly
+    // where it started.
+    expect(blocker.x).toBe(2);
+    expect(blocker.z).toBe(2);
+  });
+
   it("#1259: destination-spreading onto the mover's own already-held cell still clears isMoveStuck instead of latching it from the wait leading up to it", () => {
     // A blocker parked exactly ON the mover's leg destination, with no
     // itinerary of its own — it never moves for the whole test, so
