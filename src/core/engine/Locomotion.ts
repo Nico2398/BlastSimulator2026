@@ -508,6 +508,15 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     committed: readCommitted(emp),
     ...readMoveHistory(emp),
     ...(occupancyActive ? { mover, occupancy: state.agentOccupancy } : {}),
+    // #1274: a board leg's own destination IS the target vehicle's own held
+    // cell by construction (buildBoardLeg in PlanItinerary.ts) — without this
+    // exemption the ordinary per-hop occupancy check above rejects the leg's
+    // final approach hop forever, and the walker abandons at
+    // MOVE_STUCK_ABANDON_TICKS trying to board a vehicle from any cell but
+    // the one it already stands on.
+    ...(occupancyActive && leg.onArrive.kind === 'board'
+      ? { exemptOccupant: { kind: 'vehicle', id: leg.onArrive.vehicleId } }
+      : {}),
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
@@ -734,7 +743,8 @@ function applyReroutedAdvance(
     // handleOccupancyBlock's own identical reset below.
     committed: NULL_ROUTE_COMMITMENT,
     moveHistoryX: null, moveHistoryZ: null,
-    mover, occupancy, crossableOccupant,
+    mover, occupancy,
+    exemptOccupant: crossableOccupant,
   });
 
   emp.moveConsecutiveFailures = outcome.consecutiveFailures;
@@ -803,6 +813,11 @@ function handleAgentOccupancyBlock(
   const destinationHeldByOther = !occupancy.isFreeFor(mover, leg.destX, leg.destZ);
 
   if (!destinationHeldByOther) {
+    // (#1274) No `exemptOccupant` here: this branch only ever runs when
+    // `!destinationHeldByOther`, but a board leg's destination IS the target
+    // vehicle's own cell by construction — always self-held — so this branch
+    // is unreachable for a board leg in the first place. A latent coupling,
+    // not a gap to fill.
     const reroute = findPathAvoidingOccupiedCells(state, emp, mover, emp.x, emp.z, leg.destX, leg.destZ, requiredClearance);
     if (reroute.found) {
       return applyReroutedAdvance(state, emp, mover, isDrive, vehicle, speed, leg, reroute, occupancy, result);
@@ -868,10 +883,13 @@ function handleAgentOccupancyBlock(
     // driver and no live drive in progress — genuinely parked, not a live
     // contest, and with nobody to dispatch it out of the way on its own —
     // find a route that avoids every OTHER occupied cell but is still willing
-    // to route straight through this one specific blocker's cell
-    // (`findPathAvoidingOccupiedCells`'s `exemptOccupant`), and advance
-    // through it directly (`crossableOccupant`, `AgentAdvance.ts`) rather than
-    // paying the full stuck -> MOVE_STUCK_ABANDON_TICKS ->
+    // to route straight through this one specific blocker's cell (this
+    // function's own `exemptOccupant` param, passed to
+    // `findPathAvoidingOccupiedCells`), and advance through it directly
+    // (`AdvanceAlongPathInput.exemptOccupant`, `AgentAdvance.ts` — the same
+    // field a `board` leg's own approach uses for #1274, here reused for the
+    // crossing case) rather than paying the full stuck ->
+    // MOVE_STUCK_ABANDON_TICKS ->
     // ACTION_STUCK_BACKOFF_TICKS cost first. This generalizes the existing
     // foot-crosses-parked-vehicle exemption (`avoidVehicles === false`,
     // `AgentAdvance.ts`, also #1263) from foot movers to any mover crossing a
@@ -906,6 +924,15 @@ function handleAgentOccupancyBlock(
   if (needsExactUnsharedCell) {
     const spread = findNearestFreeCellForAgent(state, mover, leg.destX, leg.destZ);
     if (spread) {
+      // #1274: record the pre-spread destination once, on the FIRST spread
+      // only — the stable identity of "what chokepoint is this mover
+      // actually queued on", so buildWaitingByTarget (EventEngine.ts) can
+      // still cluster several movers converging on the same original target
+      // even after each one has since been individually retargeted.
+      if (leg.originalDestX == null) {
+        leg.originalDestX = leg.destX;
+        leg.originalDestZ = leg.destZ;
+      }
       leg.destX = spread.x;
       leg.destZ = spread.z;
       // Deliberately NOT resetting `vehicleWaitingTicks` here (unlike the

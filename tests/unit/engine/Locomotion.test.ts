@@ -26,6 +26,7 @@ import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
 import { AgentOccupancy, type Occupant } from '../../../src/core/nav/AgentOccupancy.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 import { isMounted } from '../../../src/core/entities/EmployeeLocomotion.js';
+import { detectTrafficJam } from '../../../src/core/events/EventEngine.js';
 
 const SEED = 42;
 
@@ -1617,5 +1618,91 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     // change ordinary, uncontested movement.
     expect(employee.x).toBe(AGENT_WALK_SPEED);
     expect(employee.z).toBe(0);
+  });
+
+  // #1274: EventEngine.ts's buildWaitingByTarget clusters waiting drivers by
+  // their CURRENT drive leg's own destX/destZ — but a destination-spread
+  // (handleAgentOccupancyBlock's step 3, above) retargets that same leg's
+  // destX/destZ onto a distinct free cell per mover, the instant each one's
+  // wait crosses AGENT_OCCUPANCY_WAIT_TICKS. Three movers converging on the
+  // identical unrelocatable cell therefore each end up on a DIFFERENT live
+  // destX/destZ one tick after they'd otherwise have qualified as a single
+  // 3-vehicle cluster — buildWaitingByTarget sees three singleton clusters of
+  // one, never the shared jam a player watching four vehicles pile up on one
+  // chokepoint actually has. `Leg.originalDestX/originalDestZ` (#1274) is
+  // meant to fix this by clustering on the leg's ORIGINAL, pre-spread target
+  // instead — this test fails today because buildWaitingByTarget doesn't read
+  // those fields yet.
+  it('a genuinely unrelocatable anchor plus 3 satellite vehicles converging on its cell fire a traffic jam instead of fragmenting into singleton destination-spreads', () => {
+    const state = buildFlatNavGridState(30, 30);
+    state.agentOccupancyEnabled = true;
+    const rng = new Random(SEED);
+
+    // The anchor: parked, mounted, no itinerary of its own — a permanent
+    // obstacle squarely on every satellite's shared destination, never
+    // relocatable by anything this test does.
+    const { employee: anchorDriver } = hireEmployee(state.employees, 'driller', rng, 15, 15);
+    const { vehicle: anchorVehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
+    anchorVehicle.occupantIds = [anchorDriver.id];
+    anchorDriver.locomotion = { kind: 'mounted', vehicleId: anchorVehicle.id };
+
+    // Three satellites, each mounted, each driving straight at the anchor's
+    // own cell (15, 15) — a destination that never frees up.
+    const satellitePositions: Array<{ x: number; z: number }> = [
+      { x: 12, z: 15 },
+      { x: 18, z: 15 },
+      { x: 15, z: 12 },
+    ];
+    const satelliteDrivers = satellitePositions.map(({ x, z }) => {
+      const { employee: driver } = hireEmployee(state.employees, 'driller', rng, x, z);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', x, z);
+      vehicle.occupantIds = [driver.id];
+      driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+      driver.itinerary = {
+        legs: [{
+          mode: 'drive', vehicleId: vehicle.id, destX: 15, destZ: 15,
+          arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 3,
+        }],
+        goal: { kind: 'reposition', x: 15, z: 15 },
+        workTicks: 0,
+        estTotalTicks: 3,
+      } satisfies Itinerary;
+      return driver;
+    });
+
+    // Snapshot of each satellite's live leg destX/destZ, taken the FIRST tick
+    // any of them shows a destination-spread — before a small, nearby spread
+    // target lets a satellite complete its (onArrive: 'none') leg outright
+    // and its itinerary go null a tick or two later. Captured once, right
+    // where the bug lives: the same tick the ladder retargets every
+    // satellite's leg, this is the state buildWaitingByTarget's clustering
+    // pass reads.
+    let spreadDestKeys: Set<string> | null = null;
+    let tick = 0;
+    for (; tick < 15 && state.events.pendingEvent === null; tick++) {
+      tickLocomotion(state);
+
+      if (spreadDestKeys === null) {
+        const legs = satelliteDrivers.map(d => d.itinerary?.legs[0] ?? null);
+        const anySpread = legs.some(leg => leg !== null && (leg.destX !== 15 || leg.destZ !== 15));
+        if (anySpread) {
+          spreadDestKeys = new Set(
+            legs.filter((leg): leg is NonNullable<typeof leg> => leg !== null)
+              .map(leg => `${leg.destX},${leg.destZ}`),
+          );
+        }
+      }
+
+      detectTrafficJam(state.vehicles.vehicles, state.employees.employees, state.events, tick);
+    }
+
+    // The three satellites really did fragment onto distinct live
+    // destinations — the bug this test targets is that fragmenting alone
+    // silently suppresses the jam, not that the spread itself never happens.
+    expect(spreadDestKeys).not.toBeNull();
+    expect(spreadDestKeys!.size).toBeGreaterThan(1);
+
+    expect(state.events.pendingEvent).not.toBeNull();
+    expect(state.events.pendingEvent?.eventId).toBe('traffic_jam');
   });
 });

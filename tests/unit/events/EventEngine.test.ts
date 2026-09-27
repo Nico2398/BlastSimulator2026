@@ -35,6 +35,7 @@ function makeWaitingVehicleAndDriver(
   targetX: number,
   targetZ: number,
   waitingTicks: number,
+  originalTarget?: { x: number; z: number },
 ): { vehicle: Vehicle; employee: Employee } {
   const id = _nextId++;
   const employees = createEmployeeState();
@@ -49,6 +50,12 @@ function makeWaitingVehicleAndDriver(
     legs: [{
       mode: 'drive', vehicleId: id, destX: targetX, destZ: targetZ,
       arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 5,
+      // #1274: when given, simulates a leg that has already been
+      // destination-spread away from `originalTarget` onto the live,
+      // per-mover (targetX, targetZ) cell above — destX/destZ stay the live
+      // value; only originalDestX/originalDestZ record where the leg was
+      // ORIGINALLY headed before any spread ever retargeted it.
+      ...(originalTarget ? { originalDestX: originalTarget.x, originalDestZ: originalTarget.z } : {}),
     }],
     goal: { kind: 'reposition', x: targetX, z: targetZ },
     workTicks: 0,
@@ -273,6 +280,42 @@ describe('EventEngine — detectTrafficJam (Task 2.8)', () => {
     employees[1]!.isMoveStuck = true;
     const result = detectTrafficJam(vehicles, employees, eventState, 100);
     expect(result).toBeNull();
+  });
+
+  // #1274: a destination-spread (Locomotion.ts's handleAgentOccupancyBlock,
+  // step 3) retargets each waiting driver's own drive leg destX/destZ onto a
+  // DIFFERENT free cell around the shared chokepoint the instant its own wait
+  // crosses AGENT_OCCUPANCY_WAIT_TICKS — buildWaitingByTarget must cluster by
+  // where those legs were ORIGINALLY headed (Leg.originalDestX/originalDestZ),
+  // not by their now-fragmented live destX/destZ, or a genuine 3-vehicle jam
+  // reads as three singleton clusters of one and never fires.
+  it('clusters three drivers on three different LIVE targets, sharing the same ORIGINAL target, into one jam', () => {
+    const originalTarget = { x: 5, z: 5 };
+    const { vehicles, employees } = split([
+      makeWaitingVehicleAndDriver(4, 5, 10, originalTarget),
+      makeWaitingVehicleAndDriver(6, 5, 10, originalTarget),
+      makeWaitingVehicleAndDriver(5, 6, 10, originalTarget),
+    ]);
+
+    const result = detectTrafficJam(vehicles, employees, eventState, 100);
+
+    expect(result).not.toBeNull();
+    expect(result?.eventId).toBe('traffic_jam');
+    expect(eventState.pendingEvent?.eventId).toBe('traffic_jam');
+  });
+
+  it('computeTrafficAdvisory reports the shared ORIGINAL target, not any one live target, for a fragmented cluster', () => {
+    const originalTarget = { x: 9, z: 9 };
+    const { vehicles, employees } = split([
+      makeWaitingVehicleAndDriver(8, 9, 10, originalTarget),
+      makeWaitingVehicleAndDriver(10, 9, 10, originalTarget),
+      makeWaitingVehicleAndDriver(9, 10, 10, originalTarget),
+    ]);
+
+    const advisories = computeTrafficAdvisory(vehicles, employees);
+
+    expect(advisories).toHaveLength(1);
+    expect(advisories[0]).toEqual({ targetX: originalTarget.x, targetZ: originalTarget.z, count: 3 });
   });
 });
 

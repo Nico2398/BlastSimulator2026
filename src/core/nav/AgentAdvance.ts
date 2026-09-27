@@ -61,16 +61,26 @@ export interface AdvanceAlongPathInput {
   occupancy?: AgentOccupancy | null;
   /**
    * A single occupant this hop is explicitly permitted to cross even though
-   * it still holds the cell (#1263) — set only by `Locomotion.ts`'s
-   * `handleAgentOccupancyBlock` once a full avoid-every-occupied-cell reroute
-   * has already proven no alternate route exists at all, and the occupant
-   * blocking the one remaining route is a driverless, not-currently-driving
-   * vehicle — parked, not a live contest, with nobody to dispatch it out of
-   * the way on its own. Scoped to one specific occupant identity, never "any
-   * vehicle", so an unrelated agent genuinely mid-move through some other
-   * cell along the route stays exactly as blocking as before.
+   * it still holds the cell — one field covering two distinct callers that
+   * both need the same exemption shape:
+   *  - the vehicle a `board` leg's own `onArrive` step names. That cell is
+   *    always self-held by construction (the leg's destination IS the
+   *    vehicle's own position), so the ordinary per-hop occupancy check
+   *    would otherwise reject the leg's own final approach hop forever
+   *    (#1274);
+   *  - a single, explicitly-named parked blocker (#1263) — set only by
+   *    `Locomotion.ts`'s `handleAgentOccupancyBlock` once a full
+   *    avoid-every-occupied-cell reroute has already proven no alternate
+   *    route exists at all, and the occupant blocking the one remaining
+   *    route is a driverless, not-currently-driving vehicle — parked, not a
+   *    live contest, with nobody to dispatch it out of the way on its own.
+   * Scoped to one specific occupant identity, never "any vehicle", so an
+   * unrelated agent genuinely mid-move through some other cell along the
+   * route stays exactly as blocking as before. Null/omitted for every leg
+   * that needs neither exemption — zero behaviour change for every existing
+   * caller/fixture.
    */
-  crossableOccupant?: Occupant | null;
+  exemptOccupant?: Occupant | null;
 }
 
 interface AdvanceAlongPathOutcome {
@@ -356,11 +366,17 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
       // stays exactly as blocked as before).
       const exemptVehicleCrossing = input.avoidVehicles === false
         && input.mover.kind === 'employee' && holder?.kind === 'vehicle';
-      // A single, explicitly-named parked blocker this hop was told it may
-      // cross (#1263) — see `crossableOccupant`'s own doc comment above.
-      const exemptCrossableOccupant = !!input.crossableOccupant && !!holder
-        && holder.kind === input.crossableOccupant.kind && holder.id === input.crossableOccupant.id;
-      if (!exemptVehicleCrossing && !exemptCrossableOccupant) {
+      // A single, explicitly-named occupant this hop was told it may cross —
+      // either a board leg's own destination vehicle (#1274) or a proven-
+      // unavoidable parked blocker (#1263); see `exemptOccupant`'s own doc
+      // comment above. Reuses AgentOccupancy's own `isFreeFor` identity check
+      // rather than re-deriving one inline: the outer `if` above already
+      // established the cell isn't free for `mover`, so within this branch
+      // `isFreeFor(exemptOccupant, ...)` can only be true when
+      // `exemptOccupant` IS the current holder.
+      const isExemptOccupant = !!input.exemptOccupant
+        && input.occupancy.isFreeFor(input.exemptOccupant, hopTargetCellX, hopTargetCellZ);
+      if (!exemptVehicleCrossing && !isExemptOccupant) {
         // Stop the hop loop for this tick right here — do not skip ahead to
         // a later hop, and do not attempt a partial move into the blocked
         // cell. Whatever earlier hops this tick already committed (x/z,
@@ -408,16 +424,17 @@ export function advanceAlongPath(input: AdvanceAlongPathInput): AdvanceAlongPath
     // `hopTarget` yet and claims nothing this tick.
     if (input.occupancy && input.mover && reachedHop) {
       if (!input.occupancy.tryMove(input.mover, hopTargetCellX, hopTargetCellZ)) {
-        // The only way tryMove can fail here is one of the two crossing
-        // exemptions above (#1263) — every other conflict already `break`s
-        // the loop before a hop is ever advanced. A mover sharing (or merely
-        // passing through) another occupant's cell — a vehicle's, or a
-        // specifically-exempted parked blocker's — needs no ground-cell
-        // registration of its own there, mirroring how a mounted employee
-        // already holds none (rebuildAgentOccupancy's own doc comment,
-        // AgentOccupancy.ts). Release whatever cell the mover held before
-        // this hop so it doesn't stay falsely claimed once they've genuinely
-        // left it.
+        // The only way tryMove can fail here is one of the exemptions above
+        // (`exemptVehicleCrossing` #1263, or `exemptOccupant` #1263/#1274) —
+        // every other conflict already `break`s the loop before a hop is
+        // ever advanced. A mover sharing (or merely passing through) another
+        // occupant's cell — a vehicle's, a board leg's own destination
+        // vehicle, or a specifically-exempted parked blocker's — needs no
+        // ground-cell registration of its own there, mirroring how a mounted
+        // employee already holds none (rebuildAgentOccupancy's own doc
+        // comment, AgentOccupancy.ts). Release whatever cell the mover held
+        // before this hop so it doesn't stay falsely claimed once they've
+        // genuinely left it.
         input.occupancy.release(input.mover);
       }
     }

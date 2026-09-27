@@ -151,6 +151,9 @@ describe('every rendered entity rests on the terrain sampler through the real sy
   it('buildings, vehicles, and employees all sit at getTerrainSurfaceY(x,z) after a level_ground order, a real blast, and a terrain-mutating dig', () => {
     const engine = createRunner();
     expect(runCommand(engine, 'new_game seed:42 size:32 staffed:true').success).toBe(true);
+    // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled flag —
+    // Locomotion.test.ts/vehicles.integration.test.ts's own inline convention.
+    engine.ctx.state!.agentOccupancyEnabled = true;
     const grid = engine.ctx.grid!;
     const h = makeHarness();
 
@@ -188,7 +191,11 @@ describe('every rendered entity rests on the terrain sampler through the real sy
 
     // ── Step 3: a real blast elsewhere, changing terrain away from the pad
     // (mirrors terrain-surface-y-post-blast.integration.test.ts, #1007).
-    expect(runCommand(engine, 'drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:5,5').success).toBe(true);
+    // spacing:6, not the tighter spacing:4 this file used before #1264: under
+    // agentOccupancyEnabled, spacing:4 deadlocks the staffed drilling crew on
+    // this tightly-packed 2x3 grid (spacing 5-6 both work; spacing 7 starts
+    // damaging the management_office pad placed in step 2).
+    expect(runCommand(engine, 'drill_plan grid rows:2 cols:3 spacing:6 depth:8 start:5,5').success).toBe(true);
     driveToCompletion(engine, 300, () => engine.ctx.state!.plannedDrillHoles.length > 0);
     expect(runCommand(engine, 'charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     driveToCompletion(engine, 300, () => Object.keys(engine.ctx.state!.plannedChargesByHole).length > 0);
