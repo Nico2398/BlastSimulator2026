@@ -230,6 +230,8 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return action.requiredSkill !== null
         ? t('notification.order_blocked_no_employee', { order, skill: t(`skill.${action.requiredSkill}`) })
         : t('notification.order_blocked_no_staff', { order });
+    case 'target_unreachable':
+      return t('notification.order_blocked_target_unreachable', { order });
     default:
       return order;
   }

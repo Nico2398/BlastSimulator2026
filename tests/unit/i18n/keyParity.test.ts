@@ -390,8 +390,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // Baseline is now 3531 (up from 3530): #1226 adds world.invalid_size,
     // the refusal message for newGameCommand's `size` validation — both
     // locales translated.
+    // Baseline is now 3532 (up from 3531): #1231 adds
+    // notification.order_blocked_target_unreachable, the blocked-order
+    // message for a debris/hauling target sitting outside ground crew's
+    // climb-reachable region — both locales translated.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3531);
+    expect(Object.keys(en).length).toBe(3532);
   });
 });
 

@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NavGrid, isStepClimbable, hasClearance, type NavCellType, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import {
   VoxelGrid,
   type VoxelData,
@@ -1734,6 +1735,38 @@ describe('NavGrid.computeClimbReachableSet', () => {
     const nav = makeNavGridFromTypes(rows);
 
     expect(NavGrid.computeClimbReachableSet(nav, 0, 0).size).toBe(NavGrid.computeReachableSet(nav, 0, 0).size);
+  });
+
+  // #1231: the flood fill used to have no notion of #1197's diagonal-corner
+  // cut at all, so it could call a cell "reachable" that no real findPath —
+  // climb-gated or plain — can actually resolve against. Direct repro
+  // matching the issue's own shape: a 3x3 grid where (2,2) is reachable from
+  // the anchor (0,0) ONLY via a single diagonal step whose two orthogonal
+  // neighbours are both 'blocked', with every other route walled off too.
+  it('excludes a target reachable only via a corner-cut between two blocked cells, matching findPath (#1197/#1231)', () => {
+    const nav = makeNavGridFromTypes([
+      ['walkable', 'blocked', 'blocked'],
+      ['blocked', 'walkable', 'blocked'],
+      ['blocked', 'blocked', 'walkable'],
+    ]);
+
+    // findPath already refuses this — the fix under test brings the flood
+    // fill into agreement with it, not the other way around.
+    const direct = findPath(nav, {
+      agentId: 1, fromX: 0, fromZ: 0, toX: 2, toZ: 2, avoidVehicles: false,
+    });
+    expect(direct.found).toBe(false);
+
+    const climbAware = NavGrid.computeClimbReachableSet(nav, 0, 0);
+    expect(climbAware.has(2, 2)).toBe(false);
+    // The anchor's own island is just itself — every neighbour is corner-cut
+    // or blocked outright.
+    expect(climbAware.size).toBe(1);
+
+    // Same corner-cut rule applies to the plain (non-climb-aware) set too —
+    // it is a solidity rule, not a slope one.
+    const plain = NavGrid.computeReachableSet(nav, 0, 0);
+    expect(plain.has(2, 2)).toBe(false);
   });
 });
 
