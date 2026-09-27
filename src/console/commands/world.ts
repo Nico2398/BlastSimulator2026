@@ -414,6 +414,7 @@ export function newGameCommand(
     return { success: false, output: t('world.unknown_mine_type', { mineType, valid }) };
   }
 
+  // TODO: implementer adds requireValidGenDimension validation here (#1226)
   const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
   const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
 
