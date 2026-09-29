@@ -16,7 +16,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
-import { sanitizeFiniteOverride, staffedSuffix, parseStaffedAndOccupancyFlags } from './commandUtils.js';
+import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
@@ -426,7 +426,7 @@ export function newGameCommand(
   }
   const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
 
-  const flags = parseStaffedAndOccupancyFlags(named);
+  const flags = parseStaffedFlag(named['staffed']);
   if (flags.error) {
     return { success: false, output: flags.error };
   }
@@ -435,7 +435,6 @@ export function newGameCommand(
     seed, mineType,
     ...(startingCash !== undefined ? { startingCash } : {}),
     ...(flags.staffed ? { staffed: true } : {}),
-    ...(flags.agentOccupancy !== undefined ? { agentOccupancyEnabled: flags.agentOccupancy } : {}),
   });
   const datum = defaultDatumForSize(size);
   ctx.state.world = createWorldState(size, datum, size, true);

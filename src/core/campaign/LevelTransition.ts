@@ -75,15 +75,11 @@ export function checkLevelComplete(
  * `staffed` mirrors `new_game`/`sandbox start`'s own opt-in (#551): a
  * pre-hired roster and pre-purchased fleet, applied inside `createGame`
  * before terrain generation.
- * `agentOccupancy` mirrors `new_game`/`sandbox start`'s own opt-in (#1263):
- * toggles `GameConfig.agentOccupancyEnabled`, applied inside `createGame`
- * before terrain generation.
  */
 export function createGameForLevel(
   campaign: CampaignState,
   levelId: string,
   staffed?: boolean,
-  agentOccupancy?: boolean,
 ): GameState | null {
   if (!startLevel(campaign, levelId)) return null;
 
@@ -97,7 +93,6 @@ export function createGameForLevel(
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
     ...(staffed ? { staffed: true } : {}),
-    ...(agentOccupancy !== undefined ? { agentOccupancyEnabled: agentOccupancy } : {}),
   };
 
   const newState = createGame(config);

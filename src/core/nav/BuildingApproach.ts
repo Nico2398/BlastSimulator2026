@@ -105,7 +105,7 @@ function isRingCandidateType(cell: NavCell): boolean {
  * that specific cell, only some free spot on the ring, so preferring a free
  * one first removes the false dependency instead of tolerating a permanent
  * stall (confirmed live: tutorial-interactive.json's own driller-contention
- * repro under `agent_occupancy:true`, issue #1263 — an idle rock_digger
+ * repro under agent occupancy, issue #1263 — an idle rock_digger
  * parked on the one ring cell nearest a resting employee's approach
  * direction stalled that employee's rest itinerary, and the drilling grind
  * behind it, for the rest of the run).

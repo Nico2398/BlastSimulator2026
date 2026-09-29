@@ -737,14 +737,6 @@ export const AGENT_OCCUPANCY_WAIT_TICKS = 10;
  */
 export const AGENT_FREE_CELL_SEARCH_MAX_RADIUS = 4;
 
-/**
- * Whether ground-cell occupancy is enforced for every agent, foot or vehicle
- * (#1206) — lands OFF; #1207 turns it on by default. `GameState.agentOccupancyEnabled`
- * reads this as its default, and the `debug occupancy on|off` console command
- * overrides it per-session.
- */
-export const AGENT_OCCUPANCY_ENABLED_DEFAULT = false;
-
 /** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
 export const AGENT_WALK_SPEED = 2;
 

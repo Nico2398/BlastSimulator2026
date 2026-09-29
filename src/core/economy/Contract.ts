@@ -278,8 +278,8 @@ export function hasFillableOreSaleOffer(
  * against one traced trajectory, exactly the fragility #1042/#1048 already
  * fixed for the analogous `ore_sale` wait (`fillableOreSaleOffered` below) —
  * a fixed pad breaks the moment anything upstream re-times the run onto a
- * different pool instance, which is what turning on `agent_occupancy:true`
- * did to the tutorial's own crew-dispatch timing. No ore-quantity check is
+ * different pool instance, which is what turning on agent occupancy did to
+ * the tutorial's own crew-dispatch timing. No ore-quantity check is
  * needed here (unlike the ore_sale sibling): `rubble_disposal` contracts
  * carry `materialId: ''` and are fulfilled from raw `storedMassKg`, so mere
  * presence in the pool is the whole condition to wait on.

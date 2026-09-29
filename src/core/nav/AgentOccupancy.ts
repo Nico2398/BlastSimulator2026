@@ -1,10 +1,9 @@
 // BlastSimulator2026 — AgentOccupancy (#1206)
-// Generalizes the vehicle-only occupancy check (Locomotion.ts's
-// isOccupiedByOtherVehicle/nextGridStep/handleOccupancyBlock — vehicle vs.
-// vehicle, immediate next hop only) to every agent, foot or vehicle: nothing
-// today stops two employees walking through each other. Lands switched off
-// by default (GameState.agentOccupancyEnabled, AGENT_OCCUPANCY_ENABLED_DEFAULT
-// in balance.ts) — #1207 turns it on.
+// Generalizes the vehicle-only occupancy check the old Locomotion.ts had
+// (isOccupiedByOtherVehicle/nextGridStep/handleOccupancyBlock — vehicle vs.
+// vehicle, immediate next hop only) to every agent, foot or vehicle: without
+// it, nothing stops two employees walking through each other. Unconditional
+// (#1207) — every game builds and reconciles this index.
 //
 // One ground cell holds at most one occupant. `AgentOccupancy` is the single
 // index of that relationship: cell -> occupant and occupant -> cell, kept in

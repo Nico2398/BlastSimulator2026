@@ -11,7 +11,7 @@ import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
-import { sanitizeFiniteOverride, parseStaffedAndOccupancyFlags, staffedSuffix } from './commandUtils.js';
+import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 // ── campaign status ──
 
@@ -93,17 +93,16 @@ export function campaignStartCommand(
   // command itself tolerate the same case instead of erroring on it.
   const campaign = ctx.state?.campaign ?? createCampaignState();
 
-  // `staffed:`/`agent_occupancy:`, mirroring new_game/sandbox start's own
-  // opt-ins (#551, #1263): a pre-hired roster and pre-purchased fleet, and an
-  // explicit agent-occupancy toggle, so a scenario that only needs an
-  // ordinary staffed opening (or a non-default occupancy setting) does not
-  // have to hire/license/buy/assign it by hand on every campaign level.
-  const flags = parseStaffedAndOccupancyFlags(named);
+  // `staffed:`, mirroring new_game/sandbox start's own opt-in (#551): a
+  // pre-hired roster and pre-purchased fleet, so a scenario that only needs
+  // an ordinary staffed opening does not have to hire/license/buy/assign it
+  // by hand on every campaign level.
+  const flags = parseStaffedFlag(named['staffed']);
   if (flags.error) {
     return { success: false, output: flags.error };
   }
 
-  const newState = createGameForLevel(campaign, levelId, flags.staffed, flags.agentOccupancy);
+  const newState = createGameForLevel(campaign, levelId, flags.staffed);
   if (!newState) {
     const lvl = getLevel(levelId);
     if (!lvl) return { success: false, output: t('campaign.start_unknown_level', { levelId }) };

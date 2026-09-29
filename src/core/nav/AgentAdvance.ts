@@ -52,12 +52,12 @@ export interface AdvanceAlongPathInput {
   /**
    * This agent's own occupant identity (#1206), passed through to the
    * ground-cell occupancy check the caller performs against `occupancy`.
-   * Optional/nullable so a fixture/caller predating the occupancy feature
-   * keeps compiling unchanged — omitting it disables the check entirely,
-   * matching AGENT_OCCUPANCY_ENABLED_DEFAULT's off-by-default landing.
+   * Optional/nullable so a fixture/caller that predates the occupancy
+   * feature, or has no occupancy index built yet, keeps compiling unchanged
+   * — omitting it disables the check entirely.
    */
   mover?: Occupant | null;
-  /** The shared ground-cell occupancy index (#1206), or null/omitted when the feature is off. */
+  /** The shared ground-cell occupancy index (#1206), or null/omitted when none is built yet. */
   occupancy?: AgentOccupancy | null;
   /**
    * A single occupant this hop is explicitly permitted to cross even though

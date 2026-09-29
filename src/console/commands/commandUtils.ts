@@ -62,35 +62,3 @@ export function parseStaffedFlag(raw: string | undefined): { staffed: boolean; e
   return { staffed: parsed === true, error: null };
 }
 
-/**
- * Parses the `agent_occupancy:true|false` console flag (#1206) shared by
- * `new_game` and `sandbox start` — mirrors `parseStaffedFlag` exactly,
- * defaulting to `undefined` (let `createGame` fall back to
- * `AGENT_OCCUPANCY_ENABLED_DEFAULT`) when omitted, rather than `false`: this
- * flag opts a fresh game in or out explicitly, it does not itself carry a
- * default the way `staffed` does.
- */
-export function parseAgentOccupancyFlag(raw: string | undefined): { agentOccupancy: boolean | undefined; error: null } | { agentOccupancy: undefined; error: string } {
-  const parsed = parseBooleanFlag(raw);
-  if (parsed === null) {
-    return { agentOccupancy: undefined, error: t('console.invalid_agent_occupancy_flag', { value: raw! }) };
-  }
-  return { agentOccupancy: parsed, error: null };
-}
-
-/**
- * Parses `staffed:true|false` and `agent_occupancy:true|false` together —
- * `new_game` and `sandbox start` read both named args identically, so this
- * is the one place either error message surfaces from.
- */
-export function parseStaffedAndOccupancyFlags(named: Record<string, string>):
-  | { staffed: boolean; agentOccupancy: boolean | undefined; error: null }
-  | { staffed: false; agentOccupancy: undefined; error: string } {
-  const staffedFlag = parseStaffedFlag(named['staffed']);
-  if (staffedFlag.error) return { staffed: false, agentOccupancy: undefined, error: staffedFlag.error };
-
-  const agentOccupancyFlag = parseAgentOccupancyFlag(named['agent_occupancy']);
-  if (agentOccupancyFlag.error) return { staffed: false, agentOccupancy: undefined, error: agentOccupancyFlag.error };
-
-  return { staffed: staffedFlag.staffed, agentOccupancy: agentOccupancyFlag.agentOccupancy, error: null };
-}
