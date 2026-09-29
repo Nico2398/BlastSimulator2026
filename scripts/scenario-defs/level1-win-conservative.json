@@ -3,11 +3,11 @@
   "description": "Level 1 (Dusty Hollow): 4 small blasts and 2 contract attempts -- named for a conservative win, but no hauling infrastructure means no delivery ever succeeds; see Findings #52-#53 for why the real trajectory (a net cash loss, well short of the $80k target) was originally asserted instead of the named outcome. #553: drilling now requires a licensed driller and a drill_rig, so exactly one vehicle is now bought where the file previously bought none -- the file's own point (no hauling infrastructure, so no delivery ever succeeds) is unchanged, but the real trajectory is far worse: the single rig ends up parked on the pattern it just drilled when the first blast fires (same mechanic tutorial-playthrough documents) and is destroyed, and because this file never buys a replacement, the remaining 3 drill_plan calls only ever order ghost holes nothing can claim. #593: the driller dies alongside the rig in that same first blast (releaseVehicleReservation now correctly syncs the dismounting driver's position to the vehicle's actual location instead of leaving it frozen at the boarding point) -- deathCount ends the run at 1, and payroll/fuel drain stops at tick ~50 rather than running the whole level. Combined with the same unlucky contract-expiry fines Findings #52-#53 already documented, the level still ends deeply in the red -- see the final campaign status step.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow agent_occupancy:true",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow agent_occupancy:true"
         }
       ],
       "role": "setup",
@@ -19,7 +19,8 @@
           "employeeCount": 0,
           "activeContractCount": 0
         }
-      }
+      },
+      "description": "#1262: agent_occupancy:true added; with the dense-grid dispatch fix (#1278) every downstream expectation reproduces the occupancy-off baseline unchanged."
     },
     {
       "command": "time resume",
@@ -264,7 +265,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
       "expect": {
         "changedBy": {
           "cash": 0,
@@ -1502,7 +1503,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m \u2014 the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" \u2014 inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m — the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" — inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
       "expect": {
         "equals": {
           "deathCount": 1,

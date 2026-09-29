@@ -1,6 +1,6 @@
 {
   "name": "survey-then-blast",
-  "description": "Seismic survey → confidence overlay → blast → ore report. Validates survey confidence overlay rendering before and after detonation. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext(), so the overlay never appears in screenshots.",
+  "description": "Seismic survey \u2192 confidence overlay \u2192 blast \u2192 ore report. Validates survey confidence overlay rendering before and after detonation. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext(), so the overlay never appears in screenshots.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow cash:200000",
+      "command": "campaign start level:dusty_hollow cash:200000 agent_occupancy:true",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:200000"
+          "command": "campaign start level:dusty_hollow cash:200000 agent_occupancy:true"
         }
       ],
       "role": "setup",
@@ -31,7 +31,8 @@
         "increased": [
           "worldSizeX"
         ]
-      }
+      },
+      "description": "#1261: added `agent_occupancy:true` to this campaign start. Known limitation (per #1261's own per-file plan): `campaignStartCommand` (src/console/commands/campaign.ts) does not yet parse `agent_occupancy:` -- a companion fix is landing separately on the impl branch (campaign.ts will call `parseStaffedAndOccupancyFlags(named)` instead of the narrower `parseStaffedFlag`, mirroring sandbox.ts/world.ts's existing pattern, and set `agentOccupancyEnabled` on the created state). Until that lands, running this file does NOT actually exercise occupancy -- this is a best-effort edit and the wait_until conversions below are verified structurally only (they pass today because occupancy is silently not active, not because the underlying dispatch/timing was re-derived under it). Final verification -- confirming occupancy is actually active, and that this file's own tight ~8-tick worker-revolt margin (see the drill_plan/tick-50 steps' own notes) still holds once it is -- happens once the campaign.ts fix is merged in."
     },
     {
       "command": "time resume",
@@ -165,7 +166,7 @@
         "equals": {
           "surveyCount": 0
         },
-        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
+        "note": "arrival-gated (#437) \u2014 queued and paid for, not yet completed"
       }
     },
     {
@@ -328,7 +329,7 @@
         "equals": {
           "surveyCount": 1
         },
-        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
+        "note": "arrival-gated (#437) \u2014 queued and paid for, not yet completed"
       }
     },
     {
@@ -628,52 +629,16 @@
       "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs working it in parallel. #554-followup (issue #586 CI, real failure): shrunk further from 9 holes (3x3) to 4 (2x2) -- real interaction-mode CI proved this file's own wellBeing (pinned at 0 with no living_quarters anywhere in the file, ScoreManager.ts's applyDecay deliberately keeps a score at exactly 0 there until direct intervention, per level1-lose-revolt.integration.test.ts's own documented design) crosses REVOLT_TICKS (120 consecutive ticks at 0, WorkerRevolt.ts) before the file's own player-facing sequence/blast steps can run once charging (#554: real, queued work, not instant) is added on top of drilling's own already-tight ~300-tick budget -- command mode's identical trace revolts too (sandbox-confirmed via direct state inspection: `revolted:true` by tick ~305-310 in both modes), it just never surfaced there because command mode has no DOM for the revolt's level-end overlay to block. Not a timing/chunking bug like the sibling fixes elsewhere this session -- the crew's own wellbeing budget was already spent by the time #554's charging needed it. 9 holes with 2 parallel drillers left ~40 real ticks of charging work needed past a ~305-tick deadline; 4 holes cuts both drilling and charging time roughly in half, landing comfortably inside the deadline instead of gambling the margin closer."
     },
     {
-      "command": "tick 50",
-      "description": "#553 follow-up: drain the ordered plan in bounded chunks rather than one large tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. #554-followup (issue #586 CI, real failure): this file's own wellBeing pins at exactly 0 partway through drilling (no living_quarters anywhere in the file) and ScoreManager.ts's applyDecay deliberately never lets a score at exactly 0 climb back up on its own (level1-lose-revolt.integration.test.ts documents this as intentional) -- so once REVOLT_TICKS (120 consecutive ticks at 0, WorkerRevolt.ts) elapses, revolt is unavoidable regardless of what commands run next. Sandbox-confirmed this file's original 9-hole/6-chunk drilling wait plus the charge-drain wait below already crossed that deadline in BOTH modes (`revolted:true` by tick ~305-310) -- command mode's own scenario-test run never surfaced it because it has no DOM for the revolt's level-end overlay to block, only interaction mode's real click on the sequence step below does. Shrinking the grid from 9 holes to 4 (see the drill_plan step's own note) was the real fix; trimmed from 6 chunks (225 nominal ticks, 75 of them dead padding past actual completion) to 3 -- sandbox-measured, 4 holes with two parallel drillers land exactly here, comfortably inside the revolt deadline instead of padding into it.",
+      "command": "wait_until field:holeCount equals:4 max_ticks:400",
+      "description": "#1261: collapsed the 3-chunk fixed `tick 50` drilling pad (predating waitUntil's auto-event-resolution fix, #601/#631) into a single wait_until on holeCount. Structurally verified only (occupancy is not actually active yet in command mode -- see the campaign start step's own note); this file's own ~8-tick worker-revolt margin needs re-checking once campaign.ts's agent_occupancy parsing lands.",
+      "timeout": 100,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 4,
+          "maxTicks": 400,
+          "timeoutMs": 100000
         }
       ],
       "role": "setup",
@@ -683,16 +648,6 @@
           "holeCount": 4
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -720,40 +675,17 @@
       }
     },
     {
-      "command": "tick 10",
-      "description": "#554-followup round 2 (issue #586 CI): the earlier fix here (a real-time waitUntil, then 6 chunked tick-10/event-choose-0 rounds sized for the original 9-hole grid) treated this as a timing/convergence problem, but sandbox-inspection of live game state proved both modes actually revolt around tick ~305-310 regardless -- this file's own wellBeing pins at exactly 0 partway through drilling (no living_quarters anywhere in the file) and ScoreManager.ts's applyDecay deliberately never lets a score at exactly 0 recover on its own (level1-lose-revolt.integration.test.ts documents this as intentional design, not a bug), so once REVOLT_TICKS (120 consecutive ticks at 0) elapses, revolt is unavoidable no matter how the remaining ticks are chunked. The drill_plan step's own note has the real fix (9 holes -> 4), which lands drilling with real margin before the deadline; trimmed this charge-drain to match -- sandbox-measured, 4 holes charge in 20 ticks from here, comfortably inside the deadline instead of the original 60-tick budget that used to pad straight through it.",
+      "command": "wait_until field:chargedCount equals:4 max_ticks:300",
+      "description": "#1261: collapsed the 3-chunk fixed `tick 10` charging pad into a single wait_until on chargedCount, same reasoning as the drilling wait above.",
+      "timeout": 90,
       "interaction": [
-        { "type": "command", "command": "tick 10" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        { "type": "command", "command": "tick 10" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        { "type": "command", "command": "tick 10" }
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 4,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
       ],
       "role": "setup",
       "expect": {
@@ -766,7 +698,9 @@
     {
       "command": "event choose 0",
       "interaction": [
-        { "type": "resolveEventIfPending" }
+        {
+          "type": "resolveEventIfPending"
+        }
       ],
       "role": "player",
       "commandOutcome": "either"
