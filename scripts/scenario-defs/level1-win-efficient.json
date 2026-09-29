@@ -1414,10 +1414,10 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 20.292499999999976,
+          "wellBeing": 16.377499999999984,
           "safety": 50,
-          "ecology": 46.44,
-          "nuisance": 41.1
+          "ecology": 46.43,
+          "nuisance": 41.075
         },
         "changedBy": {
           "tickCount": 0
@@ -1440,10 +1440,10 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 20.292499999999976,
+          "wellBeing": 16.377499999999984,
           "safety": 50,
-          "ecology": 46.44,
-          "nuisance": 41.1
+          "ecology": 46.43,
+          "nuisance": 41.075
         },
         "changedBy": {
           "tickCount": 0
@@ -2681,9 +2681,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 0,
+          "safety": 10.519999999999971,
           "ecology": 50,
-          "nuisance": 48.72000000000029
+          "nuisance": 48.60500000000029
         }
       }
     },
@@ -2704,9 +2704,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 0,
+          "safety": 10.519999999999971,
           "ecology": 50,
-          "nuisance": 48.72000000000029
+          "nuisance": 48.60500000000029
         }
       }
     },
@@ -2727,9 +2727,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 0,
+          "safety": 10.519999999999971,
           "ecology": 50,
-          "nuisance": 48.72000000000029,
+          "nuisance": 48.60500000000029,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
