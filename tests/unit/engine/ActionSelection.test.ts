@@ -816,12 +816,12 @@ describe('selectBestActionForEmployee', () => {
     const claimableIds = new Set<number>([...claimableUnreachable.map(c => c.id), claimableReachable.id]);
     const isClaimable = (action: PendingAction): boolean => claimableIds.has(action.id);
 
-    // resolveActionCost's real-cost resolution goes through findExactPath
-    // (#1109), not findPath directly, so that's the call this spy must
-    // observe — spying on findPath itself would miss it, since findExactPath
-    // calls findPath as an internal same-module reference vi.spyOn can't
-    // intercept.
-    const exactPathSpy = vi.spyOn(PathfindingModule, 'findExactPath');
+    // resolveActionCost's real-cost resolution goes through
+    // findFootPathWithVehicleFallback (#1286), not findExactPath directly, so
+    // that's the call this spy must observe — spying on findExactPath itself
+    // would miss it, since findFootPathWithVehicleFallback calls findExactPath
+    // as an internal same-module reference vi.spyOn can't intercept.
+    const exactPathSpy = vi.spyOn(PathfindingModule, 'findFootPathWithVehicleFallback');
 
     const result = selectBestActionForEmployee(
       state, emp, [...unclaimable, ...claimableUnreachable, claimableReachable], isClaimable,
@@ -874,8 +874,9 @@ describe('selectBestActionForEmployee', () => {
     const farReachable = makeAction({ id: 100, targetX: 0, targetZ: 25 });
 
     // See the #611 test above: resolveActionCost's real resolution goes
-    // through findExactPath, so the spy targets that, not findPath itself.
-    const exactPathSpy = vi.spyOn(PathfindingModule, 'findExactPath');
+    // through findFootPathWithVehicleFallback, so the spy targets that, not
+    // findExactPath itself.
+    const exactPathSpy = vi.spyOn(PathfindingModule, 'findFootPathWithVehicleFallback');
 
     const result = selectBestActionForEmployee(state, emp, [...nearUnreachable, farReachable]);
 

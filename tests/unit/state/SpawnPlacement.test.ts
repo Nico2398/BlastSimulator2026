@@ -3,7 +3,7 @@ import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.
 import { placeStartingCrew, isVehicleRouteAcceptable } from '../../../src/core/state/SpawnPlacement.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
-import { CREW_SPAWN_VEHICLE_SEPARATION } from '../../../src/core/config/balance.js';
+import { CREW_SPAWN_VEHICLE_SEPARATION, CREW_SPAWN_AGENT_SEPARATION } from '../../../src/core/config/balance.js';
 import { isLicensedForRole } from '../../../src/core/engine/VehicleReservation.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 
@@ -225,6 +225,21 @@ describe('placeStartingCrew', () => {
         const a = vehicles[i]!, b = vehicles[j]!;
         expect(Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z)))
           .toBeGreaterThanOrEqual(CREW_SPAWN_VEHICLE_SEPARATION);
+      }
+    }
+  });
+
+  it('keeps starting employees CREW_SPAWN_AGENT_SEPARATION cells apart', () => {
+    const state = walledSite();
+
+    placeStartingCrew(state);
+
+    const employees = state.employees.employees;
+    for (let i = 0; i < employees.length; i++) {
+      for (let j = i + 1; j < employees.length; j++) {
+        const a = employees[i]!, b = employees[j]!;
+        expect(Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z)))
+          .toBeGreaterThanOrEqual(CREW_SPAWN_AGENT_SEPARATION);
       }
     }
   });
