@@ -3,11 +3,11 @@
   "description": "Level 1 (Dusty Hollow): 4 small blasts and 2 contract attempts -- named for a conservative win, but no hauling infrastructure means no delivery ever succeeds; see Findings #52-#53 for why the real trajectory (a net cash loss, well short of the $80k target) was originally asserted instead of the named outcome. #553: drilling now requires a licensed driller and a drill_rig, so exactly one vehicle is now bought where the file previously bought none -- the file's own point (no hauling infrastructure, so no delivery ever succeeds) is unchanged, but the real trajectory is far worse: the single rig ends up parked on the pattern it just drilled when the first blast fires (same mechanic tutorial-playthrough documents) and is destroyed, and because this file never buys a replacement, the remaining 3 drill_plan calls only ever order ghost holes nothing can claim. #593: the driller dies alongside the rig in that same first blast (releaseVehicleReservation now correctly syncs the dismounting driver's position to the vehicle's actual location instead of leaving it frozen at the boarding point) -- deathCount ends the run at 1, and payroll/fuel drain stops at tick ~50 rather than running the whole level. Combined with the same unlucky contract-expiry fines Findings #52-#53 already documented, the level still ends deeply in the red -- see the final campaign status step.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow agent_occupancy:true",
+      "command": "campaign start level:dusty_hollow",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow agent_occupancy:true"
+          "command": "campaign start level:dusty_hollow"
         }
       ],
       "role": "setup",
@@ -20,7 +20,7 @@
           "activeContractCount": 0
         }
       },
-      "description": "#1262: agent_occupancy:true added; with the dense-grid dispatch fix (#1278) every downstream expectation reproduces the occupancy-off baseline unchanged."
+      "description": "#1262: agent occupancy turned on for this file; with the dense-grid dispatch fix (#1278) every downstream expectation reproduces the occupancy-off baseline unchanged."
     },
     {
       "command": "time resume",

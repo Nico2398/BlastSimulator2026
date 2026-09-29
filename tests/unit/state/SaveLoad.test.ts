@@ -1137,8 +1137,8 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 25', () => {
-    expect(SAVE_VERSION).toBe(25);
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1200,8 +1200,8 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 25', () => {
-    expect(SAVE_VERSION).toBe(25);
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1281,8 +1281,8 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // to the fragment, mid-break, or never hauling at all) gets `payload: null`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 25', () => {
-    expect(SAVE_VERSION).toBe(25);
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {
@@ -1374,8 +1374,8 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 // truth since v19) left exactly as they were.
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
-  it('SAVE_VERSION is 25', () => {
-    expect(SAVE_VERSION).toBe(25);
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
   });
 
   it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
@@ -1460,8 +1460,8 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
 // taken mid vehicle-gated action doesn't forget which vehicle it claimed.
 
 describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
-  it('SAVE_VERSION is 25', () => {
-    expect(SAVE_VERSION).toBe(25);
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
   });
 
   it('a v21 vehicle with reservedForActionId set migrates its reservation into VehicleState.reservations, with none of the seven other fields on the restored Vehicle', () => {
@@ -1608,8 +1608,8 @@ describe('serialize — walk trail is transient (#1199)', () => {
 // locomotion put them.
 
 describe('deserialize — v23→v24 migration for building occupancy (#1202)', () => {
-  it('SAVE_VERSION is 25', () => {
-    expect(SAVE_VERSION).toBe(25);
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
   });
 
   it('a pre-v24 save loads with every building empty and everyone outside', () => {
@@ -1652,8 +1652,8 @@ describe('deserialize — v23→v24 migration for building occupancy (#1202)', (
 // `pendingTrainingState: null`.
 
 describe('deserialize — v24→v25 migration for training walk-in (#1203)', () => {
-  it('SAVE_VERSION is 25', () => {
-    expect(SAVE_VERSION).toBe(25);
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
   });
 
   it('a pre-v25 save loads with every employee\'s pendingTrainingState defaulted to null', () => {
@@ -1679,5 +1679,42 @@ describe('deserialize — v24→v25 migration for training walk-in (#1203)', () 
 
     expect(restored.employees.employees.find(e => e.id === employee.id)!.pendingTrainingState)
       .toEqual({ buildingId: 7, skill: 'blasting', ticksRemaining: 20, fee: 300 });
+  });
+});
+
+// ── v25→v26 migration for agentOccupancyEnabled removal (#1207) ─────────────
+//
+// GameState.agentOccupancyEnabled is gone — ground-cell occupancy is
+// unconditional now, so the flag carries nothing forward. A pre-v26 save
+// may still have it set to either true or false; the migration strips it
+// unconditionally.
+
+describe('deserialize — v25→v26 migration for agentOccupancyEnabled removal (#1207)', () => {
+  it('SAVE_VERSION is 26', () => {
+    expect(SAVE_VERSION).toBe(26);
+  });
+
+  it('a pre-v26 save with agentOccupancyEnabled: true loads with the field stripped', () => {
+    const state = createGame({ seed: 42 });
+
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    parsed['version'] = 25;
+    parsed['agentOccupancyEnabled'] = true;
+
+    const restored = deserialize(JSON.stringify(parsed)) as unknown as Record<string, unknown>;
+
+    expect(restored['agentOccupancyEnabled']).toBeUndefined();
+  });
+
+  it('a pre-v26 save with agentOccupancyEnabled: false loads with the field stripped', () => {
+    const state = createGame({ seed: 42 });
+
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    parsed['version'] = 25;
+    parsed['agentOccupancyEnabled'] = false;
+
+    const restored = deserialize(JSON.stringify(parsed)) as unknown as Record<string, unknown>;
+
+    expect(restored['agentOccupancyEnabled']).toBeUndefined();
   });
 });

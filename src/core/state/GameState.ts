@@ -5,7 +5,6 @@ import {
   STARTING_CASH,
   STARTING_SITE_STAFFED_COMPOSITION,
   SPAWN_TILE_SPACING,
-  AGENT_OCCUPANCY_ENABLED_DEFAULT,
 } from '../config/balance.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
@@ -134,7 +133,7 @@ import type { RampDef } from '../mining/Ramp.js';
 // so the course now starts on arrival rather than at claim time). A pre-v25
 // save has no pending enrolment in flight: every employee missing the field
 // gets `pendingTrainingState: null`. See SaveLoad.ts's migrateV24ToV25.
-export const SAVE_VERSION = 25;
+export const SAVE_VERSION = 26;
 
 export interface GameConfig {
   seed: number;
@@ -152,8 +151,6 @@ export interface GameConfig {
   scoreDecayRate?: number;
   /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
   staffed?: boolean;
-  /** Opt-in override for `AGENT_OCCUPANCY_ENABLED_DEFAULT` (#1206). Omitted uses the balance default. */
-  agentOccupancyEnabled?: boolean;
 }
 
 /** The type of action a player has issued, waiting for an employee to execute. */
@@ -330,13 +327,7 @@ export interface GameState {
   /** Navigation grid derived from the voxel surface, buildings, and drill holes. Null until built. */
   navGrid: NavGrid | null;
 
-  /**
-   * Whether ground-cell occupancy (#1206) is enforced this game — defaults to
-   * `AGENT_OCCUPANCY_ENABLED_DEFAULT` (off), overridable via the `debug
-   * occupancy on|off` console command.
-   */
-  agentOccupancyEnabled: boolean;
-  /** The shared ground-cell occupancy index (#1206), or null while the feature is off/not yet built. */
+  /** The shared ground-cell occupancy index (#1206), lazily built on first use. */
   agentOccupancy: AgentOccupancy | null;
 
   /** Set of surveyed column keys "x,z". */
@@ -515,7 +506,6 @@ export function createGame(config: GameConfig): GameState {
     mineType: config.mineType ?? 'desert',
     world: null,
     navGrid: null,
-    agentOccupancyEnabled: config.agentOccupancyEnabled ?? AGENT_OCCUPANCY_ENABLED_DEFAULT,
     agentOccupancy: null,
     surveyedPositions: new Set(),
     surveyResults: [],

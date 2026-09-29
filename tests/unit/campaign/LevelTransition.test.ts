@@ -5,7 +5,6 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
-import { AGENT_OCCUPANCY_ENABLED_DEFAULT } from '../../../src/core/config/balance.js';
 
 describe('Level completion and transition (7.3)', () => {
   it('profit reaching threshold triggers level complete flag', () => {
@@ -96,41 +95,6 @@ describe('Level completion and transition (7.3)', () => {
     const level3 = getAllLevels()[2]!;
     // Level 3 (grumpstone_ridge) is locked at start
     expect(createGameForLevel(campaign, level3.id)).toBeNull();
-  });
-
-  // ── agentOccupancy param (#1263) — mirrors new_game/sandbox start's own
-  // opt-in (#1206): createGameForLevel's 4th param must reach
-  // GameState.agentOccupancyEnabled the same way GameConfig.agentOccupancyEnabled
-  // does for createGame.
-
-  it('createGameForLevel(..., agentOccupancy: true) enables agent occupancy on the resulting state', () => {
-    const campaign = createCampaignState();
-    const level = getAllLevels()[0]!;
-
-    const newState = createGameForLevel(campaign, level.id, false, true);
-
-    expect(newState).not.toBeNull();
-    expect(newState!.agentOccupancyEnabled).toBe(true);
-  });
-
-  it('createGameForLevel(..., agentOccupancy: false) disables agent occupancy on the resulting state', () => {
-    const campaign = createCampaignState();
-    const level = getAllLevels()[0]!;
-
-    const newState = createGameForLevel(campaign, level.id, false, false);
-
-    expect(newState).not.toBeNull();
-    expect(newState!.agentOccupancyEnabled).toBe(false);
-  });
-
-  it('createGameForLevel falls back to AGENT_OCCUPANCY_ENABLED_DEFAULT when agentOccupancy is omitted', () => {
-    const campaign = createCampaignState();
-    const level = getAllLevels()[0]!;
-
-    const newState = createGameForLevel(campaign, level.id);
-
-    expect(newState).not.toBeNull();
-    expect(newState!.agentOccupancyEnabled).toBe(AGENT_OCCUPANCY_ENABLED_DEFAULT);
   });
 
   it('continuing after completion allows further play (threshold check idempotent)', () => {

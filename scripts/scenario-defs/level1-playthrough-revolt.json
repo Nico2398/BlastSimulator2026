@@ -3,11 +3,11 @@
   "description": "Level 1 worker revolt scenario: aggressive krackle blasts, no well-being buildings, long tick cycles with events to trigger worker rebellion",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow staffed:true agent_occupancy:true",
+      "command": "campaign start level:dusty_hollow staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:true agent_occupancy:true"
+          "command": "campaign start level:dusty_hollow staffed:true"
         }
       ],
       "description": "#553: staffed:true hires and equips, for free, employee #1 driller (blasting lvl1, driving.drill_rig lvl1) through #5 driver, plus vehicles #1 drill_rig through #4 rock_fragmenter (all unmanned). Cost is free -- does not change starting cash. The file's own 7 hand-hired employees below become #6-#12.",

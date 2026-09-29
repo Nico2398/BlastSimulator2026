@@ -3,12 +3,12 @@
   "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbor Nuisance scores (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000 agent_occupancy:true",
+      "command": "new_game seed:42 cash:150000",
       "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's own terrain snapped a fresh hire/vehicle purchase's grid-centre spawn (findNearestReachableCell, blocked by relief terrain at the literal centre) to a reachable cell over 60 tiles from this file's drill site, which stalled the driller in permanent collapse/rest cycling and never let a single hole land (sandbox-measured, worker_revolt by tick 400 with zero progress). new_game's flat desert_badlands terrain has no such obstruction. Cash bumped to $150,000 (from dusty_hollow's $50,000) for the drill_rig ($35,000) this file now needs on top of its existing hire/building spend.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000 agent_occupancy:true"
+          "command": "new_game seed:42 cash:150000"
         }
       ],
       "role": "setup",

@@ -1,13 +1,13 @@
 {
   "name": "ramp-foot-traffic",
-  "description": "#1206 (agent occupancy on foot — ground-cell reservation): dig a RAMP_WIDTH=3 ramp, then dispatch 6 on-foot employees down it at once. Turns on the new occupancy check via `new_game ... agent_occupancy:true`, then asserts every employee reaches the far end within a bounded tick budget with nobody left stuck. GAP for the implementer/orchestrator: there is no generic per-tick 'no two agents share a ground cell' harness assertion today (no such field in state-schema-definitions.ts/console-api.ts, and neither `expect` nor a scenario step type expresses it) — this file's own assertions (stuckEmployeeCount:0, pendingActionCount:0, employeeCount unchanged) are the closest proxy available without inventing new harness surface, which is out of scope for a scenario-definition-only change. A direct per-tick occupancy assertion, if wanted, is a state-schema/console-api addition for a follow-up issue, not this one.",
+  "description": "#1206 (agent occupancy on foot — ground-cell reservation): dig a RAMP_WIDTH=3 ramp, then dispatch 6 on-foot employees down it at once, exercising the unconditional occupancy check, then asserts every employee reaches the far end within a bounded tick budget with nobody left stuck. GAP for the implementer/orchestrator: there is no generic per-tick 'no two agents share a ground cell' harness assertion today (no such field in state-schema-definitions.ts/console-api.ts, and neither `expect` nor a scenario step type expresses it) — this file's own assertions (stuckEmployeeCount:0, pendingActionCount:0, employeeCount unchanged) are the closest proxy available without inventing new harness surface, which is out of scope for a scenario-definition-only change. A direct per-tick occupancy assertion, if wanted, is a state-schema/console-api addition for a follow-up issue, not this one.",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true agent_occupancy:true",
+      "command": "new_game seed:42 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true agent_occupancy:true"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
@@ -18,7 +18,7 @@
           "vehicleCount": 4,
           "employeeCount": 5
         },
-        "note": "staffed:true (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) grants the roster/fleet for free at game-open, including the two driving.excavator drivers and the rock_digger this scenario needs to carve the ramp below. agent_occupancy:true turns on the ground-cell occupancy check this scenario exercises."
+        "note": "staffed:true (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) grants the roster/fleet for free at game-open, including the two driving.excavator drivers and the rock_digger this scenario needs to carve the ramp below. The ground-cell occupancy check this scenario exercises is unconditional."
       }
     },
     {

@@ -191,10 +191,9 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // fleet — exactly the roster/fleet automatic haul dispatch needs, with
     // no vehicle pre-assigned to anyone.
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled flag —
-    // this test's multiple staffed drivers self-organizing an automatic haul
-    // is exactly the multi-agent shape the flag governs.
-    ctx.state!.agentOccupancyEnabled = true;
+    // #1264: this test's multiple staffed drivers self-organizing an
+    // automatic haul is exactly the multi-agent shape agent occupancy
+    // governs — unconditional since #1207.
     expect(run('build freight_warehouse at:6,9').success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
     // drill_plan grid now queues one drill_hole PendingAction per hole
@@ -863,11 +862,9 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
 
     expect(run('campaign start level:tutorial_pit').success).toBe(true);
     const state = ctx.state!;
-    // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled flag —
-    // this full playthrough's whole crew (surveyor, driller, blaster,
+    // #1264: this full playthrough's whole crew (surveyor, driller, blaster,
     // drivers) converging on shared holes/hauls end to end is exactly the
-    // multi-agent shape the flag governs.
-    state.agentOccupancyEnabled = true;
+    // multi-agent shape agent occupancy governs — unconditional since #1207.
     const stagnation: StagnationTracker = { lastStoredMassKg: -1, lastCompletedCount: -1, stagnantTicks: 0 };
 
     for (const step of TUTORIAL_STEPS) {

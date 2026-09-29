@@ -3,11 +3,11 @@
   "description": "Chapter 5: 3 catastrophic overcharge blasts crater nuisance and ecology scores. Finding #9: the file's original premise (\"exceed vibration budget 3 times... verify $5,000 fine is applied\") has no implementation anywhere in the codebase to test — recordVibration (ScoreManager.ts) only moves nuisance/ecology, no budget counter or cash fine exists, and no event/campaign rule ties one to blast count either. That claim is dropped here in favor of the real, checkable effect (nuisance/ecology cratering); whether a real fine mechanic should exist is a game-design question, out of scope for a test-assertion pass — filed as a follow-up, not silently implemented.",
   "steps": [
     {
-      "command": "new_game seed:42 agent_occupancy:true",
+      "command": "new_game seed:42",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 agent_occupancy:true"
+          "command": "new_game seed:42"
         }
       ],
       "role": "setup",
@@ -19,12 +19,12 @@
       }
     },
     {
-      "command": "new_game seed:42 size:96 cash:400000 agent_occupancy:true",
+      "command": "new_game seed:42 size:96 cash:400000",
       "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill sites to add real travel time on top of an already-long 3-cycle file (campaign start has no staffed:true equivalent, and staffed:true itself doesn't fit here either -- see the drill_plan step below). size:96 keeps this step's original point (a bigger world than the plain new_game default above) without the campaign wrapper. Cash bumped to $250,000, then to $400,000 (#557): 3 catastrophic blasts each need a fresh driller+drill_rig (see below), $36,000 a cycle, on top of payroll/upkeep during 3 separate drilling waits -- #557's own crew-geometry fix (see the living_quarters build step, now after blast 1) hires employee #3 a full cycle earlier than before and stretches the file's own tickCount well past its pre-#557 figure (999 -> 1481, see the final finances step's own note), so payroll/upkeep now runs for materially longer; $250,000 was no longer enough headroom to reach grid 3's own vehicle purchase without a real, traced insufficient-funds stall, and $350,000 (the first bump tried) still finished the file $2,834 short of solvent (direct-traced) -- $400,000 clears grid 3's own purchase with real margin and ends the file solvent.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:96 cash:400000 agent_occupancy:true"
+          "command": "new_game seed:42 size:96 cash:400000"
         }
       ],
       "role": "setup",

@@ -19,7 +19,7 @@ import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
-import { staffedSuffix, parseStaffedAndOccupancyFlags } from './commandUtils.js';
+import { staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
@@ -63,7 +63,7 @@ export function sandboxCommand(
     return { success: false, output: t('sandbox.unknown_difficulty', { difficulty: requested.difficulty, valid }) };
   }
 
-  const flags = parseStaffedAndOccupancyFlags(named);
+  const flags = parseStaffedFlag(named['staffed']);
   if (flags.error) {
     return { success: false, output: flags.error };
   }
@@ -78,7 +78,6 @@ export function sandboxCommand(
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
     ...(flags.staffed ? { staffed: true } : {}),
-    ...(flags.agentOccupancy !== undefined ? { agentOccupancyEnabled: flags.agentOccupancy } : {}),
   });
   ctx.state.world = createWorldState(level.gridX, level.datum, level.gridZ, true);
 

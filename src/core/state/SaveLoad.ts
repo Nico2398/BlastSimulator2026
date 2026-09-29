@@ -453,6 +453,17 @@ function migrateV24ToV25(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v25 -> v26 (#1207): `GameState.agentOccupancyEnabled` is gone — ground-cell
+ * occupancy is unconditional now, so the flag carries nothing forward. Strip
+ * it if present. Mutates `obj` in place, matching every other migration
+ * block in `deserialize` below.
+ */
+function migrateV25ToV26(obj: Record<string, unknown>): Record<string, unknown> {
+  delete obj['agentOccupancyEnabled'];
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -696,6 +707,11 @@ export function deserialize(json: string): GameState {
     migrateV24ToV25(obj);
   }
 
+  // v25 -> v26: GameState.agentOccupancyEnabled removed (#1207).
+  if ((obj['version'] as number) < 26) {
+    migrateV25ToV26(obj);
+  }
+
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The
   // loader is responsible for rebuilding a real one.
@@ -704,7 +720,7 @@ export function deserialize(json: string): GameState {
   // #1206: agentOccupancy is never part of the JSON (see serialize's
   // replacer) — always null here, regardless of what an older save happened
   // to carry. tickLocomotion rebuilds it from live state the first tick it
-  // runs while agentOccupancyEnabled is true and agentOccupancy is null.
+  // runs while agentOccupancy is null.
   (obj as Record<string, unknown>)['agentOccupancy'] = null;
 
   return obj as unknown as GameState;
