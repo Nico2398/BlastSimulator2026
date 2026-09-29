@@ -262,6 +262,35 @@ export function pathCrossesFragmentOccupancy(
   return waypoints.some(wp => (grid.cellAt(wp.x, wp.z)?.fragmentOccupancy ?? 0) > 0);
 }
 
+export interface FootPathFallbackResult extends PathResult {
+  /**
+   * True when the vehicle-avoiding attempt failed and this route is the
+   * relaxed (avoidVehicles: false) fallback that does not cross fragment
+   * debris — false for a strict avoid-vehicles success, or when neither
+   * attempt produced a usable route (`found` is then also false).
+   */
+  crossedVehicles: boolean;
+}
+
+/**
+ * Attempts a foot-agent route with `request.avoidVehicles` honored; on
+ * failure, retries with vehicles unavoidable and rejects the relaxed route if
+ * it crosses fragment debris (`pathCrossesFragmentOccupancy`). Shared by
+ * PlanItinerary's cost estimation (exact: true) and Locomotion's runtime
+ * execution (exact: false).
+ */
+export function findFootPathWithVehicleFallback(
+  grid: NavGrid,
+  request: PathRequest,
+  exact: boolean,
+): FootPathFallbackResult {
+  void grid;
+  void request;
+  void exact;
+  // TODO: implement
+  return undefined as unknown as FootPathFallbackResult;
+}
+
 /**
  * The connected run of clearance-insufficient cells touching (`x`, `z`) —
  * null when (`x`, `z`) already has sufficient clearance itself, so the
