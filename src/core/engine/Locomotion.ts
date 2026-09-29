@@ -494,7 +494,7 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     const footResult = findFootPathWithVehicleFallback(
       state.navGrid,
       { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles },
-      false,
+      false /* exact */,
     );
     path = footResult;
     if (footResult.crossedVehicles) {

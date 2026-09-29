@@ -188,9 +188,9 @@ export function estimateLegDistance(
  * quietly relax the #954/#1090 guard that keeps a genuinely
  * fragment-boxed-in employee reading as unreachable (`ActionSelection.test.ts`'s
  * own regression test for that guard) — 'estimate' fidelity has no real
- * waypoints to check and so never takes this fallback at all (its own
- * `estimateLegDistance` branch already returns a heuristic distance
- * unconditionally, never null).
+ * waypoints to check and so never takes this fallback at all (this function's
+ * own early-return branch calls `octileHeuristic` directly and returns a
+ * heuristic distance unconditionally, never null).
  */
 function estimateFootLegDistance(
   state: GameState,
@@ -206,7 +206,7 @@ function estimateFootLegDistance(
 
   const avoidVehicles = !isDestinationOccupied(state, toX, toZ);
   const path = findFootPathWithVehicleFallback(
-    state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance }, true,
+    state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance }, true /* exact */,
   );
   return path.found ? path.totalCost : null;
 }
