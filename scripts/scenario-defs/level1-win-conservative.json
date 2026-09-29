@@ -4,7 +4,6 @@
   "steps": [
     {
       "command": "campaign start level:dusty_hollow agent_occupancy:true",
-      "description": "#1262: added `agent_occupancy:true` (batch B migration, following #1261/PR #1280's method). Requires the companion `campaign.ts` fix (`parseStaffedAndOccupancyFlags` in place of `parseStaffedFlag`) landing on this same branch -- see PR body.",
       "interaction": [
         {
           "type": "command",
@@ -20,7 +19,8 @@
           "employeeCount": 0,
           "activeContractCount": 0
         }
-      }
+      },
+      "description": "#1262: agent_occupancy:true added; with the dense-grid dispatch fix (#1278) every downstream expectation reproduces the occupancy-off baseline unchanged."
     },
     {
       "command": "time resume",
@@ -265,7 +265,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
       "expect": {
         "changedBy": {
           "cash": 0,
@@ -1503,7 +1503,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m \u2014 the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" \u2014 inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m — the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" — inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1735,11 +1735,11 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "safety": 0,
+          "safety": 6.950000000000016,
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#554: with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down, and with zero living employees avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback). nuisance stays untouched at 50 -- this file's real trajectory only ever triggers a union event (cash/wellBeing only, no nuisance effect), not food_fest. ecology also stays at the fresh-game 50 -- the one real blast never registered a vibration hit, and the other three never fired at all. #554-followup (issue #586 CI): dropped `wellBeing` -- the earlier tick step's own event resolution can land on a different random event between modes (see that step's own note, a tick-seeded RNG draw whose event-pool weights are wellBeing-sensitive), each with its own wellBeing delta, so this checkpoint's exact value isn't pinnable across both modes any more. #1090-followup (sandbox-measured): safety re-measured 0 -> 6.95 -- VehicleContinuity.ts's deletion shifts the first contract's expiry 16 ticks earlier (see the tick-20 steps above), which leaves applyDecay (ScoreManager.ts) more real ticks to pull safety back off its post-death floor toward baseline before this checkpoint, where before it stayed pinned at 0 for this file's whole remaining run. #1262-followup (sandbox-measured, batch B occupancy migration): safety re-measured 6.95 -> 0 again -- under `agent_occupancy:true` the driller's own walk to the drill pattern takes genuinely longer (occupancy-aware pathing avoids the tile the vehicle already occupies rather than claiming it instantly), so the first blast that kills them lands at tick 74, not 65 (direct trace, both command-mode headless, fully deterministic and reproduced twice). That later accident tick leaves `recentAccidents` (ScoreManager.ts's 10-tick window) one tick longer overlapping the still-draining `-5`/tick hit before `hasSafetyEquipment`/building terms can offset it, landing safety at exactly 0.0 instead of the earlier trace's small positive remainder -- and `applyDecay`'s own `value > 0` guard (ScoreManager.ts) deliberately never lets a score parked at *exactly* 0 climb back toward neutral on its own, so it now stays pinned at the floor for the rest of this file's run instead of recovering to 6.95 by this checkpoint."
+        "note": "#554: with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down, and with zero living employees avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback). nuisance stays untouched at 50 -- this file's real trajectory only ever triggers a union event (cash/wellBeing only, no nuisance effect), not food_fest. ecology also stays at the fresh-game 50 -- the one real blast never registered a vibration hit, and the other three never fired at all. #554-followup (issue #586 CI): dropped `wellBeing` -- the earlier tick step's own event resolution can land on a different random event between modes (see that step's own note, a tick-seeded RNG draw whose event-pool weights are wellBeing-sensitive), each with its own wellBeing delta, so this checkpoint's exact value isn't pinnable across both modes any more. #1090-followup (sandbox-measured): safety re-measured 0 -> 6.95 -- VehicleContinuity.ts's deletion shifts the first contract's expiry 16 ticks earlier (see the tick-20 steps above), which leaves applyDecay (ScoreManager.ts) more real ticks to pull safety back off its post-death floor toward baseline before this checkpoint, where before it stayed pinned at 0 for this file's whole remaining run."
       }
     },
     {
@@ -1760,9 +1760,8 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "safety": 0
-        },
-        "note": "#1262-followup: re-derived 6.95 -> 0, same occupancy-shifted-accident-tick mechanism as the `scores` checkpoint above."
+          "safety": 6.950000000000016
+        }
       }
     },
     {
@@ -1780,13 +1779,13 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "safety": 0,
+          "safety": 6.950000000000016,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null,
           "surveyCount": 0
         },
-        "note": "#1262-followup: `safety` re-derived 6.95 -> 0, same occupancy-shifted-accident-tick mechanism as the `scores` checkpoint above. #554, superseding the pre-#554 note this once carried: charging is now queued, real work (the wait_until step drains the first pattern's charge order before the file can proceed), which pushes every downstream tick later and reshuffles which contract ids are actually live in the pool when this file's three accept steps run (contract ids increment and roll out of the offered pool on their own refresh clock, CONTRACT_REFRESH_INTERVAL=20/CONTRACTS_PER_REFRESH=3, independent of anything this file does). All three accepted contracts land successfully here (#5 rubble, #7 blingite, #8 gloomium bulk), and two of the three expire before the final checkpoint: #5 (rubble, $136 penalty) at tick 197 (#1090-followup, sandbox-measured: tick 181 now -- see the tick-5 step above), and #8 (gloomium bulk, $6,514 penalty) at tick 240 -- #7 (blingite, $2,919 penalty) never expires within this file's 240-tick run. Real costs this file pays are $1,000 to hire, $35,000 for the rig, and ~$60/tick combined payroll and fuel only for the ~50 ticks the driller is alive to draw them (the sole driller and drill_rig both die in the first blast -- see that step's own note), plus one random union event mid-file and the two contract-expiry fines above ($136 + $6,514 = $6,650 total). Command mode's own deterministic trace lands cash at $1,246 -- a real net loss of $48,754 against the level's $80,000 target, but still positive, not the deep negative the pre-#554 trace once described. bankrupt/levelEnded both stay false: cash never crosses below BANKRUPTCY_THRESHOLD ($5,000) for the required BANKRUPTCY_GRACE_TICKS (100 consecutive ticks) -- confirmed via direct trace. No ecological/revolt shutdown either -- the one real blast never moved ecology off the fresh-game baseline of 50, and nuisance never moves either (no food_fest event lands in this trajectory). #554-followup (issue #586 CI): `cash`/`wellBeing` dropped from equals -- the earlier union-event tick step can resolve a different random event between modes (that step's own note has the mechanism), which changes cash/wellBeing by a different amount than command mode's own $800/6-point trace without changing anything structural (contract counts, bankruptcy, level-end state all stay exactly as calibrated)."
+        "note": "#554, superseding the pre-#554 note this once carried: charging is now queued, real work (the wait_until step drains the first pattern's charge order before the file can proceed), which pushes every downstream tick later and reshuffles which contract ids are actually live in the pool when this file's three accept steps run (contract ids increment and roll out of the offered pool on their own refresh clock, CONTRACT_REFRESH_INTERVAL=20/CONTRACTS_PER_REFRESH=3, independent of anything this file does). All three accepted contracts land successfully here (#5 rubble, #7 blingite, #8 gloomium bulk), and two of the three expire before the final checkpoint: #5 (rubble, $136 penalty) at tick 197 (#1090-followup, sandbox-measured: tick 181 now -- see the tick-5 step above), and #8 (gloomium bulk, $6,514 penalty) at tick 240 -- #7 (blingite, $2,919 penalty) never expires within this file's 240-tick run. Real costs this file pays are $1,000 to hire, $35,000 for the rig, and ~$60/tick combined payroll and fuel only for the ~50 ticks the driller is alive to draw them (the sole driller and drill_rig both die in the first blast -- see that step's own note), plus one random union event mid-file and the two contract-expiry fines above ($136 + $6,514 = $6,650 total). Command mode's own deterministic trace lands cash at $1,246 -- a real net loss of $48,754 against the level's $80,000 target, but still positive, not the deep negative the pre-#554 trace once described. bankrupt/levelEnded both stay false: cash never crosses below BANKRUPTCY_THRESHOLD ($5,000) for the required BANKRUPTCY_GRACE_TICKS (100 consecutive ticks) -- confirmed via direct trace. No ecological/revolt shutdown either -- the one real blast never moved ecology off the fresh-game baseline of 50, and nuisance never moves either (no food_fest event lands in this trajectory). #554-followup (issue #586 CI): `cash`/`wellBeing` dropped from equals -- the earlier union-event tick step can resolve a different random event between modes (that step's own note has the mechanism), which changes cash/wellBeing by a different amount than command mode's own $800/6-point trace without changing anything structural (contract counts, bankruptcy, level-end state all stay exactly as calibrated)."
       }
     }
   ]
