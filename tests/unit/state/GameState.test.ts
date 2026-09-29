@@ -595,6 +595,36 @@ function makePeakAtOriginGrid(size: number, groundTopY: number, peakTopY: number
   return grid;
 }
 
+/**
+ * Two single-cell peaks flanking one shared gate cell at (gateX, peakZ), each
+ * peak walled off from every other main-ground neighbour by void (unset)
+ * cells, so the gate is each peak's unique, unambiguous nearest cell on the
+ * site's main body of ground — not merely the nearest among a tie. Without
+ * the claim/unclaim guard in `snapAgentsToNavigableGround`, an agent stranded
+ * on either peak resolves independently to that same gate cell.
+ */
+function makeTwinPeaksGrid(size: number, groundTopY: number, peakTopY: number, gateX: number, peakZ: number): VoxelGrid {
+  const grid = new VoxelGrid(size, size);
+  const peakAX = gateX - 1; // must be 0 so peak A has no west neighbour at all
+  const peakBX = gateX + 1;
+  // Void (unset) cells wall off every main-ground neighbour of each peak
+  // except the shared gate, so the gate is the unique distance-1 candidate
+  // for both — not one option among a tie.
+  const voidCells = new Set<string>([
+    `${peakAX},${peakZ - 1}`, `${peakAX},${peakZ + 1}`,
+    `${peakBX},${peakZ - 1}`, `${peakBX},${peakZ + 1}`, `${peakBX + 1},${peakZ}`,
+  ]);
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      if (voidCells.has(`${x},${z}`)) continue; // leave unset: NavGrid reads this as 'void'
+      const isPeak = (x === peakAX || x === peakBX) && z === peakZ;
+      const top = isPeak ? peakTopY : groundTopY;
+      for (let y = 0; y <= top; y++) grid.setVoxel(x, y, z, solidVoxel());
+    }
+  }
+  return grid;
+}
+
 describe('snapAgentsToNavigableGround', () => {
   it('moves an agent stranded on a peak onto ground it can actually walk', () => {
     const state = createGame({ seed: 42, staffed: true });
@@ -631,5 +661,31 @@ describe('snapAgentsToNavigableGround', () => {
 
     expect(() => snapAgentsToNavigableGround(state)).not.toThrow();
     expect(state.employees.employees[0]!.x).toBe(0);
+  });
+
+  it('spreads two agents stranded on separate peaks onto two different cells, not the one they would both converge on (#1263)', () => {
+    const state = createGame({ seed: 42, staffed: true });
+    const gateX = 1, peakZ = 5;
+    const grid = makeTwinPeaksGrid(12, 1, 1 + 10, gateX, peakZ);
+    buildGameNavGrid(state, grid, [], []);
+
+    const [agentA, agentB] = state.employees.employees;
+    agentA!.x = gateX - 1; agentA!.z = peakZ;
+    agentB!.x = gateX + 1; agentB!.z = peakZ;
+
+    // Confirms the fixture actually reproduces the collision before asserting
+    // the fix: each peak's independent, unclaimed nearest cell is the same
+    // single gate cell.
+    const naiveA = NavGrid.findNearestNavigableCell(state.navGrid!, agentA!.x, agentA!.z, false);
+    const naiveB = NavGrid.findNearestNavigableCell(state.navGrid!, agentB!.x, agentB!.z, false);
+    expect(naiveA).toEqual({ x: gateX, z: peakZ });
+    expect(naiveB).toEqual({ x: gateX, z: peakZ });
+
+    snapAgentsToNavigableGround(state);
+
+    for (const agent of [agentA!, agentB!]) {
+      expect(NavGrid.computeClimbReachableSet(state.navGrid!, agent.x, agent.z).size).toBeGreaterThan(1);
+    }
+    expect(`${agentA!.x},${agentA!.z}`).not.toBe(`${agentB!.x},${agentB!.z}`);
   });
 });
