@@ -284,11 +284,19 @@ export function findFootPathWithVehicleFallback(
   request: PathRequest,
   exact: boolean,
 ): FootPathFallbackResult {
-  void grid;
-  void request;
-  void exact;
-  // TODO: implement
-  return undefined as unknown as FootPathFallbackResult;
+  const pathfinder = exact ? findExactPath : findPath;
+  const attempt = pathfinder(grid, request);
+
+  if (attempt.found || !request.avoidVehicles) {
+    return { ...attempt, crossedVehicles: false };
+  }
+
+  const relaxed = pathfinder(grid, { ...request, avoidVehicles: false });
+  if (!relaxed.found || pathCrossesFragmentOccupancy(grid, relaxed.waypoints)) {
+    return { ...attempt, crossedVehicles: false };
+  }
+
+  return { ...relaxed, crossedVehicles: true };
 }
 
 /**

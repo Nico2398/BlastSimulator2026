@@ -17,7 +17,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
 import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
-import { findPath, pathCrossesFragmentOccupancy, type PathResult } from '../nav/Pathfinding.js';
+import { findPath, findFootPathWithVehicleFallback, type PathResult } from '../nav/Pathfinding.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { advanceAlongPath, NULL_ROUTE_COMMITMENT, type RouteCommitment } from '../nav/AgentAdvance.js';
 import { rebuildAgentOccupancy, reconcileAgentOccupancy, type Occupant, type AgentOccupancy } from '../nav/AgentOccupancy.js';
@@ -466,44 +466,43 @@ function advanceLeg(state: GameState, emp: Employee, leg: Leg, result: Locomotio
     else clearVehicleDetour(emp);
   }
 
-  let path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> } = detourPath
-    ?? (state.navGrid
-      ? findPath(state.navGrid, {
-          agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles,
-          ...(isDrive && { requiredClearance: vehicleRequiredClearanceCells(vehicle!) }),
-        })
-      : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] });
-
-  // #1263: a foot leg's vehicle-avoiding route may not exist at all — a
-  // single parked vehicle sitting in the one climb-legal corridor out of a
-  // region (#1151's slope gate can leave exactly one) blocks every route out
-  // regardless of how far the leg's own destination is from it. Falls back
-  // to routing through it, mirroring PlanItinerary.ts's own
-  // `estimateFootLegDistance` fallback (same issue, planning side) — without
-  // this, a leg claimed on the strength of that fallback's distance still
-  // re-derives the stricter vehicle-avoiding route here every tick, finds it
-  // still doesn't exist, and never moves: `isMoveStuck` latches true forever
-  // on an action nothing will ever un-stick, since the destination itself
-  // (unlike the already-handled `!isDestinationOccupied` case above) is
-  // perfectly free. Rejects a relaxed route that crosses fragment debris
-  // (`pathCrossesFragmentOccupancy`) — same reasoning as
-  // `estimateFootLegDistance`'s own identical check: this fallback treats a
-  // stationary VEHICLE as a soft obstacle, not fragment occupancy, and must
-  // not quietly relax the #954/#1090 fragment-boxed-in guard.
-  if (!isDrive && avoidVehicles && !path.found && state.navGrid) {
-    const relaxed = findPath(state.navGrid, {
-      agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles: false,
-    });
-    if (relaxed.found && !pathCrossesFragmentOccupancy(state.navGrid, relaxed.waypoints)) {
-      path = relaxed;
+  // Drive legs keep their own detour-aware routing untouched. Foot legs
+  // delegate to `findFootPathWithVehicleFallback` (Pathfinding.ts), which
+  // mirrors PlanItinerary.ts's own `estimateFootLegDistance`: a foot leg's
+  // vehicle-avoiding route may not exist at all — a single parked vehicle
+  // sitting in the one climb-legal corridor out of a region (#1151's slope
+  // gate can leave exactly one) blocks every route out regardless of how far
+  // the leg's own destination is from it — so it falls back to a route that
+  // may cross a vehicle's cell, rejecting one that crosses fragment debris
+  // (`pathCrossesFragmentOccupancy`, inside the shared helper) so the
+  // #954/#1090 fragment-boxed-in guard stays intact. `leg.crossesVehicles` is
+  // set sticky for the rest of this leg's life on a successful fallback (see
+  // that field's own doc comment, Itinerary.ts) — without this, the very next
+  // tick re-derives `avoidVehicles` fresh from the mover's new position above
+  // and can find the strict route "found" again from there, discarding this
+  // relaxed route's own in-flight RouteCommitment and oscillating.
+  let path: PathResult | { found: boolean; waypoints: Array<{ x: number; z: number }> };
+  if (isDrive) {
+    path = detourPath
+      ?? (state.navGrid
+        ? findPath(state.navGrid, {
+            agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles,
+            requiredClearance: vehicleRequiredClearanceCells(vehicle!),
+          })
+        : { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] });
+  } else if (state.navGrid) {
+    const footResult = findFootPathWithVehicleFallback(
+      state.navGrid,
+      { agentId: emp.id, fromX: driveFromX, fromZ: driveFromZ, toX: leg.destX, toZ: leg.destZ, avoidVehicles },
+      false,
+    );
+    path = footResult;
+    if (footResult.crossedVehicles) {
       avoidVehicles = false;
-      // Sticky for the rest of this leg's life (see `Leg.crossesVehicles`'s
-      // own doc comment, Itinerary.ts) — without this, the very next tick
-      // re-derives `avoidVehicles` fresh from the mover's new position above
-      // and can find the strict route "found" again from there, discarding
-      // this relaxed route's own in-flight RouteCommitment and oscillating.
       leg.crossesVehicles = true;
     }
+  } else {
+    path = { found: true, waypoints: [{ x: emp.x, z: emp.z }, { x: leg.destX, z: leg.destZ }] };
   }
 
   if (!occupancyActive && isDrive && state.navGrid && path.found) {

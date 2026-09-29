@@ -8,7 +8,7 @@
 import { isFootprintAction, type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
-import { octileHeuristic, findExactPath, pathCrossesFragmentOccupancy } from '../nav/Pathfinding.js';
+import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback } from '../nav/Pathfinding.js';
 import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole } from './VehicleReservation.js';
@@ -200,15 +200,15 @@ function estimateFootLegDistance(
   toX: number, toZ: number,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
 ): number | null {
-  const avoidingVehicles = estimateLegDistance(
-    state, fidelity, agentId, fromX, fromZ, toX, toZ, !isDestinationOccupied(state, toX, toZ), requiredClearance,
-  );
-  if (avoidingVehicles !== null) return avoidingVehicles;
-  if (fidelity === 'estimate' || state.navGrid === null) return null;
+  if (fidelity === 'estimate' || state.navGrid === null) {
+    return octileHeuristic(fromX, fromZ, toX, toZ);
+  }
 
-  const relaxed = findExactPath(state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles: false, requiredClearance });
-  if (!relaxed.found || pathCrossesFragmentOccupancy(state.navGrid, relaxed.waypoints)) return null;
-  return relaxed.totalCost;
+  const avoidVehicles = !isDestinationOccupied(state, toX, toZ);
+  const path = findFootPathWithVehicleFallback(
+    state.navGrid, { agentId, fromX, fromZ, toX, toZ, avoidVehicles, requiredClearance }, true,
+  );
+  return path.found ? path.totalCost : null;
 }
 
 /**
