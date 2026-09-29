@@ -36,11 +36,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow cash:200000 agent_occupancy:true",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:200000 agent_occupancy:true"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
@@ -49,7 +49,7 @@
           "worldSizeX"
         ]
       },
-      "description": "#1261: added `agent_occupancy:true` to this campaign start. Known limitation (per #1261's own per-file plan): `campaignStartCommand` (src/console/commands/campaign.ts) does not yet parse `agent_occupancy:` -- a companion fix is landing separately on the impl branch (campaign.ts will call `parseStaffedAndOccupancyFlags(named)` instead of the narrower `parseStaffedFlag`, mirroring sandbox.ts/world.ts's existing pattern, and set `agentOccupancyEnabled` on the created state). Until that lands, running this file does NOT actually exercise occupancy -- this is a best-effort edit and the wait_until conversions below are verified structurally only. Final verification happens once the campaign.ts fix is merged in. Latent occupancy-contention risk worth flagging for that verification pass: both surveyors hired above are never fired and both surveyed tile (20,20), which the drill grid below reuses as its own `start:20,20` -- three separate crew members converging on the same tile/cluster is exactly the shape of contention this batch's own other files (blast-execution-visual.json, vibration-budget.json) found genuinely stalls a charge_hole action under occupancy (see issue #1278). Not fixed here without evidence occupancy is even active yet in this file; worth a real check once it is."
+      "description": "#1261/#1207: this campaign start used to opt into agent occupancy explicitly; occupancy is unconditional since #1207, so the wait_until conversions below now genuinely exercise it. Latent occupancy-contention risk worth flagging: both surveyors hired above are never fired and both surveyed tile (20,20), which the drill grid below reuses as its own `start:20,20` -- three separate crew members converging on the same tile/cluster is exactly the shape of contention this batch's own other files (blast-execution-visual.json, vibration-budget.json) found genuinely stalls a charge_hole action under occupancy (see issue #1278)."
     },
     {
       "command": "time resume",

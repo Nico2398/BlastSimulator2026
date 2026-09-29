@@ -239,8 +239,8 @@ describe('drill_plan clear / remove — cancel in-flight drill_hole actions (#55
 // names agent-occupancy/dense-grid convergence, and this file already owns
 // "N holes queued via drill_plan grid all eventually land, none lost" as its
 // own subject (see "every hole eventually lands..." above) — this is that
-// same claim under the one additional condition (agentOccupancyEnabled,
-// 1m spacing, more drillers than one crew) #1278 is about.
+// same claim under the one additional condition (agent occupancy's dense
+// convergence, 1m spacing, more drillers than one crew) #1278 is about.
 describe('drill_plan grid — dense 1m-spacing grid under agent occupancy converges without a permanent stall (#1278)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -252,9 +252,6 @@ describe('drill_plan grid — dense 1m-spacing grid under agent occupancy conver
 
     expect(run('new_game seed:42 size:48 staffed:true').success).toBe(true);
     const state = ctx.state!;
-    // #1264/#1274's own inline convention (Locomotion.test.ts,
-    // entity-ground-contact.test.ts) — opt-in flag, off by default.
-    state.agentOccupancyEnabled = true;
     // Setup-only affordability — hiring/purchasing the extra crew below is
     // not the behavior under test.
     state.cash = 1_000_000;

@@ -155,13 +155,8 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // inclusive).
       const preBuildResults = runSteps(engine, steps.slice(0, drivingCenterIdx + 1), outDir);
 
-      // #1283: this scenario's own step 0 (`campaign start ...
-      // agent_occupancy:true`) already turns the flag on for real gameplay,
-      // but an explicit `debug occupancy on` here makes that intent visible
-      // in the test itself and keeps it robust against the scenario JSON's
-      // own flag ever changing — before any drill/charge dispatch runs.
-      expect(runCommand(engine, 'debug occupancy on').success).toBe(true);
-      expect(engine.ctx.state!.agentOccupancyEnabled).toBe(true);
+      // #1283: agent occupancy is unconditional since #1207 — no per-test
+      // opt-in is needed before the drill/charge dispatch below runs.
 
       // #556: confirming those two placements only queued construction
       // sites — drive both to completion (needs topped up so there's no

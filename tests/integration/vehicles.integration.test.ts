@@ -739,11 +739,10 @@ describe('Vehicle fleet', () => {
 
   describe('traffic jam event fires via tickCommand (#411)', () => {
     it('sets pendingEvent to traffic_jam once enough vehicles have waited long enough on a shared target', () => {
-      // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled
-      // flag — several vehicles converging on one shared target cell is
-      // exactly the multi-agent shape the flag governs (and the shape
-      // #1274's own leg.originalDestX/originalDestZ fix targets).
-      ctx.state!.agentOccupancyEnabled = true;
+      // #1264: several vehicles converging on one shared target cell is
+      // exactly the multi-agent shape agent occupancy governs (and the shape
+      // #1274's own leg.originalDestX/originalDestZ fix targets) —
+      // unconditional since #1207.
       // Anchor vehicle occupies the contended target cell. It never ticks
       // (task stays 'idle'), so it just blocks the cell for occupancy checks.
       vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
@@ -1178,13 +1177,12 @@ describe('Vehicle fleet', () => {
 
     it('moveTo({vehicleId}) walks an on-foot driller to a rock_digger and boards it, resolved by tickLocomotion alone', () => {
       vehicleCommand(ctx, ['buy', 'rock_digger'], {});
-      // #1274: with agent-occupancy on, the vehicle's own cell is always
+      // #1274: with agent occupancy, the vehicle's own cell is always
       // self-held (its own future occupant hasn't boarded it yet), so the
       // ordinary per-hop occupancy check in AgentAdvance.ts must not treat
       // that as a blocker for THIS leg's own final approach hop — without
       // the exemptOccupant fix below, the driller never completes the last
       // hop onto the vehicle's cell and boarding deadlocks forever.
-      ctx.state!.agentOccupancyEnabled = true;
       const vehicle = ctx.state!.vehicles.vehicles[0]!;
       // Placed a few cells away from the vehicle's own spawn so a genuine
       // foot leg is required before boarding — not an instant same-cell board.
@@ -1419,10 +1417,9 @@ describe('Vehicle fleet', () => {
     });
 
     it('two licensed employees queued for the same vehicle role with only one free vehicle: only one boards at a time, the other claims it once released', () => {
-      // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled
-      // flag — two employees converging on the same shared vehicle is
-      // exactly the multi-agent shape the flag governs.
-      ctx.state!.agentOccupancyEnabled = true;
+      // #1264: two employees converging on the same shared vehicle is
+      // exactly the multi-agent shape agent occupancy governs —
+      // unconditional since #1207.
       const eid1 = hireOne(ctx, 'driller');
       employeeCommand(ctx, ['assign_skill', String(eid1)], { skill: 'driving.drill_rig', level: '1' });
       const rng = new Random(11);

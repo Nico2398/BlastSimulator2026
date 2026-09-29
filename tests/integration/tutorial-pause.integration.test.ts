@@ -133,11 +133,9 @@ describe('Tutorial pause behaviour (#371)', () => {
     const { runner, ctx } = createRunner();
 
     expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    // #1264: migrate onto the (currently opt-in) agentOccupancyEnabled flag —
-    // this test's staffed crew (multiple drillers/haulers converging on the
-    // same drill/charge/haul targets) is exactly the multi-agent shape the
-    // flag governs.
-    ctx.state!.agentOccupancyEnabled = true;
+    // #1264: this test's staffed crew (multiple drillers/haulers converging
+    // on the same drill/charge/haul targets) is exactly the multi-agent
+    // shape agent occupancy governs — unconditional since #1207.
     expect(runner.run('build freight_warehouse at:6,9').success).toBe(true);
     expect(runner.run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
     // drill_plan grid now queues one drill_hole PendingAction per hole

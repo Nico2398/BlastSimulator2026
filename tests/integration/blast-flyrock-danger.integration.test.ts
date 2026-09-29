@@ -143,15 +143,13 @@ const aliveCount = (ctx: MiningContext, ids: number[]): number =>
 
 beforeEach(() => resetHoleIds());
 
-// #1264: every test below migrates onto the (currently opt-in)
-// agentOccupancyEnabled flag, right after its own ctx is constructed — this
-// file's staffed driller+blaster crew converging on a packed multi-hole
-// drill/charge grid (blastAt's own 3x3, spacing:3 pattern) is exactly the
-// multi-agent shape the flag governs.
+// #1264: this file's staffed driller+blaster crew converging on a packed
+// multi-hole drill/charge grid (blastAt's own 3x3, spacing:3 pattern) is
+// exactly the multi-agent shape agent occupancy governs — unconditional
+// since #1207, so no per-test opt-in is needed any more.
 describe('Blast flyrock — danger reaches the crew', () => {
   it('a minimally stemmed overcharge throws rock that hurts people standing nearby', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     const crew = crewBesideTheBlast(ctx);
     const before = aliveCount(ctx, crew);
 
@@ -164,7 +162,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('the same charge, properly stemmed, leaves the crew alone', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     const crew = crewBesideTheBlast(ctx);
     const before = aliveCount(ctx, crew);
 
@@ -175,7 +172,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('records the accident so the lawsuit and safety systems can see it', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     crewBesideTheBlast(ctx);
 
     blastAt(ctx, '0.5');
@@ -190,7 +186,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('a blast with nobody around hurts nobody', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
 
     blastAt(ctx, '0.5');
 
@@ -200,7 +195,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('kills anyone standing on the ground the blast removes, however well stemmed', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     const rng = new Random(3);
     // Right on top of the pattern, not beside it.
     const onTheBlast = hireEmployee(ctx.state!.employees, 'driller', rng, 16, 16).employee;
@@ -214,7 +208,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('destroys a vehicle parked on the blast', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     const parked = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 16, 16).vehicle;
 
     blastAt(ctx, '2');
@@ -224,7 +217,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('leaves people well clear of the blast alone', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     const rng = new Random(11);
     // 'driver', not 'driller' (#554) — same reasoning as crewBesideTheBlast:
     // a 'blasting'-qualified bystander this far out could still get
@@ -240,10 +232,8 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('reports how far the rock was thrown, and rates the blast on it', () => {
     const reckless = makeCtx();
-    reckless.state!.agentOccupancyEnabled = true;
     blastAt(reckless, '0.5');
     const careful = makeCtx();
-    careful.state!.agentOccupancyEnabled = true;
     blastAt(careful, '2');
 
     // Both reports exist; the reckless one threw rock further and rates worse.
@@ -260,7 +250,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('destroys a building whose footprint overlaps a cleared voxel, however well stemmed', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     const placed = placeBuilding(
       ctx.state!.buildings, 'living_quarters', 18, 18,
       ctx.state!.world!.sizeX, ctx.state!.world!.sizeZ, 1,
@@ -274,7 +263,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('nothing outside computeDangerZone\'s padded bounds is touched, regardless of proximity to a landed projectile', () => {
     const ctx = makeCtx();
-    ctx.state!.agentOccupancyEnabled = true;
     resetHoleIds();
     drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
     driveDrillPlanToCompletion(ctx);
@@ -320,7 +308,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
   describe('the distance-attenuated debris gap: a few metres inside the zone, off any cleared column', () => {
     it('hurts or kills an employee standing just past the cleared footprint', () => {
       const ctx = makeCtx();
-      ctx.state!.agentOccupancyEnabled = true;
       const rng = new Random(2000);
       const bystander = hireEmployee(ctx.state!.employees, 'driver', rng, 26, 15).employee;
 
@@ -332,7 +319,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
     it('damages or destroys a vehicle standing just past the cleared footprint', () => {
       const ctx = makeCtx();
-      ctx.state!.agentOccupancyEnabled = true;
       const parked = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 27, 16).vehicle;
 
       blastAt(ctx, '0.5');
@@ -345,7 +331,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
     it('damages or destroys a building standing just past the cleared footprint', () => {
       const ctx = makeCtx();
-      ctx.state!.agentOccupancyEnabled = true;
       const placed = placeBuilding(
         ctx.state!.buildings, 'living_quarters', 26, 21,
         ctx.state!.world!.sizeX, ctx.state!.world!.sizeZ, 1,

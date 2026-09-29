@@ -10,11 +10,11 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:260000 agent_occupancy:true",
+      "command": "campaign start level:tutorial_pit cash:260000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:260000 agent_occupancy:true"
+          "command": "campaign start level:tutorial_pit cash:260000"
         }
       ],
       "description": "#553: cash bumped from $80,000 to $188,648 -- drill_hole is now a queued, vehicle-gated action, so this file needs a drill_rig (tier-1 purchaseCost $35,000, VEHICLE_STATS in balance.ts) it never used to, and it needs a second one -- plus a second driller -- after the first blast kills its crew and destroys the rig standing among the holes it just drilled, plus the 190 ticks the two drillers spend sinking the two patterns ($37,648 of payroll, fuel and maintenance). The bump is exactly those four, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #555: bumped again to $260,000 -- dig_ramp_segment is now gated the same way, so this file also needs a rock_digger (tier-1 purchaseCost $50,000) it never used to, plus the extra payroll/fuel/maintenance drain of the real ticks the ramp order now spends actually digging instead of completing in the same tick it was ordered.",
@@ -277,7 +277,7 @@
     {
       "command": "wait_until field:holeCount equals:9 max_ticks:400",
       "timeout": 180,
-      "description": "#1263: converted from a hand-measured `tick 130` pad to a real wait_until on holeCount -- this file predates the wait_until convention (#590) and its fixed pad was measured before agent_occupancy:true added driller/drill_rig contention delay to drilling, so 130 ticks landed one hole short (orderedHoleCount 1, holeCount 8) once occupancy was turned on for this step (issue #1263's own new occupancy flag). Direct trace confirms the single driller/drill_rig actually needs 131 ticks door-to-door to sink all 9 ordered holes under occupancy; max_ticks:400 gives real headroom instead of a number that merely happens to be long enough today.",
+      "description": "#1263: converted from a hand-measured `tick 130` pad to a real wait_until on holeCount -- this file predates the wait_until convention (#590) and its fixed pad was measured before agent occupancy added driller/drill_rig contention delay to drilling, so 130 ticks landed one hole short (orderedHoleCount 1, holeCount 8) once occupancy was turned on for this step (issue #1263's own new occupancy behavior). Direct trace confirms the single driller/drill_rig actually needs 131 ticks door-to-door to sink all 9 ordered holes under occupancy; max_ticks:400 gives real headroom instead of a number that merely happens to be long enough today.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1152,7 +1152,7 @@
     {
       "command": "wait_until field:holeCount equals:4 max_ticks:400",
       "timeout": 180,
-      "description": "#1263: converted from a hand-measured `tick 90` pad to a real wait_until on holeCount, same reason as the first pattern's wait above -- this file predates the wait_until convention (#590). #953's own 60->90 bump was already chasing the same symptom (climb-limit multi-level routing between patterns costing more ticks than assumed) with a bigger fixed number, but the two-cycle cascade agent_occupancy:true adds upstream (the first pattern's own wait landing one hole short) pushed this second pattern's timing further still, so 90 stalled again (orderedHoleCount 1, not 0). Direct trace against the corrected first-pattern wait shows the second driller only needs 40 ticks door-to-door once the first pattern actually finishes on time -- max_ticks:400 gives real headroom rather than another number that merely happens to work today.",
+      "description": "#1263: converted from a hand-measured `tick 90` pad to a real wait_until on holeCount, same reason as the first pattern's wait above -- this file predates the wait_until convention (#590). #953's own 60->90 bump was already chasing the same symptom (climb-limit multi-level routing between patterns costing more ticks than assumed) with a bigger fixed number, but the two-cycle cascade agent occupancy adds upstream (the first pattern's own wait landing one hole short) pushed this second pattern's timing further still, so 90 stalled again (orderedHoleCount 1, not 0). Direct trace against the corrected first-pattern wait shows the second driller only needs 40 ticks door-to-door once the first pattern actually finishes on time -- max_ticks:400 gives real headroom rather than another number that merely happens to work today.",
       "interaction": [
         {
           "type": "waitUntil",
