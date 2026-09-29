@@ -125,13 +125,13 @@
   ],
   "steps": [
     {
-      "command": "new_game mine_type:alpine_granite seed:11 size:48 staffed:true agent_occupancy:true",
+      "command": "new_game mine_type:alpine_granite seed:11 size:48 staffed:true cash:200000 agent_occupancy:true",
       "timeout": 300,
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. #1261: cash:200000 added -- under agent_occupancy:true the four-hole drain takes 268 ticks (was 203), enough for the default $50k to hit bankruptcy before the charge step, whose real click the level-end overlay then covers.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game mine_type:alpine_granite seed:11 size:48 staffed:true agent_occupancy:true"
+          "command": "new_game mine_type:alpine_granite seed:11 size:48 staffed:true cash:200000 agent_occupancy:true"
         }
       ],
       "role": "setup",
