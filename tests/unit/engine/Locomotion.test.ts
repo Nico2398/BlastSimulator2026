@@ -25,7 +25,6 @@ import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
 import { AgentOccupancy, type Occupant } from '../../../src/core/nav/AgentOccupancy.js';
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
-import { isMounted } from '../../../src/core/entities/EmployeeLocomotion.js';
 import { detectTrafficJam } from '../../../src/core/events/EventEngine.js';
 import { employeeWorkState } from '../../../src/core/engine/EmployeeDispatch.js';
 
