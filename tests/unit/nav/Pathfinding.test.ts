@@ -21,7 +21,9 @@ import { NavGrid, type NavCell, type NavCellType, isStepClimbable } from '../../
 import {
   NAV_MAX_SLOPE_RATIO, NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../../../src/core/config/balance.js';
-import { RAMP_WIDTH } from '../../../src/core/mining/Ramp.js';
+import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers

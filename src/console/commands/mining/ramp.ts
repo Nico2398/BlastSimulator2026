@@ -9,8 +9,8 @@ import {
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
 import { queueRampOrder } from '../../../core/mining/RampOrder.js';
-import { rampFootprint, orderRampWiden, validateWidenRamp } from '../../../core/mining/RampWidening.js';
-import { RAMP_DEFAULT_WIDTH, type RampWidth } from '../../../core/config/balance.js';
+import { rampFootprint, orderRampWiden, validateWidenRamp, type WidenFailure } from '../../../core/mining/RampWidening.js';
+import { RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, isRampWidth } from '../../../core/config/balance.js';
 import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction, cellsInRect } from '../siteExpansion.js';
@@ -37,7 +37,10 @@ export function buildRampCommand(
   }
 
   let rampDef: RampDef;
-  const width = parseWidth(named['width']) as RampWidth;
+  const width = parseWidth(named['width']);
+  if (!isRampWidth(width)) {
+    return { success: false, output: t('mining.build_ramp.invalid_width', { options: RAMP_WIDTH_OPTIONS.join(', ') }) };
+  }
   const depth = parseInt(named['depth'] ?? '8', 10);
 
   if (named['start'] && named['end']) {
@@ -77,7 +80,9 @@ export function buildRampCommand(
   if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
 
   const segments = defineRampSegments(ctx.grid!, rampDef);
-  queueRampOrder(ctx.state!, rampDef, footprint, segments, validation.cost, 'Build ramp');
+  if (queueRampOrder(ctx.state!, rampDef, footprint, segments, validation.cost, 'Build ramp') === null) {
+    return { success: false, output: t('mining.ramp.nothing_to_dig') };
+  }
 
   return {
     success: true,
@@ -113,6 +118,11 @@ export function cancelRampCommand(ctx: MiningContext, rampId: number): { success
   };
 }
 
+/** Translates a refused widen order: the failure's own reason inside the shared `refused` wrapper. */
+function widenRefused(id: number, failure: WidenFailure): CommandResult {
+  return { success: false, output: t('mining.widen_ramp.refused', { id, reason: t(failure.errorKey, failure.errorParams) }) };
+}
+
 /** `widen_ramp id:N width:W` — orders a built ramp widened (#1298). */
 export function widenRampCommand(
   ctx: MiningContext,
@@ -128,15 +138,15 @@ export function widenRampCommand(
   const ramp = state.builtRamps.find(r => r.id === rampId);
   if (!ramp) return { success: false, output: t('mining.widen_ramp.not_found', { id: rampId }) };
 
-  const toWidth = Number(named['width'] ?? '') as RampWidth;
-  const check = validateWidenRamp(ramp, toWidth, state.cash);
-  if (!check.success) return { success: false, output: t('mining.widen_ramp.refused', { id: rampId, reason: check.error }) };
+  const check = validateWidenRamp(ramp, Number(named['width'] ?? ''), state.cash);
+  if (!check.success) return widenRefused(rampId, check);
+  const toWidth = check.data.width;
 
   const footprint = rampFootprint(ramp.def, toWidth);
   const claim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'widen a ramp');
   if (!claim.ok) return { success: false, output: claim.output! };
 
   const result = orderRampWiden(state, ctx.grid!, rampId, toWidth);
-  if (!result.success) return { success: false, output: t('mining.widen_ramp.refused', { id: rampId, reason: result.error }) };
+  if (!result.success) return widenRefused(rampId, result);
   return { success: true, output: t('mining.widen_ramp.ordered', { id: rampId, width: toWidth, cost: formatMoney(result.data.cost) }) };
 }

@@ -5,8 +5,8 @@ import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { buildRamp, carveRampSegment, type RampDef } from '../../src/core/mining/Ramp.js';
-import { orderRampWiden, rampFootprint, type BuiltRamp } from '../../src/core/mining/RampWidening.js';
-import { createGame } from '../../src/core/state/GameState.js';
+import { orderRampWiden, rampFootprint } from '../../src/core/mining/RampWidening.js';
+import { createGame, type BuiltRamp } from '../../src/core/state/GameState.js';
 import type { RampWidth } from '../../src/core/config/balance.js';
 
 const ORIGIN_X = 15, ORIGIN_Z = 5, LENGTH = 14, DEPTH = 6;

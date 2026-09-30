@@ -19,7 +19,7 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { Random } from '../../../src/core/math/Random.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
-import { RAMP_COST_PER_METER, carveRampSegment } from '../../../src/core/mining/Ramp.js';
+import { carveRampSegment } from '../../../src/core/mining/Ramp.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
 import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
@@ -27,6 +27,11 @@ import { formatTaskCompletion } from '../../../src/console/commands/tickTaskComp
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
+import { computeRampCost } from '../../../src/core/mining/Ramp.js';
+import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+/** Cost per metre of a default-width ramp. */
+const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
+const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 function makeMiningContext(): MiningContext {
   // Staffed (#553): a `drill_plan grid/add` no longer writes holes straight

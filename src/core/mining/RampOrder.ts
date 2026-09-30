@@ -2,7 +2,7 @@
 // One place charges the order cost and queues one `dig_ramp_segment` action per
 // segment, shared by a fresh ramp order and a widen order.
 
-import type { GameState, PlannedRamp } from '../state/GameState.js';
+import type { GameState, PlannedRamp, RampFootprint } from '../state/GameState.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
 import type { RampDef, RampSegmentDef } from './Ramp.js';
@@ -20,17 +20,19 @@ export interface RampSegmentActionPayload {
  * Charges `cost` in full at order time — the unspent remainder (unworked
  * segments' share) is refunded on cancel via actionOrderCost/cancelAction —
  * and queues the excavation. The cost is split evenly across segments so the
- * refundable total can never exceed what was charged. Returns the PlannedRamp id.
+ * refundable total can never exceed what was charged. Returns the PlannedRamp id,
+ * or null — charging nothing — when there are no segments to excavate.
  */
 export function queueRampOrder(
   state: GameState,
   def: RampDef,
-  footprint: PlannedRamp['footprint'],
+  footprint: RampFootprint,
   segments: readonly RampSegmentDef[],
   cost: number,
   expenseLabel: string,
   widenOf?: number,
-): number {
+): number | null {
+  if (segments.length === 0) return null;
   state.cash -= cost;
   addExpense(state.finances, cost, 'construction', expenseLabel, state.tickCount);
 

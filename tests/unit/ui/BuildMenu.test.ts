@@ -21,9 +21,13 @@ import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import type { TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
-import { rampDefFromEndpoints, validateRampOrder, RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
+import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import { computeRampCost } from '../../../src/core/mining/Ramp.js';
+import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+/** Cost per metre of a default-width ramp. */
+const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
 
 /** Minimal GameState that won't crash the panel update loop. */
 function makeMockState(overrides?: Partial<GameState>): GameState {

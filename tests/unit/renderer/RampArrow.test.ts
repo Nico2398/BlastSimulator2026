@@ -10,8 +10,10 @@ import {
   rampArrowLayout, buildRampArrow, RampArrowLayer, RAMP_ARROW_COLOR, RAMP_ARROW_RENDER_ORDER,
 } from '../../../src/renderer/RampArrow.js';
 import { GHOST_RENDER_ORDER } from '../../../src/renderer/GhostMesh.js';
-import { RAMP_WIDTH, rampDefFromEndpoints } from '../../../src/core/mining/Ramp.js';
+import { rampDefFromEndpoints } from '../../../src/core/mining/Ramp.js';
 import { isSceneOverlay } from '../../../src/renderer/post/SceneOverlay.js';
+import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 const flat = (): number => 0;
 
@@ -54,6 +56,17 @@ describe('rampArrowLayout()', () => {
     const ew = rampArrowLayout({ originX: 8, originZ: 4, direction: 'west', length: 5 })!.corridor;
     expect(ew.maxZ - ew.minZ + 1).toBe(RAMP_WIDTH);
     expect(ew).toEqual({ minX: 4, maxX: 8, minZ: 3, maxZ: 5 });
+  });
+
+  it.each([
+    [3, { minX: 15, maxX: 17 }],
+    [5, { minX: 14, maxX: 18 }],
+    [7, { minX: 13, maxX: 19 }],
+  ] as const)('outlines a corridor %i wide, centred on the axis, without moving the tail or tip', (width, xs) => {
+    const layout = rampArrowLayout({ originX: 16, originZ: 19, direction: 'south', length: 12, width })!;
+    expect(layout.corridor).toEqual({ ...xs, minZ: 19, maxZ: 30 });
+    expect(layout.tail).toEqual({ x: 16, z: 19 });
+    expect(layout.tip).toEqual({ x: 16, z: 30 });
   });
 
   it('has nothing to draw for a zero-length ramp', () => {

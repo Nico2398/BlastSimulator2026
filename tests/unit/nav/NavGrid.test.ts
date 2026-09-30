@@ -31,11 +31,13 @@ import {
   NAV_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_DEGREES, NAV_RAMP_MIN_SLOPE_DELTA, NAV_BENCH_HEIGHT,
   NAV_CLEARANCE_MAX_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../../../src/core/config/balance.js';
-import { RAMP_WIDTH } from '../../../src/core/mining/Ramp.js';
+
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { createVehicleState, purchaseVehicle, isVehicleCurrentlyDriving, type Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers

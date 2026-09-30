@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { rampWidthOf, type RampDef } from '../core/mining/Ramp.js';
 import { rampFootprint } from '../core/mining/RampWidening.js';
+import type { RampFootprint } from '../core/state/GameState.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
 import type { SurfaceHeightSampler } from './GroundTint.js';
 
@@ -47,7 +48,7 @@ interface RampArrowLayout {
   /** Unit step along the ramp, top to bottom. */
   dir: { dx: number; dz: number };
   /** Inclusive tile bounds of the carved band. */
-  corridor: { minX: number; maxX: number; minZ: number; maxZ: number };
+  corridor: RampFootprint;
 }
 
 const DIR_STEP: Record<RampDef['direction'], { dx: number; dz: number }> = {

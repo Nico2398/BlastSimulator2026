@@ -3,12 +3,15 @@
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
-  defineRampSegments, validateRampOrder, computeRampSegmentDurationTicks, RAMP_COST_PER_METER,
+  defineRampSegments, validateRampOrder, computeRampSegmentDurationTicks,
   type RampDef,
 } from '../../../src/core/mining/Ramp.js';
 import {
   RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, RAMP_COST_PER_METER_PER_WIDTH, type RampWidth,
 } from '../../../src/core/config/balance.js';
+import { computeRampCost } from '../../../src/core/mining/Ramp.js';
+/** Cost per metre of a default-width ramp. */
+const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
 
 function makeElevatedGrid(sizeX: number, sizeZ: number, surfaceY: number): VoxelGrid {
   const grid = new VoxelGrid(sizeX, sizeZ);

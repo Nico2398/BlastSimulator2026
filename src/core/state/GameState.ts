@@ -59,7 +59,7 @@ import { createLevelStats } from '../campaign/SuccessTracker.js';
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
-import type { BuiltRamp } from '../mining/RampWidening.js';
+import type { RampWidth } from '../config/balance.js';
 
 /** Save format version — increment when GameState shape changes. */
 // v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
@@ -277,11 +277,27 @@ export interface RampSegmentTracker {
   carvedCount?: number;
 }
 
+/** Inclusive tile rectangle a ramp's corridor covers. */
+export interface RampFootprint {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+/** A finished ramp, recorded when its last segment is dug (#1298). */
+export interface BuiltRamp {
+  id: number;
+  def: RampDef;
+  width: RampWidth;
+  footprint: RampFootprint;
+}
+
 /** A ramp order in flight — its footprint is claimed and segments queue `dig_ramp_segment` actions as they're worked (#555). */
 export interface PlannedRamp {
   id: number;
   def: RampDef;
-  footprint: { minX: number; maxX: number; minZ: number; maxZ: number };
+  footprint: RampFootprint;
   segments: RampSegmentTracker[];
   /** Set when this order widens the built ramp with this id instead of cutting a new one (#1298). */
   widenOf?: number;

@@ -11,7 +11,8 @@ import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 import type { FragmentMesh } from './FragmentMesh.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
-import { findRampAtTile, type BuiltRamp } from '../core/mining/RampWidening.js';
+import { findRampAtTile } from '../core/mining/RampWidening.js';
+import type { BuiltRamp } from '../core/state/GameState.js';
 
 /** Mutable GameRenderer fields these picking helpers read, passed in place of `this` (#767). */
 export interface PickingDeps {

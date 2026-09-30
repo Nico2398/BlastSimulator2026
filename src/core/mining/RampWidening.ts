@@ -5,26 +5,18 @@
 import { computeRampCost, defineRampSegments, rampWidthOf, type RampDef } from './Ramp.js';
 import { formatMoney } from '../economy/formatMoney.js';
 import { queueRampOrder } from './RampOrder.js';
-import { RAMP_WIDTH_OPTIONS, type RampWidth } from '../config/balance.js';
-import type { GameState, PlannedRamp } from '../state/GameState.js';
+import { RAMP_WIDTH_OPTIONS, isRampWidth, type RampWidth } from '../config/balance.js';
+import type { BuiltRamp, GameState, PlannedRamp, RampFootprint } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 
-interface RampFootprint {
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
+/** Failure carries a plain-English `error` fallback plus the translation key the console/UI resolves with `t()` (mirrors validateRampOrder's messageKey). */
+export interface WidenFailure {
+  success: false;
+  error: string;
+  errorKey: string;
+  errorParams?: Record<string, string | number>;
 }
-
-/** A finished ramp, recorded when its last segment is dug. */
-export interface BuiltRamp {
-  id: number;
-  def: RampDef;
-  width: RampWidth;
-  footprint: RampFootprint;
-}
-
-type WidenResult<T> = { success: true; data: T } | { success: false; error: string };
+type WidenResult<T> = { success: true; data: T } | WidenFailure;
 
 /** Inclusive tile rectangle of the cells a ramp of `def`'s placement carves at `width`. */
 export function rampFootprint(def: Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length'>, width: RampWidth): RampFootprint {
@@ -57,36 +49,58 @@ export function nextRampWidth(current: RampWidth): RampWidth | null {
 }
 
 /** Checks a widen order (wider than current, known option, affordable) without mutating anything. */
-export function validateWidenRamp(ramp: BuiltRamp, toWidth: RampWidth, cash: number): WidenResult<{ cost: number }> {
-  if (!(RAMP_WIDTH_OPTIONS as readonly number[]).includes(toWidth)) {
-    return { success: false, error: `Invalid ramp width: choose one of ${RAMP_WIDTH_OPTIONS.join(', ')}.` };
+export function validateWidenRamp(ramp: BuiltRamp, toWidth: number, cash: number): WidenResult<{ cost: number; width: RampWidth }> {
+  if (!isRampWidth(toWidth)) {
+    const options = RAMP_WIDTH_OPTIONS.join(', ');
+    return {
+      success: false, error: `Invalid ramp width: choose one of ${options}.`,
+      errorKey: 'mining.build_ramp.invalid_width', errorParams: { options },
+    };
   }
   if (toWidth <= ramp.width) {
-    return { success: false, error: `Ramp #${ramp.id} is already ${ramp.width} wide; widen to more than that.` };
+    return {
+      success: false, error: `Ramp #${ramp.id} is already ${ramp.width} wide; widen to more than that.`,
+      errorKey: 'mining.widen_ramp.already_width', errorParams: { id: ramp.id, width: ramp.width },
+    };
   }
   const cost = computeRampCost(ramp.def.length, toWidth - ramp.width);
-  if (cash < cost) return { success: false, error: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(cash)}` };
-  return { success: true, data: { cost } };
+  if (cash < cost) {
+    const need = formatMoney(cost), have = formatMoney(cash);
+    return {
+      success: false, error: `Insufficient funds: need $${need}, have $${have}`,
+      errorKey: 'console.insufficient_funds', errorParams: { need, have },
+    };
+  }
+  return { success: true, data: { cost, width: toWidth } };
 }
 
 /** Orders `rampId` widened to `toWidth`: charges the cost and queues the extra excavation as a planned ramp. */
 export function orderRampWiden(
-  state: GameState, grid: VoxelGrid, rampId: number, toWidth: RampWidth,
+  state: GameState, grid: VoxelGrid, rampId: number, toWidth: number,
 ): WidenResult<{ plannedRampId: number; cost: number }> {
   const ramp = state.builtRamps.find(r => r.id === rampId);
-  if (!ramp) return { success: false, error: `Ramp #${rampId} not found` };
+  if (!ramp) {
+    return { success: false, error: `Ramp #${rampId} not found`, errorKey: 'mining.widen_ramp.not_found', errorParams: { id: rampId } };
+  }
   if (state.plannedRamps.some(p => p.widenOf === rampId)) {
-    return { success: false, error: `Ramp #${rampId} is already being widened` };
+    return {
+      success: false, error: `Ramp #${rampId} is already being widened`,
+      errorKey: 'mining.widen_ramp.in_progress', errorParams: { id: rampId },
+    };
   }
   const validation = validateWidenRamp(ramp, toWidth, state.cash);
   if (!validation.success) return validation;
 
-  const def: RampDef = { ...ramp.def, width: toWidth };
+  const { cost, width } = validation.data;
+  const def: RampDef = { ...ramp.def, width };
   const segments = defineRampSegments(grid, def, ramp.width);
   const plannedRampId = queueRampOrder(
-    state, def, rampFootprint(def, toWidth), segments, validation.data.cost, 'Widen ramp', rampId,
+    state, def, rampFootprint(def, width), segments, cost, 'Widen ramp', rampId,
   );
-  return { success: true, data: { plannedRampId, cost: validation.data.cost } };
+  if (plannedRampId === null) {
+    return { success: false, error: 'Nothing to excavate for this ramp', errorKey: 'mining.ramp.nothing_to_dig' };
+  }
+  return { success: true, data: { plannedRampId, cost } };
 }
 
 /**

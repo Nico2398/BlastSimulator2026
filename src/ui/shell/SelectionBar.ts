@@ -10,6 +10,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
 import { nextRampWidth } from '../../core/mining/RampWidening.js';
 import type { RampWidth } from '../../core/config/balance.js';
+import { describeRamp } from '../describeRamp.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
@@ -200,7 +201,7 @@ export class SelectionBar {
       case 'ramp': {
         const ramp = state.builtRamps.find(r => r.id === entity.id);
         if (!ramp) return null;
-        return { title: t('shell.selection.ramp_title', { width: ramp.width }), sub: t('shell.selection.ramp_sub', { id: ramp.id, width: ramp.width, length: ramp.def.length }) };
+        return describeRamp(ramp);
       }
     }
   }

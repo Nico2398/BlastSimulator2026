@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { applyTaskCompletion } from '../../../src/core/engine/TaskCompletionEffects.js';
-import { createGame, type PendingAction, type PlannedRamp, type PlannedBuilding } from '../../../src/core/state/GameState.js';
+import { createGame, type BuiltRamp, type PendingAction, type PlannedRamp, type PlannedBuilding } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -20,7 +20,7 @@ import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { subscribeNavGridToUpdates, buildingFootprintOccupants } from '../../../src/core/nav/NavGridSync.js';
 import { findBuildingApproachCell } from '../../../src/core/nav/BuildingApproach.js';
-import { rampFootprint, type BuiltRamp } from '../../../src/core/mining/RampWidening.js';
+import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import type { RampDef } from '../../../src/core/mining/Ramp.js';
 import type { PlaceBuildingActionPayload } from '../../../src/console/commands/buildOrder.js';
 

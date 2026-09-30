@@ -3,7 +3,7 @@ import {
   VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight, setVoxelColumnSurfaceHeight,
 } from '../../../src/core/world/VoxelGrid.js';
 import {
-  buildRamp, RAMP_COST_PER_METER, RAMP_WIDTH,
+  buildRamp,
   validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
   computeRampSegmentCarveTarget, carveRampSegmentSlice, computeMinimumRampLength, isRampCellPending,
   rampDefFromEndpoints,
@@ -16,6 +16,11 @@ import {
 } from '../../../src/core/config/balance.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { computeRampCost } from '../../../src/core/mining/Ramp.js';
+import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+/** Cost per metre of a default-width ramp. */
+const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
+const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 /** `height` is the grid's own constructed height (the value it was built with via `new VoxelGrid`). */
 function fillGrid(grid: VoxelGrid, height: number) {

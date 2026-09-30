@@ -396,11 +396,10 @@ describe('SelectionBar — ramp (#1298)', () => {
     expect(handler).toHaveBeenCalledWith('widen', expect.objectContaining({ kind: 'ramp', id: 1 }));
   });
 
-  it('hides or disables widen at the maximum width', () => {
+  it('offers no widen action at the maximum width', () => {
     const { bar, root } = makeBar();
     bar.show(entity('ramp', 1), stateWithRamp(7));
-    const btn = root.querySelector<HTMLButtonElement>('[data-action="widen"]');
-    expect(btn === null || btn.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[data-action="widen"]')).toBeNull();
   });
 
   it('hides the bar for a ramp id that no longer exists', () => {

@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { PickableKind } from './Pickable.js';
+import type { RampFootprint } from '../core/state/GameState.js';
 
 const RING_COLOR = 0xffb02e; // --bsx-amber
 const RING_SEGMENTS = 48;
@@ -55,7 +56,7 @@ export class EntityHighlight {
    * corridor's centre, the point `setPosition` keeps the outline anchored to.
    */
   showFootprint(
-    footprint: { minX: number; maxX: number; minZ: number; maxZ: number },
+    footprint: RampFootprint,
     position: THREE.Vector3,
     sampler: (x: number, z: number) => number,
   ): void {

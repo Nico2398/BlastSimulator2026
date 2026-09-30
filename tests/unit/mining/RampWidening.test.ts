@@ -2,10 +2,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { createGame, type GameState } from '../../../src/core/state/GameState.js';
+import { createGame, type BuiltRamp, type GameState } from '../../../src/core/state/GameState.js';
 import { buildRamp, defineRampSegments, type RampDef } from '../../../src/core/mining/Ramp.js';
 import {
-  rampFootprint, findRampAtTile, nextRampWidth, validateWidenRamp, orderRampWiden, type BuiltRamp,
+  rampFootprint, findRampAtTile, nextRampWidth, validateWidenRamp, orderRampWiden,
 } from '../../../src/core/mining/RampWidening.js';
 import { RAMP_COST_PER_METER_PER_WIDTH, type RampWidth } from '../../../src/core/config/balance.js';
 
@@ -124,7 +124,7 @@ describe('validateWidenRamp', () => {
   ])('refuses %s', (_name, current, to, cash) => {
     const r = validateWidenRamp(ramp(current), to as RampWidth, cash);
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.error.length).toBeGreaterThan(0);
+    if (!r.success) { expect(r.error.length).toBeGreaterThan(0); expect(r.errorKey).toMatch(/^(mining|console)\./); }
   });
 
   it('accepts cash exactly equal to the cost', () => {
@@ -195,7 +195,7 @@ describe('orderRampWiden', () => {
       const before = snapshot(fx.state);
       const r = orderRampWiden(...args(fx));
       expect(r.success).toBe(false);
-      if (!r.success) expect(r.error.length).toBeGreaterThan(0);
+      if (!r.success) { expect(r.error.length).toBeGreaterThan(0); expect(r.errorKey).toMatch(/^(mining|console)\./); }
       expect(snapshot(fx.state)).toEqual(before);
     });
   }

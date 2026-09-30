@@ -13,16 +13,10 @@ import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import {
   MAX_RAMP_LENGTH, NAV_MAX_SLOPE_DEGREES, RAMP_CUT_SLOPE_RATIO,
   RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH,
-  RAMP_COST_PER_METER_PER_WIDTH, type RampWidth,
+  RAMP_COST_PER_METER_PER_WIDTH, isRampWidth, type RampWidth,
 } from '../config/balance.js';
 
 // ── Config ──
-
-/** Cost per meter of ramp length in game dollars. */
-// Real haul road construction: ~$50-200/m. Scaled for gameplay.
-const RAMP_COST_PER_METER = 100;
-/** Ramp width in voxels — the default (3-wide) corridor. Per-ramp width is `RampDef.width` (#1298). */
-const RAMP_WIDTH = 3;
 
 /** Corridor width of `def` — its own choice, else the default (#1298). */
 export function rampWidthOf(def: { width?: RampWidth }): RampWidth {
@@ -170,8 +164,6 @@ function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
   return computeVoxelColumnSurfaceY(grid, x, z) ?? 0;
 }
 
-export { RAMP_COST_PER_METER, RAMP_WIDTH };
-
 // ── Ordered ramp excavation (#555 — order-then-work, mirrors #554) ──
 
 /** Result of {@link validateRampOrder}. */
@@ -205,7 +197,7 @@ export interface RampOrderValidation {
  * free (#788 point 3).
  */
 export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidation {
-  if (!(RAMP_WIDTH_OPTIONS as readonly number[]).includes(rampWidthOf(ramp))) {
+  if (!isRampWidth(rampWidthOf(ramp))) {
     return {
       success: false,
       message: `Invalid ramp width: choose one of ${RAMP_WIDTH_OPTIONS.join(', ')}.`,
