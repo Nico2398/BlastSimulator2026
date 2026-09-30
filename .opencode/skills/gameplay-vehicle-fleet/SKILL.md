@@ -232,7 +232,7 @@ blocked until cleared.
 `findTrafficJams(ramps, employees, silencedUntil?, tick?)` is the one detector; the event, the Fleet
 panel banner, the alert pip, the ground markers and the console state dump all read it. An employee
 counts when `vehicleWaitingTicks >= TRAFFIC_JAM_MIN_TICKS` and they hold an itinerary — drivers and
-walkers alike, once each. Each counted agent belongs to one chokepoint, decided by their position:
+walkers alike, once each. `TRAFFIC_JAM_MIN_TICKS` (4) must stay strictly below `AGENT_OCCUPANCY_WAIT_TICKS` (10): at that wait the occupancy ladder spreads the blocked mover and clears its itinerary, so an equal or higher threshold never sees a queue. Each counted agent belongs to one chokepoint, decided by their position:
 
 | Chokepoint | Where | `kind`, key |
 |------------|-------|-------------|

@@ -1393,7 +1393,7 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
       { x: 16, z: 14 },
       { x: 15, z: 13 },
     ];
-    const satelliteDrivers = satellitePositions.map(({ x, z }) => {
+    satellitePositions.forEach(({ x, z }) => {
       const { employee: driver } = hireEmployee(state.employees, 'driller', rng, x, z);
       const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', x, z);
       vehicle.occupantIds = [driver.id];
@@ -1407,40 +1407,15 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
         workTicks: 0,
         estTotalTicks: 3,
       } satisfies Itinerary;
-      return driver;
     });
 
-    // Snapshot of each satellite's live leg destX/destZ, taken the FIRST tick
-    // any of them shows a destination-spread — before a small, nearby spread
-    // target lets a satellite complete its (onArrive: 'none') leg outright
-    // and its itinerary go null a tick or two later. Captured once, right
-    // where the bug lives: the same tick the ladder retargets every
-    // satellite's leg, this is the state buildWaitingByTarget's clustering
-    // pass reads.
-    let spreadDestKeys: Set<string> | null = null;
-    let tick = 0;
-    for (; tick < 15 && state.events.pendingEvent === null; tick++) {
+    // The jam must fire on its own clustered waiting time, before the
+    // occupancy ladder's destination-spread (AGENT_OCCUPANCY_WAIT_TICKS)
+    // fragments the three satellites onto distinct destinations.
+    for (let tick = 0; tick < 15 && state.events.pendingEvent === null; tick++) {
       tickLocomotion(state);
-
-      if (spreadDestKeys === null) {
-        const legs = satelliteDrivers.map(d => d.itinerary?.legs[0] ?? null);
-        const anySpread = legs.some(leg => leg !== null && (leg.destX !== 15 || leg.destZ !== 15));
-        if (anySpread) {
-          spreadDestKeys = new Set(
-            legs.filter((leg): leg is NonNullable<typeof leg> => leg !== null)
-              .map(leg => `${leg.destX},${leg.destZ}`),
-          );
-        }
-      }
-
       detectTrafficJam(state.builtRamps, state.employees.employees, state.events, tick);
     }
-
-    // The three satellites really did fragment onto distinct live
-    // destinations — the bug this test targets is that fragmenting alone
-    // silently suppresses the jam, not that the spread itself never happens.
-    expect(spreadDestKeys).not.toBeNull();
-    expect(spreadDestKeys!.size).toBeGreaterThan(1);
 
     expect(state.events.pendingEvent).not.toBeNull();
     expect(state.events.pendingEvent?.eventId).toBe('traffic_jam');

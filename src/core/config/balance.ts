@@ -165,8 +165,13 @@ export const TRAFFIC_JAM_WIDEN_SILENCE_TICKS = 1000;
 /** Well-being penalty applied when the player ignores a jam (#1208). */
 export const TRAFFIC_JAM_IGNORE_WELLBEING_PENALTY = 5;
 
-/** Minimum consecutive waiting ticks per vehicle before it counts toward a traffic jam. */
-export const TRAFFIC_JAM_MIN_TICKS = 10;
+/**
+ * Minimum consecutive waiting ticks per agent before it counts toward a traffic jam.
+ * Invariant: strictly below AGENT_OCCUPANCY_WAIT_TICKS. At that many waited ticks the
+ * occupancy ladder spreads the blocked mover and clears its itinerary, so a threshold
+ * at or above it would see agents for a tick or less and never several at once.
+ */
+export const TRAFFIC_JAM_MIN_TICKS = 4;
 
 // ─── Vehicle Spawn Placement ────────────────────────────────────────────────────
 

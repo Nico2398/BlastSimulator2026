@@ -27,6 +27,7 @@ export type { GoalMismatch } from './scenario-goal.js';
  * not a silent pass-through to whatever assertion comes next.
  *
  * Auto-resolves a pending event with its first option each time one fires
+ * and the target is not yet met (the target is checked first)
  * (#554 finding): `tickCommand` itself refuses to advance at all while
  * `state.events.pendingEvent` is set ("Pending event! Resolve it first"), so
  * a `tick 1` issued after a spontaneous event stops advancing the clock
@@ -52,16 +53,19 @@ function runWaitUntil(
   let lastState: Record<string, unknown> | null = null;
   for (let i = 0; i < action.maxTicks; i++) {
     runCommand(engine, 'tick 1');
-    if (ctx.state?.events.pendingEvent) {
-      runCommand(engine, 'event choose 0');
-    }
     lastState = serializeGameState(ctx) as Record<string, unknown> | null;
     lastValue = lastState ? lastState[action.field] : undefined;
+    // Target first: a wait whose target IS a pending event (or a state that
+    // only exists while one is pending, e.g. trafficJamCount) must return with
+    // the event still pending for the next step to answer.
     if (lastValue === action.equals) {
       return {
         output: `waitUntil: "${action.field}" reached ${JSON.stringify(action.equals)} after ${i + 1} tick(s)`,
         gameState: lastState,
       };
+    }
+    if (ctx.state?.events.pendingEvent) {
+      runCommand(engine, 'event choose 0');
     }
   }
   throw new Error(

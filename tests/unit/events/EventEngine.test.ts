@@ -7,6 +7,7 @@ import {
   TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
 } from '../../../src/core/events/EventEngine.js';
+import { AGENT_OCCUPANCY_WAIT_TICKS } from '../../../src/core/config/balance.js';
 import {
   createEventSystemState,
   type EventSystemState,
@@ -125,8 +126,8 @@ describe('EventEngine — detectTrafficJam (#1208 chokepoints)', () => {
     expect(TRAFFIC_JAM_MIN_VEHICLES).toBe(3);
   });
 
-  it('exports TRAFFIC_JAM_MIN_TICKS constant equal to 10', () => {
-    expect(TRAFFIC_JAM_MIN_TICKS).toBe(10);
+  it('keeps TRAFFIC_JAM_MIN_TICKS strictly below AGENT_OCCUPANCY_WAIT_TICKS', () => {
+    expect(TRAFFIC_JAM_MIN_TICKS).toBeLessThan(AGENT_OCCUPANCY_WAIT_TICKS);
   });
 
   it('returns null with no ramps and no employees', () => {
