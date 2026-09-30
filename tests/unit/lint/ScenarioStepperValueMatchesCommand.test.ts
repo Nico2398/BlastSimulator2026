@@ -46,6 +46,7 @@ export const STEPPER_FIELD_TO_COMMAND_PARAM: Readonly<Record<string, string>> = 
   amount: 'amount',
   stemming: 'stemming',
   'delay-step': 'delay_step',
+  width: 'width',
 };
 
 /** The `data-field` a stepper action targets, from its container selector. */

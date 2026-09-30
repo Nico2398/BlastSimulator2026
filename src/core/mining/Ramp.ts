@@ -422,8 +422,11 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
 
   const rawSurfaceY: number[] = [];
   for (let step = 0; step < ramp.length; step++) {
-    const cx = ramp.originX + offset.dx * step;
-    const cz = ramp.originZ + offset.dz * step;
+    // A widen order reads the first still-pristine strip column: the axis
+    // column is already carved, so its surface is the old floor, not terrain.
+    const probe = carvedHalf + 1;
+    const cx = ramp.originX + offset.dx * step + (carvedHalf >= 0 ? perpDx * probe : 0);
+    const cz = ramp.originZ + offset.dz * step + (carvedHalf >= 0 ? perpDz * probe : 0);
     rawSurfaceY.push(computeColumnSurfaceY(grid, cx, cz));
   }
   const originSurfaceY = rawSurfaceY[0]!;

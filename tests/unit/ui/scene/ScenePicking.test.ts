@@ -32,6 +32,7 @@ function makeFakeRenderer(opts: {
 }): GameRenderer {
   return {
     pickables: () => opts.pickables ?? [],
+    rampIdAtTile: () => null,
     terrain: opts.terrainMeshes ? { meshes: opts.terrainMeshes } : null,
     // Mirrors GameRenderer's public `landscape` field (#558) — pickScene must
     // fall back to it so ground past the site's claimed edge can be aimed at.
