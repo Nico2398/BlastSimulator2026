@@ -482,7 +482,7 @@ export class GameRenderer {
   }
 
   /** Current world-space position of a live entity, for hover-tag/highlight placement. See GameRendererPicking.ts. */
-  entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole', id: number): THREE.Vector3 | null {
+  entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole' | 'ramp', id: number): THREE.Vector3 | null {
     return entityWorldPosition(this.pickingDeps(), kind, id);
   }
 

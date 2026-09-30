@@ -91,7 +91,7 @@ export type SelectionAction =
   | 'detail' | 'dispatch_here' | 'train'
   | 'haul' | 'unassign' | 'follow' | 'move_here'
   | 'upgrade' | 'move' | 'demolish'
-  | 'focus';
+  | 'focus' | 'widen';
 
 export class SelectionBar {
   private readonly root: HTMLElement;
@@ -194,6 +194,8 @@ export class SelectionBar {
         const delay = state.sequenceDelays[hole.id];
         return { title: hole.id, sub: delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m` };
       }
+      case 'ramp':
+        return null; // TODO(#1298): ramp title and width
     }
   }
 
@@ -227,6 +229,8 @@ export class SelectionBar {
         return [
           button('ghost', t('shell.selection.focus'), { icon: 'locate', dataAction: 'focus', onClick: () => fire('focus') }),
         ];
+      case 'ramp':
+        return []; // TODO(#1298): widen action
     }
   }
 

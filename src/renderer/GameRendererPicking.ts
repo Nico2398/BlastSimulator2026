@@ -105,7 +105,7 @@ export function resolveFragmentId(deps: PickingDeps, bucketIndex: number, instan
  */
 export function entityWorldPosition(
   deps: PickingDeps,
-  kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole',
+  kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole' | 'ramp',
   id: number,
 ): THREE.Vector3 | null {
   switch (kind) {
@@ -114,5 +114,6 @@ export function entityWorldPosition(
     case 'employee': return deps.characters?.getPosition(id) ?? null;
     case 'fragment': return deps.fragments?.fragmentPosition(id) ?? null;
     case 'hole': return deps.blastOverlay?.getHolePosition(id) ?? null;
+    case 'ramp': return null; // TODO(#1298): centre of the built ramp's footprint
   }
 }

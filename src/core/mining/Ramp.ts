@@ -12,7 +12,7 @@ import type { VehicleTier } from '../entities/Vehicle.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import {
   MAX_RAMP_LENGTH, NAV_MAX_SLOPE_DEGREES, RAMP_CUT_SLOPE_RATIO,
-  RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS,
+  RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, type RampWidth,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -34,6 +34,8 @@ export interface RampDef {
   length: number;
   /** Target depth (y level to reach). */
   targetDepth: number;
+  /** Corridor width in voxels; undefined means `RAMP_DEFAULT_WIDTH` (#1298). */
+  width?: RampWidth;
 }
 
 export interface RampResult {

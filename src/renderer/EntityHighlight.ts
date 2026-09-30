@@ -27,6 +27,7 @@ const DEFAULT_RADIUS: Record<PickableKind, number> = {
   // and the marker already has a white wireframe ring at 0.6 that an
   // equal-radius amber ring would sit flush against instead of surrounding.
   hole: 1.0,
+  ramp: 2.0,
 };
 
 export class EntityHighlight {

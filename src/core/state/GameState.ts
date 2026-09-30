@@ -59,6 +59,7 @@ import { createLevelStats } from '../campaign/SuccessTracker.js';
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
+import type { BuiltRamp } from '../mining/RampWidening.js';
 
 /** Save format version — increment when GameState shape changes. */
 // v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
@@ -133,7 +134,11 @@ import type { RampDef } from '../mining/Ramp.js';
 // so the course now starts on arrival rather than at claim time). A pre-v25
 // save has no pending enrolment in flight: every employee missing the field
 // gets `pendingTrainingState: null`. See SaveLoad.ts's migrateV24ToV25.
-export const SAVE_VERSION = 26;
+// v26 -> v27: GameState gained `builtRamps: BuiltRamp[]` and
+// `nextBuiltRampId` (#1298 — a finished ramp is selectable and widenable).
+// A pre-v27 save has no recorded ramps: `builtRamps` defaults to [].
+// See SaveLoad.ts's migrateV26ToV27.
+export const SAVE_VERSION = 27;
 
 export interface GameConfig {
   seed: number;
@@ -278,6 +283,8 @@ export interface PlannedRamp {
   def: RampDef;
   footprint: { minX: number; maxX: number; minZ: number; maxZ: number };
   segments: RampSegmentTracker[];
+  /** Set when this order widens the built ramp with this id instead of cutting a new one (#1298). */
+  widenOf?: number;
 }
 
 /**
@@ -430,6 +437,10 @@ export interface GameState {
   plannedRamps: PlannedRamp[];
   /** Next ID to assign to a newly created PlannedRamp. */
   nextPlannedRampId: number;
+  /** Finished ramps, selectable and widenable (#1298). */
+  builtRamps: BuiltRamp[];
+  /** Next ID to assign to a BuiltRamp. */
+  nextBuiltRampId: number;
   /** Buildings ordered but not yet built — each queues one `place_building` action and lands in `buildings.buildings` on completion (#556). */
   plannedBuildings: PlannedBuilding[];
   /** Next ID to assign to a newly created PlannedBuilding. */
@@ -550,6 +561,8 @@ export function createGame(config: GameConfig): GameState {
     tubingState: createTubingState(),
     plannedRamps: [],
     nextPlannedRampId: 1,
+    builtRamps: [],
+    nextBuiltRampId: 1,
     plannedBuildings: [],
     nextPlannedBuildingId: 1,
   };

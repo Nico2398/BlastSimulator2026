@@ -131,6 +131,8 @@ export class HoverTag {
         const delay = state.sequenceDelays[hole.id];
         return this.row('blast', hole.id, delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m`);
       }
+      case 'ramp':
+        return null; // TODO(#1298): ramp hover row
     }
   }
 

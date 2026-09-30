@@ -138,6 +138,16 @@ export function buildRampCommand(
  * `cancelAction`/`actionOrderCost`) and removes the `PlannedRamp` entirely.
  * Already-carved terrain is kept; only undug segments' cost is refunded.
  */
+/** `widen_ramp id:N width:W` — orders a built ramp widened (#1298). */
+export function widenRampCommand(
+  _ctx: MiningContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  // TODO(#1298): implement
+  return { success: false, output: 'not implemented' };
+}
+
 export function cancelRampCommand(ctx: MiningContext, rampId: number): { success: boolean; output: string } {
   const state = ctx.state!;
   const ramp = state.plannedRamps.find(r => r.id === rampId);
