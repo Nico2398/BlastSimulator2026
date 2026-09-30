@@ -32,6 +32,7 @@ function makeFakeRenderer(opts: {
 }): GameRenderer {
   return {
     pickables: () => opts.pickables ?? [],
+    rampIdAtTile: () => null,
     terrain: opts.terrainMeshes ? { meshes: opts.terrainMeshes } : null,
     // Mirrors GameRenderer's public `landscape` field (#558) — pickScene must
     // fall back to it so ground past the site's claimed edge can be aimed at.
@@ -498,5 +499,72 @@ describe('ScenePicking (class — canvas wiring, debounce, click-vs-drag)', () =
     canvas.style.cursor = 'pointer';
     sp.dispose();
     expect(canvas.style.cursor).toBe('');
+  });
+});
+
+// ── #1298: a built ramp is pickable when no entity is hit ─────────────────────
+
+describe('pickScene — ramps (#1298)', () => {
+  /** The renderer resolves a terrain tile to the id of the built ramp covering it (contract: `rampIdAtTile`). */
+  function withRamps(base: GameRenderer, rampIdAtTile: (x: number, z: number) => number | null): GameRenderer {
+    return Object.assign(base, { rampIdAtTile }) as GameRenderer;
+  }
+
+  it('returns a ramp entity for a terrain hit on a ramp tile', () => {
+    const tm = makeSolidTerrain();
+    const camera = makeTopDownCamera(3.7, 2.2);
+    const renderer = withRamps(makeFakeRenderer({ terrainMeshes: tm.meshes }), (x, z) => (x === 3 && z === 2 ? 4 : null));
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'ramp', id: 4 }));
+    tm.dispose();
+  });
+
+  it('keeps plain terrain for a tile that is not on any ramp', () => {
+    const tm = makeSolidTerrain();
+    const camera = makeTopDownCamera(3.7, 2.2);
+    const renderer = withRamps(makeFakeRenderer({ terrainMeshes: tm.meshes }), () => null);
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 3, tileZ: 2 }));
+    tm.dispose();
+  });
+
+  it('a building on a ramp tile keeps priority over the ramp', () => {
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    bm.addBuilding({ id: 7, type: 'management_office', tier: 1, x: 4, z: 4, hp: 100, active: true, occupantIds: [] }, 0);
+    scene.updateMatrixWorld(true);
+    const camera = makeTopDownCamera(5, 5);
+    const renderer = withRamps(makeFakeRenderer({ pickables: bm.pickables() }), () => 1);
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'building', id: 7 }));
+    bm.dispose();
+  });
+
+  it('a vehicle on a ramp tile keeps priority over the ramp', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const vehicle = { id: 3, type: 'debris_hauler', x: 5, z: 5, hp: 100, tier: 1, payload: null, occupantIds: [] } as never;
+    vm.addVehicle(vehicle, { vehicles: [vehicle], nextId: 4, driverBoardingCount: 0, reservations: [] } as never, [], 0);
+    scene.updateMatrixWorld(true);
+    const camera = makeTopDownCamera(5, 5);
+    const renderer = withRamps(makeFakeRenderer({ pickables: vm.pickables() }), () => 1);
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'vehicle', id: 3 }));
+    vm.dispose();
+  });
+
+  it('resolves ramps on the landscape fallback too and reports the hit point and distance', () => {
+    const landscape = makeFlatLandscapeMesh();
+    const camera = makeTopDownCamera(3.7, 2.2);
+    const renderer = withRamps(makeFakeRenderer({ landscapeMeshes: [landscape] }), (x, z) => (x === 3 && z === 2 ? 2 : null));
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'ramp', id: 2 }));
+    expect(result.entity!.distance).toBeGreaterThan(0);
   });
 });

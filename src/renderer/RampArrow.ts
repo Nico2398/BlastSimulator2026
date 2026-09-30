@@ -7,7 +7,7 @@
 //
 // The layout reads the ramp's own RampDef, so the arrow shows the ramp that
 // will actually be dug: the snapped cardinal axis rampDefFromEndpoints picks,
-// the RAMP_WIDTH-wide band defineRampSegments carves (centred on the axis),
+// the `width`-wide band defineRampSegments carves (centred on the axis),
 // and steps 0..length-1 — never the raw diagonal drag.
 //
 // Legibility: the yellow body sits on a dark, slightly larger underlay, so it
@@ -16,7 +16,9 @@
 // sampled height, and a depth-tested arrow would vanish into the cut.
 
 import * as THREE from 'three';
-import { RAMP_WIDTH, type RampDef } from '../core/mining/Ramp.js';
+import { rampWidthOf, type RampDef } from '../core/mining/Ramp.js';
+import { rampFootprint } from '../core/mining/RampWidening.js';
+import type { RampFootprint } from '../core/state/GameState.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
 import type { SurfaceHeightSampler } from './GroundTint.js';
 
@@ -36,7 +38,7 @@ const UNDERLAY_MARGIN = 0.14;
 /** Shaft is subdivided at this spacing so it follows the ground along a long ramp. */
 const SHAFT_STEP = 0.5;
 
-type RampArrowSpec = Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length'>;
+type RampArrowSpec = Pick<RampDef, 'originX' | 'originZ' | 'direction' | 'length' | 'width'>;
 
 interface RampArrowLayout {
   /** Upper-end tile — the ramp's origin. */
@@ -46,7 +48,7 @@ interface RampArrowLayout {
   /** Unit step along the ramp, top to bottom. */
   dir: { dx: number; dz: number };
   /** Inclusive tile bounds of the carved band. */
-  corridor: { minX: number; maxX: number; minZ: number; maxZ: number };
+  corridor: RampFootprint;
 }
 
 const DIR_STEP: Record<RampDef['direction'], { dx: number; dz: number }> = {
@@ -62,14 +64,7 @@ export function rampArrowLayout(ramp: RampArrowSpec): RampArrowLayout | null {
   const dir = DIR_STEP[ramp.direction];
   const tail = { x: ramp.originX, z: ramp.originZ };
   const tip = { x: tail.x + dir.dx * (ramp.length - 1), z: tail.z + dir.dz * (ramp.length - 1) };
-  const half = Math.floor(RAMP_WIDTH / 2);
-  const alongX = dir.dx !== 0;
-  const corridor = {
-    minX: alongX ? Math.min(tail.x, tip.x) : tail.x - half,
-    maxX: alongX ? Math.max(tail.x, tip.x) : tail.x + half,
-    minZ: alongX ? tail.z - half : Math.min(tail.z, tip.z),
-    maxZ: alongX ? tail.z + half : Math.max(tail.z, tip.z),
-  };
+  const corridor = rampFootprint(ramp, rampWidthOf(ramp));
   return { tail, tip, dir, corridor };
 }
 

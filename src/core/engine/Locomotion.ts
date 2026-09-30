@@ -273,7 +273,7 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
       // even though this arrival is real forward progress and the action
       // goes on to complete normally: reproduced live via
       // ramp-foot-traffic.json, six employees dispatched into a
-      // RAMP_WIDTH=3 corridor at the identical exact target cell, where the
+      // default-width (3-voxel) ramp corridor at the identical exact target cell, where the
       // slowest of the six arrives (via exactly this spread-onto-self path)
       // with its action completing but isMoveStuck never clearing again for
       // the rest of the run. Arriving — by any path — is never itself a

@@ -59,7 +59,9 @@ h(a, b) = max(|dx|, |dz|) + (√2 − 1) * min(|dx|, |dz|)
 
 ## Ramps & Multi-Level Navigation
 
-Pit descends in bench levels. Employees + vehicles access lower benches via **ramp structures** (building type `'ramp'`, footprint 1×4 cells, oriented N/S/E/W). Ramps appear as `ramp` cells bridging two bench levels.
+Pit descends in bench levels. Employees + vehicles access lower benches via **ramps**, corridors dug N/S/E/W. A ramp is a **terrain feature, not a building** (#1298): it is never in `state.buildings`, has no tier or occupants, is not destructible, and never blocks the navmesh — it only appears as `ramp` cells bridging two bench levels.
+
+**Width is per ramp.** The player picks one of `RAMP_WIDTH_OPTIONS` (3, 5, 7; default `RAMP_DEFAULT_WIDTH`) at construction (`build_ramp ... width:N`); the corridor is `floor(width/2)` voxels either side of the axis. Cost is `length × width × RAMP_COST_PER_METER_PER_WIDTH`, and dig time scales with the number of cells to clear. A finished ramp is recorded in `state.builtRamps` (`BuiltRamp`: id, def, width, footprint — `src/core/mining/RampWidening.ts`), which is what makes it selectable. `orderRampWiden(state, grid, rampId, toWidth)` (console `widen_ramp id:N width:M`) charges only the extra width and queues only the side strips; cancelling it refunds the unworked cost and the ramp keeps its old width. Selecting a ramp offers widen only — no demolish, upgrade or move.
 
 Multi-level path planning:
 1. Same bench level → standard A*
@@ -78,7 +80,7 @@ NavGrid is **incrementally updated** — full rebuild too expensive.
 | Building ordered, placed, upgraded, moved, cancelled, or demolished | Building footprint cells |
 | Vehicle parks or departs | Single cell |
 | Drill hole added | Single cell |
-| Ramp built | 1×4 footprint + adjacent cells |
+| Ramp built or widened | Corridor footprint (`rampFootprint`) + adjacent cells |
 | Site claims a chunk | Full rebuild over the new bounding box |
 
 A claim is the one trigger that rebuilds rather than patches: the bounding box itself moved, so every cell's index changed. Expansion happens at human speed, which is what makes an O(area) rebuild cheaper than making A* chunk-aware (#473 D7).

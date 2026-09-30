@@ -967,7 +967,19 @@ export const RAMP_DIG_VOXELS_PER_TICK_TIER1 = 8;
 /** Largest rectangle area (voxels) `level_ground` will accept in one order (#1009, mirrors MAX_RAMP_LENGTH above). */
 export const MAX_LEVEL_GROUND_AREA = 400;
 
-/** Cost per voxel levelled, in game dollars (#1009, mirrors RAMP_COST_PER_METER in Ramp.ts). */
+/** Ramp widths (voxels) the player may choose at construction or widen to (#1298). */
+export const RAMP_WIDTH_OPTIONS = [3, 5, 7] as const;
+export type RampWidth = typeof RAMP_WIDTH_OPTIONS[number];
+/** True when `n` is one of the selectable ramp widths. */
+export function isRampWidth(n: number): n is RampWidth {
+  return (RAMP_WIDTH_OPTIONS as readonly number[]).includes(n);
+}
+/** Width of a ramp when none is chosen — the pre-#1298 fixed width. */
+export const RAMP_DEFAULT_WIDTH: RampWidth = 3;
+/** Ramp cost per meter of length per voxel of width; the default width costs the pre-#1298 flat $100/m. */
+export const RAMP_COST_PER_METER_PER_WIDTH = 100 / 3;
+
+/** Cost per voxel levelled, in game dollars (#1009, mirrors the ramp cost in balance above). */
 export const LEVEL_GROUND_COST_PER_VOXEL = 12;
 
 /** Base duration (ticks) of a `place_building` action before the per-tier multiplier (#556 construction sites). */

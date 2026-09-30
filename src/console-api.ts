@@ -44,6 +44,10 @@ export interface SerializableGameState {
   orderedChargeCount: number;
   /** Remaining not-yet-`done` segments across every in-flight `state.plannedRamps` entry — proves a ramp order queues progressive excavation work instead of carving the whole corridor instantly (#555). A ramp is spliced out of `plannedRamps` entirely once its last segment lands, so this reaches 0 exactly when every ordered ramp has finished, not merely when the field would otherwise read 0 on an empty ramp. */
   orderedRampSegmentCount: number;
+  /** Finished ramps (state.builtRamps.length, #1298). */
+  builtRampCount: number;
+  /** Width of the first built ramp, 0 when none is built (#1298). */
+  builtRampWidth: number;
   /** Buildings ordered but not yet built (state.plannedBuildings.length) — proves a build order queues work instead of creating the building instantly (#556). */
   orderedBuildingCount: number;
   chargedCount: number;
@@ -157,6 +161,8 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     orderedRampSegmentCount: s.plannedRamps.reduce(
       (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
     ),
+    builtRampCount: s.builtRamps.length,
+    builtRampWidth: s.builtRamps[0]?.width ?? 0,
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,

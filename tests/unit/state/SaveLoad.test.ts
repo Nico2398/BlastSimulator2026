@@ -1137,8 +1137,8 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1200,8 +1200,8 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1281,8 +1281,8 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // to the fragment, mid-break, or never hauling at all) gets `payload: null`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {
@@ -1374,8 +1374,8 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 // truth since v19) left exactly as they were.
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
@@ -1460,8 +1460,8 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
 // taken mid vehicle-gated action doesn't forget which vehicle it claimed.
 
 describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it('a v21 vehicle with reservedForActionId set migrates its reservation into VehicleState.reservations, with none of the seven other fields on the restored Vehicle', () => {
@@ -1608,8 +1608,8 @@ describe('serialize — walk trail is transient (#1199)', () => {
 // locomotion put them.
 
 describe('deserialize — v23→v24 migration for building occupancy (#1202)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it('a pre-v24 save loads with every building empty and everyone outside', () => {
@@ -1652,8 +1652,8 @@ describe('deserialize — v23→v24 migration for building occupancy (#1202)', (
 // `pendingTrainingState: null`.
 
 describe('deserialize — v24→v25 migration for training walk-in (#1203)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it('a pre-v25 save loads with every employee\'s pendingTrainingState defaulted to null', () => {
@@ -1690,8 +1690,8 @@ describe('deserialize — v24→v25 migration for training walk-in (#1203)', () 
 // unconditionally.
 
 describe('deserialize — v25→v26 migration for agentOccupancyEnabled removal (#1207)', () => {
-  it('SAVE_VERSION is 26', () => {
-    expect(SAVE_VERSION).toBe(26);
+  it('SAVE_VERSION is 27', () => {
+    expect(SAVE_VERSION).toBe(27);
   });
 
   it('a pre-v26 save with agentOccupancyEnabled: true loads with the field stripped', () => {
@@ -1716,5 +1716,63 @@ describe('deserialize — v25→v26 migration for agentOccupancyEnabled removal 
     const restored = deserialize(JSON.stringify(parsed)) as unknown as Record<string, unknown>;
 
     expect(restored['agentOccupancyEnabled']).toBeUndefined();
+  });
+});
+
+// ── v26→v27 migration for GameState.builtRamps (#1298) ──────────────────────
+//
+// A finished ramp is recorded as a BuiltRamp so it can be selected and
+// widened. A pre-v27 save has no record of any ramp: builtRamps defaults to []
+// and nextBuiltRampId to 1.
+
+describe('deserialize — v26→v27 migration for builtRamps (#1298)', () => {
+  it('a fresh game starts with no built ramps and next id 1', () => {
+    const state = createGame({ seed: 42 });
+    expect(state.builtRamps).toEqual([]);
+    expect(state.nextBuiltRampId).toBe(1);
+  });
+
+  it('round-trips builtRamps and nextBuiltRampId', () => {
+    const state = createGame({ seed: 42 });
+    const def = { originX: 10, originZ: 5, direction: 'south' as const, length: 12, targetDepth: 6, width: 5 as const };
+    state.builtRamps.push({ id: 1, def, width: 5, footprint: { minX: 8, maxX: 12, minZ: 5, maxZ: 16 } });
+    state.nextBuiltRampId = 2;
+
+    const restored = deserialize(serialize(state));
+
+    expect(restored.builtRamps).toEqual(state.builtRamps);
+    expect(restored.nextBuiltRampId).toBe(2);
+  });
+
+  it('a v26 save without the fields loads with builtRamps [] and nextBuiltRampId 1', () => {
+    const state = createGame({ seed: 42 });
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    parsed['version'] = 26;
+    delete parsed['builtRamps'];
+    delete parsed['nextBuiltRampId'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.builtRamps).toEqual([]);
+    expect(restored.nextBuiltRampId).toBe(1);
+  });
+
+  it('a v27 save keeps the builtRamps it carries (migration does not overwrite)', () => {
+    const state = createGame({ seed: 42 });
+    const def = { originX: 1, originZ: 1, direction: 'east' as const, length: 10, targetDepth: 4 };
+    state.builtRamps.push({ id: 3, def, width: 7, footprint: { minX: 1, maxX: 10, minZ: -2, maxZ: 4 } });
+    state.nextBuiltRampId = 4;
+    const restored = deserialize(serialize(state));
+    expect(restored.builtRamps).toHaveLength(1);
+    expect(restored.builtRamps[0]!.width).toBe(7);
+    expect(restored.nextBuiltRampId).toBe(4);
+  });
+
+  it('a planned widen order keeps its widenOf link across save/load', () => {
+    const state = createGame({ seed: 42 });
+    const def = { originX: 1, originZ: 1, direction: 'east' as const, length: 10, targetDepth: 4, width: 5 as const };
+    state.plannedRamps.push({ id: 1, def, footprint: { minX: 0, maxX: 1, minZ: 0, maxZ: 1 }, segments: [], widenOf: 2 });
+    const restored = deserialize(serialize(state));
+    expect(restored.plannedRamps[0]!.widenOf).toBe(2);
   });
 });

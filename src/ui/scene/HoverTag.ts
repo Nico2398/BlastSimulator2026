@@ -10,6 +10,7 @@ import { el } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { findSurveyForColumn, isSurveyStale } from '../../core/mining/SurveyCalc.js';
+import { describeRamp } from '../describeRamp.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import type { PickResult } from './ScenePicking.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
@@ -130,6 +131,12 @@ export class HoverTag {
         if (!hole) return null;
         const delay = state.sequenceDelays[hole.id];
         return this.row('blast', hole.id, delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m`);
+      }
+      case 'ramp': {
+        const ramp = state.builtRamps.find(r => r.id === entity.id);
+        if (!ramp) return null;
+        const { title, sub } = describeRamp(ramp);
+        return this.row('down', title, sub);
       }
     }
   }

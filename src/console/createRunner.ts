@@ -22,6 +22,7 @@ import {
   blastPreviewCommand,
   buySoftwareCommand,
   buildRampCommand,
+  widenRampCommand,
   levelGroundCommand,
   weatherCommand,
   tubingCommand,
@@ -198,6 +199,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('build_ramp', 'Build ramp (origin:X,Z direction:south length:10)', (args, named) =>
     buildRampCommand(ctx, args, named),
+  );
+  runner.register('widen_ramp', 'Widen a built ramp (id:N width:5)', (args, named) =>
+    widenRampCommand(ctx, args, named),
   );
   runner.register('level_ground', 'Level a rectangular area (minX:0 maxX:10 minZ:0 maxZ:10)', (args, named) =>
     levelGroundCommand(ctx, args, named),

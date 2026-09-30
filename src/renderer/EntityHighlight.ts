@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { PickableKind } from './Pickable.js';
+import type { RampFootprint } from '../core/state/GameState.js';
 
 const RING_COLOR = 0xffb02e; // --bsx-amber
 const RING_SEGMENTS = 48;
@@ -27,6 +28,7 @@ const DEFAULT_RADIUS: Record<PickableKind, number> = {
   // and the marker already has a white wireframe ring at 0.6 that an
   // equal-radius amber ring would sit flush against instead of surrounding.
   hole: 1.0,
+  ramp: 2.0,
 };
 
 export class EntityHighlight {
@@ -40,13 +42,37 @@ export class EntityHighlight {
 
   /** Show the ring under a world-space position. Replaces any ring already shown. */
   show(position: THREE.Vector3, kind: PickableKind, radius: number = DEFAULT_RADIUS[kind]): void {
-    this.hide();
-
     const points: THREE.Vector3[] = [];
     for (let i = 0; i <= RING_SEGMENTS; i++) {
       const angle = (i / RING_SEGMENTS) * Math.PI * 2;
       points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
     }
+    this.mount(points, position);
+  }
+
+  /**
+   * Outline a ramp's corridor (inclusive tile bounds) instead of a ring, each
+   * edge point following the ground via `sampler`. `position` is the
+   * corridor's centre, the point `setPosition` keeps the outline anchored to.
+   */
+  showFootprint(
+    footprint: RampFootprint,
+    position: THREE.Vector3,
+    sampler: (x: number, z: number) => number,
+  ): void {
+    const x0 = footprint.minX, x1 = footprint.maxX + 1, z0 = footprint.minZ, z1 = footprint.maxZ + 1;
+    const corners: Array<[number, number]> = [];
+    for (let x = x0; x < x1; x++) corners.push([x, z0]);
+    for (let z = z0; z < z1; z++) corners.push([x1, z]);
+    for (let x = x1; x > x0; x--) corners.push([x, z1]);
+    for (let z = z1; z > z0; z--) corners.push([x0, z]);
+    corners.push([x0, z0]);
+    const points = corners.map(([x, z]) => new THREE.Vector3(x - position.x, sampler(x, z) - position.y, z - position.z));
+    this.mount(points, position);
+  }
+
+  private mount(points: THREE.Vector3[], position: THREE.Vector3): void {
+    this.hide();
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const material = new THREE.LineDashedMaterial({
       color: RING_COLOR,

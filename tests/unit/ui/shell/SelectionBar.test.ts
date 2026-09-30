@@ -361,3 +361,50 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     expect(driver?.itinerary?.legs[0]?.destZ).toBe(7);
   });
 });
+
+describe('SelectionBar — ramp (#1298)', () => {
+  function stateWithRamp(width: 3 | 5 | 7) {
+    const state = makeState();
+    const def = { originX: 10, originZ: 5, direction: 'south' as const, length: 12, targetDepth: 6, width };
+    state.builtRamps.push({ id: 1, def, width, footprint: { minX: 10 - Math.floor(width / 2), maxX: 10 + Math.floor(width / 2), minZ: 5, maxZ: 16 } });
+    state.nextBuiltRampId = 2;
+    return state;
+  }
+
+  it('shows the ramp with its id and width', () => {
+    const { bar, root } = makeBar();
+    bar.show(entity('ramp', 1), stateWithRamp(5));
+    expect(bar.visible).toBe(true);
+    expect(root.textContent).toContain('5');
+  });
+
+  it('offers a widen action and no demolish, upgrade or move', () => {
+    const { bar, root } = makeBar();
+    bar.show(entity('ramp', 1), stateWithRamp(3));
+    expect(root.querySelector('[data-action="widen"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="demolish"]')).toBeNull();
+    expect(root.querySelector('[data-action="upgrade"]')).toBeNull();
+    expect(root.querySelector('[data-action="move"]')).toBeNull();
+  });
+
+  it('fires the widen action with the ramp entity when clicked', () => {
+    const { bar, root } = makeBar();
+    const handler = vi.fn();
+    bar.setActionHandler(handler);
+    bar.show(entity('ramp', 1), stateWithRamp(5));
+    root.querySelector<HTMLButtonElement>('[data-action="widen"]')!.click();
+    expect(handler).toHaveBeenCalledWith('widen', expect.objectContaining({ kind: 'ramp', id: 1 }));
+  });
+
+  it('offers no widen action at the maximum width', () => {
+    const { bar, root } = makeBar();
+    bar.show(entity('ramp', 1), stateWithRamp(7));
+    expect(root.querySelector<HTMLButtonElement>('[data-action="widen"]')).toBeNull();
+  });
+
+  it('hides the bar for a ramp id that no longer exists', () => {
+    const { bar } = makeBar();
+    bar.show(entity('ramp', 99), makeState());
+    expect(bar.visible).toBe(false);
+  });
+});

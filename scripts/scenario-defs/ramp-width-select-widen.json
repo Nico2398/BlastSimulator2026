@@ -1,0 +1,112 @@
+{
+  "name": "ramp-width-select-widen",
+  "description": "#1298: ramp width is a player choice and a built ramp can be selected and widened. A player arms the ramp tool, raises the width param from the default 3 to 5 with the width stepper, drags the corridor and confirms (cost scales with width); once the ramp is dug BuiltRamp state reports one ramp of width 5. The player then clicks the ramp in the scene: the selection bar offers Widen and no Demolish (a ramp is a terrain feature, not a building). Clicking Widen orders only the delta, and once the extra side strips are dug the ramp is 7 wide. Contract for console-api state: builtRampCount (state.builtRamps.length) and builtRampWidth (width of the first built ramp, 0 when none).",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 staffed:true" }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "builtRampCount": 0 }
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Staffed vehicles come unmanned (#551) - crew rock_digger #3 with driver #4 before ordering excavation work. Same bootstrap as building-ramp-visual.json.",
+      "interaction": [
+        { "type": "command", "command": "vehicle driver 3 4" }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "build_ramp origin:20,20 direction:south length:11 depth:6 width:5",
+      "timeout": 60,
+      "description": "Player arms the ramp tool, sets depth 6 and raises the width param to 5 via its stepper (data-field=\"width\" on the ParamStrip, steps through RAMP_WIDTH_OPTIONS), drags the 11-tile corridor and confirms. The charged cost reflects width 5 (length * 5 * RAMP_COST_PER_METER_PER_WIDTH).",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel .bs-build-ramp-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "setStepper", "selector": "#bs-param-strip [data-field=\"depth\"]", "value": 6 },
+        { "type": "setStepper", "selector": "#bs-param-strip [data-field=\"width\"]", "value": 5 },
+        { "type": "dragTiles", "x1": 20, "z1": 20, "x2": 20, "z2": 31 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["orderedRampSegmentCount"],
+        "note": "Order charged and queued; nothing is built yet. Exact cost is asserted by unit tests; the player-visible claim here is that a click-driven order at width 5 lands."
+      }
+    },
+    {
+      "command": "wait_until field:builtRampCount equals:1 max_ticks:1200",
+      "timeout": 185,
+      "description": "Wait for every dig_ramp_segment to land; the finished ramp is recorded as a BuiltRamp. Condition-based wait on builtRampCount, never a tick pad.",
+      "interaction": [
+        { "type": "cameraFocus", "x": 20, "z": 25.5, "distance": 16 },
+        { "type": "waitUntil", "field": "builtRampCount", "equals": 1, "maxTicks": 1200, "timeoutMs": 180000 }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "builtRampCount": 1, "builtRampWidth": 5, "orderedRampSegmentCount": 0 }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 90,
+      "description": "Player clicks the dug ramp in the scene (viewport centre after a near top-down focusTile on the corridor midpoint, so the ray lands on the floor tile whatever the dug depth). The selection bar shows the ramp with a Widen action; Demolish must not exist (a ramp is a terrain feature).",
+      "interaction": [
+        { "type": "focusTile", "x": 20, "z": 25, "distance": 16, "pitch": 80 },
+        { "type": "click", "x": 640, "y": 360 },
+        { "type": "waitForSelector", "selector": "#bs-selection-bar [data-action=\"widen\"]", "timeout": 60000 }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"widen\"]",
+        "note": "Ramp selected; widen offered (width 5 < max 7). Demolish absence is asserted by unit tests."
+      }
+    },
+    {
+      "command": "widen_ramp id:1 width:7",
+      "timeout": 30,
+      "description": "Player clicks Widen on the selection bar. Each click steps to the next option (5 -> 7) and orders only the delta cost, length * (7 - 5) * RAMP_COST_PER_METER_PER_WIDTH.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-selection-bar [data-action=\"widen\"]" }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "increased": ["orderedRampSegmentCount"],
+        "equals": { "builtRampWidth": 5 },
+        "note": "Order placed and charged; the ramp is still 5 wide until the last new strip segment is dug. The exact delta is asserted by unit tests (a float figure, so not pinned here)."
+      }
+    },
+    {
+      "command": "wait_until field:builtRampWidth equals:7 max_ticks:1200",
+      "timeout": 185,
+      "description": "Wait for the side strips to be dug; the built ramp then reports width 7.",
+      "interaction": [
+        { "type": "cameraFocus", "x": 20, "z": 25.5, "distance": 16 },
+        { "type": "waitUntil", "field": "builtRampWidth", "equals": 7, "maxTicks": 1200, "timeoutMs": 180000 }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "builtRampWidth": 7, "builtRampCount": 1, "orderedRampSegmentCount": 0 }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        { "type": "command", "command": "state full" }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45, "target": [20, 25.5], "distance": 18 },
+    { "name": "birdseye", "yaw": 0, "pitch": 80, "target": [20, 25.5], "distance": 18 }
+  ]
+}

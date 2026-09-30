@@ -36,7 +36,8 @@ import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
-import { ScenePicking, pickScene } from './ui/scene/ScenePicking.js';
+import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';
+import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { SelectionBar } from './ui/shell/SelectionBar.js';
@@ -47,6 +48,7 @@ import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { createWeatherCycle } from './core/weather/WeatherCycle.js';
 import { Random } from './core/math/Random.js';
+import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
@@ -588,6 +590,10 @@ window.__gameState = () => {
     orderedRampSegmentCount: s.plannedRamps.reduce(
       (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
     ),
+    // Finished ramps and the first one's width -- mirrors serializeGameState
+    // (console-api.ts); proves a selectable/widenable ramp exists (#1298).
+    builtRampCount: s.builtRamps.length,
+    builtRampWidth: s.builtRamps[0]?.width ?? 0,
     // Buildings ordered but not yet built (state.plannedBuildings.length) --
     // mirrors serializeGameState's own field (console-api.ts), same
     // rationale as orderedHoleCount/orderedRampSegmentCount above (#556).
@@ -885,7 +891,7 @@ window.__worldToScreen = (x, z) => {
     };
   };
   const raycastForTile: RaycastForTile = (ndcX, ndcY) => {
-    const pick = pickScene(ndcX, ndcY, scene.camera, gameRenderer);
+    const pick = pickScene(ndcX, ndcY, scene.camera, gameRenderer, undefined, false);
     if (!pick.terrain) return null; // entity occlusion or a miss — honestly a miss, never silently ignored
     return { x: pick.terrain.point.x, y: pick.terrain.point.y, z: pick.terrain.point.z };
   };
@@ -982,12 +988,21 @@ uiManager.setSelectVehicleHandler((vehicleId) => {
 scenePicking.setHoverChangeHandler((hover) => {
   if (ctx.state) hoverTag.update(hover, ctx.state);
 });
+/** Width of the selected ramp as last drawn (bar + corridor highlight); a widening that lands re-draws both (#1298). */
+let shownRampWidth: number | null = null;
+function showSelection(entity: EntityPick, state: GameState): void {
+  selectionBar.show(entity, state);
+  const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
+  const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
+  shownRampWidth = ramp?.width ?? null;
+  if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
+  else if (pos) entityHighlight.show(pos, entity.kind);
+}
 scenePicking.setSelectChangeHandler((entity) => {
   if (entity && ctx.state) {
-    selectionBar.show(entity, ctx.state);
-    const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
-    if (pos) entityHighlight.show(pos, entity.kind);
+    showSelection(entity, ctx.state);
   } else {
+    shownRampWidth = null;
     selectionBar.hide();
     entityHighlight.hide();
   }
@@ -1069,6 +1084,12 @@ selectionBar.setActionHandler((action, entity) => {
       // Until then this routes to the Build panel's own move flow.
       uiManager.showPanel('build');
       break;
+    case 'widen': {
+      const ramp = ctx.state?.builtRamps.find(r => r.id === entity.id);
+      const next = ramp ? nextRampWidth(ramp.width) : null;
+      if (next !== null) reportIfFailed(t('shell.selection.widen'), window.__gameConsole(`widen_ramp id:${entity.id} width:${next}`));
+      break;
+    }
     case 'demolish':
       reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
       scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
@@ -1138,8 +1159,10 @@ scene.start((dt) => {
   // the select-change handler above then hides the ring and the bar.
   if (scenePicking.selection) {
     const pos = gameRenderer.entityWorldPosition(scenePicking.selection.kind, scenePicking.selection.id);
-    if (pos) entityHighlight.setPosition(pos);
-    else scenePicking.clearSelection();
+    if (!pos) scenePicking.clearSelection();
+    else if (shownRampWidth !== null && ctx.state?.builtRamps.find(r => r.id === scenePicking.selection?.id)?.width !== shownRampWidth) {
+      showSelection(scenePicking.selection, ctx.state!);
+    } else entityHighlight.setPosition(pos);
   }
 
   // Advance game time

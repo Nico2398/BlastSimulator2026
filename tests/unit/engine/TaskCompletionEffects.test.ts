@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { applyTaskCompletion } from '../../../src/core/engine/TaskCompletionEffects.js';
-import { createGame, type PendingAction, type PlannedRamp, type PlannedBuilding } from '../../../src/core/state/GameState.js';
+import { createGame, type BuiltRamp, type PendingAction, type PlannedRamp, type PlannedBuilding } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -20,6 +20,8 @@ import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { subscribeNavGridToUpdates, buildingFootprintOccupants } from '../../../src/core/nav/NavGridSync.js';
 import { findBuildingApproachCell } from '../../../src/core/nav/BuildingApproach.js';
+import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
+import type { RampDef } from '../../../src/core/mining/Ramp.js';
 import type { PlaceBuildingActionPayload } from '../../../src/console/commands/buildOrder.js';
 
 const SEED = 42;
@@ -325,5 +327,107 @@ describe('applyTaskCompletion — place_building footprint blocking (#1200)', ()
         expect(cell!.type).not.toBe('blocked');
       }
     }
+  });
+});
+
+describe('applyTaskCompletion — finished ramps become BuiltRamps (#1298)', () => {
+  const DEF: RampDef = { originX: 3, originZ: 1, direction: 'south', length: 4, targetDepth: 2 };
+
+  /** `segmentCount` segments; segments before `completeIndex` are already done, `completeIndex` is finishing now. */
+  function makeFixture(opts: { def?: RampDef; widenOf?: number; segmentCount: number; completeIndex: number; built?: BuiltRamp[] }) {
+    const state = createGame({ seed: SEED });
+    const grid = new VoxelGrid(12, 12);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_digger, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+    vehicle.occupantIds = [employee.id];
+    const def = opts.def ?? DEF;
+
+    const segments: PlannedRamp['segments'] = [];
+    let current!: PendingAction;
+    for (let i = 0; i < opts.segmentCount; i++) {
+      const cells = [{ x: 4, y: 1, z: 2 + i }];
+      const action: PendingAction = {
+        id: 10 + i, type: 'dig_ramp_segment', requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+        targetX: 0, targetZ: 0, targetY: 0,
+        payload: { rampId: 1, segmentIndex: i, cells, region: null },
+        targetEmployeeId: null,
+        status: i === opts.completeIndex ? 'in_progress' : 'queued',
+        holderId: i === opts.completeIndex ? employee.id : null,
+        queuedAtTick: 0,
+      };
+      if (i === opts.completeIndex) current = action;
+      if (i >= opts.completeIndex) state.pendingActions.push(action);
+      segments.push({ index: i, actionId: action.id, cells, region: null, done: i < opts.completeIndex });
+    }
+    reserveVehicle(state.vehicles, vehicle.id, current.id);
+    employee.activeActionId = current.id;
+
+    const planned: PlannedRamp = {
+      id: 1, def, footprint: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 }, segments,
+      ...(opts.widenOf !== undefined ? { widenOf: opts.widenOf } : {}),
+    };
+    state.plannedRamps.push(planned);
+    if (opts.built) { state.builtRamps.push(...opts.built); state.nextBuiltRampId = opts.built.length + 1; }
+    return { state, grid, employee, current };
+  }
+
+  function complete(f: ReturnType<typeof makeFixture>) {
+    return applyTaskCompletion(f.state, f.grid, f.employee,
+      baseProgress({ actionType: 'dig_ramp_segment', actionPayload: f.current.payload, actionId: f.current.id }),
+      new EventEmitter());
+  }
+
+  it('records one BuiltRamp with id, def, width and footprint when the last segment lands', () => {
+    const def: RampDef = { ...DEF, width: 5 };
+    const f = makeFixture({ def, segmentCount: 1, completeIndex: 0 });
+    const report = complete(f);
+    expect(report.rampSegment?.rampFullyDone).toBe(true);
+    expect(f.state.plannedRamps).toEqual([]);
+    expect(f.state.builtRamps).toHaveLength(1);
+    const built = f.state.builtRamps[0]!;
+    expect(built.id).toBe(1);
+    expect(built.def).toEqual(def);
+    expect(built.width).toBe(5);
+    expect(built.footprint).toEqual(rampFootprint(def, 5));
+    expect(f.state.nextBuiltRampId).toBe(2);
+  });
+
+  it('defaults the built width to 3 when the def carries none', () => {
+    const f = makeFixture({ segmentCount: 1, completeIndex: 0 });
+    complete(f);
+    expect(f.state.builtRamps[0]!.width).toBe(3);
+  });
+
+  it('adds no BuiltRamp while segments remain', () => {
+    const f = makeFixture({ segmentCount: 2, completeIndex: 0 });
+    const report = complete(f);
+    expect(report.rampSegment?.rampFullyDone).toBe(false);
+    expect(f.state.builtRamps).toEqual([]);
+    expect(f.state.plannedRamps).toHaveLength(1);
+  });
+
+  describe('a widen order', () => {
+    const built = (): BuiltRamp => ({ id: 1, def: { ...DEF, width: 3 }, width: 3, footprint: rampFootprint(DEF, 3) });
+    const widenDef: RampDef = { ...DEF, width: 5 };
+
+    it('keeps the old width until its last segment completes', () => {
+      const f = makeFixture({ def: widenDef, widenOf: 1, segmentCount: 2, completeIndex: 0, built: [built()] });
+      complete(f);
+      expect(f.state.builtRamps[0]!.width).toBe(3);
+      expect(f.state.plannedRamps).toHaveLength(1);
+    });
+
+    it('updates the existing BuiltRamp width and footprint on the last segment, without adding another', () => {
+      const f = makeFixture({ def: widenDef, widenOf: 1, segmentCount: 2, completeIndex: 1, built: [built()] });
+      complete(f);
+      expect(f.state.plannedRamps).toEqual([]);
+      expect(f.state.builtRamps).toHaveLength(1);
+      expect(f.state.builtRamps[0]!.id).toBe(1);
+      expect(f.state.builtRamps[0]!.width).toBe(5);
+      expect(f.state.builtRamps[0]!.footprint).toEqual(rampFootprint(DEF, 5));
+      expect(f.state.nextBuiltRampId).toBe(2);
+    });
   });
 });

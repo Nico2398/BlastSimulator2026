@@ -463,6 +463,13 @@ function migrateV25ToV26(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v26 -> v27 (#1298): no ramp was recorded before, so none is selectable. Mutates `obj` in place. */
+function migrateV26ToV27(obj: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(obj['builtRamps'])) obj['builtRamps'] = [];
+  if (typeof obj['nextBuiltRampId'] !== 'number') obj['nextBuiltRampId'] = 1;
+  return obj;
+}
+
 /**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
@@ -710,6 +717,11 @@ export function deserialize(json: string): GameState {
   // v25 -> v26: GameState.agentOccupancyEnabled removed (#1207).
   if ((obj['version'] as number) < 26) {
     migrateV25ToV26(obj);
+  }
+
+  // v26 -> v27: GameState.builtRamps / nextBuiltRampId (#1298).
+  if ((obj['version'] as number) < 27) {
+    migrateV26ToV27(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
