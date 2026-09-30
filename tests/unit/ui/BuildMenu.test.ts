@@ -407,6 +407,62 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('build_ramp start:5,5 end:10,5 depth:8'));
   });
 
+  // ── #1298: the ramp tool offers a width param before placing ──────────────
+
+  describe('Ramp tool: width param (#1298)', () => {
+    type StripField = { key: string; value: number; format?: (v: number) => string; onInc: () => void; onDec: () => void };
+
+    function armRamp() {
+      const { kit, controller, strip } = makeMockKit();
+      menu.setPlacementKit(kit);
+      container.querySelector<HTMLButtonElement>('.bs-build-ramp-btn')!.click();
+      controller.simulateSelect({ x1: 5, z1: 5, x2: 5, z2: 25 });
+      const fields = () => strip.show.mock.calls.at(-1)![0].fields as StripField[];
+      const width = () => fields().find(f => f.key === 'width')!;
+      return { controller, strip, fields, width };
+    }
+
+    it('shows a width field beside depth, defaulting to 3', () => {
+      const { fields, width } = armRamp();
+      expect(fields().map(f => f.key)).toEqual(expect.arrayContaining(['depth', 'width']));
+      expect(fields().find(f => f.key === 'depth')).toBe(fields()[0]); // depth stays first
+      expect(width().value).toBe(3);
+    });
+
+    it('steps through the width options 3, 5, 7 and clamps at both ends', () => {
+      const { width } = armRamp();
+      width().onInc(); expect(width().value).toBe(5);
+      width().onInc(); expect(width().value).toBe(7);
+      width().onInc(); expect(width().value).toBe(7);
+      width().onDec(); expect(width().value).toBe(5);
+      width().onDec(); expect(width().value).toBe(3);
+      width().onDec(); expect(width().value).toBe(3);
+    });
+
+    it('confirming dispatches build_ramp with the chosen width', () => {
+      const { controller, width } = armRamp();
+      width().onInc();
+      controller.simulateConfirm();
+      expect(gameConsole).toHaveBeenCalledWith(expect.stringMatching(/^build_ramp start:5,5 end:5,25 depth:\d+ width:5$/));
+    });
+
+    it('confirming at the default width dispatches width:3', () => {
+      const { controller } = armRamp();
+      controller.simulateConfirm();
+      expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('width:3'));
+    });
+
+    it('confirmEnabled follows the wider cost: a balance covering width 3 but not width 7 disables confirm at 7', () => {
+      const rampDef = rampDefFromEndpoints(5, 5, 5, 25, 8);
+      const cost3 = rampDef.length * RAMP_COST_PER_METER;
+      menu.update(makeMockState({ cash: cost3 + 1 }));
+      const { strip, width } = armRamp();
+      expect(strip.show.mock.calls.at(-1)![0].confirmEnabled).toBe(true);
+      width().onInc(); width().onInc();
+      expect(strip.show.mock.calls.at(-1)![0].confirmEnabled).toBe(false);
+    });
+  });
+
   // ── #1210: BuildMenu's own confirmEnabled gate must never disagree with
   // core's validateRampOrder — today it doesn't consult validateRampOrder at
   // all: `tiles` is computed locally with a +1 buildRampCommand's own
