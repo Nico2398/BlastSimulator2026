@@ -279,7 +279,7 @@ export class PlacementController {
     const rect = this.canvas.getBoundingClientRect();
     const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    const pick = pickScene(ndcX, ndcY, this.camera, this.renderer, this.raycaster);
+    const pick = pickScene(ndcX, ndcY, this.camera, this.renderer, this.raycaster, false);
     if (!pick.terrain) return null;
     return { x: pick.terrain.tileX, z: pick.terrain.tileZ };
   }

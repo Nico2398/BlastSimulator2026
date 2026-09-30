@@ -15,6 +15,7 @@
 
 import * as THREE from 'three';
 import { GroundTintLayer, buildConformingRing, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import type { RampWidth } from '../core/config/balance.js';
 import { buildRampArrow, RAMP_ARROW_COLOR } from './RampArrow.js';
 import { rampDefFromEndpoints } from '../core/mining/Ramp.js';
 
@@ -51,6 +52,8 @@ export interface OverlayLineUpdate {
   shape: 'line';
   /** Drag start (the ramp's upper end) and end tiles; the preview snaps them to the ramp that would be dug. */
   x1: number; z1: number; x2: number; z2: number;
+  /** Corridor width in voxels the ramp will be dug at; defaults to the default ramp width. */
+  width?: RampWidth;
   /** The order would be refused — the ramp previews in the refusal colour. */
   refused?: boolean;
 }
@@ -233,7 +236,7 @@ export class SelectionOverlay {
    * anchor tile.
    */
   private buildLine(u: OverlayLineUpdate): void {
-    const ramp = rampDefFromEndpoints(u.x1, u.z1, u.x2, u.z2, 0);
+    const ramp = { ...rampDefFromEndpoints(u.x1, u.z1, u.x2, u.z2, 0), ...(u.width !== undefined && { width: u.width }) };
     const arrow = buildRampArrow(ramp, this.sampler, { color: u.refused ? COLOR_BLOCKED : RAMP_ARROW_COLOR });
     this.group.add(arrow ?? this.makeHoleMarker(u.x1, u.z1));
   }

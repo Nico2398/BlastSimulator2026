@@ -18,6 +18,7 @@ import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } fro
 import { landDrilledHole } from '../mining/DrillPlan.js';
 import { landLoadedCharge } from '../mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../mining/Ramp.js';
+import { recordBuiltRamp } from '../mining/RampWidening.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
@@ -89,6 +90,7 @@ export function applyTaskCompletion(
           rampFullyDone = true;
           const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);
           if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
+          recordBuiltRamp(state, ramp);
         }
         const voxelsFilled = tracker.cells.filter(c => c.fillTarget !== undefined).length;
         const voxelsCleared = tracker.cells.length - voxelsFilled;

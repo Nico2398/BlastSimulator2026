@@ -463,8 +463,10 @@ function migrateV25ToV26(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v26 -> v27 (#1298): no ramp was recorded before, so none is selectable. Mutates `obj` in place. */
 function migrateV26ToV27(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO(#1298): implement — ensure builtRamps [] and nextBuiltRampId 1 (#1298)
+  if (!Array.isArray(obj['builtRamps'])) obj['builtRamps'] = [];
+  if (typeof obj['nextBuiltRampId'] !== 'number') obj['nextBuiltRampId'] = 1;
   return obj;
 }
 

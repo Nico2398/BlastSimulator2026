@@ -12,7 +12,8 @@ import type { VehicleTier } from '../entities/Vehicle.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import {
   MAX_RAMP_LENGTH, NAV_MAX_SLOPE_DEGREES, RAMP_CUT_SLOPE_RATIO,
-  RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, type RampWidth,
+  RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH,
+  RAMP_COST_PER_METER_PER_WIDTH, type RampWidth,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -20,8 +21,18 @@ import {
 /** Cost per meter of ramp length in game dollars. */
 // Real haul road construction: ~$50-200/m. Scaled for gameplay.
 const RAMP_COST_PER_METER = 100;
-/** Ramp width in voxels. */
+/** Ramp width in voxels — the default (3-wide) corridor. Per-ramp width is `RampDef.width` (#1298). */
 const RAMP_WIDTH = 3;
+
+/** Corridor width of `def` — its own choice, else the default (#1298). */
+export function rampWidthOf(def: { width?: RampWidth }): RampWidth {
+  return def.width ?? RAMP_DEFAULT_WIDTH;
+}
+
+/** Order cost of `length` metres of corridor at `width` voxels (#1298). */
+export function computeRampCost(length: number, width: number): number {
+  return length * (width * RAMP_COST_PER_METER_PER_WIDTH);
+}
 
 // ── Types ──
 
@@ -90,7 +101,7 @@ const DIR_OFFSETS: Record<RampDirection, { dx: number; dz: number }> = {
 /**
  * Build a ramp by clearing voxels to create a sloped passage.
  * The ramp starts at (originX, surface, originZ) and descends to targetDepth
- * over the given length. Width is fixed at RAMP_WIDTH.
+ * over the given length, `ramp.width` voxels wide (default RAMP_DEFAULT_WIDTH).
  *
  * Mutates the VoxelGrid.
  * Returns the result including cost and voxels cleared.
@@ -194,6 +205,16 @@ export interface RampOrderValidation {
  * free (#788 point 3).
  */
 export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidation {
+  if (!(RAMP_WIDTH_OPTIONS as readonly number[]).includes(rampWidthOf(ramp))) {
+    return {
+      success: false,
+      message: `Invalid ramp width: choose one of ${RAMP_WIDTH_OPTIONS.join(', ')}.`,
+      cost: 0,
+      messageKey: 'mining.build_ramp.invalid_width',
+      messageParams: { options: RAMP_WIDTH_OPTIONS.join(', ') },
+    };
+  }
+
   if (!Number.isFinite(ramp.length) || ramp.length < 1) {
     return {
       success: false,
@@ -231,7 +252,7 @@ export function validateRampOrder(ramp: RampDef, cash: number): RampOrderValidat
     };
   }
 
-  const totalCost = ramp.length * RAMP_COST_PER_METER;
+  const totalCost = computeRampCost(ramp.length, rampWidthOf(ramp));
 
   if (cash < totalCost) {
     return {
@@ -362,11 +383,16 @@ export function computeMinimumRampLength(targetDepth: number): number {
   return targetDepth / RAMP_CUT_SLOPE_RATIO;
 }
 
-export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentDef[] {
+/**
+ * `alreadyCarvedWidth` (a widen order, #1298): the corridor's existing width —
+ * only the side strips beyond its half-width are emitted.
+ */
+export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarvedWidth?: number): RampSegmentDef[] {
   const offset = DIR_OFFSETS[ramp.direction];
   const perpDx = offset.dz !== 0 ? 1 : 0;
   const perpDz = offset.dx !== 0 ? 1 : 0;
-  const halfWidth = Math.floor(RAMP_WIDTH / 2);
+  const halfWidth = Math.floor(rampWidthOf(ramp) / 2);
+  const carvedHalf = alreadyCarvedWidth === undefined ? -1 : Math.floor(alreadyCarvedWidth / 2);
   const clearanceHeight = 3;
 
   // Pass 1 — per-column floor/ceiling geometry, plus (#1151) each column's
@@ -441,6 +467,7 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentD
       const isFloorRow = y === col.floorRowY;
 
       for (let w = -halfWidth; w <= halfWidth; w++) {
+        if (Math.abs(w) <= carvedHalf) continue;
         const wx = col.cx + perpDx * w;
         const wz = col.cz + perpDz * w;
 

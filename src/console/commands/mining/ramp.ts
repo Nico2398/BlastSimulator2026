@@ -5,22 +5,21 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame } from './shared.js';
 import {
-  RAMP_WIDTH, validateRampOrder, defineRampSegments, rampDefFromEndpoints,
+  validateRampOrder, defineRampSegments, rampDefFromEndpoints, rampWidthOf,
   type RampDirection, type RampDef,
 } from '../../../core/mining/Ramp.js';
-import type { PlannedRamp } from '../../../core/state/GameState.js';
-import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
-import { addExpense } from '../../../core/economy/Finance.js';
+import { queueRampOrder } from '../../../core/mining/RampOrder.js';
+import { rampFootprint, orderRampWiden, validateWidenRamp } from '../../../core/mining/RampWidening.js';
+import { RAMP_DEFAULT_WIDTH, type RampWidth } from '../../../core/config/balance.js';
+import { cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction, cellsInRect } from '../siteExpansion.js';
 
-/** Payload carried by a queued `dig_ramp_segment` PendingAction (#555). */
-export interface RampSegmentActionPayload {
-  rampId: number;
-  segmentIndex: number;
-  cells: { x: number; y: number; z: number; floorAdjustment?: number; fillTarget?: number }[];
-  region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
-  segmentCost: number;
+export type { RampSegmentActionPayload } from '../../../core/mining/RampOrder.js';
+
+/** Parses a `width:N` argument; NaN when present but not a number, the default when absent. */
+function parseWidth(raw: string | undefined): number {
+  return raw === undefined ? RAMP_DEFAULT_WIDTH : Number(raw);
 }
 
 export function buildRampCommand(
@@ -38,6 +37,7 @@ export function buildRampCommand(
   }
 
   let rampDef: RampDef;
+  const width = parseWidth(named['width']) as RampWidth;
   const depth = parseInt(named['depth'] ?? '8', 10);
 
   if (named['start'] && named['end']) {
@@ -48,16 +48,17 @@ export function buildRampCommand(
     const endX = end[0] ?? 0;
     const endZ = end[1] ?? 0;
     rampDef = rampDefFromEndpoints(originX, originZ, endX, endZ, depth);
+    rampDef.width = width;
   } else {
     const origin = (named['origin'] ?? '0,0').split(',').map(Number);
     const originX = origin[0] ?? 0;
     const originZ = origin[1] ?? 0;
     const direction = (named['direction'] ?? 'south') as RampDirection;
     const length = parseInt(named['length'] ?? '10', 10);
-    rampDef = { originX, originZ, direction, length, targetDepth: depth };
+    rampDef = { originX, originZ, direction, length, targetDepth: depth, width };
   }
 
-  const { originX, originZ, direction, length } = rampDef;
+  const { direction, length } = rampDef;
 
   // validateRampOrder runs first, before rampFootprint/cellsInRect build any
   // array — its finite/positive and MAX_RAMP_LENGTH checks are the sole
@@ -71,59 +72,12 @@ export function buildRampCommand(
     return { success: false, output };
   }
 
-  const footprint = rampFootprint(originX, originZ, direction, length);
+  const footprint = rampFootprint(rampDef, rampWidthOf(rampDef));
   const rampClaim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp');
   if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
 
   const segments = defineRampSegments(ctx.grid!, rampDef);
-
-  // Cost is charged in full at order time — unspent remainder (unworked
-  // segments' share) is refunded on cancel via actionOrderCost/cancelAction
-  // (#555, mirrors #553/#554's order-then-work pattern).
-  ctx.state!.cash -= validation.cost;
-  addExpense(ctx.state!.finances, validation.cost, 'construction', 'Build ramp', ctx.state!.tickCount);
-
-  const rampId = ctx.state!.nextPlannedRampId++;
-  const plannedRamp: PlannedRamp = { id: rampId, def: rampDef, footprint, segments: [] };
-
-  // Segment count is now the number of excavation layers (#925), not
-  // ramp.length (one per column/meter, pre-#925) — a flat RAMP_COST_PER_METER
-  // per segment no longer sums to validation.cost. Split the charged cost
-  // evenly across segments instead, so the total refundable across every
-  // still-undone segment (actionOrderCost/cancelAction) can never exceed what
-  // was actually charged at order time.
-  const segmentCost = validation.cost / segments.length;
-
-  for (const segment of segments) {
-    const actionId = ctx.state!.nextPendingActionId++;
-
-    // skipQualificationCheck (#555, mirrors drill_hole/charge_hole's #553/
-    // #554 dispatch): a ramp order must queue silently even when nobody on
-    // the roster currently holds driving.excavator or a rock_digger yet.
-    // targetX/targetZ/targetY (#925) are the segment's own layer anchor —
-    // the footprint-band center at the layer's absolute world Y — computed
-    // once by defineRampSegments rather than re-derived per column here.
-    dispatchPendingAction(ctx.state!, {
-      id: actionId,
-      type: 'dig_ramp_segment',
-      requiredSkill: 'driving.excavator',
-      requiredVehicleRole: 'rock_digger',
-      targetX: segment.targetX,
-      targetZ: segment.targetZ,
-      targetY: segment.targetY,
-      payload: {
-        rampId, segmentIndex: segment.index, cells: segment.cells, region: segment.region,
-        segmentCost,
-      } satisfies RampSegmentActionPayload,
-      targetEmployeeId: null,
-    }, { skipQualificationCheck: true });
-
-    plannedRamp.segments.push({
-      index: segment.index, actionId, cells: segment.cells, region: segment.region, done: false, carvedCount: 0,
-    });
-  }
-
-  ctx.state!.plannedRamps.push(plannedRamp);
+  queueRampOrder(ctx.state!, rampDef, footprint, segments, validation.cost, 'Build ramp');
 
   return {
     success: true,
@@ -138,16 +92,6 @@ export function buildRampCommand(
  * `cancelAction`/`actionOrderCost`) and removes the `PlannedRamp` entirely.
  * Already-carved terrain is kept; only undug segments' cost is refunded.
  */
-/** `widen_ramp id:N width:W` — orders a built ramp widened (#1298). */
-export function widenRampCommand(
-  _ctx: MiningContext,
-  _args: string[],
-  _named: Record<string, string>,
-): CommandResult {
-  // TODO(#1298): implement
-  return { success: false, output: 'not implemented' };
-}
-
 export function cancelRampCommand(ctx: MiningContext, rampId: number): { success: boolean; output: string } {
   const state = ctx.state!;
   const ramp = state.plannedRamps.find(r => r.id === rampId);
@@ -169,24 +113,30 @@ export function cancelRampCommand(ctx: MiningContext, rampId: number): { success
   };
 }
 
-/** The cells a ramp of `length` cuts through, running `direction` from (originX, originZ). Max inclusive. */
-function rampFootprint(
-  originX: number, originZ: number, direction: RampDirection, length: number,
-): { minX: number; maxX: number; minZ: number; maxZ: number } {
-  const ox = Math.floor(originX);
-  const oz = Math.floor(originZ);
-  if (direction === 'north' || direction === 'south') {
-    return {
-      minX: ox,
-      maxX: ox + RAMP_WIDTH,
-      minZ: Math.min(oz, direction === 'north' ? oz - length : oz),
-      maxZ: Math.max(oz, direction === 'south' ? oz + length : oz),
-    };
-  }
-  return {
-    minX: Math.min(ox, direction === 'west' ? ox - length : ox),
-    maxX: Math.max(ox, direction === 'east' ? ox + length : ox),
-    minZ: oz,
-    maxZ: oz + RAMP_WIDTH,
-  };
+/** `widen_ramp id:N width:W` — orders a built ramp widened (#1298). */
+export function widenRampCommand(
+  ctx: MiningContext,
+  _args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  const state = ctx.state!;
+
+  const rampId = parseInt(named['id'] ?? '', 10);
+  if (isNaN(rampId)) return { success: false, output: t('mining.widen_ramp.usage') };
+  const ramp = state.builtRamps.find(r => r.id === rampId);
+  if (!ramp) return { success: false, output: t('mining.widen_ramp.not_found', { id: rampId }) };
+
+  const toWidth = Number(named['width'] ?? '') as RampWidth;
+  const check = validateWidenRamp(ramp, toWidth, state.cash);
+  if (!check.success) return { success: false, output: t('mining.widen_ramp.refused', { id: rampId, reason: check.error }) };
+
+  const footprint = rampFootprint(ramp.def, toWidth);
+  const claim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'widen a ramp');
+  if (!claim.ok) return { success: false, output: claim.output! };
+
+  const result = orderRampWiden(state, ctx.grid!, rampId, toWidth);
+  if (!result.success) return { success: false, output: t('mining.widen_ramp.refused', { id: rampId, reason: result.error }) };
+  return { success: true, output: t('mining.widen_ramp.ordered', { id: rampId, width: toWidth, cost: formatMoney(result.data.cost) }) };
 }

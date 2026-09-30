@@ -11,6 +11,7 @@ import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 import type { FragmentMesh } from './FragmentMesh.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
+import { findRampAtTile, type BuiltRamp } from '../core/mining/RampWidening.js';
 
 /** Mutable GameRenderer fields these picking helpers read, passed in place of `this` (#767). */
 export interface PickingDeps {
@@ -21,6 +22,8 @@ export interface PickingDeps {
   characters: CharacterMesh | null;
   fragments: FragmentMesh | null;
   blastOverlay: BlastPlanOverlay | null;
+  /** Finished ramps of the loaded game (#1298) — terrain features, so they have no mesh of their own to pick. */
+  builtRamps?: readonly BuiltRamp[];
   getTerrainSurfaceY: (x: number, z: number) => number;
   /** Smoothed (marching-cubes) terrain surface Y sampler — ground tints (#1006) conform to this, not the stepped voxel-column height. */
   getSmoothTerrainSurfaceY: (x: number, z: number) => number;
@@ -114,6 +117,17 @@ export function entityWorldPosition(
     case 'employee': return deps.characters?.getPosition(id) ?? null;
     case 'fragment': return deps.fragments?.fragmentPosition(id) ?? null;
     case 'hole': return deps.blastOverlay?.getHolePosition(id) ?? null;
-    case 'ramp': return null; // TODO(#1298): centre of the built ramp's footprint
+    case 'ramp': {
+      const f = deps.builtRamps?.find(r => r.id === id)?.footprint;
+      if (!f) return null;
+      const x = (f.minX + f.maxX + 1) / 2;
+      const z = (f.minZ + f.maxZ + 1) / 2;
+      return new THREE.Vector3(x, deps.getTerrainSurfaceY(x, z), z);
+    }
   }
+}
+
+/** Id of the built ramp covering tile (tileX, tileZ), or null — lets a terrain hit resolve to a ramp (#1298). */
+export function rampIdAtTile(deps: PickingDeps, tileX: number, tileZ: number): number | null {
+  return findRampAtTile(deps.builtRamps ?? [], tileX, tileZ)?.id ?? null;
 }

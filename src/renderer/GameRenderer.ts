@@ -61,7 +61,7 @@ import { onBlast, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDep
 import { modelLibrary } from './models/ModelLibrary.js';
 import {
   raycastSurfaceY, surfaceYAt, smoothSurfaceYAt, pickables,
-  resolveFragmentId, entityWorldPosition, type PickingDeps,
+  resolveFragmentId, entityWorldPosition, rampIdAtTile, type PickingDeps,
 } from './GameRendererPicking.js';
 
 export class GameRenderer {
@@ -481,6 +481,11 @@ export class GameRenderer {
     return resolveFragmentId(this.pickingDeps(), bucketIndex, instanceId);
   }
 
+  /** Id of the built ramp whose corridor covers a tile, or null (#1298). See GameRendererPicking.ts. */
+  rampIdAtTile(tileX: number, tileZ: number): number | null {
+    return rampIdAtTile(this.pickingDeps(), tileX, tileZ);
+  }
+
   /** Current world-space position of a live entity, for hover-tag/highlight placement. See GameRendererPicking.ts. */
   entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole' | 'ramp', id: number): THREE.Vector3 | null {
     return entityWorldPosition(this.pickingDeps(), kind, id);
@@ -772,6 +777,7 @@ export class GameRenderer {
       characters: this.characters,
       fragments: this.fragments,
       blastOverlay: this.blastOverlay,
+      builtRamps: this.lastState?.builtRamps ?? [],
       getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
       getSmoothTerrainSurfaceY: (x, z) => this.getSmoothTerrainSurfaceY(x, z),
     };

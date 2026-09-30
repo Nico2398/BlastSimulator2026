@@ -48,6 +48,7 @@ import {
 import { placementRefusalReason, type PlacementKit } from './scene/PlacementKit.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
+import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, type RampWidth } from '../core/config/balance.js';
 
 import type { GameConsoleFn } from './gameConsole.js';
 
@@ -61,6 +62,7 @@ export class BuildMenu extends PanelBase {
   /** Ground-truth height sampler (#1008) used to refuse a footprint over uneven ground; unset means no footprint check runs. */
   private surfaceHeightSampler: ((x: number, z: number) => number) | null = null;
   private rampDepth = 8;
+  private rampWidth: RampWidth = RAMP_DEFAULT_WIDTH;
   private gameConsole?: GameConsoleFn;
   /** Latest state, for tier-unlock checks before arming the placement tool. */
   private lastState: GameState | null = null;
@@ -303,7 +305,13 @@ export class BuildMenu extends PanelBase {
     this.rampDepth = depth;
   }
 
-  /** Ramps are a line drag (start → end), not a rectangle — the corridor width comes from the vehicle profile, not the drag. */
+  /** Moves the ramp width one option up or down `RAMP_WIDTH_OPTIONS`, clamped at both ends. */
+  private stepRampWidth(delta: 1 | -1): void {
+    const i = RAMP_WIDTH_OPTIONS.indexOf(this.rampWidth) + delta;
+    this.rampWidth = RAMP_WIDTH_OPTIONS[Math.min(RAMP_WIDTH_OPTIONS.length - 1, Math.max(0, i))]!;
+  }
+
+  /** Ramps are a line drag (start → end), not a rectangle — the width is chosen on the param strip. */
   private armRampTool(): void {
     const kit = this.placementKit;
     if (!kit) return;
@@ -316,11 +324,11 @@ export class BuildMenu extends PanelBase {
       // One source of truth (#1210): the same RampDef + validateRampOrder call
       // the console command runs decides the UI gate here, so the two can
       // never disagree again about a length/depth/cash combination.
-      const rampDef = sel ? rampDefFromEndpoints(sel.x1, sel.z1, sel.x2, sel.z2, this.rampDepth) : null;
+      const rampDef = sel ? { ...rampDefFromEndpoints(sel.x1, sel.z1, sel.x2, sel.z2, this.rampDepth), width: this.rampWidth } : null;
       const validation = rampDef ? validateRampOrder(rampDef, this.lastState?.cash ?? 0) : null;
       const confirmEnabled = controller.canConfirm && (validation?.success ?? false);
       // The preview turns red live, mid-drag included, whenever this ramp would be refused (#1211).
-      overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2, refused: !confirmEnabled } : null);
+      overlay.update(sel ? { shape: 'line', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2, width: this.rampWidth, refused: !confirmEnabled } : null);
       let confirmDisabledReason: string | undefined;
       if (!controller.canConfirm) {
         confirmDisabledReason = placementRefusalReason(controller);
@@ -333,6 +341,7 @@ export class BuildMenu extends PanelBase {
         subtitle: '',
         fields: [
           { key: 'depth', label: t('ui.build.ramp_depth'), value: this.rampDepth, format: v => `${v}m`, onDec: () => { this.rampDepth = Math.max(1, this.rampDepth - 1); refresh(); }, onInc: () => { this.rampDepth = Math.min(40, this.rampDepth + 1); refresh(); } },
+          { key: 'width', label: t('ui.build.ramp_width'), value: this.rampWidth, format: v => `${v}m`, onDec: () => { this.stepRampWidth(-1); refresh(); }, onInc: () => { this.stepRampWidth(1); refresh(); } },
         ],
         result: rampDef ? `${rampDef.length} ${t('ui.tile_select.tiles')}` : '—',
         confirmEnabled,
@@ -342,7 +351,7 @@ export class BuildMenu extends PanelBase {
     };
 
     controller.setConfirmHandler((sel) => {
-      const cmd = this.gameConsole?.(`build_ramp start:${sel.x1},${sel.z1} end:${sel.x2},${sel.z2} depth:${this.rampDepth}`);
+      const cmd = this.gameConsole?.(`build_ramp start:${sel.x1},${sel.z1} end:${sel.x2},${sel.z2} depth:${this.rampDepth} width:${this.rampWidth}`);
       if (!cmd?.success) {
         this.setStatus(cmd?.output ?? '');
         return false;

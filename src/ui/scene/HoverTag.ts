@@ -131,8 +131,11 @@ export class HoverTag {
         const delay = state.sequenceDelays[hole.id];
         return this.row('blast', hole.id, delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m`);
       }
-      case 'ramp':
-        return null; // TODO(#1298): ramp hover row
+      case 'ramp': {
+        const ramp = state.builtRamps.find(r => r.id === entity.id);
+        if (!ramp) return null;
+        return this.row('down', t('shell.selection.ramp_title', { width: ramp.width }), t('shell.selection.ramp_sub', { id: ramp.id, width: ramp.width, length: ramp.def.length }));
+      }
     }
   }
 

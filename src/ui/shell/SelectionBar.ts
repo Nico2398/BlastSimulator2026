@@ -8,6 +8,8 @@ import { el, button } from '../dom.js';
 import { iconEl } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
+import { nextRampWidth } from '../../core/mining/RampWidening.js';
+import type { RampWidth } from '../../core/config/balance.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
@@ -147,7 +149,8 @@ export class SelectionBar {
     if (!identity) { this.hide(); return; }
     this.titleEl.textContent = identity.title;
     this.subEl.textContent = identity.sub;
-    this.actionsEl.replaceChildren(...this.buildActions(entity));
+    const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
+    this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null));
     this.root.style.display = 'flex';
   }
 
@@ -194,12 +197,15 @@ export class SelectionBar {
         const delay = state.sequenceDelays[hole.id];
         return { title: hole.id, sub: delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m` };
       }
-      case 'ramp':
-        return null; // TODO(#1298): ramp title and width
+      case 'ramp': {
+        const ramp = state.builtRamps.find(r => r.id === entity.id);
+        if (!ramp) return null;
+        return { title: t('shell.selection.ramp_title', { width: ramp.width }), sub: t('shell.selection.ramp_sub', { id: ramp.id, width: ramp.width, length: ramp.def.length }) };
+      }
     }
   }
 
-  private buildActions(entity: EntityPick): HTMLElement[] {
+  private buildActions(entity: EntityPick, nextWidth: RampWidth | null): HTMLElement[] {
     const fire = (action: SelectionAction) => { if (this.current) this.onAction?.(action, this.current); };
     switch (entity.kind) {
       case 'employee':
@@ -229,8 +235,10 @@ export class SelectionBar {
         return [
           button('ghost', t('shell.selection.focus'), { icon: 'locate', dataAction: 'focus', onClick: () => fire('focus') }),
         ];
-      case 'ramp':
-        return []; // TODO(#1298): widen action
+      case 'ramp': // a terrain feature: widening only, never demolish/upgrade/move
+        return nextWidth === null ? [] : [
+          button('ghost', t('shell.selection.widen'), { icon: 'up', dataAction: 'widen', onClick: () => fire('widen') }),
+        ];
     }
   }
 

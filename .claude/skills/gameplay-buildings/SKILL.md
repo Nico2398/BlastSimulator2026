@@ -113,7 +113,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 3. **Protected voxels:** voxels beneath building cannot be drilled or blasted (blocked with error)
 4. **Blast destruction:** if blast reaches voxels beneath building → building destroyed instantly
 5. **No overlap:** buildings cannot overlap each other
-6. **Ramp** building type (added for NavMesh, Ch.6): 1×4 footprint, connects bench levels
+6. **Ramps are not buildings** (#1298): a ramp is a dug terrain feature (`state.builtRamps`, see `gameplay-navmesh`), never in `state.buildings`. It takes the selection plumbing only (click picks it, corridor highlighted, selection bar) and offers a widen action — no demolish, no tier upgrade, no move, no occupants.
 
 ## Destruction Effects
 

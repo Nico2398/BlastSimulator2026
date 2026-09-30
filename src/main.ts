@@ -47,6 +47,7 @@ import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
 import { createWeatherCycle } from './core/weather/WeatherCycle.js';
 import { Random } from './core/math/Random.js';
+import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
@@ -885,7 +886,7 @@ window.__worldToScreen = (x, z) => {
     };
   };
   const raycastForTile: RaycastForTile = (ndcX, ndcY) => {
-    const pick = pickScene(ndcX, ndcY, scene.camera, gameRenderer);
+    const pick = pickScene(ndcX, ndcY, scene.camera, gameRenderer, undefined, false);
     if (!pick.terrain) return null; // entity occlusion or a miss — honestly a miss, never silently ignored
     return { x: pick.terrain.point.x, y: pick.terrain.point.y, z: pick.terrain.point.z };
   };
@@ -986,7 +987,9 @@ scenePicking.setSelectChangeHandler((entity) => {
   if (entity && ctx.state) {
     selectionBar.show(entity, ctx.state);
     const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
-    if (pos) entityHighlight.show(pos, entity.kind);
+    const ramp = entity.kind === 'ramp' ? ctx.state.builtRamps.find(r => r.id === entity.id) : undefined;
+    if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
+    else if (pos) entityHighlight.show(pos, entity.kind);
   } else {
     selectionBar.hide();
     entityHighlight.hide();
@@ -1069,6 +1072,12 @@ selectionBar.setActionHandler((action, entity) => {
       // Until then this routes to the Build panel's own move flow.
       uiManager.showPanel('build');
       break;
+    case 'widen': {
+      const ramp = ctx.state?.builtRamps.find(r => r.id === entity.id);
+      const next = ramp ? nextRampWidth(ramp.width) : null;
+      if (next !== null) reportIfFailed(t('shell.selection.widen'), window.__gameConsole(`widen_ramp id:${entity.id} width:${next}`));
+      break;
+    }
     case 'demolish':
       reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
       scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected

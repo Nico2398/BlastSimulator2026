@@ -43,6 +43,8 @@ export function pickScene(
   camera: THREE.Camera,
   renderer: GameRenderer,
   raycaster: THREE.Raycaster = new THREE.Raycaster(),
+  /** False for callers that want the raw ground tile (placement tools, tile picking) even where a ramp lies. */
+  selectRamps = true,
 ): PickResult {
   raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
 
@@ -55,14 +57,19 @@ export function pickScene(
   const entity = resolveHitToEntity(closest, renderer);
   if (entity) return { entity, terrain: null };
 
+  const tileX = Math.floor(closest.point.x);
+  const tileZ = Math.floor(closest.point.z);
+  // A ramp is a terrain feature with no mesh of its own: a ground hit inside a
+  // built ramp's corridor selects it (#1298). Buildings and vehicles were
+  // already resolved above, so they keep priority.
+  const rampId = selectRamps ? renderer.rampIdAtTile(tileX, tileZ) : null;
+  if (rampId !== null) {
+    return { entity: { kind: 'ramp', id: rampId, point: closest.point.clone(), distance: closest.distance }, terrain: null };
+  }
+
   return {
     entity: null,
-    terrain: {
-      point: closest.point.clone(),
-      tileX: Math.floor(closest.point.x),
-      tileZ: Math.floor(closest.point.z),
-      distance: closest.distance,
-    },
+    terrain: { point: closest.point.clone(), tileX, tileZ, distance: closest.distance },
   };
 }
 
