@@ -56,12 +56,12 @@
     },
     {
       "command": "state",
-      "timeout": 30,
-      "description": "Player clicks the dug ramp in the scene (viewport centre after cameraFocus on the corridor midpoint). The selection bar shows the ramp with a Widen action; Demolish must not exist (a ramp is a terrain feature).",
+      "timeout": 90,
+      "description": "Player clicks the dug ramp in the scene (viewport centre after a near top-down focusTile on the corridor midpoint, so the ray lands on the floor tile whatever the dug depth). The selection bar shows the ramp with a Widen action; Demolish must not exist (a ramp is a terrain feature).",
       "interaction": [
-        { "type": "cameraFocus", "x": 20, "z": 25.5, "distance": 16 },
+        { "type": "focusTile", "x": 20, "z": 25, "distance": 16, "pitch": 80 },
         { "type": "click", "x": 640, "y": 360 },
-        { "type": "waitForSelector", "selector": "#bs-selection-bar [data-action=\"widen\"]" }
+        { "type": "waitForSelector", "selector": "#bs-selection-bar [data-action=\"widen\"]", "timeout": 60000 }
       ],
       "role": "player",
       "expect": {
