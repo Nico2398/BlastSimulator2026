@@ -14,6 +14,7 @@ import type { GameState, PendingAction, BlockedOrderReason } from '../../core/st
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
 import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
+import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
@@ -65,7 +66,7 @@ const MAX_LOG = 100;
 /** Auto-dismiss delay, matching the design's toast motion spec. */
 const TOAST_LIFETIME_MS = 6500;
 
-export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders';
+export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders' | 'traffic';
 
 export interface AlertPip {
   readonly kind: AlertKind;
@@ -148,6 +149,11 @@ export class NotificationCenter {
     ).length;
     if (stuckCount > 0) {
       pips.push({ kind: 'fleet', icon: 'vehicle', label: String(stuckCount), tone: 'warn', tip: `${stuckCount} vehicle(s) stuck` });
+    }
+    const jams = findTrafficJams(state.builtRamps, state.employees.employees);
+    if (jams.length > 0) {
+      const where = jams.map(j => t(`traffic.chokepoint.${j.kind === 'ramp_head' ? 'ramp' : j.kind}`)).join(', ');
+      pips.push({ kind: 'traffic', icon: 'vehicle', label: t('ui.alert.traffic_jam', { count: jams.length }), tone: 'warn', tip: where });
     }
     const urgentContract = state.contracts.active.find(c => {
       const remaining = c.acceptedAtTick + c.deadlineTicks - state.tickCount;

@@ -45,6 +45,7 @@ import type { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
 import { RampArrowLayer } from './RampArrow.js';
+import { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
 
 /**
  * How far past the playable rect manual panning may wander (#458 T6.1/D13).
@@ -95,6 +96,7 @@ export interface SceneSetupDeps {
   blastOverlay: BlastPlanOverlay | null;
   ghosts: GhostMesh | null;
   rampArrows: RampArrowLayer | null;
+  trafficJamMarkers: TrafficJamMarkerLayer | null;
   lastGrid: VoxelGrid | null;
   lastCutBounds: string;
   terrainMeshRevision: number;
@@ -199,6 +201,9 @@ export function buildPlayableMesh(deps: SceneSetupDeps, ctx: MiningContext): voi
 
   // Ramp arrows (#1211), one per ramp order still being dug
   deps.rampArrows = new RampArrowLayer(scene, deps.getSmoothTerrainSurfaceY);
+
+  // Traffic jam markers (#1208), one per active jam
+  deps.trafficJamMarkers = new TrafficJamMarkerLayer(scene, deps.getSmoothTerrainSurfaceY);
 }
 
 /**
@@ -381,6 +386,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.blastOverlay?.dispose();
   deps.ghosts?.dispose();
   deps.rampArrows?.dispose();
+  deps.trafficJamMarkers?.dispose();
   deps.taskProgress?.dispose();
   deps.pictograms?.dispose();
   deps.buildingOccupancyLabels?.dispose();
@@ -415,6 +421,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.blastOverlay = null;
   deps.ghosts = null;
   deps.rampArrows = null;
+  deps.trafficJamMarkers = null;
   deps.taskProgress = null;
   deps.pictograms = null;
   deps.buildingOccupancyLabels = null;

@@ -470,6 +470,15 @@ function migrateV26ToV27(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v27 -> v28 (#1208): no jam was ever answered, so no chokepoint is silenced. Mutates `obj` in place. */
+function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> {
+  const events = obj['events'] as Record<string, unknown> | undefined;
+  if (events && (typeof events['jamSilencedUntil'] !== 'object' || events['jamSilencedUntil'] === null)) {
+    events['jamSilencedUntil'] = {};
+  }
+  return obj;
+}
+
 /**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
@@ -722,6 +731,11 @@ export function deserialize(json: string): GameState {
   // v26 -> v27: GameState.builtRamps / nextBuiltRampId (#1298).
   if ((obj['version'] as number) < 27) {
     migrateV26ToV27(obj);
+  }
+
+  // v27 -> v28: EventSystemState.jamSilencedUntil (#1208).
+  if ((obj['version'] as number) < 28) {
+    migrateV27ToV28(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

@@ -13,6 +13,8 @@ import type { VehicleMesh } from './VehicleMesh.js';
 import type { CharacterMesh } from './CharacterMesh.js';
 import type { GhostMesh } from './GhostMesh.js';
 import type { RampArrowLayer } from './RampArrow.js';
+import type { TrafficJamMarkerLayer } from './TrafficJamMarkerLayer.js';
+import { findTrafficJams } from '../core/events/TrafficJams.js';
 import type { TaskProgressBar } from './TaskProgressBar.js';
 import type { EmployeePictograms } from './EmployeePictograms.js';
 import type { BuildingOccupancyLabels } from './BuildingOccupancyLabels.js';
@@ -41,6 +43,8 @@ export interface SyncDeps {
   lastGhostRevision: number;
   /** One ground arrow per ramp order still being dug (#1211). */
   rampArrows?: RampArrowLayer | null;
+  /** One ground marker per active traffic jam (#1208). */
+  trafficJamMarkers?: TrafficJamMarkerLayer | null;
   terrainMeshRevision: number;
   lastSyncedTerrainRevision: number;
   taskProgress: TaskProgressBar | null;
@@ -145,6 +149,14 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   // segment is dug. A dig lowers the ground the arrow sampled, so a terrain
   // change rebuilds the survivors.
   deps.rampArrows?.sync(state.plannedRamps, terrainDirty);
+
+  // Traffic jam markers (#1208): jams change only when a tick runs, so find
+  // them once per tick — unsilenced, a marker shows a jam the player already answered.
+  const jamMarkers = deps.trafficJamMarkers;
+  if (jamMarkers && jamMarkers.syncedTick !== state.tickCount) {
+    jamMarkers.sync(findTrafficJams(state.builtRamps, state.employees.employees));
+    jamMarkers.syncedTick = state.tickCount;
+  }
 
   // Single write site for both consumers above (#1145) — living only inside
   // the ghosts block would skip updating it whenever ghosts are absent but

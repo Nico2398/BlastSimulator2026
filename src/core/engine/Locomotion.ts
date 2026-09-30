@@ -1049,7 +1049,7 @@ function handleAgentOccupancyBlock(
     if (spread) {
       // #1274: record the pre-spread destination once, on the FIRST spread
       // only — the stable identity of "what chokepoint is this mover
-      // actually queued on", so buildWaitingByTarget (EventEngine.ts) can
+      // actually queued on", so the jam detector (TrafficJams.ts) can
       // still cluster several movers converging on the same original target
       // even after each one has since been individually retargeted.
       if (leg.originalDestX == null) {
@@ -1318,6 +1318,30 @@ function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX:
     state.navGrid, originX, originZ,
     (x, z) => !occupancy.isFreeFor(mover, x, z) || isReservedByAnotherExactLeg(state, mover, x, z),
   );
+}
+
+/**
+ * Re-spreads a stalled employee's current leg onto the nearest free cell around
+ * its pre-spread target — the same retarget `handleAgentOccupancyBlock`'s
+ * destination-spreading step makes, applied on demand (#1208's "reroute
+ * vehicles" answer). Only a leg that needs an exact, unshared cell qualifies;
+ * anything else is left untouched.
+ */
+export function respreadLegDestination(state: GameState, emp: Employee): void {
+  const leg = emp.itinerary?.legs[0];
+  if (!leg || leg.arrival === 'adjacent' || leg.neverSpread) return;
+  if (leg.onArrive.kind !== 'none' && leg.onArrive.kind !== 'effect') return;
+  const mover: Occupant = emp.locomotion.kind === 'mounted'
+    ? { kind: 'vehicle', id: emp.locomotion.vehicleId }
+    : { kind: 'employee', id: emp.id };
+  const spread = findNearestFreeCellForAgent(state, mover, leg.originalDestX ?? leg.destX, leg.originalDestZ ?? leg.destZ);
+  if (!spread) return;
+  if (leg.originalDestX == null) {
+    leg.originalDestX = leg.destX;
+    leg.originalDestZ = leg.destZ;
+  }
+  leg.destX = spread.x;
+  leg.destZ = spread.z;
 }
 
 /**

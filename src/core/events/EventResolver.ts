@@ -8,7 +8,7 @@ import { addIncome, addExpense } from '../economy/Finance.js';
 import type { EventConsequence } from './EventPool.js';
 import { getEventById } from './EventPool.js';
 import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.js';
-import type { JamWorld } from './TrafficJamEffects.js';
+import { TRAFFIC_JAM_EFFECTS, type JamWorld } from './TrafficJamEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
 
 // ── Resolution result ──
@@ -38,7 +38,7 @@ export function resolveEvent(
   optionIndex: number,
   tick: number,
   rng: Random,
-  _world?: JamWorld,
+  world?: JamWorld,
 ): ResolutionResult | null {
   if (!eventSystem.pendingEvent) return null;
 
@@ -68,6 +68,16 @@ export function resolveEvent(
     eventSystem,
     tick,
   );
+
+  // A jam event carries its chokepoint: the option's effect tag names the world change to make.
+  const jam = eventSystem.pendingEvent.jam;
+  const handler = consequence.effectTag ? TRAFFIC_JAM_EFFECTS[consequence.effectTag] : undefined;
+  if (world && jam && handler) {
+    const outcome = handler(jam, world);
+    result.effects.push(...outcome.effects);
+    result.cashChange += outcome.cashChange;
+    result.resultKey += outcome.resultKeySuffix;
+  }
 
   // Clear the pending event; record the outcome for the UI to read directly
   // instead of parsing this function's console-facing effects: string[].
