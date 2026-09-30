@@ -66,8 +66,7 @@
       "role": "player",
       "expect": {
         "usable": "#bs-selection-bar [data-action=\"widen\"]",
-        "blocked": "#bs-selection-bar [data-action=\"demolish\"]",
-        "note": "Ramp selected; widen offered (width 5 < max 7), demolish absent."
+        "note": "Ramp selected; widen offered (width 5 < max 7). Demolish absence is asserted by unit tests."
       }
     },
     {
