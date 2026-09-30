@@ -56,4 +56,4 @@ Verify all of it with `npm run validate:context`.
 
 ## Model
 
-Claude runs on `claude-sonnet-5`, set through `claude_args` in `claude-runner.yml`. OpenCode's model is set in `.opencode/opencode.json` and in the runner's environment. Every agent inherits the session model; no agent definition pins a model of its own.
+Claude runs on the `sonnet` alias (latest Sonnet) at `--effort medium`, both set through `claude_args` in `claude-runner.yml`. OpenCode's model is set in `.opencode/opencode.json` and in the runner's environment. Every agent inherits the session model; no agent definition pins a model of its own.
