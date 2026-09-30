@@ -645,6 +645,19 @@ export const SAVE_SLOT_COUNT = 5;
 export const MAX_TOTAL_FRAGMENTS = 2000;
 
 /**
+ * Most 16×16×16 voxel slabs a generated grid keeps materialized at once
+ * (~76 KB each, so ~39 MB at the cap). A slab is only a cache of generator
+ * output plus the edit record, so past this the least recently used ones are
+ * dropped and rebuilt on their next read. Sized well above a campaign level's
+ * working set — every surface band of a 160×160 site is ~300 slabs — so
+ * eviction only engages for deep digging or a large expanded site.
+ */
+export const MAX_RESIDENT_VOXEL_SLABS = 512;
+
+/** Resident slab count an eviction pass brings the cache down to — evicting in a batch keeps the sort off the per-slab allocation path. */
+export const RESIDENT_VOXEL_SLABS_AFTER_EVICTION = 384;
+
+/**
  * A* node-exploration budget formula (#458 T6.2/D14): actual cap is
  * `max(PATHFINDING_NODE_BUDGET_MIN, gridX * gridZ / PATHFINDING_NODE_BUDGET_AREA_DIVISOR)`,
  * computed by Pathfinding.ts where the grid's own dimensions are in scope — a

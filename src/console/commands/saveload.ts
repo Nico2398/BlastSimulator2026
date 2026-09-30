@@ -7,8 +7,8 @@
 // This is intentionally separate from SavesModal's own numbered slots —
 // those remain reachable through the Saves modal and its own backend.
 //
-// The VoxelGrid is embedded into `ctx.state.world.voxels` right before saving
-// (#458 T0.3) and restored from there on load, so blast craters, drilled
+// The terrain is encoded into the saved copy's `world.voxels` at save time
+// (#458 T0.3, `stateForSave`) and restored from there on load, so blast craters, drilled
 // holes, and ramps survive a save/load round trip. A save with no embedded
 // voxels at all — `load` falls back to regenerating pristine terrain from
 // the saved seed/size/mine type, the same way `new_game` builds it, same as
@@ -17,7 +17,7 @@
 // (`loadGridForState`, world.ts, #1181) — it is never silently regenerated.
 
 import type { GameContext } from './world.js';
-import { embedVoxelsForSave, loadGridForState } from './world.js';
+import { stateForSave, loadGridForState } from './world.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import { requireGame } from './commandUtils.js';
@@ -36,8 +36,7 @@ export function saveCommand(
   if (err) return err;
   const state = ctx.state!;
   const slot = named['slot'] ?? args[0] ?? DEFAULT_SLOT;
-  state.world = embedVoxelsForSave(ctx, state);
-  quickSaveSlots.set(slot, serialize(state));
+  quickSaveSlots.set(slot, serialize(stateForSave(ctx, state)));
   return { success: true, output: `Saved to slot "${slot}".` };
 }
 

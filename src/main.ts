@@ -27,7 +27,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { terrainConfigOf, ensureLandscape, loadGridForState, embedVoxelsForSave } from './console/commands/world.js';
+import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
@@ -165,16 +165,11 @@ try {
 // --- Saves Modal (redesign P8) ---
 const savesModal = new SavesModal(uiContainer);
 savesModal.setBackend(saveBackend);
-savesModal.setGetState(() => {
-  // Embed the current voxel grid right before a save is taken (#458 T0.3) —
-  // encoded lazily here rather than kept live on ctx.state, since most ticks
-  // never save. SavesModal only sees GameState; it has no idea VoxelGrid or
-  // its codec exist, by design.
-  if (ctx.state && ctx.grid && ctx.state.world) {
-    ctx.state.world = embedVoxelsForSave(ctx, ctx.state);
-  }
-  return ctx.state;
-});
+// Every save SavesModal takes — manual slots, auto-save and quick-save — reads
+// its state here: a snapshot carrying the terrain encoded from the live grid
+// at that moment (#458 T0.3). SavesModal only sees GameState; it has no idea
+// VoxelGrid or its codec exist, by design.
+savesModal.setGetState(() => (ctx.state ? stateForSave(ctx, ctx.state) : null));
 
 // --- Main Menu ---
 const mainMenu = new MainMenu(uiContainer);
@@ -1119,7 +1114,7 @@ new KeyboardShortcuts({
   // registered — every keyboard speed change (1-4) silently no-op'd.
   setSpeed: (n) => window.__gameConsole(`time speed ${n}`),
   togglePanel: (name) => uiManager.togglePanel(name),
-  quickSave: () => { if (ctx.state) void savesModal['autoSave'](ctx.state); },
+  quickSave: () => { void savesModal.quickSave(); },
   onEscape: () => uiManager.handleEscape(),
   onToggleNavGrid: () => uiManager.toggleNavGridOverlay(),
   // Keep the panel's own button in sync even while the panel is closed —

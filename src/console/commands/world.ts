@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
-import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
+import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
 import { createLazyLandscapeMap, sampleLandscapeColumn, LADDER_STEPS, type LazyLandscapeMap } from '../../core/world/LandscapeMap.js';
@@ -164,7 +164,7 @@ function regenerateGridParams(state: GameState): { sizeX: number; datum: number;
   return {
     ...base,
     sizeX: requireValidGenDimension(base.sizeX, 'world.baseSizeX'),
-    datum: requireValidGenDimension(base.datum, 'world.datum'),
+    datum: requireValidGenDatum(base.datum, 'world.datum'),
     sizeZ: requireValidGenDimension(base.sizeZ, 'world.baseSizeZ'),
   };
 }
@@ -384,23 +384,30 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     ctx.playableArea = prevPlayableArea;
     return t('world.terrain_save_corrupt');
   }
+  // The live grid now owns the terrain; the loaded payload would only go stale.
+  if (state.world?.voxels) {
+    const { voxels: _loaded, ...world } = state.world;
+    state.world = world;
+  }
   return null;
 }
 
 /**
- * The generation datum + encoded voxel payload to embed into `state.world`
- * right before a save is taken (#1181 review) — `saveCommand` (saveload.ts)
- * and `main.ts`'s `savesModal.setGetState` each independently computed this
- * (`terrainGenDatum` + the `ctx.grid && state.world && gen` guard +
- * `encodeVoxelGrid`'s spread), the save-side mirror of the exact duplication
- * `loadGridForState` above was extracted to fix on the load side. Returns
- * `state.world` unchanged when there is no grid, no world, or no resolvable
- * generator identity to embed.
+ * The state to serialize for a save: a shallow copy whose `world` carries the
+ * terrain encoded from the live grid right now. Every save path goes through
+ * this — manual slots, the console, auto-save and quick-save — so none can
+ * write terrain edits that are missing or stale. The live state is never
+ * modified: a terrain payload kept on it would go stale on the next edit and
+ * leak into whichever save serialized it next. With no grid, no world or no
+ * resolvable generator identity, the copy carries no terrain payload at all,
+ * and loading regenerates pristine terrain.
  */
-export function embedVoxelsForSave(ctx: GameContext, state: GameState): GameState['world'] {
+export function stateForSave(ctx: GameContext, state: GameState): GameState {
+  if (!state.world) return state;
   const gen = terrainGenDatum(state);
-  if (!ctx.grid || !state.world || !gen) return state.world;
-  return { ...state.world, voxels: encodeVoxelGrid(ctx.grid, gen) };
+  const { voxels: _stale, ...world } = state.world;
+  if (!ctx.grid || !gen) return { ...state, world };
+  return { ...state, world: { ...world, voxels: encodeVoxelGrid(ctx.grid, gen) } };
 }
 
 export function newGameCommand(

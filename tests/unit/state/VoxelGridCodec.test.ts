@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { generateTerrain, TERRAIN_GENERATOR_VERSION, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
-import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, MAX_VOXEL_ABS_Y, type VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   encodeVoxelGrid, decodeVoxelGrid, TerrainGenVersionMismatchError,
   type SerializedTerrainGen, type SerializedVoxels,
@@ -292,13 +292,11 @@ describe('decodeVoxelGrid — corrupted claimed rects are clamped, not trusted v
 // `RangeError: Invalid typed array length` before any clamp even runs.
 // `requireValidGenDimension` rejects outright instead, with a clean `Error`.
 describe('decodeVoxelGrid — requireValidGenDimension rejects a malformed gen.size* (#1181 review)', () => {
-  it('rejects a datum far past MAX_TERRAIN_GEN_DIMENSION with a clean Error, not a RangeError from allocateChunk', () => {
+  it('rejects a datum far past MAX_VOXEL_ABS_Y with a clean Error, not a RangeError', () => {
     const gen = makeGen();
     const grid = generateTerrain(genToConfig(gen));
     const payload = encodeVoxelGrid(grid, gen);
 
-    // Safely over MAX_TERRAIN_GEN_DIMENSION (4096) — large enough to be
-    // rejected, nowhere near large enough to risk actually allocating.
     const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, datum: 1e9 } };
 
     expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.datum/);
@@ -329,14 +327,22 @@ describe('decodeVoxelGrid — requireValidGenDimension rejects a malformed gen.s
     expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeZ/);
   });
 
-  it('rejects a value exactly one past MAX_TERRAIN_GEN_DIMENSION', () => {
+  it('rejects a sizeX exactly one past MAX_TERRAIN_GEN_DIMENSION', () => {
     const gen = makeGen();
     const grid = generateTerrain(genToConfig(gen));
     const payload = encodeVoxelGrid(grid, gen);
     const corrupted: SerializedVoxels = {
       ...payload,
-      gen: { ...payload.gen, datum: MAX_TERRAIN_GEN_DIMENSION + 1 },
+      gen: { ...payload.gen, sizeX: MAX_TERRAIN_GEN_DIMENSION + 1 },
     };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.sizeX/);
+  });
+
+  it('rejects a datum exactly one past MAX_VOXEL_ABS_Y', () => {
+    const gen = makeGen();
+    const grid = generateTerrain(genToConfig(gen));
+    const payload = encodeVoxelGrid(grid, gen);
+    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, datum: MAX_VOXEL_ABS_Y + 1 } };
     expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.datum/);
   });
 
@@ -364,20 +370,13 @@ describe('decodeVoxelGrid — requireValidGenDimension rejects a malformed gen.s
     expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.datum/);
   });
 
-  it('rejects a zero datum', () => {
-    const gen = makeGen();
-    const grid = generateTerrain(genToConfig(gen));
-    const payload = encodeVoxelGrid(grid, gen);
-    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, datum: 0 } };
-    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.datum/);
-  });
-
-  it('rejects a negative datum', () => {
-    const gen = makeGen();
-    const grid = generateTerrain(genToConfig(gen));
-    const payload = encodeVoxelGrid(grid, gen);
-    const corrupted: SerializedVoxels = { ...payload, gen: { ...payload.gen, datum: -16 } };
-    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: gen\.datum/);
+  it('accepts a zero datum and a negative datum — a datum is a voxel row, not a size (`new_game size:1` yields datum 0)', () => {
+    for (const datum of [0, -16]) {
+      const gen = makeGen({ datum });
+      const grid = generateTerrain(genToConfig(gen));
+      const decoded = decodeVoxelGrid(JSON.parse(JSON.stringify(encodeVoxelGrid(grid, gen))) as SerializedVoxels);
+      expect(computeVoxelColumnSurfaceY(decoded, 10, 10), `datum ${datum}`).toBe(computeVoxelColumnSurfaceY(grid, 10, 10));
+    }
   });
 });
 
@@ -437,52 +436,79 @@ describe('decodeVoxelGrid — isValidComposition / requireValidBoundary reject m
   });
 });
 
-// #1181 review: an unclamped `yLo`/`yHi` from a tampered/corrupted save (e.g.
-// `1e15`) would turn `replayTerrainEdits`'s per-voxel loop into an unbounded
-// scan. `clampSavePosition`/`clampAxis` must clamp both into
-// `[0, MAX_TERRAIN_GEN_DIMENSION - 1]` instead — a grid is height-free now
-// (#1190), so `MAX_TERRAIN_GEN_DIMENSION - 1` (not a per-grid `sizeY - 1`) is
-// the only ceiling left to clamp against. Proven here by asserting on the
-// RESULT (the decode completes and the decoded grid's edited range sits
-// inside real bounds), not by trusting that a bad value merely "didn't hang".
-describe('decodeVoxelGrid — clampSavePosition clamps a corrupted yLo/yHi into [0, MAX_TERRAIN_GEN_DIMENSION - 1] (#1181 review)', () => {
-  it('clamps a NaN yLo/yHi pair to the fallback row 0, rather than leaving them unbounded', () => {
+// Terrain has no floor or ceiling, so an edit row below 0 or above the old
+// 4095 ceiling is ordinary save data and must come back exactly where it was.
+// Clamping it (the old treatment) moved digs and fills onto rock nobody had
+// touched. A row that is not an integer inside ±MAX_VOXEL_ABS_Y can only come
+// from a corrupt save, and is refused.
+describe('decodeVoxelGrid — edit rows at any height round-trip; corrupt rows are refused', () => {
+  function reloaded(grid: VoxelGrid, gen: SerializedTerrainGen): VoxelGrid {
+    return decodeVoxelGrid(JSON.parse(JSON.stringify(encodeVoxelGrid(grid, gen))) as SerializedVoxels);
+  }
+
+  it('a column dug from its surface down to y = -6 reloads with the same surface and the same empty rows', () => {
     const gen = makeGen({ sizeX: 16, datum: 8, sizeZ: 16 });
     const grid = generateTerrain(genToConfig(gen));
-    const payload = encodeVoxelGrid(grid, gen);
-    const corrupted: SerializedVoxels = {
-      ...payload,
-      editColumns: [{ x: 5, z: 5, segments: [{ yLo: NaN, yHi: NaN, kind: 'dug' }] }],
-    };
+    const top = computeVoxelColumnSurfaceY(grid, 5, 5)!;
+    for (let y = top; y >= -6; y--) grid.clearVoxel(5, y, 5);
 
-    const decoded = decodeVoxelGrid(corrupted);
+    const decoded = reloaded(grid, gen);
 
-    // Clamped to row 0 only — not every row, not a crash.
-    expect(decoded.densityAt(5, 0, 5)).toBe(0);
+    expect(computeVoxelColumnSurfaceY(decoded, 5, 5)).toBe(-7);
+    for (let y = -6; y <= top; y++) expect(decoded.densityAt(5, y, 5), `row ${y}`).toBe(0);
+    expect(decoded.densityAt(5, -7, 5)).toBe(1);
   });
 
-  it('clamps a wildly out-of-range yHi (1e15) into MAX_TERRAIN_GEN_DIMENSION - 1, completing the decode instead of scanning to 1e15', () => {
+  it('a cavity dug entirely below y = 0 reloads in place, and leaves row 0 untouched', () => {
     const gen = makeGen({ sizeX: 16, datum: 8, sizeZ: 16 });
     const grid = generateTerrain(genToConfig(gen));
-    const payload = encodeVoxelGrid(grid, gen);
+    for (let y = -8; y <= -4; y++) grid.clearVoxel(6, y, 6);
+
+    const decoded = reloaded(grid, gen);
+
+    for (let y = -8; y <= -4; y++) expect(decoded.densityAt(6, y, 6), `row ${y}`).toBe(0);
+    expect(decoded.densityAt(6, -9, 6)).toBe(1);
+    expect(decoded.densityAt(6, -3, 6)).toBe(1);
+    expect(decoded.densityAt(6, 0, 6)).toBe(grid.densityAt(6, 0, 6));
+  });
+
+  it('added rock and a fracture above the old 4095 ceiling reload in place', () => {
+    const gen = makeGen({ sizeX: 16, datum: 8, sizeZ: 16 });
+    const grid = generateTerrain(genToConfig(gen));
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(7, 5000, 7, compId);
+    grid.setFractureAt(7, 5000, 7, 0.4);
+
+    const decoded = reloaded(grid, gen);
+
+    expect(decoded.densityAt(7, 5000, 7)).toBe(1);
+    expect(decoded.dominantRockAt(7, 5000, 7)).toBe('cruite');
+    expect(decoded.fractureAt(7, 5000, 7)).toBeCloseTo(0.4, 10);
+    expect(decoded.densityAt(7, MAX_TERRAIN_GEN_DIMENSION - 1, 7)).toBe(0);
+  });
+
+  it.each([
+    ['NaN', NaN],
+    ['a fraction', 2.5],
+    ['a row past MAX_VOXEL_ABS_Y', MAX_VOXEL_ABS_Y + 1],
+    ['1e15', 1e15],
+  ])('refuses a segment row that is %s instead of clamping it', (_label, badY) => {
+    const gen = makeGen({ sizeX: 16, datum: 8, sizeZ: 16 });
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
     const corrupted: SerializedVoxels = {
       ...payload,
-      editColumns: [{ x: 6, z: 6, segments: [{ yLo: 0, yHi: 1e15, kind: 'dug' }] }],
+      editColumns: [{ x: 5, z: 5, segments: [{ yLo: 0, yHi: badY, kind: 'dug' }] }],
     };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: edit segment yHi/);
+  });
 
-    const decoded = decodeVoxelGrid(corrupted);
-
-    // The real column, over a generous test-only height range, is dug — the
-    // segment's own dig genuinely applied, not just a no-op decode.
-    for (let y = 0; y < TEST_HEIGHT_RANGE; y++) {
-      expect(decoded.densityAt(6, y, 6), `expected row ${y} of column (6,6) to be dug (clamped)`).toBe(0);
-    }
-    // And separately: the clamp genuinely reached MAX_TERRAIN_GEN_DIMENSION - 1
-    // itself (the new ceiling), not merely some row well short of it — this is
-    // what tells the clamp apart from a yHi that silently stayed small.
-    expect(
-      decoded.densityAt(6, MAX_TERRAIN_GEN_DIMENSION - 1, 6),
-      'expected the clamp ceiling itself to be dug',
-    ).toBe(0);
+  it('refuses a fracture row outside the addressable range', () => {
+    const gen = makeGen({ sizeX: 16, datum: 8, sizeZ: 16 });
+    const payload = encodeVoxelGrid(generateTerrain(genToConfig(gen)), gen);
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      editFractures: [{ x: 5, y: -MAX_VOXEL_ABS_Y - 1, z: 5, modifier: 0.5 }],
+    };
+    expect(() => decodeVoxelGrid(corrupted)).toThrow(/corrupt save: edit fracture y/);
   });
 });
