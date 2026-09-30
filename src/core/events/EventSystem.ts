@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Event system engine
 // Manages category timers, weighted selection, and event firing.
 
+import type { TrafficJam } from './TrafficJams.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
@@ -30,6 +31,8 @@ export interface EventSystemState {
   timers: CategoryTimer[];
   /** Currently pending event requiring player decision. */
   pendingEvent: FiredEvent | null;
+  /** Jam chokepoint key -> tick until which that chokepoint stays silent (#1208). */
+  jamSilencedUntil: Record<string, number>;
   /**
    * The result of the most recently resolved event, kept around so the UI's
    * outcome phase has something to read after pendingEvent is cleared. Set by
@@ -66,6 +69,8 @@ export interface EventSystemState {
 export interface FiredEvent {
   eventId: string;
   firedAtTick: number;
+  /** The jam that fired a traffic_jam event (#1208). */
+  jam?: TrafficJam;
 }
 
 /** What kind of value an EventEffect carries — decides which chip color/format the UI uses. */
@@ -98,6 +103,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
       baseInterval: BASE_TIMER[cat],
     })),
     pendingEvent: null,
+    jamSilencedUntil: {},
     lastOutcome: null,
     followUpQueue: [],
     firedEventIds: [],

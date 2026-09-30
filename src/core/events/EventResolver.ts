@@ -8,6 +8,7 @@ import { addIncome, addExpense } from '../economy/Finance.js';
 import type { EventConsequence } from './EventPool.js';
 import { getEventById } from './EventPool.js';
 import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.js';
+import type { JamWorld } from './TrafficJamEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
 
 // ── Resolution result ──
@@ -37,6 +38,7 @@ export function resolveEvent(
   optionIndex: number,
   tick: number,
   rng: Random,
+  _world?: JamWorld,
 ): ResolutionResult | null {
   if (!eventSystem.pendingEvent) return null;
 

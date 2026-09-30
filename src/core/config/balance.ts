@@ -144,6 +144,27 @@ export const MIN_EVENT_INTERVAL_ACTIONS = 10;
 /** Minimum number of vehicles waiting on the same target cell to trigger a traffic jam. */
 export const TRAFFIC_JAM_MIN_VEHICLES = 3;
 
+/** Minimum agents (drivers and walkers) stuck at one chokepoint to count as a jam (#1208). Alias of TRAFFIC_JAM_MIN_VEHICLES's value. */
+export const TRAFFIC_JAM_MIN_AGENTS = 3;
+
+/** Tiles around a ramp's footprint that still count as that ramp's chokepoint (#1208). */
+export const TRAFFIC_JAM_RAMP_MARGIN = 3;
+
+/** Radius in tiles within which stuck agents merge into one passage jam (#1208). */
+export const TRAFFIC_JAM_PASSAGE_RADIUS = 3;
+
+/** Ticks a chokepoint stays silent after the player picks "reroute vehicles" (#1208). */
+export const TRAFFIC_JAM_REROUTE_SILENCE_TICKS = 100;
+
+/** Ticks a chokepoint stays silent after the player picks "ignore" (#1208). */
+export const TRAFFIC_JAM_IGNORE_SILENCE_TICKS = 400;
+
+/** Ticks a chokepoint stays silent after the player picks "widen ramp" (#1208). */
+export const TRAFFIC_JAM_WIDEN_SILENCE_TICKS = 1000;
+
+/** Well-being penalty applied when the player ignores a jam (#1208). */
+export const TRAFFIC_JAM_IGNORE_WELLBEING_PENALTY = 5;
+
 /** Minimum consecutive waiting ticks per vehicle before it counts toward a traffic jam. */
 export const TRAFFIC_JAM_MIN_TICKS = 10;
 

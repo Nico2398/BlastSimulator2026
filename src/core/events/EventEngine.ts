@@ -3,6 +3,7 @@
 
 import type { Vehicle } from '../entities/Vehicle.js';
 import { resolveVehicleDriver } from '../entities/Vehicle.js';
+import type { BuiltRamp } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventSystemState, FiredEvent } from './EventSystem.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
@@ -23,28 +24,12 @@ export { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS };
  * Returns null if an event is already pending or the condition is not met.
  */
 export function detectTrafficJam(
-  vehicles: Vehicle[],
-  employees: readonly Employee[],
-  state: EventSystemState,
-  tickCount: number,
+  _ramps: readonly BuiltRamp[],
+  _employees: readonly Employee[],
+  _state: EventSystemState,
+  _tickCount: number,
 ): FiredEvent | null {
-  if (state.pendingEvent) return null;
-  if (state.eventFreqMultiplier === 0) return null;
-
-  // Count qualifying vehicles (driver waiting on occupancy, at threshold) per
-  // target cell — re-derived (#1138) from the driving employee's own
-  // vehicleWaitingTicks and current drive leg's destination, now that
-  // neither lives on Vehicle itself any more.
-  const waitingByTarget = buildWaitingByTarget(vehicles, employees);
-
-  for (const { count } of waitingByTarget.values()) {
-    if (count >= TRAFFIC_JAM_MIN_VEHICLES) {
-      const event: FiredEvent = { eventId: 'traffic_jam', firedAtTick: tickCount };
-      state.pendingEvent = event;
-      return event;
-    }
-  }
-
+  // TODO: implement
   return null;
 }
 
