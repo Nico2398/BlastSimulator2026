@@ -237,7 +237,7 @@ walkers alike, once each. Each counted agent belongs to one chokepoint, decided 
 | Chokepoint | Where | `kind`, key |
 |------------|-------|-------------|
 | Ramp | within a built ramp's footprint grown by `TRAFFIC_JAM_RAMP_MARGIN` (lowest id on overlap); the jam's upper end (origin row or beyond it) is the pit exit, the rest the head | `pit_exit` or `ramp_head`, `ramp:<id>` |
-| Passage | on no ramp; agents bucket by `TRAFFIC_JAM_PASSAGE_RADIUS` | `passage`, `passage:<cx>,<cz>` |
+| Passage | on no ramp; agents chain into one cluster when within `TRAFFIC_JAM_PASSAGE_RADIUS` of each other | `passage`, `passage:<x>,<z>` (tile of the lowest-id agent) |
 
 A chokepoint with at least `TRAFFIC_JAM_MIN_AGENTS` agents is one `TrafficJam`. One pass over the
 employees, sorted by key, so it is deterministic. `detectTrafficJam` fires the `traffic_jam` event for

@@ -59,6 +59,34 @@ function isUpperEnd(def: RampSpec['def'], tx: number, tz: number): boolean {
   }
 }
 
+/**
+ * Single-link clusters of off-ramp agents: two agents chain together when within
+ * PASSAGE_RADIUS on both axes. Unlike fixed grid buckets, a crowd straddling a
+ * bucket edge stays one jam. The key is the tile of the cluster's lowest-id agent.
+ */
+function clusterByProximity(agents: readonly Employee[]): Group[] {
+  const sorted = [...agents].sort((a, b) => a.id - b.id);
+  const seen = new Set<number>();
+  const out: Group[] = [];
+  for (const seed of sorted) {
+    if (seen.has(seed.id)) continue;
+    seen.add(seed.id);
+    const members = [seed];
+    for (let i = 0; i < members.length; i++) {
+      const m = members[i]!;
+      for (const o of sorted) {
+        if (seen.has(o.id)) continue;
+        if (Math.abs(o.x - m.x) <= TRAFFIC_JAM_PASSAGE_RADIUS && Math.abs(o.z - m.z) <= TRAFFIC_JAM_PASSAGE_RADIUS) {
+          seen.add(o.id);
+          members.push(o);
+        }
+      }
+    }
+    out.push({ key: `passage:${Math.floor(seed.x)},${Math.floor(seed.z)}`, ramp: null, agents: members });
+  }
+  return out;
+}
+
 /** Finds every chokepoint with enough stuck agents, skipping keys silenced until a later tick. */
 export function findTrafficJams(
   ramps: readonly RampSpec[],
@@ -67,22 +95,23 @@ export function findTrafficJams(
   tick: number = 0,
 ): TrafficJam[] {
   const groups = new Map<string, Group>();
+  const loose: Employee[] = [];
   for (const emp of employees) {
     if (emp.vehicleWaitingTicks < TRAFFIC_JAM_MIN_TICKS || !emp.itinerary) continue;
     if (Number.isNaN(emp.x) || Number.isNaN(emp.z)) continue;
     const tx = Math.floor(emp.x);
     const tz = Math.floor(emp.z);
     const ramp = rampAround(ramps, tx, tz);
-    let key: string;
     if (ramp) {
-      key = `ramp:${ramp.id}`;
+      const key = `ramp:${ramp.id}`;
+      let g = groups.get(key);
+      if (!g) { g = { key, ramp, agents: [] }; groups.set(key, g); }
+      g.agents.push(emp);
     } else {
-      key = `passage:${Math.floor(emp.x / TRAFFIC_JAM_PASSAGE_RADIUS)},${Math.floor(emp.z / TRAFFIC_JAM_PASSAGE_RADIUS)}`;
+      loose.push(emp);
     }
-    let g = groups.get(key);
-    if (!g) { g = { key, ramp, agents: [] }; groups.set(key, g); }
-    g.agents.push(emp);
   }
+  for (const g of clusterByProximity(loose)) groups.set(g.key, g);
 
   const jams: TrafficJam[] = [];
   for (const g of groups.values()) {

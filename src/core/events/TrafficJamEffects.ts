@@ -26,13 +26,13 @@ interface JamEffectOutcome {
   resultKeySuffix: '' | '_alt';
 }
 
-type JamEffectHandler = (jam: TrafficJam, world: JamWorld) => JamEffectOutcome;
+type JamEffectHandler = (jam: TrafficJam, world: JamWorld, tick: number) => JamEffectOutcome;
 
-function silence(world: JamWorld, jam: TrafficJam, ticks: number): void {
-  world.state.events.jamSilencedUntil[jam.key] = world.state.tickCount + ticks;
+function silence(world: JamWorld, jam: TrafficJam, tick: number, ticks: number): void {
+  world.state.events.jamSilencedUntil[jam.key] = tick + ticks;
 }
 
-const rerouteVehicles: JamEffectHandler = (jam, world) => {
+const rerouteVehicles: JamEffectHandler = (jam, world, tick) => {
   const ids = new Set(jam.agentIds);
   for (const emp of world.state.employees.employees) {
     if (!ids.has(emp.id)) continue;
@@ -40,12 +40,12 @@ const rerouteVehicles: JamEffectHandler = (jam, world) => {
     emp.isMoveStuck = false;
     respreadLegDestination(world.state, emp);
   }
-  silence(world, jam, TRAFFIC_JAM_REROUTE_SILENCE_TICKS);
+  silence(world, jam, tick, TRAFFIC_JAM_REROUTE_SILENCE_TICKS);
   return { effects: [], cashChange: 0, resultKeySuffix: '' };
 };
 
 /** Orders the ramp one width wider; charges through orderRampWiden alone, so cashChange stays 0. */
-const widenRamp: JamEffectHandler = (jam, world) => {
+const widenRamp: JamEffectHandler = (jam, world, tick) => {
   const { state, grid } = world;
   const ramp = jam.rampId === null ? undefined : state.builtRamps.find(r => r.id === jam.rampId);
   const toWidth = ramp ? nextRampWidth(ramp.width) : null;
@@ -54,14 +54,14 @@ const widenRamp: JamEffectHandler = (jam, world) => {
   }
   const ordered = orderRampWiden(state, grid, ramp.id, toWidth);
   if (!ordered.success) return { effects: [], cashChange: 0, resultKeySuffix: '_alt' };
-  silence(world, jam, TRAFFIC_JAM_WIDEN_SILENCE_TICKS);
+  silence(world, jam, tick, TRAFFIC_JAM_WIDEN_SILENCE_TICKS);
   return { effects: [`Lost $${ordered.data.cost}`], cashChange: 0, resultKeySuffix: '' };
 };
 
-const ignoreJam: JamEffectHandler = (jam, world) => {
+const ignoreJam: JamEffectHandler = (jam, world, tick) => {
   const scores = world.state.scores;
   scores.wellBeing = clampScore(scores.wellBeing - TRAFFIC_JAM_IGNORE_WELLBEING_PENALTY);
-  silence(world, jam, TRAFFIC_JAM_IGNORE_SILENCE_TICKS);
+  silence(world, jam, tick, TRAFFIC_JAM_IGNORE_SILENCE_TICKS);
   return { effects: [], cashChange: 0, resultKeySuffix: '' };
 };
 

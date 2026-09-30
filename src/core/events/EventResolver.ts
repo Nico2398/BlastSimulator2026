@@ -73,7 +73,7 @@ export function resolveEvent(
   const jam = eventSystem.pendingEvent.jam;
   const handler = consequence.effectTag ? TRAFFIC_JAM_EFFECTS[consequence.effectTag] : undefined;
   if (world && jam && handler) {
-    const outcome = handler(jam, world);
+    const outcome = handler(jam, world, tick);
     result.effects.push(...outcome.effects);
     result.cashChange += outcome.cashChange;
     result.resultKey += outcome.resultKeySuffix;

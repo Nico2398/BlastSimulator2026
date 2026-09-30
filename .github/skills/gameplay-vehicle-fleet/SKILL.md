@@ -224,8 +224,37 @@ A destination targeting a depot resolves through the building-approach-cell look
 ## Traffic
 
 Vehicles cannot share a cell. A driver whose next drive step is occupied waits and retries, then
-attempts one vehicle-avoiding reroute, then reports stuck. Long waiting chains raise a
-`TrafficJamEvent`. Rock debris after a blast marks cells blocked until cleared.
+attempts one vehicle-avoiding reroute, then reports stuck. Rock debris after a blast marks cells
+blocked until cleared.
+
+### Jams and chokepoints (`TrafficJams.ts`, #1208)
+
+`findTrafficJams(ramps, employees, silencedUntil?, tick?)` is the one detector; the event, the Fleet
+panel banner, the alert pip, the ground markers and the console state dump all read it. An employee
+counts when `vehicleWaitingTicks >= TRAFFIC_JAM_MIN_TICKS` and they hold an itinerary — drivers and
+walkers alike, once each. Each counted agent belongs to one chokepoint, decided by their position:
+
+| Chokepoint | Where | `kind`, key |
+|------------|-------|-------------|
+| Ramp | within a built ramp's footprint grown by `TRAFFIC_JAM_RAMP_MARGIN` (lowest id on overlap); the jam's upper end (origin row or beyond it) is the pit exit, the rest the head | `pit_exit` or `ramp_head`, `ramp:<id>` |
+| Passage | on no ramp; agents chain into one cluster when within `TRAFFIC_JAM_PASSAGE_RADIUS` of each other | `passage`, `passage:<x>,<z>` (tile of the lowest-id agent) |
+
+A chokepoint with at least `TRAFFIC_JAM_MIN_AGENTS` agents is one `TrafficJam`. One pass over the
+employees, sorted by key, so it is deterministic. `detectTrafficJam` fires the `traffic_jam` event for
+the first jam whose key is not silenced (`events.jamSilencedUntil[key] > tick`), carrying the jam on
+`pendingEvent.jam`.
+
+### Answering a jam (`TrafficJamEffects.ts`)
+
+Handlers are keyed by the option's `effectTag`; `resolveEvent` runs one when given a `JamWorld`.
+
+| Option | Effect | Silence (ticks) |
+|--------|--------|-----------------|
+| `reroute_vehicles` | every jam agent: `vehicleWaitingTicks = 0`, `isMoveStuck = false`, destination re-spread by `respreadLegDestination` (Locomotion.ts). No cost | `TRAFFIC_JAM_REROUTE_SILENCE_TICKS` (100) |
+| `widen_ramp` | orders the jam's ramp one width wider via `orderRampWiden`, which charges its own cost once (the handler reports `cashChange` 0). Ramp gone, widest, already being widened or no grid: no charge, result text `res1_alt` | `TRAFFIC_JAM_WIDEN_SILENCE_TICKS` (1000) |
+| `ignore_jam` | well-being `-TRAFFIC_JAM_IGNORE_WELLBEING_PENALTY` (5) | `TRAFFIC_JAM_IGNORE_SILENCE_TICKS` (400) |
+
+Silencing only mutes the event; the banner, pip and markers keep showing a jam that persists.
 
 Player solutions to congestion: widen ramps, build parallel haulage routes, relocate the Freight
 Warehouse, clear debris with Rock Fragmenters before hauling.

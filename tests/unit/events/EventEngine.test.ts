@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   detectTrafficJam,
   detectOreReport,
-  computeTrafficAdvisory,
   TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
 } from '../../../src/core/events/EventEngine.js';
@@ -206,24 +205,6 @@ describe('EventEngine — detectTrafficJam (#1208 chokepoints)', () => {
     eventState = createEventSystemState(0);
     expect(detectTrafficJam([jamRamp()], queue(3, true), eventState, 100)).toBeNull();
     expect(eventState.pendingEvent).toBeNull();
-  });
-});
-
-describe('EventEngine — computeTrafficAdvisory (#1274)', () => {
-  beforeEach(() => { _nextId = 1; });
-
-  it('computeTrafficAdvisory reports the shared ORIGINAL target, not any one live target, for a fragmented cluster', () => {
-    const originalTarget = { x: 9, z: 9 };
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(8, 9, 10, originalTarget),
-      makeWaitingVehicleAndDriver(10, 9, 10, originalTarget),
-      makeWaitingVehicleAndDriver(9, 10, 10, originalTarget),
-    ]);
-
-    const advisories = computeTrafficAdvisory(vehicles, employees);
-
-    expect(advisories).toHaveLength(1);
-    expect(advisories[0]).toEqual({ targetX: originalTarget.x, targetZ: originalTarget.z, count: 3 });
   });
 });
 
@@ -465,66 +446,4 @@ describe('EventPool — ore report EventDef registration (Task 4.8)', () => {
       expect(event!.consequences.length).toBe(event!.options.length);
     });
   }
-});
-
-// ── computeTrafficAdvisory ───────────────────────────────────────────────────
-
-describe('EventEngine — computeTrafficAdvisory', () => {
-  beforeEach(() => { _nextId = 1; });
-
-  it('reports nothing with no waiting vehicles', () => {
-    expect(computeTrafficAdvisory([], [])).toEqual([]);
-  });
-
-  it('reports nothing below MIN_VEHICLES on the same target', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(10, 10, TRAFFIC_JAM_MIN_TICKS),
-      makeWaitingVehicleAndDriver(10, 10, TRAFFIC_JAM_MIN_TICKS),
-    ]);
-    expect(computeTrafficAdvisory(vehicles, employees)).toEqual([]);
-  });
-
-  it('reports nothing below MIN_TICKS even with enough vehicles', () => {
-    const { vehicles, employees } = split(
-      Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () =>
-        makeWaitingVehicleAndDriver(10, 10, TRAFFIC_JAM_MIN_TICKS - 1)),
-    );
-    expect(computeTrafficAdvisory(vehicles, employees)).toEqual([]);
-  });
-
-  it('reports a cluster once both thresholds are met', () => {
-    const { vehicles, employees } = split(
-      Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () =>
-        makeWaitingVehicleAndDriver(10, 10, TRAFFIC_JAM_MIN_TICKS)),
-    );
-    expect(computeTrafficAdvisory(vehicles, employees)).toEqual([{ targetX: 10, targetZ: 10, count: TRAFFIC_JAM_MIN_VEHICLES }]);
-  });
-
-  it('keeps separate targets as separate clusters', () => {
-    const { vehicles, employees } = split([
-      ...Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () => makeWaitingVehicleAndDriver(10, 10, TRAFFIC_JAM_MIN_TICKS)),
-      ...Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () => makeWaitingVehicleAndDriver(20, 20, TRAFFIC_JAM_MIN_TICKS)),
-    ]);
-    const result = computeTrafficAdvisory(vehicles, employees);
-    expect(result).toHaveLength(2);
-    expect(result.map(r => r.count)).toEqual([TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_VEHICLES]);
-  });
-
-  it('is read-only — never touches EventSystemState, unlike detectTrafficJam', () => {
-    // No EventSystemState is even passed in — this is the whole point: the
-    // banner must work independent of pendingEvent/eventFreqMultiplier gating.
-    const { vehicles, employees } = split(
-      Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () =>
-        makeWaitingVehicleAndDriver(10, 10, TRAFFIC_JAM_MIN_TICKS)),
-    );
-    expect(() => computeTrafficAdvisory(vehicles, employees)).not.toThrow();
-  });
-
-  it('ignores a driverless vehicle even if it sits on the shared target', () => {
-    const { vehicles, employees } = split(
-      Array.from({ length: TRAFFIC_JAM_MIN_VEHICLES }, () => makeWaitingVehicleAndDriver(10, 10, TRAFFIC_JAM_MIN_TICKS)),
-    );
-    vehicles.push(makeDriverlessVehicle(10, 10));
-    expect(computeTrafficAdvisory(vehicles, employees)).toEqual([{ targetX: 10, targetZ: 10, count: TRAFFIC_JAM_MIN_VEHICLES }]);
-  });
 });

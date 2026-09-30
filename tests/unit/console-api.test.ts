@@ -88,7 +88,7 @@ function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
  * mode before this.
  */
 const SERIALIZED_FIELDS = [
-  'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
+  'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'researchQueueLength', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',

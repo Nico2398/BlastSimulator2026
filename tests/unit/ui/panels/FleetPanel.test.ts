@@ -147,7 +147,7 @@ describe('FleetPanel', () => {
     panel.update(makeState(jammed, drivers));
     const banner = panel.root.querySelector('.bs-fleet-traffic');
     expect(banner).not.toBeNull();
-    expect(banner!.textContent).toContain('3 vehicles');
+    expect(banner!.textContent).toContain('3 people and vehicles');
   });
 
   it('status chip reports a real stuck duration', () => {
