@@ -2304,8 +2304,8 @@ describe('the merge gate hands back what it cannot merge', () => {
 // that ran and produced nothing, which is what both issues were told.
 describe('the agent binary cannot change underneath a run', () => {
   const CALLERS = ['claude-runner.yml', 'claude-code-review.yml'];
-  // v1.0.217 / Claude Code 2.1.263, the last build a run finished on here.
-  const PINNED = '9c5ddab2e6d17b83ea679153b31f1d5f023cf636';
+  // v1.0.237 / Claude Code 2.1.285.
+  const PINNED = 'fd1c128679612beff4ca259c78021c506e8aa7a7';
 
   it.each(CALLERS)('%s pins claude-code-action to a SHA, never a tag', (name) => {
     const uses = workflow(name)

@@ -240,11 +240,12 @@ jobs:
         # "✔ Claude Code successfully installed!" while leaving no executable
         # behind. #1006 and #1007 died on it 48 seconds apart, four attempts,
         # never reading a word of their prompts (runs 34292640758, 34292715511).
-        # 9c5ddab is v1.0.217 / Claude Code 2.1.263 — the last build this
-        # repository finished a run on (run 34129897957). Every commit between
-        # it and the broken one is a pure version bump, so the pin costs no fix.
-        # Moving it is a deliberate act: read the action's diff first.
-        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1.0.217
+        # fd1c128 is v1.0.237 / Claude Code 2.1.285. Its installer still puts
+        # the binary in ~/.local/bin, which the missing-binary gate below
+        # checks, and the build accepts the `sonnet` alias and `--effort` used
+        # in `claude_args`. Moving it is a deliberate act: read the action's
+        # diff first.
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # The PAT, not GITHUB_TOKEN. The action exports its own `github_token`
@@ -298,7 +299,11 @@ jobs:
           # no human present to approve anything -- a prompt is a silent hang.
           # `deny` rules still apply, so the .env reads denied in
           # .claude/settings.json stay denied.
-          claude_args: '--permission-mode bypassPermissions --model claude-sonnet-5'
+          # `sonnet` is the CLI's alias for the latest Sonnet model, so a new
+          # Sonnet release is picked up without editing this line. `--effort`
+          # sets the thinking level for the session and every sub-agent that
+          # does not set its own.
+          claude_args: '--permission-mode bypassPermissions --model sonnet --effort medium'
           # Without this the action prints "full output hidden for security" and
           # the job log carries no tool trace at all, so a finished run cannot be
           # audited: which specialists the orchestrator delegated to, and which
@@ -398,7 +403,7 @@ jobs:
           AGENTIC_LOOP_DEADLINE_EPOCH: ${{ steps.clock.outputs.loop_deadline }}
         # Same pin as the first attempt, and it has to stay the same one: a
         # retry on a different agent build is a different run, not a second try.
-        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1.0.217
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Same PAT as the first attempt, for the same reason: the retry is the
@@ -433,7 +438,7 @@ jobs:
             `npm run long -- wait <label>` until it stops exiting 75, all inside this turn.
 
             ${{ steps.context.outputs.prompt }}
-          claude_args: '--permission-mode bypassPermissions --model claude-sonnet-5'
+          claude_args: '--permission-mode bypassPermissions --model sonnet --effort medium'
           show_full_output: true
 
       # Reported, not acted on: the rescue step below reads the state itself and
