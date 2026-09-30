@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { VoxelGrid, CHUNK_SIZE, setVoxelColumnSurfaceHeight, computeColumnRangeY } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, CHUNK_SIZE, setVoxelColumnSurfaceHeight, computeColumnRangeY, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
 import {
   TerrainMesh,
@@ -334,7 +334,10 @@ describe('TerrainMesh', () => {
       const grid = makeThreeChunkGrid();
       const tm = new TerrainMesh(scene, grid);
       tm.buildAll();
-      expect(tm.chunkGridDims).toEqual({ ncx: 3, ncy: 1, ncz: 1 });
+      // Two bands: the solid block's top at cy 0, and its underside at y = 0,
+      // which faces the empty rows below this generator-less grid and is
+      // marched by the cube row at y = -1 (cy -1).
+      expect(tm.chunkGridDims).toEqual({ ncx: 3, ncy: 2, ncz: 1 });
 
       const mesh0Before = tm.getChunkMesh(0, 0, 0);
       const mesh1Before = tm.getChunkMesh(1, 0, 0);
@@ -1413,6 +1416,52 @@ describe('TerrainMesh', () => {
 
       tmA.dispose();
       tmB.dispose();
+    });
+  });
+
+  describe('a pit dug below y = 0 right across a chunk seam keeps its wall', () => {
+    // The pit sits in chunk (2, 1) at x = 32..35, right against chunk (1, 1).
+    // The wall between them belongs to chunk (1, 1): its east edge cubes read
+    // x = 32. That chunk is solid rock at cy = -1 with all four neighbours
+    // owned, which the skip test used to treat as "never emits geometry" —
+    // leaving a see-through hole — and its own surface range never reached
+    // cy = -1 either.
+    const dig = (grid: VoxelGrid): void => {
+      for (let x = 32; x <= 35; x++) {
+        for (let z = 20; z <= 24; z++) {
+          const top = computeVoxelColumnSurfaceY(grid, x, z)!;
+          for (let y = top + 1; y >= -10; y--) grid.clearVoxel(x, y, z);
+        }
+      }
+    };
+    const pitGrid = (): VoxelGrid => generateTerrain({ sizeX: 64, datum: 40, sizeZ: 64, seed: 42, climateBias: [0, 0] });
+
+    const wallVerticesBelowZero = (tm: TerrainMesh): number => {
+      const mesh = tm.getChunkMesh(1, -1, 1);
+      if (!mesh) return 0;
+      const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+      let n = 0;
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getX(i) >= 31 && pos.getX(i) <= 33 && pos.getY(i) < 0) n++;
+      }
+      return n;
+    };
+
+    it('buildAll marches the west neighbour chunk at the pit depth', () => {
+      const grid = pitGrid();
+      dig(grid);
+      const tm = new TerrainMesh(makeScene(), grid);
+      tm.buildAll();
+      expect(wallVerticesBelowZero(tm)).toBeGreaterThan(0);
+    });
+
+    it('remeshRegion after the dig marches the same wall', () => {
+      const grid = pitGrid();
+      const tm = new TerrainMesh(makeScene(), grid);
+      tm.buildAll();
+      dig(grid);
+      tm.remeshRegion({ minX: 32, maxX: 35, minY: -10, maxY: 60, minZ: 20, maxZ: 24 });
+      expect(wallVerticesBelowZero(tm)).toBeGreaterThan(0);
     });
   });
 

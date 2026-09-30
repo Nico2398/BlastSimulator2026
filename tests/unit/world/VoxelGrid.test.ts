@@ -17,8 +17,11 @@ import {
   clampChunkRectToTile,
   CHUNK_SIZE,
   MAX_TERRAIN_GEN_DIMENSION,
+  MAX_VOXEL_ABS_Y,
+  isValidVoxelY,
   type VoxelChunkSource,
 } from '../../../src/core/world/VoxelGrid.js';
+import { MAX_RESIDENT_VOXEL_SLABS } from '../../../src/core/config/balance.js';
 import { generateTerrain, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
 
 describe('VoxelGrid', () => {
@@ -77,13 +80,12 @@ describe('VoxelGrid', () => {
     expect(nonEmpty.length).toBe(2);
   });
 
-  it('isInBounds correctly rejects out-of-range coordinates', () => {
+  it('isInBounds rejects columns the site does not own, whatever the height', () => {
     const grid = new VoxelGrid(10, 10);
     expect(grid.isInBounds(0, 0, 0)).toBe(true);
     expect(grid.isInBounds(9, 9, 9)).toBe(true);
     expect(grid.isInBounds(10, 0, 0)).toBe(false);
     expect(grid.isInBounds(-1, 0, 0)).toBe(false);
-    expect(grid.isInBounds(0, -1, 0)).toBe(false);
     expect(grid.isInBounds(0, 0, 10)).toBe(false);
   });
 
@@ -544,11 +546,37 @@ describe('VoxelGrid — reads/writes at any y for an owned column succeed withou
     expect(grid.oresAt(4, 18, 4)).toEqual({ sparkium: 0.2 });
   });
 
-  it('isInBounds rejects y = -10 and y = MAX_TERRAIN_GEN_DIMENSION, but accepts y = MAX_TERRAIN_GEN_DIMENSION - 1, for an otherwise-owned column', () => {
+  it('isInBounds accepts any height on an owned column — below 0 and past the old 4096 ceiling — up to MAX_VOXEL_ABS_Y', () => {
     const grid = new VoxelGrid(16, 16);
-    expect(grid.isInBounds(4, -10, 4)).toBe(false);
-    expect(grid.isInBounds(4, MAX_TERRAIN_GEN_DIMENSION, 4)).toBe(false);
-    expect(grid.isInBounds(4, MAX_TERRAIN_GEN_DIMENSION - 1, 4)).toBe(true);
+    expect(grid.isInBounds(4, -10, 4)).toBe(true);
+    expect(grid.isInBounds(4, MAX_TERRAIN_GEN_DIMENSION, 4)).toBe(true);
+    expect(grid.isInBounds(4, MAX_VOXEL_ABS_Y, 4)).toBe(true);
+    expect(grid.isInBounds(4, -MAX_VOXEL_ABS_Y, 4)).toBe(true);
+    expect(grid.isInBounds(4, MAX_VOXEL_ABS_Y + 1, 4)).toBe(false);
+    expect(grid.isInBounds(4, -MAX_VOXEL_ABS_Y - 1, 4)).toBe(false);
+    expect(grid.isInBounds(4, NaN, 4)).toBe(false);
+  });
+
+  it('a voxel past MAX_VOXEL_ABS_Y reads as air and ignores writes, instead of aliasing onto another row through int32 truncation', () => {
+    const grid = new VoxelGrid(16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'a', coefficient: 1 }] });
+    const farY = 2 ** 32 + 5; // truncates to 5 under a raw int32 shift
+    grid.fillVoxel(4, 5, 4, compId);
+    grid.fillVoxel(4, farY, 4, compId);
+    expect(grid.densityAt(4, farY, 4)).toBe(0);
+    expect(grid.getVoxel(4, farY, 4)).toBeUndefined();
+    expect(grid.edits.segmentsAt(4, 4).every(s => s.yHi <= MAX_VOXEL_ABS_Y)).toBe(true);
+  });
+
+  it('isValidVoxelY accepts integer rows inside ±MAX_VOXEL_ABS_Y and rejects fractions, non-finite values and rows past the limit', () => {
+    expect(isValidVoxelY(0)).toBe(true);
+    expect(isValidVoxelY(-60)).toBe(true);
+    expect(isValidVoxelY(MAX_VOXEL_ABS_Y)).toBe(true);
+    expect(isValidVoxelY(-MAX_VOXEL_ABS_Y)).toBe(true);
+    expect(isValidVoxelY(MAX_VOXEL_ABS_Y + 1)).toBe(false);
+    expect(isValidVoxelY(1.5)).toBe(false);
+    expect(isValidVoxelY(NaN)).toBe(false);
+    expect(isValidVoxelY(Infinity)).toBe(false);
   });
 
   it('a never-written slab above/below the declared height reads default air values without allocating', () => {
@@ -849,7 +877,8 @@ class FlatChunkSource implements VoxelChunkSource {
     for (let z = z0; z < z1; z++) {
       for (let x = x0; x < x1; x++) {
         for (let y = y0; y < y1; y++) {
-          grid.writeGeneratedVoxel(x, y, z, this.compId, undefined, surfaceDensityAt(y, this.surfaceY));
+          const density = surfaceDensityAt(y, this.surfaceY);
+          if (density > 0) grid.writeGeneratedVoxel(x, y, z, this.compId, undefined, density);
         }
       }
     }
@@ -1403,13 +1432,13 @@ describe('renormaliseCarvedColumns (#1148)', () => {
   });
 });
 
-describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
-  it('forEachSolid visits every solid voxel exactly once and skips air', () => {
+describe('VoxelGrid.forEachSolidInRegion', () => {
+  it('visits every solid voxel in the box exactly once and skips air', () => {
     const grid = new VoxelGrid(4, 4);
     grid.setVoxel(1, 1, 1, { composition: { rocks: [{ rockId: 'a', coefficient: 1 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     grid.setVoxel(2, 2, 2, { composition: { rocks: [{ rockId: 'b', coefficient: 1 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
     const visited: Array<[number, number, number]> = [];
-    grid.forEachSolid((x, y, z) => visited.push([x, y, z]));
+    grid.forEachSolidInRegion({ x: 0, y: -4, z: 0 }, { x: 3, y: 8, z: 3 }, (x, y, z) => visited.push([x, y, z]));
     expect(visited.length).toBe(2);
     expect(visited).toContainEqual([1, 1, 1]);
     expect(visited).toContainEqual([2, 2, 2]);
@@ -1431,13 +1460,16 @@ describe('VoxelGrid.forEachSolid / forEachSolidInRegion', () => {
     expect(calls).toBe(0);
   });
 
-  it('a solid voxel force-written at y = MAX_TERRAIN_GEN_DIMENSION + 5 does not appear in forEachSolid — storage accepts the write, but iteration still respects the internal vertical cap (#1182)', () => {
+  it('visits solid voxels below y = 0 and past the old 4096 ceiling — iteration has no vertical cap of its own', () => {
     const grid = new VoxelGrid(4, 4);
     const compId = grid.palette.intern({ rocks: [{ rockId: 'a', coefficient: 1 }] });
-    grid.fillVoxel(1, MAX_TERRAIN_GEN_DIMENSION + 5, 1, compId, undefined, 1); // well past the internal cap
+    grid.fillVoxel(1, MAX_TERRAIN_GEN_DIMENSION + 5, 1, compId, undefined, 1);
+    grid.fillVoxel(2, -12, 2, compId, undefined, 1);
     const visited: Array<[number, number, number]> = [];
-    grid.forEachSolid((x, y, z) => visited.push([x, y, z]));
-    expect(visited).toEqual([]);
+    grid.forEachSolidInRegion({ x: 0, y: -20, z: 0 }, { x: 3, y: MAX_TERRAIN_GEN_DIMENSION + 10, z: 3 }, (x, y, z) => visited.push([x, y, z]));
+    expect(visited).toContainEqual([1, MAX_TERRAIN_GEN_DIMENSION + 5, 1]);
+    expect(visited).toContainEqual([2, -12, 2]);
+    expect(visited.length).toBe(2);
   });
 });
 
@@ -1591,13 +1623,22 @@ describe('VoxelGrid — edit recording (#1180)', () => {
 // the test can recompute independently of the grid under test.
 
 /**
- * Deterministic pure density function of (x, y, z) for `DeterministicChunkSource`
- * below — spans [0, 1] in steps of 0.1 so both solid (>= 0.5) and non-solid
- * results occur across a modest coordinate range.
+ * Per-column surface for `DeterministicChunkSource` below — varies between -30
+ * and -20, so neighbouring columns differ and a read from the wrong column
+ * shows up as a wrong density.
+ */
+function stubSurface(x: number, z: number): number {
+  return ((((x * 7 + z * 13) % 11) + 11) % 11) - 30;
+}
+
+/**
+ * Density the stub generates at (x, y, z). It follows the heightfield profile
+ * every `VoxelChunkSource` must produce — `surfaceDensityAt(y, surface)` —
+ * because the grid answers density and air checks from that without
+ * materializing.
  */
 function stubDensity(x: number, y: number, z: number): number {
-  const n = (((x * 7 + y * 13 + z * 17) % 11) + 11) % 11;
-  return n / 10;
+  return surfaceDensityAt(y, stubSurface(x, z));
 }
 
 /** Deterministic pure ore function: `{ stubore: 0.5 }` on 1 in 4 voxels, undefined otherwise. */
@@ -1611,10 +1652,10 @@ function stubOres(x: number, y: number, z: number): Record<string, number> | und
  * using one fixed composition palette index for every voxel it writes.
  */
 class DeterministicChunkSource implements VoxelChunkSource {
-  constructor(private readonly compId: number, private readonly surfaceY = 0) {}
+  constructor(private readonly compId: number) {}
 
-  surfaceHeightAt(_x: number, _z: number): number {
-    return this.surfaceY;
+  surfaceHeightAt(x: number, z: number): number {
+    return stubSurface(x, z);
   }
 
   materializeSlab(grid: VoxelGrid, x0: number, x1: number, z0: number, z1: number, cy: number): void {
@@ -1623,7 +1664,8 @@ class DeterministicChunkSource implements VoxelChunkSource {
     for (let z = z0; z < z1; z++) {
       for (let y = y0; y < y1; y++) {
         for (let x = x0; x < x1; x++) {
-          grid.writeGeneratedVoxel(x, y, z, this.compId, stubOres(x, y, z), stubDensity(x, y, z));
+          const density = stubDensity(x, y, z);
+          if (density > 0) grid.writeGeneratedVoxel(x, y, z, this.compId, stubOres(x, y, z), density);
         }
       }
     }
@@ -1683,8 +1725,11 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
     grid.oresAt(4, -55, 4); // still band A — no further allocation
     expect(grid.slabCount(0, 0)).toBe(1);
 
-    grid.getVoxel(4, -10, 4); // band B (chunkIndexOf(-10) !== chunkIndexOf(-50))
-    expect(chunkIndexOf(-10)).not.toBe(chunkIndexOf(-50)); // sanity: these really are distinct bands
+    grid.getVoxel(4, -35, 4); // band B (chunkIndexOf(-35) !== chunkIndexOf(-50)), solid rock below the stub surface
+    expect(chunkIndexOf(-35)).not.toBe(chunkIndexOf(-50)); // sanity: these really are distinct bands
+    expect(grid.slabCount(0, 0)).toBe(2);
+
+    grid.getVoxel(4, 40, 4); // open air above the surface — answered without building a slab
     expect(grid.slabCount(0, 0)).toBe(2);
   });
 
@@ -1792,5 +1837,130 @@ describe('VoxelGrid — chunk source materialize-on-read (#1183)', () => {
     const neighborY = y - CHUNK_SIZE;
     expect(chunkIndexOf(neighborY)).not.toBe(chunkIndexOf(y));
     expect(grid.densityAt(x, neighborY, z)).toBe(stubDensity(x, neighborY, z));
+  });
+});
+
+describe('VoxelGrid — resident slab cache is bounded, and evicted slabs rebuild exactly', () => {
+  const cruite = { rocks: [{ rockId: 'cruite', coefficient: 1 }] };
+  const molite = { rocks: [{ rockId: 'molite', coefficient: 1 }] };
+
+  /** Read real rock in `count` distinct y-bands of column (1, 1), all below the stub surface. */
+  function touchBands(grid: VoxelGrid, count: number, fromY = -40): void {
+    for (let k = 0; k < count; k++) grid.compositionAt(1, fromY - k * CHUNK_SIZE, 1);
+  }
+
+  it('a generated grid never keeps more than MAX_RESIDENT_VOXEL_SLABS slabs resident', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(new DeterministicChunkSource(grid.palette.intern(cruite)));
+    touchBands(grid, MAX_RESIDENT_VOXEL_SLABS + 100);
+    expect(grid.allocatedSlabCount).toBeGreaterThan(0);
+    expect(grid.allocatedSlabCount).toBeLessThanOrEqual(MAX_RESIDENT_VOXEL_SLABS);
+  });
+
+  it('a dig, a fill and a fracture whose slabs were evicted read back exactly', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(new DeterministicChunkSource(grid.palette.intern(cruite)));
+    const moliteId = grid.palette.intern(molite);
+    grid.clearVoxel(2, -30, 3);
+    grid.fillVoxel(3, 60, 3, moliteId, { sparkium: 0.25 });
+    grid.setFractureAt(4, -45, 4, 0.3);
+
+    touchBands(grid, MAX_RESIDENT_VOXEL_SLABS + 100, -200);
+    expect(grid.slabCount(0, 0)).toBeLessThanOrEqual(MAX_RESIDENT_VOXEL_SLABS);
+
+    expect(grid.densityAt(2, -30, 3)).toBe(0);
+    expect(grid.compositionAt(2, -30, 3).rocks).toEqual([]);
+    expect(grid.densityAt(3, 60, 3)).toBe(1);
+    expect(grid.dominantRockAt(3, 60, 3)).toBe('molite');
+    expect(grid.oresAt(3, 60, 3)).toEqual({ sparkium: 0.25 });
+    expect(grid.fractureAt(4, -45, 4)).toBeCloseTo(0.3, 10);
+    expect(grid.getVoxel(4, -45, 4)!.fractureModifier).toBeCloseTo(0.3, 10);
+  });
+
+  it('a grid with no generator never evicts — its written slabs are the only copy', () => {
+    const grid = new VoxelGrid(16, 16);
+    const compId = grid.palette.intern(cruite);
+    const bands = MAX_RESIDENT_VOXEL_SLABS + 20;
+    for (let k = 0; k < bands; k++) grid.fillVoxel(1, k * CHUNK_SIZE, 1, compId);
+    expect(grid.allocatedSlabCount).toBe(bands);
+    expect(grid.densityAt(1, 0, 1)).toBe(1);
+  });
+
+  it('an empty voxel that still names a material and ore keeps both through a drop', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(new DeterministicChunkSource(grid.palette.intern(cruite)));
+    grid.setVoxel(5, -40, 5, { composition: molite, density: 0, oreDensities: { sparkium: 0.4 }, fractureModifier: 1 });
+    grid.dropChunk(0, 0);
+    expect(grid.densityAt(5, -40, 5)).toBe(0);
+    expect(grid.dominantRockAt(5, -40, 5)).toBe('molite');
+    expect(grid.oresAt(5, -40, 5)).toEqual({ sparkium: 0.4 });
+  });
+
+  it('composition, ore, voxel and clear calls in open air build no slab', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(new DeterministicChunkSource(grid.palette.intern(cruite)));
+    expect(grid.compositionAt(3, 50, 3).rocks).toEqual([]);
+    expect(grid.dominantRockAt(3, 50, 3)).toBe('');
+    expect(grid.oresAt(3, 50, 3)).toBeUndefined();
+    expect(grid.getVoxel(3, 50, 3)).toMatchObject({ density: 0, oreDensities: {}, fractureModifier: 1 });
+    grid.clearVoxel(3, 50, 3);
+    expect(grid.allocatedSlabCount).toBe(0);
+    expect(grid.edits.isEmpty()).toBe(true);
+  });
+
+  it('a whole-row dig reads as air without rebuilding its slab', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(new DeterministicChunkSource(grid.palette.intern(cruite)));
+    grid.clearVoxel(6, -60, 6);
+    grid.dropChunk(0, 0);
+    expect(grid.compositionAt(6, -60, 6).rocks).toEqual([]);
+    expect(grid.allocatedSlabCount).toBe(0);
+  });
+});
+
+describe('VoxelGrid.editedYRange', () => {
+  it('is null for an unedited generated grid, even once slabs are materialized', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(new DeterministicChunkSource(grid.palette.intern({ rocks: [{ rockId: 'a', coefficient: 1 }] })));
+    grid.compositionAt(2, -40, 2);
+    expect(grid.editedYRange(0, 15, 0, 15)).toBeNull();
+  });
+
+  it('spans every edit in the rect, including a cavity far below the surface, and ignores edits outside it', () => {
+    const grid = new VoxelGrid(16, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'a', coefficient: 1 }] });
+    grid.attachChunkSource(new DeterministicChunkSource(compId));
+    grid.clearVoxel(2, -300, 3);
+    grid.fillVoxel(2, 40, 3, compId);
+    grid.clearVoxel(12, -500, 12);
+    expect(grid.editedYRange(0, 5, 0, 5)).toEqual({ minY: -300, maxY: 40 });
+    expect(grid.editedYRange(10, 15, 10, 15)).toEqual({ minY: -500, maxY: -500 });
+    expect(grid.editedYRange(6, 9, 6, 9)).toBeNull();
+  });
+
+  it('does not change when the edited slabs are dropped', () => {
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(new DeterministicChunkSource(grid.palette.intern({ rocks: [{ rockId: 'a', coefficient: 1 }] })));
+    grid.clearVoxel(4, -90, 4);
+    grid.dropChunk(0, 0);
+    expect(grid.allocatedCyRange(0, 0)).toBeNull();
+    expect(grid.editedYRange(0, 15, 0, 15)).toEqual({ minY: -90, maxY: -90 });
+  });
+});
+
+describe('VoxelGrid.generatorSurfaceHeightAt memo', () => {
+  it('returns the source height for owned and unowned columns alike, sampling an owned column once', () => {
+    let calls = 0;
+    const source: VoxelChunkSource = {
+      surfaceHeightAt: (x, z) => { calls++; return x * 0.5 - z; },
+      materializeSlab: () => {},
+    };
+    const grid = new VoxelGrid(16, 16);
+    grid.attachChunkSource(source);
+    expect(grid.generatorSurfaceHeightAt(4, 6)).toBe(-4);
+    expect(grid.generatorSurfaceHeightAt(4, 6)).toBe(-4);
+    expect(calls).toBe(1);
+    expect(grid.generatorSurfaceHeightAt(40, 2)).toBe(18); // off-site: sampled directly
+    expect(grid.generatorSurfaceHeightAt(4.5, 6)).toBe(-3.75); // non-integer: sampled directly
   });
 });

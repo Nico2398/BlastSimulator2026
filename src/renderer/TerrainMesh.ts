@@ -41,10 +41,11 @@ export const SKIRT_VISIBILITY_MARGIN_M = 2;
 /** Chunk-key packing (#1188): `chunkKey` biases each signed coordinate by
  *  `CHUNK_KEY_OFFSET` before packing, and the `cx`/`cz` fields have a
  *  `CHUNK_KEY_BASE` stride between them. Shared by `chunkKey` and its decode
- *  site in `chunkGridDims` so the two never drift apart. +/-1024 chunks per
- *  axis, cy included, since a chunk may now sit at any signed vertical slab. */
-const CHUNK_KEY_OFFSET = 1024;
-const CHUNK_KEY_BASE = 2048;
+ *  site in `chunkGridDims` so the two never drift apart. ±65536 chunks per
+ *  axis covers the grid's whole addressable height (`MAX_VOXEL_ABS_Y` is
+ *  62 500 chunks), and three 17-bit fields stay inside a safe integer. */
+const CHUNK_KEY_OFFSET = 65536;
+const CHUNK_KEY_BASE = 131072;
 
 export interface DirtyRegion {
   minX: number; minY: number; minZ: number;
@@ -361,20 +362,28 @@ export class TerrainMesh {
     for (const { cx, cz } of this.grid.ownedChunks()) {
       const rect = this.grid.chunkRect(cx, cz);
       if (!rect) continue;
-      // Union of the surface-derived range and whatever is already
-      // materialized: a surface-height scan only ever sees a column's
-      // topmost solid-to-air crossing, so real ground genuinely disconnected
-      // from that top (a block written below an air gap, never swept through
-      // from the surface) needs the already-allocated-slab signal too (#1188).
-      const surfaceRange = this.chunkVerticalSlabRange(rect);
+      // A chunk's east/south edge cubes read one column into the neighbouring
+      // chunk, so the seam between them is this chunk's geometry: size the
+      // range over those read columns too, or a cliff or pit sitting right on
+      // the seam is never marched. A surface-height scan only ever sees a
+      // column's topmost solid-to-air crossing, so a cavity or a fill apart
+      // from that top needs the edit record too — padded one row down, since
+      // the cube below an edit reads into it — which, unlike resident slabs,
+      // survives eviction. Slabs written with no generator attached have no
+      // edit record behind them, so the resident set still counts (#1188).
+      const readRect = { minX: rect.minX, maxX: rect.maxX + 1, minZ: rect.minZ, maxZ: rect.maxZ + 1 };
+      const surfaceRange = this.chunkVerticalSlabRange(readRect);
+      const editedRange = this.grid.editedYRange(readRect.minX, readRect.maxX - 1, readRect.minZ, readRect.maxZ - 1);
       const allocRange = this.grid.allocatedCyRange(cx, cz);
-      if (!surfaceRange && !allocRange) continue;
+      if (!surfaceRange && !editedRange && !allocRange) continue;
       const cyMin = Math.min(
         surfaceRange ? surfaceRange.cyMin : Infinity,
+        editedRange ? chunkIndexOf(editedRange.minY - 1) : Infinity,
         allocRange ? allocRange.min : Infinity,
       );
       const cyMax = Math.max(
         surfaceRange ? surfaceRange.cyMax : -Infinity,
+        editedRange ? chunkIndexOf(editedRange.maxY) : -Infinity,
         allocRange ? allocRange.max : -Infinity,
       );
       for (let cy = cyMin; cy <= cyMax; cy++) {
@@ -698,7 +707,22 @@ export class TerrainMesh {
     if (!slabSafe(cy + 1)) return false;
     if (cy > 0 && !slabSafe(cy - 1)) return false;
 
-    // A fully interior chunk never emits geometry.
+    // The same holds horizontally: this chunk's east and south edge cubes,
+    // and its south-east corner cube, read one column into those neighbours
+    // (at this band and, through the top row, the band above). A pit dug
+    // right across the seam puts the wall there, and only this chunk marches
+    // it — skipping on this slab alone left a see-through hole in the wall.
+    // An unowned diagonal reads as open ground, so it forbids the skip too.
+    const neighbourSolid = (ncx: number, ncz: number): boolean => {
+      const here = this.grid.chunkDensityRange(ncx, ncz, cy);
+      const above = this.grid.chunkDensityRange(ncx, ncz, cy + 1);
+      return here !== null && above !== null && here.min >= SURFACE_THRESHOLD && above.min >= SURFACE_THRESHOLD;
+    };
+    if (hasEast && !neighbourSolid(cx + 1, cz)) return false;
+    if (hasSouth && !neighbourSolid(cx, cz + 1)) return false;
+    if (hasEast && hasSouth && !neighbourSolid(cx + 1, cz + 1)) return false;
+
+    // A fully interior chunk whose read neighbours are solid too never emits geometry.
     if (hasWest && hasEast && hasNorth && hasSouth) return true;
 
     // Boundary chunk: only skippable if every bordering edge column proves a

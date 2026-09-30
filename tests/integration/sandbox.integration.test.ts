@@ -16,10 +16,19 @@ import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 
-/** Solid-voxel count — a cheap fingerprint of a generated map. */
+/**
+ * Solid-voxel count inside a fixed height window around the sandbox datum — a
+ * cheap fingerprint of a generated map. Rock continues to every depth, so a
+ * whole-column count has no end; the window is fixed rather than derived from
+ * the terrain so a carve inside it lowers the count.
+ */
 function solidCount(grid: VoxelGrid): number {
   let n = 0;
-  grid.forEachSolid(() => { n++; });
+  grid.forEachSolidInRegion(
+    { x: grid.minX, y: SANDBOX_DATUM - 32, z: grid.minZ },
+    { x: grid.maxX - 1, y: SANDBOX_DATUM + 64, z: grid.maxZ - 1 },
+    () => { n++; },
+  );
   return n;
 }
 

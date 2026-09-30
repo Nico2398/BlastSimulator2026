@@ -116,18 +116,30 @@ export class SavesModal {
   hide(): void { this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
-  /** Called each tick to trigger auto-save. */
+  /** Called each tick to trigger auto-save. `state` only times it — what gets saved comes from `getState`. */
   onTick(state: GameState): void {
     if (state.tickCount - this.lastAutoSaveTick >= AUTO_SAVE_INTERVAL_TICKS) {
       this.lastAutoSaveTick = state.tickCount;
-      void this.autoSave(state);
+      void this.autoSave();
     }
+  }
+
+  /** Save to the auto slot now — the quick-save shortcut. */
+  quickSave(): Promise<void> {
+    return this.autoSave();
   }
 
   dispose(): void { this.overlay.remove(); }
 
-  private async autoSave(state: GameState): Promise<void> {
-    if (!this.backend) return;
+  /**
+   * Save to the auto slot from `getState`, the same save-ready snapshot a
+   * manual slot uses — the live state alone lacks the encoded terrain, so
+   * saving it directly lost every terrain edit.
+   */
+  private async autoSave(): Promise<void> {
+    if (!this.backend || !this.getState) return;
+    const state = this.getState();
+    if (!state) return;
     try {
       const data = serialize(state);
       const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;

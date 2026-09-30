@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateTerrain, surfaceDensityAt, buildTerrainContext, createChunkSource,
-  requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION,
+  requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION,
   type TerrainConfig,
 } from '../../../src/core/world/TerrainGen.js';
 import { getBiome } from '../../../src/core/world/BiomeCatalog.js';
-import { VoxelGrid, chunkIndexOf, CHUNK_SIZE, getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, chunkIndexOf, CHUNK_SIZE, getDominantRockId, MAX_VOXEL_ABS_Y } from '../../../src/core/world/VoxelGrid.js';
 import { sampleSurfaceHeightY, sampleSurfaceVoxelY, applyPitMask, sampleBaseHeight, type WorldGenContext } from '../../../src/core/world/WorldGen.js';
 import { getOre } from '../../../src/core/world/OreCatalog.js';
 import { OreVeinSampler } from '../../../src/core/world/OreVeins.js';
@@ -306,6 +306,28 @@ describe('TerrainGen.createChunkSource — materializeSlab at extreme depth (#11
 // under test, so the depth gate (`depth < depthMin || depth > depthMax`) is
 // the only thing that can suppress it — deterministic regardless of the
 // noise field's actual value at the sampled point.
+
+// ── requireValidGenDatum — a datum is a voxel row, not a size ─────────────
+
+describe('requireValidGenDatum', () => {
+  it('accepts zero and negative datums — a site centre may sit at or below y = 0', () => {
+    expect(requireValidGenDatum(0, 'datum')).toBe(0);
+    expect(requireValidGenDatum(-40, 'datum')).toBe(-40);
+    expect(requireValidGenDatum(35, 'datum')).toBe(35);
+  });
+
+  it('accepts ±MAX_VOXEL_ABS_Y and throws one past it', () => {
+    expect(requireValidGenDatum(MAX_VOXEL_ABS_Y, 'datum')).toBe(MAX_VOXEL_ABS_Y);
+    expect(requireValidGenDatum(-MAX_VOXEL_ABS_Y, 'datum')).toBe(-MAX_VOXEL_ABS_Y);
+    expect(() => requireValidGenDatum(MAX_VOXEL_ABS_Y + 1, 'datum')).toThrow(/corrupt save: datum/);
+  });
+
+  it('throws for a non-integer or non-finite datum', () => {
+    expect(() => requireValidGenDatum(3.5, 'datum')).toThrow();
+    expect(() => requireValidGenDatum(NaN, 'datum')).toThrow();
+    expect(() => requireValidGenDatum(Infinity, 'datum')).toThrow();
+  });
+});
 
 // ── requireValidGenDimension — shared save-corruption guard (#1218) ────────
 

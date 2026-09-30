@@ -179,6 +179,39 @@ describe('SavesModal', () => {
     modal.dispose();
   });
 
+  it('auto-save and quick-save write the getState snapshot, not the bare state onTick was handed', async () => {
+    const backend = makeBackend();
+    const live = createGame({ seed: 1, mineType: 'desert' });
+    live.cash = 1;
+    const snapshot = { ...live, cash: 777 };
+    const { modal } = mount();
+    modal.setBackend(backend);
+    modal.setGetState(() => snapshot);
+
+    live.tickCount = 0;
+    modal.onTick(live);
+    await flush();
+    expect(backend.store.get('auto')!.meta.campaignSummary).toContain('777');
+
+    backend.store.clear();
+    await modal.quickSave();
+    expect(backend.store.get('auto')!.meta.campaignSummary).toContain('777');
+    modal.dispose();
+  });
+
+  it('auto-save writes nothing when there is no game to snapshot', async () => {
+    const backend = makeBackend();
+    const live = createGame({ seed: 1, mineType: 'desert' });
+    const { modal } = mount();
+    modal.setBackend(backend);
+    modal.setGetState(() => null);
+    live.tickCount = 0;
+    modal.onTick(live);
+    await flush();
+    expect(backend.store.has('auto')).toBe(false);
+    modal.dispose();
+  });
+
   it('clicking SAVE HERE on an empty slot saves the live state into that slot', async () => {
     const backend = makeBackend();
     const state = createGame({ seed: 1, mineType: 'desert' });

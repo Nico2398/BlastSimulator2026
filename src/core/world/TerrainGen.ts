@@ -3,7 +3,7 @@
 // a depth-stratified rock profile (Strata.ts) and per-ore anisotropic vein
 // noise (OreVeins.ts).
 
-import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, type VoxelChunkSource } from './VoxelGrid.js';
+import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, type VoxelChunkSource } from './VoxelGrid.js';
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
@@ -22,9 +22,8 @@ export const TERRAIN_GENERATOR_VERSION = 1;
 
 /**
  * Re-exported from `VoxelGrid.ts` (a lower-level module this file already
- * depends on) rather than declared here, so this ceiling stays the single
- * constant `VoxelGrid`'s `isInBounds`/`forEachSolid`/etc. actually bound `y`
- * against, instead of a second hardcoded literal here (#1190 review).
+ * depends on) rather than declared here, so the horizontal size ceiling stays
+ * one constant instead of a second hardcoded literal here (#1190 review).
  */
 export { MAX_TERRAIN_GEN_DIMENSION };
 
@@ -45,6 +44,18 @@ export { MAX_TERRAIN_GEN_DIMENSION };
 export function requireValidGenDimension(value: number, label: string): number {
   if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0 || value > MAX_TERRAIN_GEN_DIMENSION) {
     throw new Error(`corrupt save: ${label} (${value}) is not a valid terrain dimension`);
+  }
+  return value;
+}
+
+/**
+ * The datum read from untrusted save JSON. Unlike a size, a datum is a voxel
+ * row, so zero and negative values are legitimate (`new_game size:1` yields
+ * datum 0) — it only has to be an integer inside the grid's vertical range.
+ */
+export function requireValidGenDatum(value: number, label: string): number {
+  if (!isValidVoxelY(value)) {
+    throw new Error(`corrupt save: ${label} (${value}) is not a valid terrain datum`);
   }
   return value;
 }
