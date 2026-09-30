@@ -1,0 +1,237 @@
+{
+  "name": "traffic-jam-ramp-head",
+  "description": "#1208: traffic jams are detected by position at chokepoints, not by shared destination. Dig a ramp, send four on-foot employees to one tile in its body; once they stall a foot-only queue raises the traffic_jam event (trafficJamCount 1, kind ramp_head, rampId 1), and the player answers it by clicking Widen ramp in the event dialog, which orders the widening exactly once. Contract for console-api state (implementer adds): trafficJamCount, trafficJams [{kind, rampId}]. Known gap: no console command holds a ramp cell, so the crew+hauler mixed queue is unit-tested only.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "employeeCount": 5,
+          "trafficJamCount": 0
+        },
+        "note": "trafficJamCount is the #1208 console-state field (implementer adds it); no jam on a fresh site."
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Staffed vehicles come unmanned (#551) \u2014 crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "build_ramp start:15,15 end:20,25 depth:5",
+      "description": "Same geometry as ramp-navigation.json: a 10m, RAMP_WIDTH=3-wide corridor running south from (15,15). depth:5 keeps every per-column step within NAV_MAX_SLOPE_RATIO and RAMP_CUT_SLOPE_RATIO (#1151/#1152) \u2014 see that file's own note for the full derivation. Ordering only queues dig_ramp_segment work; the crewed rock_digger below carves it over the following ticks.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 20,
+          "z2": 25
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "note": "10m ramp x RAMP_COST_PER_METER (balance.ts) = 1000."
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
+      "timeout": 95,
+      "description": "Drain every queued dig_ramp_segment layer \u2014 the crewed rock_digger (vehicle #3, driver #4) clears one bench at a time until the whole corridor is carved end to end and walkable.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Ramp fully dug: every dig_ramp_segment layer landed."
+      }
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Send an on-foot employee to the same ramp tile as its crew mates (no UI control drives dispatch; a test hook like ramp-foot-traffic.json). GAP: no console command holds the ramp-head cell, so the queue relies on four walkers converging on one tile and blocking each other (#1206 occupancy); the crew+hauler mixed queue is covered by unit tests (TrafficJams.test.ts), not here."
+    },
+    {
+      "command": "employee dispatch 2 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee dispatch 3 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 3 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee dispatch 5 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 5 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:trafficJamCount equals:1 max_ticks:300",
+      "timeout": 95,
+      "description": "Wait for the converging walkers to stall at the ramp body past TRAFFIC_JAM_MIN_TICKS. A foot-only queue is a jam: the traffic_jam event becomes pending and the detector reports exactly one ramp_head jam on ramp 1.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trafficJamCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trafficJamCount": 1,
+          "trafficJams": [
+            {
+              "kind": "ramp_head",
+              "rampId": 1
+            }
+          ],
+          "pendingEvent": true
+        },
+        "note": "Contract for the console state schema (implementer adds): trafficJamCount = findTrafficJams(...).length ignoring silence; trafficJams = [{kind, rampId}]."
+      }
+    },
+    {
+      "command": "event choose 1",
+      "description": "Player answers the traffic-jam dialog through its own buttons: option 2 of 3 is Widen ramp (index 1). The widen order is charged once and queues the extra excavation; the ramp is silenced so the jam does not immediately re-fire.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice:nth-of-type(2)",
+          "timeout": 60000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice:nth-of-type(2)"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ],
+        "equals": {
+          "pendingEvent": false,
+          "builtRampWidth": 3
+        },
+        "note": "Exact cost is asserted by TrafficJamEvents.test.ts; here the player-visible claim is that the click lands an order."
+      }
+    },
+    {
+      "command": "wait_until field:builtRampWidth equals:5 max_ticks:1200",
+      "timeout": 185,
+      "description": "Wait for the extra side strip to be dug; the built ramp is then 5 wide.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "builtRampWidth",
+          "equals": 5,
+          "maxTicks": 1200,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "builtRampWidth": 5,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        15,
+        20
+      ],
+      "distance": 18
+    }
+  ]
+}

@@ -13,8 +13,10 @@ import {
   type EventSystemState,
 } from '../../../src/core/events/EventSystem.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
-import type { Employee } from '../../../src/core/entities/Employee.js';
+import type { Employee, EmployeeState } from '../../../src/core/entities/Employee.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
+import type { BuiltRamp } from '../../../src/core/state/GameState.js';
+import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { clearEvents, getEventById } from '../../../src/core/events/EventPool.js';
 import { setupEvents } from '../../../src/core/events/index.js';
@@ -82,15 +84,43 @@ function makeDriverlessVehicle(x: number, z: number): Vehicle {
 
 // ── detectTrafficJam ─────────────────────────────────────────────────────────
 
-describe('EventEngine — detectTrafficJam (Task 2.8)', () => {
+/** A ramp whose footprint is x 19..21, z 10..19. */
+function jamRamp(): BuiltRamp {
+  const def = { originX: 20, originZ: 10, direction: 'south' as const, length: 10, width: 3 as const, targetDepth: 5 };
+  return { id: 1, def, width: 3, footprint: rampFootprint(def, 3) };
+}
+
+/** A stuck (waiting >= threshold) agent standing at (x, z), on foot or driving. */
+function makeStuckAgent(es: EmployeeState, x: number, z: number, drive = false, ticks = TRAFFIC_JAM_MIN_TICKS): Employee {
+  const { employee } = hireEmployee(es, 'driller', new Random(es.nextId), x, z);
+  employee.x = x;
+  employee.z = z;
+  employee.vehicleWaitingTicks = ticks;
+  employee.itinerary = {
+    legs: [{
+      mode: drive ? 'drive' : 'foot', ...(drive ? { vehicleId: employee.id } : {}),
+      destX: 40, destZ: 40, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+    }],
+    goal: { kind: 'reposition', x: 40, z: 40 },
+    workTicks: 0,
+    estTotalTicks: 5,
+  } as unknown as Employee['itinerary'];
+  if (drive) employee.locomotion = { kind: 'mounted', vehicleId: employee.id };
+  return employee;
+}
+
+describe('EventEngine — detectTrafficJam (#1208 chokepoints)', () => {
   let eventState: EventSystemState;
+  let es: EmployeeState;
 
   beforeEach(() => {
     _nextId = 1;
     eventState = createEventSystemState();
+    es = createEmployeeState();
   });
 
-  // ── Exported constants ──
+  const queue = (n: number, drive = false, z0 = 14.5): Employee[] =>
+    Array.from({ length: n }, (_, i) => makeStuckAgent(es, 20.5, z0 + i * 0.5, drive));
 
   it('exports TRAFFIC_JAM_MIN_VEHICLES constant equal to 3', () => {
     expect(TRAFFIC_JAM_MIN_VEHICLES).toBe(3);
@@ -100,209 +130,87 @@ describe('EventEngine — detectTrafficJam (Task 2.8)', () => {
     expect(TRAFFIC_JAM_MIN_TICKS).toBe(10);
   });
 
-  // ── Test 1: empty fleet ──
-
-  it('returns null when the vehicle list is empty', () => {
-    const result = detectTrafficJam([], [], eventState, 100);
-    expect(result).toBeNull();
+  it('returns null with no ramps and no employees', () => {
+    expect(detectTrafficJam([], [], eventState, 100)).toBeNull();
   });
 
-  // ── Test 2: below vehicle count threshold ──
-
-  it('returns null when only 2 vehicles share the same target and have each waited ≥10 ticks', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(5, 5, 10),
-      makeWaitingVehicleAndDriver(5, 5, 12),
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
+  it('returns null with only 2 stuck agents on a ramp', () => {
+    expect(detectTrafficJam([jamRamp()], queue(2), eventState, 100)).toBeNull();
+    expect(eventState.pendingEvent).toBeNull();
   });
 
-  // ── Test 3: below tick threshold ──
-
-  it('returns null when 3 vehicles share the same target but each has waited only 9 ticks', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(3, 3, 9),
-      makeWaitingVehicleAndDriver(3, 3, 9),
-      makeWaitingVehicleAndDriver(3, 3, 9),
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
+  it('returns null when 3 agents have waited only TRAFFIC_JAM_MIN_TICKS - 1', () => {
+    const agents = [14.5, 15.5, 16.5].map(z => makeStuckAgent(es, 20.5, z, true, TRAFFIC_JAM_MIN_TICKS - 1));
+    expect(detectTrafficJam([jamRamp()], agents, eventState, 100)).toBeNull();
   });
 
-  // ── Test 4: jam fires — return value AND state.pendingEvent ──
-
-  it('returns a FiredEvent with eventId "traffic_jam" when ≥3 vehicles share a target with ≥10 waiting ticks each', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(7, 2, 10),
-      makeWaitingVehicleAndDriver(7, 2, 12),
-      makeWaitingVehicleAndDriver(7, 2, 15),
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 42);
-
+  it('fires traffic_jam carrying the jam when 3 drivers queue on a ramp', () => {
+    const result = detectTrafficJam([jamRamp()], queue(3, true), eventState, 42);
     expect(result).not.toBeNull();
     expect(result!.eventId).toBe('traffic_jam');
     expect(result!.firedAtTick).toBe(42);
+    expect(result!.jam?.key).toBe('ramp:1');
+    expect(result!.jam?.rampId).toBe(1);
+    expect(result!.jam?.agentIds).toHaveLength(3);
   });
 
-  it('sets state.pendingEvent when a traffic jam is detected', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(7, 2, 10),
-      makeWaitingVehicleAndDriver(7, 2, 10),
-      makeWaitingVehicleAndDriver(7, 2, 10),
-    ]);
-    detectTrafficJam(vehicles, employees, eventState, 55);
-
-    expect(eventState.pendingEvent).not.toBeNull();
-    expect(eventState.pendingEvent!.eventId).toBe('traffic_jam');
-    expect(eventState.pendingEvent!.firedAtTick).toBe(55);
+  it('sets state.pendingEvent (with the jam) when a jam is detected', () => {
+    detectTrafficJam([jamRamp()], queue(3, true), eventState, 55);
+    expect(eventState.pendingEvent).toEqual({
+      eventId: 'traffic_jam', firedAtTick: 55, jam: expect.objectContaining({ key: 'ramp:1' }),
+    });
   });
 
-  // ── Test 5: mixed tick counts — only 2 of 3 qualify ──
-
-  it('returns null when exactly 3 vehicles share a target but only 2 of them have waited ≥10 ticks (one has 9)', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(4, 4, 9),  // below threshold — does NOT qualify
-      makeWaitingVehicleAndDriver(4, 4, 10), // qualifies
-      makeWaitingVehicleAndDriver(4, 4, 11), // qualifies — but total qualifiers = 2 < MIN_VEHICLES
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
+  it('a foot-only queue raises the event', () => {
+    const result = detectTrafficJam([jamRamp()], queue(3, false), eventState, 7);
+    expect(result?.eventId).toBe('traffic_jam');
+    expect(result?.jam?.vehicleCount).toBe(0);
   });
 
-  // ── Test 6: already pending event — no double-fire ──
+  it('a passage jam away from any ramp raises the event with rampId null', () => {
+    const agents = [60.5, 61.5, 62.5].map(x => makeStuckAgent(es, x, 60.5));
+    const result = detectTrafficJam([jamRamp()], agents, eventState, 9);
+    expect(result?.jam?.kind).toBe('passage');
+    expect(result?.jam?.rampId).toBeNull();
+  });
+
+  it('a 2+2 split across two ramps raises nothing', () => {
+    const def2 = { originX: 50, originZ: 10, direction: 'south' as const, length: 10, width: 3 as const, targetDepth: 5 };
+    const ramp2: BuiltRamp = { id: 2, def: def2, width: 3, footprint: rampFootprint(def2, 3) };
+    const agents = [
+      makeStuckAgent(es, 20.5, 14.5), makeStuckAgent(es, 20.5, 15.5),
+      makeStuckAgent(es, 50.5, 14.5), makeStuckAgent(es, 50.5, 15.5),
+    ];
+    expect(detectTrafficJam([jamRamp(), ramp2], agents, eventState, 100)).toBeNull();
+  });
+
+  it('does not fire for a silenced jam key', () => {
+    eventState.jamSilencedUntil['ramp:1'] = 500;
+    expect(detectTrafficJam([jamRamp()], queue(3, true), eventState, 100)).toBeNull();
+    expect(eventState.pendingEvent).toBeNull();
+  });
+
+  it('fires again once the silence has expired', () => {
+    eventState.jamSilencedUntil['ramp:1'] = 100;
+    expect(detectTrafficJam([jamRamp()], queue(3, true), eventState, 100)).not.toBeNull();
+  });
 
   it('returns null without overwriting state.pendingEvent when an event is already pending', () => {
     const existingPending = { eventId: 'union_strike', firedAtTick: 90 };
     eventState.pendingEvent = existingPending;
-
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(2, 2, 10),
-      makeWaitingVehicleAndDriver(2, 2, 10),
-      makeWaitingVehicleAndDriver(2, 2, 10),
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-
-    expect(result).toBeNull();
-    // The pre-existing pending event must not have been overwritten
+    expect(detectTrafficJam([jamRamp()], queue(3, true), eventState, 100)).toBeNull();
     expect(eventState.pendingEvent).toBe(existingPending);
   });
 
-  // ── Test 7: vehicles on different targets ──
-
-  it('returns null when 3 vehicles are each waiting on a different target cell', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(1, 1, 10), // target (1, 1)
-      makeWaitingVehicleAndDriver(2, 2, 10), // target (2, 2)
-      makeWaitingVehicleAndDriver(3, 3, 10), // target (3, 3)
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
-  });
-
-  // ── Test 8: 4 vehicles — threshold still met ──
-
-  it('returns a FiredEvent when 4 vehicles all wait on the same target for ≥10 ticks (≥3 threshold satisfied)', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(6, 1, 10),
-      makeWaitingVehicleAndDriver(6, 1, 11),
-      makeWaitingVehicleAndDriver(6, 1, 14),
-      makeWaitingVehicleAndDriver(6, 1, 20),
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 200);
-
-    expect(result).not.toBeNull();
-    expect(result!.eventId).toBe('traffic_jam');
-  });
-
-  // ── Edge: vehicles with no waiting driver are excluded from the count ──
-
-  it('ignores a driverless vehicle even if it sits on the shared target', () => {
-    // Two genuinely waiting, one driverless bystander sharing the same cell.
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(8, 0, 10), // waiting — qualifies
-      makeWaitingVehicleAndDriver(8, 0, 10), // waiting — qualifies
-    ]);
-    vehicles.push(makeDriverlessVehicle(8, 0));
-    // Only 2 waiting vehicles qualify — below MIN_VEHICLES=3
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
-  });
-
-  it('ignores a driving employee whose current leg is not a drive leg', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(9, 0, 10),
-      makeWaitingVehicleAndDriver(9, 0, 10),
-    ]);
-    const { vehicle: thirdVehicle, employee: thirdEmployee } = makeWaitingVehicleAndDriver(9, 0, 10);
-    thirdEmployee.itinerary!.legs[0]!.mode = 'foot';
-    vehicles.push(thirdVehicle);
-    employees.push(thirdEmployee);
-
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
-  });
-
-  // ── eventFreqMultiplier = 0 suppression ──
-
-  it('returns null when eventFreqMultiplier is 0 even with qualifying vehicles', () => {
+  it('returns null when eventFreqMultiplier is 0 even with a qualifying jam', () => {
     eventState = createEventSystemState(0);
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(5, 5, 15),
-      makeWaitingVehicleAndDriver(5, 5, 15),
-      makeWaitingVehicleAndDriver(5, 5, 15),
-    ]);
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
+    expect(detectTrafficJam([jamRamp()], queue(3, true), eventState, 100)).toBeNull();
     expect(eventState.pendingEvent).toBeNull();
   });
+});
 
-  // ── issue #591: a single occupancy-stuck vehicle is not a traffic jam ─────
-  // #1138: isMoveStuck now lives on the driving Employee, not the vehicle —
-  // detectTrafficJam stays keyed on vehicleWaitingTicks alone, unaffected by
-  // isMoveStuck. TRAFFIC_JAM_MIN_VEHICLES still requires 3+ vehicles sharing a
-  // target, regardless of any one of them being individually stuck.
-
-  it('does not fire for a single stuck (isMoveStuck) vehicle, however long it has waited', () => {
-    const { vehicle, employee } = makeWaitingVehicleAndDriver(5, 5, 500);
-    employee.isMoveStuck = true;
-    const result = detectTrafficJam([vehicle], [employee], eventState, 100);
-    expect(result).toBeNull();
-    expect(eventState.pendingEvent).toBeNull();
-  });
-
-  it('still requires 3+ vehicles even when 2 of them are individually stuck', () => {
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(5, 5, 50),
-      makeWaitingVehicleAndDriver(5, 5, 50),
-    ]);
-    employees[0]!.isMoveStuck = true;
-    employees[1]!.isMoveStuck = true;
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-    expect(result).toBeNull();
-  });
-
-  // #1274: a destination-spread (Locomotion.ts's handleAgentOccupancyBlock,
-  // step 3) retargets each waiting driver's own drive leg destX/destZ onto a
-  // DIFFERENT free cell around the shared chokepoint the instant its own wait
-  // crosses AGENT_OCCUPANCY_WAIT_TICKS — buildWaitingByTarget must cluster by
-  // where those legs were ORIGINALLY headed (Leg.originalDestX/originalDestZ),
-  // not by their now-fragmented live destX/destZ, or a genuine 3-vehicle jam
-  // reads as three singleton clusters of one and never fires.
-  it('clusters three drivers on three different LIVE targets, sharing the same ORIGINAL target, into one jam', () => {
-    const originalTarget = { x: 5, z: 5 };
-    const { vehicles, employees } = split([
-      makeWaitingVehicleAndDriver(4, 5, 10, originalTarget),
-      makeWaitingVehicleAndDriver(6, 5, 10, originalTarget),
-      makeWaitingVehicleAndDriver(5, 6, 10, originalTarget),
-    ]);
-
-    const result = detectTrafficJam(vehicles, employees, eventState, 100);
-
-    expect(result).not.toBeNull();
-    expect(result?.eventId).toBe('traffic_jam');
-    expect(eventState.pendingEvent?.eventId).toBe('traffic_jam');
-  });
+describe('EventEngine — computeTrafficAdvisory (#1274)', () => {
+  beforeEach(() => { _nextId = 1; });
 
   it('computeTrafficAdvisory reports the shared ORIGINAL target, not any one live target, for a fragmented cluster', () => {
     const originalTarget = { x: 9, z: 9 };

@@ -1389,9 +1389,9 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     // Three satellites, each mounted, each driving straight at the anchor's
     // own cell (15, 15) — a destination that never frees up.
     const satellitePositions: Array<{ x: number; z: number }> = [
-      { x: 12, z: 15 },
-      { x: 18, z: 15 },
-      { x: 15, z: 12 },
+      { x: 13, z: 15 },
+      { x: 16, z: 14 },
+      { x: 15, z: 13 },
     ];
     const satelliteDrivers = satellitePositions.map(({ x, z }) => {
       const { employee: driver } = hireEmployee(state.employees, 'driller', rng, x, z);
@@ -1433,7 +1433,7 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
         }
       }
 
-      detectTrafficJam(state.vehicles.vehicles, state.employees.employees, state.events, tick);
+      detectTrafficJam(state.builtRamps, state.employees.employees, state.events, tick);
     }
 
     // The three satellites really did fragment onto distinct live
