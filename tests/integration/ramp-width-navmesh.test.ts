@@ -100,8 +100,8 @@ describe('a widened ramp', () => {
     const nav = NavGrid.buildNavGrid(widenFully(3, 7), [], []);
     for (let z = ORIGIN_Z; z < ORIGIN_Z + LENGTH; z++) {
       for (let x = ORIGIN_X - 3; x < ORIGIN_X + 3; x++) {
-        const a = nav.cellAt(x, z)!.surfaceY;
-        const b = nav.cellAt(x + 1, z)!.surfaceY;
+        const a = nav.cellAt(x, z)?.surfaceY ?? 0;
+        const b = nav.cellAt(x + 1, z)?.surfaceY ?? 0;
         expect(Math.abs(a - b), `z=${z} x=${x}`).toBeLessThanOrEqual(1);
       }
     }

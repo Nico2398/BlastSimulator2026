@@ -66,8 +66,8 @@ describe('rampFootprint', () => {
   }
 
   it('widens symmetrically about the origin line', () => {
-    const f3 = rampFootprint({ ...DEF, width: 3 }, 3);
-    const f7 = rampFootprint({ ...DEF, width: 7 }, 7);
+    const f3 = rampFootprint(DEF, 3);
+    const f7 = rampFootprint(DEF, 7);
     expect(f3.minX).toBe(9); expect(f3.maxX).toBe(11);
     expect(f7.minX).toBe(7); expect(f7.maxX).toBe(13);
     expect(f7.minZ).toBe(f3.minZ); expect(f7.maxZ).toBe(f3.maxZ);

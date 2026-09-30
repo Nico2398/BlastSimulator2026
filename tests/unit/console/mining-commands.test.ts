@@ -31,7 +31,6 @@ import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
-const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 function makeMiningContext(): MiningContext {
   // Staffed (#553): a `drill_plan grid/add` no longer writes holes straight
