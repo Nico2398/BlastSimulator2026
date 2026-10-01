@@ -28,6 +28,7 @@ import { tickLocomotion } from '../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../src/core/engine/MoveTo.js';
 import type { Leg } from '../../src/core/engine/Itinerary.js';
 import { Random } from '../../src/core/math/Random.js';
+import { rampFootprint } from '../../src/core/mining/RampWidening.js';
 import {
   TRAFFIC_JAM_MIN_AGENTS,
   TRAFFIC_JAM_MIN_TICKS,
@@ -745,6 +746,10 @@ describe('Vehicle fleet', () => {
       // unconditional since #1207.
       // Anchor vehicle occupies the contended target cell. It never ticks
       // (task stays 'idle'), so it just blocks the cell for occupancy checks.
+      // #1208: only a jam anchored at a built ramp raises the event, so the
+      // shared target sits at the head of a ramp (footprint x 19..21, z 20..29).
+      const jamRampDef = { originX: 20, originZ: 20, direction: 'south' as const, length: 10, width: 3 as const, targetDepth: 5 };
+      ctx.state!.builtRamps.push({ id: 1, def: jamRampDef, width: 3, footprint: rampFootprint(jamRampDef, 3) });
       vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
       const anchor = ctx.state!.vehicles.vehicles[0]!;
       anchor.x = 20;

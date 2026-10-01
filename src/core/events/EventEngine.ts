@@ -16,7 +16,7 @@ import {
 export { TRAFFIC_JAM_MIN_TICKS };
 
 /**
- * Detects a traffic jam (TrafficJams.ts): stuck agents clustered at a chokepoint
+ * Detects a traffic jam (TrafficJams.ts): stuck agents clustered at a ramp chokepoint
  * that the player has not recently answered. Sets state.pendingEvent (carrying
  * the jam) and returns the FiredEvent when detected. Returns null if an event
  * is already pending or no unsilenced jam exists.
@@ -30,7 +30,10 @@ export function detectTrafficJam(
   if (state.pendingEvent) return null;
   if (state.eventFreqMultiplier === 0) return null;
 
-  const jam = findTrafficJams(ramps, employees, state.jamSilencedUntil, tickCount)[0];
+  // Passage jams (no ramp) stay visible as marker/pip/banner but raise no event:
+  // there is no ramp to widen, so the event's options would not map.
+  const jam = findTrafficJams(ramps, employees, state.jamSilencedUntil, tickCount)
+    .find((j) => j.rampId !== null);
   if (!jam) return null;
 
   const event: FiredEvent = { eventId: 'traffic_jam', firedAtTick: tickCount, jam };

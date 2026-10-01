@@ -241,8 +241,8 @@ walkers alike, once each. `TRAFFIC_JAM_MIN_TICKS` (4) must stay strictly below `
 
 A chokepoint with at least `TRAFFIC_JAM_MIN_AGENTS` agents is one `TrafficJam`. One pass over the
 employees, sorted by key, so it is deterministic. `detectTrafficJam` fires the `traffic_jam` event for
-the first jam whose key is not silenced (`events.jamSilencedUntil[key] > tick`), carrying the jam on
-`pendingEvent.jam`.
+the first **ramp-anchored** jam (`rampId` set: `ramp_head` or `pit_exit`) whose key is not silenced (`events.jamSilencedUntil[key] > tick`), carrying the jam on
+`pendingEvent.jam`. A passage jam raises no event: ordinary crowding at work sites (drill and charge clusters) would pop it every few ticks, and there is no ramp to widen so the event's options would not map. It still shows the marker, alert pip and Fleet banner.
 
 ### Answering a jam (`TrafficJamEffects.ts`)
 

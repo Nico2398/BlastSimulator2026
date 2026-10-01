@@ -20,6 +20,7 @@ import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY, AGENT_FREE_CELL_SEARCH_MAX_RADIUS } from '../../../src/core/config/balance.js';
 import { tickLocomotion, openMovementTrails, isStationaryBusyEmployee, respreadLegDestination } from '../../../src/core/engine/Locomotion.js';
+import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
@@ -1370,6 +1371,9 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
   it('a genuinely unrelocatable anchor plus 3 satellite vehicles converging on its cell are detected as one jam on their original destination despite destination-spreads', () => {
     const state = buildFlatNavGridState(30, 30);
     const rng = new Random(SEED);
+    // #1208: only a ramp-anchored jam raises the event; the cluster sits at a ramp head.
+    const jamRampDef = { originX: 15, originZ: 15, direction: 'south' as const, length: 10, width: 3 as const, targetDepth: 5 };
+    state.builtRamps.push({ id: 1, def: jamRampDef, width: 3, footprint: rampFootprint(jamRampDef, 3) });
 
     // The anchor: parked, mounted, no itinerary of its own — a permanent
     // obstacle squarely on every satellite's shared destination, never

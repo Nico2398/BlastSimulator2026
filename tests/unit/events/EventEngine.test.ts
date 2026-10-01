@@ -14,6 +14,7 @@ import {
 import type { Employee, EmployeeState } from '../../../src/core/entities/Employee.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
 import type { BuiltRamp } from '../../../src/core/state/GameState.js';
+import { findTrafficJams } from '../../../src/core/events/TrafficJams.js';
 import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { clearEvents, getEventById } from '../../../src/core/events/EventPool.js';
@@ -99,11 +100,13 @@ describe('EventEngine — detectTrafficJam (#1208 chokepoints)', () => {
     expect(result?.jam?.vehicleCount).toBe(0);
   });
 
-  it('a passage jam away from any ramp raises the event with rampId null', () => {
+  it('a passage jam away from any ramp is still found but raises no event', () => {
     const agents = [60.5, 61.5, 62.5].map(x => makeStuckAgent(es, x, 60.5));
-    const result = detectTrafficJam([jamRamp()], agents, eventState, 9);
-    expect(result?.jam?.kind).toBe('passage');
-    expect(result?.jam?.rampId).toBeNull();
+    const jams = findTrafficJams([jamRamp()], agents, undefined, 9);
+    expect(jams[0]?.kind).toBe('passage');
+    expect(jams[0]?.rampId).toBeNull();
+    expect(detectTrafficJam([jamRamp()], agents, eventState, 9)).toBeNull();
+    expect(eventState.pendingEvent).toBeNull();
   });
 
   it('a 2+2 split across two ramps raises nothing', () => {

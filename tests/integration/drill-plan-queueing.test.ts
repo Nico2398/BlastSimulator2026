@@ -285,8 +285,6 @@ describe('drill_plan grid — dense 1m-spacing grid under agent occupancy conver
       // entity-ground-contact.test.ts's own tickUntilGone/driveToCompletion) —
       // fatigue never interrupts this run's own convergence question.
       for (const emp of state.employees.employees) emp.fatigue = 100;
-      // A legitimate traffic_jam event (#1208) pauses the sim until answered.
-      if (state.events.pendingEvent) run('event choose 0');
       tickOutputs.push(run('tick 1').output);
     }
 
