@@ -31,6 +31,7 @@ import {
   ARREST_EXPOSURE_THRESHOLD,
   REVOLT_TICKS,
   SCORE_DECAY_RATE,
+  TRAFFIC_JAM_MIN_TICKS,
 } from '../../src/core/config/balance.js';
 import type { BuiltRamp } from '../../src/core/state/GameState.js';
 import { rampFootprint } from '../../src/core/mining/RampWidening.js';
@@ -302,7 +303,7 @@ describe('Event system', () => {
 
   it('detectTrafficJam ignores agents below waiting-ticks threshold', () => {
     const eventState = createEventSystemState();
-    const agents = [14.5, 15.5, 16.5].map(z => makeWaitingAgent(20.5, z, 5));
+    const agents = [14.5, 15.5, 16.5].map(z => makeWaitingAgent(20.5, z, TRAFFIC_JAM_MIN_TICKS - 1));
     expect(detectTrafficJam([ramp], agents, eventState, 100)).toBeNull();
   });
 

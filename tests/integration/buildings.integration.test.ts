@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
-import { tickCommand } from '../../src/console/commands/events.js';
+import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
 import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
@@ -744,6 +744,9 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
    * blast-oversized-boulders.integration.test.ts's driveConstructionToCompletion. */
   function tickWithFatigueToppedUp(): void {
     for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+    // A legitimate traffic_jam event (#1208) pauses the sim until answered —
+    // dismiss it like the other drive-to-completion loops do.
+    if (ctx.state!.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
     tickCommand(ctx, ['1'], {});
   }
 
