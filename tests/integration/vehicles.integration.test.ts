@@ -29,7 +29,7 @@ import { moveTo } from '../../src/core/engine/MoveTo.js';
 import type { Leg } from '../../src/core/engine/Itinerary.js';
 import { Random } from '../../src/core/math/Random.js';
 import {
-  TRAFFIC_JAM_MIN_VEHICLES,
+  TRAFFIC_JAM_MIN_AGENTS,
   TRAFFIC_JAM_MIN_TICKS,
   AGENT_OCCUPANCY_WAIT_TICKS,
   WORK_DURATION_TICKS,
@@ -756,7 +756,7 @@ describe('Vehicle fleet', () => {
       // moveVehicle when driven — either shape) the first time any satellite
       // below hits the reroute threshold, which frees the target for every
       // satellite ticked afterward in this SAME tick and starves
-      // detectTrafficJam of the >=TRAFFIC_JAM_MIN_VEHICLES simultaneous
+      // detectTrafficJam of the >=TRAFFIC_JAM_MIN_AGENTS simultaneous
       // waiters it needs. Reserving the anchor for a real pending action —
       // with a real, licensed holder driving it, so #1084's I5 check stays
       // clean and `holder.pendingDriverVehicleId` (which ArrivalGate.ts's own
@@ -789,7 +789,7 @@ describe('Vehicle fleet', () => {
       ctx.state!.pendingActions.push(anchorAction);
       reserveVehicle(ctx.state!.vehicles, anchor.id, anchorAction.id);
 
-      // TRAFFIC_JAM_MIN_VEHICLES vehicles, each one grid step from the
+      // TRAFFIC_JAM_MIN_AGENTS vehicles, each one grid step from the
       // anchor's cell (their shared target), already at
       // TRAFFIC_JAM_MIN_TICKS - 1 waiting ticks — one real tickCommand tick
       // finds their path blocked by the anchor and pushes waitingTicks over
@@ -797,9 +797,9 @@ describe('Vehicle fleet', () => {
       const neighborOffsets: Array<[number, number]> = [
         [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1],
       ];
-      expect(TRAFFIC_JAM_MIN_VEHICLES).toBeLessThanOrEqual(neighborOffsets.length);
+      expect(TRAFFIC_JAM_MIN_AGENTS).toBeLessThanOrEqual(neighborOffsets.length);
 
-      for (let i = 0; i < TRAFFIC_JAM_MIN_VEHICLES; i++) {
+      for (let i = 0; i < TRAFFIC_JAM_MIN_AGENTS; i++) {
         vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
         const v = ctx.state!.vehicles.vehicles[ctx.state!.vehicles.vehicles.length - 1]!;
         const [dx, dz] = neighborOffsets[i]!;

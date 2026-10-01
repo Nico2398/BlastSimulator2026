@@ -21,7 +21,10 @@ export interface ResolutionResult {
   resultKey: string;
   /** What actually happened (human-readable). */
   effects: string[];
+  /** Cash the caller still has to apply to the flat `state.cash` (finances log already updated). */
   cashChange: number;
+  /** Cash a world effect already debited from state itself (e.g. a widen order): shown in the outcome chip, never re-applied. */
+  cashSettled: number;
   scoreChanges: Partial<Record<keyof ScoreState, number>>;
   corruptionChange: number;
   followUpQueued: string | null;
@@ -76,6 +79,10 @@ export function resolveEvent(
     const outcome = handler(jam, world, tick);
     result.effects.push(...outcome.effects);
     result.cashChange += outcome.cashChange;
+    result.cashSettled += outcome.cashSettled;
+    for (const [k, d] of Object.entries(outcome.scoreChanges) as [keyof ScoreState, number][]) {
+      result.scoreChanges[k] = (result.scoreChanges[k] ?? 0) + d;
+    }
     result.resultKey += outcome.resultKeySuffix;
   }
 
@@ -96,8 +103,9 @@ export function resolveEvent(
 function buildEventOutcome(result: ResolutionResult): EventOutcome {
   const effects: EventEffect[] = [];
 
-  if (result.cashChange !== 0) {
-    effects.push({ kind: 'cash', key: 'cash', delta: result.cashChange });
+  const shownCash = result.cashChange + result.cashSettled;
+  if (shownCash !== 0) {
+    effects.push({ kind: 'cash', key: 'cash', delta: shownCash });
   }
   for (const [key, delta] of Object.entries(result.scoreChanges)) {
     effects.push({ kind: 'score', key, delta: delta as number });
@@ -191,6 +199,7 @@ function applyConsequence(
     resultKey: `${resultKey}${isAlt ? '_alt' : ''}`,
     effects,
     cashChange,
+    cashSettled: 0,
     scoreChanges,
     corruptionChange,
     followUpQueued,

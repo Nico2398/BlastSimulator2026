@@ -1,7 +1,5 @@
 // BlastSimulator2026 — Browser entry point
 // Initializes the 3D scene, UI, audio, save system, and exposes the console bridge.
-
-import { findTrafficJams } from './core/events/TrafficJams.js';
 import * as THREE from 'three';
 import { SceneManager } from './renderer/SceneManager.js';
 import { modelLibrary } from './renderer/models/ModelLibrary.js';
@@ -35,6 +33,7 @@ import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';

@@ -10,6 +10,8 @@ import { createGame, type BuiltRamp, type GameState } from '../../../src/core/st
 import { buildRamp, type RampDef } from '../../../src/core/mining/Ramp.js';
 import { rampFootprint, validateWidenRamp } from '../../../src/core/mining/RampWidening.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { AgentOccupancy } from '../../../src/core/nav/AgentOccupancy.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   TRAFFIC_JAM_REROUTE_SILENCE_TICKS, TRAFFIC_JAM_WIDEN_SILENCE_TICKS,
@@ -48,8 +50,17 @@ function setup(width: RampWidth = 3, cash = 1_000_000, rampId: number | null = 1
     const { employee } = hireEmployee(state.employees, 'driller', rng, 10.5, 10.5 + i);
     employee.vehicleWaitingTicks = 20;
     employee.isMoveStuck = true;
+    employee.itinerary = {
+      legs: [{ mode: 'foot', vehicleId: null, destX: 12, destZ: 12, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+      goal: { kind: 'reposition', x: 12, z: 12 }, workTicks: 0, estTotalTicks: 5,
+    };
     ids.push(employee.id);
   }
+  // A bystander holds the jam agents' shared destination, so a reroute has something to spread around.
+  const { employee: holder } = hireEmployee(state.employees, 'driller', rng, 12, 12);
+  state.navGrid = NavGrid.buildNavGrid(grid, [], []);
+  state.agentOccupancy = new AgentOccupancy();
+  state.agentOccupancy.tryMove({ kind: 'employee', id: holder.id }, 12, 12);
   const jam: TrafficJam = {
     key: rampId === null ? 'passage:10,11' : `ramp:${rampId}`, kind: rampId === null ? 'passage' : 'ramp_head',
     rampId, x: 10.5, z: 11.5, agentIds: ids.sort((a, b) => a - b), vehicleCount: 0,
@@ -78,6 +89,16 @@ describe('traffic_jam — reroute_vehicles (option 0)', () => {
       const e = s.state.employees.employees.find(x => x.id === id)!;
       expect(e.vehicleWaitingTicks).toBe(0);
       expect(e.isMoveStuck).toBe(false);
+    }
+  });
+
+  it('re-spreads each jam agent\'s held destination, recording the original', () => {
+    const s = setup();
+    resolve(s, 0);
+    for (const id of s.jam.agentIds) {
+      const leg = s.state.employees.employees.find(x => x.id === id)!.itinerary!.legs[0]!;
+      expect([leg.destX, leg.destZ]).not.toEqual([12, 12]);
+      expect([leg.originalDestX, leg.originalDestZ]).toEqual([12, 12]);
     }
   });
 
@@ -116,6 +137,8 @@ describe('traffic_jam — widen_ramp (option 1)', () => {
     const result = resolve(s, 1);
     expect(s.state.plannedRamps.some(p => p.widenOf === 1)).toBe(true);
     expect(s.state.cash).toBe(cash - cost);
+    expect(result!.cashChange).toBe(0);
+    expect(s.state.events.lastOutcome!.effects).toContainEqual({ kind: 'cash', key: 'cash', delta: -cost });
     expect(result!.resultKey.endsWith('_alt')).toBe(false);
   });
 
@@ -179,6 +202,9 @@ describe('traffic_jam — ignore_jam (option 2)', () => {
     const before = s.state.scores.wellBeing;
     resolve(s, 2);
     expect(s.state.scores.wellBeing).toBe(before - TRAFFIC_JAM_IGNORE_WELLBEING_PENALTY);
+    expect(s.state.events.lastOutcome!.effects).toContainEqual(
+      { kind: 'score', key: 'wellBeing', delta: -TRAFFIC_JAM_IGNORE_WELLBEING_PENALTY },
+    );
   });
 
   it('silences the chokepoint for the ignore duration', () => {

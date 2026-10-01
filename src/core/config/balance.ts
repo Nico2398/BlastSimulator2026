@@ -141,10 +141,7 @@ export const MIN_EVENT_INTERVAL_ACTIONS = 10;
 
 // ─── Traffic ───────────────────────────────────────────────────────────────────
 
-/** Minimum number of vehicles waiting on the same target cell to trigger a traffic jam. */
-export const TRAFFIC_JAM_MIN_VEHICLES = 3;
-
-/** Minimum agents (drivers and walkers) stuck at one chokepoint to count as a jam (#1208). Alias of TRAFFIC_JAM_MIN_VEHICLES's value. */
+/** Minimum agents (drivers and walkers) stuck at one chokepoint to count as a jam (#1208). */
 export const TRAFFIC_JAM_MIN_AGENTS = 3;
 
 /** Tiles around a ramp's footprint that still count as that ramp's chokepoint (#1208). */

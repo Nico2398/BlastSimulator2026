@@ -19,7 +19,7 @@ import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED, vehicleDri
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { AGENT_WALK_SPEED, AGENT_OCCUPANCY_WAIT_TICKS, MOVE_STUCK_ABANDON_TICKS, STUCK_MORALE_PENALTY, AGENT_FREE_CELL_SEARCH_MAX_RADIUS } from '../../../src/core/config/balance.js';
-import { tickLocomotion, openMovementTrails, isStationaryBusyEmployee } from '../../../src/core/engine/Locomotion.js';
+import { tickLocomotion, openMovementTrails, isStationaryBusyEmployee, respreadLegDestination } from '../../../src/core/engine/Locomotion.js';
 import { moveTo } from '../../../src/core/engine/MoveTo.js';
 import * as AgentAdvanceModule from '../../../src/core/nav/AgentAdvance.js';
 import { NULL_ROUTE_COMMITMENT } from '../../../src/core/nav/AgentAdvance.js';
@@ -1361,20 +1361,13 @@ describe('tickLocomotion — agent occupancy on foot (#1206)', () => {
     expect(blocker.z).toBe(2);
   });
 
-  // #1274: EventEngine.ts's buildWaitingByTarget clusters waiting drivers by
-  // their CURRENT drive leg's own destX/destZ — but a destination-spread
-  // (handleAgentOccupancyBlock's step 3, above) retargets that same leg's
-  // destX/destZ onto a distinct free cell per mover, the instant each one's
-  // wait crosses AGENT_OCCUPANCY_WAIT_TICKS. Three movers converging on the
-  // identical unrelocatable cell therefore each end up on a DIFFERENT live
-  // destX/destZ one tick after they'd otherwise have qualified as a single
-  // 3-vehicle cluster — buildWaitingByTarget sees three singleton clusters of
-  // one, never the shared jam a player watching four vehicles pile up on one
-  // chokepoint actually has. `Leg.originalDestX/originalDestZ` (#1274) is
-  // meant to fix this by clustering on the leg's ORIGINAL, pre-spread target
-  // instead — this test fails today because buildWaitingByTarget doesn't read
-  // those fields yet.
-  it('a genuinely unrelocatable anchor plus 3 satellite vehicles converging on its cell fire a traffic jam instead of fragmenting into singleton destination-spreads', () => {
+  // #1274: a destination-spread (handleAgentOccupancyBlock's step 3) retargets
+  // each blocked leg's destX/destZ onto a distinct free cell, so by the time
+  // the wait crosses AGENT_OCCUPANCY_WAIT_TICKS the movers no longer share a
+  // live destination. The jam detector (TrafficJams.ts) must still cluster
+  // them on `Leg.originalDestX/originalDestZ`, the pre-spread target, and
+  // fire before the spread fragments the queue.
+  it('a genuinely unrelocatable anchor plus 3 satellite vehicles converging on its cell are detected as one jam on their original destination despite destination-spreads', () => {
     const state = buildFlatNavGridState(30, 30);
     const rng = new Random(SEED);
 
@@ -2010,5 +2003,49 @@ describe('isStationaryBusyEmployee', () => {
     employee.activeActionId = 5;
     employee.isMoveStuck = true;
     expect(isStationaryBusyEmployee(employee)).toBe(false);
+  });
+});
+
+describe('respreadLegDestination (#1208 reroute answer)', () => {
+  function walkerWithLeg(overrides: Partial<Itinerary['legs'][number]> = {}) {
+    const state = buildFlatNavGridState(20, 20);
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng, 10, 10);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 3, 3);
+    const occupancy = new AgentOccupancy();
+    expect(occupancy.tryMove({ kind: 'employee', id: holder.id }, 10, 10)).toBe(true);
+    state.agentOccupancy = occupancy;
+    const leg = {
+      mode: 'foot', vehicleId: null, destX: 10, destZ: 10, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5,
+      ...overrides,
+    } as Itinerary['legs'][number];
+    employee.itinerary = { legs: [leg], goal: { kind: 'reposition', x: 10, z: 10 }, workTicks: 0, estTotalTicks: 5 } satisfies Itinerary;
+    return { state, employee, leg };
+  }
+
+  it('retargets a held exact destination and records the original once', () => {
+    const { state, employee, leg } = walkerWithLeg();
+    respreadLegDestination(state, employee);
+    expect([leg.destX, leg.destZ]).not.toEqual([10, 10]);
+    expect([leg.originalDestX, leg.originalDestZ]).toEqual([10, 10]);
+    respreadLegDestination(state, employee);
+    expect([leg.originalDestX, leg.originalDestZ]).toEqual([10, 10]);
+  });
+
+  it('leaves adjacent, neverSpread and board legs untouched', () => {
+    for (const overrides of [
+      { arrival: 'adjacent' }, { neverSpread: true }, { onArrive: { kind: 'board', vehicleId: 1 } },
+    ]) {
+      const { state, employee, leg } = walkerWithLeg(overrides as Partial<Itinerary['legs'][number]>);
+      respreadLegDestination(state, employee);
+      expect([leg.destX, leg.destZ]).toEqual([10, 10]);
+      expect(leg.originalDestX ?? null).toBeNull();
+    }
+  });
+
+  it('does nothing without an itinerary', () => {
+    const { state, employee } = walkerWithLeg();
+    employee.itinerary = null;
+    expect(() => respreadLegDestination(state, employee)).not.toThrow();
   });
 });

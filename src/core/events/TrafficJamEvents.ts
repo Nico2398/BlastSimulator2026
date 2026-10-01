@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Traffic jam event definitions
-// Fires when ≥3 agents are stuck at one chokepoint for ≥10 ticks (TrafficJams.ts).
+// Fires when ≥TRAFFIC_JAM_MIN_AGENTS agents are stuck at one chokepoint for ≥TRAFFIC_JAM_MIN_TICKS ticks (TrafficJams.ts).
 
 import { ev } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';

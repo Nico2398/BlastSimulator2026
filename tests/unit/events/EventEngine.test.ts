@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   detectTrafficJam,
   detectOreReport,
-  TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
 } from '../../../src/core/events/EventEngine.js';
 import { AGENT_OCCUPANCY_WAIT_TICKS } from '../../../src/core/config/balance.js';
@@ -58,10 +57,6 @@ describe('EventEngine — detectTrafficJam (#1208 chokepoints)', () => {
 
   const queue = (n: number, drive = false, z0 = 14.5): Employee[] =>
     Array.from({ length: n }, (_, i) => makeStuckAgent(es, 20.5, z0 + i * 0.5, drive));
-
-  it('exports TRAFFIC_JAM_MIN_VEHICLES constant equal to 3', () => {
-    expect(TRAFFIC_JAM_MIN_VEHICLES).toBe(3);
-  });
 
   it('keeps TRAFFIC_JAM_MIN_TICKS strictly below AGENT_OCCUPANCY_WAIT_TICKS', () => {
     expect(TRAFFIC_JAM_MIN_TICKS).toBeLessThan(AGENT_OCCUPANCY_WAIT_TICKS);

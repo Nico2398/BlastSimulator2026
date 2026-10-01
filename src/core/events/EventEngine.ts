@@ -7,14 +7,13 @@ import type { EventSystemState, FiredEvent } from './EventSystem.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
 import { findTrafficJams } from './TrafficJams.js';
 import {
-  TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
   ORE_REPORT_LUCKY_RATIO,
   ORE_REPORT_BARREN_RATIO,
   ORE_REPORT_ABSURDIUM_FRACTION,
 } from '../config/balance.js';
 
-export { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS };
+export { TRAFFIC_JAM_MIN_TICKS };
 
 /**
  * Detects a traffic jam (TrafficJams.ts): stuck agents clustered at a chokepoint
