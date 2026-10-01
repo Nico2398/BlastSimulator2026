@@ -1,6 +1,6 @@
 // BlastSimulator2026 — TrafficJamMarkerLayer: one ground marker per active jam (#1208)
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { TrafficJamMarkerLayer } from '../../../src/renderer/TrafficJamMarkerLayer.js';
 import type { TrafficJam } from '../../../src/core/events/TrafficJams.js';
@@ -74,5 +74,62 @@ describe('TrafficJamMarkerLayer', () => {
     layer.dispose();
     layer.sync([jam('ramp:1')]);
     expect(scene.children).toHaveLength(1);
+  });
+
+  it('count reflects the number of markers drawn', () => {
+    const layer = new TrafficJamMarkerLayer(new THREE.Scene(), flat);
+    expect(layer.count).toBe(0);
+    layer.sync([jam('ramp:1'), jam('ramp:2')]);
+    expect(layer.count).toBe(2);
+    layer.sync([jam('ramp:2')]);
+    expect(layer.count).toBe(1);
+  });
+
+  it('pulses the ring scale on render', () => {
+    const scene = new THREE.Scene();
+    const layer = new TrafficJamMarkerLayer(scene, flat);
+    layer.sync([jam('ramp:1')]);
+    const ring = (scene.children[0] as THREE.Group).children[0] as THREE.Mesh;
+    vi.spyOn(performance, 'now').mockReturnValue(225); // quarter period: sin = 1
+    ring.onBeforeRender({} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    expect(ring.scale.x).toBeCloseTo(1.18, 5);
+  });
+
+  describe('with a 2D canvas available', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    function stubDocument(ctx: unknown): void {
+      vi.stubGlobal('document', {
+        createElement: () => ({ width: 0, height: 0, getContext: () => ctx }),
+      });
+    }
+
+    it('draws the label onto a canvas texture and disposes it on removal', () => {
+      const fillText = vi.fn();
+      stubDocument({ fillStyle: '', font: '', textAlign: '', textBaseline: '', fillRect: vi.fn(), fillText });
+      const scene = new THREE.Scene();
+      const layer = new TrafficJamMarkerLayer(scene, flat);
+      layer.sync([jam('ramp:1')]);
+      expect(fillText).toHaveBeenCalledTimes(1);
+      const label = (scene.children[0] as THREE.Group).children[1] as THREE.Mesh;
+      const map = (label.material as THREE.MeshBasicMaterial).map;
+      expect(map).toBeInstanceOf(THREE.CanvasTexture);
+      const disposed = vi.fn();
+      map!.addEventListener('dispose', disposed);
+      layer.sync([]);
+      expect(disposed).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to a flat colour when the canvas has no 2D context', () => {
+      stubDocument(null);
+      const scene = new THREE.Scene();
+      const layer = new TrafficJamMarkerLayer(scene, flat);
+      layer.sync([jam('ramp:1')]);
+      const label = (scene.children[0] as THREE.Group).children[1] as THREE.Mesh;
+      expect((label.material as THREE.MeshBasicMaterial).map).toBeNull();
+    });
   });
 });
