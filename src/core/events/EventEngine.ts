@@ -1,29 +1,28 @@
 // BlastSimulator2026 — EventEngine: game-state-driven event detection
 // Detects conditions that trigger events outside the normal timer system.
 
-import type { Vehicle } from '../entities/Vehicle.js';
-import { resolveVehicleDriver } from '../entities/Vehicle.js';
+import type { BuiltRamp } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventSystemState, FiredEvent } from './EventSystem.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
+import { findTrafficJams } from './TrafficJams.js';
 import {
-  TRAFFIC_JAM_MIN_VEHICLES,
   TRAFFIC_JAM_MIN_TICKS,
   ORE_REPORT_LUCKY_RATIO,
   ORE_REPORT_BARREN_RATIO,
   ORE_REPORT_ABSURDIUM_FRACTION,
 } from '../config/balance.js';
 
-export { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS };
+export { TRAFFIC_JAM_MIN_TICKS };
 
 /**
- * Detects a traffic jam: ≥TRAFFIC_JAM_MIN_VEHICLES vehicles waiting on the
- * same target cell for ≥TRAFFIC_JAM_MIN_TICKS consecutive ticks.
- * Sets state.pendingEvent and returns the FiredEvent when detected.
- * Returns null if an event is already pending or the condition is not met.
+ * Detects a traffic jam (TrafficJams.ts): stuck agents clustered at a ramp chokepoint
+ * that the player has not recently answered. Sets state.pendingEvent (carrying
+ * the jam) and returns the FiredEvent when detected. Returns null if an event
+ * is already pending or no unsilenced jam exists.
  */
 export function detectTrafficJam(
-  vehicles: Vehicle[],
+  ramps: readonly BuiltRamp[],
   employees: readonly Employee[],
   state: EventSystemState,
   tickCount: number,
@@ -31,76 +30,15 @@ export function detectTrafficJam(
   if (state.pendingEvent) return null;
   if (state.eventFreqMultiplier === 0) return null;
 
-  // Count qualifying vehicles (driver waiting on occupancy, at threshold) per
-  // target cell — re-derived (#1138) from the driving employee's own
-  // vehicleWaitingTicks and current drive leg's destination, now that
-  // neither lives on Vehicle itself any more.
-  const waitingByTarget = buildWaitingByTarget(vehicles, employees);
+  // Passage jams (no ramp) stay visible as marker/pip/banner but raise no event:
+  // there is no ramp to widen, so the event's options would not map.
+  const jam = findTrafficJams(ramps, employees, state.jamSilencedUntil, tickCount)
+    .find((j) => j.rampId !== null);
+  if (!jam) return null;
 
-  for (const { count } of waitingByTarget.values()) {
-    if (count >= TRAFFIC_JAM_MIN_VEHICLES) {
-      const event: FiredEvent = { eventId: 'traffic_jam', firedAtTick: tickCount };
-      state.pendingEvent = event;
-      return event;
-    }
-  }
-
-  return null;
-}
-
-/** One cell with enough vehicles queued on it to count as a jam. */
-export interface TrafficAdvisory {
-  targetX: number;
-  targetZ: number;
-  count: number;
-}
-
-/**
- * Shared clustering pass for detectTrafficJam and computeTrafficAdvisory
- * (#1138): a vehicle counts as "waiting on this cell" when its driving
- * employee's own `vehicleWaitingTicks` is at threshold and their current
- * itinerary leg is a drive leg — the cell they are queued on is that leg's
- * pre-spread destination when one was ever recorded, else its live one
- * (`leg.originalDestX ?? leg.destX`, see the #1274 comment below), replacing
- * the deleted `Vehicle.state`/`.waitingTicks`/`.targetX`/`.targetZ` fields.
- */
-function buildWaitingByTarget(vehicles: readonly Vehicle[], employees: readonly Employee[]): Map<string, TrafficAdvisory> {
-  const waitingByTarget = new Map<string, TrafficAdvisory>();
-  for (const v of vehicles) {
-    const driver = resolveVehicleDriver(v, employees);
-    if (!driver || driver.vehicleWaitingTicks < TRAFFIC_JAM_MIN_TICKS) continue;
-    const leg = driver.itinerary?.legs[0];
-    if (!leg || leg.mode !== 'drive') continue;
-
-    // #1274: cluster by the leg's PRE-SPREAD destination when it has one —
-    // Locomotion.ts's destination-spreading retargets a blocked drive leg's
-    // live destX/destZ to an individually-found free cell as soon as
-    // vehicleWaitingTicks crosses this same threshold, which would otherwise
-    // fracture several vehicles converging on one cell into singletons
-    // before this clustering pass ever sees them together.
-    const targetX = leg.originalDestX ?? leg.destX;
-    const targetZ = leg.originalDestZ ?? leg.destZ;
-
-    const key = `${targetX},${targetZ}`;
-    const entry = waitingByTarget.get(key);
-    if (entry) entry.count++;
-    else waitingByTarget.set(key, { targetX, targetZ, count: 1 });
-  }
-  return waitingByTarget;
-}
-
-/**
- * Read-only view of the same waiting-vehicle clustering detectTrafficJam uses
- * to decide whether to fire the traffic_jam event — for the Fleet panel's
- * advisory banner, which must not have detectTrafficJam's side effects
- * (writing state.pendingEvent, gating on eventFreqMultiplier/an event already
- * pending). A player should see the cluster forming regardless of whether an
- * event is currently blocked or paused. Uses the same MIN_VEHICLES/MIN_TICKS
- * thresholds so the banner and the event agree on what counts as a jam.
- */
-export function computeTrafficAdvisory(vehicles: readonly Vehicle[], employees: readonly Employee[]): TrafficAdvisory[] {
-  const waitingByTarget = buildWaitingByTarget(vehicles, employees);
-  return [...waitingByTarget.values()].filter(e => e.count >= TRAFFIC_JAM_MIN_VEHICLES);
+  const event: FiredEvent = { eventId: 'traffic_jam', firedAtTick: tickCount, jam };
+  state.pendingEvent = event;
+  return event;
 }
 
 /**

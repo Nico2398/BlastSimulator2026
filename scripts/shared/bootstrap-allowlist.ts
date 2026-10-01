@@ -167,6 +167,12 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // covers every `vehicle driver <vehicleId> <employeeId>` command in the
   // suite.
   'vehicle driver',
+  // traffic-jam-ramp-head.json (#1208): staging four crewed vehicles side by
+  // side and sending them together down one ramp needs exact, simultaneous
+  // per-vehicle targets; the Fleet panel reposition control takes one vehicle
+  // at a time and the scenario needs the four orders within one tick. The
+  // jam itself is raised and answered through real events/clicks.
+  'vehicle reposition',
   // needs-cycle.json: "hauler" is not a real hire role (Usage:
   // employee hire role:(driller|blaster|driver|surveyor|manager)) — there
   // is no hire button for a role that doesn't exist, a genuine no-op in

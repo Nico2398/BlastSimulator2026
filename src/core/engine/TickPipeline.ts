@@ -309,7 +309,7 @@ export function runTick(
   // 8f-2. Traffic jam detection — runs immediately after locomotion, once
   // per tick, so console/scenario "tick" steps can fire TrafficJamEvent too
   // (#411).
-  fired = fired ?? detectTrafficJam(state.vehicles.vehicles, state.employees.employees, state.events, state.tickCount);
+  fired = fired ?? detectTrafficJam(state.builtRamps, state.employees.employees, state.events, state.tickCount);
 
   // 8h. Arrival gate — must run after locomotion above: promotes rest/task
   // intents queued this tick or a prior one into their active timers/effects

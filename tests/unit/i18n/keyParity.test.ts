@@ -394,6 +394,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // notification.order_blocked_target_unreachable, the blocked-order
     // message for a debris/hauling target sitting outside ground crew's
     // climb-reachable region — both locales translated.
+    // #1208 adds 6 net keys (jam options, widen results, banner): 3546.
     // Baseline is now 3528 (down from 3532): #1207 flips
     // AGENT_OCCUPANCY_ENABLED_DEFAULT to true and deletes the flag along
     // with the now-dead `debug occupancy` console command — drops 4 keys
@@ -401,7 +402,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // console.debug_occupancy_off, console.invalid_agent_occupancy_flag),
     // both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3540);
+    expect(Object.keys(en).length).toBe(3546);
   });
 });
 

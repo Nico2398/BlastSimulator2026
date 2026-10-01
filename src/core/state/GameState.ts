@@ -138,7 +138,9 @@ import type { RampWidth } from '../config/balance.js';
 // `nextBuiltRampId` (#1298 — a finished ramp is selectable and widenable).
 // A pre-v27 save has no recorded ramps: `builtRamps` defaults to [].
 // See SaveLoad.ts's migrateV26ToV27.
-export const SAVE_VERSION = 27;
+// v27 -> v28: EventSystemState gained `jamSilencedUntil` (#1208). A pre-v28
+// save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
+export const SAVE_VERSION = 28;
 
 export interface GameConfig {
   seed: number;

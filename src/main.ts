@@ -1,6 +1,5 @@
 // BlastSimulator2026 — Browser entry point
 // Initializes the 3D scene, UI, audio, save system, and exposes the console bridge.
-
 import * as THREE from 'three';
 import { SceneManager } from './renderer/SceneManager.js';
 import { modelLibrary } from './renderer/models/ModelLibrary.js';
@@ -34,6 +33,7 @@ import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';
@@ -550,6 +550,7 @@ window.__gameState = () => {
   if (!ctx.state) return null;
   const s = ctx.state;
   const livingEmployees = getLivingEmployees(s.employees.employees);
+  const jams = findTrafficJams(s.builtRamps, s.employees.employees);
   return {
     seed: s.seed,
     time: s.time,
@@ -610,6 +611,9 @@ window.__gameState = () => {
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
+    // Mirrors serializeGameState (console-api.ts): active jams, silencing ignored (#1208).
+    trafficJamCount: jams.length,
+    trafficJams: jams.map(j => ({ kind: j.kind, rampId: j.rampId })),
     // Raw roster size, dead included — deliberate: `killEmployee` never
     // splices `employees` (only `fireEmployee` does), so this stays a
     // total-ever-hired count. `deathCount` tracks how many of them died; the

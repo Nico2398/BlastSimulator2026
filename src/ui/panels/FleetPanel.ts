@@ -26,7 +26,7 @@ import type { Employee } from '../../core/entities/Employee.js';
 import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
 import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
-import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
+import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
@@ -171,14 +171,15 @@ export class FleetPanel extends PanelBase {
   }
 
   private makeTrafficBanner(state: GameState): HTMLElement | null {
-    const advisories = computeTrafficAdvisory(state.vehicles.vehicles, state.employees.employees);
-    if (advisories.length === 0) return null;
-    const worst = advisories.reduce((a, b) => (b.count > a.count ? b : a));
+    // Unsilenced on purpose: the banner shows a jam forming even after the player answered the event.
+    const jams = findTrafficJams(state.builtRamps, state.employees.employees);
+    if (jams.length === 0) return null;
+    const worst = jams.reduce((a, b) => (b.agentIds.length > a.agentIds.length ? b : a));
     const banner = el('div', { attrs: { style: 'display:flex;gap:8px;padding:9px 11px;border-radius:5px;background:rgba(255,176,46,.08);border:1px solid rgba(255,176,46,.26)' } });
     banner.append(
       el('div', { attrs: { style: 'color:var(--bsx-amber)' }, children: [iconEl('warn', 14)] }),
       el('span', {
-        text: t('ui.fleet.traffic_advisory', { count: worst.count, x: worst.targetX, z: worst.targetZ }),
+        text: t('ui.fleet.traffic_advisory', { count: worst.agentIds.length, x: Math.floor(worst.x), z: Math.floor(worst.z) }),
         attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary);flex:1' },
       }),
     );

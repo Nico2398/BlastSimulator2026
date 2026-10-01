@@ -1,0 +1,370 @@
+{
+  "name": "traffic-jam-ramp-head",
+  "description": "#1208: traffic jams are detected by position at chokepoints, not by shared destination. Dig a ramp, crew four vehicles and send them to one tile in its body; once they stall a queue raises the traffic_jam event (trafficJamCount 1, kind ramp_head, rampId 1), and the player answers it by clicking Widen ramp in the event dialog, which orders the widening exactly once. Contract for console-api state (implementer adds): trafficJamCount, trafficJams [{kind, rampId}]. Known gap: walkers dispatched to one tile stack without blocking, so the foot-only and mixed queues are unit-tested only.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "employeeCount": 5,
+          "trafficJamCount": 0
+        },
+        "note": "trafficJamCount is the #1208 console-state field (implementer adds it); no jam on a fresh site."
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "description": "Staffed vehicles come unmanned (#551) \u2014 crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "build_ramp start:15,15 end:20,25 depth:5",
+      "description": "Same geometry as ramp-navigation.json: a 10m, RAMP_WIDTH=3-wide corridor running south from (15,15). depth:5 keeps every per-column step within NAV_MAX_SLOPE_RATIO and RAMP_CUT_SLOPE_RATIO (#1151/#1152) \u2014 see that file's own note for the full derivation. Ordering only queues dig_ramp_segment work; the crewed rock_digger below carves it over the following ticks.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 20,
+          "z2": 25
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "note": "10m ramp x RAMP_COST_PER_METER (balance.ts) = 1000."
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
+      "timeout": 95,
+      "description": "Drain every queued dig_ramp_segment layer \u2014 the crewed rock_digger (vehicle #3, driver #4) clears one bench at a time until the whole corridor is carved end to end and walkable.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Ramp fully dug: every dig_ramp_segment layer landed."
+      }
+    },
+    {
+      "command": "vehicle driver 2 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 3"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Ramp is dug. Crew the idle vehicles with the licensed drivers: hauler #2 with driver #3, fragmenter #4 with driver #4, drill rig #1 with driller #1 (rock_digger #3 is already crewed and parked at the ramp foot (15,24)). Crewing choices come from the licence table: #5 and #3 cannot drive the fragmenter, #1 only the drill rig."
+    },
+    {
+      "command": "vehicle driver 4 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 4"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "role": "setup",
+      "description": "Let every driver walk to and board their vehicle before the convergence."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "A spontaneous random event can fire during the preceding tick batch; a pending event halts ticking in the browser (isPaused), so the staging and the jam wait below would never advance. Resolved through the dialog's own buttons when one is pending; a no-op otherwise.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "vehicle reposition 1 14 17",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 1 14 17"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Stage all four vehicles side by side at the ramp head (15,17) area so they start the final run together, instead of trickling in from the depot one at a time (a staggered arrival never has three waiting at once)."
+    },
+    {
+      "command": "vehicle reposition 2 15 17",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 15 17"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle reposition 4 16 17",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 4 16 17"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle reposition 3 15 18",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 3 15 18"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "role": "setup",
+      "description": "Let every vehicle reach its staging tile."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "A spontaneous random event can fire during the preceding tick batch; a pending event halts ticking in the browser (isPaused), so the staging and the jam wait below would never advance. Resolved through the dialog's own buttons when one is pending; a no-op otherwise.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "vehicle reposition 1 15 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 1 15 24"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Convergence: all four vehicles sent together to one ramp-body tile; one takes it, the rest queue single-file behind it.  Vehicles (not walkers) form the queue because walkers dispatched to one tile stack without blocking (peak wait 2); foot-only queues are unit-tested (TrafficJams.test.ts). The jam needs TRAFFIC_JAM_MIN_TICKS < AGENT_OCCUPANCY_WAIT_TICKS, otherwise the occupancy ladder spreads the queue before three agents have waited long enough."
+    },
+    {
+      "command": "vehicle reposition 2 15 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 2 15 24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle reposition 4 15 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 4 15 24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle reposition 3 15 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle reposition 3 15 24"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "role": "setup",
+      "description": "Advance simulation time through the console until the stall passes TRAFFIC_JAM_MIN_TICKS: ticking halts on the traffic_jam event itself. Not a waitUntil: waitUntil auto-resolves a pending event after each tick (choose 0 = Reroute Convoy) and would clear the very jam this step must observe. A browser clock is also ~6s/frame without a GPU. The converging vehicles stall at the ramp body; the detector reports exactly one ramp_head jam on ramp 1 and the event is pending.",
+      "expect": {
+        "equals": {
+          "trafficJamCount": 1,
+          "trafficJams": [
+            {
+              "kind": "ramp_head",
+              "rampId": 1
+            }
+          ],
+          "pendingEvent": true
+        },
+        "note": "Contract for the console state schema (implementer adds): trafficJamCount = findTrafficJams(...).length ignoring silence; trafficJams = [{kind, rampId}]."
+      }
+    },
+    {
+      "command": "event choose 1",
+      "description": "Player answers the traffic-jam dialog through its own buttons: option 2 of 3 is Widen ramp (index 1). The widen order is charged once and queues the extra excavation; the ramp is silenced so the jam does not immediately re-fire.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice:nth-of-type(2)",
+          "timeout": 60000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice:nth-of-type(2)"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "orderedRampSegmentCount"
+        ],
+        "equals": {
+          "pendingEvent": false,
+          "builtRampWidth": 3
+        },
+        "note": "Exact cost is asserted by TrafficJamEvents.test.ts; here the player-visible claim is that the click lands an order."
+      }
+    },
+    {
+      "command": "event dismiss",
+      "description": "Player dismisses the outcome card so the scene behind it is visible: the jam marker at the ramp head is unsilenced, so it stays up while the queue still stands.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeout": 60000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "pendingEvent": false
+        }
+      }
+    },
+    {
+      "command": "wait_until field:builtRampWidth equals:5 max_ticks:1200",
+      "timeout": 185,
+      "description": "Wait for the extra side strip to be dug; the built ramp is then 5 wide.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "builtRampWidth",
+          "equals": 5,
+          "maxTicks": 1200,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "builtRampWidth": 5,
+          "orderedRampSegmentCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        15,
+        20
+      ],
+      "distance": 18
+    }
+  ]
+}

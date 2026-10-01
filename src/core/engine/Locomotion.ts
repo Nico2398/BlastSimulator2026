@@ -1036,47 +1036,26 @@ function handleAgentOccupancyBlock(
     }
   }
 
-  // "Destination spreading": only a leg whose arrival step needs an exact,
-  // unshared cell (never a board/enter_building arrival, which must reach
-  // the one specific vehicle/building cell it names), and is not itself a
-  // relocated occupant's own return trip (`leg.neverSpread`, #1278 follow-up
-  // — see that field's own doc comment, Itinerary.ts), can have its target
-  // relocated out from under it.
-  const needsExactUnsharedCell = destinationHeldByOther && leg.arrival !== 'adjacent' && !leg.neverSpread
-    && (leg.onArrive.kind === 'none' || leg.onArrive.kind === 'effect');
-  if (needsExactUnsharedCell) {
-    const spread = findNearestFreeCellForAgent(state, mover, leg.destX, leg.destZ);
-    if (spread) {
-      // #1274: record the pre-spread destination once, on the FIRST spread
-      // only — the stable identity of "what chokepoint is this mover
-      // actually queued on", so buildWaitingByTarget (EventEngine.ts) can
-      // still cluster several movers converging on the same original target
-      // even after each one has since been individually retargeted.
-      if (leg.originalDestX == null) {
-        leg.originalDestX = leg.destX;
-        leg.originalDestZ = leg.destZ;
-      }
-      leg.destX = spread.x;
-      leg.destZ = spread.z;
-      // Deliberately NOT resetting `vehicleWaitingTicks` here (unlike the
-      // reroute/sidestep branches above, both of which just moved the
-      // mover for real): a retarget alone is not a resolution, only a new
-      // target for the SAME still-blocked leg. Resetting the counter would
-      // force a fresh AGENT_OCCUPANCY_WAIT_TICKS-tick wait before the
-      // ladder gets to try anything at all against the new destination —
-      // even a reroute around an obstacle already known, from this very
-      // tick, to sit on the direct route to it. With several movers
-      // converging on the same crowded target and each retarget only
-      // costing a few ticks to resolve once actually attempted, that
-      // compounded, repeatedly-reset wait was enough on its own to blow
-      // through a generous tick budget while every OTHER mover (whose own
-      // reroute never needed to detour around anything) resolved in one
-      // step — reproduced live via this file's own "four employees
-      // dispatched to the identical exact target cell" test, where the
-      // slowest of the four never moved a single cell in 40 ticks despite
-      // a real route around the blocker existing the entire time.
-      return 'blocked';
-    }
+  // Destination spreading (see spreadLegDestination for which legs qualify).
+  if (destinationHeldByOther && spreadLegDestination(state, mover, leg, leg.destX, leg.destZ)) {
+    // Deliberately NOT resetting `vehicleWaitingTicks` here (unlike the
+    // reroute/sidestep branches above, both of which just moved the
+    // mover for real): a retarget alone is not a resolution, only a new
+    // target for the SAME still-blocked leg. Resetting the counter would
+    // force a fresh AGENT_OCCUPANCY_WAIT_TICKS-tick wait before the
+    // ladder gets to try anything at all against the new destination —
+    // even a reroute around an obstacle already known, from this very
+    // tick, to sit on the direct route to it. With several movers
+    // converging on the same crowded target and each retarget only
+    // costing a few ticks to resolve once actually attempted, that
+    // compounded, repeatedly-reset wait was enough on its own to blow
+    // through a generous tick budget while every OTHER mover (whose own
+    // reroute never needed to detour around anything) resolved in one
+    // step — reproduced live via this file's own "four employees
+    // dispatched to the identical exact target cell" test, where the
+    // slowest of the four never moved a single cell in 40 ticks despite
+    // a real route around the blocker existing the entire time.
+    return 'blocked';
   }
 
   // Neither a reroute, a sidestep, nor destination-spreading resolved the
@@ -1318,6 +1297,48 @@ function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX:
     state.navGrid, originX, originZ,
     (x, z) => !occupancy.isFreeFor(mover, x, z) || isReservedByAnotherExactLeg(state, mover, x, z),
   );
+}
+
+/**
+ * "Destination spreading": retargets `leg` onto the nearest free cell around
+ * (originX, originZ). Only a leg whose arrival step needs an exact, unshared
+ * cell qualifies — never a board/enter_building arrival (which must reach the
+ * one specific vehicle/building cell it names), and never a relocated
+ * occupant's own return trip (`leg.neverSpread`, #1278 follow-up, Itinerary.ts).
+ * Records the pre-spread destination once, on the FIRST spread only (#1274):
+ * the stable identity of the chokepoint the mover is queued on, so the jam
+ * detector (TrafficJams.ts) can still cluster movers after each was retargeted.
+ * Returns whether the leg was retargeted.
+ */
+function spreadLegDestination(state: GameState, mover: Occupant, leg: Leg, originX: number, originZ: number): boolean {
+  const needsExactUnsharedCell = leg.arrival !== 'adjacent' && !leg.neverSpread
+    && (leg.onArrive.kind === 'none' || leg.onArrive.kind === 'effect');
+  if (!needsExactUnsharedCell) return false;
+  const spread = findNearestFreeCellForAgent(state, mover, originX, originZ);
+  if (!spread) return false;
+  if (leg.originalDestX == null) {
+    leg.originalDestX = leg.destX;
+    leg.originalDestZ = leg.destZ;
+  }
+  leg.destX = spread.x;
+  leg.destZ = spread.z;
+  return true;
+}
+
+/**
+ * Re-spreads a stalled employee's current leg onto the nearest free cell around
+ * its pre-spread target — the same retarget `handleAgentOccupancyBlock`'s
+ * destination-spreading step makes, applied on demand (#1208's "reroute
+ * vehicles" answer). Only a leg that needs an exact, unshared cell qualifies;
+ * anything else is left untouched.
+ */
+export function respreadLegDestination(state: GameState, emp: Employee): void {
+  const leg = emp.itinerary?.legs[0];
+  if (!leg) return;
+  const mover: Occupant = emp.locomotion.kind === 'mounted'
+    ? { kind: 'vehicle', id: emp.locomotion.vehicleId }
+    : { kind: 'employee', id: emp.id };
+  spreadLegDestination(state, mover, leg, leg.originalDestX ?? leg.destX, leg.originalDestZ ?? leg.destZ);
 }
 
 /**

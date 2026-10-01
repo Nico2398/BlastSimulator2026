@@ -57,7 +57,7 @@ export function eventCommand(
       const idx = parseInt(args[1] ?? '', 10);
       if (isNaN(idx)) return { success: false, output: t('eventResolution.choose_usage') };
       const rng = new Random(state.seed + state.tickCount);
-      const result = resolveEvent(state.events, state.finances, state.scores, idx, state.tickCount, rng);
+      const result = resolveEvent(state.events, state.finances, state.scores, idx, state.tickCount, rng, { state, grid: ctx.grid });
       if (!result) return { success: false, output: t('eventResolution.choose_invalid') };
 
       // resolveEvent already logged the transaction to state.finances via

@@ -94,7 +94,8 @@ export function checkGoalAgainstState(
   if (goal.equals) {
     for (const [field, expected] of Object.entries(goal.equals)) {
       const actual = after?.[field];
-      if (actual !== expected) {
+      // Structural compare so array/object fields (trafficJams) can be asserted.
+      if (actual !== expected && JSON.stringify(actual) !== JSON.stringify(expected)) {
         mismatches.push({ field, goalType: 'equals', expected, actual });
         if (violation === null) {
           violation = `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(actual)}`;

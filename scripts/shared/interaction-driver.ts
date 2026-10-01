@@ -503,7 +503,9 @@ export async function checkGoal(
 
     if (goal.equals) {
       for (const [field, expected] of Object.entries(goal.equals)) {
-        if (state[field] !== expected) {
+        // Structural compare so array/object fields (trafficJams) can be asserted,
+        // matching scenario-goal.ts.
+        if (state[field] !== expected && JSON.stringify(state[field]) !== JSON.stringify(expected)) {
           throw new InteractionFailure(
             `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(state[field])}`,
             describeAvailable(await probe(page)),

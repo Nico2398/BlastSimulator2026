@@ -8,6 +8,7 @@ import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileS
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 
 export { createRunner };
@@ -60,6 +61,12 @@ export interface SerializableGameState {
   pendingActionCount: number;
   buildingCount: number;
   vehicleCount: number;
+  /** Active traffic jams at chokepoints, silencing ignored (findTrafficJams, #1208). */
+  trafficJamCount: number;
+  /** Kind and ramp id of every active jam (#1208). */
+  trafficJams: { kind: ChokepointKind; rampId: number | null }[];
+  /** Whether an event awaits the player's decision (state.events.pendingEvent !== null). */
+  pendingEvent: boolean;
   /** Raw roster size, dead included — deliberate: `killEmployee` never splices `employees` (only `fireEmployee` does), so this stays a total-ever-hired count. `deathCount` tracks how many of them died; the six fields below this one filter to the living roster instead. */
   employeeCount: number;
   /** Qualifications the roster holds — proves a skill was actually obtained, not just clicked at. */
@@ -139,6 +146,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
   const s = ctx.state;
   if (!s) return null;
   const livingEmployees = getLivingEmployees(s.employees.employees);
+  const jams = findTrafficJams(s.builtRamps, s.employees.employees);
   return {
     seed: s.seed,
     time: s.time,
@@ -171,6 +179,9 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
+    trafficJamCount: jams.length,
+    trafficJams: jams.map(j => ({ kind: j.kind, rampId: j.rampId })),
+    pendingEvent: s.events.pendingEvent !== null,
     employeeCount: s.employees.employees.length,
     qualificationCount: livingEmployees
       .reduce((n, e) => n + e.qualifications.length, 0),
