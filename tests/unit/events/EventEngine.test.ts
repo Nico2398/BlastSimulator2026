@@ -52,7 +52,6 @@ describe('EventEngine — detectTrafficJam (#1208 chokepoints)', () => {
   let es: EmployeeState;
 
   beforeEach(() => {
-    _nextId = 1;
     eventState = createEventSystemState();
     es = createEmployeeState();
   });
