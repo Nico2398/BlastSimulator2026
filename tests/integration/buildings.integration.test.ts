@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
+import { setupEvents } from '../../src/core/events/index.js';
 import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
@@ -734,6 +735,9 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
     // Generous cash: 3 debris_hauler vehicles + a freight_warehouse + a
     // management_office order, plus several hundred ticks of payroll/upkeep.
     ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32, cash: 1_000_000 });
+    // Three haulers in one passage legitimately raise a traffic_jam event (#1208);
+    // it can only be answered with the event pool registered.
+    setupEvents();
   });
 
   /** Top up every employee's fatigue before a tick — an unrelated forced-rest
