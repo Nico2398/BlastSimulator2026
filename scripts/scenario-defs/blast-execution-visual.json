@@ -3328,6 +3328,55 @@
       }
     },
     {
+      "command": "charge hole:H17 explosive:boomite amount:8 stemming:0.5",
+      "description": "#1208 timing shift: a traffic_jam event now fires mid-wait (crowd of charge workers on this 8x8/1m grid) and `tick` stops at an event, so the trajectory shifts a few ticks and H17/H9 are still unloaded when the drain above completes. Same straggler-retry precedent as the H8 retry directly above; `commandOutcome: either` and clickIfPresent keep it a harmless no-op on a run where they are already charged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:H9 explosive:boomite amount:8 stemming:0.5",
+      "description": "#1208 timing shift: see H17's note directly above.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
+      "description": "#1208: drains the H17/H9 straggler retry above.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 30000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
       "command": "sequence auto delay_step:25",
       "description": "#1278 migration: the three wildcard `charge hole:*` resweeps that used to sit here (#953/#1201/#1252, each pairing a wholesale re-order with its own drain wait) are removed -- direct-traced (command mode, replaying this file's own exact command sequence under agent occupancy): the named 34-hole straggler list plus its widened drain wait (see that step's own note) already reaches chargedCount:64/orderedChargeCount:0 on its own, before any of the three resweeps would fire. Removing them isn't just tidying: `charge hole:*` re-dispatches a charge_hole action for every ALREADY-charged hole too (no already-loaded guard, mining.ts) -- with 33 employees congesting this same 8x8/1m-spacing grid under real occupancy wait/relocate behavior, a wholesale re-order of 64 holes (most already done) cost roughly 1200 further ticks and ~$2.3M more payroll across the three resweeps in a direct A/B trace, which is what pushed cycle 4 into a real `worker_revolt` (and, before the cash bump on this file's own `new_game` step, bankruptcy) that the named-list-only trajectory never reaches. Left in place: the named per-hole list and its own H8 retry immediately above, which the same trace confirms are still genuinely needed (a real, if smaller, per-hole straggler set persists under occupancy) -- per issue #1278's own task framing, only proven-unnecessary insurance comes out; the rest stays.",
       "interaction": [
