@@ -21,7 +21,7 @@
     },
     {
       "command": "vehicle driver 3 4",
-      "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
+      "description": "Staffed vehicles come unmanned (#551) \u2014 crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
       "interaction": [
         {
           "type": "command",
@@ -32,7 +32,7 @@
     },
     {
       "command": "build_ramp start:15,15 end:20,25 depth:5",
-      "description": "Same geometry as ramp-navigation.json: a 10m, RAMP_WIDTH=3-wide corridor running south from (15,15). depth:5 keeps every per-column step within NAV_MAX_SLOPE_RATIO and RAMP_CUT_SLOPE_RATIO (#1151/#1152) — see that file's own note for the full derivation. Ordering only queues dig_ramp_segment work; the crewed rock_digger below carves it over the following ticks.",
+      "description": "Same geometry as ramp-navigation.json: a 10m, RAMP_WIDTH=3-wide corridor running south from (15,15). depth:5 keeps every per-column step within NAV_MAX_SLOPE_RATIO and RAMP_CUT_SLOPE_RATIO (#1151/#1152) \u2014 see that file's own note for the full derivation. Ordering only queues dig_ramp_segment work; the crewed rock_digger below carves it over the following ticks.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -74,7 +74,7 @@
     {
       "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
       "timeout": 95,
-      "description": "Drain every queued dig_ramp_segment layer — the crewed rock_digger (vehicle #3, driver #4) clears one bench at a time until the whole corridor is carved end to end and walkable.",
+      "description": "Drain every queued dig_ramp_segment layer \u2014 the crewed rock_digger (vehicle #3, driver #4) clears one bench at a time until the whole corridor is carved end to end and walkable.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -135,6 +135,17 @@
       "description": "Let every driver walk to and board their vehicle before the convergence."
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "A spontaneous random event can fire during the preceding tick batch; a pending event halts ticking in the browser (isPaused), so the staging and the jam wait below would never advance. Resolved through the dialog's own buttons when one is pending; a no-op otherwise.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "vehicle reposition 1 14 17",
       "interaction": [
         {
@@ -187,6 +198,17 @@
       "description": "Let every vehicle reach its staging tile."
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "A spontaneous random event can fire during the preceding tick batch; a pending event halts ticking in the browser (isPaused), so the staging and the jam wait below would never advance. Resolved through the dialog's own buttons when one is pending; a no-op otherwise.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "vehicle reposition 1 15 24",
       "interaction": [
         {
@@ -228,19 +250,15 @@
       "role": "bootstrap"
     },
     {
-      "command": "wait_until field:trafficJamCount equals:1 max_ticks:300",
-      "timeout": 95,
-      "description": "Wait for the converging vehicles to stall at the ramp body past TRAFFIC_JAM_MIN_TICKS. A foot-only queue is a jam: the traffic_jam event becomes pending and the detector reports exactly one ramp_head jam on ramp 1.",
+      "command": "tick 60",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "trafficJamCount",
-          "equals": 1,
-          "maxTicks": 300,
-          "timeoutMs": 90000
+          "type": "command",
+          "command": "tick 60"
         }
       ],
       "role": "setup",
+      "description": "Advance simulation time through the console until the stall passes TRAFFIC_JAM_MIN_TICKS: ticking halts on the traffic_jam event itself. Not a waitUntil: waitUntil auto-resolves a pending event after each tick (choose 0 = Reroute Convoy) and would clear the very jam this step must observe. A browser clock is also ~6s/frame without a GPU. The converging vehicles stall at the ramp body; the detector reports exactly one ramp_head jam on ramp 1 and the event is pending.",
       "expect": {
         "equals": {
           "trafficJamCount": 1,
@@ -282,6 +300,27 @@
           "builtRampWidth": 3
         },
         "note": "Exact cost is asserted by TrafficJamEvents.test.ts; here the player-visible claim is that the click lands an order."
+      }
+    },
+    {
+      "command": "event dismiss",
+      "description": "Player dismisses the outcome card so the scene behind it is visible: the jam marker at the ramp head is unsilenced, so it stays up while the queue still stands.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeout": 60000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "pendingEvent": false
+        }
       }
     },
     {

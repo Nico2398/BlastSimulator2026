@@ -12,7 +12,6 @@ import {
   createEventSystemState,
   type EventSystemState,
 } from '../../../src/core/events/EventSystem.js';
-import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { Employee, EmployeeState } from '../../../src/core/entities/Employee.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
 import type { BuiltRamp } from '../../../src/core/state/GameState.js';
@@ -20,67 +19,6 @@ import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { clearEvents, getEventById } from '../../../src/core/events/EventPool.js';
 import { setupEvents } from '../../../src/core/events/index.js';
-
-// ── Fixture builder ──────────────────────────────────────────────────────────
-
-let _nextId = 1;
-
-/**
- * #1138: a vehicle carries no state/waitingTicks/targetX/targetZ of its own
- * any more — detectTrafficJam/computeTrafficAdvisory now cluster on the
- * DRIVING EMPLOYEE's own `vehicleWaitingTicks` and current drive leg's
- * destX/destZ (EventEngine.ts's buildWaitingByTarget). Builds a
- * (vehicle, employee) pair: the employee is the occupant driving toward
- * (targetX, targetZ), waiting `waitingTicks` ticks so far.
- */
-function makeWaitingVehicleAndDriver(
-  targetX: number,
-  targetZ: number,
-  waitingTicks: number,
-  originalTarget?: { x: number; z: number },
-): { vehicle: Vehicle; employee: Employee } {
-  const id = _nextId++;
-  const employees = createEmployeeState();
-  const { employee } = hireEmployee(employees, 'driller', new Random(id), targetX - 1, targetZ);
-  // Each pair builds its own throwaway EmployeeState (ids always start at 1),
-  // so employee.id must be forced unique across pairs before the vehicle and
-  // employee are combined into one shared list — otherwise resolveVehicleDriver's
-  // `employees.find(e => e.id === driverId)` matches the wrong employee object.
-  employee.id = id;
-  employee.vehicleWaitingTicks = waitingTicks;
-  employee.itinerary = {
-    legs: [{
-      mode: 'drive', vehicleId: id, destX: targetX, destZ: targetZ,
-      arrival: 'exact', onArrive: { kind: 'alight' }, estTicks: 5,
-      // #1274: when given, simulates a leg that has already been
-      // destination-spread away from `originalTarget` onto the live,
-      // per-mover (targetX, targetZ) cell above — destX/destZ stay the live
-      // value; only originalDestX/originalDestZ record where the leg was
-      // ORIGINALLY headed before any spread ever retargeted it.
-      ...(originalTarget ? { originalDestX: originalTarget.x, originalDestZ: originalTarget.z } : {}),
-    }],
-    goal: { kind: 'reposition', x: targetX, z: targetZ },
-    workTicks: 0,
-    estTotalTicks: 5,
-  };
-
-  const vehicle: Vehicle = {
-    id, type: 'debris_hauler', tier: 1, x: targetX - 1, z: targetZ, hp: 100,
-    payload: null,
-    occupantIds: [employee.id],
-  };
-  return { vehicle, employee };
-}
-
-/** Splits an array of (vehicle, employee) pairs into two parallel arrays. */
-function split(pairs: Array<{ vehicle: Vehicle; employee: Employee }>): { vehicles: Vehicle[]; employees: Employee[] } {
-  return { vehicles: pairs.map(p => p.vehicle), employees: pairs.map(p => p.employee) };
-}
-
-/** A driverless vehicle — occupantIds empty, never a driving employee to read waiting-state off. */
-function makeDriverlessVehicle(x: number, z: number): Vehicle {
-  return { id: _nextId++, type: 'debris_hauler', tier: 1, x, z, hp: 100, payload: null, occupantIds: [] };
-}
 
 // ── detectTrafficJam ─────────────────────────────────────────────────────────
 
