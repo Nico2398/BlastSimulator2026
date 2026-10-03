@@ -6,7 +6,7 @@
 // employee auto-claims/drives/loads/delivers them instead of hauling being
 // reachable only through the manual Fleet-panel button.
 
-import type { GameState, PendingAction } from '../state/GameState.js';
+import type { GameState, PendingAction, ActionType } from '../state/GameState.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
@@ -192,4 +192,10 @@ export function haulActionCarriesOre(
   if (!tracked) return false;
 
   return fragmentHasOre(tracked.fragment.oreDensities);
+}
+
+/** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */
+export function isAutoDebrisAction(_type: ActionType): boolean {
+  // TODO: implement
+  return false;
 }
