@@ -3087,6 +3087,8 @@
   "notification.order_blocked_no_driver": "{order} needs a {role} — nobody is licensed to drive one.",
   "notification.order_blocked_target_unreachable": "{order} can't reach its target — no route connects it to the rest of the site.",
   "notification.pip.blocked_orders_label": "{count} BLOCKED",
+  "notification.pip.stranded_debris_label": "{count} OUT OF REACH",
+  "notification.pip.stranded_debris_tip": "{count} debris job(s) out of reach - build a ramp or level the ground to haul them, or leave them",
   "notification.pip.blocked_orders_tip": "{count} order(s) queued with nobody able to do them yet",
   "shell.rail.blast": "Blast",
   "shell.rail.survey": "Survey",

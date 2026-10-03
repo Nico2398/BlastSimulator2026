@@ -3087,6 +3087,8 @@
   "notification.order_blocked_no_driver": "{order} nécessite un(e) {role} — personne n'est autorisé(e) à en conduire un(e).",
   "notification.order_blocked_target_unreachable": "La cible de {order} est inaccessible — aucun chemin ne la relie au reste du site.",
   "notification.pip.blocked_orders_label": "{count} BLOQUÉ(S)",
+  "notification.pip.stranded_debris_label": "{count} HORS DE PORTÉE",
+  "notification.pip.stranded_debris_tip": "{count} tâche(s) de débris hors de portée - construisez une rampe ou nivelez le terrain pour les évacuer, ou laissez-les",
   "notification.pip.blocked_orders_tip": "{count} ordre(s) en attente, sans personne pour les exécuter",
   "shell.rail.blast": "Minage",
   "shell.rail.survey": "Sondage",

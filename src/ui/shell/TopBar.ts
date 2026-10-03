@@ -312,6 +312,8 @@ export class TopBar {
       if (pip.kind === 'event') btn.classList.add('bs-event-badge');
       const tone = pip.tone === 'critical'
         ? { bg: 'rgba(255,91,76,.14)', border: 'rgba(255,91,76,.45)', fg: 'var(--bsx-critical-text)' }
+        : pip.tone === 'neutral'
+        ? { bg: 'rgba(160,170,185,.10)', border: 'rgba(160,170,185,.30)', fg: 'var(--bsx-info)' }
         : { bg: 'rgba(255,176,46,.12)', border: 'rgba(255,176,46,.36)', fg: 'var(--bsx-amber-hover)' };
       btn.style.cssText = `display:flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:1px solid ${tone.border};border-radius:4px;background:${tone.bg};color:${tone.fg};cursor:pointer;font:700 10px/1 var(--bsx-font-mono);white-space:nowrap`;
       if (pip.tone === 'critical') btn.style.animation = 'bs-pulse 2.4s ease-in-out infinite';

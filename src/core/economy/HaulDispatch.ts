@@ -37,7 +37,7 @@ export interface HaulActionPayload {
 export function syncHaulDispatch(state: GameState): void {
   const coveredFragmentIds = new Set<number>();
   for (const action of state.pendingActions) {
-    if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') continue;
+    if (!isAutoDebrisAction(action.type)) continue;
     const fragmentId = action.payload['fragmentId'];
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
@@ -195,7 +195,6 @@ export function haulActionCarriesOre(
 }
 
 /** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */
-export function isAutoDebrisAction(_type: ActionType): boolean {
-  // TODO: implement
-  return false;
+export function isAutoDebrisAction(type: ActionType): boolean {
+  return type === 'haul_debris' || type === 'fragment_debris';
 }

@@ -66,13 +66,13 @@ const MAX_LOG = 100;
 /** Auto-dismiss delay, matching the design's toast motion spec. */
 const TOAST_LIFETIME_MS = 6500;
 
-export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders' | 'traffic';
+export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders' | 'traffic' | 'debris';
 
 export interface AlertPip {
   readonly kind: AlertKind;
   readonly icon: IconName;
   readonly label: string;
-  readonly tone: 'warn' | 'critical';
+  readonly tone: 'neutral' | 'warn' | 'critical';
   readonly tip: string;
 }
 
@@ -182,9 +182,13 @@ export class NotificationCenter {
     // the contract-expiry pattern just above: warn once per (action,
     // reason) pair, re-toast only if the reason itself changes, and forget
     // ids that are no longer blocked.
-    const blockedActions = state.pendingActions.filter(
+    // Stranded debris (#1302) is a player-owned state, not a failure: no toast,
+    // no log entry, just one neutral summary pip.
+    const queuedBlocked = state.pendingActions.filter(
       a => a.status === 'queued' && a.blockedReason != null,
     );
+    const strandedCount = queuedBlocked.filter(a => a.blockedReason === 'debris_out_of_reach').length;
+    const blockedActions = queuedBlocked.filter(a => a.blockedReason !== 'debris_out_of_reach');
     for (const action of blockedActions) {
       const reason = action.blockedReason as BlockedOrderReason;
       if (this.warnedBlockedOrders.get(action.id) === reason) continue;
@@ -198,6 +202,15 @@ export class NotificationCenter {
     }
     if (this.warnedBlockedOrders.size > 0) {
       this.pruneStaleKeys(this.warnedBlockedOrders, new Set(blockedActions.map(a => a.id)));
+    }
+    if (strandedCount > 0) {
+      pips.push({
+        kind: 'debris',
+        icon: 'clock',
+        label: t('notification.pip.stranded_debris_label', { count: strandedCount }),
+        tone: 'neutral',
+        tip: t('notification.pip.stranded_debris_tip', { count: strandedCount }),
+      });
     }
     if (blockedActions.length > 0) {
       pips.push({
@@ -238,6 +251,8 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
         : t('notification.order_blocked_no_staff', { order });
     case 'target_unreachable':
       return t('notification.order_blocked_target_unreachable', { order });
+    case 'debris_out_of_reach':
+      return t('notification.pip.stranded_debris_tip', { count: 1 });
     default:
       return order;
   }
