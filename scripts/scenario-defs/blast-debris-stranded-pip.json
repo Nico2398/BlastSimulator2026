@@ -534,11 +534,14 @@
     },
     {
       "command": "tick 30",
-      "description": "Observe: hauler and driver ready but the pocket is cut off, so the topbar shows the neutral OUT OF REACH pip, no per-piece warn toasts.",
+      "description": "Capture the pip screenshot for visual inspection: hauler and driver are ready but the pocket is cut off, so the topbar should show the neutral OUT OF REACH pip and no per-piece warn toasts. The expect asserts only that wages ran (cash decreased).",
       "interaction": [
         {
           "type": "command",
           "command": "tick 30"
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup",

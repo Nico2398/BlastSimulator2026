@@ -1353,7 +1353,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('debris_out_of_reach');
   });
 
-  it('never throws and never flags target_unreachable when there is no active freight_warehouse yet (early game)', () => {
+  it('never throws and stamps neither target_unreachable nor debris_out_of_reach when there is no active freight_warehouse yet (early game)', () => {
     const state = makeStateWithPocket(false);
     // No depot, no employees, no vehicles — the earliest possible game state
     // with a queued debris order already sitting in the pocket.
@@ -1365,7 +1365,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('debris_out_of_reach');
   });
 
-  it('never throws and never flags target_unreachable when state.navGrid is null', () => {
+  it('never throws and stamps neither target_unreachable nor debris_out_of_reach when state.navGrid is null', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = null;
     const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);

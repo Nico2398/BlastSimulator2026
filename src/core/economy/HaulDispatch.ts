@@ -150,7 +150,7 @@ export function isHaulOrFragmentActionClaimable(
   action: PendingAction,
   lookup?: FragmentLookup,
 ): boolean {
-  if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return true;
+  if (!isAutoDebrisAction(action.type)) return true;
 
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked) return false;
@@ -186,7 +186,7 @@ export function haulActionCarriesOre(
   action: PendingAction,
   lookup?: FragmentLookup,
 ): boolean {
-  if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return false;
+  if (!isAutoDebrisAction(action.type)) return false;
 
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked) return false;

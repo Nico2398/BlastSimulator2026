@@ -252,6 +252,7 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
     case 'target_unreachable':
       return t('notification.order_blocked_target_unreachable', { order });
     case 'debris_out_of_reach':
+      // Unreachable from update(): stranded debris is surfaced as one summary pip, not a per-order toast. Kept for exhaustiveness.
       return t('notification.pip.stranded_debris_tip', { count: 1 });
     default:
       return order;

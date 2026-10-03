@@ -1,6 +1,6 @@
 {
   "name": "blast-debris-stranded-ramp",
-  "description": "Stranded debris is a normal, player-owned outcome (#1302): a single-hole blast on tutorial_pit leaves debris in a pocket the ground crew cannot reach; fragments stay where physics put them and no per-piece blocked-order warning is raised. The player builds a ramp into the pocket and the debris is hauled with no further order.",
+  "description": "Stranded debris is a normal, player-owned outcome (#1302): a single-hole blast on tutorial_pit leaves debris in a pocket the ground crew cannot reach; fragments stay where physics put them and no per-piece blocked-order warning is raised. The player builds a ramp into the pocket, which becomes reachable, and with a haul crew in place hauling of the pocket's debris begins with no further order (storedMassKg grows). Clearing the whole pocket is not asserted.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit cash:2000000",
@@ -450,8 +450,8 @@
       }
     },
     {
-      "command": "build_ramp start:27,10 end:17,10 depth:5",
-      "description": "The player connects the stranded pocket: a 10 m ramp from (27,10) down to the crater at (17,10), depth 5 (within the slope limit). Ordering only queues dig_ramp_segment work; the crewed rock digger carves it. Geometry traced in the blast-debris-reachability integration test.",
+      "command": "build_ramp start:27,9 end:17,9 depth:5",
+      "description": "The player connects the stranded pocket: a 10 m ramp from (27,9) down to the crater at (17,9), depth 5 (within the slope limit). Ordering only queues dig_ramp_segment work; the crewed rock digger carves it. Geometry traced in the blast-debris-reachability integration test.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -473,16 +473,16 @@
         {
           "type": "focusTile",
           "x": 22,
-          "z": 10,
+          "z": 9,
           "distance": 30,
           "pitch": 75
         },
         {
           "type": "dragTiles",
           "x1": 27,
-          "z1": 10,
+          "z1": 9,
           "x2": 17,
-          "z2": 10
+          "z2": 9
         },
         {
           "type": "screenshot"

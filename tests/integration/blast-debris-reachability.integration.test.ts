@@ -14,7 +14,7 @@
 // climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's
 // approach cell, while most of the map stays reachable. The SAME site with
 // amount:1 leaves nothing disconnected (non-regression guard). A ramp
-// `start:27,10 end:17,10 depth:5`, carved by a crewed rock_digger, connects the
+// `start:27,9 end:17,9 depth:5`, carved by a crewed rock_digger, connects the
 // pocket.
 //
 // Drives the real console command layer (createRunner): no DOM, no Three.js.
@@ -188,7 +188,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
   );
 
   it(
-    'hauls the stranded debris with no further order once a ramp connects the pocket, and the debris_out_of_reach stamp clears',
+    'starts hauling stranded debris once a ramp connects the pocket, and the debris_out_of_reach stamp clears',
     () => {
       // Generous cash: wages over the long wait for the plateau must not starve the ramp order.
       const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
