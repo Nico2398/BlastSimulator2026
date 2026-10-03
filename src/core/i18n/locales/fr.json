@@ -1329,7 +1329,7 @@
   "event.traffic_jam.res0": "Tout le monde dans le nœud est redirigé vers un autre endroit. Aucun coût, et la circulation reprend en quelques minutes.",
   "event.traffic_jam.res1": "La rampe est commandée plus large pour éviter de futurs embouteillages. Coûteux, et ça règle le goulot d'étranglement pour de bon une fois creusée.",
   "event.traffic_jam.res2": "L'embouteillage est laissé à lui-même. Il finit par se résorber, au prix d'un après-midi très long et très klaxonné.",
-  "event.traffic_jam.res1_alt": "La rampe ne peut pas être élargie maintenant : elle est déjà au maximum, déjà en cours d'élargissement, ou impossible à creuser. Rien n'est dépensé, et l'embouteillage reste.",
+  "event.traffic_jam.res1_alt": "La rampe ne peut pas être élargie maintenant : elle est déjà au maximum, déjà en cours d'élargissement, impossible à creuser, ou trop chère pour la mine. Rien n'est dépensé, et l'embouteillage reste.",
   "event.traffic_jam.title": "Embouteillage",
   "event.tutorial_synergy_consultant.desc": "Un homme en costume valant plus cher que toute votre exploitation clique sur une télécommande PowerPoint...",
   "event.tutorial_synergy_consultant.opt0": "Engagé ! (Coût : 3 000 $)",

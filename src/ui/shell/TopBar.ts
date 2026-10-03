@@ -49,6 +49,8 @@ const ALERT_ROUTE: Partial<Record<AlertPip['kind'], PanelName>> = {
   crew: 'employees',
   fleet: 'vehicles',
   orders: 'ops',
+  // The Fleet panel carries the traffic advisory banner (#1208).
+  traffic: 'vehicles',
 };
 
 /**

@@ -1,6 +1,6 @@
 {
   "name": "traffic-jam-ramp-head",
-  "description": "#1208: traffic jams are detected by position at chokepoints, not by shared destination. Dig a ramp, crew four vehicles and send them to one tile in its body; once they stall a queue raises the traffic_jam event (trafficJamCount 1, kind ramp_head, rampId 1), and the player answers it by clicking Widen ramp in the event dialog, which orders the widening exactly once. Contract for console-api state (implementer adds): trafficJamCount, trafficJams [{kind, rampId}]. Known gap: walkers dispatched to one tile stack without blocking, so the foot-only and mixed queues are unit-tested only.",
+  "description": "#1208: traffic jams are detected by position at chokepoints, not by shared destination. Dig a ramp, send a crew member on foot to one tile in its body, then send four crewed vehicles to the same tile; once they stall a queue raises the traffic_jam event (trafficJamCount 1, kind ramp_head, rampId 1), and the player answers it by clicking Widen ramp in the event dialog, which orders the widening exactly once. Contract for console-api state (implementer adds): trafficJamCount, trafficJams [{kind, rampId}]. A queue of walkers alone raises the event too; that case is unit-tested (TrafficJams.test.ts), because a walker may step past a vehicle (#1263), so a crew sent after the haulers squeezes by rather than queuing.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -21,7 +21,7 @@
     },
     {
       "command": "vehicle driver 3 4",
-      "description": "Staffed vehicles come unmanned (#551) \u2014 crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
+      "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, one of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants, before ordering any excavation work. Mirrors ramp-navigation.json's own crewing step.",
       "interaction": [
         {
           "type": "command",
@@ -32,7 +32,7 @@
     },
     {
       "command": "build_ramp start:15,15 end:20,25 depth:5",
-      "description": "Same geometry as ramp-navigation.json: a 10m, RAMP_WIDTH=3-wide corridor running south from (15,15). depth:5 keeps every per-column step within NAV_MAX_SLOPE_RATIO and RAMP_CUT_SLOPE_RATIO (#1151/#1152) \u2014 see that file's own note for the full derivation. Ordering only queues dig_ramp_segment work; the crewed rock_digger below carves it over the following ticks.",
+      "description": "Same geometry as ramp-navigation.json: a 10m, RAMP_WIDTH=3-wide corridor running south from (15,15). depth:5 keeps every per-column step within NAV_MAX_SLOPE_RATIO and RAMP_CUT_SLOPE_RATIO (#1151/#1152) — see that file's own note for the full derivation. Ordering only queues dig_ramp_segment work; the crewed rock_digger below carves it over the following ticks.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -74,7 +74,7 @@
     {
       "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:400",
       "timeout": 95,
-      "description": "Drain every queued dig_ramp_segment layer \u2014 the crewed rock_digger (vehicle #3, driver #4) clears one bench at a time until the whole corridor is carved end to end and walkable.",
+      "description": "Drain every queued dig_ramp_segment layer — the crewed rock_digger (vehicle #3, driver #4) clears one bench at a time until the whole corridor is carved end to end and walkable.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -146,6 +146,17 @@
       "commandOutcome": "either"
     },
     {
+      "command": "employee dispatch 2 x:15 z:16",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:15 z:16"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Stage blaster #2, the one crew member on foot, at the ramp head beside the vehicles, so it reaches the convergence tile ahead of them."
+    },
+    {
       "command": "vehicle reposition 1 14 17",
       "interaction": [
         {
@@ -209,6 +220,39 @@
       "commandOutcome": "either"
     },
     {
+      "command": "employee dispatch 2 x:15 z:24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:15 z:24"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "The crew member walks down the ramp first and takes the convergence tile; the haulers sent next queue behind it."
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "description": "Let the crew member reach the tile before the vehicles set off."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "A spontaneous random event can fire during the preceding tick batch; a pending event halts ticking in the browser (isPaused), so the staging and the jam wait below would never advance. Resolved through the dialog's own buttons when one is pending; a no-op otherwise.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "vehicle reposition 1 15 24",
       "interaction": [
         {
@@ -217,7 +261,7 @@
         }
       ],
       "role": "bootstrap",
-      "description": "Convergence: all four vehicles sent together to one ramp-body tile; one takes it, the rest queue single-file behind it.  Vehicles (not walkers) form the queue because walkers dispatched to one tile stack without blocking (peak wait 2); foot-only queues are unit-tested (TrafficJams.test.ts). The jam needs TRAFFIC_JAM_MIN_TICKS < AGENT_OCCUPANCY_WAIT_TICKS, otherwise the occupancy ladder spreads the queue before three agents have waited long enough."
+      "description": "Convergence: all four vehicles sent together to the ramp-body tile the crew member already holds; they queue single-file behind it. The jam needs TRAFFIC_JAM_MIN_TICKS < AGENT_OCCUPANCY_WAIT_TICKS, otherwise the occupancy ladder spreads the queue before three agents have waited long enough."
     },
     {
       "command": "vehicle reposition 2 15 24",

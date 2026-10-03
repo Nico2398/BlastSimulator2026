@@ -251,7 +251,7 @@ Handlers are keyed by the option's `effectTag`; `resolveEvent` runs one when giv
 | Option | Effect | Silence (ticks) |
 |--------|--------|-----------------|
 | `reroute_vehicles` | every jam agent: `vehicleWaitingTicks = 0`, `isMoveStuck = false`, destination re-spread by `respreadLegDestination` (Locomotion.ts). No cost | `TRAFFIC_JAM_REROUTE_SILENCE_TICKS` (100) |
-| `widen_ramp` | orders the jam's ramp one width wider via `orderRampWiden`, which charges its own cost once (the handler reports `cashChange` 0). Ramp gone, widest, already being widened or no grid: no charge, result text `res1_alt` | `TRAFFIC_JAM_WIDEN_SILENCE_TICKS` (1000) |
+| `widen_ramp` | orders the jam's ramp one width wider via `orderRampWiden`, which charges its own cost once (the handler reports `cashChange` 0). Only widens within ground the site already owns (claiming new ground is the console's job). Ramp gone, widest, already being widened, off-site, unaffordable or no grid: no charge, result text `res1_alt`, and the reroute silence so the event does not re-fire next tick | `TRAFFIC_JAM_WIDEN_SILENCE_TICKS` (1000); reroute's on failure |
 | `ignore_jam` | well-being `-TRAFFIC_JAM_IGNORE_WELLBEING_PENALTY` (5) | `TRAFFIC_JAM_IGNORE_SILENCE_TICKS` (400) |
 
 Silencing only mutes the event; the banner, pip and markers keep showing a jam that persists.

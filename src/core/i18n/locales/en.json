@@ -1329,7 +1329,7 @@
   "event.traffic_jam.res0": "Everyone in the knot is re-routed to a different spot. No cost, and traffic starts moving again within minutes.",
   "event.traffic_jam.res1": "The ramp is ordered wider to prevent future jams. Expensive, and it fixes the bottleneck for good once dug.",
   "event.traffic_jam.res2": "The jam is left to sort itself out. Eventually it does, at the cost of a very long, very honked afternoon.",
-  "event.traffic_jam.res1_alt": "The ramp cannot be widened right now: it is already the widest, is being widened, or cannot be dug. Nothing is spent, and the jam stays.",
+  "event.traffic_jam.res1_alt": "The ramp cannot be widened right now: it is already the widest, is already being widened, cannot be dug, or the mine cannot afford it. Nothing is spent, and the jam stays.",
   "event.traffic_jam.title": "Traffic Jam",
   "event.tutorial_synergy_consultant.desc": "A man in a suit that costs more than your entire operation clicks a PowerPoint remote...",
   "event.tutorial_synergy_consultant.opt0": "You're hired! (Cost: $3,000)",
