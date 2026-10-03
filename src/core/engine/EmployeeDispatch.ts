@@ -23,6 +23,7 @@ import { getVehicleReservation } from '../entities/Vehicle.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import type { ReachableSet } from '../nav/NavGridReachability.js';
 import { findHaulDepotApproach } from '../economy/HaulingTask.js';
+import { isAutoDebrisAction } from '../economy/HaulDispatch.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
 /**
@@ -121,7 +122,10 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
       reachableTargets !== null && action.type !== 'dig_ramp_segment'
       && !reachableTargets.has(action.targetX, action.targetZ)
     ) {
-      action.blockedReason = 'target_unreachable';
+      // Auto-generated debris work outside the reachable set is a normal,
+      // player-owned state (#1302), not a failed order: it waits silently and
+      // resumes once the player connects it. Player orders keep the warning.
+      action.blockedReason = isAutoDebrisAction(action.type) ? 'debris_out_of_reach' : 'target_unreachable';
       continue;
     }
     // Shared shape between the vehicle-gated and plain branches below: an
@@ -274,11 +278,13 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 }
 
 /**
- * `target_unreachable` blockedReason classification support (#1231): a
+ * blockedReason reachability classification support (#1231): a
  * PendingAction whose target cell sits outside the ground crew's reachable
- * region (behind #1197's diagonal-corner cut) never makes progress, and
- * nothing else flags it. Anchors NavGrid.computeClimbReachableSet at the
- * nearest active freight_warehouse's approach cell (findHaulDepotApproach,
+ * region (behind #1197's diagonal-corner cut) makes no progress until the
+ * player connects it. A player order there is stamped `target_unreachable`;
+ * auto-generated haul/fragment debris is stamped `debris_out_of_reach` —
+ * stranded debris is a normal, player-owned state (#1302), not a defect.
+ * Anchors NavGrid.computeClimbReachableSet at the nearest active freight_warehouse's approach cell (findHaulDepotApproach,
  * HaulingTask.ts) — the reference point passed in is a neutral grid origin,
  * not any one employee's position, since this reflects what ground crew as a
  * whole can reach, not one individual's route. Returns a *reachable*-set —

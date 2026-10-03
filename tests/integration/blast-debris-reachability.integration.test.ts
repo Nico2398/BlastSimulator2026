@@ -1,56 +1,23 @@
-// BlastSimulator2026 — Integration: a blast can leave debris (or any resource
-// an employee is expected to walk to) sitting in a NavGrid region
-// topologically disconnected from where ground crew operate, with no
-// observable signal — issue #1231.
+// BlastSimulator2026 — Integration: a blast can leave debris sitting in a
+// NavGrid region topologically disconnected from where ground crew operate.
+// That is a LEGITIMATE, player-owned outcome (#1302, reversing the premise of
+// #1231): debris is physically simulated and goes where it goes. Fragments are
+// never moved, rejected or adjusted for reachability. The auto-generated
+// haul_debris / fragment_debris work waits silently, stamped
+// 'debris_out_of_reach' (never 'target_unreachable', which stays reserved for
+// work the player explicitly ordered), and resumes on its own once the player
+// connects the pocket (here: a ramp).
 //
-// Reproduction history: the first version of this file replayed the EXACT
-// original tutorial_pit blast plan scripts/scenario-defs/economy-full-loop.json
-// used before PR #1233 relocated it (`drill_plan grid rows:2 cols:2 spacing:3
-// depth:6 start:10,10 diameter:0.089`, recovered from `git show a8d371f2 --
-// scripts/scenario-defs/economy-full-loop.json`). A direct-traced empirical
-// check of that geometry (standalone repro harness driving createRunner
-// through this exact command sequence, then NavGrid.computeClimbReachableSet
-// from the real post-depot approach cell) showed it does NOT match the
-// premise the original test asserted: the debris field splits, with the
-// majority of debris actions (162 of 219) climb-disconnected from the depot
-// and a genuine minority (57) reachable and hauled — not the "every action at
-// this site is unreachable" shape the original test's first case claimed, and
-// not the "nothing here is ever unreachable" shape its (14,6) non-regression
-// case claimed either (that site showed the same kind of split, 103
-// unreachable of 187, when checked the same way). Neither of those two shapes
-// is what issue #1231 itself describes — a "closed pocket of size 6",
-// i.e. a SMALL disconnected component, not most of a crater. That specific
-// numeric fixture also turns out to belong to a different, larger level than
-// tutorial_pit (the PR's own commit message cites reachable-set sizes of 1508
-// and 3043 cells — impossible on tutorial_pit's 32x32=1024-cell grid), so
-// replaying it here was always an approximation, not a literal repro.
+// Fixture (empirically traced on tutorial_pit): a single-hole blast at (18,10)
+// (rows:1 cols:1 spacing:3 depth:6 diameter:0.089) with charge amount:3
+// stemming:2 leaves exactly 3 NavGrid cells — (18,9), (19,10), (18,10) —
+// climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's
+// approach cell, while most of the map stays reachable. The SAME site with
+// amount:1 leaves nothing disconnected (non-regression guard). A ramp
+// `start:27,9 end:17,9 depth:5`, carved by a crewed rock_digger, connects the
+// pocket.
 //
-// This version instead constructs a minimal, independently-verified
-// synthetic reproduction on tutorial_pit: a single-hole blast (rows:1 cols:1,
-// far smaller than the four-hole grid above) at (18,10), spacing:3 depth:6
-// diameter:0.089. With charge amount:3 stemming:2, this blast's own debris
-// field leaves exactly 3 NavGrid cells — (18,9), (19,10), (18,10) — climb-
-// disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's
-// approach cell, while the depot's own reachable component stays large
-// (989 of the grid's 1024 cells, direct-traced) and the debris actions
-// targeting those 3 cells are a small minority (14 of 75) of this blast's own
-// debris actions — the "small pocket, most of the map still reachable" shape
-// #1231 actually describes. Confirmed permanent (not merely slow) by running
-// 1000+ extra ticks past the point storedMassKg plateaus: the pocket's own
-// action count and cell set never change, while every reachable action's
-// mass genuinely gets delivered (storedMassKg 0 -> 787.5 -> 1837.5 -> holds).
-// The SAME site with a smaller charge (amount:1 instead of amount:3,
-// otherwise identical) leaves 0 cells disconnected — direct-traced the same
-// way — and is this file's non-regression guard: a small blast at the exact
-// same coordinates whose entire debris field is reachable and gets hauled,
-// proving the classifier doesn't over-flag a genuinely-connected site.
-//
-// Drives the real console command layer (createRunner), exactly the way
-// tests/integration/collapse-vehicle-recovery.integration.test.ts and
-// tests/integration/blast-report-modal-save-load.integration.test.ts do —
-// no DOM, no Three.js, real ticks through the real tick pipeline (NavGrid is
-// patched synchronously off the `terrain:updated` event the blast emits,
-// NavGridSync.ts, so no extra rebuild delay is needed beyond ordinary ticks).
+// Drives the real console command layer (createRunner): no DOM, no Three.js.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
@@ -82,11 +49,11 @@ function isPocketCell(x: number, z: number): boolean {
  * then detonates it. Returns the runner/state plus a bound `run` so callers
  * can continue driving ticks afterward.
  */
-function drillChargeAndBlast(startX: number, startZ: number, amount: number): { run: (cmd: string) => unknown; state: GameState } {
+function drillChargeAndBlast(startX: number, startZ: number, amount: number, cash = 250000): { run: (cmd: string) => unknown; state: GameState } {
   const { runner, ctx } = createRunner();
   const run = (cmd: string) => runner.run(cmd);
 
-  expect(run('campaign start level:tutorial_pit cash:250000')).toMatchObject({ success: true });
+  expect(run(`campaign start level:tutorial_pit cash:${cash}`)).toMatchObject({ success: true });
   const state = ctx.state!;
 
   expect(run('employee hire role:driller')).toMatchObject({ success: true });
@@ -138,6 +105,8 @@ function crewHaulingAndBuildDepot(run: (cmd: string) => unknown, state: GameStat
   expect(run('build freight_warehouse at:1,8')).toMatchObject({ success: true });
   tickUntilFresh(run, state, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active), 400);
   expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active)).toBe(true);
+  // One tier-1 warehouse holds 2000 kg, less than this blast's reachable debris: without ample room the hauler stops on "storage full" and the queue never drains to just the pocket. Capacity is not what these tests probe.
+  state.logistics.storageCapacityKg = 1_000_000;
 }
 
 /** Every currently-queued debris action (haul_debris/fragment_debris) still sitting in pendingActions. */
@@ -145,81 +114,136 @@ function debrisActions(state: GameState): PendingAction[] {
   return state.pendingActions.filter(a => a.type === 'haul_debris' || a.type === 'fragment_debris');
 }
 
-describe('Blast debris left in an unreachable NavGrid pocket (#1231)', () => {
+/** Hires an excavator-licensed driver, buys a rock_digger and crews it, so a built ramp actually gets carved. */
+function crewRockDigger(run: (cmd: string) => unknown, state: GameState): void {
+  expect(run('employee hire role:driver')).toMatchObject({ success: true });
+  const diggerDriver = [...state.employees.employees].reverse().find(e => e.role === 'driver')!;
+  expect(run(`employee assign_skill ${diggerDriver.id} skill:driving.excavator level:5`)).toMatchObject({ success: true });
+  expect(run('vehicle buy rock_digger')).toMatchObject({ success: true });
+  const digger = state.vehicles.vehicles.find(v => v.type === 'rock_digger')!;
+  expect(run(`vehicle driver ${digger.id} ${diggerDriver.id}`)).toMatchObject({ success: true });
+}
+
+/** Ticks until every remaining debris action is parked out of reach (the reachable part of the blast is fully hauled). */
+function tickUntilOnlyStrandedDebrisRemains(run: (cmd: string) => unknown, state: GameState): void {
+  tickUntilFresh(run, state, () => {
+    const actions = debrisActions(state);
+    return actions.length > 0 && actions.every(a => a.blockedReason === 'debris_out_of_reach');
+  }, 1500);
+}
+
+describe('Blast debris left in an unreachable NavGrid pocket is a normal, player-owned state (#1302)', () => {
   it(
-    "flags only the debris actions targeting the verified 3-cell disconnected pocket with blockedReason 'target_unreachable' (never resolved), while the reachable majority of the same blast's debris genuinely gets hauled",
+    "stamps debris_out_of_reach (never target_unreachable) on exactly the pocket's debris, leaves it queued where physics put it, while the reachable majority is hauled",
     () => {
       const { run, state } = drillChargeAndBlast(18, 10, 3);
+      const placedAtBlast = new Map(state.logistics.fragments.map(f => [f.fragment.id, { ...f.fragment.position }]));
+      expect(placedAtBlast.size).toBeGreaterThan(0);
       crewHaulingAndBuildDepot(run, state);
 
-      // One more small, bounded round beyond the depot's own wait_until above
-      // — the NavGrid was already patched synchronously by the blast itself
-      // (NavGridSync's `terrain:updated` subscription), so this is only for
-      // tickEmployees' classification pass (EmployeeDispatch.ts) to run at
-      // least once against a depot that now actually exists. Direct-traced:
-      // no real hauling work has happened yet at this checkpoint (storedMassKg
-      // is still 0), so the classification below reflects the blast's own
-      // geometry, not partial progress.
       tickUntilFresh(run, state, () => false, 3);
       expect(state.logistics.storedMassKg).toBe(0);
 
-      const actionsRightAfterDepot = debrisActions(state);
-      expect(actionsRightAfterDepot.length).toBeGreaterThan(0);
-      const pocketActionsRightAfterDepot = actionsRightAfterDepot.filter(a => isPocketCell(a.targetX, a.targetZ));
-      const reachableActionsRightAfterDepot = actionsRightAfterDepot.filter(a => !isPocketCell(a.targetX, a.targetZ));
-      expect(pocketActionsRightAfterDepot.length).toBeGreaterThan(0);
-      expect(reachableActionsRightAfterDepot.length).toBeGreaterThan(0);
-      for (const action of pocketActionsRightAfterDepot) {
-        expect(action.blockedReason).toBe('target_unreachable');
+      const early = debrisActions(state);
+      const pocketEarly = early.filter(a => isPocketCell(a.targetX, a.targetZ));
+      const reachableEarly = early.filter(a => !isPocketCell(a.targetX, a.targetZ));
+      expect(pocketEarly.length).toBeGreaterThan(0);
+      expect(reachableEarly.length).toBeGreaterThan(0);
+      for (const action of pocketEarly) {
+        expect(action.blockedReason).toBe('debris_out_of_reach');
         expect(action.status).toBe('queued');
       }
-      for (const action of reachableActionsRightAfterDepot) {
-        expect(action.blockedReason).not.toBe('target_unreachable');
-      }
+      for (const action of reachableEarly) expect(action.blockedReason ?? null).toBeNull();
+      // 'target_unreachable' is reserved for player-ordered work (#1302).
+      expect(early.some(a => a.blockedReason === 'target_unreachable')).toBe(false);
 
-      // Reachable debris genuinely gets hauled — direct-traced to reach
-      // storedMassKg > 0 well within 400 ticks of this exact setup.
-      tickUntilFresh(run, state, () => state.logistics.storedMassKg > 0, 400);
+      // The reachable majority genuinely gets hauled; what remains is only the pocket.
+      tickUntilOnlyStrandedDebrisRemains(run, state);
       expect(state.logistics.storedMassKg).toBeGreaterThan(0);
-
-      // Prove the pocket never resolves — no employee is ever wrongly
-      // dispatched to an unreachable target (already true today via
-      // ActionSelection.ts's own per-employee reachability screen; only the
-      // blockedReason assertion is new). Bounded, not thousands of ticks —
-      // direct-traced to still hold 1000+ ticks past this point.
-      tickUntilFresh(run, state, () => false, 300);
-
-      const finalActions = debrisActions(state);
-      const pocketActionsFinal = finalActions.filter(a => isPocketCell(a.targetX, a.targetZ));
-      expect(pocketActionsFinal.length).toBeGreaterThan(0);
-      for (const action of pocketActionsFinal) {
+      const remaining = debrisActions(state);
+      expect(remaining.length).toBeGreaterThan(0);
+      for (const action of remaining) {
+        expect(isPocketCell(action.targetX, action.targetZ)).toBe(true);
+        expect(action.blockedReason).toBe('debris_out_of_reach');
         expect(action.status).toBe('queued');
-        expect(action.blockedReason).toBe('target_unreachable');
+      }
+      expect(state.pendingActions.some(a => a.blockedReason === 'target_unreachable')).toBe(false);
+
+      // Stranded fragments are left exactly where the blast physics put them.
+      const strandedStillOnGround = state.logistics.fragments.filter(f => f.state === 'on_ground' && placedAtBlast.has(f.fragment.id));
+      expect(strandedStillOnGround.length).toBeGreaterThan(0);
+      for (const tracked of strandedStillOnGround) {
+        expect(tracked.fragment.position).toEqual(placedAtBlast.get(tracked.fragment.id));
+      }
+
+      // Waiting longer changes nothing: no hauling, no new stamp, no escalation.
+      const storedBefore = state.logistics.storedMassKg;
+      tickUntilFresh(run, state, () => false, 200);
+      expect(state.logistics.storedMassKg).toBe(storedBefore);
+      for (const action of debrisActions(state)) {
+        expect(action.blockedReason).toBe('debris_out_of_reach');
       }
     },
+    120000,
   );
 
   it(
-    'does NOT flag target_unreachable on the SAME (18,10) site with a smaller charge (amount:1) whose entire debris field the direct trace confirmed fully reachable (non-regression)',
+    'starts hauling stranded debris once a ramp connects the pocket, and the debris_out_of_reach stamp clears',
+    () => {
+      // Generous cash: wages over the long wait for the plateau must not starve the ramp order.
+      const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
+      crewHaulingAndBuildDepot(run, state);
+      crewRockDigger(run, state); // crewed up front; it has no work until the ramp is ordered
+      tickUntilOnlyStrandedDebrisRemains(run, state);
+
+      const strandedCount = debrisActions(state).length;
+      expect(strandedCount).toBeGreaterThan(0);
+      const strandedFragmentIds = debrisActions(state).map(a => a.payload['fragmentId'] as number);
+
+      const storedBeforeRamp = state.logistics.storedMassKg;
+      expect(run('build_ramp start:27,9 end:17,9 depth:5')).toMatchObject({ success: true });
+      tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 800);
+      expect(state.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
+
+      // No extra player action: the stamp clears on its own and the crew resumes the work.
+      tickUntilFresh(run, state, () => debrisActions(state).every(a => a.blockedReason === null || a.blockedReason === undefined), 50);
+      expect(debrisActions(state).filter(a => a.blockedReason === 'debris_out_of_reach')).toHaveLength(0);
+      expect(state.pendingActions.some(a => a.blockedReason === 'target_unreachable')).toBe(false);
+      // Resumed: some of the once-stranded pieces are claimed by the crew (or already gone), not left idle in the queue.
+      // (Clearing the whole pocket is not asserted: the debris itself occupies the pocket's one-lane cells, so the
+      // order in which a lone hauler can reach each piece is a path-planning concern outside #1302.)
+      const strandedIds = new Set(strandedFragmentIds);
+      const strandedActions = (): PendingAction[] => debrisActions(state).filter(a => strandedIds.has(a.payload['fragmentId'] as number));
+      // Hauling resumes with no further order: a once-stranded piece is actually picked up and stored.
+      tickUntilFresh(run, state, () => strandedActions().length < strandedCount && state.logistics.storedMassKg > storedBeforeRamp, 1500);
+      expect(strandedActions().length).toBeLessThan(strandedCount);
+      expect(state.logistics.storedMassKg).toBeGreaterThan(storedBeforeRamp);
+      // (Clearing every piece is not asserted: debris fills the pocket's one-lane cells, so a claimed piece can sit
+      // behind another one -- an engine path-planning concern outside #1302.)
+    },
+    240000,
+  );
+
+  it(
+    'stamps nothing on the SAME (18,10) site with a smaller charge (amount:1) whose entire debris field is reachable (non-regression)',
     () => {
       const { run, state } = drillChargeAndBlast(18, 10, 1);
       crewHaulingAndBuildDepot(run, state);
 
       tickUntilFresh(run, state, () => false, 3);
 
-      const actionsRightAfterDepot = debrisActions(state);
-      expect(actionsRightAfterDepot.length).toBeGreaterThan(0);
-      for (const action of actionsRightAfterDepot) {
+      const actions = debrisActions(state);
+      expect(actions.length).toBeGreaterThan(0);
+      for (const action of actions) {
         expect(action.blockedReason).not.toBe('target_unreachable');
+        expect(action.blockedReason).not.toBe('debris_out_of_reach');
       }
 
-      // Hauling should actually make progress here — the direct trace of
-      // this exact setup reaches storedMassKg > 0 well within 400 ticks.
       tickUntilFresh(run, state, () => state.logistics.storedMassKg > 0, 400);
       expect(state.logistics.storedMassKg).toBeGreaterThan(0);
 
       for (const action of debrisActions(state)) {
-        expect(action.blockedReason).not.toBe('target_unreachable');
+        expect(action.blockedReason).not.toBe('debris_out_of_reach');
       }
     },
   );
