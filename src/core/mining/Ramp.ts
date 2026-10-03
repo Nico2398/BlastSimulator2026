@@ -397,7 +397,7 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
   // (`floorRowY`) that carve time can identify as "this column is now done".
   //
   // (#1152) `floorY` descends at a constant, continuous rise-per-metre-of-run
-  // from the ramp's own origin surface elevation (`rawSurfaceY[0]`), not from
+  // from the ramp's own origin surface elevation (`originSurfaceY`), not from
   // each column's own local surface — a per-column floor read follows local
   // terrain noise into a non-monotonic, jagged line, steeper than
   // NAV_MAX_SLOPE_RATIO between two adjacent columns even though the ramp's
@@ -408,42 +408,42 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
   // per-column smoothing is needed here anymore. `ceilingY` (headroom) keeps
   // reading each column's own raw local surface height — clearance above the
   // floor must track actual local terrain, only the floor is a straight line.
+  // (#1298 review) One column per footprint cell, not per step: on ground
+  // that slopes across the ramp, the cells beside the axis sit higher or
+  // lower than it, so each needs its own headroom (`ceilingY`) and its own
+  // cut-or-fill decision against the step's shared straight `floorY`. The
+  // floor line itself is anchored on the axis column's step-0 surface — for a
+  // widen order that column is already carved, but at step 0 the depth is 0,
+  // so its surface is still the original ground the ramp was cut from.
   const columns: RampColumn[] = [];
   let globalMinY = Infinity;
   let globalMaxY = -Infinity;
 
-  const rawSurfaceY: number[] = [];
-  for (let step = 0; step < ramp.length; step++) {
-    // A widen order reads the first still-pristine strip column: the axis
-    // column is already carved, so its surface is the old floor, not terrain.
-    const probe = carvedHalf + 1;
-    const cx = ramp.originX + offset.dx * step + (carvedHalf >= 0 ? perpDx * probe : 0);
-    const cz = ramp.originZ + offset.dz * step + (carvedHalf >= 0 ? perpDz * probe : 0);
-    rawSurfaceY.push(computeColumnSurfaceY(grid, cx, cz));
-  }
-  const originSurfaceY = rawSurfaceY[0]!;
+  const originSurfaceY = computeColumnSurfaceY(grid, ramp.originX, ramp.originZ);
 
   for (let step = 0; step < ramp.length; step++) {
     const currentDepth = computeRampColumnDepth(step, ramp.length, ramp.targetDepth);
-    const cx = ramp.originX + offset.dx * step;
-    const cz = ramp.originZ + offset.dz * step;
-
-    const surfaceY = rawSurfaceY[step]!;
-
     const floorY = originSurfaceY - currentDepth;
-    // Math.max(surfaceY, floorY): a column whose terrain dips below the
-    // straight floor line still needs ceilingY above floorY, or the dip's
-    // fill row (at/above floorY) falls outside [floorY, ceilingY) and Pass 2
-    // silently skips it (#1172). Existing (non-dip) columns always have
-    // surfaceY >= floorY, so this is a no-op there.
-    const ceilingY = Math.max(surfaceY, floorY) + clearanceHeight;
     // Always in (0, 1] — see RampSegmentDef.cells' floorAdjustment doc.
     const floorAdjustment = 1 - (currentDepth - Math.floor(currentDepth));
-    const isFillColumn = surfaceY < floorY - RAMP_FILL_EPSILON;
 
-    columns.push({ cx, cz, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn });
-    globalMinY = Math.min(globalMinY, floorY);
-    globalMaxY = Math.max(globalMaxY, ceilingY - 1);
+    for (let w = -halfWidth; w <= halfWidth; w++) {
+      if (Math.abs(w) <= carvedHalf) continue;
+      const cx = ramp.originX + offset.dx * step + perpDx * w;
+      const cz = ramp.originZ + offset.dz * step + perpDz * w;
+      const surfaceY = computeColumnSurfaceY(grid, cx, cz);
+      // Math.max(surfaceY, floorY): a column whose terrain dips below the
+      // straight floor line still needs ceilingY above floorY, or the dip's
+      // fill row (at/above floorY) falls outside [floorY, ceilingY) and Pass 2
+      // silently skips it (#1172). Existing (non-dip) columns always have
+      // surfaceY >= floorY, so this is a no-op there.
+      const ceilingY = Math.max(surfaceY, floorY) + clearanceHeight;
+      const isFillColumn = surfaceY < floorY - RAMP_FILL_EPSILON;
+
+      columns.push({ cx, cz, floorY, ceilingY, floorRowY: Math.ceil(floorY), floorAdjustment, isFillColumn });
+      globalMinY = Math.min(globalMinY, floorY);
+      globalMaxY = Math.max(globalMaxY, ceilingY - 1);
+    }
   }
 
   // Pass 2 — one segment per y, top (globalMaxY) to bottom (globalMinY).
@@ -461,28 +461,25 @@ export function defineRampSegments(grid: VoxelGrid, ramp: RampDef, alreadyCarved
       bandMinZ = Math.min(bandMinZ, col.cz); bandMaxZ = Math.max(bandMaxZ, col.cz);
       const isFloorRow = y === col.floorRowY;
 
-      for (let w = -halfWidth; w <= halfWidth; w++) {
-        if (Math.abs(w) <= carvedHalf) continue;
-        const wx = col.cx + perpDx * w;
-        const wz = col.cz + perpDz * w;
+      const wx = col.cx;
+      const wz = col.cz;
 
-        let cell: RampSegmentDef['cells'][number] | undefined;
-        if (col.isFillColumn && isFloorRow) {
-          // Fill column, floor row: nothing solid to gate on by definition
-          // (this column's terrain dips below the straight floor line), so
-          // bypass the density gate entirely and push a fillTarget cell
-          // instead of the cut/floorAdjustment cell below (#1172).
-          if (grid.containsColumn(wx, wz)) cell = { x: wx, y, z: wz, fillTarget: col.floorY };
-        } else if (grid.densityAt(wx, y, wz) > 0) {
-          cell = isFloorRow ? { x: wx, y, z: wz, floorAdjustment: col.floorAdjustment } : { x: wx, y, z: wz };
-        }
-
-        if (!cell) continue;
-        cells.push(cell);
-        minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
-        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-        minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
+      let cell: RampSegmentDef['cells'][number] | undefined;
+      if (col.isFillColumn && isFloorRow) {
+        // Fill column, floor row: nothing solid to gate on by definition
+        // (this column's terrain dips below the straight floor line), so
+        // bypass the density gate entirely and push a fillTarget cell
+        // instead of the cut/floorAdjustment cell below (#1172).
+        if (grid.containsColumn(wx, wz)) cell = { x: wx, y, z: wz, fillTarget: col.floorY };
+      } else if (grid.densityAt(wx, y, wz) > 0) {
+        cell = isFloorRow ? { x: wx, y, z: wz, floorAdjustment: col.floorAdjustment } : { x: wx, y, z: wz };
       }
+
+      if (!cell) continue;
+      cells.push(cell);
+      minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+      minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
     }
 
     // No column contributes at this y — a true gap between disjoint

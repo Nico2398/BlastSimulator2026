@@ -189,6 +189,26 @@ describe('traffic_jam — widen_ramp (option 1)', () => {
     expect(result!.resultKey.endsWith('_alt')).toBe(true);
   });
 
+  it('refuses a widen that would reach past the site\'s owned ground: no charge, no order, _alt result', () => {
+    const s = setup(3);
+    const ramp = s.state.builtRamps[0]!;
+    // Shifted to the grid's west edge: 3 wide fits (x 0..2), 5 wide needs x = -1.
+    ramp.def = { ...ramp.def, originX: 1 };
+    ramp.footprint = rampFootprint(ramp.def, 3);
+    const cash = s.state.cash;
+    const result = resolve(s, 1);
+    expect(s.state.cash).toBe(cash);
+    expect(s.state.plannedRamps).toHaveLength(0);
+    expect(result!.resultKey.endsWith('_alt')).toBe(true);
+  });
+
+  it('a failed widen still silences the chokepoint, so the event does not re-fire next tick', () => {
+    for (const s of [setup(7), setup(3, 1)]) {
+      resolve(s, 1);
+      expect(s.state.events.jamSilencedUntil[s.jam.key]).toBe(TICK + TRAFFIC_JAM_REROUTE_SILENCE_TICKS);
+    }
+  });
+
   it('a failed widen still clears the pending event', () => {
     const s = setup(7);
     resolve(s, 1);

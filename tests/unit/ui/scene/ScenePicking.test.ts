@@ -520,6 +520,16 @@ describe('pickScene — ramps (#1298)', () => {
     tm.dispose();
   });
 
+  it('keeps the ground tile under a ramp, so Move Here can target a ramp tile', () => {
+    const tm = makeSolidTerrain();
+    const camera = makeTopDownCamera(3.7, 2.2);
+    const renderer = withRamps(makeFakeRenderer({ terrainMeshes: tm.meshes }), (x, z) => (x === 3 && z === 2 ? 4 : null));
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 3, tileZ: 2 }));
+    tm.dispose();
+  });
+
   it('keeps plain terrain for a tile that is not on any ramp', () => {
     const tm = makeSolidTerrain();
     const camera = makeTopDownCamera(3.7, 2.2);

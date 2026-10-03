@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Unit tests: widening a built ramp (#1298)
 
 import { describe, it, expect } from 'vitest';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 import { createGame, type BuiltRamp, type GameState } from '../../../src/core/state/GameState.js';
-import { buildRamp, defineRampSegments, type RampDef } from '../../../src/core/mining/Ramp.js';
+import { buildRamp, carveRampSegment, defineRampSegments, type RampDef } from '../../../src/core/mining/Ramp.js';
 import {
   rampFootprint, findRampAtTile, nextRampWidth, validateWidenRamp, orderRampWiden,
 } from '../../../src/core/mining/RampWidening.js';
@@ -215,5 +215,44 @@ describe('orderRampWiden', () => {
     const r = orderRampWiden(state, grid, 1, 7);
     expect(r.success).toBe(false);
     expect(snapshot(state)).toEqual(before);
+  });
+});
+
+describe('ramp floor on cross-sloped ground', () => {
+  /** Ground rising one voxel per column across x (perpendicular to a south ramp). */
+  function makeCrossSlopedGrid(sizeX: number, sizeZ: number): VoxelGrid {
+    const grid = new VoxelGrid(sizeX, sizeZ);
+    for (let z = 0; z < sizeZ; z++)
+      for (let x = 0; x < sizeX; x++)
+        for (let y = 0; y <= 22 + (x - 10); y++)
+          grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
+    return grid;
+  }
+
+  /** Every footprint column at one step of a south ramp sits at the same floor height as the axis column. */
+  function expectLevelAcrossWidth(grid: VoxelGrid, def: RampDef, width: number): void {
+    const half = Math.floor(width / 2);
+    for (let step = 1; step < def.length; step++) {
+      const z = def.originZ + step;
+      const axis = computeVoxelColumnSurfaceY(grid, def.originX, z);
+      for (let w = -half; w <= half; w++) {
+        expect(computeVoxelColumnSurfaceY(grid, def.originX + w, z), `step ${step}, offset ${w}`).toBe(axis);
+      }
+    }
+  }
+
+  it('carves a 7-wide ramp level across its whole width', () => {
+    const grid = makeCrossSlopedGrid(30, 40);
+    const def: RampDef = { ...DEF, width: 7 };
+    expect(buildRamp(grid, def, 1e9).success).toBe(true);
+    expectLevelAcrossWidth(grid, def, 7);
+  });
+
+  it('carves the widened strips at the existing corridor floor, not the terrain beside it', () => {
+    const grid = makeCrossSlopedGrid(30, 40);
+    const def: RampDef = { ...DEF, width: 3 };
+    expect(buildRamp(grid, def, 1e9).success).toBe(true);
+    for (const seg of defineRampSegments(grid, { ...def, width: 7 }, 3)) carveRampSegment(grid, seg);
+    expectLevelAcrossWidth(grid, def, 7);
   });
 });

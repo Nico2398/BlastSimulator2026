@@ -5,7 +5,7 @@ import type { ScoreState } from '../scores/ScoreManager.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { TrafficJam } from './TrafficJams.js';
 import { respreadLegDestination } from '../engine/Locomotion.js';
-import { nextRampWidth, orderRampWiden } from '../mining/RampWidening.js';
+import { nextRampWidth, orderRampWiden, rampFootprint } from '../mining/RampWidening.js';
 import { clampScore } from '../scores/ScoreManager.js';
 import {
   TRAFFIC_JAM_IGNORE_SILENCE_TICKS,
@@ -52,16 +52,26 @@ const rerouteVehicles: JamEffectHandler = (jam, world, tick) => {
   return { ...UNCHANGED, effects: [], resultKeySuffix: '' };
 };
 
-/** Orders the ramp one width wider; orderRampWiden does the debit, so the cost is reported as cashSettled, not cashChange (the console mirror would double-debit). */
+/**
+ * Orders the ramp one width wider; orderRampWiden does the debit, so the cost is reported as cashSettled, not cashChange (the console mirror would double-debit).
+ * Only widens within ground the site already owns. A widen that cannot be ordered still silences the chokepoint for the reroute duration: the queue is still there, and
+ * without a cooldown the event re-fires on the very next tick and pauses the game again.
+ */
 const widenRamp: JamEffectHandler = (jam, world, tick) => {
   const { state, grid } = world;
+  const failed = (): JamEffectOutcome => {
+    silence(world, jam, tick, TRAFFIC_JAM_REROUTE_SILENCE_TICKS);
+    return { ...UNCHANGED, effects: [], resultKeySuffix: '_alt' };
+  };
   const ramp = jam.rampId === null ? undefined : state.builtRamps.find(r => r.id === jam.rampId);
   const toWidth = ramp ? nextRampWidth(ramp.width) : null;
-  if (!ramp || toWidth === null || !grid || state.plannedRamps.some(p => p.widenOf === ramp.id)) {
-    return { ...UNCHANGED, effects: [], resultKeySuffix: '_alt' };
-  }
+  if (!ramp || toWidth === null || !grid || state.plannedRamps.some(p => p.widenOf === ramp.id)) return failed();
+  // Claiming new ground (site expansion) is the console's job; an event answer
+  // only widens within ground the site already owns.
+  const f = rampFootprint(ramp.def, toWidth);
+  for (let z = f.minZ; z <= f.maxZ; z++) for (let x = f.minX; x <= f.maxX; x++) if (!grid.containsColumn(x, z)) return failed();
   const ordered = orderRampWiden(state, grid, ramp.id, toWidth);
-  if (!ordered.success) return { ...UNCHANGED, effects: [], resultKeySuffix: '_alt' };
+  if (!ordered.success) return failed();
   silence(world, jam, tick, TRAFFIC_JAM_WIDEN_SILENCE_TICKS);
   return { ...UNCHANGED, effects: [`Lost $${ordered.data.cost}`], cashSettled: -ordered.data.cost, resultKeySuffix: '' };
 };

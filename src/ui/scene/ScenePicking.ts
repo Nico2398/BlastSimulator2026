@@ -16,7 +16,7 @@ export interface EntityPick {
   readonly distance: number;
 }
 
-/** A terrain hit — nothing pickable was in front of it. */
+/** A terrain hit — nothing pickable was in front of it, or only a ramp, which is ground itself. */
 export interface TerrainPick {
   readonly point: THREE.Vector3;
   readonly tileX: number;
@@ -59,18 +59,17 @@ export function pickScene(
 
   const tileX = Math.floor(closest.point.x);
   const tileZ = Math.floor(closest.point.z);
+  const terrain: TerrainPick = { point: closest.point.clone(), tileX, tileZ, distance: closest.distance };
   // A ramp is a terrain feature with no mesh of its own: a ground hit inside a
   // built ramp's corridor selects it (#1298). Buildings and vehicles were
-  // already resolved above, so they keep priority.
+  // already resolved above, so they keep priority. The ground hit stays on the
+  // result, so "Move Here"/"Dispatch Here" can still target a ramp tile.
   const rampId = selectRamps ? renderer.rampIdAtTile(tileX, tileZ) : null;
   if (rampId !== null) {
-    return { entity: { kind: 'ramp', id: rampId, point: closest.point.clone(), distance: closest.distance }, terrain: null };
+    return { entity: { kind: 'ramp', id: rampId, point: closest.point.clone(), distance: closest.distance }, terrain };
   }
 
-  return {
-    entity: null,
-    terrain: { point: closest.point.clone(), tileX, tileZ, distance: closest.distance },
-  };
+  return { entity: null, terrain };
 }
 
 function resolveHitToEntity(hit: THREE.Intersection, renderer: GameRenderer): EntityPick | null {
@@ -255,7 +254,9 @@ export class ScenePicking {
 }
 
 function pickKey(pick: PickResult): string {
-  if (pick.entity) return `e:${pick.entity.kind}:${pick.entity.id}`;
-  if (pick.terrain) return `t:${pick.terrain.tileX}:${pick.terrain.tileZ}`;
-  return '';
+  // A ramp pick carries its ground tile too: moving along the ramp must
+  // re-latch the aim, or "Move Here" targets the tile first hovered.
+  const tile = pick.terrain ? `t:${pick.terrain.tileX}:${pick.terrain.tileZ}` : '';
+  if (pick.entity) return `e:${pick.entity.kind}:${pick.entity.id}${tile}`;
+  return tile;
 }
