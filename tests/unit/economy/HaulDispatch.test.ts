@@ -13,12 +13,13 @@
 // below is expected to fail until #552 is implemented.
 
 import { describe, it, expect } from 'vitest';
+import type { ActionType } from '../../../src/core/state/GameState.js';
 import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
-import { syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup } from '../../../src/core/economy/HaulDispatch.js';
+import { isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup } from '../../../src/core/economy/HaulDispatch.js';
 import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 
 const SEED = 42;
@@ -626,5 +627,17 @@ describe('createFragmentLookup — one index per dispatch pass', () => {
     expect(actions.map(a => haulActionCarriesOre(state, a, lookup)))
       .toEqual(actions.map(a => haulActionCarriesOre(state, a)));
     expect(actions.map(a => haulActionCarriesOre(state, a, lookup))).toEqual([true, false, false]);
+  });
+});
+
+describe('isAutoDebrisAction (#1302)', () => {
+  it('is true for haul_debris and fragment_debris', () => {
+    expect(isAutoDebrisAction('haul_debris')).toBe(true);
+    expect(isAutoDebrisAction('fragment_debris')).toBe(true);
+  });
+
+  it('is false for player-ordered and other action types', () => {
+    const others: ActionType[] = ['survey', 'place_building', 'drill_hole', 'charge_hole', 'dig_ramp_segment', 'level_ground'];
+    for (const type of others) expect(isAutoDebrisAction(type), type).toBe(false);
   });
 });
