@@ -132,6 +132,11 @@ rock is abandoned mid-arc.
   fell, whatever the terrain beside it does — otherwise flyrock trickles back into the pit it was
   thrown out of, and where flyrock lands is the whole reason it is dangerous.
 
+**Placement is physics-only (#1302).** Where fragments and debris land is decided by blast physics
+alone and is never adjusted, rejected or relocated for reachability. No reachability query lives in
+`src/core/mining` or fragment/physics code. Debris stranded outside the ground crew's reachable set
+belongs to the player: connect it (ramp, levelling, another blast) or leave it.
+
 `MuckPileSummary.summariseMuckPile` reads the settled pile back: size and speed spread, and how
 much rock rests on nothing. Clearance is per column against **the pile beneath**, not the terrain —
 rock stacked in a heap sits metres above the floor and is resting, not floating. Both state bridges
