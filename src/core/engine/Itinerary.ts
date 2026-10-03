@@ -79,21 +79,35 @@ export interface Leg {
    */
   crossesVehicles?: boolean;
   /**
-   * Set on a leg installed to walk a relocated idle occupant back to the
-   * exact cell it just got displaced from (#1278 follow-up,
-   * `relocateIdleDestinationBlocker`'s own `returnAfterRelocate` — see that
-   * function's doc comment in Locomotion.ts). `handleAgentOccupancyBlock`'s
-   * destination-spread step reads this to skip retargeting the leg
-   * elsewhere: a return trip's whole point is reclaiming that ONE specific
-   * cell once it is free again, so accepting a "close enough" consolation
-   * cell instead — the very thing destination-spreading exists to do for an
-   * ordinary leg — would silently strand the relocated occupant somewhere
-   * other than where it started, with nothing left to send it home again.
+   * Set on a leg whose destination is the one cell its arrival is for, so
+   * `handleAgentOccupancyBlock`'s destination-spread step (and the traffic-jam
+   * "reroute" answer's `respreadLegDestination`) must never retarget it onto
+   * a "close enough" neighbour — the very thing destination-spreading exists
+   * to do for an ordinary leg. Two writers:
+   * - `PlanItinerary.ts`'s `lockTargetCellLeg`, on the final leg of a work
+   *   itinerary for an action tied to one specific hole (`isHoleAction`,
+   *   GameState.ts — #1291): the arrival gate only checks that the itinerary
+   *   emptied, never where the mover stands, and the hole lands
+   *   drilled/charged at its own planned x/z regardless, so a spread leg
+   *   would silently service the hole from the wrong tile.
+   * - `relocateIdleDestinationBlocker`'s `returnAfterRelocate` return trip
+   *   (#1278 follow-up, Locomotion.ts, alongside `returnTrip` below):
+   *   reclaiming that ONE specific cell is the whole point, so a
+   *   consolation cell would strand the relocated occupant somewhere other
+   *   than where it started, with nothing left to send it home again.
    * Optional/nullable so a fixture/caller predating this field keeps
    * compiling unchanged (never true, so it behaves exactly like every leg
    * before this fix).
    */
   neverSpread?: boolean;
+  /**
+   * Marks `relocateIdleDestinationBlocker`'s own `returnAfterRelocate`
+   * return trip (#1278/#1283 follow-up, Locomotion.ts) — the one leg
+   * `isOnReturnTripLeg` treats as inert. Kept apart from `neverSpread`,
+   * which a hole-work leg also carries (#1291) while being a genuine,
+   * contested claim on its cell. Optional, same reasoning as `neverSpread`.
+   */
+  returnTrip?: boolean;
 }
 
 /** What the itinerary is ultimately for. */
