@@ -96,6 +96,14 @@ Two `NavGrid` static queries, beyond `findPath`, for picking a destination that 
 - `computeReachableSet(navGrid, anchorX, anchorZ)` / `computeClimbReachableSet(...)` — every cell connected to the anchor, without and with the per-step climb gate. The climb-aware one is the exact set a real `findPath` from that anchor can resolve against, which is what lets a caller screen candidate destinations without paying for a pathfind (`selectBestActionForEmployee`, ActionSelection.ts).
 - `findNearestNavigableCell(navGrid, targetX, targetZ)` — nearest cell inside the grid's **largest climb-connected region**, with no anchor to assume. Spawn points are chosen before terrain exists (a staffed roster, a campaign level's literals), and with a climb limit in force a fixed coordinate can land on a one-cell island atop a peak. `regenerateGrid` snaps every employee and vehicle through this once the grid is built (`snapAgentsToNavigableGround`, GameState.ts); an agent already on the main ground is left untouched.
 
+## Stranded Debris (#1302)
+
+Debris outside the ground-crew reachable set is a legitimate state, not a defect. Auto-generated
+`haul_debris` / `fragment_debris` work there waits (blockedReason `debris_out_of_reach`) without
+counting as a failure or a blocked order, is shown as a single summary indication (neutral top-bar
+pip, no toast or log entry), and resumes on its own once connected. Player-ordered unreachable
+actions (survey, place_building, ...) still get `target_unreachable` and the per-order warning.
+
 ## Building Approach Cells
 
 A building's entire footprint — including its `entryPoint`/`exitPoint` markers, which are cosmetic door offsets, not a walkability guarantee — classifies `blocked`. `findPath` rejects an impassable goal outright, so nothing can path onto a building's raw (x, z). `findBuildingApproachCell(navGrid, building, def, fromX, fromZ)` (`src/core/nav/BuildingApproach.ts`) finds the nearest walkable ring cell just outside the footprint, closest to the mover. Any destination that targets a building — rest routing, hauling delivery, shift-cycle sleep — resolves through this, never the building's own coordinates.

@@ -1169,7 +1169,7 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
 // completion fast path to test here any more.
 
 // ═══════════════════════════════════════════════════════════════════════════
-// #1231 — target_unreachable: a blast can leave a debris (or ramp-segment,
+// #1231 / #1302 — unreachable targets: a blast can leave a debris (or ramp-segment,
 // etc.) PendingAction targeting a NavGrid region climb-disconnected from
 // where ground crew actually operate (anchored at the nearest active
 // freight_warehouse's approach cell, findHaulDepotApproach/
@@ -1177,7 +1177,9 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
 // per-employee reachability screen (ActionSelection.ts) will ever pick it —
 // but before this feature nothing SAID so: blockedReason stayed null/some
 // unrelated reason forever, an invisible dead order. The classification pass
-// (tickEmployees) now stamps 'target_unreachable' on exactly these.
+// (tickEmployees) stamps 'target_unreachable' on player-ordered work, and
+// 'debris_out_of_reach' on auto-generated haul_debris/fragment_debris (#1302):
+// stranded debris is a legitimate, player-owned state, not a blocked order.
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable classification (#1231)', () => {
@@ -1278,7 +1280,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
     });
   });
 
-  it('flags target_unreachable on a haul_debris order whose target sits in a NavGrid pocket disconnected from the depot', () => {
+  it('stamps debris_out_of_reach (never target_unreachable) on a haul_debris order whose target sits in a NavGrid pocket disconnected from the depot', () => {
     const state = makeStateWithPocket(true);
     staffDebrisHauling(state);
     const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
@@ -1286,8 +1288,57 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
 
     tickEmployees(state);
 
-    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('debris_out_of_reach');
     expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+  });
+
+  it('stamps debris_out_of_reach on a fragment_debris order in the pocket', () => {
+    const state = makeStateWithPocket(true);
+    staffDebrisHauling(state);
+    const action = makeHaulDebrisAction({ id: 1, type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter', targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('debris_out_of_reach');
+  });
+
+  it('still stamps target_unreachable on a player-ordered survey whose target sits in the pocket (#1302: player orders unchanged)', () => {
+    const state = makeStateWithPocket(true);
+    const action: PendingAction = {
+      id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z, targetY: 0,
+      payload: {}, targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+  });
+
+  it('still stamps target_unreachable on a player-ordered place_building whose target sits in the pocket (#1302)', () => {
+    const state = makeStateWithPocket(true);
+    const action: PendingAction = {
+      id: 1, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
+      targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z, targetY: 0,
+      payload: {}, targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+  });
+
+  it('leaves a reachable haul_debris order with no blockedReason (null) when staffed', () => {
+    const state = makeStateWithPocket(true);
+    staffDebrisHauling(state);
+    state.pendingActions.push(makeHaulDebrisAction({ id: 1, targetX: REACHABLE_TARGET.x, targetZ: REACHABLE_TARGET.z }));
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason ?? null).toBeNull();
   });
 
   it('does NOT flag target_unreachable on a haul_debris order whose target is climb-reachable from the depot (no false positive)', () => {
@@ -1299,9 +1350,10 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
     tickEmployees(state);
 
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('debris_out_of_reach');
   });
 
-  it('never throws and never flags target_unreachable when there is no active freight_warehouse yet (early game)', () => {
+  it('never throws and stamps neither target_unreachable nor debris_out_of_reach when there is no active freight_warehouse yet (early game)', () => {
     const state = makeStateWithPocket(false);
     // No depot, no employees, no vehicles — the earliest possible game state
     // with a queued debris order already sitting in the pocket.
@@ -1310,9 +1362,10 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
 
     expect(() => tickEmployees(state)).not.toThrow();
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('debris_out_of_reach');
   });
 
-  it('never throws and never flags target_unreachable when state.navGrid is null', () => {
+  it('never throws and stamps neither target_unreachable nor debris_out_of_reach when state.navGrid is null', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = null;
     const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);
@@ -1322,6 +1375,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
 
     expect(() => tickEmployees(state)).not.toThrow();
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('debris_out_of_reach');
   });
 
   it('never flags target_unreachable on a dig_ramp_segment order, even when its target sits in the disconnected pocket (top-down excavation is exempt)', () => {
@@ -1359,7 +1413,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
     expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
   });
 
-  it('precedence: target_unreachable wins over no_vehicle_in_fleet/no_licensed_driver for a vehicle-gated order', () => {
+  it('precedence: debris_out_of_reach wins over no_vehicle_in_fleet/no_licensed_driver for a vehicle-gated debris order', () => {
     const state = makeStateWithPocket(true);
     // No debris_hauler vehicle anywhere, nobody licensed — both
     // no_vehicle_in_fleet and no_licensed_driver would otherwise apply.
@@ -1368,18 +1422,18 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
 
     const result = tickEmployees(state);
 
-    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('debris_out_of_reach');
     expect(result.unqualified).not.toContain(1);
   });
 
-  it('self-clears: once a previously-unreachable pocket connects to the depot side, a later tick drops target_unreachable', () => {
+  it('self-clears: once a previously-unreachable pocket connects to the depot side, a later tick drops debris_out_of_reach', () => {
     const state = makeStateWithPocket(true);
     staffDebrisHauling(state);
     const action = makeHaulDebrisAction({ id: 1, targetX: UNREACHABLE_TARGET.x, targetZ: UNREACHABLE_TARGET.z });
     state.pendingActions.push(action);
 
     tickEmployees(state);
-    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('debris_out_of_reach');
 
     // Punch a single-cell gate through the wall column, connecting REGION_A
     // and REGION_B — simulates a later incremental NavGrid rebuild resolving
@@ -1389,6 +1443,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
     tickEmployees(state);
 
     expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
+    expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('debris_out_of_reach');
   });
 
   // Per-action clearance (#1231 review round 3): a single-cell-wide corridor
@@ -1455,7 +1510,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
       expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).not.toBe('target_unreachable');
     });
 
-    it('still flags a vehicle-gated haul_debris order beyond the same corridor as target_unreachable', () => {
+    it('still flags a vehicle-gated haul_debris order beyond the same corridor as debris_out_of_reach', () => {
       const state = createGame({ seed: SEED });
       state.navGrid = makeCorridorGrid();
       const placed = placeBuilding(state.buildings, 'freight_warehouse', 1, 1, WIDTH, HEIGHT);
@@ -1467,7 +1522,7 @@ describe('tickEmployees / computeGroundCrewReachableSet — target_unreachable c
 
       tickEmployees(state);
 
-      expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('target_unreachable');
+      expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('debris_out_of_reach');
     });
   });
 });

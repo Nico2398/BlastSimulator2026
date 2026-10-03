@@ -6,7 +6,7 @@
 // employee auto-claims/drives/loads/delivers them instead of hauling being
 // reachable only through the manual Fleet-panel button.
 
-import type { GameState, PendingAction } from '../state/GameState.js';
+import type { GameState, PendingAction, ActionType } from '../state/GameState.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
@@ -37,7 +37,7 @@ export interface HaulActionPayload {
 export function syncHaulDispatch(state: GameState): void {
   const coveredFragmentIds = new Set<number>();
   for (const action of state.pendingActions) {
-    if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') continue;
+    if (!isAutoDebrisAction(action.type)) continue;
     const fragmentId = action.payload['fragmentId'];
     if (typeof fragmentId === 'number') coveredFragmentIds.add(fragmentId);
   }
@@ -150,7 +150,7 @@ export function isHaulOrFragmentActionClaimable(
   action: PendingAction,
   lookup?: FragmentLookup,
 ): boolean {
-  if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return true;
+  if (!isAutoDebrisAction(action.type)) return true;
 
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked) return false;
@@ -186,10 +186,15 @@ export function haulActionCarriesOre(
   action: PendingAction,
   lookup?: FragmentLookup,
 ): boolean {
-  if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return false;
+  if (!isAutoDebrisAction(action.type)) return false;
 
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked) return false;
 
   return fragmentHasOre(tracked.fragment.oreDensities);
+}
+
+/** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */
+export function isAutoDebrisAction(type: ActionType): boolean {
+  return type === 'haul_debris' || type === 'fragment_debris';
 }

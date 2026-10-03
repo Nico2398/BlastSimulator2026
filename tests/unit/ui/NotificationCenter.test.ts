@@ -287,6 +287,109 @@ describe('NotificationCenter (redesign P1)', () => {
     });
   });
 
+  // ── #1302: stranded auto-generated debris is a summary pip, not a toast per piece ──
+  describe('stranded debris summary (#1302)', () => {
+    function makeDebrisAction(id: number, overrides: Partial<PendingAction> = {}): PendingAction {
+      return {
+        id,
+        type: 'haul_debris',
+        requiredSkill: null,
+        requiredVehicleRole: 'debris_hauler',
+        targetX: id, targetZ: 0, targetY: 0,
+        payload: { fragmentId: id },
+        targetEmployeeId: null,
+        status: 'queued',
+        holderId: null,
+        queuedAtTick: 0,
+        blockedReason: 'debris_out_of_reach',
+        ...overrides,
+      };
+    }
+    const strandedLabel = (count: number) => t('notification.pip.stranded_debris_label', { count });
+    const orderBlockedEntries = (center: NotificationCenter) =>
+      center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+    const findStrandedPips = (pips: ReturnType<NotificationCenter['update']>, count: number) =>
+      pips.filter(p => p.label === strandedLabel(count));
+
+    it('raises no toast and no log entry for N stranded debris actions', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      for (let i = 1; i <= 25; i++) state.pendingActions.push(makeDebrisAction(i));
+
+      center.update(state);
+
+      expect(center.getToasts()).toHaveLength(0);
+      expect(orderBlockedEntries(center)).toHaveLength(0);
+    });
+
+    it('raises exactly one non-warn summary pip carrying the stranded count', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      for (let i = 1; i <= 25; i++) state.pendingActions.push(makeDebrisAction(i, i % 2 ? {} : { type: 'fragment_debris', requiredVehicleRole: 'rock_fragmenter' }));
+
+      const pips = center.update(state);
+
+      expect(pips).toHaveLength(1);
+      expect(findStrandedPips(pips, 25)).toHaveLength(1);
+      expect(pips[0]!.tone).not.toBe('warn');
+      expect(pips[0]!.tone).not.toBe('critical');
+      expect(pips[0]!.kind).not.toBe('orders');
+      expect(pips[0]!.tip).toBe(t('notification.pip.stranded_debris_tip', { count: 25 }));
+    });
+
+    it('does not repeat the summary on a second update() call', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      for (let i = 1; i <= 5; i++) state.pendingActions.push(makeDebrisAction(i));
+
+      center.update(state);
+      const pips = center.update(state);
+
+      expect(pips).toHaveLength(1);
+      expect(center.getToasts()).toHaveLength(0);
+    });
+
+    it('updates the pip count as debris is hauled and removes the pip once none remain', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      for (let i = 1; i <= 3; i++) state.pendingActions.push(makeDebrisAction(i));
+      expect(findStrandedPips(center.update(state), 3)).toHaveLength(1);
+
+      state.pendingActions.pop();
+      expect(findStrandedPips(center.update(state), 2)).toHaveLength(1);
+
+      for (const a of state.pendingActions) a.blockedReason = null;
+      expect(center.update(state)).toHaveLength(0);
+
+      state.pendingActions.length = 0;
+      expect(center.update(state)).toHaveLength(0);
+    });
+
+    it('mixed: a player-ordered target_unreachable action still gets one warn toast and the BLOCKED pip, alongside the stranded pip', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      for (let i = 1; i <= 4; i++) state.pendingActions.push(makeDebrisAction(i));
+      state.pendingActions.push({
+        id: 100, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+        targetX: 9, targetZ: 9, targetY: 0, payload: {}, targetEmployeeId: null,
+        status: 'queued', holderId: null, queuedAtTick: 0, blockedReason: 'target_unreachable',
+      });
+
+      const pips = center.update(state);
+
+      const toasts = center.getToasts();
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0]!.severity).toBe('warn');
+      expect(orderBlockedEntries(center)).toHaveLength(1);
+      const ordersPip = pips.find(p => p.kind === 'orders');
+      expect(ordersPip).toBeDefined();
+      expect(ordersPip!.label).toContain('1');
+      expect(ordersPip!.tone).toBe('warn');
+      expect(findStrandedPips(pips, 4)).toHaveLength(1);
+      expect(pips).toHaveLength(2);
+    });
+  });
+
   describe('buildBlockedOrderMessage (#1061)', () => {
     function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
       return {
