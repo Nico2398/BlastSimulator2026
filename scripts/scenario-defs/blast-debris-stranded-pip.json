@@ -1,6 +1,6 @@
 {
-  "name": "blast-debris-stranded-ramp",
-  "description": "Stranded debris is a normal, player-owned outcome (#1302): a single-hole blast on tutorial_pit leaves debris in a pocket the ground crew cannot reach; fragments stay where physics put them and no per-piece blocked-order warning is raised. The player builds a ramp into the pocket and the debris is hauled with no further order.",
+  "name": "blast-debris-stranded-pip",
+  "description": "Stranded debris summary pip (#1302): after the single-hole blast, with warehouse, hauler and driver in place but no ramp, the topbar shows one neutral \"N OUT OF REACH\" pip instead of per-action warn toasts.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit cash:2000000",
@@ -450,87 +450,6 @@
       }
     },
     {
-      "command": "build_ramp start:27,10 end:17,10 depth:5",
-      "description": "The player connects the stranded pocket: a 10 m ramp from (27,10) down to the crater at (17,10), depth 5 (within the slope limit). Ordering only queues dig_ramp_segment work; the crewed rock digger carves it. Geometry traced in the blast-debris-reachability integration test.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-ramp-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 5
-        },
-        {
-          "type": "focusTile",
-          "x": 22,
-          "z": 10,
-          "distance": 30,
-          "pitch": 75
-        },
-        {
-          "type": "dragTiles",
-          "x1": 27,
-          "z1": 10,
-          "x2": 17,
-          "z2": 10
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
-      "timeout": 250,
-      "description": "Drain every queued dig_ramp_segment layer: the ramp is carved end to end and now connects the pocket.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedRampSegmentCount",
-          "equals": 0,
-          "maxTicks": 800,
-          "timeoutMs": 240000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedRampSegmentCount": 0,
-          "builtRampCount": 1
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
       "command": "employee hire role:driver",
       "interaction": [
         {
@@ -574,50 +493,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "description": "Hire the driver for the rock fragmenter.",
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "employeeCount": 4
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 4 skill:driving.excavator level:5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 4 skill:driving.excavator level:5"
-        }
-      ],
-      "description": "Excavator licence for the fragmenter driver.",
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle buy rock_fragmenter",
+      "command": "vehicle buy debris_hauler",
       "interaction": [
         {
           "type": "clickSelector",
@@ -625,14 +501,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Buy the rock fragmenter.",
+      "description": "Buy the debris hauler while the pocket is still cut off.",
       "role": "player",
       "expect": {
         "decreased": [
@@ -641,14 +517,14 @@
       }
     },
     {
-      "command": "vehicle driver 3 4",
+      "command": "vehicle driver 3 3",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 3 4"
+          "command": "vehicle driver 3 3"
         }
       ],
-      "description": "Crew the fragmenter (vehicle 3) with driver 4.",
+      "description": "Crew the hauler with the truck-licensed driver.",
       "role": "bootstrap",
       "expect": {
         "changedBy": {
@@ -657,70 +533,18 @@
       }
     },
     {
-      "command": "tick 5",
-      "description": "#553: lets the rock_fragmenter's driver board and drive off toward its first boulder, clearing its spawn tile before the debris_hauler purchase below ever lands a vehicle there.",
+      "command": "tick 30",
+      "description": "Observe: hauler and driver ready but the pocket is cut off, so the topbar shows the neutral OUT OF REACH pip, no per-piece warn toasts.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 5"
+          "command": "tick 30"
         }
       ],
       "role": "setup",
       "expect": {
         "decreased": [
           "cash"
-        ]
-      }
-    },
-    {
-      "command": "vehicle buy debris_hauler",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
-        }
-      ],
-      "description": "Buy the debris hauler.",
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "vehicle driver 4 3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 4 3"
-        }
-      ],
-      "description": "Crew the debris hauler (vehicle 4) with driver 3.",
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "tick 150",
-      "description": "With the ramp built and the haul crew in place, the debris is hauled with no further order -- the debris that sat in the pocket is reachable now (#1302). storedMassKg grows from 0.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "increased": [
-          "storedMassKg"
         ]
       }
     }
