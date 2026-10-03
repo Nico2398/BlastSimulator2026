@@ -5,7 +5,7 @@
 // executor). Nothing consumes this yet (phase 3a, see gameplay-vehicle-fleet).
 // Read-only: never mutates state, never reserves/boards a vehicle.
 
-import { isFootprintAction, type GameState, type PendingAction } from '../state/GameState.js';
+import { isFootprintAction, isHoleAction, type GameState, type PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback } from '../nav/Pathfinding.js';
@@ -817,10 +817,10 @@ export function planItinerary(
       // guard `resolveRideAlightPoint` relies on.
       const action = opts?.action ?? state.pendingActions.find(a => a.id === resolved.actionId);
       const transportItinerary = findCheapestTransportItinerary(state, employee, goal, fidelity, resolved, footItinerary.estTotalTicks, action);
-      if (transportItinerary !== null) return transportItinerary;
+      if (transportItinerary !== null) return lockTargetCellLeg(state, transportItinerary, opts?.action);
     }
 
-    return footItinerary;
+    return lockTargetCellLeg(state, footItinerary, opts?.action);
   }
 
   // Vehicle-gated: an explicit `via` hint names the vehicle outright; absent
@@ -846,5 +846,26 @@ export function planItinerary(
   legs.push(driveLeg);
 
   const estTotalTicks = legs.reduce((sum, leg) => sum + leg.estTicks, 0) + resolved.workTicks;
-  return { legs, goal, workTicks: resolved.workTicks, estTotalTicks };
+  return lockTargetCellLeg(state, { legs, goal, workTicks: resolved.workTicks, estTotalTicks }, opts?.action);
+}
+
+/**
+ * Marks `itinerary`'s final leg `neverSpread` when its goal is work on one
+ * specific drill hole (`isHoleAction`, GameState.ts — #1291). Every
+ * itinerary shape planItinerary builds for such a goal (on foot, transport
+ * ride, vehicle-gated drive) ends with the leg reaching the action's own
+ * target cell, and `ArrivalGate.ts` starts the work the moment that
+ * itinerary empties without checking where the mover stands — so a leg
+ * destination-spread onto a neighbouring tile (`Locomotion.ts`'s
+ * `spreadLegDestination`) would drill or charge the hole from the wrong
+ * cell. `actionHint` follows resolveGoal's own hint-with-fallback
+ * convention (#1090).
+ */
+function lockTargetCellLeg(state: GameState, itinerary: Itinerary, actionHint?: PendingAction): Itinerary {
+  const goal = itinerary.goal;
+  if (goal.kind !== 'work') return itinerary;
+  const action = actionHint ?? state.pendingActions.find(a => a.id === goal.actionId);
+  const lastLeg = itinerary.legs[itinerary.legs.length - 1];
+  if (action && isHoleAction(action.type) && lastLeg) lastLeg.neverSpread = true;
+  return itinerary;
 }

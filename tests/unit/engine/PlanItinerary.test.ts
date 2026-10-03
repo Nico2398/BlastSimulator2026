@@ -613,3 +613,64 @@ describe('estimateLegDistance', () => {
     expect(allowed).not.toBeNull();
   });
 });
+
+describe('hole-work legs are locked against destination-spreading (#1291)', () => {
+  // Locomotion.ts's spreadLegDestination retargets an exact leg onto a
+  // neighbouring free cell when its destination is held; ArrivalGate.ts then
+  // starts the work wherever the mover stopped, and the hole lands
+  // drilled/charged at its own planned x/z regardless. A hole-work leg must
+  // therefore never spread — every itinerary shape marks its final leg.
+  it('charge_hole on foot: the single foot leg reaching the hole is neverSpread', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+    const action = makeAction({ id: 1, type: 'charge_hole', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+    expect(itinerary!.legs).toHaveLength(1);
+    expect(itinerary!.legs[0]!.neverSpread).toBe(true);
+    expect(itinerary!.legs[0]!.returnTrip).toBeUndefined();
+  });
+
+  it('charge_hole by transport ride: only the final foot leg into the hole is neverSpread', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'debris_hauler', 0, 0);
+    purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action = makeAction({ id: 1, type: 'charge_hole', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { action });
+    const legs = itinerary!.legs;
+    expect(legs.some(l => l.mode === 'drive')).toBe(true);
+    const lastLeg = legs[legs.length - 1]!;
+    expect([lastLeg.destX, lastLeg.destZ]).toEqual([20, 0]);
+    expect(lastLeg.neverSpread).toBe(true);
+    expect(legs.slice(0, -1).every(l => !l.neverSpread)).toBe(true);
+  });
+
+  it('drill_hole (drill_rig-gated): the drive leg onto the hole is neverSpread, the walk-and-board leg is not', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+    purchaseVehicle(state.vehicles, 'drill_rig', 5, 0);
+    const action = makeAction({ id: 1, type: 'drill_hole', requiredVehicleRole: 'drill_rig', targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+    const [boardLeg, driveLeg] = itinerary!.legs;
+    expect(boardLeg!.neverSpread).toBeUndefined();
+    expect(driveLeg!.mode).toBe('drive');
+    expect(driveLeg!.neverSpread).toBe(true);
+  });
+
+  it('general_work and reposition goals keep spreading', () => {
+    const state = makeState();
+    const employee = hireLicensedDriller(state, 'drill_rig', 0, 0);
+    const action = makeAction({ id: 1, targetX: 20, targetZ: 0 });
+    state.pendingActions.push(action);
+
+    const work = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact');
+    const reposition = planItinerary(state, employee, { kind: 'reposition', x: 20, z: 0 }, 'exact');
+    expect(work!.legs.every(l => !l.neverSpread)).toBe(true);
+    expect(reposition!.legs.every(l => !l.neverSpread)).toBe(true);
+  });
+});

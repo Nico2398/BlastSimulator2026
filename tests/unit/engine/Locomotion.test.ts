@@ -28,6 +28,9 @@ import { AgentOccupancy, type Occupant } from '../../../src/core/nav/AgentOccupa
 import type { Itinerary } from '../../../src/core/engine/Itinerary.js';
 import { detectTrafficJam } from '../../../src/core/events/EventEngine.js';
 import { employeeWorkState } from '../../../src/core/engine/EmployeeDispatch.js';
+import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
+import { planItinerary } from '../../../src/core/engine/PlanItinerary.js';
+import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 
 const SEED = 42;
 
@@ -2051,5 +2054,92 @@ describe('respreadLegDestination (#1208 reroute answer)', () => {
     const { state, employee } = walkerWithLeg();
     employee.itinerary = null;
     expect(() => respreadLegDestination(state, employee)).not.toThrow();
+  });
+});
+
+describe('hole work never starts off the hole cell (#1291)', () => {
+  // A charge_hole leg whose hole cell is held by a busy employee used to be
+  // destination-spread onto a neighbour; ArrivalGate.ts then started the
+  // charge there (only the itinerary emptying is checked), and the hole
+  // landed charged at its own x/z — serviced from the wrong tile.
+  function chargerAgainstBusyHolder() {
+    const state = buildFlatNavGridState(20, 20);
+    const rng = new Random(SEED);
+    const { employee: holder } = hireEmployee(state.employees, 'driller', rng, 10, 10);
+    holder.activeActionId = 999;
+    holder.taskTicksRemaining = 500;
+    const { employee: charger } = hireEmployee(state.employees, 'driller', rng, 3, 3);
+    const action: PendingAction = {
+      id: 1, type: 'charge_hole', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 10, targetZ: 10, targetY: 0, payload: { holeId: 'h1' }, targetEmployeeId: null,
+      status: 'assigned', holderId: charger.id, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+    charger.activeActionId = action.id;
+    charger.pendingTaskDuration = 10;
+    charger.itinerary = planItinerary(state, charger, { kind: 'work', actionId: action.id }, 'exact', { action });
+    return { state, holder, charger };
+  }
+
+  it('waits rather than spreading onto a neighbour while a busy employee holds the hole cell', () => {
+    const { state, charger } = chargerAgainstBusyHolder();
+    for (let t = 0; t < MOVE_STUCK_ABANDON_TICKS + 20; t++) {
+      tickLocomotion(state);
+      const started = tickArrivalGate(state).taskStarted.includes(charger.id);
+      expect(started, `charge started at ${charger.x},${charger.z} on tick ${t}`).toBe(false);
+    }
+  });
+
+  it('charges from the hole cell itself once the holder goes idle and can be relocated', () => {
+    const { state, holder, charger } = chargerAgainstBusyHolder();
+    let startedAt: { x: number; z: number } | null = null;
+    for (let t = 0; t < 100 && startedAt === null; t++) {
+      if (t === AGENT_OCCUPANCY_WAIT_TICKS) {
+        holder.activeActionId = null;
+        holder.taskTicksRemaining = null;
+      }
+      tickLocomotion(state);
+      if (tickArrivalGate(state).taskStarted.includes(charger.id)) startedAt = { x: charger.x, z: charger.z };
+    }
+    expect(startedAt).toEqual({ x: 10, z: 10 });
+  });
+});
+
+describe('an on-foot work claim whose itinerary dies is released, not started in place (#1291 follow-up)', () => {
+  // A charge_hole transport ride whose board leg is refused (its vehicle
+  // moved away) used to leave the claim staged: ArrivalGate.ts read the
+  // cleared itinerary as "arrived" and started charging wherever the
+  // employee stood, with the ride's own vehicle reservation still held (I5).
+  it('re-queues the action and releases the ride reservation when board() refuses', () => {
+    const state = buildFlatNavGridState(30, 30);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED['debris_hauler'], 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 2, 0);
+    const action: PendingAction = {
+      id: 1, type: 'charge_hole', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 25, targetZ: 0, targetY: 0, payload: { holeId: 'h1' }, targetEmployeeId: null,
+      status: 'assigned', holderId: employee.id, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    employee.pendingTaskDuration = 10;
+    employee.itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { action });
+    expect(employee.itinerary!.legs[0]!.onArrive).toEqual({ kind: 'board', vehicleId: vehicle.id });
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
+    vehicle.x = 2;
+    vehicle.z = 10;
+
+    let startedAt: { x: number; z: number } | null = null;
+    for (let t = 0; t < 20 && employee.activeActionId !== null; t++) {
+      tickLocomotion(state);
+      if (tickArrivalGate(state).taskStarted.includes(employee.id)) startedAt = { x: employee.x, z: employee.z };
+    }
+
+    expect(startedAt).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+    expect(employee.pendingTaskDuration).toBeNull();
+    expect(action.status).toBe('queued');
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 });

@@ -202,11 +202,16 @@ function isLegArrived(x: number, z: number, leg: Leg): boolean {
  * WorldInvariants.ts's I5 check to find the reservation stale on some later
  * tick, lets the ordinary dispatch loop retry it (this employee or another)
  * instead. A no-op when `activeActionId` is already null (already released by
- * a caller further up, e.g. the stuck-move-abandon branch just below) or
- * names an on-foot action (requiredVehicleRole === null) — an on-foot
- * itinerary failure has its own recovery path (a retry next tick) and this
- * release is scoped to the vehicle-reservation staleness I4/I5 exist to
- * catch.
+ * a caller further up, e.g. the stuck-move-abandon branch just below).
+ *
+ * An on-foot action is released the same way while its work is still
+ * staged (`pendingTaskDuration` set, #1291 follow-up): `ArrivalGate.ts`
+ * reads a null itinerary as "arrived" and would otherwise start that work
+ * the very same tick, wherever the itinerary died — e.g. a `charge_hole`
+ * transport ride whose board leg `board()` refused (the ride's vehicle
+ * moved), which charged the hole from several cells away and left the ride's
+ * own vehicle reservation held for a claim already in progress (I5,
+ * confirmed live via blast-execution-visual.json's dense cycle-4 grid).
  */
 function clearItineraryOnFailure(state: GameState, emp: Employee): void {
   emp.itinerary = null;
@@ -214,7 +219,7 @@ function clearItineraryOnFailure(state: GameState, emp: Employee): void {
 
   if (emp.activeActionId !== null) {
     const action = state.pendingActions.find(a => a.id === emp.activeActionId);
-    if (action !== undefined && action.requiredVehicleRole !== null) {
+    if (action !== undefined && (action.requiredVehicleRole !== null || emp.pendingTaskDuration !== null)) {
       interruptActiveAction(state, emp, action.id, { forceOpenPool: true });
     }
   }
@@ -642,8 +647,8 @@ function resetStuckTracking(emp: Employee): void {
  * True while `emp`'s current leg is `relocateIdleDestinationBlocker`'s own
  * `returnAfterRelocate` return trip (#1283 follow-up) — walking back to a
  * cell it was displaced from, with no real claim on it any more
- * (`Leg.neverSpread`'s own doc comment, Itinerary.ts, is the only thing that
- * ever sets this field). Treated as inert everywhere this ladder decides
+ * (`Leg.returnTrip`'s own doc comment, Itinerary.ts — not `neverSpread`,
+ * which a hole-work leg also carries, #1291). Treated as inert everywhere this ladder decides
  * whether a blocker is a genuine, contested "stuck" opponent
  * (`corridorBlockerEmp`/`blockerEmp` below) or safe to relocate again
  * (`relocateIdleDestinationBlocker`'s own idle-only guard): a return trip's
@@ -661,7 +666,7 @@ function resetStuckTracking(emp: Employee): void {
  * finishes returning), exactly as if `returnAfterRelocate` had been left off.
  */
 function isOnReturnTripLeg(emp: Employee): boolean {
-  return emp.itinerary?.legs[0]?.neverSpread === true;
+  return emp.itinerary?.legs[0]?.returnTrip === true;
 }
 
 /**
@@ -1085,8 +1090,8 @@ function handleAgentOccupancyBlock(
  * `returnAfterRelocate` (#1278 follow-up, default false): when true, an
  * employee occupant relocated this way is immediately re-dispatched
  * (`moveTo`, with `allowUnreachable: true` and the resulting leg marked
- * `neverSpread` — see that field's own doc comment, Itinerary.ts) back
- * toward the exact cell it just vacated. Scoped to the corridor-blocker call
+ * `neverSpread` and `returnTrip` — see those fields' own doc comments,
+ * Itinerary.ts) back toward the exact cell it just vacated. Scoped to the corridor-blocker call
  * site alone (`handleAgentOccupancyBlock`'s own `blockedStep` case) rather
  * than turned on for every caller: there, the relocated occupant already
  * reached ITS OWN distinct target earlier in the very same dense-grid
@@ -1162,7 +1167,10 @@ function relocateIdleDestinationBlocker(
     if (returnAfterRelocate) {
       moveTo(state, emp.id, { x: originX, z: originZ }, { allowUnreachable: true });
       const returnLeg = emp.itinerary?.legs[0];
-      if (returnLeg) returnLeg.neverSpread = true;
+      if (returnLeg) {
+        returnLeg.neverSpread = true;
+        returnLeg.returnTrip = true;
+      }
     }
     return true;
   }
@@ -1303,8 +1311,9 @@ function findNearestFreeCellForAgent(state: GameState, mover: Occupant, originX:
  * "Destination spreading": retargets `leg` onto the nearest free cell around
  * (originX, originZ). Only a leg whose arrival step needs an exact, unshared
  * cell qualifies — never a board/enter_building arrival (which must reach the
- * one specific vehicle/building cell it names), and never a relocated
- * occupant's own return trip (`leg.neverSpread`, #1278 follow-up, Itinerary.ts).
+ * one specific vehicle/building cell it names), and never a `leg.neverSpread`
+ * leg — a hole-work leg (#1291) or a relocated occupant's own return trip
+ * (#1278 follow-up); see that field's own doc comment, Itinerary.ts.
  * Records the pre-spread destination once, on the FIRST spread only (#1274):
  * the stable identity of the chokepoint the mover is queued on, so the jam
  * detector (TrafficJams.ts) can still cluster movers after each was retargeted.

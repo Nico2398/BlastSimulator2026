@@ -189,6 +189,19 @@ export function isFootprintAction(type: ActionType): boolean {
 }
 
 /**
+ * True for the two action types tied to one specific drill hole —
+ * `drill_hole` and `charge_hole`. Their work lands on the hole's own planned
+ * x/z (TaskCompletionEffects.ts) whoever performs it and wherever they stand,
+ * so `PlanItinerary.ts` locks the leg reaching that hole against
+ * destination-spreading (`Leg.neverSpread`, #1291): an employee or drill rig
+ * spread onto a neighbouring tile would otherwise service the hole from the
+ * wrong cell.
+ */
+export function isHoleAction(type: ActionType): boolean {
+  return type === 'drill_hole' || type === 'charge_hole';
+}
+
+/**
  * Lifecycle status of a PendingAction — 'queued' (waiting, unclaimed),
  * 'assigned' (claimed by an employee still walking to the target), or
  * 'in_progress' (the employee has arrived and is executing it). The record
