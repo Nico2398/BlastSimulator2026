@@ -200,7 +200,8 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       expect(strandedCount).toBeGreaterThan(0);
       const strandedFragmentIds = debrisActions(state).map(a => a.payload['fragmentId'] as number);
 
-      expect(run('build_ramp start:27,10 end:17,10 depth:5')).toMatchObject({ success: true });
+      const storedBeforeRamp = state.logistics.storedMassKg;
+      expect(run('build_ramp start:27,9 end:17,9 depth:5')).toMatchObject({ success: true });
       tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 800);
       expect(state.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
 
@@ -212,10 +213,13 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       // (Clearing the whole pocket is not asserted: the debris itself occupies the pocket's one-lane cells, so the
       // order in which a lone hauler can reach each piece is a path-planning concern outside #1302.)
       const strandedIds = new Set(strandedFragmentIds);
-      const isStrandedAction = (a: PendingAction): boolean => strandedIds.has(a.payload['fragmentId'] as number);
-      tickUntilFresh(run, state, () => false, 100);
-      const remaining = debrisActions(state).filter(isStrandedAction);
-      expect(remaining.length < strandedCount || remaining.some(a => a.status === 'assigned')).toBe(true);
+      const strandedActions = (): PendingAction[] => debrisActions(state).filter(a => strandedIds.has(a.payload['fragmentId'] as number));
+      // Hauling resumes with no further order: a once-stranded piece is actually picked up and stored.
+      tickUntilFresh(run, state, () => strandedActions().length < strandedCount && state.logistics.storedMassKg > storedBeforeRamp, 1500);
+      expect(strandedActions().length).toBeLessThan(strandedCount);
+      expect(state.logistics.storedMassKg).toBeGreaterThan(storedBeforeRamp);
+      // (Clearing every piece is not asserted: debris fills the pocket's one-lane cells, so a claimed piece can sit
+      // behind another one -- an engine path-planning concern outside #1302.)
     },
     240000,
   );
