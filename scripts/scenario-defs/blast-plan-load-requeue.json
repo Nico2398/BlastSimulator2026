@@ -1,0 +1,100 @@
+{
+  "name": "blast-plan-load-requeue",
+  "description": "#1342: after a blast empties the site, loading a saved blast plan re-orders its holes and charges as real work. Load must not write finished holes: it queues drill_hole and charge_hole orders (orderedHoleCount / orderedChargeCount rise, holeCount stays 0, cash drops for the explosives), and the crew then drills the holes and loads the charges.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 15,
+      "interaction": [{ "type": "command", "command": "new_game seed:42 staffed:true" }],
+      "role": "setup",
+      "expect": { "equals": { "holeCount": 0, "orderedHoleCount": 0 } }
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:15,15",
+      "interaction": [{ "type": "command", "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:15,15" }],
+      "role": "setup",
+      "expect": { "equals": { "orderedHoleCount": 4, "holeCount": 0 } }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "interaction": [
+        { "type": "awaitUsable", "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]" },
+        { "type": "clickSelector", "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]" },
+        { "type": "waitUntil", "field": "orderedHoleCount", "equals": 0, "maxTicks": 3000, "timeoutMs": 120000 }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "orderedHoleCount": 0, "holeCount": 4 } }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [{ "type": "command", "command": "charge hole:* explosive:boomite amount:5 stemming:2" }],
+      "role": "setup",
+      "expect": { "increased": ["orderedChargeCount"] }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "interaction": [
+        { "type": "waitUntil", "field": "orderedChargeCount", "equals": 0, "maxTicks": 3000, "timeoutMs": 120000 }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "chargedCount": 4, "orderedChargeCount": 0 } }
+    },
+    {
+      "command": "blast_plan save",
+      "description": "Player clicks Save in the Drill step's saved-plans list; empty name field saves under 'default'.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"save-plan\"]" },
+        { "type": "waitForSelector", "selector": "#bs-blast-panel [data-plan=\"default\"] [data-action=\"load-plan\"]" }
+      ],
+      "role": "player",
+      "expect": { "equals": { "holeCount": 4, "chargedCount": 4 } }
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [{ "type": "command", "command": "sequence auto delay_step:25" }],
+      "role": "setup",
+      "expect": { "equals": { "sequencedCount": 4 } }
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "interaction": [{ "type": "command", "command": "blast" }],
+      "role": "setup",
+      "expect": { "equals": { "holeCount": 0, "chargedCount": 0 } }
+    },
+    {
+      "command": "blast_plan load",
+      "description": "Player clicks Load on the saved plan. Holes and charges are ordered, not written: nothing is drilled yet and the explosives are paid.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-plan=\"default\"] [data-action=\"load-plan\"]" },
+        { "type": "waitUntil", "field": "orderedHoleCount", "equals": 4, "maxTicks": 1, "timeoutMs": 10000 }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": { "orderedHoleCount": 4, "orderedChargeCount": 4, "holeCount": 0, "chargedCount": 0 },
+        "decreased": ["cash"]
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "interaction": [
+        { "type": "waitUntil", "field": "orderedHoleCount", "equals": 0, "maxTicks": 3000, "timeoutMs": 120000 }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "orderedHoleCount": 0, "holeCount": 4 } }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "interaction": [
+        { "type": "waitUntil", "field": "orderedChargeCount", "equals": 0, "maxTicks": 3000, "timeoutMs": 120000 }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "orderedChargeCount": 0, "chargedCount": 4 } }
+    }
+  ]
+}
