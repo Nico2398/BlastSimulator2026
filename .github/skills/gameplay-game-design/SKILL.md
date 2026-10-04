@@ -124,6 +124,7 @@ Examples: Cruite (soft), Grumpite (medium), Obstiite (hard), endgame rocks.
 ### Explosives (fictional, humorous names)
 Each has: energy yield, cost, water sensitivity, charge limits, rock tier requirement, blast radius modifier, vibration profile.
 Examples: Pop-Rock (starter), Big Bada Boom (mid), Dynatomics (endgame).
+Cost: costPerKg x kg is charged when the charge order is placed (finance category `explosives`) and refunded in full if the order is cancelled; firing the blast charges nothing.
 
 ### Ores
 Fictional humorous names. "Treranium" (très rare, high value), common ores, exotic ores.
