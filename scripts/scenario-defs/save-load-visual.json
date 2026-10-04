@@ -172,6 +172,50 @@
       "role": "observe"
     },
     {
+      "command": "state",
+      "description": "#1327: open the Saves modal from the top bar, to prove Escape closes it next. awaitUsable (not waitForSelector): the modal root always exists in the DOM, hidden or not.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "usable": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]"
+      }
+    },
+    {
+      "command": "state",
+      "description": "#1327: Escape closes the Saves modal (main.ts Esc layer -> SavesModal.handleEscape). The wait polls the root's layout box collapsing, since keypress returns before the handler's effect is observable.",
+      "interaction": [
+        {
+          "type": "keypress",
+          "key": "Escape"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-saves-modal",
+          "property": "clientHeight",
+          "expectedValue": 0
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "blocked": "#bs-saves-modal"
+      }
+    },
+    {
       "command": "save slot:quicksave",
       "description": "Left unmarked: \"quicksave\" isn't a real UI slot -- SavesModal.ts only exposes 'auto' and numbered 'slot_N' (SAVE_SLOT_COUNT) slots. The real UI flow is demonstrated for real below (steps 10/11/16, clicking #bs-saveload-btn and a numbered slot), just under a different slot name than this console-only quicksave.",
       "interaction": [

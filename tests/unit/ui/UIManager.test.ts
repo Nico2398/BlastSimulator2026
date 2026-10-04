@@ -840,3 +840,76 @@ describe('UIManager — showConfirm / confirmOpen (#1314)', () => {
     expect(uiManager.confirmOpen).toBe(false);
   });
 });
+
+// ── eventModalVisible + saves-style Esc layer (#1327) ───────────────────────
+
+describe('UIManager — eventModalVisible and Esc layering (#1327)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+  });
+  afterEach(() => {
+    uiManager.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('eventModalVisible is false with no pending event', () => {
+    uiManager.update(makeState());
+    expect(uiManager.eventModalVisible).toBe(false);
+  });
+
+  it('eventModalVisible is true while an event is pending and false once resolved', () => {
+    const state = makeState();
+    state.events.pendingEvent = { eventId: 'tutorial_synergy_consultant', firedAtTick: 1 };
+    uiManager.update(state);
+    expect(uiManager.eventModalVisible).toBe(true);
+    const dialog = container.querySelector('#bs-event-dialog') as HTMLElement;
+    expect(dialog.style.display).not.toBe('none');
+
+    state.events.pendingEvent = null;
+    uiManager.update(state);
+    expect(uiManager.eventModalVisible).toBe(false);
+  });
+
+  it('a registered saves-style layer outranks hideAllPanels: panel stays open on first Esc', () => {
+    let open = true;
+    const layer = vi.fn(() => {
+      if (!open) return false;
+      open = false;
+      return true;
+    });
+    uiManager.registerEscLayer(layer);
+    uiManager.showPanel('build');
+
+    uiManager.handleEscape();
+
+    expect(layer).toHaveBeenCalled();
+    const buildPanel = container.querySelector('#bs-build-panel') as HTMLElement;
+    expect(buildPanel.style.display).not.toBe('none');
+
+    uiManager.handleEscape(); // layer declines now -> panel closes
+    expect(buildPanel.style.display).toBe('none');
+  });
+
+  it('an open confirm modal closes before a saves-style layer that defers to it', () => {
+    let open = true;
+    uiManager.registerEscLayer(() => {
+      if (uiManager.confirmOpen || uiManager.eventModalVisible || !open) return false;
+      open = false;
+      return true;
+    });
+    uiManager.showConfirm({ icon: 'map', title: 'T', body: 'B', confirmLabel: 'GO', onConfirm: () => {} });
+
+    uiManager.handleEscape();
+    expect(uiManager.confirmOpen).toBe(false);
+    expect(open).toBe(true); // saves layer did not consume the confirm's Esc
+
+    uiManager.handleEscape();
+    expect(open).toBe(false);
+  });
+});
