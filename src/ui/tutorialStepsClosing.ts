@@ -6,6 +6,7 @@
 // level's profit target, and the closing card.
 
 import type { GameState } from '../core/state/GameState.js';
+import type { FinanceState } from '../core/economy/Finance.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
 import type { DefeatReason } from './screens/LevelEndScreen.js';
@@ -13,6 +14,15 @@ import type { DefeatReason } from './screens/LevelEndScreen.js';
 /** True for any terminal `levelEndReason` other than a genuine win — reuses the same union `LevelEndScreen` already carries rather than redefining it (#959). */
 function isDefeatReason(reason: GameState['levelEndReason']): reason is DefeatReason {
   return reason !== null && reason !== 'completed';
+}
+
+/** Profit earned so far against the level's profit target, and what is still missing. */
+export function victoryProgress(
+  _finances: FinanceState,
+  _target: number,
+): { profit: number; target: number; remaining: number } {
+  // TODO: implement
+  return { profit: 0, target: 0, remaining: 0 };
 }
 
 export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
@@ -64,6 +74,7 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     tickBudget: 60,
     waitsOnWork: true,
     highlightTarget: '#bs-hud-scores',
+    textParamsFor: () => ({}), // TODO: implement
     // Only a genuine win completes this step — `state.levelEnded` alone also
     // goes true on bankruptcy/arrest/ecological_shutdown/worker_revolt, which
     // used to hand straight to the congratulations card on a loss (#959).
