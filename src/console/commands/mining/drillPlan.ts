@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType } from './shared.js';
+import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState } from './shared.js';
 import {
   createGridPlan, addHole, removeHole, resetHoleIds,
   computeDrillHoleDurationTicks,
@@ -12,7 +12,7 @@ import {
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
-import { clearTubing, removeHoleTubing } from '../../../core/mining/Tubing.js';
+import { removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -35,6 +35,7 @@ function clearHoleCharges(state: GameState, holeId: string): void {
   delete state.chargesByHole[holeId];
   delete state.plannedChargesByHole[holeId];
   delete state.sequenceDelays[holeId];
+  removeHoleTubing(state.tubingState, holeId);
 }
 
 /**
@@ -55,11 +56,7 @@ export function clearDrillPlan(ctx: MiningContext): number {
   cancelPendingActionsOfType(state, 'charge_hole');
   cancelOutstandingDrillActions(state);
 
-  state.drillHoles = [];
-  clearTubing(state.tubingState);
-  state.chargesByHole = {};
-  state.plannedChargesByHole = {};
-  state.sequenceDelays = {};
+  resetPlanState(state);
 
   return clearedCount;
 }
@@ -184,7 +181,6 @@ export function drillPlanCommand(
     if (removeHole(state.drillHoles, holeId)) {
       cancelOutstandingChargeAction(state, holeId);
       clearHoleCharges(state, holeId);
-      removeHoleTubing(state.tubingState, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 
@@ -195,7 +191,6 @@ export function drillPlanCommand(
       cancelOutstandingChargeAction(state, holeId);
       state.plannedDrillHoles.splice(plannedIdx, 1);
       clearHoleCharges(state, holeId);
-      removeHoleTubing(state.tubingState, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 

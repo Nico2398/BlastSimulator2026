@@ -38,11 +38,17 @@ describe('tubing lifecycle via console (#1351)', () => {
     drive(runner, ctx, () => Object.keys(ctx.state!.plannedChargesByHole).length === 0);
     runner.run('sequence auto delay_step:25');
     expect(runner.run('blast').success).toBe(true);
+    expect(ctx.state!.tubingState.installedHoles.size).toBe(0);
+    expect(ctx.state!.tubingState.inventory).toBe(1);
 
-    runner.run(GRID);
-    drive(runner, ctx, () => ctx.state!.plannedDrillHoles.length === 0);
+    expect(runner.run(GRID).success).toBe(true);
+    // Hole ids restart after a blast: the new first ordered hole reuses the
+    // tubed id and must come up untubed. (Post-blast debris keeps the new
+    // drill orders queued, so assert on the ordered holes, not drilled ones.)
+    const newFirstId = ctx.state!.plannedDrillHoles[0].id;
     const tubing = ctx.state!.tubingState;
-    expect(tubing.installedHoles.has(firstId)).toBe(false);
+    expect(newFirstId).toBe(firstId);
+    expect(tubing.installedHoles.has(newFirstId)).toBe(false);
     expect(tubing.installedHoles.size).toBe(0);
     expect(tubing.inventory).toBe(1);
   });

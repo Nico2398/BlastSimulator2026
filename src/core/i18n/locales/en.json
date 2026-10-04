@@ -3406,7 +3406,7 @@
   "mining.level_ground.refused_building_overlap": "Refused: a building occupies part of that area.",
   "mining.level_ground.already_flat": "Ground already flat here — nothing to level.",
   "mining.level_ground.ordered": "Ground levelling ordered: {voxels} voxels queued for excavation (${cost}).",
-  "mining.tubing.install_usage": "Usage: tubing install hole=<id>",
+  "mining.tubing.install_usage": "Usage: tubing install hole:<id>",
   "mining.weather.set_usage": "Usage: weather set <state>. Valid: {valid}",
   "mining.survey.usage": "Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.unknown_method": "Unknown method \"{method}\". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",
