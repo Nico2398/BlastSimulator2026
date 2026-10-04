@@ -510,3 +510,50 @@ describe('PlayableArea.villages (#1343)', () => {
     expect(area.villages()).toEqual([]);
   });
 });
+
+describe('PlayableArea.previewClaimArea (#1396)', () => {
+  it('returns null for a rect entirely inside the site', () => {
+    const { area } = makeArea();
+    expect(area.previewClaimArea({ minX: 4, minZ: 4, maxX: 10, maxZ: 10 })).toBeNull();
+  });
+
+  it('returns null for a rect over ordinary claimable ground, without claiming it', () => {
+    const { grid, area } = makeArea();
+    const before = grid.chunkCount;
+    expect(area.previewClaimArea({ minX: 34, minZ: 10, maxX: 36, maxZ: 12 })).toBeNull();
+    expect(grid.chunkCount).toBe(before);
+    expect(grid.hasChunk(2, 0)).toBe(false);
+  });
+
+  it('refuses when ANY chunk the rect touches is refused, not just the first', () => {
+    const { grid, area } = makeArea();
+    area.adoptStructures(structuresProtectingChunk(2, 0));
+    const before = grid.chunkCount;
+    // Starts inside the site (chunk 1) and reaches into protected chunk 2.
+    expect(area.previewClaimArea({ minX: 20, minZ: 0, maxX: 34, maxZ: 10 })).toBe('protected_structure');
+    expect(grid.chunkCount).toBe(before);
+  });
+
+  it('treats the rect max as exclusive: a rect ending exactly on a chunk boundary does not touch the next chunk', () => {
+    const { area } = makeArea();
+    area.adoptStructures(structuresProtectingChunk(2, 0));
+    const edge = PlayableArea.chunkRect(2, 0).minX;
+    expect(area.previewClaimArea({ minX: edge - 4, minZ: 0, maxX: edge, maxZ: 10 })).toBeNull();
+    expect(area.previewClaimArea({ minX: edge - 4, minZ: 0, maxX: edge + 1, maxZ: 10 })).toBe('protected_structure');
+  });
+
+  it('returns expansion_disabled for a rect outside the site when expansion is off', () => {
+    const config = { ...CONFIG };
+    const grid = generateTerrain(config);
+    const area = new PlayableArea(grid, config, { expansionEnabled: false });
+    const before = grid.chunkCount;
+    expect(area.previewClaimArea({ minX: 34, minZ: 10, maxX: 36, maxZ: 12 })).toBe('expansion_disabled');
+    expect(grid.chunkCount).toBe(before);
+  });
+
+  it('agrees with previewClaim for a single-cell-sized rect', () => {
+    const { area } = makeArea();
+    area.adoptStructures(structuresProtectingChunk(2, 0));
+    expect(area.previewClaimArea({ minX: 34, minZ: 10, maxX: 35, maxZ: 11 })).toBe(area.previewClaim(34, 10));
+  });
+});

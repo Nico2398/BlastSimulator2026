@@ -11,7 +11,7 @@
 // unconfirmable for no reason the controller names.
 
 import { describe, it, expect } from 'vitest';
-import { placementRefusalReason } from '../../../../src/ui/scene/PlacementKit.js';
+import { placementRefusalReason, hoverRefusal } from '../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementController } from '../../../../src/ui/scene/PlacementController.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../../../src/core/config/balance.js';
@@ -86,5 +86,24 @@ describe('placementRefusalReason', () => {
     expect(placementRefusalReason(controller({ selection }))).toBe(
       t('shell.placement.outside_region')
     );
+  });
+});
+
+describe('hoverRefusal', () => {
+  it('a controller refusal beats the rect reason and paints refused', () => {
+    const r = hoverRefusal(controller({ refusalReason: 'protected_structure' }), 'rect reason');
+    expect(r).toEqual({ refused: true, reason: t('shell.placement.refused_protected_ground') });
+  });
+
+  it('a rect reason outranks the pick_first prompt and paints refused', () => {
+    expect(hoverRefusal(controller(), 'rect reason')).toEqual({ refused: true, reason: 'rect reason' });
+  });
+
+  it('pick_first alone is a prompt, not a refusal', () => {
+    expect(hoverRefusal(controller(), null)).toEqual({ refused: false, reason: t('shell.placement.pick_first') });
+  });
+
+  it('nothing refused when Confirm is live', () => {
+    expect(hoverRefusal(controller({ canConfirm: true }), null)).toEqual({ refused: false, reason: undefined });
   });
 });
