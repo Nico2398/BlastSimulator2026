@@ -208,3 +208,12 @@ export function wetHoleIdSet(ctx: MiningContext): Set<string> {
 export function levelVillagePositions(ctx: MiningContext): VillagePosition[] {
   return villagePositions(ctx.playableArea?.villages() ?? []);
 }
+
+/**
+ * Cancel every pending `drill_hole` action and empty `state.plannedDrillHoles`.
+ * Returns the number of ordered holes cancelled. Other action types untouched.
+ */
+export function cancelOutstandingDrillActions(_state: GameState): number {
+  // TODO: implement
+  return 0;
+}
