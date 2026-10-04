@@ -327,13 +327,13 @@
       }
     },
     {
-      "command": "wait_until field:tickCount equals:428 max_ticks:260",
-      "description": "The real wait for automatic haul dispatch to run its course, expressed as a tickCount target (rather than a plain `tick 200`) so waitUntil's own internal event-auto-resolution (issue #590) carries this step through any spontaneous event instead of a bare `tick` refusing outright the instant one fires mid-window -- sandbox-confirmed against this exact seed/setup: tickCount reads 228 immediately before this step, so 428 is 200 real ticks of dispatch beyond that, with max_ticks:260 leaving slack for a handful of event-resolution iterations along the way. Sandbox-confirmed on today's (buggy) code: the warehouse is already permanently full (storedMassKg 2125/2000, unchanged 300+ ticks past this window) by the time this step ends, with collectedOreTotal stuck at 0 the whole way. This is the fix's own acceptance check: collectedOreTotal must rise off zero once ore-bearing candidates can jump the queue ahead of plain spoil while the warehouse still has room.",
+      "command": "wait_until field:tickCount equals:400 max_ticks:260",
+      "description": "The real wait for automatic haul dispatch to run its course, expressed as a tickCount target (rather than a plain `tick 200`) so waitUntil's own internal event-auto-resolution (issue #590) carries this step through any spontaneous event instead of a bare `tick` refusing outright the instant one fires mid-window -- sandbox-confirmed against this exact seed/setup: tickCount reads 228 immediately before this step, so 428 is 200 real ticks of dispatch beyond that, with max_ticks:260 leaving slack for a handful of event-resolution iterations along the way. Sandbox-confirmed on today's (buggy) code: the warehouse is already permanently full (storedMassKg 2125/2000, unchanged 300+ ticks past this window) by the time this step ends, with collectedOreTotal stuck at 0 the whole way. This is the fix's own acceptance check: collectedOreTotal must rise off zero once ore-bearing candidates can jump the queue ahead of plain spoil while the warehouse still has room. #1313: the target is tick 400, not 428 -- with no living quarters the crew's wellBeing sits at 0 from tick ~295 and the worker revolt ends the level at tick 415, after which the mine is frozen and tickCount can never advance. 400 still gives the dispatch ~160 ticks to run and keeps the level alive for the whole window.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "tickCount",
-          "equals": 428,
+          "equals": 400,
           "maxTicks": 260,
           "timeoutMs": 120000
         }

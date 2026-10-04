@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-arrest",
-  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 20) -- arrest doesn't happen until tick 50, by which point the level has already been won. Confirmed via direct trace; see the note on the second tick 10 step and the final campaign status step.",
+  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 18). #1313: the mine is frozen once the level has ended, so exposure stops accruing and the arrest never happens here; every tick after the win asserts the frozen state (cash and tickCount unchanged). The arrest outcome itself is proven in tests/integration/full-level/level1-lose-arrest.integration.test.ts, which pre-completes the level so the arrest can race alone.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow cash:80000",
@@ -317,12 +317,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 179900,
-          "tickCount": 20,
+          "cash": 165200,
+          "tickCount": 18,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "the level's own profit-threshold win condition fires here, confirmed via direct trace -- another 10 ticks of $8000/tick smuggling income pushes cumulative profit past dusty_hollow's unlock threshold. This is a real, verified consequence, not a scenario bug: this \"losing scenario\" actually WINS first, 30 ticks before arrest (below) ever triggers. levelEnded staying true does not block further commands from running or state from continuing to change, confirmed by every step after this one."
+        "note": "the level's own profit-threshold win condition fires here (tick 18), confirmed via direct trace -- smuggling income at $8000/tick pushes cumulative profit past dusty_hollow's unlock threshold. This \"losing scenario\" actually WINS first. #1313: the tick command stops on the tick the level ends, so this `tick 10` lands on tick 18 and the rest of its batch is not run."
       }
     },
     {
@@ -347,11 +347,15 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 78700
+          "cash": 0,
+          "tickCount": 0
         },
         "equals": {
-          "tickCount": 30
-        }
+          "tickCount": 18,
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -428,11 +432,15 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 78700
+          "cash": 0,
+          "tickCount": 0
         },
         "equals": {
-          "tickCount": 40
-        }
+          "tickCount": 18,
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -457,13 +465,16 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 78700
+          "cash": 0,
+          "tickCount": 0
         },
         "equals": {
-          "tickCount": 50,
-          "arrested": true
+          "tickCount": 18,
+          "levelEnded": true,
+          "levelEndReason": "completed",
+          "arrested": false
         },
-        "note": "confirmed via direct trace: arrest finally triggers here, 30 ticks after the level had already ended in victory above -- the file's own name and premise (\"triggering criminal arrest\") do hold by the end, just not as the first or only outcome."
+        "note": "#1313: the level already ended ('completed' at tick 18) and the mine is frozen: exposure stops accruing, so the arrest that used to trigger here never does. Nothing ticks."
       }
     },
     {
@@ -488,11 +499,15 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 78700
+          "cash": 0,
+          "tickCount": 0
         },
         "equals": {
-          "tickCount": 60
-        }
+          "tickCount": 18,
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -517,11 +532,15 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 78700
+          "cash": 0,
+          "tickCount": 0
         },
         "equals": {
-          "tickCount": 70
-        }
+          "tickCount": 18,
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "note": "#1313: level already ended ('completed' at tick 18) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -589,12 +608,12 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 70,
-          "arrested": true,
+          "tickCount": 18,
+          "arrested": false,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "final state: both the win (tick 20) and the arrest (tick 50) are real and both hold by the end -- the level's own end-game screens would show victory first, arrest second, an intentional-looking design tension between smuggling's profitability and its exposure risk rather than a bug."
+        "note": "final state: the win at tick 18 froze the mine -- no arrest, tickCount still 18. #1313."
       }
     }
   ]

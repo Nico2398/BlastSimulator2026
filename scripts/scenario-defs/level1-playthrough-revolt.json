@@ -1,20 +1,20 @@
 {
   "name": "level1-playthrough-revolt",
-  "description": "Level 1 worker revolt scenario: aggressive krackle blasts, no well-being buildings, long tick cycles with events to trigger worker rebellion",
+  "description": "Level 1 worker revolt scenario: no well-being buildings and a 12-strong crew drilling flat out crash wellBeing to its floor, and the site revolts. #1313: the mine freezes the moment the level ends, so the scenario funds the level ($1,050,000) to stay solvent -- bankruptcy used to fire mid-drill at tick 209 and the file ticked on over an already-lost game -- and reaches the revolt as the first and only end (tick 383). Everything after it asserts the frozen state.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow staffed:true",
+      "command": "campaign start level:dusty_hollow staffed:true cash:1050000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:true"
+          "command": "campaign start level:dusty_hollow staffed:true cash:1050000"
         }
       ],
       "description": "#553: staffed:true hires and equips, for free, employee #1 driller (blasting lvl1, driving.drill_rig lvl1) through #5 driver, plus vehicles #1 drill_rig through #4 rock_fragmenter (all unmanned). Cost is free -- does not change starting cash. The file's own 7 hand-hired employees below become #6-#12.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 1050000
         }
       }
     },
@@ -357,7 +357,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 83800,
+          "cash": 1083800,
           "employeeCount": 12
         }
       }
@@ -373,7 +373,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 83800,
+          "cash": 1083800,
           "employeeCount": 12,
           "holeCount": 0,
           "deathCount": 0
@@ -580,35 +580,16 @@
           "wellBeing": 0,
           "nuisance": 50,
           "deathCount": 0,
-          "bankrupt": true,
-          "levelEnded": true,
-          "levelEndReason": "bankruptcy"
+          "bankrupt": false,
+          "levelEnded": false
         },
-        "note": "#596/#597-followup: this 168-tick request completes in full (sandbox-measured: 175->343, all 168 ticks) -- tickCount converted equals->changedBy (issue #596) since the batch running to completion, not a specific running total, is this step's own point. safety drops to a plain 50 (was 56.6): the earlier event is now union_unlucky_days, which carries no safety delta, so there is no tremor bump left to decay from. Along the way, 12 employees' payroll with zero income anywhere in this file crosses the $5,000 threshold and BANKRUPTCY_GRACE_TICKS=100 (Bankruptcy.ts) completes at tick 209 -- bankruptcy fires mid-drill, well before this pattern finishes, let alone blasts. Ticking does not stop when levelEnded flips (tickCommand only refuses to advance on a *pending event*, confirmed by direct trace), so the drill run itself completes normally on top of an already-lost game. wellBeing also crashes to 0 during this stretch (fatigue collapse with no living quarters anywhere in this file) and never recovers for the rest of the run except one brief bump (see the pattern-2 gap below)."
+        "note": "#596/#597-followup: this 168-tick request completes in full (175->343, all 168 ticks). #1313: the level is funded so payroll never reaches the $5,000 bankruptcy threshold (it used to, at tick 209, and the file kept ticking over an ended level -- a frozen mine no longer allows that); the level is still running here. wellBeing crashes to 0 during this stretch (fatigue collapse with no living quarters anywhere in this file) and its zero streak, which started at tick 263, is what ends the level in the revolt below."
       }
     },
     {
-      "command": "charge hole:* explosive:krackle amount:8 stemming:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
-        }
-      ],
-      "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 209 (84 ticks before this step, per the tick-168 wait step's own expect above) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel control here sits at z-panel (100, tokens.ts), so the overlay covers charge-all just like it does in level2-playthrough-win.json and level3-playthrough-win.json's identical finding -- same overlay class, this file's own bankruptcy trigger instead of theirs. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 16 holes really do charge and the rest of this file's own trajectory (5 deaths at blast 1, destroyed rig, eventual revolt) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong.",
-      "role": "guard",
-      "expect": {
-        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "traced in command mode; cash is deliberately not asserted here -- ground rule #12, this step follows a tick block",
-        "increased": [
-          "orderedChargeCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "command": "wait_until field:levelEnded equals:true max_ticks:3000",
       "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #554-followup (this session): the speed button itself is unreachable by this point -- bankruptcy fired at tick 209, inside the tick-168 step two checkpoints back, and every later charge/sequence/blast step's own notes already document the resulting full-viewport bankruptcy overlay (z-index 9999) covering every panel control for the rest of the run. `awaitUsable` followed by `clickSelector` against the speed button still hits that same overlay -- `awaitUsable`'s probe resolves (the button itself is neither disabled nor hidden), but the click that follows lands on the overlay in front of it (`element is covered by div`), sandbox-reproduced. Unlike the ~53 other files this speed-up fix was ported to, none of which have already gone bankrupt by their own equivalent step, this file's own premise is bankruptcy landing mid-drill, before pattern 1 even finishes -- so the overlay is already up here specifically. Uses `time speed:8` via the `time` console command instead -- explicitly carved out of the setup role's allowlist as a player affordance separate from state-mutating commands (`TIME_COMMAND_ALLOWLIST`, `scripts/shared/interaction-types.ts`) precisely because it models the same speed button without going through the DOM, so it lands the same time-scale change without depending on a control the overlay has already permanently covered. Resets back to `time speed:1` immediately once the wait resolves, as a minimal-footprint discipline (this fix should only touch the one step it exists for) -- sandbox-tested, and it does NOT by itself resync the rest of the file: the divergence documented on the next guard step's own note (a real event, not the file's long-pinned politics_competitor_mine, showing up here in interaction mode) persists identically whether speed is reset afterward or left at 8x, so it is set here during the wait itself (real ticks genuinely need to run faster than 1x to drain a 16-hole charge queue within timeoutMs's 120s budget, sandbox-confirmed necessary), not by anything that happens once the wait is already done. The reset is kept anyway, since leaving speed elevated for the rest of a 500+-tick file with no further reason to run fast has no upside and this session found none.",
+      "description": "#1313: advance until the level ends. REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapse at tick 383 and the mine freezes there -- earlier than any blast could land (a blaster needs more than 40 ticks to charge the 16 holes), so this file ends in a revolt with the pattern drilled and never fired.",
       "interaction": [
         {
           "type": "command",
@@ -616,8 +597,8 @@
         },
         {
           "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
+          "field": "levelEnded",
+          "equals": true,
           "maxTicks": 3000,
           "timeoutMs": 120000
         },
@@ -629,275 +610,19 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 16,
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
-        }
-      ],
-      "role": "guard",
-      "description": "#553: same class as the charge step above -- the full-viewport bankruptcy overlay has covered auto-sequence since tick 209 too.",
-      "expect": {
-        "equals": {
-          "chargedCount": 16,
-          "sequencedCount": 16
-        },
-        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "description": "#553 Finding: 16 holes x 8kg krackle in a tight 4x4 grid throws fragments up to 90.3m (CATASTROPHIC rating, sandbox-traced) -- far enough to reach the staffed-vehicle muster point near the map corner where employees #2-#5 (blaster, 3 drivers) have been idling the whole file with nothing assigned to them. Employee #1, the driller, is standing at the pattern they just finished sinking, same as every driller in every other #553-fixed file. All 5 die. Vehicle #1 (parked among the holes it had just drilled) is destroyed with them -- deathCount and vehicleCount both move for the first time in this file's history. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/sequence steps above -- no player can click Execute to fire this, the overlay has owned the whole screen since tick 209. `expect.blocked` proves that; the command still runs directly so the real casualty/fleet numbers below keep holding. #553-followup (issue #586 CI): dropped the exact `ecology: 31.9` -- a real CI run read 32.07, ecology drifting slightly on however many real ticks elapsed during the several waitForTutorialStep/waitForSelector polls earlier in this file (same real-time-accrual class as the cash checkpoints documented elsewhere in this PR, here surfacing as a small float drift instead of a dollar figure). nuisance was assumed to be a pure function of the blast itself and held exact -- wrong: a later CI run showed it drifting too (4.75 -> 5.175), so it carries the same real-time-accrual dependency as ecology and is dropped here as well.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "deathCount": 9,
-          "vehicleCount": 0,
-          "bankrupt": true,
           "levelEnded": true,
-          "levelEndReason": "bankruptcy"
-        },
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
-      }
-    },
-    {
-      "command": "employee list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
-        }
-      ],
-      "description": "#553 procedure step 5: verify who died, not just assume it's the two who worked the pattern. Sandbox-confirmed the five dead are exactly employees #1-#5 -- every staffed employee this file never dispatches anywhere -- while #6-#12 (the file's own hires) are all still OK, never having been near the site.",
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
+          "levelEndReason": "worker_revolt",
+          "revolted": true,
+          "bankrupt": false,
+          "tickCount": 383,
+          "wellBeing": 0,
+          "deathCount": 0,
+          "holeCount": 16,
           "employeeCount": 12
         }
       }
     },
     {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "description": "#553-followup (issue #586 CI): dropped the exact `ecology: 31.9` and `nuisance: 4.75` here too -- both inherit the same real-time-accrual drift as the blast step above (see its own note).",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "deathCount": 9,
-          "employeeCount": 12,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "description": "#553-followup (issue #586 CI): dropped the exact `ecology: 31.9` and `nuisance: 4.75` here too -- both inherit the same real-time-accrual drift as the blast step above (see its own note).",
-      "expect": {
-        "equals": {
-          "safety": 50,
-          "wellBeing": 0
-        },
-        "note": "#596/#597-followup: safety reads a plain 50, not a decayed tremor bump -- the earlier event is union_unlucky_days now (no safety delta), so there is nothing to decay from. The five deaths' own accident penalty (recentAccidents * 5 per tick, ScoreManager.ts) only starts applying once ticking resumes."
-      }
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 5
-        },
-        "equals": {
-          "safety": 0,
-          "wellBeing": 0,
-          "deathCount": 9,
-          "bankrupt": true,
-          "revolted": true
-        },
-        "note": "#596/#597-followup: this 5-tick request completes in full (sandbox-measured, 343->348) -- tickCount converted equals->changedBy (issue #596). Also dropped cash/ecology/nuisance -- a real CI run read cash -154384 against this file's previously-pinned -154432 ($48 off), the same real-time-accrual drift documented on the blast step above (waitForTutorialStep/waitForSelector polls before tick 293 shift the base slightly; cash/ecology/nuisance accumulate from it and never reset). safety crashes to 0 within these 5 ticks (five deaths' accident penalty) and stays floored there for the rest of the run -- sandbox-confirmed exact, no drift risk once it hits the floor."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 5
-        },
-        "equals": {
-          "safety": 0,
-          "wellBeing": 0,
-          "deathCount": 9
-        },
-        "note": "#596/#597-followup: this 5-tick request completes in full (sandbox-measured, 348->353) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "safety": 0,
-          "wellBeing": 0
-        },
-        "note": "#596/#597-followup: tickCount dropped -- this observe step is downstream of the tick-5 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step above."
-      }
-    },
-    {
-      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 20,
-          "holeCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
-        "note": "#553: ordering still costs nothing and always succeeds (skipQualificationCheck, Drill.ts) -- but this file has zero drillers left with both a driving.drill_rig licence AND a rig to sit in (vehicle #1, the only one this file ever owned, was destroyed in blast 1, and cash is deep in the negative from a 12-employee payroll -- no replacement is affordable). These 20 holes are permanently unreachable ghosts; the tick-wait step below proves it rather than assuming it. Interaction-mode finding: same bankruptcy full-screen overlay as the pattern-1 charge/sequence/blast steps above -- grid-tool is covered by this point too, `expect.blocked` proves it while the command still runs directly to order the ghost pattern."
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "orderedHoleCount": 20,
-          "holeCount": 0,
-          "deathCount": 9
-        },
-        "note": "#553 sandbox-measured stall proof: orderedHoleCount is unchanged from the step above after 10 full ticks -- no vehicle, no licensed spare, no cash to buy one. This is the real, permanent state for the rest of the file; every later drill_plan/charge/sequence/blast in this file is this same stall repeated at a new site. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 353->363) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
-        }
-      ],
-      "description": "krackle and 1.0m stemming still hold from the first cycle (ChargeStep instance fields, no reset path — a blast clearing the plan does not touch them), so only the amount moves: 2 increments, 8 -> 10kg, krackle's maximum. #553 interaction-mode finding: moot regardless -- charge-all is covered by the bankruptcy overlay from tick 209 onward, same as the pattern-1 charge/sequence/blast steps above, so this is a guard step like the drill_plan step before it.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "chargedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "#553: Charge All still runs -- it charges hole:*, and holeCount is 0 (all 20 holes are still ghosts in plannedDrillHoles, per the stall proof above) -- so it charges nothing. Not a bug in this step; the panel has no way to know a hole is undrillable. Unreachable by click either way -- the bankruptcy overlay covers charge-all here too."
-      }
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
-        }
-      ],
-      "role": "guard",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Auto-sequences 0 holes, same reason as the charge step above. #553: same bankruptcy overlay as the charge step -- auto-sequence is covered too.",
-      "expect": {
-        "equals": {
-          "chargedCount": 0,
-          "sequencedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
         {
@@ -905,90 +630,18 @@
           "command": "blast"
         }
       ],
-      "description": "#553: a blast with 0 charged holes still fires (BAD rating, 0 voxels cleared, sandbox-confirmed) rather than erroring -- no new ecology/nuisance/casualty consequence, since nothing detonates. Interaction-mode finding: same bankruptcy full-screen overlay as the pattern-1 blast step -- execute is covered here too, `expect.blocked` proves it while the command still runs directly. #553-followup (issue #586 CI): ecology/nuisance dropped from the equals block below -- same real-time-accrual drift class as the tick-298 step's note above.",
+      "description": "#1313: the level has ended in a revolt with no hole charged, so there is nothing to fire: the console refuses, nothing dies, and the level-end screen covers the execute control.",
       "role": "guard",
       "expect": {
         "equals": {
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "deathCount": 9
+          "holeCount": 16,
+          "deathCount": 0,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt"
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "deathCount": 9,
-          "employeeCount": 12,
-          "vehicleCount": 0
-        },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "safety": 0,
-          "wellBeing": 0
-        },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "increased": [
-          "tickCount"
-        ],
-        "equals": {
-          "safety": 0,
-          "wellBeing": 0,
-          "deathCount": 9
-        },
-        "note": "#596/#597-followup: this 10-tick request now only advances 3 ticks (363 -> 366, not the old 313 -> 315) -- a second random event (politics_competitor_mine, not the old union_rep_secretary -- #596's event-pool dedup change reorders which event is eligible) becomes pending here and the tick loop breaks the instant it fires, before the event's own cash delta applies. Resolved by the step below. tickCount converted equals->increased (issue #596): exactly how far this batch gets before the second event interrupts it is itself timing-sensitive, the same class as the pattern-1 interruption above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "description": "#554-followup (this session, issue #586 CI): in COMMAND mode this event is still politics_competitor_mine (Price War, no wellBeing effect) -- confirmed by a full, clean command-mode run of this exact file with every #596/#597-era value below unchanged. In INTERACTION mode this checkpoint genuinely draws a different event: sandbox-reproduced identically across three independent runs as Neighbor Collapse (options: Send Rescue / Poach Contracts / Safety Audit Response) at tick 471, whose option 0 (\"Send Rescue\") lands a real wellBeing bump alongside its cash decrease. This is not an effect of leaving speed elevated after step 27's wait (disproved: resetting to `time speed:1` immediately after that wait changes nothing about which event draws here) -- draining a 16-hole charge queue in real time at all, regardless of speed, is enough real-clock-driven tick accrual to cross this event's own eligibility threshold, the same real-time-accrual-drift class this file's other notes already document for cash/ecology/nuisance, just large enough here to change which event fires rather than nudge a number. Issue #586 CI's own report (\"wellBeing should be 0 but is 4\") is this exact checkpoint, diverging by a different magnitude yet again (CI: 4, this sandbox: 8) -- two independently-observed non-zero readings at the same checkpoint, neither matching command mode's 0, confirms this is a genuine command/interaction split, not one fixed wrong number to re-pin. wellBeing is otherwise this scenario's own subject and stays `equals` everywhere else in this file (crashes to 0 and never recovers) -- this one checkpoint is the sole exception, and is dropped from `equals` rather than pinned to any single one of the (at least) three different real values now on record for it, the same treatment this file already gives cash/ecology/nuisance once they're confirmed to vary this way. tickCount dropped from this step's own expect for the same reason as the tick-283/event-choose-0 step earlier in this file -- it doesn't move during an event-choose, and the tick-10 step above already covers it directionally. Interaction-mode finding (issue #586 CI): unlike the file's other post-bankruptcy events, this one is genuinely unreachable, not a covered-by-div race -- sandbox-reproduced (scripts/_repro_temp.ts-class harness replay, real Puppeteer clicks throughout): the tick-10 step above's own blast (0-hole ghost, same as the pattern-2/3/4 blasts throughout this file) arms BlastReportModal's 3-real-second open delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts); UIManager.update (UIManager.ts:421) defers EventModal.update entirely while that report is pending-or-visible, so the event dialog never opens and #bs-event-dialog still holds stale, hidden .bs-event-choice nodes from the PREVIOUS (already-dismissed) event -- exactly the kind of stale-node trap a bare waitForSelector(selector) can't tell apart from a live dialog, which is what produced Puppeteer's own \"Node is either not clickable or not an Element\" against a display:none ancestor. Confirmed via __probeSelector that this is not a race that a longer wait fixes: right now the blast report's own Close button reads \"hidden\" (still inside its 3s delay); left running past that delay it flips to \"covered\" -- LevelEndScreen's z-index 9999 sits above BlastReportModal's shared z-index 600 (unlike the event dialog's own 10500, styles.ts), so once armed, the report can never be dismissed post-bankruptcy either, and the event stays gated behind it permanently. `blocked` proves the report's Close button (the real control standing between the player and this event) while `event choose 0` still runs directly, in whichever mode is running, to keep the rest of the file's trajectory intact. #922-followup: accurate driver-position tracking shifts the whole file's tick trajectory earlier from here on, and by this checkpoint COMMAND mode itself now draws a third distinct event, union_casual_friday (wellBeing +5, safety -10, no cash consequence) -- sandbox-confirmed deterministic across repeat command-mode runs on this branch. `decreased: [cash]` no longer holds in every environment (command mode's own event now leaves cash untouched at this checkpoint), so it drops, joining wellBeing/tickCount as fields already known not to hold mode-invariantly here.",
-      "role": "guard",
-      "expect": {
-        "blocked": ".bs-confirm-overlay [data-action=\"report-close\"]",
-        "note": "#553-followup (issue #586 CI): the report-close button this proves against is present but hidden the instant the event fires (still inside BlastReportModal's 3s real-time open delay) -- a stronger, later-timed probe against the same control reads 'covered' once the delay elapses, matching the bankruptcy overlay's own z-index over every z-index:600 modal elsewhere in this file. Either reading proves the same permanent block; 'hidden' is what a probe taken this early and reliably observes."
       },
-      "commandOutcome": "either"
+      "commandOutcome": "refused"
     },
     {
       "command": "tick 10",
@@ -1001,713 +654,37 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "tickCount": 10
+          "cash": 0,
+          "tickCount": 0
         },
         "equals": {
-          "wellBeing": 0,
-          "deathCount": 9
-        },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- the event two checkpoints back (its own note has the full finding) genuinely differs between command mode (politics_competitor_mine, no safety delta, safety continues the plain 0.05/tick DECAY_RATE recovery this note's own #596/#597-era value of 12.5 assumed) and interaction mode (Neighbor Collapse, sandbox-observed +10 safety delta, so the same 10-tick recovery lands 10.5 there instead), so no single number holds in both. wellBeing never bumped above 0 in command mode at the previous event; in interaction mode it did (see two checkpoints back) but has already crashed back to its floor by the end of THIS block in every environment observed, so wellBeing:0 stays pinned and mode-invariant here. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 366->376) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "wellBeing": 0,
-          "deathCount": 9
-        },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above (this file's own event-pool now diverges by mode from around tick 471 onward). #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 376->386) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "wellBeing": 0
-        },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 20,
-          "holeCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
-        "note": "#553: same permanently-unreachable ghosts as pattern 2 -- still no vehicle, no cash. Interaction-mode finding: same bankruptcy full-screen overlay as pattern 2's grid-tool step -- covered here too."
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "orderedHoleCount": 20,
-          "holeCount": 0,
-          "deathCount": 9
-        },
-        "note": "#553 sandbox-measured stall proof, same as pattern 2's. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 386->396) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No third random event actually fires anywhere for the rest of this file's #553 trajectory (sandbox-confirmed by direct trace through the final tick).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:8 stemming:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
-        }
-      ],
-      "description": "Back down to 8kg: 2 amount decrements off the 10kg the previous cycle left. Product and stemming untouched. #553 interaction-mode finding: charge-all is still covered by the bankruptcy overlay here, same as every charge step since pattern 1's blast -- guard step like pattern 2's.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "chargedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "#553: charges nothing, same reason as pattern 2's charge step -- holeCount is still 0."
-      }
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
-        }
-      ],
-      "role": "guard",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes. #553: same bankruptcy overlay as the charge step -- auto-sequence covered too.",
-      "expect": {
-        "equals": {
-          "chargedCount": 0,
-          "sequencedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "description": "#553: another 0-hole blast, same as pattern 2's -- fires cleanly, no new consequence. Interaction-mode finding: same bankruptcy full-screen overlay as the earlier blast steps -- execute is covered here too. #553-followup (issue #586 CI): ecology/nuisance dropped from the equals block below -- same real-time-accrual drift class as the tick-298 step's note above.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "deathCount": 9
-        },
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "deathCount": 9,
-          "employeeCount": 12,
-          "vehicleCount": 0
-        },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "wellBeing": 0
-        },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 396->406) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 406->416) -- tickCount converted equals->changedBy (issue #596). This is also the tick sandbox-measured to be where `revolted` actually flips true now (wellBeing's continuous zero streak since tick 343 crosses REVOLT_TICKS=120, WorkerRevolt.ts) -- earlier than the pre-#596/#597 trajectory's tick 445, since wellBeing no longer gets a tick-315 union-event bump to reset the streak (see the event-choose-0 step three checkpoints back). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 416->426) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "wellBeing": 0
-        },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 25,
-          "holeCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
-        "note": "#553: same permanently-unreachable ghosts as patterns 2 and 3. Interaction-mode finding: same bankruptcy full-screen overlay as patterns 2/3's grid-tool steps -- covered here too."
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "orderedHoleCount": 25,
-          "holeCount": 0,
-          "deathCount": 9
-        },
-        "note": "#553 sandbox-measured stall proof, same as patterns 2 and 3's. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 426->436) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
-        }
-      ],
-      "description": "Back up to 10kg: 2 amount increments off the 8kg the previous cycle left. Product and stemming untouched. #553 interaction-mode finding: charge-all still covered by the bankruptcy overlay, same as every charge step since pattern 1's blast -- guard step like the other stalled patterns.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "chargedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "#553: charges nothing, same reason as the other stalled patterns."
-      }
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
-        }
-      ],
-      "role": "guard",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes. #553: same bankruptcy overlay as the charge step -- auto-sequence covered too.",
-      "expect": {
-        "equals": {
-          "chargedCount": 0,
-          "sequencedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "description": "#553: the fourth and final 0-hole blast -- fires cleanly, no new consequence. Across this whole file, only the very first blast ever detonates real explosive; patterns 2-4 order holes nobody can ever drill. Interaction-mode finding: same bankruptcy full-screen overlay as the earlier blast steps -- execute is covered here too. #553-followup (issue #586 CI): ecology/nuisance dropped from the equals block below -- same real-time-accrual drift class as the tick-298 step's note above.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "deathCount": 9
-        },
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "deathCount": 9,
-          "employeeCount": 12,
-          "vehicleCount": 0
-        },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "wellBeing": 0
-        },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": true
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 436->446) -- tickCount converted equals->changedBy (issue #596). revolted flipped false->true earlier in this file now (tick 416, three tick-10 blocks back) -- see that step's own note -- so it already reads true here, not false as in the pre-#596/#597 trajectory. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": true
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 446->456) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": true
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 456->466) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": true
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 466->476) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "tickCount": 10
-        },
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": true
-        },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 476->486) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "wait_until field:tickCount equals:601 max_ticks:60",
-      "description": "#601-followup (real CI): replaces the old bare `tick 10` -- this file's own `tick 10`/`event choose 0` blocks earlier in the file are almost all protected by their own `changedBy: {tickCount: 10}` check, EXCEPT the one right after tick 469 (no such check there, by design: command mode's own trace only nets +2 there, a real event landing early, not the full 10). `changedBy` only proves each block's own relative advance, not the running absolute total, so a one-tick difference in exactly when that one unprotected block's event fires between command and interaction mode -- the same ordinary UI-click-vs-console timing noise documented throughout this session's other files -- silently carries an absolute tickCount deficit all the way to this, the file's first step that pins tickCount as a hard `equals`, undetected until here (real CI: 601 expected, 592 actual, a 9-tick shortfall). `waitUntil` closes whatever gap actually exists, from wherever it actually originated, rather than guessing which specific block needs a bigger pad: every field this step and the four observe steps after it still check (deathCount, employeeCount, bankrupt, revolted, wellBeing, levelEnded, levelEndReason) is already floor/ceiling-clamped by tick 601 in every environment this file's own notes describe, so a handful of extra ticks closing this gap changes nothing else.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "tickCount",
-          "equals": 601,
-          "maxTicks": 60,
-          "timeoutMs": 30000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 601,
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": true
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 601,
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
+          "tickCount": 383,
           "levelEnded": true,
-          "levelEndReason": "bankruptcy",
-          "revolted": true
+          "levelEndReason": "worker_revolt",
+          "revolted": true,
+          "deathCount": 0
         },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above; command mode still lands 18.5 here (confirmed by a full clean command-mode run), interaction mode does not, and this file no longer assumes the two modes draw the same random events from around tick 471 onward. #596/#597-followup: tickCount corrected 445->496 -- nothing about this file's event timeline is uncertain past tick 366 (direct trace confirms no third random event fires through the end, same as before, just at the new shifted ticks) -- this held for command mode, still does; interaction mode's own extra event is covered above. Ecology/nuisance stay dropped -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note), since they accumulate from a slightly-wrong base rather than from anything decided at any one tick. #601-followup: wellBeing dropped too, same command/interaction event-divergence class as safety just above it, now precisely characterized: the tick-471 event-choose-0 step's own note already documents that interaction mode genuinely draws a different event there (Neighbor Collapse, wellBeing bump) than command mode does (Price War, no wellBeing effect) -- #601's harness fix doesn't cause this, it exposes it, by landing the wait_until step just above exactly on tick 601 (deterministically, in both modes) instead of failing earlier on tickCount itself. Direct trace confirms the bump fully decays back to wellBeing:0 (this scenario's own normal, permanent floor -- 'crashes to 0 and never recovers' per the event-choose-0 step's note) within about 10 more ticks in every interaction-mode run observed, reproduced identically (6.05, twice) -- but not by exactly tick 601, and command mode's own trace never carries the bump in the first place, so no single shared tick number can both stay exactly 601 and guarantee wellBeing has finished settling in every environment. tickCount itself stays a hard equals (#601's own fix makes it land on the correct value deterministically); wellBeing is the one field this specific checkpoint cannot also pin without re-coupling the two modes' independent event draws."
+        "note": "#1313: frozen mine -- a tick after the end advances nothing, cash and tickCount stay put."
       }
     },
     {
-      "command": "finances",
+      "command": "state full",
       "interaction": [
         {
           "type": "command",
-          "command": "finances"
+          "command": "state full"
         }
       ],
       "role": "observe",
       "expect": {
         "equals": {
-          "bankrupt": true,
-          "tickCount": 601
+          "holeCount": 16,
+          "deathCount": 0,
+          "employeeCount": 12,
+          "levelEnded": true
         }
-      }
-    },
-    {
-      "command": "stats",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "stats"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 601,
-          "employeeCount": 12
-        }
-      }
+      },
+      "description": "#1313: read-only state after the revolt: nobody died (no blast ever fired) and the crew is intact."
     },
     {
       "command": "campaign status",
@@ -1720,16 +697,17 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 601,
-          "deathCount": 9,
-          "employeeCount": 12,
-          "bankrupt": true,
+          "wellBeing": 0,
+          "tickCount": 383,
+          "revolted": true,
           "levelEnded": true,
-          "levelEndReason": "bankruptcy",
-          "revolted": true
+          "levelEndReason": "worker_revolt",
+          "deathCount": 0,
+          "employeeCount": 12
         },
-        "note": "#553: this file's premise holds both ways at once. Drilling is real, queued, vehicle-gated work: a single driller sinks the 4x4 pattern (interrupted once by a real random event, union_unlucky_days as of #596/#597 -- not the pre-#596 weather_minor_tremor -- at tick 175, not the pre-#596 tick 125) by tick 343, and 12 employees' payroll with zero income anywhere in this file crosses the bankruptcy threshold before that pattern even finishes drilling (BANKRUPTCY_GRACE_TICKS=100 completes at tick 209, per Bankruptcy.ts) -- levelEndReason is 'bankruptcy' because that fires first, same conclusion as before. But pattern 1's blast, once it finally lands, is catastrophic enough (16 holes x 8kg krackle, CATASTROPHIC rating, 90.3m throw) to kill all 5 staffed employees and destroy the only drill_rig this file ever owns -- and with no vehicle, no licensed spare worth the risk, and cash already deep in the negative, patterns 2-4 order 65 more holes that can never be drilled. The survivors' well-being, pinned at 0 by fatigue collapse with no living quarters anywhere in this file, stays there long enough (REVOLT_TICKS=120, WorkerRevolt.ts) that revolted flips true too -- now at tick 416 (#596/#597: the second random event, politics_competitor_mine, carries no wellBeing delta, so unlike the old union_rep_secretary draw there is no tick-315 bump left to reset the revolt streak, and it completes earlier than the pre-#596/#597 file's tick 445) -- the workforce actually revolts this time, well after the mine is already bankrupt."
-      }
+        "note": "final state: the revolt at tick 383 is the level's only end, and the mine stayed frozen after it. #1313."
+      },
+      "description": "#1313: final campaign status -- still the revolt, still tick 383."
     }
   ]
 }
