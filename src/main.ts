@@ -50,6 +50,7 @@ import { createWeatherCycle } from './core/weather/WeatherCycle.js';
 import { Random } from './core/math/Random.js';
 import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
+import { hasLevelEnded } from './core/engine/GameOverConditions.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
 // --- 3D Scene ---
@@ -971,6 +972,7 @@ uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`time speed ${speed}`);
 });
 uiManager.setQuitHandler(() => {
+  levelEndScreen.hide();
   mainMenu.show();
   uiManager.hide();
 });
@@ -1156,6 +1158,11 @@ new KeyboardShortcuts({
 let accumulatedGameMs = 0;
 let hadPendingEvent = false;
 
+/** A full-screen menu covers the mine; the simulation must not run behind it. */
+function fullScreenMenuUp(): boolean {
+  return mainMenu.visible || worldMap.visible || levelEndScreen.visible || loadingScreen.visible;
+}
+
 scene.start((dt) => {
   gameRenderer.update(dt);
   entityHighlight.update(dt);
@@ -1171,7 +1178,7 @@ scene.start((dt) => {
   }
 
   // Advance game time
-  if (ctx.state && !ctx.state.isPaused && autoTickEnabled) {
+  if (ctx.state && !ctx.state.isPaused && autoTickEnabled && !hasLevelEnded(ctx.state) && !fullScreenMenuUp()) {
     accumulatedGameMs += dt * 1000;
     // Tick every BASE_TICK_MS ms; timeScale is handled inside tickCommand
     while (accumulatedGameMs >= BASE_TICK_MS) {
@@ -1183,6 +1190,9 @@ scene.start((dt) => {
         break;
       }
     }
+  } else {
+    // Gate closed: drop banked time so reopening does not burst-tick.
+    accumulatedGameMs = 0;
   }
 
   // Play chime when a new pending event appears
@@ -1198,7 +1208,7 @@ scene.start((dt) => {
   if (ctx.state) {
     uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
     if (!mainMenu.visible) uiManager.show();
-    savesModal.onTick(ctx.state);
+    if (!fullScreenMenuUp()) savesModal.onTick(ctx.state);
   }
   if (ctx.state && !tutorial.isActive) levelEndScreen.update(ctx.state);
 });
