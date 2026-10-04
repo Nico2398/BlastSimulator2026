@@ -9,7 +9,8 @@ import { el } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { CampaignState } from '../../core/campaign/Campaign.js';
-import { getAllLevels, type LevelDef } from '../../core/campaign/Level.js';
+import { getCampaignLevels } from '../../core/campaign/Campaign.js';
+import type { LevelDef } from '../../core/campaign/Level.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 
 /** Card art + short category label per biome — the 3 real campaign biomes only (tutorial_pit is excluded from this screen). */
@@ -150,7 +151,7 @@ export class WorldMap {
   dispose(): void { this.overlay.remove(); }
 
   private render(campaign: CampaignState | null): void {
-    const levels = getAllLevels().filter(l => l.difficultyTier > 0);
+    const levels = getCampaignLevels();
 
     let earnedStars = 0;
     this.cardGrid.replaceChildren(...levels.map((lvl, idx) => {

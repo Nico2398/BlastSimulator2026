@@ -4,7 +4,7 @@ import { LevelEndScreen } from '../../../../src/ui/screens/LevelEndScreen.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { LevelStats } from '../../../../src/core/campaign/SuccessTracker.js';
-import { setLocale } from '../../../../src/core/i18n/I18n.js';
+import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import { TICKS_PER_DAY } from '../../../../src/core/config/balance.js';
 
 function mount(): { container: HTMLDivElement; screen: LevelEndScreen } {
@@ -481,6 +481,90 @@ describe('LevelEndScreen', () => {
       const text = container.querySelector('#bs-level-end-screen')!.textContent!;
       expect(text).toContain('TARGET REACHED');
       expect(text).not.toContain('THE CREW HAS WALKED OUT');
+      screen.dispose();
+    });
+  });
+
+  describe('campaign finale (#1320)', () => {
+    // A failing assertion skips screen.dispose(); clear leaked roots so one failure cannot cascade.
+    afterEach(() => { document.body.innerHTML = ''; });
+
+    function finale(levelId: string, complete: boolean): GameState {
+      const s = stateAtLevelEnd(THREE_STAR, levelId);
+      s.campaign.campaignComplete = complete;
+      return s;
+    }
+    const rootText = (c: HTMLElement): string => c.querySelector('#bs-level-end-screen')!.textContent!;
+
+    it('new i18n keys resolve to real text', () => {
+      expect(t('ui.level_end.campaign_complete.headline')).not.toBe('ui.level_end.campaign_complete.headline');
+      expect(t('ui.level_end.campaign_complete.body')).not.toBe('ui.level_end.campaign_complete.body');
+    });
+
+    it('victory on treranium_depths with campaignComplete shows headline and body', () => {
+      const { container, screen } = mount();
+      screen.update(finale('treranium_depths', true));
+      const text = rootText(container);
+      expect(text).toContain(t('ui.level_end.campaign_complete.headline'));
+      expect(text).toContain(t('ui.level_end.campaign_complete.body'));
+      expect(text).toContain('BACK TO PORTFOLIO');
+      screen.dispose();
+    });
+
+    it('treranium_depths victory without campaignComplete shows no finale text', () => {
+      const { container, screen } = mount();
+      screen.update(finale('treranium_depths', false));
+      expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.headline'));
+      screen.dispose();
+    });
+
+    it('shows the finale when the stored flag is false but all 3 real levels are completed', () => {
+      const { container, screen } = mount();
+      const s = finale('treranium_depths', false);
+      for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) s.campaign.levels[id]!.completed = true;
+      screen.update(s);
+      expect(rootText(container)).toContain(t('ui.level_end.campaign_complete.headline'));
+      screen.dispose();
+    });
+
+    it.each(['dusty_hollow', 'grumpstone_ridge', 'tutorial_pit'])('victory on %s shows no finale text', id => {
+      const { container, screen } = mount();
+      screen.update(finale(id, true));
+      expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.headline'));
+      expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.body'));
+      screen.dispose();
+    });
+
+    it('finale text clears after a defeat render and after a non-final victory', () => {
+      const { container, screen } = mount();
+      screen.update(finale('treranium_depths', true));
+      expect(rootText(container)).toContain(t('ui.level_end.campaign_complete.headline'));
+      const mid = finale('treranium_depths', true);
+      mid.levelEnded = false;
+      mid.levelEndReason = null;
+      screen.update(mid);
+      const d = stateAtDefeat('bankruptcy', 'treranium_depths');
+      d.campaign.campaignComplete = true;
+      screen.update(d);
+      expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.headline'));
+      screen.update(mid);
+      screen.update(finale('dusty_hollow', false));
+      expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.headline'));
+      expect(rootText(container)).not.toContain(t('ui.level_end.campaign_complete.body'));
+      screen.dispose();
+    });
+
+    it('refreshLocale switches the finale text to French', () => {
+      const { container, screen } = mount();
+      screen.update(finale('treranium_depths', true));
+      const enHeadline = t('ui.level_end.campaign_complete.headline');
+      setLocale('fr');
+      const frHeadline = t('ui.level_end.campaign_complete.headline');
+      expect(frHeadline).not.toBe(enHeadline);
+      screen.refreshLocale();
+      expect(rootText(container)).toContain(frHeadline);
+      expect(rootText(container)).toContain(t('ui.level_end.campaign_complete.body'));
+      expect(rootText(container)).not.toContain(enHeadline);
       screen.dispose();
     });
   });

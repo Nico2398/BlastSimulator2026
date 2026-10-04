@@ -16,7 +16,8 @@ import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
-import { getLevel, getAllLevels } from '../../core/campaign/Level.js';
+import { getCampaignLevels, isCampaignDone, isFinalCampaignLevel } from '../../core/campaign/Campaign.js';
+import { getLevel } from '../../core/campaign/Level.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { GameState } from '../../core/state/GameState.js';
 
@@ -41,6 +42,7 @@ export class LevelEndScreen {
   private readonly starRow: HTMLElement;
   private readonly headlineEl: HTMLElement;
   private readonly recapEl: HTMLElement;
+  private readonly campaignCompleteEl: HTMLElement;
   private readonly statGridEl: HTMLElement;
   private readonly starRatingTitle: HTMLElement;
   private readonly starRatingRows: HTMLElement;
@@ -83,7 +85,11 @@ export class LevelEndScreen {
     this.recapEl = el('span', { attrs: {
       style: 'font:400 14px/1.6 var(--bsx-font-ui);color:var(--bsx-text-secondary);text-align:center;max-width:520px',
     } });
-    banner.append(this.starRow, this.headlineEl, this.recapEl);
+    this.campaignCompleteEl = el('span', { attrs: {
+      style: 'display:none;font:700 14px/1.6 var(--bsx-font-ui);color:var(--bsx-amber);text-align:center;max-width:520px',
+    } });
+    this.campaignCompleteEl.id = 'bs-level-end-campaign-complete';
+    banner.append(this.starRow, this.headlineEl, this.recapEl, this.campaignCompleteEl);
 
     this.statGridEl = el('div');
 
@@ -212,6 +218,8 @@ export class LevelEndScreen {
     this.starRow.replaceChildren();
     this.headlineEl.textContent = '';
     this.recapEl.textContent = '';
+    this.campaignCompleteEl.textContent = '';
+    this.campaignCompleteEl.style.display = 'none';
     this.statGridEl.replaceChildren();
     this.starRatingRows.replaceChildren();
     this.continueBtn.textContent = '';
@@ -229,7 +237,7 @@ export class LevelEndScreen {
   private nextLevelId(state: GameState): string | null {
     const activeId = state.campaign.activeLevelId;
     if (!activeId) return null;
-    const all = getAllLevels();
+    const all = getCampaignLevels();
     const idx = all.findIndex(l => l.id === activeId);
     if (idx < 0 || idx + 1 >= all.length) return null;
     return all[idx + 1]!.id;
@@ -249,7 +257,10 @@ export class LevelEndScreen {
       return star;
     }));
 
-    this.headlineEl.textContent = t('ui.level_end.victory.headline');
+    const campaignDone = activeId !== null && isFinalCampaignLevel(activeId) && isCampaignDone(state.campaign);
+    this.headlineEl.textContent = t(campaignDone ? 'ui.level_end.campaign_complete.headline' : 'ui.level_end.victory.headline');
+    this.campaignCompleteEl.textContent = campaignDone ? t('ui.level_end.campaign_complete.body') : '';
+    this.campaignCompleteEl.style.display = campaignDone ? '' : 'none';
     this.recapEl.textContent = t('ui.level_end.victory.recap', {
       level: level ? t(level.nameKey) : '',
       profit: `$${formatMoney(stats.totalWealth)}`,

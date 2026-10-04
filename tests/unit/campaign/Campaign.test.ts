@@ -5,8 +5,11 @@ import {
   startLevel,
   getLevelProgress,
   returnToWorldMap,
+  isCampaignLevel,
+  isFinalCampaignLevel,
+  isCampaignComplete,
 } from '../../../src/core/campaign/Campaign.js';
-import { getAllLevels } from '../../../src/core/campaign/Level.js';
+import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 // LevelProgress is part of campaign state — no extra imports needed
@@ -97,5 +100,87 @@ describe('Campaign state and progression (7.2)', () => {
 
     expect(getLevelProgress(restored.campaign, levels[0]!.id)?.completed).toBe(true);
     expect(getLevelProgress(restored.campaign, levels[1]!.id)?.unlocked).toBe(true);
+  });
+});
+
+describe('campaign completion excludes the tutorial (#1320)', () => {
+  const REAL = ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths'];
+
+  function win(c: ReturnType<typeof createCampaignState>, id: string): void {
+    recordProfit(c, id, getLevel(id)!.unlockThreshold);
+  }
+
+  it('isCampaignLevel is true for tier > 0 levels', () => {
+    for (const id of REAL) expect(isCampaignLevel(getLevel(id)!)).toBe(true);
+  });
+
+  it('isCampaignLevel is false for the tutorial (tier 0)', () => {
+    expect(isCampaignLevel(getLevel('tutorial_pit')!)).toBe(false);
+    expect(isCampaignLevel({ difficultyTier: 0 })).toBe(false);
+  });
+
+  it('isFinalCampaignLevel is true only for treranium_depths', () => {
+    expect(isFinalCampaignLevel('treranium_depths')).toBe(true);
+    expect(isFinalCampaignLevel('dusty_hollow')).toBe(false);
+    expect(isFinalCampaignLevel('grumpstone_ridge')).toBe(false);
+    expect(isFinalCampaignLevel('tutorial_pit')).toBe(false);
+    expect(isFinalCampaignLevel('nowhere')).toBe(false);
+  });
+
+  it('completing the 3 real levels (tutorial untouched) sets campaignComplete', () => {
+    const c = createCampaignState();
+    for (const id of REAL) win(c, id);
+    expect(getLevelProgress(c, 'tutorial_pit')?.completed).toBe(false);
+    expect(c.campaignComplete).toBe(true);
+  });
+
+  it('two real levels do not complete the campaign', () => {
+    const c = createCampaignState();
+    win(c, 'dusty_hollow');
+    win(c, 'grumpstone_ridge');
+    expect(c.campaignComplete).toBe(false);
+  });
+
+  it('only the tutorial does not complete the campaign', () => {
+    const c = createCampaignState();
+    win(c, 'tutorial_pit');
+    expect(c.campaignComplete).toBe(false);
+  });
+
+  it('tutorial plus all 3 real levels completes, in any order', () => {
+    const orders = [
+      ['tutorial_pit', ...REAL],
+      [...REAL, 'tutorial_pit'],
+      ['grumpstone_ridge', 'tutorial_pit', 'treranium_depths', 'dusty_hollow'],
+    ];
+    for (const order of orders) {
+      const c = createCampaignState();
+      for (const id of order) win(c, id);
+      expect(c.campaignComplete).toBe(true);
+    }
+  });
+
+  it('replaying a completed level does not flip campaignComplete back', () => {
+    const c = createCampaignState();
+    for (const id of REAL) win(c, id);
+    recordProfit(c, 'dusty_hollow', 1);
+    expect(c.campaignComplete).toBe(true);
+  });
+
+  it('isCampaignComplete derives from levels, ignoring a stale stored flag', () => {
+    const c = createCampaignState();
+    expect(isCampaignComplete(c)).toBe(false);
+    for (const id of REAL) c.levels[id]!.completed = true;
+    c.campaignComplete = false; // stale
+    expect(isCampaignComplete(c)).toBe(true);
+    c.levels['treranium_depths']!.completed = false;
+    c.campaignComplete = true; // stale the other way
+    expect(isCampaignComplete(c)).toBe(false);
+  });
+
+  it('isCampaignComplete ignores the tutorial entry', () => {
+    const c = createCampaignState();
+    c.levels['tutorial_pit']!.completed = true;
+    expect(isCampaignComplete(c)).toBe(false);
   });
 });

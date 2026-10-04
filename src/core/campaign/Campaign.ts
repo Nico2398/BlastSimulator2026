@@ -4,6 +4,7 @@
 // GameState is reset when starting a new level.
 
 import { getAllLevels, getLevel } from './Level.js';
+import type { LevelDef } from './Level.js';
 
 // ── Types ──
 
@@ -24,7 +25,7 @@ export interface CampaignState {
   levels: Record<string, LevelProgress>;
   /** ID of the currently active level, or null if on world map. */
   activeLevelId: string | null;
-  /** True when all 3 levels have been completed. */
+  /** True when all campaign levels (tier > 0; the tutorial is excluded) have been completed. */
   campaignComplete: boolean;
 }
 
@@ -82,7 +83,7 @@ export function recordProfit(
   if (!wasCompleted && nowComplete) {
     entry.completed = true;
     _unlockNext(campaign, levelId);
-    _checkCampaignComplete(campaign);
+    campaign.campaignComplete = isCampaignComplete(campaign);
     return true;
   }
 
@@ -99,10 +100,27 @@ function _unlockNext(campaign: CampaignState, completedId: string): void {
   if (entry) entry.unlocked = true;
 }
 
-/** Check if all levels are completed; set campaignComplete flag. */
-function _checkCampaignComplete(campaign: CampaignState): void {
-  const all = getAllLevels();
-  campaign.campaignComplete = all.every(l => campaign.levels[l.id]?.completed === true);
+/** True when the level counts toward campaign completion (tier > 0; the tutorial does not). */
+export function isCampaignLevel(level: Pick<LevelDef, 'difficultyTier'>): boolean {
+  return level.difficultyTier > 0;
+}
+
+/** Campaign levels in order (tier > 0; the tutorial is excluded). */
+export function getCampaignLevels(): LevelDef[] {
+  return getAllLevels().filter(isCampaignLevel);
+}
+
+/** True when levelId is the last campaign level (highest-ordered tier > 0 level). */
+export function isFinalCampaignLevel(levelId: string): boolean {
+  const campaignLevels = getCampaignLevels();
+  return campaignLevels[campaignLevels.length - 1]?.id === levelId;
+}
+
+/** True when every campaign level (tier > 0) is completed. */
+export function isCampaignComplete(campaign: CampaignState): boolean {
+  const campaignLevels = getCampaignLevels();
+  return campaignLevels.length > 0
+    && campaignLevels.every(l => campaign.levels[l.id]?.completed === true);
 }
 
 /**
@@ -127,4 +145,9 @@ export function getLevelProgress(
   levelId: string,
 ): LevelProgress | undefined {
   return campaign.levels[levelId];
+}
+
+/** True when the stored campaignComplete flag is set or every campaign level is completed. */
+export function isCampaignDone(campaign: CampaignState): boolean {
+  return campaign.campaignComplete || isCampaignComplete(campaign);
 }
