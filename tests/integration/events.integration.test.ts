@@ -266,7 +266,7 @@ describe('Event system', () => {
 
   it('tickEventSystem processes follow-up queue before timers', () => {
     const eventState = createEventSystemState();
-    queueFollowUp(eventState, 'union_coffee_uprising');
+    queueFollowUp(eventState, 'union_strike_aftermath');
 
     // pendingEvent should be null initially
     expect(eventState.pendingEvent).toBeNull();
@@ -279,9 +279,9 @@ describe('Event system', () => {
 
     // Should pick up the follow-up event
     expect(result).not.toBeNull();
-    expect(result!.eventId).toBe('union_coffee_uprising');
+    expect(result!.eventId).toBe('union_strike_aftermath');
     expect(eventState.pendingEvent).not.toBeNull();
-    expect(eventState.pendingEvent!.eventId).toBe('union_coffee_uprising');
+    expect(eventState.pendingEvent!.eventId).toBe('union_strike_aftermath');
   });
 
   // ── 5. detectTrafficJam (#1208: chokepoint / position based) ──────────────
@@ -423,8 +423,8 @@ describe('Event system', () => {
 
   it('followUpQueue drains when tickEventSystem processes them', () => {
     const eventState = createEventSystemState();
-    queueFollowUp(eventState, 'union_coffee_uprising');
-    queueFollowUp(eventState, 'union_overtime_revolt');
+    queueFollowUp(eventState, 'union_strike_aftermath');
+    queueFollowUp(eventState, 'politics_mayor_wins');
     expect(eventState.followUpQueue).toHaveLength(2);
 
     const evCtx = makeEventCtx();
@@ -432,7 +432,7 @@ describe('Event system', () => {
 
     // First follow-up should have been consumed; second stays in queue
     expect(eventState.followUpQueue).toHaveLength(1);
-    expect(eventState.followUpQueue[0]).toBe('union_overtime_revolt');
+    expect(eventState.followUpQueue[0]).toBe('politics_mayor_wins');
   });
 
   // ── 9. time command shows speed and pause state ────────────────────────────

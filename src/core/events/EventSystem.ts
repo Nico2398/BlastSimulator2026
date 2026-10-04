@@ -5,8 +5,8 @@ import type { TrafficJam } from './TrafficJams.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
-import { getEventsByCategory } from './EventPool.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS } from '../config/balance.js';
+import { getEventsByCategory, getEventById } from './EventPool.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -137,10 +137,15 @@ export function tickEventSystem(
   // Don't fire new events while one is pending
   if (state.pendingEvent) return null;
 
-  // Check follow-up queue first, skipping already-fired events
-  while (state.followUpQueue.length > 0) {
-    const eventId = state.followUpQueue.shift()!;
-    if (!state.firedEventIds.includes(eventId)) {
+  // Follow-up queue: drop stale entries (already fired, unknown, or not follow-up-only),
+  // then count down once per tick. While counting, timers run as with an empty queue.
+  state.followUpQueue = state.followUpQueue.filter(id =>
+    !state.firedEventIds.includes(id) && getEventById(id)?.followUpOnly === true);
+  if (state.followUpQueue.length > 0) {
+    state.followUpDelayTicks--;
+    if (state.followUpDelayTicks <= 0) {
+      const eventId = state.followUpQueue.shift()!;
+      state.followUpDelayTicks = FOLLOWUP_DELAY_TICKS;
       state.firedEventIds.push(eventId);
       state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
       state.lastEventTick = ctx.tickCount;
@@ -200,6 +205,7 @@ export function clearLastOutcome(state: EventSystemState): void {
 
 /** Queue a follow-up event. */
 export function queueFollowUp(state: EventSystemState, eventId: string): void {
+  if (state.followUpQueue.length === 0) state.followUpDelayTicks = FOLLOWUP_DELAY_TICKS;
   state.followUpQueue.push(eventId);
 }
 
@@ -221,7 +227,7 @@ export function selectEvent(
   firedEventIds: string[] = [],
 ): EventDef | null {
   const events = getEventsByCategory(category);
-  const available = events.filter(e => !firedEventIds.includes(e.id) && e.canFire(ctx));
+  const available = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx));
 
   if (available.length === 0) return null;
 

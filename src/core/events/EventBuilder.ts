@@ -36,6 +36,7 @@ export function ev(
     }),
     weightCoeff: opts.weight,
     canFire: opts.canFire ?? (() => true),
+    ...(opts.followUpOnly ? { followUpOnly: true } : {}),
   };
 }
 
