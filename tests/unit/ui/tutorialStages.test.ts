@@ -263,27 +263,28 @@ describe('toggle-survey-overlay stage fallback (#905)', () => {
   });
 });
 
+// Mirrors BlastWorkshop.ts's real DOM shape (see the #926 describe below).
+function withBox(el: HTMLElement): HTMLElement {
+  el.getBoundingClientRect = () => ({
+    width: 40, height: 20, top: 0, left: 0, right: 40, bottom: 20, x: 0, y: 0,
+    toJSON: () => ({}),
+  }) as DOMRect;
+  return el;
+}
+
+function makeButton(attrs: Record<string, string>, parent: HTMLElement): HTMLButtonElement {
+  const btn = document.createElement('button');
+  for (const [k, v] of Object.entries(attrs)) btn.setAttribute(k, v);
+  parent.appendChild(btn);
+  withBox(btn);
+  return btn;
+}
+
 describe('sequence stage list — Charge-tab reachability regression (#926)', () => {
   // Mirrors BlastWorkshop.ts's real DOM shape: a toolbar button that opens
   // the panel, a `#bs-blast-panel` root holding a tab strip (`[data-step]`,
   // always on screen regardless of which tab is active) and one body per
   // step (display:none unless its own tab is the active one).
-  function withBox(el: HTMLElement): HTMLElement {
-    el.getBoundingClientRect = () => ({
-      width: 40, height: 20, top: 0, left: 0, right: 40, bottom: 20, x: 0, y: 0,
-      toJSON: () => ({}),
-    }) as DOMRect;
-    return el;
-  }
-
-  function makeButton(attrs: Record<string, string>, parent: HTMLElement): HTMLButtonElement {
-    const btn = document.createElement('button');
-    for (const [k, v] of Object.entries(attrs)) btn.setAttribute(k, v);
-    parent.appendChild(btn);
-    withBox(btn);
-    return btn;
-  }
-
   beforeEach(() => {
     document.body.innerHTML = '';
   });
@@ -356,6 +357,88 @@ describe('sequence stage list — Charge-tab reachability regression (#926)', ()
     const index = resolveStageIndex(stages);
     expect(stages[index]!.target).toBe('#bs-blast-panel [data-action="auto-sequence"]');
     expect(isReachable(stages[index]!.target)).toBe(true);
+  });
+});
+
+describe('#1337 evacuate-zone manual-tab reachability', () => {
+  const FIRE_TAB = '#bs-blast-panel [data-step="5"]';
+  const HORN = '#bs-blast-panel [data-action="sound-horn"]';
+
+  function mount(opts: { panel: boolean; fireVisible: boolean }): void {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    document.body.appendChild(toolbar);
+    makeButton({ 'data-panel': 'blast' }, toolbar);
+    if (!opts.panel) return;
+
+    const panel = document.createElement('div');
+    panel.id = 'bs-blast-panel';
+    document.body.appendChild(panel);
+    const strip = document.createElement('div');
+    panel.appendChild(strip);
+    for (const n of ['3', '4', '5']) makeButton({ 'data-step': n }, strip);
+
+    const sequenceBody = document.createElement('div');
+    sequenceBody.style.display = opts.fireVisible ? 'none' : '';
+    panel.appendChild(sequenceBody);
+    makeButton({ 'data-action': 'auto-sequence' }, sequenceBody);
+
+    const fireBody = document.createElement('div');
+    fireBody.style.display = opts.fireVisible ? '' : 'none';
+    panel.appendChild(fireBody);
+    makeButton({ 'data-action': 'sound-horn' }, fireBody);
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('resolves to the Fire tab button when the player manually showed Sequence and Fire body is hidden', () => {
+    mount({ panel: true, fireVisible: false });
+    const stages = TUTORIAL_STAGES['evacuate-zone']!;
+    const resolved = stages[resolveStageIndex(stages)]!;
+    expect(resolved.target).toBe(FIRE_TAB);
+    expect(resolved).not.toBe(stages[0]);
+    expect(isReachable(resolved.target)).toBe(true);
+  });
+
+  it('resolves to Sound the Horn once the Fire body is visible', () => {
+    mount({ panel: true, fireVisible: true });
+    const stages = TUTORIAL_STAGES['evacuate-zone']!;
+    const resolved = stages[resolveStageIndex(stages)]!;
+    expect(resolved.target).toBe(HORN);
+    expect(isReachable(resolved.target)).toBe(true);
+  });
+
+  it('resolves to the toolbar Blast stage when the Blast panel is not open', () => {
+    mount({ panel: false, fireVisible: false });
+    const stages = TUTORIAL_STAGES['evacuate-zone']!;
+    expect(resolveStageIndex(stages)).toBe(0);
+  });
+
+  it('lists exactly toolbar, Fire tab, Sound the Horn in order', () => {
+    const stages = TUTORIAL_STAGES['evacuate-zone']!;
+    expect(stages).toHaveLength(3);
+    expect(stages.map((st) => st.hintKey)).toEqual([
+      'tutorial.stage.open_blast',
+      'tutorial.stage.open_fire_tab',
+      'tutorial.stage.sound_horn',
+    ]);
+    expect(stages[1]!.target).toBe(FIRE_TAB);
+    expect(stages[2]!.target).toBe(HORN);
+  });
+
+  it('has distinct open_fire_tab hint text in en and fr and no spentWhen on any stage', () => {
+    const key = 'tutorial.stage.open_fire_tab';
+    const enText = (en as Record<string, string>)[key];
+    const frText = (fr as Record<string, string>)[key];
+    expect(enText, 'missing en key').toBeTruthy();
+    expect(frText, 'missing fr key').toBeTruthy();
+    expect(enText).not.toBe(frText);
+    expect(enText).not.toBe((en as Record<string, string>)['tutorial.stage.sound_horn']);
+    for (const st of TUTORIAL_STAGES['evacuate-zone']!) {
+      expect((st as { spentWhen?: unknown }).spentWhen).toBeUndefined();
+    }
   });
 });
 

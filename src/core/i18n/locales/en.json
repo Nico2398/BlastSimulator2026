@@ -3052,6 +3052,7 @@
   "tutorial.stage.open_sequence_tab": "Click the 3 Sequence tab in the Blast panel.",
   "tutorial.stage.auto_sequence": "Press Auto Sequence (V-Pattern) to set the detonation delays.",
   "tutorial.stage.sound_horn": "Click Sound the Horn and clear the blast zone before firing.",
+  "tutorial.stage.open_fire_tab": "Click the 5 Fire tab in the Blast panel.",
   "tutorial.stage.execute": "Press Fire.",
   "tutorial.stage.blast_confirm": "Confirm the blast.",
   "tutorial.stage.event_choose": "Pick one of the answers.",
