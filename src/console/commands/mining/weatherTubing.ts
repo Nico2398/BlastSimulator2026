@@ -69,7 +69,7 @@ export function tubingCommand(
   if (sub === 'install') {
     const holeSpec = named['hole'] ?? '';
     const holeId = resolveHoleId(ctx.state!, holeSpec, false);
-    const result = installTubing(ctx.state!.tubingState, holeId);
+    const result = installTubing(ctx.state!.tubingState, holeId, ctx.state!.drillHoles.map(h => h.id));
     return { success: result.success, output: result.message };
   }
 

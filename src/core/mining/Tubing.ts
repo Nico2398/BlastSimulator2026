@@ -51,7 +51,9 @@ export function buyTubing(
 export function installTubing(
   state: TubingState,
   holeId: string,
+  knownHoleIds: readonly string[],
 ): TubingResult {
+  void knownHoleIds; // TODO: implement unknown-hole refusal
   if (state.inventory <= 0) {
     return { success: false, message: 'No tubing in inventory', cost: 0 };
   }
@@ -61,6 +63,20 @@ export function installTubing(
   state.inventory--;
   state.installedHoles.add(holeId);
   return { success: true, message: `Tubing installed on hole ${holeId}`, cost: 0 };
+}
+
+/** Drop tubing record for a hole (no refund). Returns whether the hole had tubing. */
+export function removeHoleTubing(state: TubingState, holeId: string): boolean {
+  void state;
+  void holeId;
+  // TODO: implement
+  return false;
+}
+
+/** Empty installedHoles, keeping inventory. */
+export function clearTubing(state: TubingState): void {
+  void state;
+  // TODO: implement
 }
 
 /** Check if a hole has tubing installed. */
