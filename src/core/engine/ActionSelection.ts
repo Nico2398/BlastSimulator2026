@@ -339,6 +339,17 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 }
 
 /**
+ * True unless `action` is a charge_hole order whose hole is still only
+ * planned (its drill order has not landed yet).
+ */
+export function isChargeHoleClaimable(state: GameState, action: PendingAction): boolean {
+  if (action.type !== 'charge_hole') return true;
+  const holeId = action.payload['holeId'];
+  if (typeof holeId !== 'string') return true;
+  return !state.plannedDrillHoles.some(h => h.id === holeId);
+}
+
+/**
  * True when `action`'s stuck-abandon backoff (if any) has expired, or it never had one.
  * See PendingAction.stuckBackoffUntilTick.
  */
@@ -384,6 +395,7 @@ export function findStarvedActionForEmployee(state: GameState, employee: Employe
     a.requiredVehicleRole === null &&
     !isEvacuationHoldActive(state, a) &&
     isActionPastStuckBackoff(state, a) &&
+    isChargeHoleClaimable(state, a) &&
     state.tickCount - a.queuedAtTick >= ACTION_STARVATION_TICK_THRESHOLD);
 
   return selectBestActionForEmployee(state, employee, candidates);

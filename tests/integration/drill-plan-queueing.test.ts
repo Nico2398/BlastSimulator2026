@@ -16,6 +16,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { tickUntil } from './helpers.js';
+import { getFinancialReport } from '../../src/core/economy/Finance.js';
 
 describe('drill_plan grid — queues drill_hole actions instead of writing holes instantly (#553)', () => {
   afterEach(() => {
@@ -295,5 +296,311 @@ describe('drill_plan grid — dense 1m-spacing grid under agent occupancy conver
     // result.abandoned reports at the unit level — never fired across a
     // successful, fully-converged run.
     expect(tickOutputs.some(output => output.includes('ACTION ABANDONED'))).toBe(false);
+  });
+});
+
+// ── blast_plan load queues orders instead of writing finished holes (#1342) ──
+
+function explosivesTotal(state: { finances: Parameters<typeof getFinancialReport>[0]; tickCount: number }): number {
+  const report = getFinancialReport(state.finances, state.tickCount);
+  return report.expensesByCategory.find(c => c.category === 'explosives')?.total ?? 0;
+}
+
+/** Drills + charges a 2x2 grid, lands everything, saves it as `default`. */
+function setupSavedPlan() {
+  const { runner, ctx } = createRunner();
+  const run = (cmd: string) => runner.run(cmd);
+  expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+  const state = ctx.state!;
+  expect(run('drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+  tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
+  expect(state.drillHoles).toHaveLength(4);
+  expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+  tickUntil(run, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
+  expect(Object.keys(state.chargesByHole)).toHaveLength(4);
+  expect(run('blast_plan save').success).toBe(true);
+  return { run, state };
+}
+
+/**
+ * Empties the site of drilled holes and charges without firing, so the crater
+ * and debris of a real blast cannot make the reloaded holes unreachable.
+ */
+function clearHolesWithoutBlast(state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; chargesByHole: Record<string, unknown>; sequenceDelays: Record<string, unknown> }): void {
+  // Keep the mine solvent while the crew works (the first run spent the starting cash).
+  state.cash = 5_000_000;
+  state.finances.cash = 5_000_000;
+  state.drillHoles.length = 0;
+  for (const k of Object.keys(state.chargesByHole)) delete state.chargesByHole[k];
+  for (const k of Object.keys(state.sequenceDelays)) delete state.sequenceDelays[k];
+}
+
+/** Fires the loaded plan's blast so the site holds no holes, keeping the saved plan. */
+function fireBlast(
+  run: (cmd: string) => { success: boolean },
+  state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; employees: { employees: Array<{ x: number; z: number }> }; vehicles: { vehicles: Array<{ x: number; z: number }> } },
+): void {
+  // Move the whole crew and fleet clear of the blast zone so the shot does not
+  // kill the workers the reloaded plan needs.
+  for (const unit of [...state.employees.employees, ...state.vehicles.vehicles]) { unit.x = 2; unit.z = 2; }
+  // The ore revenue is not what these tests are about; keep the mine solvent while the crew works.
+  state.cash = 5_000_000;
+  state.finances.cash = 5_000_000;
+  expect(run('sequence auto').success).toBe(true);
+  expect(run('blast').success).toBe(true);
+  expect(state.drillHoles).toHaveLength(0);
+}
+
+describe('blast_plan load — orders the saved plan instead of writing finished holes (#1342)', () => {
+  it('same tick: drillHoles unchanged, N planned holes, N drill_hole actions, no new chargesByHole entries', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    const chargedBefore = Object.keys(state.chargesByHole).length;
+
+    const result = run('blast_plan load');
+    expect(result.success).toBe(true);
+
+    expect(state.drillHoles).toHaveLength(0);
+    expect(state.plannedDrillHoles).toHaveLength(4);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(4);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(chargedBefore);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(4);
+  });
+
+  it('queues one charge_hole action per saved charge, deducts the summed orderCost and books an explosives expense', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    const cashBefore = state.cash;
+    const explosivesBefore = explosivesTotal(state);
+
+    expect(run('blast_plan load').success).toBe(true);
+
+    const chargeActions = state.pendingActions.filter(a => a.type === 'charge_hole');
+    expect(chargeActions).toHaveLength(4);
+    const sum = chargeActions.reduce((acc, a) => acc + (a.payload['orderCost'] as number), 0);
+    expect(sum).toBeGreaterThan(0);
+    expect(state.cash).toBeCloseTo(cashBefore - sum, 5);
+    expect(explosivesTotal(state) - explosivesBefore).toBeCloseTo(sum, 5);
+    for (const a of chargeActions) {
+      const id = a.payload['holeId'] as string;
+      expect(state.plannedDrillHoles.some(h => h.id === id)).toBe(true);
+      expect(state.plannedChargesByHole[id]).toBeDefined();
+    }
+  });
+
+  it('ghosts exist for the ordered holes: every planned hole has a queued drill_hole action', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    expect(run('blast_plan load').success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(4);
+    for (const h of state.plannedDrillHoles) {
+      expect(state.pendingActions.some(a => a.type === 'drill_hole' && a.payload['holeId'] === h.id && a.status === 'queued')).toBe(true);
+    }
+  });
+
+  it('ticking drills the holes, then each charge lands only after its own hole; chargesByHole ends under the new ids', () => {
+    const { run, state } = setupSavedPlan();
+    clearHolesWithoutBlast(state);
+    expect(run('blast_plan load').success).toBe(true);
+    const newIds = state.plannedDrillHoles.map(h => h.id);
+
+    for (let i = 0; i < 1500 && (state.plannedDrillHoles.length > 0 || Object.keys(state.plannedChargesByHole).length > 0); i++) {
+      for (const emp of state.employees.employees) emp.fatigue = 100;
+      run('tick 1');
+      for (const id of Object.keys(state.chargesByHole)) {
+        expect(state.drillHoles.some(h => h.id === id)).toBe(true);
+      }
+    }
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.drillHoles.map(h => h.id).sort()).toEqual([...newIds].sort());
+    expect(Object.keys(state.chargesByHole).sort()).toEqual([...newIds].sort());
+  });
+
+  it('a pre-existing order and drilled hole keep their ids; loaded holes get distinct ids even when saved ids overlap live ones', () => {
+    const { run, state } = setupSavedPlan();
+    clearHolesWithoutBlast(state);
+    expect(run('drill_plan add x:25 z:25 depth:8').success).toBe(true);
+    tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
+    const liveId = state.drillHoles[0]!.id;
+    // A still-planned (undrilled) hole, ordered right before the load.
+    expect(run('drill_plan add x:10 z:10 depth:8').success).toBe(true);
+    const orderedHole = { ...state.plannedDrillHoles[0]! };
+    const orderedAction = { ...state.pendingActions.find(a => a.type === 'drill_hole' && a.payload['holeId'] === orderedHole.id)! };
+    // Saved plan reuses the live hole's id.
+    const saved = state.savedPlans['default']!;
+    saved.drillHoles = saved.drillHoles.map((h, i) => (i === 0 ? { ...h, id: liveId } : h));
+    saved.chargesByHole = { [liveId]: Object.values(saved.chargesByHole)[0]! };
+
+    expect(run('blast_plan load').success).toBe(true);
+
+    expect(state.drillHoles[0]!.id).toBe(liveId);
+    // The pre-existing order is untouched: same hole record, same queued action.
+    expect(state.plannedDrillHoles.find(h => h.id === orderedHole.id)).toEqual(orderedHole);
+    const actionAfter = state.pendingActions.find(a => a.type === 'drill_hole' && a.payload['holeId'] === orderedHole.id);
+    expect(actionAfter?.id).toBe(orderedAction.id);
+    expect(actionAfter?.type).toBe(orderedAction.type);
+    expect(actionAfter?.payload).toEqual(orderedAction.payload);
+    const plannedIds = state.plannedDrillHoles.map(h => h.id);
+    expect(plannedIds).not.toContain(liveId);
+    expect(new Set(plannedIds).size).toBe(plannedIds.length);
+    for (const id of Object.keys(state.plannedChargesByHole)) expect(plannedIds).toContain(id);
+  });
+
+  it('insufficient cash refuses the whole load: no mutation, console.insufficient_funds', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    state.cash = 1;
+    state.finances.cash = 1;
+    const actionsBefore = state.pendingActions.length;
+
+    const result = run('blast_plan load');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(actionsBefore);
+    expect(state.cash).toBe(1);
+  });
+
+  it('a missing plan still fails with No saved plan', () => {
+    const { runner } = createRunner();
+    expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const result = runner.run('blast_plan load name:nope');
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No saved plan');
+  });
+
+  it('skips holes already at the same x,z: loading twice orders nothing new the second time', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    expect(run('blast_plan load').success).toBe(true);
+    const cashAfterFirst = state.cash;
+    const actions = state.pendingActions.length;
+
+    const second = run('blast_plan load');
+
+    expect(second.success).toBe(true);
+    expect(second.output).toContain('adds nothing new');
+    expect(state.plannedDrillHoles).toHaveLength(4);
+    expect(state.pendingActions).toHaveLength(actions);
+    expect(state.cash).toBe(cashAfterFirst);
+  });
+
+  it('partial skip against a planned hole: only the fresh holes and their charges are ordered and counted', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    const saved = state.savedPlans['default']!;
+    const { x, z } = saved.drillHoles[0]!;
+    expect(run(`drill_plan add x:${x} z:${z} depth:8`).success).toBe(true);
+    const plannedBefore = state.plannedDrillHoles.length;
+
+    const result = run('blast_plan load');
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('3 drill orders and 3 charge orders');
+    expect(result.output).toContain('1 holes skipped');
+    expect(state.plannedDrillHoles).toHaveLength(plannedBefore + 3);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(3);
+  });
+
+  it('partial skip against an already-drilled hole: the drilled hole is not re-ordered', () => {
+    const { run, state } = setupSavedPlan();
+    clearHolesWithoutBlast(state);
+    const { x, z } = state.savedPlans['default']!.drillHoles[0]!;
+    expect(run(`drill_plan add x:${x} z:${z} depth:8`).success).toBe(true);
+    tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
+    expect(state.drillHoles).toHaveLength(1);
+
+    const result = run('blast_plan load');
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('3 drill orders and 3 charge orders');
+    expect(result.output).toContain('1 holes skipped');
+    expect(state.drillHoles).toHaveLength(1);
+    expect(state.plannedDrillHoles).toHaveLength(3);
+    expect(state.plannedDrillHoles.some(h => h.x === x && h.z === z)).toBe(false);
+  });
+
+  it('re-keys state.sequenceDelays to the new hole ids, matching the saved delays by position', () => {
+    const { run, state } = setupSavedPlan();
+    expect(run('sequence auto').success).toBe(true);
+    expect(run('blast_plan save').success).toBe(true);
+    const saved = state.savedPlans['default']!;
+    expect(Object.keys(saved.sequenceDelays).length).toBeGreaterThan(0);
+    clearHolesWithoutBlast(state);
+
+    expect(run('blast_plan load').success).toBe(true);
+
+    expect(Object.keys(state.sequenceDelays)).toHaveLength(Object.keys(saved.sequenceDelays).length);
+    for (const old of saved.drillHoles) {
+      const fresh = state.plannedDrillHoles.find(h => h.x === old.x && h.z === old.z)!;
+      expect(state.sequenceDelays[fresh.id]).toBe(saved.sequenceDelays[old.id]);
+    }
+  });
+
+  it('a saved charge that fails validation refuses the whole load with no mutation', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    const saved = state.savedPlans['default']!;
+    const lastId = saved.drillHoles[3]!.id;
+    saved.chargesByHole[lastId] = { ...saved.chargesByHole[lastId]!, explosiveId: 'no_such_explosive' };
+    const cash = state.cash;
+    const actions = state.pendingActions.length;
+
+    const result = run('blast_plan load');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Unknown explosive');
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(actions);
+    expect(state.cash).toBe(cash);
+  });
+
+  it('a refused site claim refuses the whole load with no mutation', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    const saved = state.savedPlans['default']!;
+    // Far outside the owned area: the expansion claim is refused.
+    saved.drillHoles[0] = { ...saved.drillHoles[0]!, x: 5000, z: 5000 };
+    const cash = state.cash;
+    const actions = state.pendingActions.length;
+
+    const result = run('blast_plan load');
+
+    expect(result.success).toBe(false);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(actions);
+    expect(state.cash).toBe(cash);
+  });
+
+  it('after a blast, load then an immediate blast fires nothing: no hole is drilled yet', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    expect(run('blast_plan load').success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(4);
+    expect(state.drillHoles).toHaveLength(0);
+    // Nothing is drilled, so firing clears no rock (the old instant load let it fire again).
+    const report = run('blast') as { success: boolean; output?: string };
+    expect(state.drillHoles).toHaveLength(0);
+    expect(report.output ?? '').toContain('Cleared voxels: 0');
+  });
+
+  it('drill_plan remove on a loaded planned hole cancels its charge order and refunds the cost', () => {
+    const { run, state } = setupSavedPlan();
+    fireBlast(run, state);
+    expect(run('blast_plan load').success).toBe(true);
+    const cashAfterLoad = state.cash;
+    const action = state.pendingActions.find(a => a.type === 'charge_hole')!;
+    const holeId = action.payload['holeId'] as string;
+    const cost = action.payload['orderCost'] as number;
+
+    expect(run(`drill_plan remove hole:${holeId}`).success).toBe(true);
+
+    expect(state.plannedChargesByHole[holeId]).toBeUndefined();
+    expect(state.pendingActions.some(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId)).toBe(false);
+    expect(state.cash).toBeCloseTo(cashAfterLoad + cost, 5);
   });
 });

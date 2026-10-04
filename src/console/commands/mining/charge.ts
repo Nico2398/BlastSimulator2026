@@ -34,7 +34,7 @@ export interface ChargeHoleActionPayload {
  * in full and does not refund the loaded charge (that explosive is consumed)
  * — intentional default.
  */
-function dispatchChargeAction(
+export function dispatchChargeAction(
   ctx: MiningContext,
   hole: { id: string; x: number; z: number },
   explosiveId: string,
@@ -75,7 +75,7 @@ function dispatchChargeAction(
  * order's cost is net of the refund its hole's outstanding order will give
  * back when replaced. Equal cash is allowed. Null when affordable.
  */
-function chargeFundsFailure(
+export function chargeFundsFailure(
   state: GameState,
   orders: ReadonlyArray<{ holeId: string; explosiveId: string; amountKg: number }>,
 ): CommandResult | null {
