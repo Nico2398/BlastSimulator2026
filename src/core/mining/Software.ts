@@ -129,11 +129,10 @@ export function purchaseSoftware(
 // ── Preview functions ──
 
 /**
+ * Preview energy field. Requires software tier >= 1.
  * Previews take the same `wetHoleIds` set executeBlast receives (wetHoleIdsFor), so a
  * water-sensitive charge in a wet hole is predicted as weakened as the blast will be.
  */
-
-/** Preview energy field. Requires software tier >= 1. */
 export function previewEnergy(
   plan: BlastPlan,
   grid: VoxelGrid,
