@@ -3367,6 +3367,8 @@
   "mining.blast_plan.invalid_plan_header": "Plan invalide",
   "mining.blast_plan.validation_issues_header": "Problèmes de validation",
   "mining.blast_plan.valid": "Le plan est valide et prêt pour le tir.",
+  "mining.blast_plan.loaded": "Plan « {name} » chargé : {holes} ordres de forage et {charges} ordres de chargement en file ({cost}), {skipped} trous ignorés.",
+  "mining.blast_plan.load_nothing_new": "Le plan « {name} » n'apporte rien de nouveau : tous les trous sont déjà forés ou commandés.",
   "mining.preview.usage": "Utilisation : preview energy|fragments|projections|vibrations",
   "mining.build_ramp.cancel_usage": "Utilisation : build_ramp cancel id:<ramp-id>",
   "mining.build_ramp.invalid_length": "Longueur de rampe invalide : la longueur doit être un nombre positif fini.",

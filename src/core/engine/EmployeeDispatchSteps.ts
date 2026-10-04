@@ -13,7 +13,7 @@ import type { Employee } from '../entities/Employee.js';
 import { holdsRequiredSkill } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
-  isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
+  isRampSegmentClaimable, isChargeHoleClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
   canReleaseStrandedVehicleGatedAction, isActionPastStuckBackoff, type SelectedAction,
 } from './ActionSelection.js';
 import { claimPendingAction } from './TaskDispatch.js';
@@ -59,7 +59,9 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       && !isEvacuationHoldActive(state, a)
       // #1130: a forced stuck-abandon release backs this action off for a
       // cooldown — see isActionPastStuckBackoff's own doc comment.
-      && isActionPastStuckBackoff(state, a))
+      && isActionPastStuckBackoff(state, a)
+      // #1342: a loaded charge waits for its hole's drill order to land.
+      && isChargeHoleClaimable(state, a))
     .sort((a, b) => {
       // Rest actions win ties over any other targeted action, so a rest
       // queued alongside other work for this employee is always the first
@@ -361,6 +363,7 @@ export function claimOnePoolCandidate(
     state, employee, poolCandidates,
     candidate => findVehicleForClaim(state, candidate, employee).ok
       && isRampSegmentClaimable(state, candidate)
+      && isChargeHoleClaimable(state, candidate)
       && (!deferVehicleGatedToIdleAlternative
         || !hasIdleLicensedAlternative(state, candidate, employee)),
   );
