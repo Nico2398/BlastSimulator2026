@@ -3372,6 +3372,7 @@
   "mining.drill_plan.none": "Aucun trou de forage. Utilisez drill_plan grid ou drill_plan add.",
   "mining.drill_plan.invalid_grid": "Grille de forage invalide : les lignes et colonnes doivent être des entiers positifs.",
   "mining.charge.missing_explosive": "Explosif manquant. Utilisation : charge hole:1 explosive:boomite amount:5kg stemming:2m",
+  "mining.charge.explosive_not_available": "{explosive} n'est pas disponible sur {level}. Disponibles : {available}",
   "mining.charge.none_set": "Aucune charge définie.",
   "mining.sequence.usage": "Utilisation : sequence auto|set|show [options]",
   "mining.sequence.none_set": "Aucune séquence définie.",

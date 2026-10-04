@@ -3372,6 +3372,7 @@
   "mining.drill_plan.none": "No drill holes. Use drill_plan grid or drill_plan add.",
   "mining.drill_plan.invalid_grid": "Invalid drill grid: rows and cols must be positive whole numbers.",
   "mining.charge.missing_explosive": "Missing explosive. Usage: charge hole:1 explosive:boomite amount:5kg stemming:2m",
+  "mining.charge.explosive_not_available": "{explosive} is not available at {level}. Available: {available}",
   "mining.charge.none_set": "No charges set.",
   "mining.sequence.usage": "Usage: sequence auto|set|show [options]",
   "mining.sequence.none_set": "No sequence set.",

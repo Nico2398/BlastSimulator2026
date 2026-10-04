@@ -3,6 +3,7 @@
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 import type { GameState } from '../state/GameState.js';
+import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 
 // ── Types ──
 
@@ -255,4 +256,23 @@ export function resolveContractPriceMultiplier(state: GameState): number {
   const levelId = state.campaign.activeLevelId;
   if (!levelId) return 1;
   return getLevel(levelId)?.contractPriceMultiplier ?? 1;
+}
+
+/**
+ * Explosive ids purchasable/usable at the given level. Null or unknown level
+ * id (sandbox) yields the full catalog; a known level yields its
+ * `availableExplosives` filtered by catalog membership.
+ */
+export function resolveAvailableExplosives(activeLevelId: string | null): readonly string[] {
+  // TODO: implement
+  void activeLevelId;
+  return getAllExplosives().map(e => e.id);
+}
+
+/** True when `explosiveId` may be used at the given level. */
+export function isExplosiveAvailable(activeLevelId: string | null, explosiveId: string): boolean {
+  // TODO: implement
+  void activeLevelId;
+  void explosiveId;
+  return true;
 }

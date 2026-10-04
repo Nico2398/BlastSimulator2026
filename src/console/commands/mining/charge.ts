@@ -193,3 +193,15 @@ export function sequenceCommand(
 
   return { success: false, output: t('mining.sequence.usage') };
 }
+
+/**
+ * Failure when `explosiveId` is a catalog explosive the active level does not
+ * offer. Null when allowed or when the id is not in the catalog (unknown ids
+ * keep their existing error path).
+ */
+export function levelExplosiveFailure(state: GameState, explosiveId: string): CommandResult | null {
+  // TODO: implement
+  void state;
+  void explosiveId;
+  return null;
+}
