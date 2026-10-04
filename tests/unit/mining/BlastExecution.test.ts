@@ -420,30 +420,8 @@ describe('buildBlastReport', () => {
   });
 
   it('reports zero projection distance when nothing was projected', () => {
-    // Hand-built minimal BlastResult rather than a real blast pipeline —
-    // this is testing buildBlastReport's arithmetic in isolation, not
-    // executeBlast's decision about when projection happens.
-    const result: BlastResult = {
-      fragments: [],
-      fragmentCount: 0,
-      averageFragmentSize: 0,
-      oversizedFragments: 0,
-      projectionCount: 0,
-      maxProjectionSpeed: 0,
-      vibrationAtVillages: [],
-      totalRockVolume: 0,
-      totalOreValue: 0,
-      rating: 'mediocre',
-      crackedVoxels: 0,
-      clearedVoxels: 0,
-      clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
-      destroyedBuildings: [],
-      secondaryBlastEvents: [],
-      maxThrowDistance: 0,
-      projectileCount: 0,
-      flights: [],
-      clearedColumns: [],
-    };
+    // Hand-built minimal BlastResult — tests buildBlastReport's arithmetic in isolation.
+    const result = emptyBlastResult();
     const report = buildBlastReport(result, 0, 0);
     expect(report.maxProjectionDistanceM).toBe(0);
   });
@@ -460,34 +438,26 @@ function emptyBlastResult(): BlastResult {
 }
 
 describe('buildBlastReport wet holes (#1348)', () => {
-  const emptyResult: BlastResult = {
-    fragments: [], fragmentCount: 0, averageFragmentSize: 0, oversizedFragments: 0,
-    projectionCount: 0, maxProjectionSpeed: 0, vibrationAtVillages: [], totalRockVolume: 0,
-    totalOreValue: 0, rating: 'mediocre', crackedVoxels: 0, clearedVoxels: 0,
-    clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, destroyedBuildings: [],
-    secondaryBlastEvents: [], maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [],
-  };
-
   it('includes wetHoleIds and fizzledHoleIds when wet holes exist', () => {
-    const report = buildBlastReport(emptyResult, 0, 0, [], { wet: ['H1', 'H2'], fizzled: ['H1'] });
+    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: ['H1', 'H2'], fizzled: ['H1'] });
     expect(report.wetHoleIds).toEqual(['H1', 'H2']);
     expect(report.fizzledHoleIds).toEqual(['H1']);
   });
 
   it('includes an empty fizzledHoleIds when wet holes exist but none fizzled', () => {
-    const report = buildBlastReport(emptyResult, 0, 0, [], { wet: ['H1'], fizzled: [] });
+    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: ['H1'], fizzled: [] });
     expect(report.wetHoleIds).toEqual(['H1']);
     expect(report.fizzledHoleIds).toEqual([]);
   });
 
   it('omits both fields when no hole was wet', () => {
-    const report = buildBlastReport(emptyResult, 0, 0, [], { wet: [], fizzled: [] });
+    const report = buildBlastReport(emptyBlastResult(), 0, 0, [], { wet: [], fizzled: [] });
     expect('wetHoleIds' in report).toBe(false);
     expect('fizzledHoleIds' in report).toBe(false);
   });
 
   it('omits both fields when the wet argument is defaulted', () => {
-    const report = buildBlastReport(emptyResult, 0, 0);
+    const report = buildBlastReport(emptyBlastResult(), 0, 0);
     expect('wetHoleIds' in report).toBe(false);
     expect('fizzledHoleIds' in report).toBe(false);
   });
