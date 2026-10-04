@@ -481,6 +481,16 @@ export interface FootprintOccupant {
   z: number;
 }
 
+/** Whether the inclusive-min / exclusive-max world rect overlaps any occupant's footprint (#1396). */
+export function rectOverlapsOccupants(
+  occupants: ReadonlyArray<FootprintOccupant>,
+  rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+): boolean {
+  void occupants; void rect;
+  // TODO: implement
+  return false;
+}
+
 /**
  * Whether a building of `type`/`tier` can be placed at (x, z) given the
  * current occupants (live buildings AND planned-but-not-yet-built ones) —

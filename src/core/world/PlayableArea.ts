@@ -309,6 +309,16 @@ export class PlayableArea {
   }
 
   /**
+   * Whether claiming every chunk the rect touches would be refused, and why —
+   * non-mutating (#1396).
+   */
+  previewClaimArea(rect: { minX: number; minZ: number; maxX: number; maxZ: number }): ClaimRefusalReason | null {
+    void rect;
+    // TODO: implement
+    return null;
+  }
+
+  /**
    * Every chunk adjacent to the site that a claim would refuse — the frontier
    * the border wall marks (#473 D6/P4). Returned as world rects, max
    * exclusive, in chunk coordinates order.

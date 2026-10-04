@@ -24,6 +24,7 @@ import { ToolRail } from './shell/ToolRail.js';
 import { Toasts } from './shell/Toasts.js';
 import { ActivityLog } from './shell/ActivityLog.js';
 import { NotificationCenter, type NotifyInput } from './notify/NotificationCenter.js';
+import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
 import type { PlacementKit } from './scene/PlacementKit.js';
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -242,6 +243,13 @@ export class UIManager {
   /** Passes the terrain-height sampler down to the Build panel, for the flatness refusal check (#1008). */
   setBuildSurfaceSampler(fn: (x: number, z: number) => number): void {
     this.buildMenu.setSurfaceHeightSampler(fn);
+  }
+
+  /** Passes the non-mutating claim preview down to the Build panel (#1396). */
+  setClaimAreaPreview(
+    fn: (rect: { minX: number; minZ: number; maxX: number; maxZ: number }) => ClaimRefusalReason | null,
+  ): void {
+    this.buildMenu.setClaimAreaPreview(fn);
   }
 
   /** Wire the survey confidence overlay's player-facing visibility toggle (#496) — SurveyPanel's button drives this. */

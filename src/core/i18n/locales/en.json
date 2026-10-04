@@ -3359,6 +3359,7 @@
   "ui.blast_workshop.report.wet_holes_ok": "Wet holes: {wet}. No explosive failed.",
   "shell.placement.outside_region": "Outside the highlighted area — click inside the blue outline.",
   "shell.placement.pick_first": "Click the highlighted area in the scene first.",
+  "shell.placement.refused_occupied": "Space is occupied — a building or construction site covers part of that spot.",
   "shell.placement.refused_protected_ground": "Protected ground — a village, river or landmark stands there.",
   "shell.placement.refused_uneven_ground": "Too steep — the ground the building covers may vary by at most {max} level(s).",
   "shell.placement.refused_expansion_disabled": "Outside the site, and this site cannot be expanded.",

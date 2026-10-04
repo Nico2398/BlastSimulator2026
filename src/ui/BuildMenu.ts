@@ -31,6 +31,7 @@ import { t } from '../core/i18n/I18n.js';
 import { el, button, emptyState, panelRoot, panelHeader, panelBody } from './dom.js';
 import { iconEl } from './icons.js';
 import { LocaleTextRegistry } from './localeText.js';
+import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
 import type { GameState } from '../core/state/GameState.js';
 import {
   getAllBuildingTypes,
@@ -128,6 +129,13 @@ export class BuildMenu extends PanelBase {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
+  /** Register the non-mutating claim preview for a footprint rect, used to show a refused ghost before Confirm (#1396). */
+  setClaimAreaPreview(
+    fn: (rect: { minX: number; minZ: number; maxX: number; maxZ: number }) => ClaimRefusalReason | null,
+  ): void {
+    void fn;
+    // TODO: implement
+  }
   /** Register the terrain-height sampler used to refuse a footprint over uneven ground (#1008). */
   setSurfaceHeightSampler(fn: (x: number, z: number) => number): void {
     this.surfaceHeightSampler = fn;

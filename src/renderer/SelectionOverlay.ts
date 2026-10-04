@@ -46,6 +46,8 @@ export interface OverlayCellsUpdate {
   region?: { x1: number; z1: number; x2: number; z2: number } | null;
   /** Spacing (tiles) between drill-hole markers; omit for no markers (building/ramp footprints don't drill). */
   holeSpacing?: number;
+  /** Paint the cells red: the action would be refused (#1396). */
+  refused?: boolean;
 }
 
 export interface OverlayLineUpdate {
@@ -67,6 +69,8 @@ export interface OverlayPointUpdate {
   radius?: number;
   /** Tints the point/footprint teal (survey) instead of amber — buildings stay amber; green live-validity is not computed here (see file header). */
   tone?: 'default' | 'survey';
+  /** Paint the footprint red: the action would be refused (#1396). */
+  refused?: boolean;
 }
 
 export type OverlayUpdate = OverlayCellsUpdate | OverlayLineUpdate | OverlayPointUpdate;
