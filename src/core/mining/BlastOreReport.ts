@@ -8,7 +8,7 @@ import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /** The fields of a fragment the ore report reads. */
-export type OreReportFragment = Pick<FragmentData, 'origin' | 'volume' | 'oreDensities'>;
+type OreReportFragment = Pick<FragmentData, 'origin' | 'volume' | 'oreDensities'>;
 
 /** Actual ore yields from a blast and comparison to pre-blast survey estimate. */
 export interface BlastOreReport {
