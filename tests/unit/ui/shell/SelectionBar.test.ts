@@ -49,7 +49,7 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Train'))).toBe(true);
   });
 
-  it('shows the vehicle action set (Follow, Move Here, Haul, Unassign)', () => {
+  it('shows the vehicle action set (Follow, Move Here) and no Haul/Unassign', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
@@ -58,8 +58,11 @@ describe('SelectionBar', () => {
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
     expect(labels.some(l => l?.includes('Follow'))).toBe(true);
     expect(labels.some(l => l?.includes('Move Here'))).toBe(true);
-    expect(labels.some(l => l?.includes('Haul'))).toBe(true);
-    expect(labels.some(l => l?.includes('Unassign'))).toBe(true);
+    expect(labels.some(l => l?.includes('Haul'))).toBe(false);
+    expect(labels.some(l => l?.includes('Unassign'))).toBe(false);
+    expect(root.querySelector('[data-action="haul"]')).toBeNull();
+    expect(root.querySelector('[data-action="unassign"]')).toBeNull();
+    expect(root.querySelectorAll('button[data-action]').length).toBe(2);
   });
 
   it('shows the building action set (Upgrade, Move, Demolish)', () => {
@@ -219,7 +222,7 @@ describe('SelectionBar', () => {
 
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
     expect(labels.some(l => l?.includes('Train'))).toBe(false);
-    expect(labels.some(l => l?.includes('Haul'))).toBe(true);
+    expect(labels.some(l => l?.includes('Follow'))).toBe(true);
   });
 
   // ── vehicle "Move Here" (gap G4: `vehicle reposition <id> <x> <z>` had no button) ──
@@ -284,6 +287,19 @@ describe('SelectionBar', () => {
     bar.dispose();
     expect(container.contains(root)).toBe(false);
   });
+});
+
+describe('removed vehicle Haul/Unassign i18n keys (#1400)', () => {
+  const locales = ['en', 'fr'].map(l => [l, JSON.parse(readFileSync(join(process.cwd(), `src/core/i18n/locales/${l}.json`), 'utf8')) as Record<string, unknown>] as const);
+  for (const key of ['shell.selection.haul', 'shell.selection.unassign', 'shell.selection.no_haul_target']) {
+    for (const [name, json] of locales) {
+      it(`${name}.json has no ${key}`, () => {
+        expect(Object.keys(json)).not.toContain(key);
+        const nested = key.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], json);
+        expect(nested).toBeUndefined();
+      });
+    }
+  }
 });
 
 // main.ts owns what each SelectionBar action *does*, and it can't be imported
