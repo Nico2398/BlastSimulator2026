@@ -15,6 +15,7 @@ import {
   hasPendingActionOfType, hasPlannedBuildingOfType, isHaulDispatched, isSellOreWaiting,
 } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
+import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
 import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { BuildingType, BuildingTier } from '../core/entities/Building.js';
@@ -230,7 +231,7 @@ export type TutorialHazard = TileRegion;
  * `minX`/`minZ` are 0 and the grid dimensions come straight from its `LevelDef`.
  */
 function tutorialVehicleSpawnPoint(): TutorialHazard {
-  const level = getLevel('tutorial_pit')!;
+  const level = getLevel(TUTORIAL_LEVEL_ID)!;
   const x = Math.floor(level.gridX / 2);
   const z = Math.floor(level.gridZ / 2);
   return { x1: x, z1: z, x2: x, z2: z, exact: true };

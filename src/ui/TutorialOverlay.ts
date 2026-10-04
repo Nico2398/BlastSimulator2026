@@ -286,7 +286,10 @@ export class TutorialOverlay {
     }
   }
 
-  /** Ends the tutorial like finish() but does not record bs_tutorial_done. */
+  /**
+   * Ends the tutorial like finish() but does not record bs_tutorial_done.
+   * Stop entry point when the live level switches away from the tutorial map.
+   */
   abandon(): void {
     if (!this._active) return;
     this.teardown();

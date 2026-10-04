@@ -8,6 +8,7 @@ import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
+import { shouldAutoStartTutorial, shouldKeepTutorialRunning, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
 import { probeTutorialState } from './ui/tutorialStateProbe.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
@@ -178,8 +179,8 @@ savesModal.setGetState(() => (ctx.state ? stateForSave(ctx, ctx.state) : null));
 const mainMenu = new MainMenu(uiContainer);
 mainMenu.setBackend(saveBackend);
 mainMenu.setOnNewCampaign(() => {
-  // Show world map so the player can pick a level. The tutorial (if not yet
-  // completed) triggers later, once a level is actually entered — starting it
+  // Show world map so the player can pick a level. The tutorial (tutorial_pit
+  // only, if not yet completed) triggers later, once that level is entered — starting it
   // here would stack its coach-marks on top of the level-selection cards.
   mainMenu.hide();
   worldMap.show(null);
@@ -233,9 +234,9 @@ function startLevel(levelId: string): void {
   // terrain generation for a sandbox world this never shows).
   const level = getLevel(levelId);
   void enterLevel([`campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined).then(() => {
-    // First-time players get tutorial guidance once their level is actually
-    // loaded, not while still picking one from the world map.
-    if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+    // First-time players get tutorial guidance once the tutorial level is
+    // actually loaded, not while picking from the world map; other levels never.
+    if (shouldAutoStartTutorial(levelId, TutorialOverlay.isCompleted())) tutorial.start(ctx.state ?? undefined);
   });
 }
 worldMap.setOnStartLevel((levelId) => {
@@ -370,7 +371,7 @@ function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Pr
 
 // --- Tutorial ---
 const tutorial = new TutorialOverlay(uiContainer);
-const tutorialPitLevel = getLevel('tutorial_pit');
+const tutorialPitLevel = getLevel(TUTORIAL_LEVEL_ID);
 mainMenu.setOnTutorial(() => {
   mainMenu.hide();
   void enterLevel(
@@ -479,6 +480,9 @@ function onLevelStateReplaced(state: GameState): void {
   uiManager.closeStaleLevelOverlays(state);
   ctx.weatherCycle = createWeatherCycle(state.seed);
   ctx.rng = new Random(state.seed + 1000);
+  // The tutorial's steps are tuned to its own map: a swap to any other level
+  // ends it (#1319), else it would block that level's end screen.
+  if (tutorial.isActive && !shouldKeepTutorialRunning(state.campaign.activeLevelId)) tutorial.abandon();
 }
 
 /**
