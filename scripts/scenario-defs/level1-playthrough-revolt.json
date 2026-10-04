@@ -1,6 +1,6 @@
 {
   "name": "level1-playthrough-revolt",
-  "description": "Level 1 worker revolt scenario: no well-being buildings and a 12-strong crew drilling flat out crash wellBeing to its floor, and the site revolts. #1313: the mine freezes the moment the level ends, so the scenario funds the level ($1,050,000) to stay solvent -- bankruptcy used to fire mid-drill at tick 209 and the file ticked on over an already-lost game -- and reaches the revolt as the first and only end (tick 383). Everything after it asserts the frozen state.",
+  "description": "Level 1 worker revolt scenario: an aggressive 16-hole krackle blast, then a 12-strong crew with no rest relief sinks wellBeing to its floor and the site revolts. #1431 (rebuilt after #1313 froze the mine at level end): the opening is funded ($1,050,000, solvent throughout) and two living quarters keep wellBeing up through the drill and the blast, so the blast fires at tick 478 while the level is still running (killing the idle crew near the pattern). wellBeing then falls to 0 and stays there for REVOLT_TICKS, and the worker revolt (levelEndReason 'worker_revolt', never bankruptcy) is the only end, at tick 619. Everything after it asserts the frozen state.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:true cash:1050000",
@@ -190,8 +190,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -460,11 +460,97 @@
       }
     },
     {
+      "command": "build living_quarters at:15,17",
+      "description": "#1431: living quarters keep wellBeing above zero through the drill and blast, so the revolt lands after the blast instead of before it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 17
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:25,17",
+      "description": "#1431: living quarters keep wellBeing above zero through the drill and blast, so the revolt lands after the blast instead of before it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 17
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:600",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the crew to finish the living quarters before the drilling begins.",
+      "role": "setup",
+      "timeout": 150,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:6,5",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -506,8 +592,7 @@
         "equals": {
           "orderedHoleCount": 16,
           "holeCount": 0
-        },
-        "note": "#553: confirming the grid only orders the 16 holes -- they're ghosts until employee #1 drives vehicle #1 to each one, drained by the tick-wait steps below."
+        }
       },
       "description": "#1151: shifted one cell east. Under the 30-degree slope gate (5,11) sits outside the crew's climb-reachable patch on dusty_hollow, so no driller could ever claim that hole and the pattern stalled at 15 of 16 forever. Measured by replaying this file's own steps to this point; start:6,5 is the nearest origin whose whole 4x4 grid is reachable."
     },
@@ -522,23 +607,15 @@
       "role": "setup",
       "expect": {
         "increased": [
-          "tickCount",
-          "holeCount",
-          "wellBeing"
-        ],
-        "decreased": [
-          "orderedHoleCount"
+          "tickCount"
         ],
         "equals": {
-          "ecology": 50,
-          "safety": 50,
-          "nuisance": 50,
           "deathCount": 0,
           "bankrupt": false,
           "levelEnded": false
-        },
-        "note": "#596/#597-followup: setupEvents idempotency + the cooldown-threshold caching fix change exactly when the first random event goes pending -- this 283-tick request now advances 165 ticks (not 115) before stopping, landing 10 of 16 holes, and the event that fires is a different one too (union_unlucky_days, not weather_minor_tremor -- #596's event-pool dedup change reorders the RNG draw). tickCount/holeCount/orderedHoleCount/wellBeing converted from chained absolutes to directional (issue #596): exactly how far a tick request gets before an event interrupts it is what these two fixes changed, so pinning a fresh absolute here just repeats the same fragility under the next timing-affecting fix. ecology/safety/nuisance/deathCount/bankrupt/levelEnded are untouched by the event-timing shift and stay exact."
-      }
+        }
+      },
+      "description": "Advance until the first event interrupts (or 283 ticks pass); the crew is still drilling and wellBeing is held up by the living quarters."
     },
     {
       "command": "event choose 0",
@@ -552,44 +629,192 @@
       "expect": {
         "decreased": [
           "cash"
-        ],
-        "increased": [
-          "wellBeing"
         ]
       },
       "commandOutcome": "either"
     },
     {
-      "command": "tick 168",
+      "command": "wait_until field:holeCount equals:16 max_ticks:600",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 168"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 16,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the crew to sink all 16 holes (the pattern drills in the field, not instantly).",
+      "role": "setup",
+      "timeout": 150,
+      "expect": {
+        "equals": {
+          "holeCount": 16,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "bankrupt": false,
+          "levelEnded": false
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:8 stemming:1",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 8
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 1
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Charges all drilled holes with 8 kg krackle -- the aggressive blast this scenario is named for.",
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "description": "Drain the charge orders at speed 8 (charging is real work); the level is still running here.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
       "expect": {
-        "changedBy": {
-          "tickCount": 168
-        },
         "equals": {
-          "orderedHoleCount": 0,
-          "holeCount": 16,
-          "ecology": 50,
-          "safety": 50,
-          "wellBeing": 0,
-          "nuisance": 50,
+          "orderedChargeCount": 0,
+          "chargedCount": 16,
           "deathCount": 0,
-          "bankrupt": false,
           "levelEnded": false
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:10",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
-        "note": "#596/#597-followup: this 168-tick request completes in full (175->343, all 168 ticks). #1313: the level is funded so payroll never reaches the $5,000 bankruptcy threshold (it used to, at tick 209, and the file kept ticking over an ended level -- a frozen mine no longer allows that); the level is still running here. wellBeing crashes to 0 during this stretch (fatigue collapse with no living quarters anywhere in this file) and its zero streak, which started at tick 263, is what ends the level in the revolt below."
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
+          "value": 10
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "description": "Auto-sequence the charged holes.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 16,
+          "sequencedCount": 16,
+          "levelEnded": false
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]",
+          "timeout": 20000
+        }
+      ],
+      "description": "Fires the 16-hole krackle pattern while the level is still running: the blast comes first, the revolt after.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "deathCount": 10,
+          "levelEnded": false,
+          "bankrupt": false
+        }
       }
     },
     {
       "command": "wait_until field:levelEnded equals:true max_ticks:3000",
       "timeout": 125,
-      "description": "#1313: advance until the level ends. REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapse at tick 383 and the mine freezes there -- earlier than any blast could land (a blaster needs more than 40 ticks to charge the 16 holes), so this file ends in a revolt with the pattern drilled and never fired.",
+      "description": "Advance (at speed 8) until the level ends. wellBeing has sunk to 0 and stays there for REVOLT_TICKS (120) consecutive ticks: the worker revolt is the only end, and it lands after the blast. The mine freezes at that tick (#1313). Cash stays far above the bankruptcy threshold throughout.",
       "interaction": [
         {
           "type": "command",
@@ -614,34 +839,14 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 383,
+          "tickCount": 619,
+          "deathCount": 10,
           "wellBeing": 0,
-          "deathCount": 0,
-          "holeCount": 16,
-          "employeeCount": 12
+          "holeCount": 0,
+          "employeeCount": 12,
+          "vehicleCount": 0
         }
       }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "description": "#1313: the level has ended in a revolt with no hole charged, so there is nothing to fire: the console refuses, nothing dies, and the level-end screen covers the execute control.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "holeCount": 16,
-          "deathCount": 0,
-          "levelEnded": true,
-          "levelEndReason": "worker_revolt"
-        },
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
-      },
-      "commandOutcome": "refused"
     },
     {
       "command": "tick 10",
@@ -658,13 +863,993 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 383,
+          "tickCount": 619,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "revolted": true,
-          "deathCount": 0
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
         },
-        "note": "#1313: frozen mine -- a tick after the end advances nothing, cash and tickCount stay put."
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "tickCount": 619,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "deathCount": 10
+        }
+      },
+      "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 0,
+          "tickCount": 619,
+          "levelEndReason": "worker_revolt"
+        },
+        "note": "wellBeing sits on its floor; the revolt is the end."
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "employeeCount": 12,
+          "deathCount": 10
+        }
       }
     },
     {
@@ -678,13 +1863,48 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "holeCount": 16,
-          "deathCount": 0,
-          "employeeCount": 12,
-          "levelEnded": true
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "revolted": true,
+          "bankrupt": false,
+          "tickCount": 619,
+          "deathCount": 10,
+          "wellBeing": 0,
+          "employeeCount": 12
         }
-      },
-      "description": "#1313: read-only state after the revolt: nobody died (no blast ever fired) and the crew is intact."
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "bankrupt": false,
+          "tickCount": 619
+        }
+      }
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 619,
+          "employeeCount": 12
+        }
+      }
     },
     {
       "command": "campaign status",
@@ -697,17 +1917,17 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "wellBeing": 0,
-          "tickCount": 383,
-          "revolted": true,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 0,
+          "revolted": true,
+          "bankrupt": false,
+          "tickCount": 619,
+          "deathCount": 10,
+          "wellBeing": 0,
           "employeeCount": 12
         },
-        "note": "final state: the revolt at tick 383 is the level's only end, and the mine stayed frozen after it. #1313."
-      },
-      "description": "#1313: final campaign status -- still the revolt, still tick 383."
+        "note": "final state: revolt, not bankruptcy; the level is lost but the company is solvent."
+      }
     }
   ]
 }
