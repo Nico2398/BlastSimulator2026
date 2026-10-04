@@ -185,8 +185,14 @@ mainMenu.setOnNewCampaign(() => {
   worldMap.show(null);
 });
 mainMenu.setOnContinue((slotId) => {
-  mainMenu.hide();
-  void savesModal.loadFromSlot(slotId);
+  // Keep the menu up while the async load runs: it is the gate
+  // (fullScreenMenuUp) that stops the previous ctx.state ticking/autosaving
+  // before the loaded state replaces it. Hide only once the state was swapped;
+  // a missing/failed/refused load leaves the menu showing.
+  const stateBeforeLoad = ctx.state;
+  void savesModal.loadFromSlot(slotId).then(() => {
+    if (ctx.state !== stateBeforeLoad) mainMenu.hide();
+  });
 });
 mainMenu.setOnLoad(() => { savesModal.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });

@@ -8,7 +8,7 @@ import type { SaveBackend } from '../../../src/core/state/SaveBackend.js';
 import { AUTO_SAVE_INTERVAL_TICKS } from '../../../src/core/config/balance.js';
 
 function makeBackend() {
-  const save = vi.fn(async () => {});
+  const save = vi.fn(async (_slotId: string, _data: unknown) => {});
   const backend: SaveBackend = {
     save,
     load: vi.fn(async () => null),
