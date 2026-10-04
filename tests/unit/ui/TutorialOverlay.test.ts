@@ -6,6 +6,7 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { addIncome } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
 
 function createMockState(): GameState {
@@ -365,13 +366,15 @@ describe('TutorialOverlay (12.4)', () => {
       const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
       // "(12, 8)" / "16,19" — a pair of numbers the player is expected to aim at.
       const COORD_PAIR = /\(?\d+\s*,\s*\d+\)?/;
+      // Money figures ("5,000", "12,500,000" on the victory card) are not pairs: drop them first.
+      const withoutMoney = (text: string): string => text.replace(/\d{1,3}(?:,\d{3})+\b/g, '');
 
       for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
         (tut as any).stepIndex = i;
         (tut as any).render();
         const id = TUTORIAL_STEPS[i]!.id;
-        expect(COORD_PAIR.test(textEl.textContent ?? ''), `step ${id} body prints coordinates`).toBe(false);
-        expect(COORD_PAIR.test(stageEl.textContent ?? ''), `step ${id} instruction prints coordinates`).toBe(false);
+        expect(COORD_PAIR.test(withoutMoney(textEl.textContent ?? '')), `step ${id} body prints coordinates`).toBe(false);
+        expect(COORD_PAIR.test(withoutMoney(stageEl.textContent ?? '')), `step ${id} instruction prints coordinates`).toBe(false);
       }
     });
 
@@ -852,6 +855,25 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       setLocale('fr');
       expect(() => tut.refreshLocale()).not.toThrow();
+    });
+  });
+
+  describe('victory card live figures (#1329)', () => {
+    it('refreshes the body text on a guide tick when net profit changes', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      while (TUTORIAL_STEPS[tut.stepIndex]!.id !== 'victory') tut.advanceToNextStep();
+
+      const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
+      const before = textEl.textContent;
+
+      addIncome(state.finances, 1234, 'contracts', 'test income', 1);
+      tut.tickGuide();
+
+      expect(textEl.textContent).not.toBe(before);
+      expect(textEl.textContent).toContain('1,234');
     });
   });
 

@@ -3,6 +3,12 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+import { victoryProgress } from '../../../src/ui/tutorialStepsClosing.js';
+import { stagesFor } from '../../../src/ui/tutorialStages.js';
+import { createFinanceState, addIncome, addExpense, getFinancialReport } from '../../../src/core/economy/Finance.js';
+import { getLevel } from '../../../src/core/campaign/Level.js';
+import { TUTORIAL_LEVEL_ID } from '../../../src/ui/tutorialTrigger.js';
+import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
@@ -1053,5 +1059,146 @@ describe('box-cut step (#1210) — completion tracks nextPlannedRampId/plannedRa
     const src = boxCutStep.isComplete.toString();
     expect(src).not.toMatch(/navGrid/i);
     expect(src).not.toContain('countNavCellsByType');
+  });
+});
+
+
+describe('victory step card (#1329) — honest about progress before the level ends', () => {
+  const step = TUTORIAL_STEPS.find((s) => s.id === 'victory')!;
+  const target = getLevel(TUTORIAL_LEVEL_ID)!.unlockThreshold;
+  const originalLocale = getLocale();
+  afterEach(() => setLocale(originalLocale));
+
+  function financesWithProfit(profit: number) {
+    const f = createFinanceState(100000);
+    if (profit > 0) addIncome(f, profit, 'contract' as never, 'test', 1);
+    else if (profit < 0) addExpense(f, -profit, 'wages' as never, 'test', 1);
+    return f;
+  }
+
+  function stateWith(profit: number, levelEnded = false): GameState {
+    return {
+      finances: financesWithProfit(profit),
+      levelEnded,
+      levelEndReason: levelEnded ? 'completed' : null,
+      tickCount: 10,
+    } as unknown as GameState;
+  }
+
+  function render(state: GameState, locale: 'en' | 'fr') {
+    setLocale(locale);
+    const params = step.textParamsFor ? step.textParamsFor(state) : undefined;
+    return { title: t(step.titleKey), body: t(step.textKey, params) };
+  }
+
+  describe('victoryProgress', () => {
+    it('zero profit leaves the whole target remaining', () => {
+      expect(victoryProgress(financesWithProfit(0), target)).toEqual({ profit: 0, target, remaining: target });
+    });
+    it('reads profit as the financial report net profit', () => {
+      const f = financesWithProfit(1200);
+      expect(victoryProgress(f, target).profit).toBe(getFinancialReport(f, 0).netProfit);
+      expect(victoryProgress(f, target).remaining).toBe(target - 1200);
+    });
+    it('profit above target clamps remaining to 0', () => {
+      const r = victoryProgress(financesWithProfit(target + 700), target);
+      expect(r.remaining).toBe(0);
+      expect(r.profit).toBe(target + 700);
+    });
+    it('negative profit adds to what remains', () => {
+      const r = victoryProgress(financesWithProfit(-300), target);
+      expect(r.profit).toBe(-300);
+      expect(r.remaining).toBe(target + 300);
+    });
+    it('profit exactly at target leaves 0', () => {
+      expect(victoryProgress(financesWithProfit(target), target).remaining).toBe(0);
+    });
+    it('uses the supplied target, not a literal', () => {
+      expect(victoryProgress(financesWithProfit(100), 250)).toEqual({ profit: 100, target: 250, remaining: 150 });
+    });
+  });
+
+  describe('card text before the level ends', () => {
+    it('provides textParamsFor returning profit, target and remaining', () => {
+      expect(step.textParamsFor).toBeDefined();
+      const p = step.textParamsFor!(stateWith(1200));
+      expect(Object.keys(p)).toEqual(expect.arrayContaining(['profit', 'target', 'remaining']));
+    });
+
+    it('en title and body do not claim completion', () => {
+      const { title, body } = render(stateWith(1200), 'en');
+      expect(title).not.toMatch(/complete|completed|finished/i);
+      expect(body).not.toMatch(/complete|completed|finished/i);
+    });
+
+    it('fr title and body do not claim completion', () => {
+      const { title, body } = render(stateWith(1200), 'fr');
+      expect(title).not.toMatch(/termin|accompli|compl[eé]t/i);
+      expect(body).not.toMatch(/termin|accompli|compl[eé]t/i);
+    });
+
+    it('leaves no unresolved placeholders in either locale', () => {
+      for (const loc of ['en', 'fr'] as const) {
+        const { title, body } = render(stateWith(1200), loc);
+        expect(title).not.toMatch(/[{}]/);
+        expect(body).not.toMatch(/[{}]/);
+      }
+    });
+
+    it('en body names profit, target and remaining, formatted', () => {
+      const { body } = render(stateWith(1200), 'en');
+      expect(body).toContain('1,200');
+      expect(body).toContain('5,000');
+      expect(body).toContain('3,800');
+    });
+
+    it('en body names the action: contracts and delivering', () => {
+      const { body } = render(stateWith(1200), 'en');
+      expect(body).toMatch(/contract/i);
+      expect(body).toMatch(/deliver/i);
+    });
+
+    it('fr body carries the same figures', () => {
+      const { body } = render(stateWith(1200), 'fr');
+      expect(body).toMatch(/1[,\s\u202f\u00a0.]?200/);
+      expect(body).toMatch(/3[,\s\u202f\u00a0.]?800/);
+    });
+
+    it('shows a zero remaining without breaking when profit already exceeds target', () => {
+      const p = step.textParamsFor!(stateWith(target + 1));
+      expect(String(p.remaining)).toMatch(/^0$/);
+    });
+  });
+
+  describe('completion is unchanged', () => {
+    it('is incomplete while the level runs', () => {
+      expect(step.isComplete(stateWith(target + 1), {})).toBe(false);
+    });
+    it('completes on a genuine win', () => {
+      expect(step.isComplete(stateWith(target, true), {})).toBe(true);
+    });
+    it('does not complete on a defeat', () => {
+      const s = { ...stateWith(0, true), levelEndReason: 'bankruptcy' } as unknown as GameState;
+      expect(step.isComplete(s, {})).toBe(false);
+    });
+  });
+
+  describe('stage hint', () => {
+    it('victory stage uses tutorial.stage.earn_profit, not the generic hint', () => {
+      const stages = stagesFor('victory', step.highlightTarget);
+      expect(stages.length).toBeGreaterThan(0);
+      expect(stages.some((s) => s.hintKey === 'tutorial.stage.earn_profit')).toBe(true);
+      expect(stages.some((s) => s.hintKey === 'tutorial.stage.generic')).toBe(false);
+    });
+    it('earn_profit is translated and differs between en and fr', () => {
+      setLocale('en');
+      const en = t('tutorial.stage.earn_profit');
+      setLocale('fr');
+      const fr = t('tutorial.stage.earn_profit');
+      expect(en).not.toBe('tutorial.stage.earn_profit');
+      expect(fr).not.toBe('tutorial.stage.earn_profit');
+      expect(en.length).toBeGreaterThan(0);
+      expect(en).not.toBe(fr);
+    });
   });
 });
