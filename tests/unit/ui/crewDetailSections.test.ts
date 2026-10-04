@@ -14,13 +14,17 @@ import {
   moraleColor,
   describeActivity,
   makeHiredLocationStrip,
+  makePaySection,
 } from '../../../src/ui/crewDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import { MORALE_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../../../src/core/config/balance.js';
+import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
+import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
@@ -205,5 +209,72 @@ describe('makeHiredLocationStrip', () => {
     const state = makeState();
     state.navGrid = null;
     expect(makeHiredLocationStrip(makeEmployee({ x: 5, z: 5 }), state).textContent).toContain('(5, 5)');
+  });
+});
+
+// ── PAY section: salary is paid once per PAY_CYCLE_TICKS, 1 tick = 1 game-hour (#1373) ──
+
+describe('makePaySection per-hour display (#1373)', () => {
+  /** Expected per-hour figure: salary / PAY_CYCLE_TICKS, 1 decimal, no trailing .0. */
+  const perHour = (amount: number): string => String(Math.round((amount / PAY_CYCLE_TICKS) * 10) / 10);
+  /** Prefix match that rejects a longer number ("$50" must not match "$500"). */
+  const exactly = (prefix: string): RegExp => new RegExp(prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\d.])');
+  const pay = (e: Employee): string => makePaySection(e, () => {}).textContent ?? '';
+
+  it('shows salary 450 as $45/h, not $450/h', () => {
+    const text = pay(makeEmployee({ salary: 45 * PAY_CYCLE_TICKS }));
+    expect(text).toContain('$45/h');
+    expect(text).not.toContain(`$${45 * PAY_CYCLE_TICKS}/h`);
+  });
+
+  it('derives the divisor from PAY_CYCLE_TICKS', () => {
+    const salary = 450;
+    expect(pay(makeEmployee({ salary }))).toContain(`$${perHour(salary)}/h`);
+  });
+
+  it('keeps one decimal when salary is not a multiple of the cycle', () => {
+    const salary = 45 * PAY_CYCLE_TICKS + PAY_CYCLE_TICKS / 2;
+    expect(pay(makeEmployee({ salary }))).toContain(`$${perHour(salary)}/h`);
+    expect(perHour(salary)).toBe('45.5');
+  });
+
+  it('shows zero salary as $0/h', () => {
+    expect(pay(makeEmployee({ salary: 0 }))).toContain('$0/h');
+  });
+
+  it('shows the default fixture salary 1000 per hour, not $1000/h', () => {
+    const text = pay(makeEmployee());
+    expect(text).toContain(`$${perHour(1000)}/h`);
+    expect(text).not.toContain('$1000/h');
+  });
+
+  it('shows base figure per hour', () => {
+    const e = makeEmployee({ role: 'driller' });
+    expect(pay(e)).toMatch(exactly(`Base $${perHour(BASE_SALARIES.driller)}`));
+  });
+
+  it('shows skill bonus per hour', () => {
+    const e = makeEmployee({
+      qualifications: [{ category: 'drilling', proficiencyLevel: 2, xp: 0 }],
+    });
+    expect(pay(e)).toMatch(exactly(`+ skills $${perHour(QUALIFICATION_SALARY_BONUS[2])}`));
+  });
+});
+
+describe('pay i18n keys keep placeholder parity (#1373)', () => {
+  const placeholders = (s: string): string[] => (s.match(/\{\w+\}/g) ?? []).sort();
+  const en = enLocale as Record<string, string>;
+  const fr = frLocale as Record<string, string>;
+
+  for (const key of ['ui.crew.pay_base', 'ui.crew.pay_bonus', 'ui.crew.pay_total']) {
+    it(`${key} uses the same placeholders in en and fr`, () => {
+      expect(placeholders(fr[key])).toEqual(placeholders(en[key]));
+      expect(placeholders(en[key])).toEqual(['{amount}']);
+    });
+  }
+
+  it('pay_total still reads per hour in both locales', () => {
+    expect(en['ui.crew.pay_total']).toContain('/h');
+    expect(fr['ui.crew.pay_total']).toContain('/h');
   });
 });
