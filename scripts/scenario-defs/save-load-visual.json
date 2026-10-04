@@ -307,11 +307,11 @@
       ],
       "role": "player",
       "expect": {
-        "changedBy": {
-          "cash": 0
-        },
         "increased": [
           "orderedChargeCount"
+        ],
+        "decreased": [
+          "cash"
         ]
       }
     },

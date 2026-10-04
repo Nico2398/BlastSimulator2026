@@ -105,7 +105,11 @@ function blastAt(ctx: MiningContext, stemming: string): void {
   resetHoleIds();
   drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
   driveDrillPlanToCompletion(ctx);
-  chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
+  // Charging bills explosives at order time (#1341); these tests are about
+  // flyrock, not budget, so fund the order explicitly.
+  ctx.state!.cash = Math.max(ctx.state!.cash, 1_000_000);
+  const ordered = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
+  expect(ordered.success, ordered.output).toBe(true);
   driveChargePlanToCompletion(ctx);
   sequenceCommand(ctx, ['auto'], { delay_step: '25' });
   const result = blastCommand(ctx, [], {});

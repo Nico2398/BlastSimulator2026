@@ -442,8 +442,8 @@ function clearHolderWalkFields(emp: Employee): void {
 }
 
 /**
- * Order-time cost already charged for an action's type — survey today, 0 for
- * everything else. Used by cancelAction to compute the refund.
+ * Order-time cost already charged for an action — survey, ramp segment,
+ * building, level ground and charge orders; 0 for everything else. Used by cancelAction to compute the refund.
  */
 function actionOrderCost(action: PendingAction): number {
   if (action.type === 'dig_ramp_segment') return (action.payload['segmentCost'] as number) ?? 0;
@@ -455,6 +455,9 @@ function actionOrderCost(action: PendingAction): number {
   // was charged at order time (level.ts) and is refunded in full on
   // cancellation (#1009, mirrors place_building above).
   if (action.type === 'level_ground') return (action.payload['orderCost'] as number) ?? 0;
+  // Explosives are charged when the charge order is placed (charge.ts) and
+  // refunded in full on cancellation (#1341).
+  if (action.type === 'charge_hole') return (action.payload['orderCost'] as number) ?? 0;
   if (action.type !== 'survey') return 0;
   const method = action.payload['method'];
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;

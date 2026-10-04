@@ -28,6 +28,7 @@ import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } 
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
+import { chargeOrderCost } from '../../../core/mining/ChargePlan.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { TUBING_COST } from '../../../core/mining/Tubing.js';
@@ -211,7 +212,7 @@ export class ChargeStep {
   private updateChargeLine(holeCount: number): void {
     const explosive = getExplosive(this.selectedExplosiveId);
     const name = explosive ? t(explosive.nameKey) : this.selectedExplosiveId;
-    const cost = explosive ? holeCount * this.amountKg * explosive.costPerKg : 0;
+    const cost = chargeOrderCost(this.selectedExplosiveId, holeCount * this.amountKg);
     this.chargeLineEl.textContent = t('ui.blast_workshop.charge.charge_line', {
       count: holeCount, amount: this.amountKg, name, cost: `$${formatMoney(cost)}`,
     });

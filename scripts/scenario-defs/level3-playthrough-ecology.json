@@ -1335,11 +1335,11 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "changedBy": {
-          "cash": 0
-        },
         "increased": [
           "orderedChargeCount"
+        ],
+        "decreased": [
+          "cash"
         ]
       }
     },
