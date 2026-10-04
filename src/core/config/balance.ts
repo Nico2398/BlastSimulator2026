@@ -713,13 +713,21 @@ export const RESIDENT_VOXEL_SLABS_AFTER_EVICTION = 384;
  */
 export const PATHFINDING_NODE_BUDGET_MIN = 500;
 export const PATHFINDING_NODE_BUDGET_AREA_DIVISOR = 2;
-
 /** A* node-exploration budget for a grid of the given dimensions. */
 export function pathfindingNodeBudget(gridWidth: number, gridHeight: number): number {
   return Math.max(
     PATHFINDING_NODE_BUDGET_MIN,
     Math.floor((gridWidth * gridHeight) / PATHFINDING_NODE_BUDGET_AREA_DIVISOR),
   );
+}
+
+/**
+ * A* node budget for the one retry after the first budget is exhausted: the
+ * whole grid area (A* never expands a node twice, so this is the unbounded
+ * search's ceiling).
+ */
+export function pathfindingRetryNodeBudget(gridWidth: number, gridHeight: number): number {
+  return Math.max(PATHFINDING_NODE_BUDGET_MIN, gridWidth * gridHeight);
 }
 
 /** Number of consecutive failed re-route attempts before the agent transitions to stuck state. */

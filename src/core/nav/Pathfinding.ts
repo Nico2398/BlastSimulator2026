@@ -3,7 +3,7 @@
 
 import { NavGrid, isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import type { NavCell } from './NavGrid.js';
-import { pathfindingNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
+import { pathfindingNodeBudget, pathfindingRetryNodeBudget, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 import { NEIGHBOUR_OFFSETS_8 as NEIGHBOUR_OFFSETS } from './NeighbourOffsets.js';
 
 /**
@@ -542,6 +542,8 @@ export function findRampConnections(grid: NavGrid): RampConnection[] {
         const nz = z + dz;
         const neighbor = grid.cellAt(nx, nz);
         if (!neighbor || neighbor.type === 'blocked' || neighbor.type === 'void') continue;
+        // A cliff-adjacent ramp cell is no connection: the step must be walkable.
+        if (!isStepClimbable(cell.surfaceY, neighbor.surfaceY, Math.hypot(dx, dz))) continue;
 
         const level = neighbor.benchLevel;
         // Keep first neighbor per level for determinism
@@ -988,6 +990,7 @@ function findOrdinaryPath(
   requiredClearance: number,
   startPocket: Set<number> | null,
   goalPocket: Set<number> | null,
+  budget: number = pathfindingNodeBudget(grid.width, grid.height),
 ): PathResult {
   // Fast path — try direct line before A* only if it's clearly optimal.
   //    Compare direct-line cost to heuristic lower bound (octile * MIN_WALKABLE_COST).
@@ -1013,7 +1016,6 @@ function findOrdinaryPath(
   const openHeap = new MinHeap<AStarNode>();
   let exploredCount = 0;
 
-  const budget = pathfindingNodeBudget(grid.width, grid.height);
   const startPos = cellIndex(grid, sx, sz);
   gScoreArr[startPos] = 0;
   stampArr[startPos] = currentStamp;
@@ -1068,6 +1070,15 @@ function findOrdinaryPath(
         openHeap.push({ key: tieBreakKey(tentativeG + h, neighborPos), pos: neighborPos, g: tentativeG });
       }
     }
+  }
+
+  // Budget exhausted with frontier left (not a genuine wall): a long switchback
+  // can need more nodes than the base budget, so retry once with a bigger one.
+  const retryBudget = pathfindingRetryNodeBudget(grid.width, grid.height);
+  if (openHeap.size > 0 && budget < retryBudget) {
+    const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget);
+    // The retry already ran the direct-line fallback on exhaustion.
+    return retried;
   }
 
   // Budget exceeded or open set empty — try direct-line fallback

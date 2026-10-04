@@ -52,12 +52,12 @@ function makeCell(type: NavCellType, benchLevel: number = 0, surfaceY?: number):
 }
 
 /** Create a flat NavGrid where every cell has the given type (default 'walkable'). */
-function makeFlatGrid(width: number, height: number, fillType: NavCellType = 'walkable'): NavGrid {
+function makeFlatGrid(width: number, height: number, fillType: NavCellType = 'walkable', surfaceY?: number): NavGrid {
   const cells: NavCell[][] = [];
   for (let z = 0; z < height; z++) {
     const row: NavCell[] = [];
     for (let x = 0; x < width; x++) {
-      row.push(makeCell(fillType));
+      row.push(makeCell(fillType, 0, surfaceY));
     }
     cells.push(row);
   }
@@ -1018,14 +1018,9 @@ describe('findPath — multi-level routing', () => {
     // z=9 except a ramp at (5,9) connecting level 1<->2, level 2 (z=10..13).
     // No ramp anywhere connects level 0 directly to level 2.
     //
-    // Every level cell sits at surfaceY=0 (flat), but both ramp cells sit at
-    // surfaceY=50 — a cliff on both sides ordinary A*'s own climb-legality
-    // gate (isStepClimbable) refuses to step onto or off of, so the plain
-    // "try ordinary A* first" path (findPath step 5) cannot cross either
-    // wall at all and must fall through to ramp-graph routing (step 6). The
-    // ramp graph itself (findRampConnections/rampEndpoints) never applies a
-    // climb check — a ramp cell is the sanctioned connector regardless of
-    // height — so multi-level routing can still legitimately cross.
+    // Every cell is flat (surfaceY=0), so each ramp column is climbable on both
+    // sides (#1305: findRampConnections omits cliff-adjacent ramp cells) while
+    // void cells wall off the rest of each bench row.
     const width = 10;
     const height = 14;
     const cells: NavCell[][] = [];
@@ -1035,11 +1030,11 @@ describe('findPath — multi-level routing', () => {
         if (z <= 3) {
           row.push(makeCell('walkable', 0, 0));
         } else if (z === 4) {
-          row.push(x === 5 ? makeCell('ramp', 0, 50) : makeCell('void', 0));
+          row.push(x === 5 ? makeCell('ramp', 0, 0) : makeCell('void', 0));
         } else if (z <= 8) {
           row.push(makeCell('walkable', 1, 0));
         } else if (z === 9) {
-          row.push(x === 5 ? makeCell('ramp', 1, 50) : makeCell('void', 1));
+          row.push(x === 5 ? makeCell('ramp', 1, 0) : makeCell('void', 1));
         } else {
           row.push(makeCell('walkable', 2, 0));
         }
@@ -1958,5 +1953,96 @@ describe('findPath — diagonal waypoints never cut a blocked/void corner, on th
     const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 14, toZ: 14, avoidVehicles: false });
     expect(result.found).toBe(true);
     assertNoCornerCut(grid, result.waypoints);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #1305 — ramp connections must be climbable; ordinary routes must survive the base node budget
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 1-row grid: x0,x1 upper bench (level 0), x2 ramp, x3,x4 lower bench (level 1); surfaceY per column. */
+function makeRampRow(ys: [number, number, number, number, number]): NavGrid {
+  const types: NavCellType[] = ['walkable', 'walkable', 'ramp', 'walkable', 'walkable'];
+  const levels = [0, 0, 0, 1, 1];
+  const row = types.map((t, i) => makeCell(t, levels[i]!, ys[i]!));
+  return new NavGrid(5, 1, [row]);
+}
+
+describe('findRampConnections — climbability (#1305)', () => {
+  it('omits a ramp-typed cell whose upper neighbour is an unclimbable cliff away', () => {
+    // Ramp sits at the lower bench height; the upper neighbour is ~8 m higher.
+    const grid = makeRampRow([8, 8, 0, 0, 0]);
+    expect(isStepClimbable(8, 0, 1)).toBe(false);
+    expect(findRampConnections(grid).some(r => r.rampX === 2 && r.rampZ === 0)).toBe(false);
+  });
+
+  it('omits a ramp-typed cell whose lower neighbour is the cliff', () => {
+    const grid = makeRampRow([0, 0, 8, 0, 0]);
+    expect(findRampConnections(grid).some(r => r.rampX === 2 && r.rampZ === 0)).toBe(false);
+  });
+
+  it('keeps a genuine ramp whose steps to both benches are climbable', () => {
+    const grid = makeRampRow([0.5, 0.5, 0.25, 0, 0]);
+    expect(isStepClimbable(0.5, 0.25, 1)).toBe(true);
+    expect(isStepClimbable(0.25, 0, 1)).toBe(true);
+    const conn = findRampConnections(grid).find(r => r.rampX === 2 && r.rampZ === 0);
+    expect(conn).toBeDefined();
+    expect(conn!.upperLevel).toBe(1); // upperLevel is the higher bench-level index
+    expect(conn!.lowerLevel).toBe(0);
+  });
+
+  it('findPath does not route across a cliff-adjacent ramp cell', () => {
+    const grid = makeRampRow([8, 8, 0, 0, 0]);
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 4, toZ: 0, avoidVehicles: false });
+    expect(result.found).toBe(false);
+  });
+});
+
+describe('findPath — ordinary route longer than the base node budget (#1305)', () => {
+  /** Serpentine corridor: odd rows are walls (blocked) except one gap alternating at each end. Corridor cell count exceeds half the grid area. */
+  function makeSerpentine(width: number, height: number): NavGrid {
+    const grid = makeFlatGrid(width, height, 'walkable', 0);
+    for (let z = 1; z < height; z += 2) {
+      for (let x = 0; x < width; x++) setCell(grid, x, z, 'blocked');
+      const gapX = (z - 1) / 2 % 2 === 0 ? width - 1 : 0;
+      setCell(grid, gapX, z, 'walkable', { surfaceY: 0 });
+    }
+    return grid;
+  }
+
+  it('returns the ordinary winding route: no repeated 2D cells, every step climbable', () => {
+    const width = 400;
+    const height = 11;
+    const grid = makeSerpentine(width, height);
+    const corridorCells = (height + 1) / 2 * width + (height - 1) / 2;
+    expect(corridorCells).toBeGreaterThan(Math.floor((width * height) / 2)); // beyond the base budget
+    const result = findPath(grid, { agentId: 1, fromX: 0, fromZ: 0, toX: 0, toZ: height - 1, avoidVehicles: false });
+    expect(result.found).toBe(true);
+    const last = result.waypoints[result.waypoints.length - 1]!;
+    expect(last).toMatchObject({ x: 0, z: height - 1 });
+    const seen = new Set<string>();
+    for (const wp of result.waypoints) {
+      const key = `${wp.x},${wp.z}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+    for (let i = 1; i < result.waypoints.length; i++) {
+      const a = result.waypoints[i - 1]!;
+      const b = result.waypoints[i]!;
+      expect(isValidStep(a, b)).toBe(true);
+      expect(grid.cellAt(b.x, b.z)!.type).not.toBe('blocked');
+      expect(isStepClimbable(grid.cellAt(a.x, a.z)!.surfaceY, grid.cellAt(b.x, b.z)!.surfaceY, Math.hypot(b.x - a.x, b.z - a.z))).toBe(true);
+    }
+  });
+
+  it('a fully walled goal returns found:false and terminates', () => {
+    const grid = makeFlatGrid(60, 60, 'walkable', 0);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx !== 0 || dz !== 0) setCell(grid, 40 + dx, 40 + dz, 'blocked');
+      }
+    }
+    const result = findPath(grid, { agentId: 1, fromX: 2, fromZ: 2, toX: 40, toZ: 40, avoidVehicles: false });
+    expect(result.found).toBe(false);
   });
 });

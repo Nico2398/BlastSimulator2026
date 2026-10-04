@@ -68,6 +68,8 @@ Multi-level path planning:
 2. Different levels → find nearest ramp connecting required levels → 3-query route: `start → ramp entrance → ramp exit → destination`
 3. No ramp for required levels → `found: false`, emit `no_ramp_available` event
 
+A ramp connection (`findRampConnections`) requires `isStepClimbable` steps from the ramp cell to BOTH its upper and lower neighbour; a cliff-adjacent `ramp` cell is omitted (#1305). The ordinary search distinguishes an empty open set (genuine wall: straight to the multi-level fallback) from an exhausted node budget: on exhaustion it retries once with `pathfindingRetryNodeBudget` (full grid area, `PATHFINDING_RETRY_BUDGET_AREA_DIVISOR`) before the ramp fallback, so a long switchback is routed ordinarily.
+
 A pit floor is therefore only workable once a ramp reaches it: dispatch queues haul/charge actions against fragments the crew cannot climb down to, and they sit unclaimed until one is dug. Level scripts and scenarios that blast a bench and then expect it hauled out have to build that ramp first (`level2-playthrough-win.json` does, at the rim, before its first blast).
 
 ## Dynamic NavGrid Updates
