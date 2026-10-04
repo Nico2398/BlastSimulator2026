@@ -155,7 +155,7 @@ describe('economy.ts contract empty-state messages — English literal + fr dive
     it('matches the exact English literal by default', () => {
       const ctx = makeCtx();
       // The real generateContracts always refills from an empty pool (its own
-      // "currentTick - lastRefreshTick < REFRESH_INTERVAL && available.length > 0"
+      // "currentTick - lastRefreshTick < CONTRACT_REFRESH_INTERVAL && available.length > 0"
       // guard only skips refresh when the pool is already non-empty) — so a
       // no-op mock is required to observe the "none available" branch at all.
       vi.spyOn(ContractModule, 'generateContracts').mockImplementation(() => {});

@@ -3003,7 +3003,7 @@
       }
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:360",
+      "command": "contract deliver type:rubble_disposal amount:470",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -3012,7 +3012,7 @@
         {
           "type": "set",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
-          "value": "360"
+          "value": "470"
         },
         {
           "type": "clickSelector",
@@ -3879,8 +3879,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 42.739901998475474,
-          "nuisance": 31.32979419679861
+          "ecology": 42.81990199847547,
+          "nuisance": 31.529794196798612
         },
         "changedBy": {
           "tickCount": 0
@@ -4742,7 +4742,7 @@
       }
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:420",
+      "command": "contract deliver type:rubble_disposal amount:350",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -4751,7 +4751,7 @@
         {
           "type": "set",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
-          "value": "420"
+          "value": "350"
         },
         {
           "type": "clickSelector",
@@ -4798,7 +4798,7 @@
           "employeeCount": 16,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 98.77166666666696,
+          "wellBeing": 99.95,
           "safety": 0,
           "ecology": 35.6255865500862,
           "nuisance": 13.278305312679684
@@ -4824,7 +4824,7 @@
           "employeeCount": 16,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 98.77166666666696,
+          "wellBeing": 99.95,
           "safety": 0,
           "ecology": 35.6255865500862,
           "nuisance": 13.278305312679684

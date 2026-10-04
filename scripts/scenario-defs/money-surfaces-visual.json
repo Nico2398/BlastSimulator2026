@@ -224,12 +224,12 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] [data-action=\"negotiate\"]",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"] [data-action=\"negotiate\"]",
           "timeout": 30000
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] [data-action=\"negotiate\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"] [data-action=\"negotiate\"]"
         },
         {
           "type": "waitForSelector",
