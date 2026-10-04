@@ -112,6 +112,15 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   await page.goto(devServerUrl, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#game-canvas, canvas', { timeout: canvasTimeoutMs });
   console.log('Game canvas detected. Waiting for initialization...');
+  // The canvas element is in the static HTML, so it exists before main.ts has
+  // run. `window.__gameState` is assigned only once main.ts's module finishes
+  // evaluating; a first scenario that reads it earlier fails with
+  // "window.__gameState is not a function" (CI run 37219987469, shard 6/10).
+  await page.waitForFunction(
+    () => typeof (window as unknown as { __gameState?: unknown }).__gameState === 'function'
+      && typeof (window as unknown as { __gameConsole?: unknown }).__gameConsole === 'function',
+    { timeout: canvasTimeoutMs },
+  );
 
   // The main menu overlay starts visible, same as a real player would see it.
   // Scenarios that begin with `new_game` tear it down themselves the moment
