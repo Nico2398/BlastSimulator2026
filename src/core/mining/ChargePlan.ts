@@ -94,8 +94,6 @@ export function computeChargeHoleDurationTicks(amountKg: number): number {
  * explosive id (#1341).
  */
 export function chargeOrderCost(explosiveId: string, amountKg: number): number {
-  void explosiveId;
-  void amountKg;
-  // TODO: implement
-  return 0;
+  const explosive = getExplosive(explosiveId);
+  return explosive ? explosive.costPerKg * amountKg : 0;
 }

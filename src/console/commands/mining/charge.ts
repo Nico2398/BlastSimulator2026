@@ -3,10 +3,13 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction } from './shared.js';
-import { createCharge, batchCharge, computeChargeHoleDurationTicks } from '../../../core/mining/ChargePlan.js';
+import { requireGame, requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, findOutstandingChargeAction } from './shared.js';
+import { createCharge, batchCharge, computeChargeHoleDurationTicks, chargeOrderCost } from '../../../core/mining/ChargePlan.js';
 import { dispatchPendingAction } from '../../../core/engine/TaskDispatch.js';
 import { MIN_STEMMING_M } from '../../../core/config/balance.js';
+import { addExpense } from '../../../core/economy/Finance.js';
+import { formatMoney } from '../../../core/economy/formatMoney.js';
+import type { GameState } from '../../../core/state/GameState.js';
 import { setDelay, autoVPattern } from '../../../core/mining/Sequence.js';
 
 /** Payload carried by a queued `charge_hole` PendingAction (#554). */
@@ -16,13 +19,16 @@ export interface ChargeHoleActionPayload {
   amountKg: number;
   stemmingM: number;
   durationTicks: number;
+  /** Cash charged at order time (costPerKg x kg); refunded on cancel (#1341). */
+  orderCost: number;
 }
 
 /**
  * Queue a `charge_hole` PendingAction for `hole` with the given (already
  * validated) charge, cancelling any outstanding order for the same hole
  * first so a re-charge replaces rather than stacks (#554, mirrors drillPlan
- * grid/add's drill_hole dispatch).
+ * grid/add's drill_hole dispatch). Charges the explosives cost now (the
+ * caller has already verified funds via `chargeFundsFailure`).
  */
 function dispatchChargeAction(
   ctx: MiningContext,
@@ -35,6 +41,7 @@ function dispatchChargeAction(
   cancelOutstandingChargeAction(state, hole.id);
 
   const durationTicks = computeChargeHoleDurationTicks(amountKg);
+  const orderCost = chargeOrderCost(explosiveId, amountKg);
   const actionId = state.nextPendingActionId++;
   // skipQualificationCheck (#554, mirrors drill_hole's #553 dispatch): a
   // charge order must queue silently even when nobody on the roster
@@ -48,12 +55,37 @@ function dispatchChargeAction(
     targetZ: hole.z,
     targetY: 0,
     payload: {
-      holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks,
+      holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks, orderCost,
     } satisfies ChargeHoleActionPayload,
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
   state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
+
+  state.cash -= orderCost;
+  addExpense(state.finances, orderCost, 'explosives', `Charge ${hole.id}: ${explosiveId} ${amountKg}kg`, state.tickCount);
+}
+
+/**
+ * Funds check for a set of charge orders, run before any mutation. Each
+ * order's cost is net of the refund its hole's outstanding order will give
+ * back when replaced. Equal cash is allowed. Null when affordable.
+ */
+function chargeFundsFailure(
+  state: GameState,
+  orders: ReadonlyArray<{ holeId: string; explosiveId: string; amountKg: number }>,
+): CommandResult | null {
+  let need = 0;
+  for (const o of orders) {
+    const outstanding = findOutstandingChargeAction(state, o.holeId);
+    const refund = outstanding ? ((outstanding.payload['orderCost'] as number) ?? 0) : 0;
+    need += chargeOrderCost(o.explosiveId, o.amountKg) - refund;
+  }
+  if (need <= state.cash) return null;
+  return {
+    success: false,
+    output: t('console.insufficient_funds', { need: formatMoney(need), have: formatMoney(state.cash) }),
+  };
 }
 
 export function chargeCommand(
@@ -92,9 +124,13 @@ export function chargeCommand(
     if (result.errors.length > 0) {
       return { success: false, output: `Errors:\n${result.errors.map(e => `  ${e.holeId}: ${e.message}`).join('\n')}` };
     }
-    for (const h of ctx.state!.drillHoles) {
-      const charge = result.charges[h.id];
-      if (!charge) continue;
+    const targets = ctx.state!.drillHoles.filter(h => result.charges[h.id]);
+    const broke = chargeFundsFailure(ctx.state!, targets.map(h => ({
+      holeId: h.id, explosiveId: result.charges[h.id]!.explosiveId, amountKg: result.charges[h.id]!.amountKg,
+    })));
+    if (broke) return broke;
+    for (const h of targets) {
+      const charge = result.charges[h.id]!;
       dispatchChargeAction(ctx, h, charge.explosiveId, charge.amountKg, charge.stemmingM);
     }
     return { success: true, output: `Ordered charges for ${holeIds.length} holes with ${explosiveId} ${amount}kg` };
@@ -112,6 +148,8 @@ export function chargeCommand(
   const result = createCharge(explosiveId, amount, stemming, hole.depth);
   if ('error' in result) return { success: false, output: result.error };
 
+  const broke = chargeFundsFailure(ctx.state!, [{ holeId: hole.id, explosiveId, amountKg: amount }]);
+  if (broke) return broke;
   dispatchChargeAction(ctx, hole, explosiveId, amount, stemming);
   return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
 }
