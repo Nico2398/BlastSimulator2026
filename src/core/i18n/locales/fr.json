@@ -3052,6 +3052,7 @@
   "tutorial.stage.open_sequence_tab": "Cliquez sur l'onglet 3 Séquence dans le panneau Minage.",
   "tutorial.stage.auto_sequence": "Appuyez sur Séquence auto (motif en V) pour régler les retards de détonation.",
   "tutorial.stage.sound_horn": "Cliquez sur Sonner la corne et évacuez la zone de tir avant de tirer.",
+  "tutorial.stage.open_fire_tab": "Cliquez sur l'onglet 5 Tir dans le panneau Minage.",
   "tutorial.stage.execute": "Appuyez sur Tirer.",
   "tutorial.stage.blast_confirm": "Confirmez le tir.",
   "tutorial.stage.event_choose": "Choisissez une des réponses.",
