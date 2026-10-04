@@ -3,6 +3,7 @@
 // Pure function operating on GameState + VoxelGrid, no side effects.
 
 import type { Vec3 } from '../math/Vec3.js';
+import type { Village } from '../world/Structures.js';
 import { length as vecLength } from '../math/Vec3.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
@@ -164,6 +165,8 @@ export interface BlastReport {
   destroyedBuildings: DestroyedBuildingInfo[];
   /** Casualties/damage this blast caused (#557). Optional: pre-existing literal fixtures omit it; buildBlastReport defaults to `[]`. */
   accidents?: AccidentRecord[];
+  /** Peak vibration at any village (#1343). Optional: omitted when no village was measured. */
+  maxVibration?: number;
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
@@ -190,6 +193,18 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
 export interface VillagePosition {
   id: string;
   position: Vec3;
+}
+
+/** Map villages to vibration targets (stub, #1343). */
+export function villagePositions(villages: readonly Village[]): VillagePosition[] {
+  void villages;
+  return []; // TODO: implement
+}
+
+/** Mean per-hole vibration modifier of a plan; wet holes dampen differently (stub, #1343). */
+export function averageVibrationMod(plan: BlastPlan, wetHoleIds: ReadonlySet<string>): number {
+  void plan; void wetHoleIds;
+  return 1; // TODO: implement
 }
 
 // ── Pipeline ──

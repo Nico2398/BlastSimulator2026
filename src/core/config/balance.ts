@@ -1577,3 +1577,12 @@ export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'u
   ambient: 0.4,
   ui: 0.6,
 };
+
+/** Score gain per unit of village vibration (stub 0, #1343). */
+export const VILLAGE_VIBRATION_SCORE_GAIN = 0;
+
+/** Nuisance added per projected fragment (#1343). */
+export const BLAST_PROJECTION_NUISANCE_PER_PROJECTION = 0.5;
+
+/** Ticks over which vibration score effects are applied (#1343). */
+export const SCORE_VIBRATION_WINDOW_TICKS = 10;
