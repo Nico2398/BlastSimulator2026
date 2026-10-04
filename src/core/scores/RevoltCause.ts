@@ -2,7 +2,7 @@
 
 import { getShiftDurationTicks, type ShiftMode } from '../entities/SitePolicy.js';
 
-export type RevoltCause = 'no_rest_policy' | 'no_housing' | 'morale_drain';
+type RevoltCause = 'no_rest_policy' | 'no_housing' | 'morale_drain';
 
 /**
  * Classify the root cause of a worker revolt.
