@@ -937,15 +937,4 @@ describe('TutorialOverlay (12.4)', () => {
       expect(waitingChip.style.display).toBe('none');
     });
   });
-
-  describe('shouldAutoStart', () => {
-    it('auto-starts first-run only on tutorial_pit', () => {
-      expect(TutorialOverlay.shouldAutoStart('tutorial_pit')).toBe(true);
-      expect(TutorialOverlay.shouldAutoStart('dusty_hollow')).toBe(false);
-    });
-    it('never auto-starts once the tutorial is completed', () => {
-      localStorage.setItem('bs_tutorial_done', '1');
-      expect(TutorialOverlay.shouldAutoStart('tutorial_pit')).toBe(false);
-    });
-  });
 });
