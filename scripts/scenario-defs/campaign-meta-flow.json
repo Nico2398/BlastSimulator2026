@@ -1,0 +1,384 @@
+{
+  "name": "campaign-meta-flow",
+  "description": "Issue #1326: the campaign meta-flow end to end with real clicks. Main menu New Campaign -> Portfolio -> start Dusty Hollow -> win -> level-end Continue into Grumpstone Ridge -> TopBar Site Map and Back to site -> save -> Settings Return to Menu -> main-menu Continue reloads the save -> bankruptcy -> level-end Retry restarts the level. Command mode checks the state numbers; interaction mode proves every menu, card and button is reachable by clicking.",
+  "steps": [
+    {
+      "command": "state",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        }
+      ],
+      "role": "observe",
+      "description": "Observe the fresh main menu state: no level running. Command mode has no game before the first campaign start, so `state` may be refused there.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "description": "Player clicks New Campaign; the Portfolio must offer Dusty Hollow's Start. `state` is the inert paired command. Command mode has no game yet, so the inert `state` may be refused.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu #bs-menu-new-campaign"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]",
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "description": "Player starts Dusty Hollow from its Portfolio card; the HUD must be reachable. Command mode has no portfolio, so the paired command starts the same level.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn",
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-saveload-btn",
+        "equals": {
+          "levelEnded": false
+        }
+      },
+      "timeout": 120
+    },
+    {
+      "command": "campaign complete level:dusty_hollow",
+      "description": "Debug force-win (console-only, #1431): ends Dusty Hollow completed and unlocks Grumpstone Ridge.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign complete level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Gate: level-end Continue must become usable. First-run tutorial can defer the screen, hence the generous timeoutMs.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-level-end-screen [data-action=\"continue\"]",
+          "timeoutMs": 30000
+        }
+      ],
+      "role": "observe",
+      "timeout": 60,
+      "expect": {
+        "usable": "#bs-level-end-screen [data-action=\"continue\"]"
+      }
+    },
+    {
+      "command": "campaign start level:grumpstone_ridge",
+      "description": "Player clicks Continue on the level-end screen; Grumpstone Ridge starts and the HUD (TopBar Site Map) is reachable. Paired command starts that level in command mode.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-level-end-screen [data-action=\"continue\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-return-map",
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": ".bs-return-map",
+        "blocked": "#bs-level-end-screen [data-action=\"continue\"]",
+        "equals": {
+          "levelEnded": false
+        }
+      },
+      "timeout": 120
+    },
+    {
+      "command": "state",
+      "description": "Player opens the Site Map from the TopBar; a way back to site must be offered. `state` is the inert paired command.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": ".bs-return-map"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-world-map-back-to-site"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map-back-to-site",
+        "changedBy": {
+          "tickCount": 0,
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "description": "Player clicks Back to site; the map closes and the HUD is reachable again.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-world-map-back-to-site"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-saveload-btn",
+        "blocked": "#bs-world-map-back-to-site",
+        "changedBy": {
+          "tickCount": 0,
+          "cash": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "description": "Player saves into slot 1 through the Saves modal. `state` is the inert paired command.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-saves-modal"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-saveload-btn",
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Player opens Settings, scrolls to Return to Menu and confirms; the main menu returns with Continue reachable. The 500 ms wait copies main-menu-load.json's scroll preamble: no observable condition exists to poll for the wheel's compositor scroll settling before the danger button is clicked. `state` is the inert paired command.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-settings-panel"
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 400
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": 2000
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickLabel",
+          "label": "Return to Menu"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-main-menu #bs-menu-continue"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-continue",
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Player clicks the menu's Continue; the most recent save loads, the menu closes and the HUD is reachable. `state` is the inert paired command (command mode keeps the running Grumpstone game).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu #bs-menu-continue"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn",
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-saveload-btn",
+        "blocked": "#bs-main-menu #bs-menu-continue",
+        "equals": {
+          "levelEnded": false
+        }
+      },
+      "timeout": 120
+    },
+    {
+      "command": "campaign start level:grumpstone_ridge cash:0",
+      "description": "Restart Grumpstone Ridge with zero cash so bankruptcy runs its grace clock.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:grumpstone_ridge cash:0"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 0,
+          "levelEnded": false
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "description": "Resume the clock so payroll and upkeep drain.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:levelEndReason equals:bankruptcy max_ticks:600",
+      "description": "Advance simulation until the level ends in bankruptcy.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "levelEndReason",
+          "equals": "bankruptcy",
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 180,
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Gate: defeat screen's Retry must become usable.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-level-end-screen [data-action=\"retry\"]",
+          "timeoutMs": 30000
+        }
+      ],
+      "role": "observe",
+      "timeout": 60,
+      "expect": {
+        "usable": "#bs-level-end-screen [data-action=\"retry\"]"
+      }
+    },
+    {
+      "command": "campaign start level:grumpstone_ridge",
+      "description": "Player clicks Retry; the level restarts with its own starting cash and no level-end state.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-level-end-screen [data-action=\"retry\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn",
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-saveload-btn",
+        "blocked": "#bs-level-end-screen [data-action=\"retry\"]",
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "levelEnded": false
+        }
+      },
+      "timeout": 120
+    },
+    {
+      "command": "state",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        }
+      ],
+      "role": "observe",
+      "description": "Final state: restarted level running, not ended.",
+      "expect": {
+        "equals": {
+          "levelEnded": false
+        }
+      }
+    }
+  ]
+}

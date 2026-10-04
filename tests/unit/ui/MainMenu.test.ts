@@ -184,6 +184,20 @@ describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
     menu.dispose();
   });
 
+  it('the Continue button carries id bs-menu-continue, distinct from Resume (#1326)', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: 'dusty_hollow' },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')))!;
+    expect(continueBtn.id).toBe('bs-menu-continue');
+    expect(continueBtn.id).not.toBe('bs-menu-resume');
+    menu.dispose();
+  });
+
   it('clicking CONTINUE routes to onContinue with the most recent save\'s slotId', async () => {
     const menu = new MainMenu(container);
     const cb = vi.fn();
