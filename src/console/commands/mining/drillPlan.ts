@@ -72,7 +72,7 @@ export function clearDrillPlan(ctx: MiningContext): number {
  * caller pushes the hole itself; add's caller already got it pushed by
  * addHole.
  */
-function dispatchDrillHoleAction(
+export function dispatchDrillHoleAction(
   ctx: MiningContext,
   hole: DrillHole,
 ): void {

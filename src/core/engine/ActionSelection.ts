@@ -339,6 +339,15 @@ export function isRampSegmentClaimable(state: GameState, action: PendingAction):
 }
 
 /**
+ * True unless `action` is a charge_hole order whose hole is still only
+ * planned (its drill order has not landed yet).
+ */
+export function isChargeHoleClaimable(_state: GameState, _action: PendingAction): boolean {
+  // TODO: implement
+  return true;
+}
+
+/**
  * True when `action`'s stuck-abandon backoff (if any) has expired, or it never had one.
  * See PendingAction.stuckBackoffUntilTick.
  */
