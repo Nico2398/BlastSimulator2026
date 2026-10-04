@@ -375,7 +375,7 @@ const tutorialPitLevel = getLevel(TUTORIAL_LEVEL_ID);
 mainMenu.setOnTutorial(() => {
   mainMenu.hide();
   void enterLevel(
-    ['new_game seed:42 size:24', 'campaign start level:tutorial_pit'],
+    ['new_game seed:42 size:24', `campaign start level:${TUTORIAL_LEVEL_ID}`],
     tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
   ).then(() => { tutorial.start(ctx.state ?? undefined); });
 });
@@ -385,7 +385,7 @@ mainMenu.setOnTutorial(() => {
 // whatever the player currently has loaded.
 uiManager.setReplayTutorialHandler(() => {
   void enterLevel(
-    ['new_game seed:42 size:24', 'campaign start level:tutorial_pit'],
+    ['new_game seed:42 size:24', `campaign start level:${TUTORIAL_LEVEL_ID}`],
     tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
   ).then(() => { tutorial.start(ctx.state ?? undefined); });
 });
