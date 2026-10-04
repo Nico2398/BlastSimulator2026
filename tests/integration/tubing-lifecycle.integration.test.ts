@@ -29,7 +29,7 @@ describe('tubing lifecycle via console (#1351)', () => {
   it('blast drops tubing: next grid plan has no tubed holes', () => {
     const game = drilledGame();
     const { runner, ctx } = game;
-    const firstId = ctx.state!.drillHoles[0].id;
+    const firstId = ctx.state!.drillHoles[0]!.id;
     expect(runner.run('buy amount:2').success).toBe(true);
     expect(runner.run(`install_tubing hole:${firstId}`).success).toBe(true);
     expect(ctx.state!.tubingState.installedHoles.has(firstId)).toBe(true);
@@ -45,7 +45,7 @@ describe('tubing lifecycle via console (#1351)', () => {
     // Hole ids restart after a blast: the new first ordered hole reuses the
     // tubed id and must come up untubed. (Post-blast debris keeps the new
     // drill orders queued, so assert on the ordered holes, not drilled ones.)
-    const newFirstId = ctx.state!.plannedDrillHoles[0].id;
+    const newFirstId = ctx.state!.plannedDrillHoles[0]!.id;
     const tubing = ctx.state!.tubingState;
     expect(newFirstId).toBe(firstId);
     expect(tubing.installedHoles.has(newFirstId)).toBe(false);
@@ -55,7 +55,7 @@ describe('tubing lifecycle via console (#1351)', () => {
 
   it('drill_plan clear drops tubing, inventory unchanged', () => {
     const { runner, ctx } = drilledGame();
-    const id = ctx.state!.drillHoles[0].id;
+    const id = ctx.state!.drillHoles[0]!.id;
     runner.run('buy amount:2');
     runner.run(`install_tubing hole:${id}`);
     expect(runner.run('drill_plan clear').success).toBe(true);
@@ -65,7 +65,7 @@ describe('tubing lifecycle via console (#1351)', () => {
 
   it('drill_plan remove drops tubing for that hole only, inventory unchanged', () => {
     const { runner, ctx } = drilledGame();
-    const [a, b] = ctx.state!.drillHoles.map(h => h.id);
+    const [a, b] = ctx.state!.drillHoles.map(h => h.id) as [string, string];
     runner.run('buy amount:3');
     runner.run(`install_tubing hole:${a}`);
     runner.run(`install_tubing hole:${b}`);
@@ -97,7 +97,7 @@ describe('tubing lifecycle via console (#1351)', () => {
 
   it('install_tubing on a known hole still succeeds and consumes one unit', () => {
     const { runner, ctx } = drilledGame();
-    const id = ctx.state!.drillHoles[0].id;
+    const id = ctx.state!.drillHoles[0]!.id;
     runner.run('buy amount:2');
     expect(runner.run(`install_tubing hole:${id}`).success).toBe(true);
     expect(ctx.state!.tubingState.inventory).toBe(1);
