@@ -180,6 +180,11 @@ export class LevelEndScreen {
   hide(): void { this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
+  /** Hides the screen and clears the render cache so the next update() re-renders from scratch. */
+  reset(): void {
+    // TODO: implement
+  }
+
   update(state: GameState): void {
     if (state.levelEndReason === null) {
       this.rendered = false;
