@@ -7,12 +7,14 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
-import { createGridPlan, resetHoleIds } from '../../src/core/mining/DrillPlan.js';
+import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, type BlastResult } from '../../src/core/mining/BlastExecution.js';
 import { summariseMuckPile } from '../../src/core/mining/MuckPileSummary.js';
+
+const holeIds = { nextHoleId: 1 };
 
 interface Shot {
   rock?: string;
@@ -54,9 +56,9 @@ function fireOnto(shot: Shot): { result: BlastResult; grid: VoxelGrid } {
     spacing = 4, depth = 8, rows = 2, cols = 3,
   } = shot;
 
-  resetHoleIds();
+  holeIds.nextHoleId = 1;
   const grid = bench(rock);
-  const holes = createGridPlan({ x: 12, z: 12 }, rows, cols, spacing, depth, 0.15);
+  const holes = createGridPlan(holeIds, { x: 12, z: 12 }, rows, cols, spacing, depth, 0.15);
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
   const { charges } = batchCharge(holes.map(h => h.id), depths, explosive, kg, stemming);
@@ -70,7 +72,7 @@ function fireOnto(shot: Shot): { result: BlastResult; grid: VoxelGrid } {
 const meanFragmentSize = (r: BlastResult): number =>
   r.fragmentCount > 0 ? r.totalRockVolume / r.fragmentCount : 0;
 
-beforeEach(() => resetHoleIds());
+beforeEach(() => holeIds.nextHoleId = 1);
 
 describe('Blast balance — more explosive does more', () => {
   it('breaks more rock', () => {

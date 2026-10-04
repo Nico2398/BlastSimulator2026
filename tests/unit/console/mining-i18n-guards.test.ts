@@ -12,7 +12,7 @@ import {
   surveyCommand,
   weatherCommand,
 } from '../../../src/console/commands/mining.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import { makeEmptyCtx } from './i18nGuardHelpers.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
@@ -56,8 +56,6 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
     tickCommand(ctx, ['1'], {});
   }
 }
-
-beforeEach(() => resetHoleIds());
 afterEach(() => setLocale('en'));
 
 // ── requireGame (mining.ts's own local guard) ────────────────────────────

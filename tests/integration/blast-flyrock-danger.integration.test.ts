@@ -13,7 +13,7 @@ import {
   sequenceCommand,
   type MiningContext,
 } from '../../src/console/commands/mining.js';
-import { resetHoleIds } from '../../src/core/mining/DrillPlan.js';
+
 import { hireEmployee } from '../../src/core/entities/Employee.js';
 import { Random } from '../../src/core/math/Random.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
@@ -102,7 +102,6 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
 
 /** Fire a 3×3 pattern at (15,15) with the given stemming. */
 function blastAt(ctx: MiningContext, stemming: string): void {
-  resetHoleIds();
   drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
   driveDrillPlanToCompletion(ctx);
   // Charging bills explosives at order time (#1341); these tests are about
@@ -144,8 +143,6 @@ function crewBesideTheBlast(ctx: MiningContext, count = 12): number[] {
 
 const aliveCount = (ctx: MiningContext, ids: number[]): number =>
   ctx.state!.employees.employees.filter(e => ids.includes(e.id) && e.alive && !e.injured).length;
-
-beforeEach(() => resetHoleIds());
 
 // #1264: this file's staffed driller+blaster crew converging on a packed
 // multi-hole drill/charge grid (blastAt's own 3x3, spacing:3 pattern) is
@@ -241,7 +238,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
     blastAt(careful, '2');
 
     // Both reports exist; the reckless one threw rock further and rates worse.
-    resetHoleIds();
     drillPlanCommand(reckless, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', start: '30,30' });
     driveDrillPlanToCompletion(reckless);
     chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
@@ -267,7 +263,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('nothing outside computeDangerZone\'s padded bounds is touched, regardless of proximity to a landed projectile', () => {
     const ctx = makeCtx();
-    resetHoleIds();
     drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
     driveDrillPlanToCompletion(ctx);
     const zone = computeDangerZone(ctx.state!.drillHoles, BLAST_DANGER_MARGIN_M)!;

@@ -19,11 +19,13 @@ import {
 import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { HoleCharge } from '../../../src/core/mining/ChargePlan.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
-import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { Random } from '../../../src/core/math/Random.js';
 
+const holeIds = { nextHoleId: 1 };
+
 beforeEach(() => {
-  resetHoleIds();
+  holeIds.nextHoleId = 1;
   resetBoulderFragIds();
 });
 
@@ -76,7 +78,7 @@ describe('BlastCalc — vibration', () => {
   });
 
   it('groupChargesByDelay aggregates correctly', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 1, 3, 3, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 3, 3, 8, 0.15);
     const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {
       [holes[0]!.id]: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
       [holes[1]!.id]: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
@@ -498,7 +500,6 @@ describe('BlastCalc — computeInitialEnergy', () => {
     expect(computeInitialEnergy(charge, 8, true)).toBe(computeInitialEnergy(charge, 8, false));
   });
 });
-
 
 // -- oversized-fragment threshold --
 

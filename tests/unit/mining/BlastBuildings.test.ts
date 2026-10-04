@@ -15,7 +15,7 @@ import {
 } from '../../../src/core/entities/Building.js';
 
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
-import { addHole, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import {
@@ -30,6 +30,8 @@ import {
   createScoreState,
   recordBuildingDestruction,
 } from '../../../src/core/scores/ScoreManager.js';
+
+const holeIds = { nextHoleId: 1 };
 
 // ── Shared test helpers ────────────────────────────────────────────────────────
 
@@ -86,7 +88,7 @@ function makeTestGrid(): VoxelGrid {
 // falls within any building's footprint cells, and no error otherwise.
 
 describe('checkProtectedPositions', () => {
-  beforeEach(() => resetHoleIds());
+  beforeEach(() => holeIds.nextHoleId = 1);
 
   it('returns a ValidationError when a hole sits on a building footprint cell', () => {
     // explosive_warehouse tier-1 footprint: rect(2,2) → covers cells
@@ -95,7 +97,7 @@ describe('checkProtectedPositions', () => {
     placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
-    addHole(holes, 2, 2, 5, 0.15); // exact match on footprint cell (2, 2)
+    addHole(holeIds, holes, 2, 2, 5, 0.15); // exact match on footprint cell (2, 2)
 
     const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
 
@@ -111,7 +113,7 @@ describe('checkProtectedPositions', () => {
     placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
-    addHole(holes, 8, 8, 5, 0.15); // well clear of the building
+    addHole(holeIds, holes, 8, 8, 5, 0.15); // well clear of the building
 
     const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
 
@@ -124,8 +126,8 @@ describe('checkProtectedPositions', () => {
     placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
-    const underBuilding = addHole(holes, 2, 2, 5, 0.15); // overlaps footprint cell (2, 2)
-    addHole(holes, 10, 10, 5, 0.15);                      // no overlap
+    const underBuilding = addHole(holeIds, holes, 2, 2, 5, 0.15); // overlaps footprint cell (2, 2)
+    addHole(holeIds, holes, 10, 10, 5, 0.15);                      // no overlap
 
     const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
 
@@ -141,7 +143,7 @@ describe('checkProtectedPositions', () => {
     placeBuilding(buildingState, 'explosive_warehouse', 2, 2, 20, 20);
 
     const holes: DrillHole[] = [];
-    addHole(holes, 2.3, 2.7, 5, 0.15);
+    addHole(holeIds, holes, 2.3, 2.7, 5, 0.15);
 
     const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
 
@@ -162,7 +164,7 @@ describe('checkProtectedPositions', () => {
 // — all inside the blast zone.  A building placed at (15, 15) is outside the zone.
 
 describe('executeBlast — building destruction', () => {
-  beforeEach(() => resetHoleIds());
+  beforeEach(() => holeIds.nextHoleId = 1);
 
   it('removes a building from buildingState when its footprint voxels are cleared', () => {
     const grid = makeTestGrid();
@@ -172,7 +174,7 @@ describe('executeBlast — building destruction', () => {
     expect(buildingState.buildings).toHaveLength(1);
 
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15); // directly above building origin
+    addHole(holeIds, holes, 5, 5, 5, 0.15); // directly above building origin
     const plan = makeBlastPlan(holes);
 
     // Pass buildingState as 5th argument so executeBlast can remove destroyed buildings.
@@ -190,7 +192,7 @@ describe('executeBlast — building destruction', () => {
     expect(placed.success).toBe(true);
 
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);
+    addHole(holeIds, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
@@ -210,7 +212,7 @@ describe('executeBlast — building destruction', () => {
     const buildingId = placed.building!.id; // capture before blast removes it
 
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);
+    addHole(holeIds, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
@@ -237,7 +239,7 @@ describe('executeBlast — building destruction', () => {
 //   • The destroyed building is not an explosive_warehouse
 
 describe('executeBlast — secondary blast events', () => {
-  beforeEach(() => resetHoleIds());
+  beforeEach(() => holeIds.nextHoleId = 1);
 
   it('emits a secondaryBlastEvent for an explosive_warehouse that has stored explosives', () => {
     const grid = makeTestGrid();
@@ -249,7 +251,7 @@ describe('executeBlast — secondary blast events', () => {
     (buildingState.buildings[0] as any).storedExplosivesKg = 200;
 
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);
+    addHole(holeIds, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
@@ -271,7 +273,7 @@ describe('executeBlast — secondary blast events', () => {
     (buildingState.buildings[0] as any).storedExplosivesKg = 0;
 
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);
+    addHole(holeIds, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
@@ -289,7 +291,7 @@ describe('executeBlast — secondary blast events', () => {
     placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
 
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);
+    addHole(holeIds, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);
@@ -308,7 +310,7 @@ describe('executeBlast — secondary blast events', () => {
     placeBuilding(buildingState, 'management_office', 5, 5, 20, 20);
 
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);
+    addHole(holeIds, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = (executeBlast as any)(plan, grid, [], 1.0, buildingState);

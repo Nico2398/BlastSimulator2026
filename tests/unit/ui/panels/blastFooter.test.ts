@@ -2,11 +2,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BlastFooter } from '../../../../src/ui/panels/blastFooter.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { addHole, resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
+import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
+
+const holeIds = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -22,7 +24,7 @@ function makeFooter(): { footer: BlastFooter; container: HTMLElement; fireReques
 }
 
 function chargeAndSequence(state: ReturnType<typeof makeState>) {
-  const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+  const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
   const chargeResult = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
   state.sequenceDelays[hole.id] = 0;
@@ -30,7 +32,7 @@ function chargeAndSequence(state: ReturnType<typeof makeState>) {
 }
 
 beforeEach(() => {
-  resetHoleIds();
+  holeIds.nextHoleId = 1;
   document.body.innerHTML = '';
   setLocale('en');
 });
@@ -48,7 +50,7 @@ describe('BlastFooter', () => {
   it('sums plan cost from every charged hole\'s explosive cost', () => {
     const { footer } = makeFooter();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
     const chargeResult = createCharge('boomite', 5, 2, hole.depth); // boomite: $12/kg
     if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
 
@@ -61,8 +63,8 @@ describe('BlastFooter', () => {
   it('FIRE stays disabled with a reason when holes are drilled but not fully charged (default en locale)', () => {
     const { footer } = makeFooter();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
-    addHole(state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 13, 10, 8, 0.15);
 
     footer.update(state);
 
@@ -78,8 +80,8 @@ describe('BlastFooter', () => {
     setLocale('fr');
     const { footer } = makeFooter();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
-    addHole(state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 13, 10, 8, 0.15);
 
     footer.update(state);
 

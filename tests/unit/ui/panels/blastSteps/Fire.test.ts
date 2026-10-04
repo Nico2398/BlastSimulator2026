@@ -2,10 +2,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
-import { addHole, resetHoleIds } from '../../../../../src/core/mining/DrillPlan.js';
+import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { purchaseVehicle } from '../../../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../../../src/core/entities/Employee.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
+
+const holeIds = { nextHoleId: 1 };
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -39,7 +41,7 @@ function addEmployee(state: GameState, x: number, z: number): Employee {
   return emp;
 }
 
-beforeEach(() => resetHoleIds());
+beforeEach(() => holeIds.nextHoleId = 1);
 
 describe('FireStep', () => {
   it('shows the no-plan empty state and disables Sound the Horn when there are no holes', () => {
@@ -54,7 +56,7 @@ describe('FireStep', () => {
   it('shows the danger zone as clear when a plan exists but nobody is nearby', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     step.update(state, 'sunny');
 
     expect(step.root.textContent).toContain('Danger zone is clear');
@@ -65,7 +67,7 @@ describe('FireStep', () => {
   it('lists an employee standing inside the computed danger zone, tagged IN ZONE', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     addEmployee(state, 22, 22); // well within the 15m-padded box around (20,20)
     step.update(state, 'sunny');
 
@@ -78,7 +80,7 @@ describe('FireStep', () => {
   it('does not list a dead employee, even if their last position was inside the zone', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     const emp = addEmployee(state, 22, 22);
     emp.alive = false;
     step.update(state, 'sunny');
@@ -89,7 +91,7 @@ describe('FireStep', () => {
   it('lists a driver-equipped vehicle inside the zone, tagged IN ZONE', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
     vehicle.occupantIds = [1]; // driver aboard — not stranded
 
@@ -101,7 +103,7 @@ describe('FireStep', () => {
   it('shows the distinct stranded tag for a driverless vehicle, while a driver-equipped one still shows IN ZONE (#947)', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle: driven } = purchaseVehicle(state.vehicles, 'debris_hauler', 21, 21);
     driven.occupantIds = [1];
     const { vehicle: driverless } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
@@ -116,7 +118,7 @@ describe('FireStep', () => {
   it('checklist shows the stranded-count message when the zone holds only a driverless vehicle (#947)', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
     vehicle.occupantIds = [];
 
@@ -128,7 +130,7 @@ describe('FireStep', () => {
   it('checklist shows the stranded-count message for a mix of an employee and a driverless vehicle (#947)', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     addEmployee(state, 22, 22);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 23, 23);
     vehicle.occupantIds = [];
@@ -141,7 +143,7 @@ describe('FireStep', () => {
   it('keeps Sound the Horn clickable when the only occupant is a stranded driverless vehicle (#947)', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
     vehicle.occupantIds = [];
 
@@ -154,7 +156,7 @@ describe('FireStep', () => {
   it('does not list an employee standing outside the padded box', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     addEmployee(state, 100, 100); // far outside the 15m margin
     step.update(state, 'sunny');
 
@@ -165,7 +167,7 @@ describe('FireStep', () => {
   it('Sound the Horn dispatches zone clear with the real computed bounds', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     addEmployee(state, 22, 22);
     step.update(state, 'sunny');
 
@@ -187,7 +189,7 @@ describe('FireStep', () => {
   it('pre-flight checklist warns about wet holes while raining, and clears once dry', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
 
     step.update(state, 'heavy_rain');
     expect(step.root.textContent).toContain('holes are full of water');
@@ -199,7 +201,7 @@ describe('FireStep', () => {
   it('treats missing weather as dry (no crash)', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
 
     expect(() => step.update(state, undefined)).not.toThrow();
     expect(step.root.textContent).toContain('dry or tubed');
@@ -214,7 +216,7 @@ describe('FireStep', () => {
   it('refreshLocale() does not throw and keeps rendering', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     step.update(state, 'sunny');
     expect(() => step.refreshLocale()).not.toThrow();
     step.update(state, 'sunny');
@@ -244,7 +246,7 @@ describe('FireStep — scroll-bounded zone occupant list (#958)', () => {
   it('bounds the zone occupant list to a wrapper with inline overflow-y:auto and a numeric max-height, holding every occupant', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     for (let i = 0; i < 20; i++) addEmployee(state, 21, 21);
     for (let i = 0; i < 20; i++) purchaseVehicle(state.vehicles, 'debris_hauler', 22, 22);
     step.update(state, 'sunny');
@@ -257,7 +259,7 @@ describe('FireStep — scroll-bounded zone occupant list (#958)', () => {
   it('keeps Sound the Horn and the pre-flight checklist reachable as siblings, outside the bounded wrapper', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 20, 20, 8, 0.15);
+    addHole(holeIds, state.drillHoles, 20, 20, 8, 0.15);
     for (let i = 0; i < 20; i++) addEmployee(state, 21, 21);
     for (let i = 0; i < 20; i++) purchaseVehicle(state.vehicles, 'debris_hauler', 22, 22);
     step.update(state, 'sunny');

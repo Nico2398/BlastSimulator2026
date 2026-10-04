@@ -14,7 +14,7 @@ import {
   surveyCommand,
   tubingCommand,
 } from '../../../src/console/commands/mining.js';
-import { resetHoleIds, computeDrillHoleDurationTicks } from '../../../src/core/mining/DrillPlan.js';
+import { computeDrillHoleDurationTicks } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
@@ -100,8 +100,6 @@ function driveRampToCompletion(ctx: MiningContext, maxTicks = 400): void {
     tickCommand(ctx, ['1'], {});
   }
 }
-
-beforeEach(() => resetHoleIds());
 afterEach(() => { vi.restoreAllMocks(); });
 
 // ── blast_plan list ──────────────────────────────────────────────────────────

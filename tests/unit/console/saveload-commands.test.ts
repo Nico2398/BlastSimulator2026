@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { saveCommand, loadCommand } from '../../../src/console/commands/saveload.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+
 import { computeVoxelColumnSurfaceY } from '../../../src/core/world/VoxelGrid.js';
 import { requireValidGenDimension, MAX_TERRAIN_GEN_DIMENSION } from '../../../src/core/world/TerrainGen.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
@@ -17,8 +17,6 @@ import type { SerializedVoxels } from '../../../src/core/state/VoxelGridCodec.js
 function makeCtx(): MiningContext {
   return makeGameContext({ mineType: 'desert', seed: '1', size: '16' });
 }
-
-beforeEach(() => resetHoleIds());
 
 describe('saveCommand', () => {
   it('requires a loaded game', () => {

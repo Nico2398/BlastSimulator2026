@@ -19,7 +19,7 @@ import {
 } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+
 import type { BlastRegion } from '../../../src/core/mining/BlastExecution.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
@@ -37,6 +37,8 @@ import { createVehicleState, purchaseVehicle, isVehicleCurrentlyDriving, type Ve
 import { hireEmployee, createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+
+const holeIds = { nextHoleId: 1 };
 const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1263,12 +1265,12 @@ describe('NavGrid.patchNavGrid — ramp formation within patch', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('executeBlast — clearedRegion', () => {
-  beforeEach(() => resetHoleIds());
+  beforeEach(() => holeIds.nextHoleId = 1);
 
   it('returns a BlastResult with clearedRegion reflecting the blast zone', () => {
     const grid = makeTestGrid();                  // 20×10×20, solid y=0..4
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);               // hole at (5,5), depth 5
+    addHole(holeIds, holes, 5, 5, 5, 0.15);               // hole at (5,5), depth 5
     const plan = makeBlastPlan(holes);
 
     const result = executeBlast(plan, grid, [], 1.0);
@@ -1297,7 +1299,7 @@ describe('executeBlast — clearedRegion', () => {
     // Grid with no blastable rock (all air) → blast clears nothing
     const grid = new VoxelGrid(20, 20);
     const holes: DrillHole[] = [];
-    addHole(holes, 5, 5, 5, 0.15);
+    addHole(holeIds, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = executeBlast(plan, grid, [], 1.0);

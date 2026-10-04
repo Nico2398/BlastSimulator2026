@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { cancelOutstandingDrillActions } from '../../../src/console/commands/mining/shared.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 
 function setup(gridCmd = 'drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:14,14') {
   const { runner, ctx } = createRunner();
@@ -11,7 +10,6 @@ function setup(gridCmd = 'drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:
 }
 
 describe('cancelOutstandingDrillActions (#1346)', () => {
-  beforeEach(() => resetHoleIds());
 
   it('cancels every drill_hole action, empties plannedDrillHoles and returns the count', () => {
     const { state } = setup();

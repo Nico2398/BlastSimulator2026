@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  createGridPlan, addHole, removeHole, holeNumericId, resetHoleIds, digVoxel,
-  landDrilledHole, computeDrillHoleDurationTicks,
-} from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan, addHole, removeHole, holeNumericId, maxHoleNumericId, digVoxel, landDrilledHole, computeDrillHoleDurationTicks } from '../../../src/core/mining/DrillPlan.js';
 import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import {
   VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight,
@@ -15,16 +12,18 @@ import {
   DRILL_HOLE_REFERENCE_DIAMETER_M,
 } from '../../../src/core/config/balance.js';
 
-beforeEach(() => resetHoleIds());
+const holeIds = { nextHoleId: 1 };
+
+beforeEach(() => holeIds.nextHoleId = 1);
 
 describe('DrillPlan', () => {
   it('createGridPlan creates correct number of holes', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
     expect(holes.length).toBe(12);
   });
 
   it('createGridPlan positions are correct', () => {
-    const holes = createGridPlan({ x: 20, z: 25 }, 3, 4, 3, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 20, z: 25 }, 3, 4, 3, 8, 0.15);
     // First row: (20,25), (23,25), (26,25), (29,25)
     expect(holes[0]!.x).toBe(20);
     expect(holes[0]!.z).toBe(25);
@@ -36,15 +35,15 @@ describe('DrillPlan', () => {
   });
 
   it('grid spacing is correctly applied', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 2, 2, 5, 10, 0.1);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 2, 2, 5, 10, 0.1);
     expect(holes[0]!.x).toBe(0);
     expect(holes[1]!.x).toBe(5);
     expect(holes[2]!.z).toBe(5);
   });
 
   it('addHole appends a hole with unique ID', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
-    const added = addHole(holes, 10, 15, 6, 0.1);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
+    const added = addHole(holeIds, holes, 10, 15, 6, 0.1);
     expect(holes.length).toBe(2);
     expect(added.id).not.toBe(holes[0]!.id);
     expect(added.x).toBe(10);
@@ -53,7 +52,7 @@ describe('DrillPlan', () => {
   });
 
   it('removeHole removes the matching hole and returns true', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
     const targetId = holes[0]!.id;
 
     const removed = removeHole(holes, targetId);
@@ -64,7 +63,7 @@ describe('DrillPlan', () => {
   });
 
   it('removeHole returns false and leaves the plan untouched when the ID is unknown', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
 
     const removed = removeHole(holes, 'H999');
 
@@ -84,8 +83,8 @@ describe('DrillPlan', () => {
   });
 
   it('holeNumericId round-trips IDs produced by createGridPlan and addHole', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
-    const added = addHole(holes, 5, 5, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const added = addHole(holeIds, holes, 5, 5, 8, 0.15);
 
     expect(holeNumericId(holes[0]!.id)).toBe(1);
     expect(holeNumericId(holes[1]!.id)).toBe(2);
@@ -97,13 +96,13 @@ describe('DrillPlan', () => {
   // id generation).
 
   it('createGridPlan produces stable, sequential ids across a full grid', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 2, 2, 3, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 2, 2, 3, 8, 0.15);
     expect(holes.map(h => h.id)).toEqual(['H1', 'H2', 'H3', 'H4']);
   });
 
   it('addHole continues the sequential id counter after a grid plan', () => {
-    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
-    const added = addHole(holes, 9, 9, 8, 0.15);
+    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const added = addHole(holeIds, holes, 9, 9, 8, 0.15);
     expect(added.id).toBe('H3');
   });
 });
@@ -341,5 +340,97 @@ describe('digVoxel', () => {
     // cell higher to clear the stranded residue at oldTop+1 — the emitted
     // region must widen to match, not stop at the raw dug voxel's own y.
     expect(emitted.region.maxY).toBe(oldTop! + 1);
+  });
+});
+
+// ── #1352: the id counter lives on the caller's state, not in the module ────
+
+describe('hole id counter (#1352)', () => {
+  const hole = (id: string) => ({ id, x: 0, z: 0, depth: 8, diameter: 0.15 });
+
+  it('createGridPlan advances the counter by rows*cols', () => {
+    const counter = { nextHoleId: 1 };
+    const holes = createGridPlan(counter, { x: 0, z: 0 }, 2, 3, 3, 8, 0.15);
+    expect(holes.map(h => h.id)).toEqual(['H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+    expect(counter.nextHoleId).toBe(7);
+  });
+
+  it('createGridPlan starts at the counter value it is given', () => {
+    const counter = { nextHoleId: 10 };
+    const holes = createGridPlan(counter, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    expect(holes.map(h => h.id)).toEqual(['H10', 'H11']);
+    expect(counter.nextHoleId).toBe(12);
+  });
+
+  it('two counters are independent', () => {
+    const a = { nextHoleId: 1 };
+    const b = { nextHoleId: 1 };
+    const ha = addHole(a, [], 0, 0, 8, 0.15);
+    addHole(a, [], 1, 1, 8, 0.15);
+    const hb = addHole(b, [], 0, 0, 8, 0.15);
+    expect(ha.id).toBe('H1');
+    expect(hb.id).toBe('H1');
+    expect(a.nextHoleId).toBe(3);
+    expect(b.nextHoleId).toBe(2);
+  });
+
+  it('sequential adds are unique and increasing', () => {
+    const counter = { nextHoleId: 1 };
+    const holes: ReturnType<typeof createGridPlan> = [];
+    const ids = [0, 1, 2, 3, 4].map(i => addHole(counter, holes, i, i, 8, 0.15).id);
+    expect(ids).toEqual(['H1', 'H2', 'H3', 'H4', 'H5']);
+    expect(new Set(ids).size).toBe(5);
+  });
+
+  it('removing the highest hole does not reuse its id', () => {
+    const counter = { nextHoleId: 1 };
+    const holes: ReturnType<typeof createGridPlan> = [];
+    addHole(counter, holes, 0, 0, 8, 0.15);
+    const top = addHole(counter, holes, 1, 1, 8, 0.15);
+    removeHole(holes, top.id);
+    const next = addHole(counter, holes, 2, 2, 8, 0.15);
+    expect(next.id).toBe('H3');
+  });
+
+  it('addHole skips ids held by reservedHoles', () => {
+    const counter = { nextHoleId: 1 };
+    const added = addHole(counter, [], 5, 5, 8, 0.15, [hole('H1'), hole('H2')]);
+    expect(added.id).toBe('H3');
+    expect(counter.nextHoleId).toBe(4);
+  });
+
+  it('addHole skips ids held by the plan itself', () => {
+    const counter = { nextHoleId: 1 };
+    const holes = [hole('H1')];
+    expect(addHole(counter, holes, 5, 5, 8, 0.15).id).toBe('H2');
+  });
+});
+
+describe('maxHoleNumericId (#1352)', () => {
+  it('returns 0 for no ids', () => {
+    expect(maxHoleNumericId([])).toBe(0);
+  });
+
+  it('returns the highest numeric part', () => {
+    expect(maxHoleNumericId(['H1', 'H7', 'H3'])).toBe(7);
+  });
+
+  it('compares numerically, not lexically', () => {
+    expect(maxHoleNumericId(['H9', 'H10'])).toBe(10);
+  });
+
+  it('ignores ids that are not H<n>', () => {
+    expect(maxHoleNumericId(['foo', 'H', 'H2x', 'X99', 'h50', 'H4'])).toBe(4);
+  });
+
+  it('returns 0 when no id matches', () => {
+    expect(maxHoleNumericId(['foo', 'bar'])).toBe(0);
+  });
+
+  it('accepts any iterable and does not consume state', () => {
+    const set = new Set(['H2', 'H5']);
+    expect(maxHoleNumericId(set)).toBe(5);
+    expect(maxHoleNumericId(set)).toBe(5);
+    expect(set.size).toBe(2);
   });
 });
