@@ -716,14 +716,17 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole).toHaveBeenCalledWith('build destroy 11');
   });
 
-  it('cancelling (never confirming) leaves gameConsole untouched (#1399)', () => {
+  it('Demolish click only hands off a confirm config and does not run build destroy (#1399)', () => {
     const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [building];
     menu.setConfirmHandler(vi.fn());
     menu.update(state);
+    const handler = vi.fn();
+    menu.setConfirmHandler(handler);
     findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
 
+    expect(handler).toHaveBeenCalledTimes(1);
     expect(gameConsole).not.toHaveBeenCalled();
   });
 

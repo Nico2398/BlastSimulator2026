@@ -25,14 +25,14 @@ describe('buildDemolishConfirm (#1399)', () => {
     const b = makeBuilding();
     const cfg = buildDemolishConfirm(b, vi.fn());
     expect(cfg.body).toContain(t('building.management_office.t1.name'));
-    expect(cfg.body).toContain(formatMoney(getDemolishCost(b)));
+    expect(cfg.body).toContain(`$${formatMoney(getDemolishCost(b))}`);
     expect(cfg.body).not.toContain('ui.build.demolish_confirm_body');
   });
 
   it('cost string tracks the tier', () => {
     const b = makeBuilding({ tier: 2 });
     const cfg = buildDemolishConfirm(b, vi.fn());
-    expect(cfg.body).toContain(formatMoney(getDemolishCost(b)));
+    expect(cfg.body).toContain(`$${formatMoney(getDemolishCost(b))}`);
     expect(cfg.body).toContain(t('building.management_office.t2.name'));
   });
 
@@ -63,7 +63,7 @@ describe('buildDemolishConfirm (#1399)', () => {
     expect(cfg.body).not.toMatch(/\bkg\b.*lost|lost.*\bkg\b/i);
   });
 
-  it('does not invoke onConfirm when only built (cancel path)', () => {
+  it('building the config alone never runs onConfirm', () => {
     const onConfirm = vi.fn();
     buildDemolishConfirm(makeBuilding(), onConfirm);
     expect(onConfirm).not.toHaveBeenCalled();

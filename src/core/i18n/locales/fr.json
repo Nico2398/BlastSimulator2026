@@ -2435,7 +2435,7 @@
   "ui.build.placed_buildings": "Bâtiments placés",
   "ui.build.demolished": "Bâtiment démoli !",
   "ui.build.demolish_confirm_title": "Démolir le bâtiment ?",
-  "ui.build.demolish_confirm_body": "Démolir {name} pour {cost} ? Rien n'est remboursé et c'est irréversible.",
+  "ui.build.demolish_confirm_body": "Démolir {name} pour {cost} $ ? Rien n'est remboursé et c'est irréversible.",
   "ui.build.demolish_confirm_loses_explosives": "Les explosifs stockés ({kg} kg) sont perdus.",
   "ui.build.upgraded": "Bâtiment amélioré !",
   "ui.build.invalid_placement": "Placement invalide",

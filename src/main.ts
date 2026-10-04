@@ -1118,9 +1118,9 @@ selectionBar.setActionHandler((action, entity) => {
       break;
     }
     case 'demolish': {
-      const b = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
-      if (!b) break;
-      uiManager.showConfirm(buildDemolishConfirm(b, () => {
+      const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
+      if (!placedBuilding) break;
+      uiManager.showConfirm(buildDemolishConfirm(placedBuilding, () => {
         reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
         scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
       }));

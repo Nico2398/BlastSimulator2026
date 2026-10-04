@@ -96,11 +96,12 @@ export class BuildMenu extends PanelBase {
   private readonly underConstructionEls = new Map<BuildingType, HTMLElement>();
   private readonly locale = new LocaleTextRegistry();
 
+  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
+
   /** Routes the placed-row Demolish click to a confirm modal (#1399); unset means the click does nothing. */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
     this.onConfirmRequestCb = cb;
   }
-  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-build-panel'));
