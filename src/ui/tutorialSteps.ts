@@ -15,6 +15,7 @@ import {
   createSurveyOverlayToggleStep,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
+import { hasFillableOreSaleOffer } from '../core/economy/Contract.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
 
 /** The one scripted event the tutorial fires, so the player meets the dialog. */
@@ -494,7 +495,11 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     (s) => (s.contracts?.completedHistory ?? []).filter((c) => c.type === 'ore_sale' && c.completed).length,
     ['contract accept type:ore_sale', 'contract deliver type:ore_sale amount:2000'],
     TOOLBAR_TARGET.contracts,
-    { tickBudget: 20, waitsOnWork: true },
+    {
+      tickBudget: 20,
+      waitsOnWork: true,
+      clockMustRun: (s) => !hasFillableOreSaleOffer(s.contracts?.available ?? [], s.collectedOre ?? {}),
+    },
   ),
 
   // ── Step 16: finances ──

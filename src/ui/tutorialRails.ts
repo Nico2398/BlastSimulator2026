@@ -56,6 +56,7 @@ export class TutorialRails {
   private stepStartTick = 0;
   private budget = DEFAULT_TICK_BUDGET;
   private waitsOnWork = false;
+  private clockMustRun: ((state: GameState) => boolean) | undefined;
   private held = false;
   private lastProgressSignature: string | null = null;
   private lastProgressTick = 0;
@@ -67,6 +68,7 @@ export class TutorialRails {
     this.stageIndex = 0;
     this.budget = step.tickBudget ?? DEFAULT_TICK_BUDGET;
     this.waitsOnWork = step.waitsOnWork === true;
+    this.clockMustRun = step.clockMustRun;
     this.stepStartTick = state?.tickCount ?? 0;
     this.lastProgressSignature = null;
     this.lastProgressTick = this.stepStartTick;
@@ -142,6 +144,7 @@ export class TutorialRails {
         tick: this.lastProgressTick,
         trainingActive: this.lastProgressTrainingActive,
       },
+      this.clockMustRun?.(state) === true,
     );
     this.lastProgressSignature = decision.progressSignature;
     this.lastProgressTick = decision.lastProgressTick;

@@ -383,6 +383,10 @@ function isWorkInProgress(state: GameState): boolean {
  * keeps moving — a driver still walking toward a vehicle — never runs out the
  * clock; work that genuinely stalls still gets held `WORK_GRACE_TICKS` after
  * it stopped moving.
+ *
+ * `clockMustRun` overrides all of the above once the allowance is spent: the
+ * step's own condition cannot be met while the world is frozen, so the clock
+ * is never held (#1336).
  */
 export function decideClock(
   state: GameState,
@@ -390,8 +394,7 @@ export function decideClock(
   budget: number = DEFAULT_TICK_BUDGET,
   waitsOnWork: boolean = false,
   progress: ClockProgress = { signature: null, tick: stepStartTick },
-  // TODO(#1336): force the clock to run when true.
-  _clockMustRun: boolean = false,
+  clockMustRun: boolean = false,
 ): ClockDecision {
   const tickCount = state.tickCount ?? 0;
   const spent = Math.max(0, tickCount - stepStartTick);
@@ -399,6 +402,15 @@ export function decideClock(
   if (spent < budget) {
     return {
       hold: false, spent, progressSignature: progress.signature, lastProgressTick: progress.tick, trainingActive,
+    };
+  }
+  // The step cannot finish until the world moves (e.g. no fillable ore_sale
+  // offer yet, so the market must keep refreshing): never hold, whether or
+  // not the step waits on work. The signature is re-read each call so the
+  // grace window re-anchors once the flag clears.
+  if (clockMustRun) {
+    return {
+      hold: false, spent, progressSignature: workSignature(state), lastProgressTick: tickCount, trainingActive,
     };
   }
   if (!waitsOnWork) {
