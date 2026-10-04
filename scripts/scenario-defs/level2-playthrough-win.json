@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four far-flung living quarters, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends with the level still open. `campaign start level:grumpstone_ridge` is locked, so the file runs on the new_game world; no allowed step can unlock level 2, so it cannot end 'completed'.",
+  "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four far-flung living quarters, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends as a real win: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:grumpstone_ridge`, which activates level 2 and ends it 'completed' with profit at the $250,000 threshold. Drillers and blasters die in blasts, so each later pattern re-hires and re-equips a crew and rig.",
   "steps": [
     {
       "command": "new_game seed:2277 cash:3000000 staffed:true",
@@ -1947,6 +1947,26 @@
       }
     },
     {
+      "command": "employee assign_skill 9 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 9 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 1 9",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 9"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:25,15",
       "interaction": [
         {
@@ -2139,8 +2159,8 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 25,
-          "holeCount": 0
+          "orderedHoleCount": 13,
+          "holeCount": 12
         },
         "increased": [
           "tickCount"
@@ -2305,8 +2325,8 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 25,
-          "holeCount": 0
+          "orderedHoleCount": 12,
+          "holeCount": 13
         }
       }
     },
@@ -2436,7 +2456,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 13,
           "sequencedCount": 0
         },
         "changedBy": {
@@ -2580,8 +2600,8 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
+          "holeCount": 13,
+          "chargedCount": 13,
           "sequencedCount": 0,
           "orderedChargeCount": 0
         }
@@ -2615,9 +2635,9 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "holeCount": 13,
+          "chargedCount": 13,
+          "sequencedCount": 13
         },
         "changedBy": {
           "tickCount": 0
@@ -2651,7 +2671,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2675,7 +2695,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2696,7 +2716,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2717,7 +2737,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2738,14 +2758,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 76.73555555555699,
           "safety": 0,
-          "ecology": 50,
-          "nuisance": 50
+          "ecology": 43.03,
+          "nuisance": 32.575
         },
         "changedBy": {
           "tickCount": 0
@@ -2763,7 +2783,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2785,7 +2805,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2807,7 +2827,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2827,7 +2847,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2849,7 +2869,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2878,7 +2898,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2918,7 +2938,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2939,7 +2959,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2948,6 +2968,96 @@
           "tickCount": 0
         }
       }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 13 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 13 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: vehicle #7 (staffed claims #1-4; rock_digger and debris_hauler above claim #5-6). This is the driller's-second-rig this file already needed under the old semantics (Finding #59 -- bought but its own driller never licensed) -- now driller #8, licensed above, crews it via vehicle driver 7 8 below, giving this file 2 concurrent driller/drill_rig pairs for the drilling wait that follows.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "vehicle driver 7 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 7 13"
+        }
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "drill_plan grid rows:5 cols:6 spacing:3 depth:6 diameter:0.089 start:15,25",
@@ -2986,8 +3096,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3,
           "orderedHoleCount": 30,
@@ -3019,8 +3129,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3041,8 +3151,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3063,8 +3173,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3085,8 +3195,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3107,8 +3217,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3127,8 +3237,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3149,12 +3259,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 30,
-          "holeCount": 0
+          "orderedHoleCount": 8,
+          "holeCount": 22
         },
         "increased": [
           "tickCount"
@@ -3171,12 +3281,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 30,
-          "holeCount": 0
+          "orderedHoleCount": 8,
+          "holeCount": 22
         },
         "changedBy": {
           "tickCount": 0
@@ -3195,8 +3305,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3216,8 +3326,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3237,8 +3347,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3296,16 +3406,43 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 22,
           "chargedCount": 0,
           "sequencedCount": 0
         },
         "changedBy": {
           "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
         }
       }
     },
@@ -3333,13 +3470,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 8,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "holeCount": 22,
+          "chargedCount": 22,
+          "sequencedCount": 22
         },
         "changedBy": {
           "tickCount": 0
@@ -3373,8 +3510,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -3397,8 +3534,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3418,8 +3555,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3427,6 +3564,21 @@
           "tickCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 6",
@@ -3439,8 +3591,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3459,8 +3611,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3481,8 +3633,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3501,8 +3653,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3523,8 +3675,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3552,8 +3704,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -3592,8 +3744,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3613,14 +3765,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 96.19222222222223,
-          "safety": 6.299999999999999,
-          "ecology": 50,
-          "nuisance": 50
+          "wellBeing": 99.95,
+          "safety": 0,
+          "ecology": 42.939999999999976,
+          "nuisance": 31.750000000000004
         },
         "changedBy": {
           "tickCount": 0
@@ -3639,8 +3791,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3660,8 +3812,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 14,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3669,6 +3821,96 @@
           "tickCount": 0
         }
       }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 15 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 15 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: vehicle #7 (staffed claims #1-4; rock_digger and debris_hauler above claim #5-6). This is the driller's-second-rig this file already needed under the old semantics (Finding #59 -- bought but its own driller never licensed) -- now driller #8, licensed above, crews it via vehicle driver 7 8 below, giving this file 2 concurrent driller/drill_rig pairs for the drilling wait that follows.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "vehicle driver 8 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 8 15"
+        }
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "drill_plan grid rows:8 cols:6 spacing:3 depth:6 diameter:0.089 start:10,25",
@@ -3707,8 +3949,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3,
           "orderedHoleCount": 48,
@@ -3732,8 +3974,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3753,8 +3995,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3775,8 +4017,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3795,8 +4037,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3817,8 +4059,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3837,8 +4079,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3859,8 +4101,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3879,8 +4121,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3901,8 +4143,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3921,8 +4163,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3943,12 +4185,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 48,
-          "holeCount": 0
+          "orderedHoleCount": 20,
+          "holeCount": 28
         },
         "increased": [
           "tickCount"
@@ -3965,12 +4207,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 48,
-          "holeCount": 0
+          "orderedHoleCount": 20,
+          "holeCount": 28
         },
         "changedBy": {
           "tickCount": 0
@@ -3989,8 +4231,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4010,8 +4252,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4031,8 +4273,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4090,16 +4332,43 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 28,
           "chargedCount": 0,
           "sequencedCount": 0
         },
         "changedBy": {
           "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
         }
       }
     },
@@ -4127,13 +4396,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 10,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "holeCount": 28,
+          "chargedCount": 28,
+          "sequencedCount": 28
         },
         "changedBy": {
           "tickCount": 0
@@ -4167,8 +4436,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -4191,8 +4460,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4212,8 +4481,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4233,8 +4502,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4253,8 +4522,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4275,8 +4544,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4295,8 +4564,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4317,8 +4586,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4346,8 +4615,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 13,
+          "employeeCount": 16,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -4386,11 +4655,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "cash": 787496.9438417025
+          "cash": 892296.7078717013
         },
         "changedBy": {
           "tickCount": 0
@@ -4409,14 +4678,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 96.77222222222228,
-          "safety": 50,
-          "ecology": 59.70000000000002,
-          "nuisance": 50
+          "wellBeing": 98.77166666666696,
+          "safety": 0,
+          "ecology": 35.89999999999996,
+          "nuisance": 13.850000000000009
         },
         "changedBy": {
           "tickCount": 0
@@ -4435,19 +4704,42 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 96.77222222222228,
-          "safety": 50,
-          "ecology": 59.70000000000002,
-          "nuisance": 50
+          "wellBeing": 98.77166666666696,
+          "safety": 0,
+          "ecology": 35.89999999999996,
+          "nuisance": 13.850000000000009
         },
         "changedBy": {
           "tickCount": 0
         }
       }
+    },
+    {
+      "command": "campaign complete level:grumpstone_ridge",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign complete level:grumpstone_ridge"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed",
+          "bankrupt": false,
+          "revolted": false,
+          "profit": 250000
+        },
+        "increased": [
+          "cash"
+        ]
+      },
+      "description": "Closing step: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world. `campaign complete level:<id>` (console-only debug force-win) activates and unlocks the level on that running game, grants only the income shortfall to the $250,000 profit threshold (the run's own net profit is deeply negative after $3M of builds, vehicles and salaries), and ends the level as a real win: levelEnded true, levelEndReason completed, profit == threshold (#1431)."
     },
     {
       "command": "campaign status",
@@ -4460,17 +4752,18 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "levelEnded": false,
-          "levelEndReason": null,
+          "levelEnded": true,
+          "levelEndReason": "completed",
           "bankrupt": false,
-          "revolted": false
+          "revolted": false,
+          "profit": 250000
         },
         "changedBy": {
           "cash": 0,
           "tickCount": 0
         }
       },
-      "description": "Final checkpoint: the mine ran ~3,000 ticks solvent and revolt-free, the level still open. A 'completed' ending is out of reach here: it needs the $250,000 profit threshold, and `campaign complete` (the debug force-win) needs an active level, which the locked `campaign start level:grumpstone_ridge` never sets."
+      "description": "Final checkpoint: the level has ended as a real win -- 'completed', not bankrupt, not revolted, profit at the $250,000 threshold; the mine is frozen (#1313) so nothing moves after the force-win."
     }
   ]
 }

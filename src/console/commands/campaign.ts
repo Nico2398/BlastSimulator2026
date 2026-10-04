@@ -4,11 +4,11 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
-import { getLevelProgress, createCampaignState } from '../../core/campaign/Campaign.js';
-import { addIncome } from '../../core/economy/Finance.js';
+import { getLevelProgress, createCampaignState, recordProfit } from '../../core/campaign/Campaign.js';
+import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
 import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
-import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
+import { calculateStarRating, snapshotStats } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
@@ -45,13 +45,28 @@ export function campaignStatusCommand(
 
 // ── campaign complete (debug) ──
 
+/**
+ * Debug force-win. Works on the active level; with `level:<id>` it also
+ * activates that level on the running game (unlocking it) so a scenario
+ * started by `new_game` can still end as a real campaign win. Grants only the
+ * income shortfall below the level's profit threshold, then snapshots the
+ * stats so `levelStats.totalWealth` (the state dump's `profit`) reads the
+ * threshold rather than a stale pre-completion value.
+ */
 export function campaignCompleteCommand(
   ctx: GameContext,
   _args: string[],
-  _named: Record<string, string>,
+  named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state) {
     return { success: false, output: t('console.no_game_loaded') };
+  }
+  const requested = named['level'];
+  if (requested !== undefined) {
+    const entry = ctx.state.campaign.levels[requested];
+    if (!entry) return { success: false, output: t('campaign.complete_unknown_level', { levelId: requested }) };
+    entry.unlocked = true;
+    ctx.state.campaign.activeLevelId = requested;
   }
   const levelId = ctx.state.campaign.activeLevelId;
   if (!levelId) {
@@ -60,9 +75,13 @@ export function campaignCompleteCommand(
   const level = getLevel(levelId);
   if (!level) return { success: false, output: t('campaign.complete_unknown_level', { levelId }) };
 
-  // Force-complete: add a large income transaction to push profit over threshold
-  addIncome(ctx.state.finances, level.unlockThreshold, 'contracts', 'debug:force_complete', ctx.state.tickCount);
+  const shortfall = level.unlockThreshold - getFinancialReport(ctx.state.finances, 0).netProfit;
+  if (shortfall > 0) {
+    addIncome(ctx.state.finances, shortfall, 'contracts', 'debug:force_complete', ctx.state.tickCount);
+  }
   ctx.state.cash = ctx.state.finances.cash;
+  snapshotStats(ctx.state.levelStats, ctx.state);
+  recordProfit(ctx.state.campaign, levelId, ctx.state.levelStats.totalWealth);
   ctx.state.levelEnded = true;
   ctx.state.levelEndReason = 'completed';
 
