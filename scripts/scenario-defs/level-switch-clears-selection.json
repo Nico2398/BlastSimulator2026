@@ -100,13 +100,13 @@
     },
     {
       "command": "state",
-      "description": "The previous level's selection bar must be hidden (display none) after the switch; a stale bar would point at an employee from the old level.",
+      "description": "The previous level's selection bar must be hidden after the switch (display none lays out to clientHeight 0, a top-level DOM property waitForProperty can read); a stale bar would point at an employee from the old level.",
       "interaction": [
         {
           "type": "waitForProperty",
           "selector": "#bs-selection-bar",
-          "property": "style.display",
-          "expectedValue": "none",
+          "property": "clientHeight",
+          "expectedValue": 0,
           "timeoutMs": 10000
         }
       ],
