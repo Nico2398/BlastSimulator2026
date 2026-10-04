@@ -7,6 +7,7 @@ import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
+import { t } from '../../src/core/i18n/I18n.js';
 import { createRunner } from '../../src/console/createRunner.js';
 
 // Helper: fill a region of the grid with a rock type
@@ -268,5 +269,125 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
     expect(result.output.toLowerCase()).toContain('loading');
     expect(result.output.toLowerCase()).not.toContain('missing charge');
     expect(Object.keys(state.chargesByHole)).toHaveLength(0);
+  });
+});
+
+// ── #1346: firing the blast cancels every still-ordered drill hole ───────────
+
+describe('Blast execution — #1346', () => {
+  /** Drill a 3x4 grid until >=3 holes have landed while others are still ordered, then charge only the landed ones. */
+  function setupPartiallyDrilled() {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:4 spacing:3 depth:8 start:12,12').success).toBe(true);
+    const state = ctx.state!;
+    for (let i = 0; i < 2000 && state.drillHoles.length < 3; i++) run('tick 1');
+    expect(state.drillHoles.length).toBeGreaterThanOrEqual(3);
+    expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
+    // Keep ordering charges for each newly landed hole until every landed hole
+    // is charged while others are still ordered (the drill crew keeps working).
+    const ordered = new Set<string>();
+    for (let i = 0; i < 3000; i++) {
+      for (const h of state.drillHoles) {
+        if (ordered.has(h.id)) continue;
+        expect(run(`charge hole:${h.id} explosive:boomite amount:8 stemming:2`).success).toBe(true);
+        ordered.add(h.id);
+      }
+      if (state.plannedDrillHoles.length === 0) break;
+      if (state.drillHoles.every(h => state.chargesByHole[h.id])) break;
+      run('tick 1');
+    }
+    const ids = state.drillHoles.map(h => h.id);
+    expect(ids.length).toBeGreaterThanOrEqual(3);
+    expect(ids.every(id => state.chargesByHole[id])).toBe(true);
+    expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
+    return { run, state, ids };
+  }
+
+  it('a successful blast cancels all pending drill_hole actions and empties plannedDrillHoles', () => {
+    const { run, state } = setupPartiallyDrilled();
+    const orderedBefore = state.plannedDrillHoles.length;
+    expect(orderedBefore).toBeGreaterThan(0);
+    expect(state.pendingActions.some(a => a.type === 'drill_hole')).toBe(true);
+    // Only the charged, drilled holes may be in the plan at fire time.
+    for (const h of state.drillHoles) expect(state.chargesByHole[h.id]).toBeDefined();
+    expect(run('sequence auto delay_step:25').success).toBe(true);
+
+    const result = run('blast');
+
+    expect(result.success).toBe(true);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(result.output).toContain(t('mining.blast.cancelled_drill_orders', { count: orderedBefore }));
+  });
+
+  it('no new hole is drilled after the blast, however long the crew keeps ticking', () => {
+    const { run, state } = setupPartiallyDrilled();
+    expect(run('sequence auto delay_step:25').success).toBe(true);
+    expect(run('blast').success).toBe(true);
+    const drilledAfterBlast = state.drillHoles.length;
+    for (let i = 0; i < 600; i++) run('tick 1');
+    expect(state.drillHoles).toHaveLength(drilledAfterBlast);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+  });
+
+  it('a refused blast (charges still loading) cancels nothing', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:4 spacing:3 depth:8 start:12,12').success).toBe(true);
+    const state = ctx.state!;
+    for (let i = 0; i < 2000 && state.drillHoles.length < 2; i++) run('tick 1');
+    expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
+    const id = state.drillHoles[0]!.id;
+    expect(run(`charge hole:${id} explosive:boomite amount:8 stemming:2`).success).toBe(true);
+    const pendingDrills = state.pendingActions.filter(a => a.type === 'drill_hole').length;
+    const planned = state.plannedDrillHoles.length;
+
+    const result = run('blast');
+
+    expect(result.success).toBe(false);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(pendingDrills);
+    expect(state.plannedDrillHoles).toHaveLength(planned);
+  });
+
+  it('a refused blast (invalid plan: drilled hole without a charge) cancels nothing', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:4 spacing:3 depth:8 start:12,12').success).toBe(true);
+    const state = ctx.state!;
+    for (let i = 0; i < 2000 && state.drillHoles.length < 1; i++) run('tick 1');
+    expect(state.drillHoles.length).toBeGreaterThan(0);
+    const planned = state.plannedDrillHoles.length;
+    expect(planned).toBeGreaterThan(0);
+    const pendingDrills = state.pendingActions.filter(a => a.type === 'drill_hole').length;
+
+    const result = run('blast');
+
+    expect(result.success).toBe(false);
+    expect(state.plannedDrillHoles).toHaveLength(planned);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(pendingDrills);
+  });
+
+  it('a fully drilled pattern blasts with no cancel line', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    const state = ctx.state!;
+    for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+    expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    for (let i = 0; i < 2000 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
+    expect(run('sequence auto delay_step:25').success).toBe(true);
+
+    const result = run('blast');
+
+    expect(result.success).toBe(true);
+    // key is absent from locales today, so t() echoes the key; either way no line may appear.
+    expect(result.output).not.toContain('cancelled_drill_orders');
+    expect(result.output).not.toContain(t('mining.blast.cancelled_drill_orders', { count: 0 }));
   });
 });

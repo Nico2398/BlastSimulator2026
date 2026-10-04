@@ -5,6 +5,7 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole, resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
+import { readFileSync } from 'node:fs';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
 function makeState(): GameState {
@@ -157,5 +158,87 @@ describe('PreflightModal', () => {
     const { modal, container } = makeModal();
     modal.dispose();
     expect(container.contains(modal.root)).toBe(false);
+  });
+});
+
+// ── #1346: ordered-but-undrilled holes are cancelled by the blast — warn ─────
+
+describe('PreflightModal — undrilled-holes warning (#1346)', () => {
+  const KEY = 'ui.blast_workshop.preflight.warn_undrilled';
+  const readLocale = (l: string): Record<string, string> =>
+    JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8'));
+
+  function withPlanned(n: number): GameState {
+    const state = chargedPlan();
+    for (let i = 0; i < n; i++) {
+      const h = addHole([], 20 + i, 20, 8, 0.15);
+      state.plannedDrillHoles.push(h);
+    }
+    return state;
+  }
+
+  const warnText = (n: number): string =>
+    readLocale('en')[KEY]!.replace('{count}', String(n));
+
+  it('en.json and fr.json both define the key, with different text', () => {
+    const en = readLocale('en')[KEY];
+    const fr = readLocale('fr')[KEY];
+    expect(en).toBeTruthy();
+    expect(fr).toBeTruthy();
+    expect(en).not.toBe(fr);
+    expect(en).toContain('{count}');
+    expect(fr).toContain('{count}');
+  });
+
+  it('en.json and fr.json define mining.blast.cancelled_drill_orders, with different text', () => {
+    const k = 'mining.blast.cancelled_drill_orders';
+    expect(readLocale('en')[k]).toBeTruthy();
+    expect(readLocale('fr')[k]).toBeTruthy();
+    expect(readLocale('en')[k]).not.toBe(readLocale('fr')[k]);
+  });
+
+  it('shows a warning with the count when holes are still ordered', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(withPlanned(3), 'sunny');
+    expect(modal.root.textContent).toContain(warnText(3));
+  });
+
+  it('shows no warning when nothing is ordered', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(chargedPlan(), 'sunny');
+    expect(modal.root.textContent).not.toContain(warnText(0));
+    expect(modal.root.textContent).not.toContain(KEY);
+    const tpl = readLocale('en')[KEY]!.split('{count}')[0]!;
+    expect(tpl.length).toBeGreaterThan(0);
+    expect(modal.root.textContent).not.toContain(tpl);
+  });
+
+  it('is non-blocking: DETONATE stays enabled', () => {
+    const { modal } = makeModal();
+    modal.show();
+    modal.update(withPlanned(2), 'sunny');
+    expect(modal.root.textContent).toContain(warnText(2));
+    const btn = modal.root.querySelector('[data-action="preflight-detonate"]') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('updates when the count changes and disappears when it reaches zero', () => {
+    const { modal } = makeModal();
+    modal.show();
+    const state = withPlanned(3);
+    modal.update(state, 'sunny');
+    expect(modal.root.textContent).toContain(warnText(3));
+
+    state.plannedDrillHoles.pop();
+    modal.update(state, 'sunny');
+    expect(modal.root.textContent).toContain(warnText(2));
+    expect(modal.root.textContent).not.toContain(warnText(3));
+
+    state.plannedDrillHoles = [];
+    modal.update(state, 'sunny');
+    const tpl = readLocale('en')[KEY]!.split('{count}')[0]!;
+    expect(modal.root.textContent).not.toContain(tpl);
   });
 });
