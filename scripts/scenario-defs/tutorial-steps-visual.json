@@ -1443,7 +1443,7 @@
       }
     },
     {
-      "command": "tick 60",
+      "command": "tick 70",
       "timeout": 30,
       "interaction": [
         {

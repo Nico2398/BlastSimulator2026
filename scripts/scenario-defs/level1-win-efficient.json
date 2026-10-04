@@ -2605,7 +2605,7 @@
           "surveyCount": 2,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "ecology": 50
+          "ecology": 60.77758124034693
         }
       }
     },
@@ -2681,9 +2681,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 10.519999999999971,
-          "ecology": 50,
-          "nuisance": 48.30829425072332
+          "safety": 0,
+          "ecology": 60.77758124034693,
+          "nuisance": 40.30829425072332
         }
       }
     },
@@ -2704,9 +2704,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 10.519999999999971,
-          "ecology": 50,
-          "nuisance": 48.30829425072332
+          "safety": 0,
+          "ecology": 60.77758124034693,
+          "nuisance": 40.30829425072332
         }
       }
     },
@@ -2727,9 +2727,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 10.519999999999971,
-          "ecology": 50,
-          "nuisance": 48.30829425072332,
+          "safety": 0,
+          "ecology": 60.77758124034693,
+          "nuisance": 40.30829425072332,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

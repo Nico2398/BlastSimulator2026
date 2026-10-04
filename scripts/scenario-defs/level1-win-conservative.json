@@ -928,7 +928,7 @@
       }
     },
     {
-      "command": "contract accept type:supply material:blingite",
+      "command": "contract accept type:ore_sale material:blingite",
       "interaction": [
         {
           "type": "clickSelector",
@@ -936,11 +936,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -954,17 +954,17 @@
           "tickCount": 0
         }
       },
-      "description": "#554: this contract's numeric id kept renumbering run to run for this file's second accept (the earlier rubble accept above, plus contract-pool refreshes -- CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3 -- independent of anything this file does). #635 drops the numeric id for the stable `type:supply material:blingite` selector (blingite bulk, 440kg @ $22.11/kg, 97-tick deadline, $2919 penalty -- confirmed via `contract list`). #513/#581: the accept click is scoped to `[data-contract-type=\"supply\"][data-contract-material=\"blingite\"]`, the contract this step's `command` names, for the same DOM-order-coupling reason documented on the first accept step above."
+      "description": "#554: this contract's numeric id kept renumbering run to run for this file's second accept (the earlier rubble accept above, plus contract-pool refreshes -- CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3 -- independent of anything this file does). #635 drops the numeric id for the stable `type:ore_sale material:blingite` selector (blingite bulk, 440kg @ $22.11/kg, 97-tick deadline, $2919 penalty -- confirmed via `contract list`). #513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"]`, the contract this step's `command` names, for the same DOM-order-coupling reason documented on the first accept step above."
     },
     {
-      "command": "contract deliver type:supply material:blingite amount:400",
+      "command": "contract deliver type:ore_sale material:blingite amount:400",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:supply material:blingite amount:400"
+          "command": "contract deliver type:ore_sale material:blingite amount:400"
         }
       ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (rubble, blingite supply) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 400.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:blingite`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the deliver step above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (rubble, blingite supply) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 400.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:blingite`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the deliver step above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -972,7 +972,7 @@
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -1338,7 +1338,7 @@
       }
     },
     {
-      "command": "contract accept type:supply material:gloomium",
+      "command": "contract accept type:supply material:blingite",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1346,11 +1346,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"gloomium\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"gloomium\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1364,17 +1364,17 @@
           "tickCount": 0
         }
       },
-      "description": "#554: this contract's numeric id kept renumbering run to run for this file's third accept (the two earlier accepts above, plus the pool refreshing further by this tick). #635 drops the numeric id for the stable `type:supply material:gloomium` selector -- Supply gloomium (bulk), 320kg @ $67.86/kg, 44-tick deadline, $6,514 penalty, confirmed via `contract list` at tick 195. Same DOM-order scoping reasoning as the two accept steps above."
+      "description": "#554: this contract's numeric id kept renumbering run to run for this file's third accept (the two earlier accepts above, plus the pool refreshing further by this tick). #635 drops the numeric id for the stable `type:supply material:blingite` selector -- Supply gloomium (bulk), 320kg @ $67.86/kg, 44-tick deadline, $6,514 penalty, confirmed via `contract list` at tick 195. Same DOM-order scoping reasoning as the two accept steps above."
     },
     {
-      "command": "contract deliver type:supply material:gloomium amount:250",
+      "command": "contract deliver type:supply material:blingite amount:230",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:supply material:gloomium amount:250"
+          "command": "contract deliver type:supply material:blingite amount:230"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available, 250.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:gloomium`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the two deliver steps above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available, 250.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:blingite`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the two deliver steps above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1382,7 +1382,7 @@
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"gloomium\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -1653,11 +1653,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 20",
+      "command": "tick 22",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 22"
         }
       ],
       "role": "setup",
@@ -1672,7 +1672,7 @@
         },
         "note": "#554: contract #8 (gloomium bulk, accepted at tick 195, 44-tick deadline, $6,514 penalty) expires mid-block at tick 240 -- sandbox-measured against current code. #5 (rubble) already expired at the earlier tick-5 step above; #7 (blingite, 97-tick deadline from its tick-166 accept) is still active at tick 240 -- its own deadline lands past this file's final checkpoint. cash: $7,760 -> $1,246. activeContractCount drops from 2 to 1. Cumulative ticksBelowThreshold (BANKRUPTCY_THRESHOLD=$5,000 in balance.ts) never reaches the 100-tick BANKRUPTCY_GRACE_TICKS by the final tick -- confirmed via direct trace (`bankrupt`/`levelEnded` both still false at the final checkpoint below).",
         "changedBy": {
-          "tickCount": 20
+          "tickCount": 22
         }
       }
     },
@@ -1737,7 +1737,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "safety": 6.950000000000016,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
@@ -1762,7 +1762,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "safety": 6.950000000000016
+          "safety": 0
         }
       }
     },
@@ -1777,11 +1777,11 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 240,
+          "tickCount": 242,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "safety": 6.950000000000016,
+          "safety": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null,
