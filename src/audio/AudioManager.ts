@@ -5,6 +5,9 @@
 
 export type AudioCategory = 'effects' | 'ambient' | 'ui';
 
+/** A volume slider target: the master bus or one category. */
+export type VolumeChannel = 'master' | AudioCategory;
+
 export interface SoundHandle {
   /** Stop the sound (for looping sounds). */
   stop(): void;
@@ -85,6 +88,11 @@ export class AudioManager {
     } else {
       if (!this.muted) this.categoryGains[channel].gain.value = clamped;
     }
+  }
+
+  /** Apply several stored volumes at once (0–1 each); absent channels keep their value. */
+  applyVolumes(_volumes: Partial<Record<VolumeChannel, number>>): void {
+    // TODO: implement
   }
 
   /** Get the current volume for a channel. */
