@@ -18,6 +18,8 @@ import type { SaveBackend, SaveMeta } from '../../core/state/SaveBackend.js';
 import { SAVE_SLOT_COUNT, AUTO_SAVE_INTERVAL_TICKS } from '../../core/config/balance.js';
 import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { getLevel } from '../../core/campaign/Level.js';
+import type { SaveBackendKind } from '../../persistence/selectBackend.js';
+import type { ConfirmModalConfig } from './ConfirmModal.js';
 
 /** Returns null when the state was loaded, or a player-facing refusal reason. */
 export type OnLoadCallback = (state: GameState) => string | null;
@@ -49,6 +51,16 @@ export class SavesModal {
   private lastAutoSaveTick = -AUTO_SAVE_INTERVAL_TICKS;
   private timedState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
+
+  /** Tell the modal which backend is active so it can show a fallback notice. */
+  setBackendKind(_kind: SaveBackendKind): void {
+    // TODO: implement
+  }
+
+  /** Route overwrite/delete/load confirmations through the shared confirm modal. */
+  setConfirmHandler(_cb: (config: ConfirmModalConfig) => void): void {
+    // TODO: implement
+  }
 
   constructor(container: HTMLElement) {
     this.overlay = el('div', {

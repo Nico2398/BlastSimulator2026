@@ -27,6 +27,12 @@ function txn(db: IDBDatabase, mode: IDBTransactionMode): IDBObjectStore {
 }
 
 export class IndexedDBPersistence implements SaveBackend {
+  /** Resolves when IndexedDB is usable; rejects when missing, blocked, errored or timed out. */
+  async probe(): Promise<void> {
+    // TODO: implement
+    return undefined;
+  }
+
   async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
     const slot = buildSaveSlot(slotId, name, data, campaignSummary, levelId);
     const db = await openDB();
