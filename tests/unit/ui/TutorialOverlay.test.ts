@@ -364,7 +364,8 @@ describe('TutorialOverlay (12.4)', () => {
       const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
       const stageEl = container.querySelector('.bs-tutorial-stage') as HTMLElement;
       // "(12, 8)" / "16,19" — a pair of numbers the player is expected to aim at.
-      const COORD_PAIR = /\(?\d+\s*,\s*\d+\)?/;
+      // A thousands group ("5,000" in the victory card's money figures) is not a pair.
+      const COORD_PAIR = /\(?\d+\s*,\s*(?!\d{3}\b)\d+\)?/;
 
       for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
         (tut as any).stepIndex = i;
