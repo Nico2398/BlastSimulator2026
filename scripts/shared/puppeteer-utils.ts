@@ -113,6 +113,18 @@ export async function initBrowser(options: BrowserInitOptions): Promise<BrowserI
   await page.waitForSelector('#game-canvas, canvas', { timeout: canvasTimeoutMs });
   console.log('Game canvas detected. Waiting for initialization...');
 
+  // The canvas exists before main.ts has finished wiring the window bridges
+  // (`__gameState`, `__gameConsole`, ...). A scenario that is first in its
+  // shard reads them within ~1 s and failed with "window.__gameState is not a
+  // function" — wait on the bridge itself rather than on elapsed time.
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as Record<string, unknown>;
+      return typeof w.__gameState === 'function' && typeof w.__gameConsole === 'function';
+    },
+    { timeout: canvasTimeoutMs },
+  );
+
   // The main menu overlay starts visible, same as a real player would see it.
   // Scenarios that begin with `new_game` tear it down themselves the moment
   // that command runs (see main.ts's console bridge) — forcing it hidden
