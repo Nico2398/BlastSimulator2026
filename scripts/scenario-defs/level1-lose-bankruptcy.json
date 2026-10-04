@@ -626,6 +626,27 @@
       "role": "observe"
     },
     {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "description": "The level is over: ticking again must not advance the clock or pay another salary (#1313). `tick` reports the level ended and advances 0 ticks.",
+      "expect": {
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        },
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
+    },
+    {
       "command": "campaign status",
       "interaction": [
         {
