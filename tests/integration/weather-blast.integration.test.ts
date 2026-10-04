@@ -112,6 +112,25 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
   });
 });
 
+describe('console blast output reports wet holes (#1348)', () => {
+  it('rain + untubed boomite prints the wet-holes line with wet and fizzled counts', () => {
+    const wet = createRunner();
+    wet.runner.run('new_game seed:42 staffed:true');
+    wet.runner.run('weather set heavy_rain');
+    const result = drillChargeSequenceBlast(wet.runner, wet.ctx, 'boomite');
+    expect(result.success).toBe(true);
+    expect(result.output).toMatch(/Wet holes: 6 \(6 fizzled\)/);
+  });
+
+  it('a dry blast prints no wet-holes line', () => {
+    const dry = createRunner();
+    dry.runner.run('new_game seed:42 staffed:true');
+    const result = drillChargeSequenceBlast(dry.runner, dry.ctx, 'boomite');
+    expect(result.success).toBe(true);
+    expect(result.output).not.toMatch(/Wet holes/);
+  });
+});
+
 describe('software previews model wet holes like the real blast (#1347)', () => {
   function previewCounts(output: string): { fractured: number; cracked: number } {
     const m = /(\d+) fractured, (\d+) cracked/.exec(output);
