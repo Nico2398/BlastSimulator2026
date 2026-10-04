@@ -55,16 +55,22 @@ body:
     attributes:
       label: Scope
       description: >
-        Every area the change will stay inside. Runs whose scopes do not overlap
-        can work at the same time. engine: src/core/engine, entities, state ·
-        nav: src/core/nav, src/core/mining · economy: src/core/economy, campaign,
-        scores · world: src/core/world, weather, events · ui: src/ui · renderer:
-        src/renderer, src/audio, 3D models · console: src/console · scenarios:
-        scripts/scenario-defs and the scenario runners · pipeline: workflows,
-        actions, .github/scripts, agents, agentic-* skills (runs alone) · global:
-        many areas at once (runs alone). A gameplay or dev skill takes the scope
-        of the code it documents; files every area touches, like balance.ts or
-        the locale files, need no scope of their own.
+        Every area the change will edit — not the areas it only reads, calls or
+        tests through. Runs whose scopes do not overlap can work at the same
+        time, so every extra scope costs parallelism. engine: src/core/engine,
+        entities, state · nav: src/core/nav, src/core/mining · economy:
+        src/core/economy, campaign, scores · world: src/core/world, weather,
+        events · ui: all of src/ui or its shared base (UIManager, PanelBase, dom,
+        styles, tokens) — clashes with every UI area below · hud: shell, notify,
+        MiniMap · panels: management panels and modals · workshop: blast
+        planning UI · scene: src/ui/scene, BuildMenu · tutorial: tutorial
+        overlay and steps · screens: menus, loading, world map, level end ·
+        renderer: src/renderer, src/audio, 3D models · console: src/console ·
+        scenarios: scripts/scenario-defs and the scenario runners · pipeline:
+        workflows, actions, .github/scripts, agents, agentic-* skills (runs
+        alone) · global: many areas at once (runs alone). A gameplay or dev skill
+        takes the scope of the code it documents; files every area touches, like
+        balance.ts or the locale files, need no scope of their own.
       multiple: true
       options:
         - scope:engine
@@ -72,6 +78,12 @@ body:
         - scope:economy
         - scope:world
         - scope:ui
+        - scope:hud
+        - scope:panels
+        - scope:workshop
+        - scope:scene
+        - scope:tutorial
+        - scope:screens
         - scope:renderer
         - scope:console
         - scope:scenarios

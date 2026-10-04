@@ -73,11 +73,18 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  * any two adjacent PRs. A scope is a hint that makes collisions rare, never a
  * guarantee that makes them impossible.
  *
- * Coarse on purpose. A finer grid buys little and invites mislabelling, and a
- * wrong label costs a conflict round. Files every area touches — `balance.ts`,
+ * Coarse on purpose, with one exception. A finer grid invites mislabelling, and
+ * a wrong label costs a conflict round. Files every area touches — `balance.ts`,
  * the locale files, `main.ts`, `GameState.ts` — belong to no scope; the gate is
  * what handles them. A change that genuinely spans many areas says so with
  * `scope:global`, which runs alone.
+ *
+ * The exception is `src/ui`. On 4 Oct 2026 more than half of the 65 `ready`
+ * issues carried `scope:ui`, so one live UI run kept every other UI issue
+ * waiting and `AGENTIC_MAX_PARALLEL_RUNS=4` ran one session. `ui` is split into
+ * the areas below it (`SCOPE_PARENTS`); `scope:ui` itself still exists, for a
+ * change to the shared UI base or across several UI areas, and it clashes with
+ * every one of them.
  *
  * Every `ready` issue declares at least one scope: it is part of the
  * Definition of Ready (`readinessVerdict` below, `agentic-issue-creation`).
@@ -91,7 +98,13 @@ const SCOPES = Object.freeze({
   nav: 'Terrain surface and movement: src/core/nav, src/core/mining',
   economy: 'Money and progression: src/core/economy, campaign, scores',
   world: 'World generation and events: src/core/world, weather, events',
-  ui: 'Panels and screens: src/ui',
+  ui: 'All of src/ui, or its shared base: UIManager, PanelBase, dom, styles, tokens, icons',
+  hud: 'Always-on HUD: src/ui/shell, src/ui/notify, MiniMap, KeyboardShortcuts, gameConsole',
+  panels: 'Management panels and modals in src/ui/panels, crew and fleet detail sections',
+  workshop: 'Blast planning UI: BlastWorkshop, src/ui/panels/blastSteps, blast report, preflight',
+  scene: 'In-scene interaction: src/ui/scene, BuildMenu, describeRamp',
+  tutorial: 'Guided tutorial: TutorialOverlay and src/ui/tutorial*.ts',
+  screens: 'Full screens: MainMenu, loading screen, src/ui/screens, SandboxPanel, langPills',
   renderer: 'Drawing, sound and models: src/renderer, src/audio, assets/models',
   console: 'Headless command surface: src/console',
   scenarios: 'Scenario definitions and runners: scripts/scenario-defs',
@@ -108,6 +121,21 @@ const SCOPES = Object.freeze({
  * the code it documents.
  */
 const EXCLUSIVE_SCOPES = new Set(['pipeline', 'global']);
+
+/**
+ * Scopes that sit inside a wider one. A scope clashes with its parent as well
+ * as with itself, so `scope:ui` — the shared base every UI area builds on —
+ * never runs beside `scope:panels`, while `scope:panels` runs beside
+ * `scope:tutorial`.
+ */
+const SCOPE_PARENTS = Object.freeze({
+  hud: 'ui',
+  panels: 'ui',
+  workshop: 'ui',
+  scene: 'ui',
+  tutorial: 'ui',
+  screens: 'ui',
+});
 
 /** Consecutive blocked runs, since the last pipeline merge, that stop the chain. */
 const DEFAULT_BLOCKED_CHAIN_LIMIT = 3;
@@ -704,10 +732,15 @@ function scopeClaim(issue) {
   return { exclusive: false, scopes: declared, why: null };
 }
 
+/** Whether two scopes cover common ground: the same one, or one inside the other. */
+function scopesOverlap(a, b) {
+  return a === b || SCOPE_PARENTS[a] === b || SCOPE_PARENTS[b] === a;
+}
+
 /** Whether two claims may not be held at the same time. */
 function claimsConflict(a, b) {
   if (a.exclusive || b.exclusive) return true;
-  return a.scopes.some((scope) => b.scopes.includes(scope));
+  return a.scopes.some((scope) => b.scopes.some((other) => scopesOverlap(scope, other)));
 }
 
 /**
@@ -745,7 +778,7 @@ function clashReason(claim, holder) {
   if (claim.exclusive) {
     return `it runs alone — ${claim.why} — and #${holder.number} is ${holder.holds}`;
   }
-  const shared = claim.scopes.filter((scope) => holder.claim.scopes.includes(scope));
+  const shared = claim.scopes.filter((scope) => holder.claim.scopes.some((other) => scopesOverlap(scope, other)));
   return `${shared.map((scope) => `\`${SCOPE_PREFIX}${scope}\``).join(', ')} is held by #${holder.number} (${holder.holds})`;
 }
 
@@ -839,6 +872,9 @@ function resumeTargetFor(deliverable) {
   return { number: pipeline.number, head: pipeline.head || null };
 }
 
+/** How `selectNextAssignable` marks a hold kept by an issue that is waiting, not running. */
+const WAITING_AHEAD = 'waiting ahead of it';
+
 /**
  * Picks the issues to assign now, or explains why there are none.
  *
@@ -858,7 +894,8 @@ function resumeTargetFor(deliverable) {
  * scopes — the Definition of Ready refuses one that does not — and
  * `scope:global` or `scope:pipeline` claims the whole repository.
  *
- * **Its place in line.** An older issue that could run but for a scope clash
+ * **Its place in line.** An older issue that could run but for a clash with a
+ * *running* claim — a live run, or an issue assigned earlier in this pass —
  * *holds* its claim for the rest of the pass, so nothing younger that overlaps
  * it starts first. Without that, a steady stream of small issues in one scope
  * could keep an older one in the same scope waiting forever. No clock is
@@ -866,6 +903,15 @@ function resumeTargetFor(deliverable) {
  * that runs alone holds everything, so the queue drains until it can run. Only an issue that is otherwise assignable holds a place — one waiting
  * on a dependency does not, or a paused issue would hold the very scope its own
  * blocker needs.
+ *
+ * A hold is one level deep. An issue that waits only on another *waiting*
+ * issue's hold waits, but holds nothing itself. Transitive holds chained
+ * through overlapping multi-scope issues: on 4 Oct 2026 live #1320 (ui,
+ * economy) made #1341 (console, engine, economy) wait, whose hold made #1343
+ * (nav, engine, world) wait, whose hold covered the last free scopes — one
+ * session ran with four slots configured. Starvation stays bounded: once the
+ * issue it waited behind starts, the clash is with a running claim and the
+ * younger issue holds its place from then on.
  *
  * `completedIssue` is the issue whose own run fired this chain. It is exempt
  * from the in-progress count below — its labels are still the finishing run's —
@@ -962,14 +1008,22 @@ async function selectNextAssignable(api, options = {}) {
     }
 
     const claim = scopeClaim(issue);
-    const clash = holders.find((holder) => claimsConflict(claim, holder.claim));
-    if (clash) {
+    const clashes = holders.filter((holder) => claimsConflict(claim, holder.claim));
+    if (clashes.length > 0) {
+      waited += 1;
+      const running = clashes.find((holder) => holder.holds !== WAITING_AHEAD);
+      if (!running) {
+        log(
+          `#${issue.number}: waits — ${clashReason(claim, clashes[0])}. ` +
+            'It waits behind a waiting issue, not a running one, so it holds no place of its own.'
+        );
+        continue;
+      }
       log(
-        `#${issue.number}: waits — ${clashReason(claim, clash)}. ` +
+        `#${issue.number}: waits — ${clashReason(claim, running)}. ` +
           'It holds its place: nothing younger that overlaps it starts first.'
       );
-      holders.push({ number: issue.number, holds: 'waiting ahead of it', claim });
-      waited += 1;
+      holders.push({ number: issue.number, holds: WAITING_AHEAD, claim });
       // A waiting issue that claims everything leaves nothing to find further on.
       if (claim.exclusive) break;
       continue;
@@ -1101,11 +1155,13 @@ module.exports = {
   DEFAULT_MAX_PARALLEL_RUNS,
   EXCLUSIVE_SCOPES,
   MAX_DEPENDENCY_NODES,
+  SCOPE_PARENTS,
   SCOPE_PREFIX,
   SCOPES,
   assessCandidate,
   blockedByFor,
   blockedChainLimit,
+  claimsConflict,
   consecutiveHaltedRuns,
   dependencyVerdict,
   graphVerdict,
