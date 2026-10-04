@@ -6,13 +6,27 @@
 // level's profit target, and the closing card.
 
 import type { GameState } from '../core/state/GameState.js';
+import type { FinanceState } from '../core/economy/Finance.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
+import { getFinancialReport } from '../core/economy/Finance.js';
+import { formatMoney } from '../core/economy/formatMoney.js';
+import { getLevel } from '../core/campaign/Level.js';
+import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
 import type { DefeatReason } from './screens/LevelEndScreen.js';
 
 /** True for any terminal `levelEndReason` other than a genuine win — reuses the same union `LevelEndScreen` already carries rather than redefining it (#959). */
 function isDefeatReason(reason: GameState['levelEndReason']): reason is DefeatReason {
   return reason !== null && reason !== 'completed';
+}
+
+/** Profit earned so far against the level's profit target, and what is still missing. */
+export function victoryProgress(
+  finances: FinanceState,
+  target: number,
+): { profit: number; target: number; remaining: number } {
+  const profit = getFinancialReport(finances, 0).netProfit;
+  return { profit, target, remaining: Math.max(0, target - profit) };
 }
 
 export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
@@ -64,6 +78,11 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     tickBudget: 60,
     waitsOnWork: true,
     highlightTarget: '#bs-hud-scores',
+    textParamsFor: (state: GameState) => {
+      const target = getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
+      const { profit, remaining } = victoryProgress(state.finances, target);
+      return { profit: formatMoney(profit), target: formatMoney(target), remaining: formatMoney(remaining) };
+    },
     // Only a genuine win completes this step — `state.levelEnded` alone also
     // goes true on bankruptcy/arrest/ecological_shutdown/worker_revolt, which
     // used to hand straight to the congratulations card on a loss (#959).

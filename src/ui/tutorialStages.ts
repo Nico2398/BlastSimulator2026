@@ -537,6 +537,17 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'tick-advance': [
     { target: '#bs-hud-top .bs-speed-btn', hintKey: 'tutorial.stage.let_time_run' },
   ],
+
+  // Contracts panel opening and the speed bar are permanently allowed (rails
+  // base set); the deliver controls inside the panel are listed so ore can
+  // actually be sold on this stage.
+  victory: [
+    {
+      target: '#bs-hud-scores',
+      hintKey: 'tutorial.stage.earn_profit',
+      also: ['#bs-contract-panel .bs-contract-deliver', '#bs-contract-panel .bs-contract-amount'],
+    },
+  ],
 };
 
 /**

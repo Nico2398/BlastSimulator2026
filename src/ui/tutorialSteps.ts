@@ -33,6 +33,8 @@ export interface TutorialStep {
   titleKeyFor?(state: GameState): string;
   /** Same override shape as `titleKeyFor`, for `textKey`. */
   textKeyFor?(state: GameState): string;
+  /** Interpolation params for the step's text, resolved against the current `GameState`. */
+  textParamsFor?(state: GameState): Record<string, string | number>;
   /**
    * Console commands equivalent to the step's objective, shown to the player as
    * a hint. These are never executed by the tutorial — completing the step is

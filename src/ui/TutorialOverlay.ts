@@ -364,6 +364,7 @@ export class TutorialOverlay {
       return;
     }
 
+    if (step?.textParamsFor) this.renderText(step);
     this.refreshGuide();
     const held = this.rails.updateClock(this.gameState);
     this.pausedEl.style.display = held ? '' : 'none';
@@ -385,12 +386,19 @@ export class TutorialOverlay {
     }
   }
 
+  /** Body text; steps with `textParamsFor` show live figures, so this reruns each guide tick. */
+  private renderText(step: (typeof TUTORIAL_STEPS)[number]): void {
+    const key = step.textKeyFor && this.gameState ? step.textKeyFor(this.gameState) : step.textKey;
+    const params = this.gameState ? step.textParamsFor?.(this.gameState) : undefined;
+    this.textEl.textContent = t(key, params);
+  }
+
   private render(): void {
     const step = TUTORIAL_STEPS[this.stepIndex];
     if (!step) return;
 
     this.titleEl.textContent = t(step.titleKeyFor && this.gameState ? step.titleKeyFor(this.gameState) : step.titleKey);
-    this.textEl.textContent = t(step.textKeyFor && this.gameState ? step.textKeyFor(this.gameState) : step.textKey);
+    this.renderText(step);
     this.stepCounter.textContent = `${this.stepIndex + 1} / ${TOTAL_TUTORIAL_STEPS}`;
 
     const progress = ((this.stepIndex + 1) / TOTAL_TUTORIAL_STEPS) * 100;
