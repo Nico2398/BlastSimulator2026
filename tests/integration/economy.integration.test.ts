@@ -94,6 +94,7 @@ function pushStoredFragment(
     isProjection: false,
     halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
     shapeSeed: id,
+    origin: { x: 0, y: 0, z: 0 },
   };
   ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null });
   ctx.state!.logistics.storedMassKg += mass;
@@ -939,6 +940,7 @@ describe('Economy', () => {
       isProjection: false,
       halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
       shapeSeed: 9001,
+      origin: { x: 18, y: 0, z: 19 },
     };
     ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null });
 

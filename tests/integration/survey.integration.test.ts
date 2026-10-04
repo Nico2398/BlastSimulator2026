@@ -24,7 +24,12 @@ import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { SURVEY_STALE_TICKS, SURVEY_COSTS, SURVEY_DURATION_TICKS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
-import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import { executeBlast, type FragmentData } from '../../src/core/mining/BlastExecution.js';
+import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
+import { batchCharge } from '../../src/core/mining/ChargePlan.js';
+import { autoVPattern } from '../../src/core/mining/Sequence.js';
+import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
+import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -440,6 +445,7 @@ describe('Survey system', () => {
         isProjection: false,
         halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
         shapeSeed: 1,
+        origin: { x: 10, y: 4, z: 10 },
       },
       {
         id: 2,
@@ -452,6 +458,7 @@ describe('Survey system', () => {
         isProjection: false,
         halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
         shapeSeed: 2,
+        origin: { x: 12, y: 3, z: 10 },
       },
     ];
 
@@ -497,6 +504,71 @@ describe('Survey system', () => {
     const actual = reportWithSurvey.totalYieldKg;
     const estimated = reportWithSurvey.estimatedYieldKg;
     expect(reportWithSurvey.yieldRatio).toBeCloseTo(actual / estimated, 4);
+  });
+
+  // ── 10b. Ore report reads estimates at where the rock sat, not where it landed (#1355) ──
+
+  it('post-blast estimate is keyed by fragment origin (floor), independent of where flyrock lands', () => {
+    const grid = new VoxelGrid(40, 40);
+    for (let z = 5; z <= 25; z++) {
+      for (let y = 0; y <= 10; y++) {
+        for (let x = 5; x <= 25; x++) {
+          grid.setVoxel(x, y, z, {
+            composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] },
+            density: 1.0,
+            oreDensities: { blingite: 0.2 },
+            fractureModifier: 1.0,
+          });
+        }
+      }
+    }
+
+    // Survey covers a disc around the blast; density varies per column so a
+    // neighbouring-column lookup (round vs floor) changes the estimate.
+    const estimates: Record<string, Record<string, number>> = {};
+    const discCentre = { x: 16, z: 14 };
+    for (let z = 0; z < 40; z++) {
+      for (let x = 0; x < 40; x++) {
+        if (Math.hypot(x - discCentre.x, z - discCentre.z) <= 9) {
+          estimates[`${x},${z}`] = { blingite: 0.1 + 0.01 * x + 0.001 * z };
+        }
+      }
+    }
+    const survey: SurveyResult = {
+      id: 7, method: 'seismic', centerX: discCentre.x, centerZ: discCentre.z,
+      completedTick: 10, surveyorId: 1, estimates, confidence: 0.9,
+    };
+
+    const holeCounter = { nextHoleId: 1 };
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const depths: Record<string, number> = {};
+    for (const h of holes) depths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, depths, 'boomite', 8, 2);
+    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const result = executeBlast(plan, grid, []);
+    expect(result).not.toBeNull();
+    const fragments = result!.fragments;
+    expect(fragments.length).toBeGreaterThan(0);
+
+    // Independent expectation: floor of origin, never of landing position.
+    let expectedKg = 0;
+    for (const f of fragments) {
+      const col = estimates[`${Math.floor(f.origin.x)},${Math.floor(f.origin.z)}`];
+      if (!col) continue;
+      for (const d of Object.values(col)) expectedKg += f.volume * d * ORE_DENSITY_KG_M3;
+    }
+    expect(expectedKg).toBeGreaterThan(0);
+
+    // Variant A: as landed. Variant B: every fragment flung far outside the disc.
+    const landed = computeBlastOreReport(fragments, [survey]);
+    const flung = fragments.map(f => ({ ...f, position: { x: f.position.x + 200, y: f.position.y, z: f.position.z + 200 } }));
+    const flungReport = computeBlastOreReport(flung, [survey]);
+
+    expect(landed.estimatedYieldKg).toBeGreaterThan(0);
+    expect(landed.estimatedYieldKg).toBeCloseTo(expectedKg, 6);
+    expect(flungReport.estimatedYieldKg).toBe(landed.estimatedYieldKg);
+    expect(flungReport.yieldRatio).toBe(landed.yieldRatio);
   });
 
   // ── Additional: confidence is always [0, 1] ────────────────────────────────

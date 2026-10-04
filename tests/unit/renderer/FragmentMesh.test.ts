@@ -31,6 +31,7 @@ function makeFragment(id: number, overrides: Partial<FragmentData> = {}): Fragme
     isProjection: false,
     halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
     shapeSeed: id * 2654435761 % 2147483647,
+    origin: { x: id * 2, y: 0.5, z: 0 },
     ...overrides,
   };
 }

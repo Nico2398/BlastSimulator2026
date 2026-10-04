@@ -614,12 +614,14 @@ describe('Campaign', () => {
         rockId: 'sandite', oreDensities: { blingite: 0.3, dirtite: 0.1 },
         initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
         halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 1,
+        origin: { x: 0, y: 0, z: 0 },
       },
       {
         id: 2, position: { x: 0, y: 0, z: 0 }, volume: 15, mass: 50,
         rockId: 'sandite', oreDensities: { blingite: 0.0, dirtite: 0.5 },
         initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
         halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 2,
+        origin: { x: 0, y: 0, z: 0 },
       },
     ];
 
@@ -636,6 +638,7 @@ describe('Campaign', () => {
       rockId: 'sandite', oreDensities: { treranium: 0.8 },
       initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
       halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 3,
+      origin: { x: 0, y: 0, z: 0 },
     }]);
 
     expect(stats.totalVolumeBlasted).toBe(50);

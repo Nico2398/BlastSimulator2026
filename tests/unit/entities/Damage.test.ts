@@ -48,6 +48,7 @@ function makeProjection(id: number, x: number, z: number, mass: number, velocity
     isProjection: true,
     halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
     shapeSeed: id,
+    origin: { x, y: 0, z },
   };
 }
 

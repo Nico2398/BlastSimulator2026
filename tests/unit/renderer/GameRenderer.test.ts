@@ -76,6 +76,7 @@ describe('GameRenderer — onBlast()', () => {
       isProjection: false,
       halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
       shapeSeed: 3,
+      origin: { x: 10, y: 5, z: 10 },
     }];
 
     renderer.onBlast(ctx);
@@ -117,6 +118,7 @@ describe('GameRenderer — onBlast()', () => {
       isProjection: false,
       halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
       shapeSeed: 3,
+      origin: { x: 10, y: 0, z: 10 },
     }];
 
     renderer.onBlast(ctx);
@@ -555,6 +557,7 @@ describe('GameRenderer — scene picking (P2)', () => {
       isProjection: false,
       halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
       shapeSeed: 5,
+      origin: { x: 10, y: 5, z: 10 },
     }];
     renderer.onBlast(ctx);
 

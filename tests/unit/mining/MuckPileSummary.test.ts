@@ -40,6 +40,7 @@ function fragment(
     isProjection: false,
     halfExtents: { x: half, y: half, z: half },
     shapeSeed: 0,
+    origin: { x: pos[0], y: pos[1], z: pos[2] },
   } as FragmentData;
 }
 

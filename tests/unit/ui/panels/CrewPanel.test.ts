@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { CrewPanel } from '../../../../src/ui/panels/CrewPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
+import { PAY_CYCLE_TICKS, BASE_SALARIES, QUALIFICATION_SALARY_BONUS } from '../../../../src/core/config/balance.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
@@ -227,14 +228,16 @@ describe('CrewPanel', () => {
   it('pay section shows a real base/bonus/total breakdown', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeEmployee({
-      id: 1, role: 'driller', salary: 570,
+      id: 1, role: 'driller', salary: BASE_SALARIES.driller + QUALIFICATION_SALARY_BONUS[1],
       qualifications: [{ category: 'blasting', proficiencyLevel: 1, xp: 0 }],
     })]));
     toggle(panel, 1);
     const text = panel.root.textContent!;
-    expect(text).toContain('Base $500');
-    expect(text).toContain('+ skills $50');
-    expect(text).toContain('$570/h');
+    // Stored salary is per pay cycle; display is per hour (1 tick = 1 hour).
+    const hourly = (n: number) => Math.round((n / PAY_CYCLE_TICKS) * 10) / 10;
+    expect(text).toContain(`Base $${hourly(BASE_SALARIES.driller)}/h`);
+    expect(text).toContain(`+ skills $${hourly(QUALIFICATION_SALARY_BONUS[1])}/h`);
+    expect(text).toContain(`$${hourly(BASE_SALARIES.driller + QUALIFICATION_SALARY_BONUS[1])}/h`);
   });
 
   it('a raise preset button dispatches employee raise with the real id and amount', () => {
@@ -244,7 +247,7 @@ describe('CrewPanel', () => {
     panel.update(makeState([makeEmployee({ id: 3 })]));
     toggle(panel, 3);
 
-    const raiseBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === '+$100')!;
+    const raiseBtn = [...panel.root.querySelectorAll('button')].find(b => b.textContent === `+$${100 / PAY_CYCLE_TICKS}/h`)!;
     raiseBtn.click();
 
     expect(calls).toContain('employee raise 3 amount:100');
