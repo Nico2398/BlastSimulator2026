@@ -441,12 +441,14 @@ describe('navmesh changes', () => {
     expect(runCommand(site.engine, `drill_plan add x:${MOAT_X0} z:${BRIDGE_Z[0]}`).success).toBe(true);
     tick(site);
     const nav = site.state().navGrid!;
-    // Whatever the hole does to the crossing, the colour must agree with the navmesh.
+    // A planned hole leaves its cell passable, so the bridge still crosses: pin
+    // the verdict (blue) and check it against the navmesh rather than echoing it.
     const crossing = [MOAT_X0, MOAT_X1].every(x => BRIDGE_Z.some(z => {
       const cell = nav.cellAt(x, z);
       return cell !== undefined && cell.type !== 'blocked' && cell.type !== 'void';
     }));
-    expect(isRed(site, id)).toBe(!crossing);
+    expect(crossing).toBe(true);
+    expect(isRed(site, id)).toBe(false);
   });
 });
 

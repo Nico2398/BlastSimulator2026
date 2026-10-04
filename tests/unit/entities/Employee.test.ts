@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import {
+  holdsRequiredSkill,
   createEmployeeState,
   hireEmployee,
   giveRaise,
@@ -1387,4 +1388,16 @@ describe('Employee - checkCollapse (7.6)', () => {
     expect(emp2.collapsing).toBe(true);
   });
 
+});
+
+describe('holdsRequiredSkill (#1306)', () => {
+  const emp = { qualifications: [{ category: 'blasting', proficiencyLevel: 1, xp: 0 }] } as unknown as Parameters<typeof holdsRequiredSkill>[0];
+
+  it('is true with no requirement', () => {
+    expect(holdsRequiredSkill(emp, null)).toBe(true);
+  });
+  it('is true for a held skill and false for a missing one', () => {
+    expect(holdsRequiredSkill(emp, 'blasting')).toBe(true);
+    expect(holdsRequiredSkill(emp, 'geology')).toBe(false);
+  });
 });

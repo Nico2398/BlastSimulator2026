@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { NotificationCenter, buildBlockedOrderMessage } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
-import type { PendingAction } from '../../../src/core/state/GameState.js';
+import type { PendingAction, PlannedRamp } from '../../../src/core/state/GameState.js';
 import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -387,6 +387,60 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(ordersPip!.tone).toBe('warn');
       expect(findStrandedPips(pips, 4)).toHaveLength(1);
       expect(pips).toHaveLength(2);
+    });
+  });
+
+  describe('per-ramp blocked-order dedupe (#1306)', () => {
+    function layerAction(id: number): PendingAction {
+      return {
+        id, type: 'dig_ramp_segment', requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger',
+        targetX: id, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+        status: 'queued', holderId: null, queuedAtTick: 0, blockedReason: 'target_unreachable',
+      };
+    }
+    function rampOf(id: number, actionIds: number[]): PlannedRamp {
+      return {
+        id,
+        def: {} as PlannedRamp['def'], footprint: {} as PlannedRamp['footprint'],
+        segments: actionIds.map((actionId, index) => ({
+          index, actionId, cells: [], region: null, done: false, carvedCount: 0,
+        })),
+      };
+    }
+    const orderBlockedToasts = (center: NotificationCenter) =>
+      center.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+
+    it('warns once for a ramp whose three layers are all unreachable', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.pendingActions.push(layerAction(1), layerAction(2), layerAction(3));
+      state.plannedRamps.push(rampOf(1, [1, 2, 3]));
+
+      center.update(state);
+      center.update(state);
+
+      expect(orderBlockedToasts(center)).toHaveLength(1);
+    });
+
+    it('warns once per ramp, not once overall, for two unreachable ramps', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.pendingActions.push(layerAction(1), layerAction(2), layerAction(3), layerAction(4));
+      state.plannedRamps.push(rampOf(1, [1, 2]), rampOf(2, [3, 4]));
+
+      center.update(state);
+
+      expect(orderBlockedToasts(center)).toHaveLength(2);
+    });
+
+    it('still warns once per order when the blocked orders are not ramp layers', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.pendingActions.push(layerAction(1), layerAction(2));
+
+      center.update(state);
+
+      expect(orderBlockedToasts(center)).toHaveLength(2);
     });
   });
 

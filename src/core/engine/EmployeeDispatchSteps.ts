@@ -10,6 +10,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
+import { holdsRequiredSkill } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
   isRampSegmentClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
@@ -344,7 +345,7 @@ export function claimOnePoolCandidate(
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
     (!excludeOnFootActions || a.requiredVehicleRole !== null) &&
-    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
+    holdsRequiredSkill(employee, a.requiredSkill) &&
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
     isHaulOrFragmentActionClaimable(state, a, fragmentOf) &&
     // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that

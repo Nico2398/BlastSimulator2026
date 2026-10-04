@@ -24,7 +24,7 @@ import {
 } from '../../../src/core/entities/Employee.js';
 import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
-import { dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields, interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
+import { backfillGhostBuildings, dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields, interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -1568,5 +1568,55 @@ describe('cancelAction — refunds a queued place_building action in full (#556)
 
     expect((state as any).pendingActions.find((a: PendingAction) => a.id === 302)).toBeUndefined();
     expect((state as any).ghostPreviews.find((g: { id: number }) => g.id === 302)).toBeUndefined();
+  });
+});
+
+describe('backfillGhostBuildings (#1306)', () => {
+  function stateWithBuildingOrder(): { state: GameState; actionId: number } {
+    const state = makeGame();
+    addQualifiedEmployee(state, 'blasting', SEED);
+    state.plannedBuildings.push({
+      id: 7, buildingId: 1, type: 'freight_warehouse', tier: 1, x: 3, z: 4, actionId: 300, cost: 100,
+    } as GameState['plannedBuildings'][number]);
+    const action = makePendingAction({ id: 300, requiredSkill: null, payload: { buildingOrderId: 7 } });
+    (action as any).type = 'place_building';
+    dispatchPendingAction(state, action);
+    return { state, actionId: 300 };
+  }
+
+  it('gives a place_building ghost saved without `building` the order\'s building and bumps the revision', () => {
+    const { state, actionId } = stateWithBuildingOrder();
+    const ghost = state.ghostPreviews.find(g => g.id === actionId)!;
+    delete ghost.building; // as restored from a save predating #1306
+    const revision = state.ghostPreviewsRevision;
+
+    backfillGhostBuildings(state);
+
+    expect(ghost.building).toEqual({ type: 'freight_warehouse', tier: 1, x: 3, z: 4 });
+    expect(state.ghostPreviewsRevision).toBe(revision + 1);
+  });
+
+  it('leaves a ghost that already has `building` untouched and bumps nothing', () => {
+    const { state, actionId } = stateWithBuildingOrder();
+    const ghost = state.ghostPreviews.find(g => g.id === actionId)!;
+    expect(ghost.building).toBeDefined();
+    const revision = state.ghostPreviewsRevision;
+
+    backfillGhostBuildings(state);
+
+    expect(state.ghostPreviewsRevision).toBe(revision);
+  });
+
+  it('skips non-building ghosts and ghosts whose building order is gone', () => {
+    const { state, actionId } = stateWithBuildingOrder();
+    delete state.ghostPreviews.find(g => g.id === actionId)!.building;
+    state.plannedBuildings.length = 0;
+    dispatchPendingAction(state, makePendingAction({ id: 301 }));
+    const revision = state.ghostPreviewsRevision;
+
+    backfillGhostBuildings(state);
+
+    expect(state.ghostPreviews.every(g => g.building === undefined)).toBe(true);
+    expect(state.ghostPreviewsRevision).toBe(revision);
   });
 });

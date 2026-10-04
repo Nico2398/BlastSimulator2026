@@ -6,7 +6,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
-import { getLivingEmployees } from '../entities/Employee.js';
+import { getLivingEmployees, holdsRequiredSkill } from '../entities/Employee.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
@@ -232,7 +232,7 @@ export function canReleaseStrandedOnFootAction(
     other.alive &&
     other.activeActionId === null &&
     other.restTicksRemaining === null &&
-    (action.requiredSkill === null || other.qualifications.some(q => q.category === action.requiredSkill)),
+    holdsRequiredSkill(other, action.requiredSkill),
   );
 }
 
@@ -357,7 +357,7 @@ export function isActionPastStuckBackoff(state: GameState, action: PendingAction
 function isQueuedActionAvailableToEmployee(employee: Employee, action: PendingAction): boolean {
   return action.status === 'queued' &&
     (action.targetEmployeeId === null || action.targetEmployeeId === employee.id) &&
-    (action.requiredSkill === null || employee.qualifications.some(q => q.category === action.requiredSkill));
+    holdsRequiredSkill(employee, action.requiredSkill);
 }
 
 /**

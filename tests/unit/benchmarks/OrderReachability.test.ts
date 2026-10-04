@@ -15,7 +15,7 @@ import { refreshOrderReachability } from '../../../src/core/engine/OrderReachabi
 
 const SIZE = 100;
 
-function makeState(actorCount: number): GameState {
+function makeState(actorCount: number, restOrders = 0): GameState {
   const state = createGame({ seed: 42 });
   const cells: NavCell[][] = [];
   for (let z = 0; z < SIZE; z++) {
@@ -47,6 +47,10 @@ function makeState(actorCount: number): GameState {
     else if (i % 3 === 1) queueOrder(i, { type: 'level_ground', requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger' });
     else queueOrder(i, {});
   }
+  // ForceShiftRest queues one rest order per tired employee, each aimed at that employee.
+  for (const emp of state.employees.employees.slice(0, restOrders)) {
+    queueOrder(emp.id, { type: 'rest', targetEmployeeId: emp.id, targetX: (emp.x + 50) % SIZE, targetZ: emp.z });
+  }
   return state;
 }
 
@@ -73,5 +77,15 @@ describe('refreshOrderReachability benchmark (#1306)', () => {
     const many = medianMs(makeState(400));
     // Floor the denominator: a sub-millisecond baseline would make the ratio noise.
     expect(many).toBeLessThan(Math.max(few, 2) * 3);
+  });
+
+  it('cost with 50 targeted rest orders stays within 3x of 2 rest orders (no grid x employees growth)', () => {
+    const few = medianMs(makeState(60, 2));
+    const many = medianMs(makeState(60, 50));
+    expect(many).toBeLessThan(Math.max(few, 2) * 3);
+  });
+
+  it('judges 50 targeted rest orders on top of 100 pooled ones well inside a tick budget', () => {
+    expect(medianMs(makeState(200, 50))).toBeLessThan(25);
   });
 });

@@ -3,9 +3,11 @@
 // A queued action is "unreachable" (its ghost reads red) when none of the actors
 // able to perform THAT action can reach its target, or no such actor exists.
 // Actors are worked out per action from its own requirements (skill, vehicle
-// role, named employee) and grouped by that key, so the cost is one employee
-// fill plus (for vehicle-gated keys) one vehicle fill per distinct key —
-// bounded by the grid and the queued actions, never by the number of actors.
+// role) and grouped by that key, so the cost is one employee fill plus (for
+// vehicle-gated keys) one vehicle fill per distinct key. An order aimed at one
+// named employee on foot (a rest order) is answered from a single shared
+// labelling of the grid instead of a fill of its own, so N such orders cost one
+// pass, not N — bounded by the grid and the distinct keys, never by actors.
 // Temporary unavailability (injured, resting, training, busy) does not remove
 // an actor: alive and on the roster is enough.
 
@@ -14,8 +16,11 @@ import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { isLicensedForRole } from './VehicleReservation.js';
 import { isAutoDebrisAction } from '../economy/HaulDispatch.js';
+import { holdsRequiredSkill } from '../entities/Employee.js';
 import {
   computeClimbReachableSetFromSources,
+  computeClimbComponents,
+  type ClimbComponents,
   type ReachableSet,
 } from '../nav/NavGridReachability.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
@@ -39,7 +44,7 @@ export function orderActorKey(action: ActorRequirements): OrderActorKey {
 
 interface ActorPool {
   hasActor: boolean;
-  reachable: ReachableSet | null;
+  reachable: Pick<ReachableSet, 'has'> | null;
 }
 
 const NO_ACTORS: ActorPool = { hasActor: false, reachable: null };
@@ -49,16 +54,26 @@ function candidateEmployees(state: GameState, req: ActorRequirements): Employee[
   return state.employees.employees.filter(emp =>
     emp.alive
     && (req.targetEmployeeId === null || emp.id === req.targetEmployeeId)
-    && (req.requiredSkill === null || emp.qualifications.some(q => q.category === req.requiredSkill))
+    && holdsRequiredSkill(emp, req.requiredSkill)
     && (req.requiredVehicleRole === null || isLicensedForRole(emp, req.requiredVehicleRole)),
   );
 }
 
-function buildActorPool(state: GameState, req: ActorRequirements): ActorPool {
+function buildActorPool(
+  state: GameState,
+  req: ActorRequirements,
+  footComponents: () => ClimbComponents,
+): ActorPool {
   const navGrid = state.navGrid;
   if (navGrid === null) return NO_ACTORS;
   const employees = candidateEmployees(state, req);
   if (employees.length === 0) return NO_ACTORS;
+
+  const [only] = employees;
+  if (req.targetEmployeeId !== null && req.requiredVehicleRole === null && only !== undefined) {
+    const components = footComponents();
+    return { hasActor: true, reachable: { has: (x, z) => components.canReach(only.x, only.z, x, z) } };
+  }
 
   const onFoot = computeClimbReachableSetFromSources(navGrid, employees, NAV_CLEARANCE_EMPLOYEE_CELLS);
   const role = req.requiredVehicleRole;
@@ -82,9 +97,12 @@ export function buildOrderReachability(
   actions: ReadonlyArray<PendingAction>,
 ): OrderReachability {
   const pools = new Map<OrderActorKey, ActorPool>();
+  let components: ClimbComponents | null = null;
+  const footComponents = (): ClimbComponents =>
+    components ??= computeClimbComponents(state.navGrid!, NAV_CLEARANCE_EMPLOYEE_CELLS);
   for (const action of actions) {
     const key = orderActorKey(action);
-    if (!pools.has(key)) pools.set(key, buildActorPool(state, action));
+    if (!pools.has(key)) pools.set(key, buildActorPool(state, action, footComponents));
   }
   return {
     canReach: (key, x, z) => pools.get(key)?.reachable?.has(x, z) ?? false,
@@ -164,9 +182,8 @@ function availabilityReason(
   eligible: ReadonlyArray<Employee>,
   action: PendingAction,
 ): BlockedOrderReason | null {
-  const holdsSkill = (emps: ReadonlyArray<Employee>): boolean => action.requiredSkill === null
-    ? emps.length > 0
-    : emps.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
+  const holdsSkill = (emps: ReadonlyArray<Employee>): boolean =>
+    emps.some(emp => holdsRequiredSkill(emp, action.requiredSkill));
   const role = action.requiredVehicleRole;
   if (role !== null) {
     if (!state.vehicles.vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';

@@ -9,6 +9,7 @@ import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
   computeClimbReachableSet,
   computeClimbReachableSetFromSources,
+  computeClimbComponents,
 } from '../../../src/core/nav/NavGridReachability.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS, NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 
@@ -125,5 +126,44 @@ describe('computeClimbReachableSetFromSources (#1306)', () => {
     expect(set.has(-1, 0)).toBe(false);
     expect(set.has(W, 0)).toBe(false);
     expect(set.has(0, H)).toBe(false);
+  });
+});
+
+describe('computeClimbComponents (#1306)', () => {
+  /** Walls, a cliff column, a low-clearance strip and a stranded cell, so every gate is exercised. */
+  const mixed = (x: number, z: number): Partial<NavCell> | null => {
+    if (x === 10 && z !== 4) return BLOCKED;
+    if (x === 15) return { surfaceY: z < 5 ? 0 : 50 };
+    if (x === 20) return { clearance: 0 };
+    if (x === 5 && z === 5) return BLOCKED; // a stranded source stands here
+    return x > 15 ? { surfaceY: 0 } : null;
+  };
+
+  it('answers every (source, target) pair exactly like computeClimbReachableSet from that source', () => {
+    const grid = makeGrid(mixed);
+    const components = computeClimbComponents(grid, NAV_CLEARANCE_EMPLOYEE_CELLS);
+    for (const [sx, sz] of [[3, 3], [12, 8], [25, 1], [5, 5], [20, 2], [10, 0]] as const) {
+      const set = computeClimbReachableSet(grid, sx, sz, NAV_CLEARANCE_EMPLOYEE_CELLS);
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          expect(components.canReach(sx, sz, x, z), `from ${sx},${sz} to ${x},${z}`).toBe(set.has(x, z));
+        }
+      }
+    }
+  });
+
+  it('a stranded source reaches its own cell and the ground it can step onto, nothing walled off', () => {
+    const grid = makeGrid(threeRegions);
+    const components = computeClimbComponents(grid);
+    expect(components.canReach(10, 5, 10, 5)).toBe(true);
+    expect(components.canReach(10, 5, 3, 3)).toBe(true);
+    expect(components.canReach(10, 5, 15, 5)).toBe(true);
+    expect(components.canReach(10, 5, 25, 5)).toBe(false);
+  });
+
+  it('rejects a target outside the grid', () => {
+    const components = computeClimbComponents(makeGrid());
+    expect(components.canReach(3, 3, -1, 3)).toBe(false);
+    expect(components.canReach(3, 3, W, 3)).toBe(false);
   });
 });

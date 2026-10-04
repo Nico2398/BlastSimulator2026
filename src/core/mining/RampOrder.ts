@@ -58,7 +58,7 @@ export function queueRampOrder(
         rampId, segmentIndex: segment.index, cells: segment.cells, region: segment.region, segmentCost,
       } satisfies RampSegmentActionPayload,
       targetEmployeeId: null,
-    }, { skipQualificationCheck: true });
+    }, { skipQualificationCheck: true, deferClassification: true });
 
     plannedRamp.segments.push({
       index: segment.index, actionId, cells: segment.cells, region: segment.region, done: false, carvedCount: 0,
@@ -66,8 +66,8 @@ export function queueRampOrder(
   }
 
   state.plannedRamps.push(plannedRamp);
-  // The layers were coloured one by one as they were dispatched, before the ramp
-  // existed to judge them together — re-judge them as one ramp (#1306).
+  // Layers were dispatched uncoloured: judge them once, as one ramp, now that it
+  // exists (#1306) — one classification pass instead of one per layer.
   refreshOrderReachability(state);
   return rampId;
 }

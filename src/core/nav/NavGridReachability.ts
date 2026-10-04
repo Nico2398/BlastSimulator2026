@@ -6,7 +6,7 @@
 // (dev-coding-conventions) — NavGrid keeps thin static wrappers around these
 // so `NavGrid.findNearestReachableCell` etc. remain the public entry points.
 
-import type { NavGrid } from './NavGrid.js';
+import type { NavGrid, NavCell } from './NavGrid.js';
 import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
@@ -580,6 +580,30 @@ function floodFillReachable(
 }
 
 /**
+ * The per-step gates every fill shares once the destination is known to be a
+ * passable, in-grid cell: the #1231 corner-cut refusal (the same one
+ * findPath's neighbour expansion applies, #1197 — O(1), two extra cellAt
+ * lookups), the optional climb gate, and the destination's clearance.
+ */
+function isLegalStep(
+  navGrid: NavGrid,
+  x: number,
+  z: number,
+  from: NavCell | null | undefined,
+  nx: number,
+  nz: number,
+  to: NavCell,
+  climbAware: boolean,
+  requiredClearance: number,
+): boolean {
+  const dx = nx - x;
+  const dz = nz - z;
+  if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(navGrid, x, z, nx, nz)) return false;
+  if (climbAware && !isStepClimbable(from?.surfaceY, to.surfaceY, Math.hypot(dx, dz))) return false;
+  return hasClearance(to, requiredClearance);
+}
+
+/**
  * `floodFillReachable`'s body, seeded from several in-grid source cells at once
  * (#1306): one fill answers "reachable from ANY source" at a cost bounded by the
  * grid, never by the number of sources. A single source is exactly the old
@@ -624,14 +648,7 @@ function floodFillFromSources(
       const neighbourCell = navGrid.cellAt(nx, nz);
       if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
-      // #1231: same corner-cut refusal findPath's own neighbour expansion
-      // applies (#1197) — a diagonal step whose two orthogonal neighbours are
-      // both blocked/void is never a real route regardless of climbAware.
-      // O(1) (two extra cellAt lookups), same cost class as the checks either
-      // side of it — see this function's own doc comment above.
-      if (dx !== 0 && dz !== 0 && !isDiagonalCornerClear(navGrid, x, z, nx, nz)) continue;
-      if (climbAware && !isStepClimbable(cell?.surfaceY, neighbourCell.surfaceY, Math.hypot(dx, dz))) continue;
-      if (!hasClearance(neighbourCell, requiredClearance)) continue;
+      if (!isLegalStep(navGrid, x, z, cell, nx, nz, neighbourCell, climbAware, requiredClearance)) continue;
       visitedArr[neighborIdx] = 1;
       queueArr[count++] = neighborIdx;
     }
@@ -658,4 +675,87 @@ export function computeClimbReachableSetFromSources(
     z: Math.round(navGrid.clampZ(s.z)),
   }));
   return snapshotFill(navGrid, cells, true, requiredClearance);
+}
+
+/** Climb-aware connected components of a nav grid for one clearance. */
+export interface ClimbComponents {
+  /**
+   * Whether (tx, tz) is climb-reachable from the source (sx, sz) — exactly what
+   * `computeClimbReachableSet(navGrid, sx, sz, clearance).has(tx, tz)` answers,
+   * in O(1) after the one labelling pass. Passable cells with clearance are
+   * symmetric under `isLegalStep`, so reachability between them is "same
+   * component"; a source that is itself impassable (stranded by a blast) reaches
+   * its own cell plus the components of the legal neighbours it can step onto.
+   */
+  canReach(sx: number, sz: number, tx: number, tz: number): boolean;
+}
+
+/**
+ * One O(grid) labelling pass that answers any number of per-source reachability
+ * queries (#1306) — the cost of judging N orders targeted at N different
+ * employees is one labelling, not N fills.
+ */
+export function computeClimbComponents(
+  navGrid: NavGrid,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+): ClimbComponents {
+  const { width, height, originX, originZ } = navGrid;
+  const label = new Int32Array(width * height);
+  const stack = new Int32Array(width * height);
+  const isGood = (cell: NavCell | null | undefined): cell is NavCell =>
+    cell != null && cell.type !== 'blocked' && cell.type !== 'void' && hasClearance(cell, requiredClearance);
+
+  let next = 0;
+  for (let start = 0; start < label.length; start++) {
+    if (label[start] !== 0) continue;
+    const startX = originX + (start % width);
+    const startZ = originZ + ((start / width) | 0);
+    if (!isGood(navGrid.cellAt(startX, startZ))) continue;
+    next++;
+    label[start] = next;
+    let top = 0;
+    stack[top++] = start;
+    while (top > 0) {
+      const idx = stack[--top]!;
+      const x = originX + (idx % width);
+      const z = originZ + ((idx / width) | 0);
+      const cell = navGrid.cellAt(x, z);
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+        const nx = x + dx;
+        const nz = z + dz;
+        if (!navGrid.containsCell(nx, nz)) continue;
+        const nIdx = (nz - originZ) * width + (nx - originX);
+        if (label[nIdx] !== 0) continue;
+        const to = navGrid.cellAt(nx, nz);
+        if (!isGood(to) || !isLegalStep(navGrid, x, z, cell, nx, nz, to, true, requiredClearance)) continue;
+        label[nIdx] = next;
+        stack[top++] = nIdx;
+      }
+    }
+  }
+
+  const labelAt = (x: number, z: number): number =>
+    navGrid.containsCell(x, z) ? label[(z - originZ) * width + (x - originX)]! : 0;
+
+  return {
+    canReach(sx, sz, tx, tz): boolean {
+      const fromX = Math.round(navGrid.clampX(sx));
+      const fromZ = Math.round(navGrid.clampZ(sz));
+      if (!navGrid.containsCell(fromX, fromZ)) return false;
+      if (fromX === tx && fromZ === tz) return true;
+      const targetLabel = labelAt(tx, tz);
+      if (targetLabel === 0) return false;
+      const sourceLabel = labelAt(fromX, fromZ);
+      if (sourceLabel !== 0) return sourceLabel === targetLabel;
+      const from = navGrid.cellAt(fromX, fromZ);
+      for (const [dx, dz] of NEIGHBOUR_OFFSETS_8) {
+        const nx = fromX + dx;
+        const nz = fromZ + dz;
+        if (labelAt(nx, nz) !== targetLabel) continue;
+        const to = navGrid.cellAt(nx, nz);
+        if (to !== undefined && isLegalStep(navGrid, fromX, fromZ, from, nx, nz, to, true, requiredClearance)) return true;
+      }
+      return false;
+    },
+  };
 }
