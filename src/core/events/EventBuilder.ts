@@ -11,6 +11,7 @@ export function ev(
   opts: {
     weight: (s: ScoreState) => number;
     canFire?: (ctx: EventContext) => boolean;
+    followUpOnly?: boolean;
     options: Array<{ cashDelta?: number; scoreDelta?: Partial<Record<keyof ScoreState, number>>;
       corruptionDelta?: number; followUp?: string; effectTag?: string;
       probability?: number; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>; }>;

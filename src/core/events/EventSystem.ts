@@ -42,6 +42,8 @@ export interface EventSystemState {
   lastOutcome: EventOutcome | null;
   /** Queue of follow-up events to fire. */
   followUpQueue: string[];
+  /** Ticks remaining before the head of followUpQueue may fire. */
+  followUpDelayTicks: number;
   /** IDs of events that have already fired this level — each fires at most once. */
   firedEventIds: string[];
   /** Tick count of the most recent event fire. Used to gate events by player activity. */
@@ -106,6 +108,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     jamSilencedUntil: {},
     lastOutcome: null,
     followUpQueue: [],
+    followUpDelayTicks: 0,
     firedEventIds: [],
     lastEventTick: 0,
     actionCountSinceEvent: 0,
