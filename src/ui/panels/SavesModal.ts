@@ -47,6 +47,7 @@ export class SavesModal {
   private loading = false;
   private errorShown = false;
   private lastAutoSaveTick = -AUTO_SAVE_INTERVAL_TICKS;
+  private timedState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -123,9 +124,17 @@ export class SavesModal {
   }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
-  /** Called each tick to trigger auto-save. `state` only times it — what gets saved comes from `getState`. */
+  /**
+   * Called each tick to trigger auto-save. `state` only times it — what gets saved comes from `getState`.
+   * The interval baseline is per state object: a replaced state restarts tickCount at 0, so the swap
+   * tick autosaves immediately and the next save lands one interval later.
+   */
   onTick(state: GameState): void {
     if (hasLevelEnded(state)) return;
+    if (state !== this.timedState) {
+      this.timedState = state;
+      this.lastAutoSaveTick = state.tickCount - AUTO_SAVE_INTERVAL_TICKS;
+    }
     if (state.tickCount - this.lastAutoSaveTick >= AUTO_SAVE_INTERVAL_TICKS) {
       this.lastAutoSaveTick = state.tickCount;
       void this.autoSave();
