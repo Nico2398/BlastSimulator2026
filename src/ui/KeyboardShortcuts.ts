@@ -23,7 +23,7 @@ export interface ShortcutCallbacks {
   onToggleSurveyOverlay?: () => void;
 }
 
-export interface ShortcutOptions {
+interface ShortcutOptions {
   /**
    * When it returns true, every key except Escape is ignored and Space/F5
    * are not preventDefault'd. `setEnabled(false)` still suppresses everything.
@@ -34,8 +34,7 @@ export interface ShortcutOptions {
 export class KeyboardShortcuts {
   private readonly handler: (e: KeyboardEvent) => void;
   private enabled = true;
-  // TODO: implement — consulted by the key handler once behaviour lands.
-  readonly options: ShortcutOptions;
+  private readonly options: ShortcutOptions;
 
   constructor(callbacks: ShortcutCallbacks, options: ShortcutOptions = {}) {
     this.options = options;
@@ -44,6 +43,7 @@ export class KeyboardShortcuts {
       // Don't fire shortcuts when typing in an input
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (this.options.isSuppressed?.() && e.code !== 'Escape') return;
 
       switch (e.code) {
         case 'Space':
