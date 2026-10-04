@@ -218,6 +218,177 @@ describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
   });
 });
 
+// ── show() re-reads the save backend (issue #1317) ───────────────────────────
+
+describe('MainMenu — show() refreshes CONTINUE and the LOAD hint (issue #1317)', () => {
+  let container: HTMLDivElement;
+  let saves: SaveMeta[];
+  let listImpl: () => Promise<SaveMeta[]>;
+  let backend: SaveBackend;
+
+  const flush = () => new Promise<void>(r => setTimeout(r, 0));
+  const meta = (slotId: string, timestamp: number, campaignSummary: string, levelId: string | null = 'dusty_hollow'): SaveMeta =>
+    ({ slotId, name: slotId, timestamp, version: 7, campaignSummary, levelId });
+  const btn = (key: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+    .find(b => b.textContent?.includes(t(key)))!;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    setLocale('en');
+    saves = [];
+    listImpl = () => Promise.resolve(saves);
+    backend = {
+      save: vi.fn(),
+      load: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(() => listImpl()),
+    };
+  });
+
+  afterEach(() => {
+    setLocale('en');
+    container.remove(); // a failing test skips dispose(); do not leak overlays into later suites
+  });
+
+  it('CONTINUE appears when a save exists by the time show() is called again', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await flush();
+    menu.show();
+    await flush();
+    expect(btn('menu.continue').style.display).toBe('none');
+
+    saves = [meta('slot_1', 1000, '$5,000 — Day 1')];
+    menu.show();
+    await flush();
+    expect(btn('menu.continue').style.display).toBe('flex');
+    menu.dispose();
+  });
+
+  it('summary text reflects a newer save after show() is called again', async () => {
+    saves = [meta('slot_1', 1000, '$40,000 — Day 3')];
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await flush();
+    menu.show();
+    expect(container.textContent).toContain('$40,000 — Day 3');
+
+    saves = [...saves, meta('auto', 5000, '$184,300 — Day 11', null)];
+    menu.show();
+    await flush();
+    const text = container.textContent ?? '';
+    expect(text).toContain('$184,300 — Day 11');
+    expect(text).toContain(t('menu.sandbox'));
+    expect(text).not.toContain('$40,000 — Day 3');
+    menu.dispose();
+  });
+
+  it('LOAD hint count updates on show()', async () => {
+    saves = [meta('slot_1', 1000, 'a')];
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await flush();
+    menu.show();
+    expect(btn('menu.load').textContent).toContain(t('ui.menu.hint_saves', { n: 1 }));
+
+    saves = [...saves, meta('slot_2', 2000, 'b'), meta('slot_3', 3000, 'c')];
+    menu.show();
+    await flush();
+    expect(btn('menu.load').textContent).toContain(t('ui.menu.hint_saves', { n: 3 }));
+    menu.dispose();
+  });
+
+  it('a deleted save hides CONTINUE and clears the LOAD hint on show()', async () => {
+    saves = [meta('slot_1', 1000, '$9,000 — Day 2')];
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await flush();
+    menu.show();
+    expect(btn('menu.continue').style.display).toBe('flex');
+
+    saves = [];
+    menu.show();
+    await flush();
+    expect(btn('menu.continue').style.display).toBe('none');
+    expect(btn('menu.load').textContent).not.toContain(t('ui.menu.hint_saves', { n: 1 }));
+    expect(btn('menu.load').textContent?.trim()).toBe(t('menu.load'));
+    menu.dispose();
+  });
+
+  it('show() with no backend does not throw and CONTINUE stays hidden', async () => {
+    const menu = new MainMenu(container);
+    expect(() => menu.show()).not.toThrow();
+    await flush();
+    expect(btn('menu.continue').style.display).toBe('none');
+    menu.dispose();
+  });
+
+  it('a rejecting list() leaves no unhandled rejection, CONTINUE hidden and LOAD hint empty', async () => {
+    saves = [meta('slot_1', 1000, '$9,000 — Day 2')];
+    const unhandled: unknown[] = [];
+    const onUnhandled = (e: unknown) => { unhandled.push(e); };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const menu = new MainMenu(container);
+      menu.setBackend(backend);
+      await flush();
+      menu.show();
+      expect(btn('menu.continue').style.display).toBe('flex');
+
+      listImpl = () => Promise.reject(new Error('idb down'));
+      menu.show();
+      await flush();
+      await flush();
+      expect(btn('menu.continue').style.display).toBe('none');
+      expect(btn('menu.load').textContent?.trim()).toBe(t('menu.load'));
+      expect(unhandled).toEqual([]);
+      menu.dispose();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+
+  it('a slow stale list() resolving after a newer one does not overwrite the UI', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await flush();
+
+    let resolveSlow: ((m: SaveMeta[]) => void) | undefined;
+    listImpl = () => new Promise<SaveMeta[]>(r => { resolveSlow = r; });
+    menu.show(); // first call: slow, will return old data
+
+    listImpl = () => Promise.resolve([meta('slot_2', 9000, '$99,000 — Day 20')]);
+    menu.show(); // second call: fast, new data
+    await flush();
+    expect(container.textContent).toContain('$99,000 — Day 20');
+
+    resolveSlow?.([meta('slot_1', 1000, '$1,000 — Day 1')]);
+    await flush();
+    const text = container.textContent ?? '';
+    expect(text).toContain('$99,000 — Day 20');
+    expect(text).not.toContain('$1,000 — Day 1');
+    expect(btn('menu.load').textContent).toContain(t('ui.menu.hint_saves', { n: 1 }));
+    menu.dispose();
+  });
+
+  it('dispose() before list() resolves ignores the late result', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await flush();
+    const continueBtn = btn('menu.continue');
+
+    let resolveLate: ((m: SaveMeta[]) => void) | undefined;
+    listImpl = () => new Promise<SaveMeta[]>(r => { resolveLate = r; });
+    menu.show();
+    menu.dispose();
+    resolveLate?.([meta('slot_1', 1000, '$7,000 — Day 4')]);
+    await flush();
+    expect(continueBtn.style.display).toBe('none');
+    expect(continueBtn.textContent).not.toContain('$7,000 — Day 4');
+  });
+});
+
 // ── Bug 3: hardcoded English subtitle bypasses t() (issue #457) ───────────────
 
 describe('MainMenu — subtitle goes through i18n (issue #457)', () => {
