@@ -23,7 +23,7 @@ import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../co
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
 type OrderActorKey = string;
 
-export type OrderReachabilityVerdict = 'reachable' | 'unreachable';
+type OrderReachabilityVerdict = 'reachable' | 'unreachable';
 
 /** Per-actor-pool reachability query over the current nav grid. */
 interface OrderReachability {
@@ -99,9 +99,9 @@ interface Judgement {
 
 /**
  * Verdict for each of `targets`. A ramp layer takes the verdict of the ramp's
- * first not-done segment (the layer next in line to dig), so layers waiting
- * behind a half-dug layer never flicker red; when that layer is already claimed
- * the ramp reads reachable.
+ * first not-done segment (the layer next in line to dig), claimed or not, so
+ * layers waiting behind a half-dug layer follow that layer's verdict and never
+ * flicker red because of the carve step.
  */
 function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): Map<number, Judgement> {
   const verdicts = new Map<number, Judgement>();
@@ -122,7 +122,7 @@ function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): 
   const judged: PendingAction[] = [];
   for (const target of targets) {
     const repAction = leadActionOf(target);
-    if (repAction !== undefined && repAction.status === 'queued') judged.push(repAction);
+    if (repAction !== undefined) judged.push(repAction);
   }
   const reach = buildOrderReachability(state, judged);
   const judgementOf = (action: PendingAction): Judgement => {
@@ -136,7 +136,7 @@ function judgeActions(state: GameState, targets: ReadonlyArray<PendingAction>): 
     const repAction = leadActionOf(target);
     verdicts.set(
       target.id,
-      repAction !== undefined && repAction.status === 'queued'
+      repAction !== undefined
         ? judgementOf(repAction)
         : { verdict: 'reachable', hasActor: true },
     );
@@ -191,9 +191,11 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     const judgement = judgements.get(action.id);
     const red = judgement?.verdict === 'unreachable';
     const ghost = ghostById.get(action.id);
-    if (ghost !== undefined && judgement !== undefined && (ghost.unreachable === true) !== red) {
+    if (ghost !== undefined && judgement !== undefined) {
+      // Always stamp, so a blue ghost carries an explicit `false`; only a real
+      // red/blue flip needs the renderer to re-sync.
+      if ((ghost.unreachable === true) !== red) flipped = true;
       ghost.unreachable = red;
-      flipped = true;
     }
 
     if (judgement !== undefined && red && judgement.hasActor) {

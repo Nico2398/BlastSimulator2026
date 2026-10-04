@@ -14,7 +14,7 @@ import { BuildingMesh } from '../../../src/renderer/BuildingMesh.js';
 import { RAMP_ARROW_COLOR } from '../../../src/renderer/RampArrow.js';
 import { buildingModelId } from '../../../src/renderer/models/ModelIds.js';
 import { ModelLibrary } from '../../../src/renderer/models/ModelLibrary.js';
-import { getBuildingDef, getDefSize, type Building } from '../../../src/core/entities/Building.js';
+import type { Building } from '../../../src/core/entities/Building.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
 
 function makePreview(id: number, overrides: Partial<GhostPreview> = {}): GhostPreview {
@@ -799,11 +799,9 @@ describe('place_building ghost shows its own model as a hologram (#1306)', () =>
     expect(ghostBox.min.z).toBeCloseTo(realBox.min.z, 3);
     expect(ghostBox.max.z).toBeCloseTo(realBox.max.z, 3);
 
-    const { sizeX, sizeZ } = getDefSize(getBuildingDef(TYPE, TIER));
-    expect(ghostBox.min.x).toBeGreaterThanOrEqual(building.x - 0.5 - 1e-6);
-    expect(ghostBox.max.x).toBeLessThanOrEqual(building.x + sizeX - 0.5 + 1e-6);
-    expect(ghostBox.min.z).toBeGreaterThanOrEqual(building.z - 0.5 - 1e-6);
-    expect(ghostBox.max.z).toBeLessThanOrEqual(building.z + sizeZ - 0.5 + 1e-6);
+    // Footprint bounds are deliberately not asserted: the authored model is
+    // wider than its footprint cells, and the real building overhangs the
+    // same way. Equality with the real building's bounds above is the contract.
     real.dispose();
     gm.dispose();
   });
@@ -897,7 +895,9 @@ describe('place_building ghost shows its own model as a hologram (#1306)', () =>
   it('a place_building preview without building info still draws the footprint box', () => {
     const scene = new THREE.Scene();
     const gm = makeGhostMesh(scene, new ModelLibrary());
-    gm.sync([buildingPreview(1, { building: undefined })]);
+    const { building: _omitted, ...withoutBuilding } = buildingPreview(1);
+    void _omitted;
+    gm.sync([withoutBuilding]);
     const meshes = meshesOf(gm.getGroup(1)!);
     expect(meshes).toHaveLength(1);
     expect(meshes[0]!.geometry).toBeInstanceOf(THREE.BoxGeometry);

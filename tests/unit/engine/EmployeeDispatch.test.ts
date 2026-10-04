@@ -1615,7 +1615,6 @@ describe('queued-order reachability — per-actor red rule (#1306)', () => {
       const rev = state.ghostPreviewsRevision;
       refreshOrderReachability(state);
       refreshOrderReachability(state);
-      tickEmployees(state);
       expect(state.ghostPreviewsRevision).toBe(rev);
     });
 

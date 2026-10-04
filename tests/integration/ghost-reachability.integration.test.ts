@@ -368,14 +368,12 @@ describe('navmesh changes', () => {
     const digOrder = queueDig(site, B_TARGET);
     tick(site);
     expect(isRed(site, walkOrder)).toBe(false);
-    // Whether the 2-wide bridge admits a vehicle is the nav layer's call; the
-    // contract here is that a pocket vehicles cannot enter is judged per
-    // action. Narrow it to 1 lane to make the split certain.
-    for (const z of BRIDGE_Z.slice(1)) {
-      setColumn(site.engine, MOAT_X0, z, TRENCH_FLOOR);
-      setColumn(site.engine, MOAT_X1, z, TRENCH_FLOOR);
+    // Two ordered buildings, one against each side of the 2-cell bridge (a
+    // planned footprint is an obstacle at once), leave every bridge cell within
+    // 1 cell of one: room for a person (clearance 1), not for a vehicle (2).
+    for (const z of [BRIDGE_Z[0]! - 2, BRIDGE_Z[1]! + 1]) {
+      expect(runCommand(site.engine, `build management_office at:${MOAT_X0},${z}`).success).toBe(true);
     }
-    announceStrip(site.engine);
     tick(site);
     expect(isRed(site, walkOrder)).toBe(false);
     expect(isRed(site, digOrder)).toBe(true);
@@ -422,6 +420,15 @@ describe('navmesh changes', () => {
 
     expect(runCommand(site.engine, `drill_plan add x:34 z:10`).success).toBe(true);
     expect(site.state().navGrid!.cellAt(outside.x, outside.z)).toBeDefined();
+    // The claimed land is natural terrain, a cliff below the plateau, so it is
+    // still cut off. Level it (a carve every real one announces) and the next
+    // command, which is all a paused game gets, brings the order into reach.
+    expect(isRed(site, id)).toBe(true);
+    for (let x = SIZE; x < SIZE + 16; x++) for (let z = 0; z < SIZE; z++) setColumn(site.engine, x, z, SURFACE);
+    site.engine.emitter.emit('terrain:updated', {
+      region: { minX: SIZE - 1, maxX: SIZE + 15, minY: 0, maxY: SURFACE + 1, minZ: 0, maxZ: SIZE - 1 },
+    });
+    expect(runCommand(site.engine, 'time pause').success).toBe(true);
     expect(ghost(site, id).unreachable).toBe(false);
   });
 

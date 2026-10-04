@@ -159,8 +159,10 @@ describe('buildOrderReachability (#1306)', () => {
     const state = makeState();
     hire(state, IN_A);
     hire(state, IN_B, ['geology']);
-    const free = state.pendingActions.find(a => a.id === queue(state, 'survey', IN_A_TARGET))!;
-    const gated = state.pendingActions.find(a => a.id === queue(state, 'survey', IN_A_TARGET, { requiredSkill: 'geology' }))!;
+    const freeId = queue(state, 'survey', IN_A_TARGET);
+    const gatedId = queue(state, 'survey', IN_A_TARGET, { requiredSkill: 'geology' });
+    const free = state.pendingActions.find(a => a.id === freeId)!;
+    const gated = state.pendingActions.find(a => a.id === gatedId)!;
     const reach = buildOrderReachability(state, [free, gated]);
     expect(reach.canReach(orderActorKey(free), IN_A_TARGET.x, IN_A_TARGET.z)).toBe(true);
     expect(reach.canReach(orderActorKey(gated), IN_A_TARGET.x, IN_A_TARGET.z)).toBe(false);
@@ -170,7 +172,8 @@ describe('buildOrderReachability (#1306)', () => {
   it('a dead employee is not an actor', () => {
     const state = makeState();
     const emp = hire(state, IN_A);
-    const action = state.pendingActions.find(a => a.id === queue(state, 'survey', IN_A_TARGET))!;
+    const id = queue(state, 'survey', IN_A_TARGET);
+    const action = state.pendingActions.find(a => a.id === id)!;
     killEmployee(state.employees, emp.id);
     expect(buildOrderReachability(state, [action]).hasActor(orderActorKey(action))).toBe(false);
   });
@@ -272,7 +275,7 @@ describe('classifyNewOrder (#1306)', () => {
     const state = makeState();
     hire(state, IN_A);
     const id = queue(state, 'survey', IN_B_TARGET);
-    ghostOf(state, id).unreachable = undefined;
+    delete ghostOf(state, id).unreachable;
     classifyNewOrder(state, id);
     expect(ghostOf(state, id).unreachable).toBe(true);
   });

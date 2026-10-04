@@ -32,8 +32,8 @@ export const GHOST_RENDER_ORDER = 10;
 export const GHOST_UNREACHABLE_COLOR = new THREE.Color(0xff2a88);
 const GHOST_UNREACHABLE_EMISSIVE = new THREE.Color(0xcc1166);
 export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0xff4a98);
-const GHOST_UNREACHABLE_OPACITY_MIN = 0.25;
-const GHOST_UNREACHABLE_OPACITY_MAX = 0.65;
+export const GHOST_UNREACHABLE_OPACITY_MIN = 0.25;
+export const GHOST_UNREACHABLE_OPACITY_MAX = 0.65;
 
 // Claimed ghosts (an employee has claimed the action and is en route/working
 // it, #547) read distinctly from unclaimed ones — dimmer and pulsing slower —
