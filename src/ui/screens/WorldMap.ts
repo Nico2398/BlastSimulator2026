@@ -220,19 +220,20 @@ export class WorldMap {
 
     if (!unlocked) {
       const lockBlock = el('div', { attrs: {
+        'data-role': 'lock',
         style: 'margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:5px;'
           + 'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)',
       } });
       const lockIcon = el('div', { attrs: { style: 'color:var(--bsx-text-micro)' }, children: [iconEl('lock', 13, 0.6)] });
       const lockText = el('span', {
-        text: prevLevel ? t('menu.level_locked', { threshold: `$${formatMoney(lvl.unlockThreshold)}`, level: t(prevLevel.nameKey) }) : '',
+        text: prevLevel ? t('menu.level_locked', { threshold: `$${formatMoney(prevLevel.unlockThreshold)}`, level: t(prevLevel.nameKey) }) : '',
         attrs: { style: 'font:500 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
       });
       lockBlock.append(lockIcon, lockText);
       body.appendChild(lockBlock);
     } else {
       const startBtn = el('button', {
-        text: completed ? t('menu.level_resume') : t('menu.level_start'),
+        text: completed ? t('menu.level_replay') : t('menu.level_start'),
         attrs: { style: `margin-top:auto;height:40px;border:0;border-radius:5px;cursor:pointer;pointer-events:all;`
           + `font:800 11px/1 var(--bsx-font-ui);letter-spacing:.18em;`
           + `background:${completed ? 'rgba(255,176,46,.16)' : 'var(--bsx-amber)'};color:${completed ? 'var(--bsx-amber)' : 'var(--bsx-text-on-amber)'}` },

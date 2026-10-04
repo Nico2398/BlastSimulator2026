@@ -49,7 +49,7 @@ export class MainMenu {
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private tickerIndex = 0;
   /** Bumped per Continue-summary refresh so an older, slower list() cannot overwrite a newer one. */
-  private summarySeq = 0;
+  private refreshSeq = 0;
   private disposed = false;
 
   private readonly locale = new LocaleTextRegistry();
@@ -183,6 +183,7 @@ export class MainMenu {
   }
 
   dispose(): void {
+    this.refreshSeq++;
     this.stopTicker();
     this.disposed = true;
     this.overlay.remove();
@@ -208,10 +209,16 @@ export class MainMenu {
   }
 
   private async refreshContinueSummary(): Promise<void> {
-    if (!this.backend) return;
-    const seq = ++this.summarySeq;
-    const metas = await this.backend.list();
-    if (this.disposed || seq !== this.summarySeq) return; // stale or unmounted
+    const seq = ++this.refreshSeq;
+    let metas: SaveMeta[] = [];
+    if (this.backend) {
+      try {
+        metas = await this.backend.list();
+      } catch {
+        metas = [];
+      }
+    }
+    if (this.disposed || seq !== this.refreshSeq) return; // stale or unmounted
     this.saveCount = metas.length;
     this.mostRecentSave = metas.reduce<SaveMeta | null>(
       (best, m) => (!best || m.timestamp > best.timestamp) ? m : best,

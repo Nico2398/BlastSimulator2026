@@ -2876,7 +2876,7 @@
   "ui.shady.select_employee": "Choose someone…",
   "menu.level_locked": "Locked — requires {threshold} on {level} to unlock",
   "menu.level_start": "Start Level",
-  "menu.level_resume": "Resume",
+  "menu.level_replay": "Replay",
   "shortcuts.title": "Keyboard Shortcuts",
   "shortcuts.pause": "Space: Pause / Resume",
   "shortcuts.speed": "1-4: Game Speed",
