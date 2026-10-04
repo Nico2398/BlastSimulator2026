@@ -48,7 +48,9 @@ export class MainMenu {
   private saveCount = 0;
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private tickerIndex = 0;
+  /** Bumped per Continue-summary refresh so an older, slower list() cannot overwrite a newer one. */
   private refreshSeq = 0;
+  private disposed = false;
 
   private readonly locale = new LocaleTextRegistry();
 
@@ -83,7 +85,7 @@ export class MainMenu {
     const buttonCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:7px;width:340px' } });
 
     this.continueSummaryEl = el('span', { attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);opacity:.72' } });
-    this.continueBtn = this.makeContinueStyleButton('menu.continue', undefined, this.continueSummaryEl);
+    this.continueBtn = this.makeContinueStyleButton('menu.continue', 'bs-menu-continue', this.continueSummaryEl);
     this.continueBtn.addEventListener('click', () => {
       if (this.mostRecentSave) this.onContinue?.(this.mostRecentSave.slotId);
     });
@@ -161,6 +163,7 @@ export class MainMenu {
     this.overlay.style.display = 'flex';
     this.updateResumeButton();
     this.startTicker();
+    // Saves made since construction (Saves modal -> Return to Menu) must surface.
     void this.refreshContinueSummary();
   }
   hide(): void {
@@ -182,6 +185,7 @@ export class MainMenu {
   dispose(): void {
     this.refreshSeq++;
     this.stopTicker();
+    this.disposed = true;
     this.overlay.remove();
   }
 
@@ -214,7 +218,7 @@ export class MainMenu {
         metas = [];
       }
     }
-    if (seq !== this.refreshSeq) return;
+    if (this.disposed || seq !== this.refreshSeq) return; // stale or unmounted
     this.saveCount = metas.length;
     this.mostRecentSave = metas.reduce<SaveMeta | null>(
       (best, m) => (!best || m.timestamp > best.timestamp) ? m : best,

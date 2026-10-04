@@ -184,6 +184,20 @@ describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
     menu.dispose();
   });
 
+  it('the Continue button carries id bs-menu-continue, distinct from Resume (#1326)', async () => {
+    const menu = new MainMenu(container);
+    menu.setBackend(fakeBackend([
+      { slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: 'dusty_hollow' },
+    ]));
+    await new Promise(r => setTimeout(r, 0));
+    menu.show();
+    const continueBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes(t('menu.continue')))!;
+    expect(continueBtn.id).toBe('bs-menu-continue');
+    expect(continueBtn.id).not.toBe('bs-menu-resume');
+    menu.dispose();
+  });
+
   it('clicking CONTINUE routes to onContinue with the most recent save\'s slotId', async () => {
     const menu = new MainMenu(container);
     const cb = vi.fn();
@@ -200,6 +214,65 @@ describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
     continueBtn.click();
     expect(cb).toHaveBeenCalledWith('slot_2');
     menu.dispose();
+  });
+
+  it('show() refreshes CONTINUE for a save made after construction (#1326)', async () => {
+    const saves: SaveMeta[] = [];
+    const backend = fakeBackend(saves);
+    (backend.list as ReturnType<typeof vi.fn>).mockImplementation(async () => [...saves]);
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await new Promise(r => setTimeout(r, 0));
+    const continueBtn = container.querySelector<HTMLButtonElement>('#bs-menu-continue')!;
+    expect(continueBtn.style.display).toBe('none');
+
+    saves.push({ slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: 'dusty_hollow' });
+    menu.show();
+    await new Promise(r => setTimeout(r, 0));
+    expect(continueBtn.style.display).toBe('flex');
+    expect(container.textContent).toContain('$9,000 — Day 2');
+    menu.dispose();
+  });
+
+  it('an older, slower list() resolving last does not overwrite the newer result', async () => {
+    const older: SaveMeta = { slotId: 'old', name: 'Old', timestamp: 1000, version: 7, campaignSummary: 'OLDER-SUMMARY', levelId: 'dusty_hollow' };
+    const newer: SaveMeta = { slotId: 'new', name: 'New', timestamp: 2000, version: 7, campaignSummary: 'NEWER-SUMMARY', levelId: 'dusty_hollow' };
+    const resolvers: Array<(m: SaveMeta[]) => void> = [];
+    const backend = fakeBackend([]);
+    (backend.list as ReturnType<typeof vi.fn>).mockImplementation(
+      () => new Promise<SaveMeta[]>(res => { resolvers.push(res); }),
+    );
+    const menu = new MainMenu(container);
+    menu.setBackend(backend); // list call #1 (slow)
+    menu.show();              // list call #2 (fast)
+    expect(resolvers).toHaveLength(2);
+
+    resolvers[1]!([newer]);
+    await new Promise(r => setTimeout(r, 0));
+    resolvers[0]!([older]);
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(container.textContent).toContain('NEWER-SUMMARY');
+    expect(container.textContent).not.toContain('OLDER-SUMMARY');
+    menu.dispose();
+  });
+
+  it('dispose() while list() is in flight leaves the menu untouched when it resolves', async () => {
+    let resolve!: (m: SaveMeta[]) => void;
+    const backend = fakeBackend([]);
+    (backend.list as ReturnType<typeof vi.fn>).mockImplementation(
+      () => new Promise<SaveMeta[]>(res => { resolve = res; }),
+    );
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    const continueBtn = container.querySelector<HTMLButtonElement>('#bs-menu-continue')!;
+
+    menu.dispose();
+    resolve([{ slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: 'LATE-SUMMARY', levelId: 'dusty_hollow' }]);
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(continueBtn.style.display).toBe('none');
+    expect(continueBtn.textContent).not.toContain('LATE-SUMMARY');
   });
 
   it('LOAD button hints the real save count once resolved', async () => {
