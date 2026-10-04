@@ -170,6 +170,29 @@ describe('TutorialOverlay (12.4)', () => {
       expect(TutorialOverlay.isCompleted()).toBe(true);
     });
 
+    it('abandon() deactivates, removes the guided class and does not record completion (#1315)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      expect(tut.isActive).toBe(true);
+      expect(document.body.classList.contains('bs-tutorial-guided')).toBe(true);
+      tut.abandon();
+      expect(tut.isActive).toBe(false);
+      expect(document.body.classList.contains('bs-tutorial-guided')).toBe(false);
+      expect(localStorage.getItem('bs_tutorial_done')).toBeNull();
+      expect(TutorialOverlay.isCompleted()).toBe(false);
+    });
+
+    it('abandon() hides the overlay and is safe when never started (#1315)', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      tut.abandon();
+      expect((container.querySelector('.bs-tutorial-overlay') as HTMLElement).style.display).toBe('none');
+      expect(() => tut.abandon()).not.toThrow();
+      expect(localStorage.getItem('bs_tutorial_done')).toBeNull();
+    });
+
     it('takes the guided class off the body when it finishes', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;

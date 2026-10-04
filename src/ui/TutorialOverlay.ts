@@ -286,7 +286,22 @@ export class TutorialOverlay {
     }
   }
 
+  /** Ends the tutorial like finish() but does not record bs_tutorial_done. */
+  abandon(): void {
+    if (!this._active) return;
+    this.teardown();
+  }
+
   private finish(): void {
+    this.teardown();
+    try {
+      localStorage.setItem('bs_tutorial_done', '1');
+    } catch {
+      // Silently ignore — localStorage may be unavailable in restricted browsing environments
+    }
+  }
+
+  private teardown(): void {
     this.stopGuide();
     this.clearAutoAdvance();
     this.rails.clear();
@@ -298,11 +313,6 @@ export class TutorialOverlay {
     }
     this.pausedEl.style.display = 'none';
     this.overlay.style.display = 'none';
-    try {
-      localStorage.setItem('bs_tutorial_done', '1');
-    } catch {
-      // Silently ignore — localStorage may be unavailable in restricted browsing environments
-    }
     this.gameState = null;
   }
 
