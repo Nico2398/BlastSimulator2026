@@ -313,8 +313,17 @@ export class PlayableArea {
    * non-mutating (#1396).
    */
   previewClaimArea(rect: { minX: number; minZ: number; maxX: number; maxZ: number }): ClaimRefusalReason | null {
-    void rect;
-    // TODO: implement
+    const cx0 = Math.floor(rect.minX / CHUNK_SIZE);
+    const cz0 = Math.floor(rect.minZ / CHUNK_SIZE);
+    // maxX/maxZ are exclusive: the last covered tile is max - 1.
+    const cx1 = Math.floor((rect.maxX - 1) / CHUNK_SIZE);
+    const cz1 = Math.floor((rect.maxZ - 1) / CHUNK_SIZE);
+    for (let cz = cz0; cz <= cz1; cz++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const reason = this.previewClaim(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
+        if (reason) return reason;
+      }
+    }
     return null;
   }
 

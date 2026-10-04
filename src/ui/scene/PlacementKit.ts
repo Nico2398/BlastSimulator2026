@@ -26,6 +26,11 @@ const CLAIM_REFUSAL_KEY: Record<ClaimRefusalReason, string> = {
   not_adjacent: 'shell.placement.refused_too_far',
 };
 
+/** Player-facing text for a site-claim refusal. */
+export function claimRefusalText(reason: ClaimRefusalReason): string {
+  return t(CLAIM_REFUSAL_KEY[reason]);
+}
+
 export interface PlacementKit {
   readonly controller: PlacementController;
   readonly overlay: SelectionOverlay;
@@ -43,7 +48,7 @@ export interface PlacementKit {
  */
 export function placementRefusalReason(controller: PlacementController): string | undefined {
   if (controller.canConfirm) return undefined;
-  if (controller.refusalReason) return t(CLAIM_REFUSAL_KEY[controller.refusalReason]);
+  if (controller.refusalReason) return claimRefusalText(controller.refusalReason);
   if (controller.footprintInvalid) {
     return t('shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
   }

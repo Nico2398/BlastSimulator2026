@@ -10,7 +10,8 @@ import {
   validateLevelOrder,
   type LevelOrderDef, type LevelOrderValidation,
 } from '../../../core/mining/LevelGround.js';
-import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
+import { rectOverlapsOccupants } from '../../../core/entities/Building.js';
+import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { LEVEL_GROUND_COST_PER_VOXEL } from '../../../core/config/balance.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { addExpense } from '../../../core/economy/Finance.js';
@@ -67,27 +68,11 @@ export function levelGroundCommand(
   }
 
   // Refuse before any claim/charge when the rect overlaps a building already
-  // standing or still under construction — mirrors the AABB-overlap test
-  // `checkFootprintPlacement` (Building.ts) runs against the same two
-  // occupant lists. Inlined rather than extracted into a shared helper: it's
-  // a 4-line check with one caller here.
-  const rectSizeX = rect.maxX - rect.minX + 1;
-  const rectSizeZ = rect.maxZ - rect.minZ + 1;
-  const overlapsRect = (bx: number, bz: number, bSizeX: number, bSizeZ: number): boolean =>
-    rect.minX < bx + bSizeX && rect.minX + rectSizeX > bx &&
-    rect.minZ < bz + bSizeZ && rect.minZ + rectSizeZ > bz;
-
-  for (const b of ctx.state!.buildings.buildings) {
-    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, b.tier));
-    if (overlapsRect(b.x, b.z, sizeX, sizeZ)) {
-      return { success: false, output: t('mining.level_ground.refused_building_overlap') };
-    }
-  }
-  for (const pb of ctx.state!.plannedBuildings) {
-    const { sizeX, sizeZ } = getDefSize(getBuildingDef(pb.type, pb.tier));
-    if (overlapsRect(pb.x, pb.z, sizeX, sizeZ)) {
-      return { success: false, output: t('mining.level_ground.refused_building_overlap') };
-    }
+  // standing or still under construction (max is inclusive here, exclusive in the helper).
+  if (rectOverlapsOccupants(buildingFootprintOccupants(ctx.state!), {
+    minX: rect.minX, minZ: rect.minZ, maxX: rect.maxX + 1, maxZ: rect.maxZ + 1,
+  })) {
+    return { success: false, output: t('mining.level_ground.refused_building_overlap') };
   }
 
   const claim = claimForAction(ctx, cellsInRect(rect.minX, rect.minZ, rect.maxX, rect.maxZ), 'level ground');

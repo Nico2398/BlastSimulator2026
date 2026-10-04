@@ -36,6 +36,7 @@ import type { GameState } from '../core/state/GameState.js';
 import {
   getAllBuildingTypes,
   getBuildingDef,
+  getDefSize,
   getDemolishCost,
   getUpgradeCost,
   getMoveCost,
@@ -44,15 +45,20 @@ import {
   isFootprintBuildable,
   type BuildingType,
   type BuildingTier,
+  rectOverlapsOccupants,
   type Building,
 } from '../core/entities/Building.js';
-import { placementRefusalReason, type PlacementKit } from './scene/PlacementKit.js';
+import { placementRefusalReason, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, type RampWidth } from '../core/config/balance.js';
 
+import { buildingFootprintOccupants } from '../core/nav/NavGridSync.js';
+
 import type { GameConsoleFn } from './gameConsole.js';
 
+/** World rect, min inclusive / max exclusive. */
+type PlacementRect = { minX: number; minZ: number; maxX: number; maxZ: number };
 
 export class BuildMenu extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -62,6 +68,8 @@ export class BuildMenu extends PanelBase {
   private placementKit: PlacementKit | null = null;
   /** Ground-truth height sampler (#1008) used to refuse a footprint over uneven ground; unset means no footprint check runs. */
   private surfaceHeightSampler: ((x: number, z: number) => number) | null = null;
+  /** Non-mutating claim preview for a footprint rect (#1396); unset skips the claim check. */
+  private claimAreaPreview: ((rect: PlacementRect) => ClaimRefusalReason | null) | null = null;
   private rampDepth = 8;
   private rampWidth: RampWidth = RAMP_DEFAULT_WIDTH;
   private gameConsole?: GameConsoleFn;
@@ -133,8 +141,7 @@ export class BuildMenu extends PanelBase {
   setClaimAreaPreview(
     fn: (rect: { minX: number; minZ: number; maxX: number; maxZ: number }) => ClaimRefusalReason | null,
   ): void {
-    void fn;
-    // TODO: implement
+    this.claimAreaPreview = fn;
   }
   /** Register the terrain-height sampler used to refuse a footprint over uneven ground (#1008). */
   setSurfaceHeightSampler(fn: (x: number, z: number) => number): void {
@@ -262,6 +269,20 @@ export class BuildMenu extends PanelBase {
     return wrap;
   }
 
+  /**
+   * Why `rect` (min inclusive, max exclusive) would be refused before Confirm (#1396): the site claim
+   * over the whole rect, or a building / construction site already covering part of it. Null when
+   * clear. `movingId` is a building being moved, which does not block its own new spot.
+   */
+  private rectRefusal(rect: PlacementRect, movingId?: number): string | null {
+    const claim = this.claimAreaPreview?.(rect) ?? null;
+    if (claim) return claimRefusalText(claim);
+    if (!this.lastState) return null;
+    const moving = movingId === undefined ? undefined : this.lastState.buildings.buildings.find((b) => b.id === movingId);
+    const occupants = buildingFootprintOccupants(this.lastState).filter((o) => o !== moving);
+    return rectOverlapsOccupants(occupants, rect) ? t('shell.placement.refused_occupied') : null;
+  }
+
   /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
   private armLevelGroundTool(): void {
     const kit = this.placementKit;
@@ -272,7 +293,13 @@ export class BuildMenu extends PanelBase {
     const refresh = (): void => {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
       const sel = controller.selection;
-      overlay.update(sel ? { shape: 'rect', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2 } : null);
+      const rectRefusal = sel
+        ? this.rectRefusal({
+          minX: Math.min(sel.x1, sel.x2), minZ: Math.min(sel.z1, sel.z2),
+          maxX: Math.max(sel.x1, sel.x2) + 1, maxZ: Math.max(sel.z1, sel.z2) + 1,
+        })
+        : null;
+      overlay.update(sel ? { shape: 'rect', x1: sel.x1, z1: sel.z1, x2: sel.x2, z2: sel.z2, refused: !!rectRefusal } : null);
       const area = sel ? (sel.x2 - sel.x1 + 1) * (sel.z2 - sel.z1 + 1) : 0;
       strip.show({
         icon: 'grid',
@@ -280,16 +307,21 @@ export class BuildMenu extends PanelBase {
         subtitle: '',
         fields: [],
         result: sel ? `${area}` : '—',
-        confirmEnabled: controller.canConfirm,
-        confirmDisabledReason: placementRefusalReason(controller),
+        confirmEnabled: controller.canConfirm && !rectRefusal,
+        confirmDisabledReason: placementRefusalReason(controller) ?? rectRefusal ?? undefined,
         instruction: t('ui.build.level_ground_instruction'),
       });
     };
 
     controller.setConfirmHandler((sel) => {
       const cmd = this.gameConsole?.(`level_ground minX:${sel.x1} maxX:${sel.x2} minZ:${sel.z1} maxZ:${sel.z2}`);
-      this.setStatus(cmd?.success ? t('ui.build.level_ground_ordered') : (cmd?.output ?? ''));
+      if (!cmd?.success) {
+        this.setStatus(cmd?.output ?? '');
+        return false;
+      }
+      this.setStatus(t('ui.build.level_ground_ordered'));
       overlay.flashConfirm();
+      return true;
     });
     controller.setChangeHandler(refresh);
     controller.arm({ shape: 'rect' });
@@ -375,7 +407,7 @@ export class BuildMenu extends PanelBase {
   }
 
   /** Point + real footprint ghost, shared by placing a new building and moving an existing one. */
-  private armBuildingPointTool(type: BuildingType, tier: BuildingTier, title: string, onConfirm: (x: number, z: number) => void): void {
+  private armBuildingPointTool(type: BuildingType, tier: BuildingTier, title: string, onConfirm: (x: number, z: number) => boolean, movingId?: number): void {
     const kit = this.placementKit;
     if (!kit) return;
     const { controller, overlay, strip } = kit;
@@ -385,22 +417,33 @@ export class BuildMenu extends PanelBase {
     const refresh = (): void => {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
       const sel = controller.selection;
-      overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, footprintCells: def.footprint } : null);
+      const at = sel ? { x: sel.x1, z: sel.z1 } : controller.hoveredTile;
+      const controllerReason = placementRefusalReason(controller);
+      let rectReason: string | null = null;
+      if (at) {
+        const { sizeX, sizeZ } = getDefSize(def);
+        rectReason = this.rectRefusal({ minX: at.x, minZ: at.z, maxX: at.x + sizeX, maxZ: at.z + sizeZ }, movingId);
+      }
+      // `pick_first` (nothing hovered/selected yet) is a prompt, not a refusal — only a real controller refusal paints red.
+      const controllerRefused = !!controller.refusalReason || controller.footprintInvalid || !!controller.refusedTile;
+      const refused = !!at && (controllerRefused || !!rectReason);
+      overlay.update(at ? { shape: 'point', x: at.x, z: at.z, footprintCells: def.footprint, refused } : null);
       strip.show({
         icon: 'build',
         title,
         subtitle: `$${def.constructionCost.toLocaleString('en-US')}`,
         fields: [],
         result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
-        confirmEnabled: controller.canConfirm,
-        confirmDisabledReason: placementRefusalReason(controller),
+        confirmEnabled: controller.canConfirm && !rectReason,
+        confirmDisabledReason: controllerReason ?? rectReason ?? undefined,
         instruction: t('ui.build.place_instruction'),
       });
     };
 
     controller.setConfirmHandler((sel) => {
-      onConfirm(sel.x1, sel.z1);
+      if (!onConfirm(sel.x1, sel.z1)) return false;
       overlay.flashConfirm();
+      return true;
     });
     controller.setChangeHandler(refresh);
     controller.arm({ shape: 'point' });
@@ -479,6 +522,7 @@ export class BuildMenu extends PanelBase {
         this.armBuildingPointTool(type, tier, t(`building.${type}.t${tier}.name`), (x, z) => {
           const cmdResult = this.gameConsole?.(`build ${type} at:${x},${z} tier:${tier}`);
           this.setStatus(cmdResult?.success ? t('ui.build.ordered') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
+          return cmdResult?.success === true;
         });
       },
     });
@@ -579,7 +623,8 @@ export class BuildMenu extends PanelBase {
       this.armBuildingPointTool(b.type, b.tier, `${t('ui.build.move')} #${b.id}`, (x, z) => {
         const cmdResult = this.gameConsole?.(`build move ${b.id} to:${x},${z}`);
         this.setStatus(cmdResult?.success ? t('ui.build.moved') : (cmdResult?.output ?? ''));
-      });
+        return cmdResult?.success === true;
+      }, b.id);
     });
 
     const nextTier = b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;

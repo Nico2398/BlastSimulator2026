@@ -486,8 +486,13 @@ export function rectOverlapsOccupants(
   occupants: ReadonlyArray<FootprintOccupant>,
   rect: { minX: number; minZ: number; maxX: number; maxZ: number },
 ): boolean {
-  void occupants; void rect;
-  // TODO: implement
+  for (const occ of occupants) {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));
+    if (rect.minX < occ.x + sizeX && rect.maxX > occ.x &&
+        rect.minZ < occ.z + sizeZ && rect.maxZ > occ.z) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -522,13 +527,8 @@ export function checkFootprintPlacement(
     return { valid: false, error: 'Out of bounds' };
   }
 
-  for (const occ of occupants) {
-    const occDef = getBuildingDef(occ.type, occ.tier);
-    const { sizeX: oSX, sizeZ: oSZ } = getDefSize(occDef);
-    if (x < occ.x + oSX && x + sizeX > occ.x &&
-        z < occ.z + oSZ && z + sizeZ > occ.z) {
-      return { valid: false, error: 'Space is occupied' };
-    }
+  if (rectOverlapsOccupants(occupants, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ })) {
+    return { valid: false, error: 'Space is occupied' };
   }
 
   if (voxelGrid !== undefined) {

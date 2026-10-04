@@ -214,14 +214,15 @@ export class SelectionOverlay {
     for (let z = z0; z <= z1; z++) {
       for (let x = x0; x <= x1; x++) {
         const inRegion = region !== null && x >= region.x1 && x <= region.x2 && z >= region.z1 && z <= region.z2;
-        const color = region ? (inRegion ? COLOR_PINNED : COLOR_SELECTION) : COLOR_SELECTION;
+        const color = u.refused ? COLOR_BLOCKED : region ? (inRegion ? COLOR_PINNED : COLOR_SELECTION) : COLOR_SELECTION;
         patches.push(cellPatch(`${x}:${z}`, x, z, color, opacity));
       }
     }
     this.selectionTintLayer.replace(patches);
 
-    this.group.add(this.makeBorder(x0, z0, x1, z1, region ? COLOR_PINNED : COLOR_SELECTION));
-    this.group.add(...this.makeCorners(x0, z0, x1, z1, region ? COLOR_PINNED : COLOR_SELECTION));
+    const outline = u.refused ? COLOR_BLOCKED : region ? COLOR_PINNED : COLOR_SELECTION;
+    this.group.add(this.makeBorder(x0, z0, x1, z1, outline));
+    this.group.add(...this.makeCorners(x0, z0, x1, z1, outline));
 
     if (u.holeSpacing && u.holeSpacing > 0) {
       for (let z = z0; z <= z1; z += u.holeSpacing) {
@@ -246,7 +247,7 @@ export class SelectionOverlay {
   }
 
   private buildPoint(u: OverlayPointUpdate, flashing: boolean): void {
-    const color = u.tone === 'survey' ? COLOR_SURVEY : COLOR_SELECTION;
+    const color = u.refused ? COLOR_BLOCKED : u.tone === 'survey' ? COLOR_SURVEY : COLOR_SELECTION;
     const cells = u.footprintCells ?? [[0, 0]] as const;
     const opacity = flashing ? 0.6 : CELL_FILL_OPACITY;
     // `u.footprintCells` (as opposed to the default single-tile path, where
