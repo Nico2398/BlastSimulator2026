@@ -440,6 +440,7 @@ describe('Survey system', () => {
         isProjection: false,
         halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
         shapeSeed: 1,
+        origin: { x: 10, y: 4, z: 10 },
       },
       {
         id: 2,
@@ -452,6 +453,7 @@ describe('Survey system', () => {
         isProjection: false,
         halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
         shapeSeed: 2,
+        origin: { x: 12, y: 3, z: 10 },
       },
     ];
 

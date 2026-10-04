@@ -40,6 +40,7 @@ function makeFragment(id: number, mass: number = 100): FragmentData {
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
     shapeSeed: 1,
+    origin: { x: 0, y: 0, z: 0 },
   };
 }
 
@@ -65,6 +66,7 @@ function makeStoredFragment(
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
     shapeSeed: 1,
+    origin: { x: 0, y: 0, z: 0 },
   };
 }
 

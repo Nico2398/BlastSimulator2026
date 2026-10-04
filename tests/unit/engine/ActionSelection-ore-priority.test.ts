@@ -123,6 +123,7 @@ function makeFragment(id: number, x: number, z: number, oreDensities: Record<str
     isProjection: false,
     halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
     shapeSeed: id,
+    origin: { x, y: 0, z },
   };
 }
 

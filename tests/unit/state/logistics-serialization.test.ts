@@ -25,6 +25,7 @@ function makeFragment(id: number, fragState: TrackedFragment['state']): TrackedF
       isProjection: false,
       halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
       shapeSeed: id,
+      origin: { x: 0, y: 0, z: 0 },
     },
     state: fragState,
     vehicleId: null,

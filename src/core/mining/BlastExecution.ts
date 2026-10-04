@@ -66,6 +66,8 @@ export interface FragmentData {
   halfExtents: Vec3;
   /** Stable per-fragment randomness for render shape variants and tumble. */
   shapeSeed: number;
+  /** Where the fragment's rock sat before the blast moved it; never mutated afterwards. */
+  origin: Vec3;
 }
 
 // ── Blast Report ──
@@ -314,6 +316,7 @@ export function executeBlast(
         isProjection: vecLength(velocity) > PROJECTION_SPEED_THRESHOLD,
         halfExtents: gen.halfExtents,
         shapeSeed: gen.shapeSeed,
+        origin: { ...gen.origin }, // TODO: implement (stub copies position)
       });
 
       if (gen.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD) oversizedFragments++;

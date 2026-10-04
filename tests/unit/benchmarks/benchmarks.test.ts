@@ -630,6 +630,7 @@ function setupDebrisFieldState(fragmentCount: number): { state: GameState; emplo
       isProjection: false,
       halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
       shapeSeed: i,
+      origin: { x: 5 + (i % 50), y: 0, z: 5 + Math.floor(i / 50) },
     });
   }
   state.logistics.storageCapacityKg = fragmentCount * 100;

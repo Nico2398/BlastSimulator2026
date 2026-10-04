@@ -864,6 +864,7 @@ describe('SurveyCalc — computeBlastOreReport (4.7)', () => {
       isProjection: false,
       halfExtents: vec3(0.25, 0.25, 0.25),
       shapeSeed: 0,
+      origin: position,
     };
   }
 

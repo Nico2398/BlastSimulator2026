@@ -83,6 +83,7 @@ function makeFragment(id: number, x: number, z: number, volume: number): Fragmen
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
     shapeSeed: id,
+    origin: { x, y: 0, z },
   };
 }
 

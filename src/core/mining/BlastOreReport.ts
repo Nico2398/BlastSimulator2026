@@ -6,6 +6,9 @@ import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/** The fields of a fragment the ore report reads. */
+export type OreReportFragment = Pick<FragmentData, 'origin' | 'volume' | 'oreDensities'>;
+
 /** Actual ore yields from a blast and comparison to pre-blast survey estimate. */
 export interface BlastOreReport {
   /** Actual ore yields in kg, keyed by ore ID. */
@@ -47,10 +50,10 @@ function findBestSurveyForColumn(
  * Returns 0 when no survey covers the fragment's column.
  */
 function fragmentColumnEstimateKg(
-  fragment: FragmentData,
+  fragment: OreReportFragment,
   surveys: readonly SurveyResult[],
 ): number {
-  const colKey = `${Math.round(fragment.position.x)},${Math.round(fragment.position.z)}`;
+  const colKey = `${Math.round(fragment.origin.x)},${Math.round(fragment.origin.z)}`;
   const survey = findBestSurveyForColumn(surveys, colKey);
   if (!survey) return 0;
   const colEstimates = survey.estimates[colKey];
@@ -108,7 +111,7 @@ export function fragmentHasOre(oreDensities: Record<string, number>): boolean {
  * `yieldRatio` is actual / estimated; defaults to 1.0 when no estimate exists.
  */
 export function computeBlastOreReport(
-  fragments: readonly FragmentData[],
+  fragments: readonly OreReportFragment[],
   surveyResults?: readonly SurveyResult[],
 ): BlastOreReport {
   const oreYields: Record<string, number> = {};
