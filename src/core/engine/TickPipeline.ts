@@ -112,7 +112,6 @@ export interface RunTickOptions {
   checkInvariants: boolean;
 }
 
-/** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
 /** Village vibration (score units) of the last blast while it is within the score window, else 0. */
 function recentVillageVibration(state: GameState): number {
   const report = state.lastBlastReport;
@@ -120,6 +119,7 @@ function recentVillageVibration(state: GameState): number {
   return report.maxVibration * VILLAGE_VIBRATION_SCORE_GAIN;
 }
 
+/** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
 function deductExpense(
   state: GameState,
   cost: number,

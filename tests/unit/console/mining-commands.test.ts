@@ -758,7 +758,9 @@ describe('blast_preview — state.lastBlastPreview', () => {
 
     const preview = ctx.state!.lastBlastPreview!;
     expect(preview.vibrations).not.toBeNull();
-    expect(preview.vibrations!.affectedVillages).toBe(ctx.playableArea?.villages().length ?? 0);
+    const villageCount = ctx.playableArea!.villages().length;
+    expect(villageCount).toBeGreaterThan(0);
+    expect(preview.vibrations!.affectedVillages).toBe(villageCount);
     expect(preview.fragments).not.toBeNull();
     expect(preview.projections).not.toBeNull();
   });

@@ -9,6 +9,9 @@ import type { BlastPlan, ValidationError } from '../../../core/mining/BlastPlan.
 import { getDefSize, getBuildingDef } from '../../../core/entities/Building.js';
 import type { MiningContext } from './types.js';
 import type { GameContext } from '../world.js';
+import { villagePositions } from '../../../core/mining/BlastExecution.js';
+import type { VillagePosition } from '../../../core/mining/BlastExecution.js';
+import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 
 export function requireGame(ctx: MiningContext): string | null {
@@ -194,4 +197,14 @@ export function assembleValidBlastPlan(
     return { error: { success: false, output: formatBlastPlanErrors(errors, header) } };
   }
   return { error: null, plan };
+}
+
+/** Ids of drilled holes currently wet (rain-flooded); weather defaults to 'sunny' before the cycle exists. */
+export function wetHoleIdSet(ctx: MiningContext): Set<string> {
+  return new Set(wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny'));
+}
+
+/** Vibration targets for the current level's villages (none when no playable area is loaded). */
+export function levelVillagePositions(ctx: MiningContext): VillagePosition[] {
+  return villagePositions(ctx.playableArea?.villages() ?? []);
 }

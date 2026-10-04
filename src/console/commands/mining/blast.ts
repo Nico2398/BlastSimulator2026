@@ -3,8 +3,8 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, assembleValidBlastPlan } from './shared.js';
-import { executeBlast, buildBlastReport, villagePositions } from '../../../core/mining/BlastExecution.js';
+import { requireGame, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
+import { executeBlast, buildBlastReport, maxVillageVibration } from '../../../core/mining/BlastExecution.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
@@ -13,7 +13,6 @@ import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../../core/campaign/SuccessTracker.js';
-import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
@@ -52,8 +51,8 @@ export function blastCommand(
   // see console-api.ts's `weather` field doc) — 'sunny' (not raining) is the
   // correct fallback either way, since createWeatherCycle's own initial
   // state is always 'sunny' regardless of seed.
-  const wetHoleIds = new Set(wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny'));
-  const villages = villagePositions(ctx.playableArea?.villages() ?? []);
+  const wetHoleIds = wetHoleIdSet(ctx);
+  const villages = levelVillagePositions(ctx);
   const result = executeBlast(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
   if (!result) return { success: false, output: t('mining.blast.execution_failed') };
 
@@ -84,9 +83,9 @@ export function blastCommand(
   if (result.projectionCount > 0) {
     recordVibration(state.scores, result.projectionCount * BLAST_PROJECTION_NUISANCE_PER_PROJECTION);
   }
-  const maxVillageVibration = result.vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0);
-  if (maxVillageVibration > 0) {
-    recordVibration(state.scores, maxVillageVibration * VILLAGE_VIBRATION_SCORE_GAIN);
+  const villageVibration = maxVillageVibration(result.vibrationAtVillages);
+  if (villageVibration > 0) {
+    recordVibration(state.scores, villageVibration * VILLAGE_VIBRATION_SCORE_GAIN);
   }
 
   // Standing on the rock when it goes is not survivable, whatever the charge:
@@ -208,7 +207,7 @@ export function blastCommand(
       `Oversized fragments: ${result.oversizedFragments}`,
       `Projections: ${result.projectionCount}`,
       ...(result.vibrationAtVillages.length > 0
-        ? [t('mining.blast.max_village_vibration', { value: maxVillageVibration.toFixed(4) })]
+        ? [t('mining.blast.max_village_vibration', { value: villageVibration.toFixed(4) })]
         : []),
       `Furthest throw: ${result.maxThrowDistance.toFixed(1)} m`,
       `Total rock volume: ${result.totalRockVolume.toFixed(1)} m³`,

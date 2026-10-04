@@ -18,7 +18,7 @@ import {
   groupChargesByDelay,
   stemmingFactor,
 } from './BlastCalc.js';
-import { buildPlanEnergyField } from './BlastExecution.js';
+import { buildPlanEnergyField, maxVillageVibration } from './BlastExecution.js';
 import { effectiveAt } from './EnergyPropagation.js';
 import { computeFragmentVelocity, throwFractionForBlowout } from './FragmentVelocity.js';
 import {
@@ -327,7 +327,7 @@ export function previewVibrations(
 
   return {
     villages: results,
-    maxVibration: results.reduce((m, v) => Math.max(m, v.vibration), 0),
+    maxVibration: maxVillageVibration(results),
   };
 }
 

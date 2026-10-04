@@ -186,7 +186,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     destroyedBuildings: result.destroyedBuildings,
     accidents,
     ...(result.vibrationAtVillages.length > 0
-      ? { maxVibration: result.vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0) }
+      ? { maxVibration: maxVillageVibration(result.vibrationAtVillages) }
       : {}),
   };
 }
@@ -196,6 +196,11 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
 export interface VillagePosition {
   id: string;
   position: Vec3;
+}
+
+/** Strongest vibration across villages; 0 when there are none. */
+export function maxVillageVibration(list: readonly { vibration: number }[]): number {
+  return list.reduce((m, v) => Math.max(m, v.vibration), 0);
 }
 
 /** Map villages to vibration targets (ground level, ids `village-<index>`). */
@@ -452,7 +457,7 @@ export function executeBlast(
   const totalVolume = fragments.reduce((s, f) => s + f.volume, 0);
   const avgSize = fragments.length > 0 ? totalVolume / fragments.length : 0;
 
-  const maxVibration = vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0);
+  const maxVibration = maxVillageVibration(vibrationAtVillages);
   const rating = calculateRating(projectionCount, maxThrowDistance, clearedVoxels, maxVibration, fragments.length);
 
   emitter?.emit('blast:ended', undefined);
