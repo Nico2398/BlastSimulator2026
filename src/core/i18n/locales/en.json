@@ -2833,6 +2833,7 @@
   "ui.saves.ago_days": "{n}d ago",
   "ui.saves.fallback_notice": "Browser storage unavailable. Saves last for this session only.",
   "ui.saves.overwrite": "OVERWRITE",
+  "ui.saves.delete": "DELETE",
   "ui.saves.confirm_overwrite_title": "Overwrite save?",
   "ui.saves.confirm_overwrite_body": "This replaces the existing save in this slot.",
   "ui.saves.confirm_delete_title": "Delete save?",

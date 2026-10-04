@@ -38,6 +38,14 @@ export function relativeTime(timestampMs: number): string {
   return t('ui.saves.ago_days', { n: Math.floor(hours / 24) });
 }
 
+type ConfirmKind = 'overwrite' | 'delete' | 'load';
+// Keys stay literal so check:i18n sees them.
+const CONFIRM_TEXT: Record<ConfirmKind, { title: string; body: string; confirmLabel: string }> = {
+  overwrite: { title: 'ui.saves.confirm_overwrite_title', body: 'ui.saves.confirm_overwrite_body', confirmLabel: 'ui.saves.overwrite' },
+  delete: { title: 'ui.saves.confirm_delete_title', body: 'ui.saves.confirm_delete_body', confirmLabel: 'ui.saves.delete' },
+  load: { title: 'ui.saves.confirm_load_title', body: 'ui.saves.confirm_load_body', confirmLabel: 'saveload.load' },
+};
+
 export class SavesModal {
   private readonly overlay: HTMLElement;
   private readonly slotList: HTMLElement;
@@ -56,38 +64,8 @@ export class SavesModal {
   private readonly fallbackNotice: HTMLElement;
   private autoSaveFailing = false;
   private onAutoSaveFailed?: () => void;
-
-  /** Surface an autosave failure outside the modal (it may be closed when the save fails). */
-  setOnAutoSaveFailed(cb: () => void): void {
-    this.onAutoSaveFailed = cb;
-  }
   private writing = false;
-
-  /** Tell the modal which backend is active so it can show a fallback notice. */
-  setBackendKind(kind: SaveBackendKind): void {
-    this.sessionOnly = kind === 'memory';
-    // Only in the DOM while the memory fallback is active, so hidden text never lingers.
-    if (this.sessionOnly) this.slotList.before(this.fallbackNotice);
-    else this.fallbackNotice.remove();
-  }
   private sessionOnly = false;
-
-  /** Route overwrite/delete/load confirmations through the shared confirm modal. */
-  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
-    this.confirmHandler = cb;
-  }
-
-  /** Runs `action` after the player confirms; straight away when no confirm handler is wired. */
-  private confirmThen(kind: 'overwrite' | 'delete' | 'load', icon: string, action: () => void): void {
-    if (!this.confirmHandler) { action(); return; }
-    this.confirmHandler({
-      icon,
-      title: t(`ui.saves.confirm_${kind}_title`),
-      body: t(`ui.saves.confirm_${kind}_body`),
-      confirmLabel: t(kind === 'overwrite' ? 'ui.saves.overwrite' : kind === 'delete' ? 'ui.saves.confirm_delete_title' : 'saveload.load'),
-      onConfirm: action,
-    });
-  }
 
   constructor(container: HTMLElement) {
     this.overlay = el('div', {
@@ -146,6 +124,31 @@ export class SavesModal {
     box.append(header, body);
     this.overlay.appendChild(box);
     container.appendChild(this.overlay);
+  }
+
+  /** Surface a save failure outside the modal (it may be closed when the save fails). */
+  setOnAutoSaveFailed(cb: () => void): void {
+    this.onAutoSaveFailed = cb;
+  }
+
+  /** Tell the modal which backend is active so it can show a fallback notice. */
+  setBackendKind(kind: SaveBackendKind): void {
+    this.sessionOnly = kind === 'memory';
+    // Only in the DOM while the memory fallback is active, so hidden text never lingers.
+    if (this.sessionOnly) this.slotList.before(this.fallbackNotice);
+    else this.fallbackNotice.remove();
+  }
+
+  /** Route overwrite/delete/load confirmations through the shared confirm modal. */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    this.confirmHandler = cb;
+  }
+
+  /** Runs `action` after the player confirms; straight away when no confirm handler is wired. */
+  private confirmThen(kind: ConfirmKind, icon: string, action: () => void): void {
+    if (!this.confirmHandler) { action(); return; }
+    const { title, body, confirmLabel } = CONFIRM_TEXT[kind];
+    this.confirmHandler({ icon, title: t(title), body: t(body), confirmLabel: t(confirmLabel), onConfirm: action });
   }
 
   get root(): HTMLElement { return this.overlay; }
@@ -211,14 +214,15 @@ export class SavesModal {
         this.autoSaveFailing = false;
         if (this.statusEl.textContent === t('ui.saves.autosave_failed')) this.setStatus('');
       }
-      if (announce) this.setStatus(t('saveload.quick_saved'));
+      if (announce) this.setStatus(t(this.sessionOnly ? 'saveload.saved_session_only' : 'saveload.quick_saved'));
     } catch {
-      // One notice per failure streak; the next success re-arms it.
-      if (!this.autoSaveFailing) {
-        this.autoSaveFailing = true;
+      // A quick-save is an explicit player action: always report. The timed autosave
+      // reports once per failure streak; the next success re-arms it.
+      if (announce || !this.autoSaveFailing) {
         this.setStatus(t('ui.saves.autosave_failed'), 'error');
         this.onAutoSaveFailed?.();
       }
+      this.autoSaveFailing = true;
     }
   }
 

@@ -3,7 +3,7 @@
 
 import type { SaveBackend } from '../core/state/SaveBackend.js';
 import { IndexedDBPersistence } from './IndexedDBPersistence.js';
-import { DownloadPersistence } from './DownloadPersistence.js';
+import { InMemoryPersistence } from './InMemoryPersistence.js';
 
 export type SaveBackendKind = 'indexeddb' | 'memory';
 
@@ -14,7 +14,7 @@ export interface SaveBackendFactory {
 
 const DEFAULT_FACTORY: SaveBackendFactory = {
   idb: () => new IndexedDBPersistence(),
-  fallback: () => new DownloadPersistence(),
+  fallback: () => new InMemoryPersistence(),
 };
 
 /**

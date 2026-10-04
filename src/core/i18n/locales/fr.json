@@ -2833,6 +2833,7 @@
   "ui.saves.ago_days": "il y a {n} j",
   "ui.saves.fallback_notice": "Stockage du navigateur indisponible. Les sauvegardes durent uniquement pour cette session.",
   "ui.saves.overwrite": "ÉCRASER",
+  "ui.saves.delete": "SUPPRIMER",
   "ui.saves.confirm_overwrite_title": "Écraser la sauvegarde ?",
   "ui.saves.confirm_overwrite_body": "Cela remplace la sauvegarde existante de cet emplacement.",
   "ui.saves.confirm_delete_title": "Supprimer la sauvegarde ?",

@@ -1,22 +1,22 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { DownloadPersistence } from '../../../src/persistence/DownloadPersistence.js';
+import { InMemoryPersistence } from '../../../src/persistence/InMemoryPersistence.js';
 
-describe('DownloadPersistence as in-memory fallback', () => {
+describe('InMemoryPersistence as in-memory fallback', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('save never creates an anchor or an object URL', async () => {
     const createObjectURL = vi.fn(() => 'blob:x');
     Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true, writable: true });
     const createElement = vi.spyOn(document, 'createElement');
-    const backend = new DownloadPersistence();
+    const backend = new InMemoryPersistence();
     await backend.save('slot_1', 'One', '{"a":1}', '$1', null);
     expect(createObjectURL).not.toHaveBeenCalled();
     expect(createElement.mock.calls.filter(c => c[0] === 'a')).toHaveLength(0);
   });
 
   it('round-trips save, load, list and delete in memory', async () => {
-    const backend = new DownloadPersistence();
+    const backend = new InMemoryPersistence();
     await backend.save('slot_1', 'One', 'DATA1', '$1', 'dusty_hollow');
     await backend.save('slot_2', 'Two', 'DATA2', '$2', null);
 
@@ -34,7 +34,7 @@ describe('DownloadPersistence as in-memory fallback', () => {
   });
 
   it('saving the same slot twice replaces its content', async () => {
-    const backend = new DownloadPersistence();
+    const backend = new InMemoryPersistence();
     await backend.save('slot_1', 'One', 'OLD', '$1', null);
     await backend.save('slot_1', 'One', 'NEW', '$1', null);
     expect((await backend.load('slot_1'))?.data).toBe('NEW');
@@ -42,7 +42,7 @@ describe('DownloadPersistence as in-memory fallback', () => {
   });
 
   it('loading a missing slot returns null and deleting one does not throw', async () => {
-    const backend = new DownloadPersistence();
+    const backend = new InMemoryPersistence();
     expect(await backend.load('nope')).toBeNull();
     await expect(backend.delete('nope')).resolves.toBeUndefined();
   });

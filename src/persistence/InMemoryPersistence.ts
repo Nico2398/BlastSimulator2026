@@ -10,7 +10,7 @@ import { buildSaveSlot } from './SaveSlotBuilder.js';
  * Saving never triggers a download (autosave would spam the player);
  * manual export lives in SavesModal.exportSave.
  */
-export class DownloadPersistence implements SaveBackend {
+export class InMemoryPersistence implements SaveBackend {
   private readonly slots = new Map<string, SaveSlot>();
 
   async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {

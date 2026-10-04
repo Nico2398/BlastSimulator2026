@@ -848,13 +848,54 @@ describe('SavesModal', () => {
         expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
       });
 
-      it('shows the failure once per streak: a second failure does not re-announce it', async () => {
+      it('timed autosave shows the failure once per streak: a second failure does not re-announce it', async () => {
+        const { modal } = await autosaveSetup();
+        const tick = (n: number) => ({ ...createGame({ seed: 1, mineType: 'desert' }), tickCount: n });
+        const first = tick(0);
+        modal.onTick(first);
+        await flush();
+        expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
+        (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent = '';
+        modal.onTick({ ...first, tickCount: AUTO_SAVE_INTERVAL_TICKS });
+        await flush();
+        expect(statusOf(modal)).toBe('');
+      });
+
+      it('a quick-save failure always reports, even within a failure streak', async () => {
         const { modal } = await autosaveSetup();
         await modal.quickSave();
         expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
         (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent = '';
         await modal.quickSave();
-        expect(statusOf(modal)).toBe('');
+        expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
+      });
+
+      it('onAutoSaveFailed fires once per autosave streak and on every quick-save failure', async () => {
+        const { failing, modal, state } = await autosaveSetup();
+        const cb = vi.fn();
+        modal.setOnAutoSaveFailed(cb);
+        modal.onTick(state);
+        await flush();
+        modal.onTick({ ...state, tickCount: AUTO_SAVE_INTERVAL_TICKS });
+        await flush();
+        expect(cb).toHaveBeenCalledTimes(1);
+        await modal.quickSave();
+        await modal.quickSave();
+        expect(cb).toHaveBeenCalledTimes(3);
+        failing.on = false;
+        await modal.quickSave();
+        failing.on = true;
+        modal.onTick({ ...state, tickCount: AUTO_SAVE_INTERVAL_TICKS * 2 });
+        await flush();
+        expect(cb).toHaveBeenCalledTimes(4);
+      });
+
+      it('a quick-save success on the memory fallback says it is session-only', async () => {
+        const { failing, modal } = await autosaveSetup();
+        failing.on = false;
+        modal.setBackendKind('memory');
+        await modal.quickSave();
+        expect(statusOf(modal)).toBe(t('saveload.saved_session_only'));
       });
 
       it('the next successful autosave clears the failure, and a later failure shows again', async () => {
