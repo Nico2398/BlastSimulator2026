@@ -427,6 +427,14 @@ export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
  *  region computation and, expanded further, for TerrainBody's collider-building scope. */
 export const BLAST_ZONE_RADIUS = 5;
 
+/** Pre-fire estimate: horizontal radius (m) around a hole within which columns are
+ *  assumed to break. Placeholder — tuned during implementation (#1354). */
+export const BLAST_ESTIMATE_BREAK_RADIUS_M = 4;
+
+/** Pre-fire estimate: fraction of a covering hole's depth assumed to break in a
+ *  column. Placeholder — tuned during implementation (#1354). */
+export const BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR = 0.5;
+
 // ─── Fragment generation (blast step 3) ────────────────────────────────────────
 
 /** How many pieces each axis of a broken voxel is diced into before fragments are
