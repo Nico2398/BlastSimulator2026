@@ -251,7 +251,6 @@ export function executeBlast(
   /** Hole ids currently flooded (raining, no tubing installed — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): BlastResult | null {
-  void wetHoleIds; // TODO: implement (wet-hole modelling)
   // 1. Validate
   const errors = validateBlastPlan(plan);
   if (errors.length > 0) return null;
@@ -533,12 +532,11 @@ export function buildPlanEnergyField(
   grid: VoxelGrid,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): EnergyField | null {
-  void wetHoleIds; // TODO: implement (wet-hole modelling)
   const holeSurfaceYs: Record<string, number> = {};
   for (const hole of plan.holes) {
     holeSurfaceYs[hole.id] = firstEmptyLayerAboveGround(grid, hole.x, hole.z);
   }
-  return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs);
+  return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs, wetHoleIds);
 }
 
 export function buildBlastEnergyField(
@@ -548,7 +546,6 @@ export function buildBlastEnergyField(
   holeSurfaceYs: Record<string, number>,
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): EnergyField | null {
-  void wetHoleIds; // TODO: implement (wet-hole modelling)
   // calculateBlastZone reports an inclusive box; the field's is half-open.
   const requested: BlastBox = {
     minX: bbox.minX, minY: bbox.minY, minZ: bbox.minZ,

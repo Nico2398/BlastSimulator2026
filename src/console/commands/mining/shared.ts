@@ -11,7 +11,7 @@ import type { MiningContext } from './types.js';
 import type { GameContext } from '../world.js';
 import { villagePositions } from '../../../core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../../core/mining/BlastExecution.js';
-import { wetHoles } from '../../../core/mining/WetHoles.js';
+import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 
 export function requireGame(ctx: MiningContext): string | null {
@@ -201,7 +201,7 @@ export function assembleValidBlastPlan(
 
 /** Ids of drilled holes currently wet (rain-flooded); weather defaults to 'sunny' before the cycle exists. */
 export function wetHoleIdSet(ctx: MiningContext): Set<string> {
-  return new Set(wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny'));
+  return wetHoleIdsFor(ctx.state!, ctx.weatherCycle?.current ?? 'sunny');
 }
 
 /** Vibration targets for the current level's villages (none when no playable area is loaded). */
