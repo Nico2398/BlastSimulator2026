@@ -191,7 +191,7 @@
     {
       "command": "sequence auto delay_step:25",
       "timeout": 30,
-      "description": "Auto Sequence (V-Pattern) fills in every hole's delay at once, tab counter reads 4/4",
+      "description": "Auto Sequence (V-Pattern) fills in every hole's delay at once, tab counter reads 4/4. #1420: each drilled hole now shows its delay label (e.g. \"25 ms\", coloured by 100 ms bucket) above it in the scene; the camera is framed on the 2x2 hole grid (centre 11.5,11.5) so the screenshot shows all four labels.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -200,6 +200,13 @@
         {
           "type": "wait",
           "durationMs": 300
+        },
+        {
+          "type": "focusTile",
+          "x": 11.5,
+          "z": 11.5,
+          "distance": 12,
+          "pitch": 50
         },
         {
           "type": "screenshot"

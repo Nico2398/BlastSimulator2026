@@ -13,6 +13,7 @@ import type { EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { BAR_Y_OFFSET } from './TaskProgressBar.js';
 import { faceCamera } from './Billboard.js';
 import { EmployeeBillboardRoster, forEachEmployeeActivity } from './EmployeeBillboardRoster.js';
+import { createCanvas2d } from './createCanvas2d.js';
 
 /**
  * Which non-working pictogram an employee shows. Mirrors
@@ -83,19 +84,14 @@ const FALLBACK_COLOR: Record<PictogramKind, number> = {
  * drawGlyph crashing.
  */
 function buildIconMaterial(kind: PictogramKind): THREE.MeshBasicMaterial {
-  if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    canvas.width = CANVAS_SIZE;
-    canvas.height = CANVAS_SIZE;
-    const ctx = canvas.getContext('2d');
-    if (ctx !== null) {
-      drawGlyph(ctx, kind);
+  const surface = createCanvas2d(CANVAS_SIZE, CANVAS_SIZE);
+  if (surface !== null) {
+    drawGlyph(surface.ctx, kind);
 
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
+    const texture = new THREE.CanvasTexture(surface.canvas);
+    texture.needsUpdate = true;
 
-      return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
-    }
+    return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
   }
 
   return new THREE.MeshBasicMaterial({ color: FALLBACK_COLOR[kind], transparent: true, depthWrite: false });

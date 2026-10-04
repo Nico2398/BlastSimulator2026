@@ -14,6 +14,7 @@ import { getBuildingPeopleCapacity } from '../core/entities/Building.js';
 import { t } from '../core/i18n/I18n.js';
 import { faceCamera } from './Billboard.js';
 import { EmployeeBillboardRoster } from './EmployeeBillboardRoster.js';
+import { createCanvas2d } from './createCanvas2d.js';
 
 const LABEL_WIDTH = 1.0;
 const LABEL_HEIGHT = 0.36;
@@ -53,15 +54,12 @@ interface OccupancyLabel {
  * so the fallback still triggers on that path instead of drawLabel crashing.
  */
 function buildLabelMaterial(): Pick<OccupancyLabel, 'material' | 'canvas' | 'texture'> {
-  if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
-    if (canvas.getContext('2d') !== null) {
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
-      return { material, canvas, texture };
-    }
+  const surface = createCanvas2d(CANVAS_WIDTH, CANVAS_HEIGHT);
+  if (surface !== null) {
+    const { canvas } = surface;
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    return { material, canvas, texture };
   }
 
   return {

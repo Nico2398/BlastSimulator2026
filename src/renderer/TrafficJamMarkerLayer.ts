@@ -8,6 +8,7 @@ import { t } from '../core/i18n/I18n.js';
 import type { TrafficJam } from '../core/events/TrafficJams.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
 import type { SurfaceHeightSampler } from './GroundTint.js';
+import { createCanvas2d } from './createCanvas2d.js';
 
 const RING_COLOR = 0xff8c1a;
 const RING_INNER = 1.1;
@@ -30,22 +31,18 @@ interface JamMarker {
 
 /** Builds the warning-glyph label material; a flat colour where no 2D canvas exists (Node-only tests). */
 function buildLabelMaterial(): { material: THREE.MeshBasicMaterial; texture: THREE.CanvasTexture | null } {
-  if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    canvas.width = CANVAS_W;
-    canvas.height = CANVAS_H;
-    const ctx = canvas.getContext('2d');
-    if (ctx !== null) {
-      ctx.fillStyle = 'rgba(26,20,8,0.85)';
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-      ctx.fillStyle = '#ffb02e';
-      ctx.font = `bold ${Math.round(CANVAS_H * 0.6)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`⚠ ${t('ui.marker.traffic_jam')}`, CANVAS_W / 2, CANVAS_H / 2 + 1);
-      const texture = new THREE.CanvasTexture(canvas);
-      return { material: new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, side: THREE.DoubleSide }), texture };
-    }
+  const surface = createCanvas2d(CANVAS_W, CANVAS_H);
+  if (surface !== null) {
+    const { canvas, ctx } = surface;
+    ctx.fillStyle = 'rgba(26,20,8,0.85)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillStyle = '#ffb02e';
+    ctx.font = `bold ${Math.round(CANVAS_H * 0.6)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`⚠ ${t('ui.marker.traffic_jam')}`, CANVAS_W / 2, CANVAS_H / 2 + 1);
+    const texture = new THREE.CanvasTexture(canvas);
+    return { material: new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, side: THREE.DoubleSide }), texture };
   }
   return { material: new THREE.MeshBasicMaterial({ color: RING_COLOR, transparent: true, depthTest: false, side: THREE.DoubleSide }), texture: null };
 }
