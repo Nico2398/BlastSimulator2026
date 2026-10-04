@@ -4,8 +4,10 @@ import { LevelEndScreen } from '../../../../src/ui/screens/LevelEndScreen.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { LevelStats } from '../../../../src/core/campaign/SuccessTracker.js';
+import { placeBuilding } from '../../../../src/core/entities/Building.js';
+import type { ShiftMode } from '../../../../src/core/entities/SitePolicy.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
-import { TICKS_PER_DAY } from '../../../../src/core/config/balance.js';
+import { TICKS_PER_DAY, REVOLT_TICKS } from '../../../../src/core/config/balance.js';
 
 function mount(): { container: HTMLDivElement; screen: LevelEndScreen } {
   const container = document.createElement('div');
@@ -612,6 +614,118 @@ describe('LevelEndScreen', () => {
       expect(text).toContain('TARGET REACHED');
       expect(text).toContain('100,000');
       screen.dispose();
+    });
+  });
+  describe('worker_revolt tip names the real cause (#1421)', () => {
+    const TIP = 'ui.level_end.defeat.worker_revolt.tip';
+    const HOURS = { hours: `${REVOLT_TICKS}` };
+
+    function revoltState(mode: ShiftMode, housing: 'none' | 'active' | 'inactive'): GameState {
+      const state = stateAtDefeat('worker_revolt');
+      state.scores.wellBeing = 0;
+      state.sitePolicy.shiftMode = mode;
+      if (housing !== 'none') {
+        state.buildings.unlockedTiers.living_quarters = 3;
+        placeBuilding(state.buildings, 'living_quarters', 0, 0, 64, 64, 1);
+        const q = state.buildings.buildings.find(b => b.type === 'living_quarters')!;
+        q.active = housing === 'active';
+      }
+      return state;
+    }
+
+    function renderText(state: GameState): string {
+      const { container, screen } = mount();
+      screen.update(state);
+      const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+      screen.dispose();
+      container.remove();
+      return text;
+    }
+
+    it('REVOLT_TICKS is 120', () => {
+      expect(REVOLT_TICKS).toBe(120);
+    });
+
+    it('shift_8h with living quarters shows the morale_drain tip, never mentions continuous', () => {
+      const text = renderText(revoltState('shift_8h', 'active'));
+      expect(text).toContain(t(`${TIP}.morale_drain`, HOURS));
+      expect(text.toLowerCase()).not.toContain('continuous');
+    });
+
+    it('shift_8h without housing shows the no_housing tip naming housing, not continuous', () => {
+      const text = renderText(revoltState('shift_8h', 'none'));
+      const tip = t(`${TIP}.no_housing`, HOURS);
+      expect(text).toContain(tip);
+      expect(tip.toLowerCase()).toMatch(/housing|living quarters/);
+      expect(text.toLowerCase()).not.toContain('continuous');
+    });
+
+    it('continuous shows the no_rest_policy tip mentioning continuous', () => {
+      const text = renderText(revoltState('continuous', 'active'));
+      const tip = t(`${TIP}.no_rest_policy`, HOURS);
+      expect(text).toContain(tip);
+      expect(tip.toLowerCase()).toContain('continuous');
+    });
+
+    it('custom shows the no_rest_policy tip', () => {
+      expect(renderText(revoltState('custom', 'active'))).toContain(t(`${TIP}.no_rest_policy`, HOURS));
+    });
+
+    it('shift_12h behaves like shift_8h for both housing cases', () => {
+      expect(renderText(revoltState('shift_12h', 'active'))).toContain(t(`${TIP}.morale_drain`, HOURS));
+      expect(renderText(revoltState('shift_12h', 'none'))).toContain(t(`${TIP}.no_housing`, HOURS));
+    });
+
+    it('continuous without housing still shows no_rest_policy', () => {
+      const text = renderText(revoltState('continuous', 'none'));
+      expect(text).toContain(t(`${TIP}.no_rest_policy`, HOURS));
+      expect(text).not.toContain(t(`${TIP}.no_housing`, HOURS));
+    });
+
+    it('inactive living quarters count as no housing', () => {
+      const text = renderText(revoltState('shift_8h', 'inactive'));
+      expect(text).toContain(t(`${TIP}.no_housing`, HOURS));
+      expect(text).not.toContain(t(`${TIP}.morale_drain`, HOURS));
+    });
+
+    it('interpolates REVOLT_TICKS (120) into every tip, leaving no raw placeholder', () => {
+      const cases: [ShiftMode, 'none' | 'active'][] = [['continuous', 'active'], ['shift_8h', 'none'], ['shift_8h', 'active']];
+      for (const [mode, housing] of cases) {
+        const text = renderText(revoltState(mode, housing));
+        expect(text).not.toContain('{hours}');
+        expect(text).toContain('120');
+      }
+    });
+
+    it('the old single tip key is no longer what is rendered', () => {
+      const text = renderText(revoltState('shift_8h', 'active'));
+      expect(text).not.toContain(t(TIP));
+    });
+
+    it('stats row says 8-hour shifts while the tip lacks "continuous"', () => {
+      const text = renderText(revoltState('shift_8h', 'active'));
+      expect(text).toContain('8-hour shifts');
+      expect(text.toLowerCase()).not.toContain('continuous');
+    });
+
+    it('other defeat reasons keep their existing tip keys', () => {
+      for (const reason of ['bankruptcy', 'arrest', 'ecological_shutdown'] as const) {
+        const text = renderText(stateAtDefeat(reason));
+        expect(text).toContain(t(`ui.level_end.defeat.${reason}.tip`));
+      }
+    });
+
+    it('fr locale gives distinct non-empty tips per cause', () => {
+      setLocale('fr');
+      const keys = ['no_rest_policy', 'no_housing', 'morale_drain'].map(k => `${TIP}.${k}`);
+      const tips = keys.map(k => t(k, HOURS));
+      for (let i = 0; i < keys.length; i++) {
+        expect(tips[i]).not.toBe('');
+        expect(tips[i]).not.toBe(keys[i]);
+        expect(tips[i]).not.toContain('{hours}');
+      }
+      expect(new Set(tips).size).toBe(3);
+      expect(renderText(revoltState('shift_8h', 'none'))).toContain(tips[1]);
     });
   });
 });

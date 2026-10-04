@@ -126,3 +126,5 @@ Both `forceShiftRestIfNeeded` and `forceShiftRestIfNeededByPolicy` (`src/core/en
 ## Types
 
 The single `fatigue` gauge (0–100) and `collapsing` live on `Employee` in `src/core/entities/Employee.ts`, alongside the rest state the needs system drives — `restTicksRemaining`, `restNeedKey`, `pendingRestDuration`, `pendingRestNeedKey`, `ticksWorked`. `NeedKey` (currently just `'fatigue'`) and `EmployeeWorkState` (`'working' | 'idle' | 'resting' | 'traveling'`) are defined in `src/core/entities/EmployeeNeeds.ts` and re-exported from `Employee.ts`. That file is the authority on their names and shapes; thresholds and rates are in `src/core/config/balance.ts`.
+
+The worker-revolt defeat tip names the real cause (`revoltCause`, `src/core/scores/RevoltCause.ts`, #1421): continuous/custom shift mode -> `no_rest_policy` (highest precedence), else no active Living Quarters -> `no_housing`, else `morale_drain`; the level-end screen shows `ui.level_end.defeat.worker_revolt.tip.<cause>`.
