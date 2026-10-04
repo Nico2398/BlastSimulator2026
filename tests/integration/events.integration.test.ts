@@ -32,6 +32,7 @@ import {
   REVOLT_TICKS,
   SCORE_DECAY_RATE,
   TRAFFIC_JAM_MIN_TICKS,
+  FOLLOWUP_DELAY_TICKS,
 } from '../../src/core/config/balance.js';
 import type { BuiltRamp } from '../../src/core/state/GameState.js';
 import { rampFootprint } from '../../src/core/mining/RampWidening.js';
@@ -265,13 +266,16 @@ describe('Event system', () => {
 
   it('tickEventSystem processes follow-up queue before timers', () => {
     const eventState = createEventSystemState();
-    eventState.followUpQueue.push('union_coffee_uprising');
+    queueFollowUp(eventState, 'union_coffee_uprising');
 
     // pendingEvent should be null initially
     expect(eventState.pendingEvent).toBeNull();
 
     const evCtx = makeEventCtx();
-    const result = tickEventSystem(eventState, evCtx, new Random(42));
+    let result = null;
+    for (let i = 0; i < FOLLOWUP_DELAY_TICKS && !result; i++) {
+      result = tickEventSystem(eventState, evCtx, new Random(42));
+    }
 
     // Should pick up the follow-up event
     expect(result).not.toBeNull();
@@ -424,7 +428,7 @@ describe('Event system', () => {
     expect(eventState.followUpQueue).toHaveLength(2);
 
     const evCtx = makeEventCtx();
-    tickEventSystem(eventState, evCtx, new Random(42));
+    for (let i = 0; i < FOLLOWUP_DELAY_TICKS; i++) tickEventSystem(eventState, evCtx, new Random(42));
 
     // First follow-up should have been consumed; second stays in queue
     expect(eventState.followUpQueue).toHaveLength(1);
