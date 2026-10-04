@@ -61,6 +61,11 @@ export interface TutorialStep {
    * decides.
    */
   waitsOnWork?: boolean;
+  /**
+   * Predicate: true when the clock must keep running regardless of the tick
+   * budget (e.g. nothing the player waits on can progress while held).
+   */
+  clockMustRun?: (state: GameState) => boolean;
   captureSnapshot?: ((state: GameState) => Record<string, unknown>) | undefined;
   isComplete: (state: GameState, snapshot: Record<string, unknown>) => boolean;
   /**

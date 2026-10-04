@@ -390,6 +390,8 @@ export function decideClock(
   budget: number = DEFAULT_TICK_BUDGET,
   waitsOnWork: boolean = false,
   progress: ClockProgress = { signature: null, tick: stepStartTick },
+  // TODO(#1336): force the clock to run when true.
+  _clockMustRun: boolean = false,
 ): ClockDecision {
   const tickCount = state.tickCount ?? 0;
   const spent = Math.max(0, tickCount - stepStartTick);

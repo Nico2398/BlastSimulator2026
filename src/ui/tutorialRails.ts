@@ -32,6 +32,7 @@ export interface RailsStep {
   highlightTarget?: string;
   tickBudget?: number;
   waitsOnWork?: boolean;
+  clockMustRun?: (state: GameState) => boolean;
 }
 
 /** What the card should show about the current stage and the clock. */
