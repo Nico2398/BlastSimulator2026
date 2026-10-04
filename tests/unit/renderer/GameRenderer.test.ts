@@ -21,7 +21,7 @@ import { GhostMesh } from '../../../src/renderer/GhostMesh.js';
 
 import { makeMockSceneManager, makeCtx } from '../../helpers/rendererFixtures.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 describe('GameRenderer — diagnostics accessors', () => {
   it('lastGridId is null before any game is loaded', () => {
@@ -141,7 +141,7 @@ describe('GameRenderer — safety zone evacuation wiring', () => {
     const { employee } = hireEmployee(ctx.state!.employees, 'driller', rng, 5, 5);
     defineZone(ctx.state!.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
     // Hole at (5,5), margin 15 → danger box (-10,-10)-(20,20), overlaps (0,0)-(10,10).
-    addHole(holeIds, ctx.state!.drillHoles, 5, 5, 10, 0.1);
+    addHole(holeCounter, ctx.state!.drillHoles, 5, 5, 10, 0.1);
 
     const evacSpy = vi.spyOn(CharacterMesh.prototype, 'setEvacuating');
     renderer.syncFromContext(ctx);
@@ -156,7 +156,7 @@ describe('GameRenderer — safety zone evacuation wiring', () => {
     const rng = new Random(1);
     const { employee } = hireEmployee(ctx.state!.employees, 'driller', rng, 25, 25);
     defineZone(ctx.state!.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
-    addHole(holeIds, ctx.state!.drillHoles, 5, 5, 10, 0.1);
+    addHole(holeCounter, ctx.state!.drillHoles, 5, 5, 10, 0.1);
 
     const evacSpy = vi.spyOn(CharacterMesh.prototype, 'setEvacuating');
     renderer.syncFromContext(ctx);
@@ -503,7 +503,7 @@ describe('GameRenderer — scene picking (P2)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
-    const hole = addHole(holeIds, ctx.state!.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, ctx.state!.drillHoles, 10, 10, 8, 0.15);
 
     renderer.showBlastPlanOverlay(ctx);
 
@@ -516,7 +516,7 @@ describe('GameRenderer — scene picking (P2)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
-    const hole = addHole(holeIds, ctx.state!.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, ctx.state!.drillHoles, 10, 10, 8, 0.15);
 
     renderer.showBlastPlanOverlay(ctx);
 
@@ -530,7 +530,7 @@ describe('GameRenderer — scene picking (P2)', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     const ctx = makeCtx();
     renderer.syncFromContext(ctx);
-    addHole(holeIds, ctx.state!.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, ctx.state!.drillHoles, 10, 10, 8, 0.15);
     renderer.showBlastPlanOverlay(ctx);
     expect(renderer.pickables().some(o => o.userData['entityKind'] === 'hole')).toBe(true);
 

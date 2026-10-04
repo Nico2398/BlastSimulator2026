@@ -26,7 +26,7 @@ import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { computeVoxelColumnSurfaceY, MAX_TERRAIN_GEN_DIMENSION, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 const BLAST_ORIGIN_X = 20;
 const BLAST_ORIGIN_Z = 20;
@@ -67,12 +67,12 @@ function startTreraniumDepths(): GameContext {
 
 /** Runs the identical blast + site-expansion sequence against `ctx`'s grid. */
 function runBlastAndExpansion(ctx: GameContext): void {
-  holeIds.nextHoleId = 1;
+  holeCounter.nextHoleId = 1;
 
   const blastSurfaceY = computeVoxelColumnSurfaceY(ctx.grid!, BLAST_ORIGIN_X, BLAST_ORIGIN_Z);
   expect(blastSurfaceY, 'expected solid ground under the blast pattern').toBeGreaterThanOrEqual(0);
 
-  const holes = createGridPlan(holeIds, { x: BLAST_ORIGIN_X, z: BLAST_ORIGIN_Z }, 2, 3, 4, 8, 0.15);
+  const holes = createGridPlan(holeCounter, { x: BLAST_ORIGIN_X, z: BLAST_ORIGIN_Z }, 2, 3, 4, 8, 0.15);
   const holeIds = holes.map(h => h.id);
   const holeDepths: Record<string, number> = {};
   for (const h of holes) holeDepths[h.id] = h.depth;

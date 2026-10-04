@@ -77,7 +77,7 @@ describe('hole id uniqueness (#1352)', () => {
   });
 
   it('removing the highest hole does not reuse its id', () => {
-    const { runner, ctx } = newGame();
+    const { runner } = newGame();
     for (const x of [10, 14]) runner.run(`drill_plan add x:${x} z:10`);
     runner.run('drill_plan clear');
     const result = runner.run('drill_plan add x:10 z:10');

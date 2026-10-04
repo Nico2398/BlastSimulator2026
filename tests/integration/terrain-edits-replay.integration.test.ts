@@ -28,7 +28,7 @@ import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { defineRampSegments, carveRampSegment, type RampDef } from '../../src/core/mining/Ramp.js';
 import { levelGroundRect } from '../../src/core/mining/LevelGround.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 const DUSTY_HOLLOW_LEVEL = getLevel('dusty_hollow');
 if (!DUSTY_HOLLOW_LEVEL) throw new Error('dusty_hollow level definition not found');
@@ -104,7 +104,7 @@ function assertGridsMatchVoxelForVoxel(replayed: VoxelGrid, live: VoxelGrid): vo
 
 describe('TerrainEdits — record and replay against a dusty_hollow-shaped grid (#1180)', () => {
   it('replaying the live grid\'s edit record onto a fresh generated grid reproduces it voxel for voxel', () => {
-    holeIds.nextHoleId = 1;
+    holeCounter.nextHoleId = 1;
     const config = dustyHollowTerrainConfig();
     const live = generateTerrain(config);
 
@@ -113,7 +113,7 @@ describe('TerrainEdits — record and replay against a dusty_hollow-shaped grid 
     const blastSurfaceY = computeVoxelColumnSurfaceY(live, blastOriginX, blastOriginZ);
     expect(blastSurfaceY, 'expected solid ground under the blast pattern').toBeGreaterThanOrEqual(0);
 
-    const holes = createGridPlan(holeIds, { x: blastOriginX, z: blastOriginZ }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: blastOriginX, z: blastOriginZ }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;

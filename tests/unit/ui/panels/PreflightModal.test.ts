@@ -8,7 +8,7 @@ import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { readFileSync } from 'node:fs';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -25,14 +25,14 @@ function makeModal(): { modal: PreflightModal; container: HTMLElement; gameConso
 
 function chargedPlan(): GameState {
   const state = makeState();
-  const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+  const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
   const chargeResult = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
   state.sequenceDelays[hole.id] = 0;
   return state;
 }
 
-beforeEach(() => holeIds.nextHoleId = 1);
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('PreflightModal', () => {
   it('is hidden until show() is called', () => {
@@ -173,7 +173,7 @@ describe('PreflightModal — undrilled-holes warning (#1346)', () => {
   function withPlanned(n: number): GameState {
     const state = chargedPlan();
     for (let i = 0; i < n; i++) {
-      const h = addHole(holeIds, [], 20 + i, 20, 8, 0.15);
+      const h = addHole(holeCounter, [], 20 + i, 20, 8, 0.15);
       state.plannedDrillHoles.push(h);
     }
     return state;

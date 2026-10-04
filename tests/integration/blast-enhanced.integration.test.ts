@@ -32,7 +32,7 @@ import { tickCommand } from '../../src/console/commands/tick.js';
 import { blastCommand, blastPreviewCommand } from '../../src/console/commands/mining.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ const VILLAGE_FAR: VillagePosition[] = [
 // ── Blast enhanced ────────────────────────────────────────────────────────────
 
 describe('Blast enhanced', () => {
-  beforeEach(() => holeIds.nextHoleId = 1);
+  beforeEach(() => { holeCounter.nextHoleId = 1; });
   // ── 1. Multi-rock composition ─────────────────────────────────────────────
 
   it('multi-rock composition computes weighted threshold', () => {
@@ -160,7 +160,7 @@ describe('Blast enhanced', () => {
     fillMultiRock(grid, 'cruite', 'titanite', 15, 5, 25, 0, 10, 5, 25);
 
     // boomite 6kg (340E/kg × 6 = 2040E) — enough to fracture cruite but not titanite
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 2, 4, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 4, 6, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -183,7 +183,7 @@ describe('Blast enhanced', () => {
   it('empty plan returns null blast result', () => {
     const grid = new VoxelGrid(10, 10);
     // Holes exist but no charges or delays → validation fails
-    const holes = createGridPlan(holeIds, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     const plan = assembleBlastPlan(holes, {}, {});
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).toBeNull();
@@ -197,7 +197,7 @@ describe('Blast enhanced', () => {
 
     // boomite 8kg (340E/kg × 8 = 2720E) on molite (threshold 500)
     // → energy ratio ~1.25 per hole → good fragmentation, minimal projections
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -221,7 +221,7 @@ describe('Blast enhanced', () => {
 
     // dynatomics 25kg (1300E/kg × 25 = 32500E) on cruite (threshold 200)
     // → grossly overcharged → projections, bad/catastrophic rating
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -244,7 +244,7 @@ describe('Blast enhanced', () => {
 
     // pop_rock 2kg (200E/kg × 2 = 400E) on titanite (threshold 4000)
     // → way undercharged → almost no fragmentation
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 1, 1, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 1, 3, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -268,7 +268,7 @@ describe('Blast enhanced', () => {
 
     // pop_rock 0.5kg (minimum charge) on titanite (threshold 4000)
     // → extremely weak, far below any fracture threshold
-    const holes = createGridPlan(holeIds, { x: 10, z: 10 }, 1, 1, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 1, 1, 3, 6, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -311,7 +311,7 @@ describe('Blast enhanced', () => {
     const beforeVoxel = grid.getVoxel(12, 2, 12);
     expect(beforeVoxel?.density).toBe(1.0);
 
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -371,7 +371,7 @@ describe('Blast enhanced', () => {
 // the blast must feed the nuisance score.
 
 describe('Blast enhanced — village vibration (#1343)', () => {
-  beforeEach(() => holeIds.nextHoleId = 1);
+  beforeEach(() => { holeCounter.nextHoleId = 1; });
 
   /** A Grumpstone Ridge game (unlocked through the campaign) with a 2x2 plan drilled and charged, ready to preview/blast. */
   function chargedRidge(opts: { tier?: number; explosive?: string; noVillages?: boolean } = {}): GameContext {
@@ -454,7 +454,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
 
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'cruite', 0, 39, 0, 10, 0, 39);
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 2, 4, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 4, 6, 0.15);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'boomite', 5, 1.5);

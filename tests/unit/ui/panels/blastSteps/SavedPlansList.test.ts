@@ -11,7 +11,7 @@ import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import type { SavedBlastPlan } from '../../../../../src/core/state/GameState.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -42,7 +42,7 @@ function makePlan(holes: number, charged = 0): SavedBlastPlan {
   return { drillHoles, chargesByHole, sequenceDelays: {} };
 }
 
-beforeEach(() => holeIds.nextHoleId = 1);
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('DrillStep — Saved Plans (gap G6)', () => {
   it('mounts a Save control inside the Drill step', () => {
@@ -57,7 +57,7 @@ describe('DrillStep — Saved Plans (gap G6)', () => {
   it('Save with an empty name field dispatches blast_plan save under the console default — clickable with zero typing', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state, 'sunny');
 
     saveBtn(step).click();

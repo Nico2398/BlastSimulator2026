@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRunner } from '../../../../src/console-api.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -135,7 +135,7 @@ describe('SelectionBar', () => {
   it('shows hole id, depth, and sequence delay, and the Focus action', () => {
     const { bar, root } = makeBar();
     const state = makeState();
-    const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     state.sequenceDelays[hole.id] = 25;
 
     bar.show(entity('hole', holeNumericId(hole.id)), state);
@@ -150,7 +150,7 @@ describe('SelectionBar', () => {
   it('shows hole depth with no delay suffix when the hole is not yet sequenced', () => {
     const { bar, root } = makeBar();
     const state = makeState();
-    const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
 
     bar.show(entity('hole', holeNumericId(hole.id)), state);
     expect(root.textContent).toContain('8m');
@@ -243,7 +243,7 @@ describe('SelectionBar', () => {
     const state = makeState();
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
     const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
-    const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
 
     for (const pick of [
       entity('employee', employee.id),

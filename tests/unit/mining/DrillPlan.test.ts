@@ -12,18 +12,18 @@ import {
   DRILL_HOLE_REFERENCE_DIAMETER_M,
 } from '../../../src/core/config/balance.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
-beforeEach(() => holeIds.nextHoleId = 1);
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('DrillPlan', () => {
   it('createGridPlan creates correct number of holes', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
     expect(holes.length).toBe(12);
   });
 
   it('createGridPlan positions are correct', () => {
-    const holes = createGridPlan(holeIds, { x: 20, z: 25 }, 3, 4, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 20, z: 25 }, 3, 4, 3, 8, 0.15);
     // First row: (20,25), (23,25), (26,25), (29,25)
     expect(holes[0]!.x).toBe(20);
     expect(holes[0]!.z).toBe(25);
@@ -35,15 +35,15 @@ describe('DrillPlan', () => {
   });
 
   it('grid spacing is correctly applied', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 2, 2, 5, 10, 0.1);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 2, 2, 5, 10, 0.1);
     expect(holes[0]!.x).toBe(0);
     expect(holes[1]!.x).toBe(5);
     expect(holes[2]!.z).toBe(5);
   });
 
   it('addHole appends a hole with unique ID', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
-    const added = addHole(holeIds, holes, 10, 15, 6, 0.1);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 1, 3, 8, 0.15);
+    const added = addHole(holeCounter, holes, 10, 15, 6, 0.1);
     expect(holes.length).toBe(2);
     expect(added.id).not.toBe(holes[0]!.id);
     expect(added.x).toBe(10);
@@ -52,7 +52,7 @@ describe('DrillPlan', () => {
   });
 
   it('removeHole removes the matching hole and returns true', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
     const targetId = holes[0]!.id;
 
     const removed = removeHole(holes, targetId);
@@ -63,7 +63,7 @@ describe('DrillPlan', () => {
   });
 
   it('removeHole returns false and leaves the plan untouched when the ID is unknown', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
 
     const removed = removeHole(holes, 'H999');
 
@@ -83,8 +83,8 @@ describe('DrillPlan', () => {
   });
 
   it('holeNumericId round-trips IDs produced by createGridPlan and addHole', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
-    const added = addHole(holeIds, holes, 5, 5, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const added = addHole(holeCounter, holes, 5, 5, 8, 0.15);
 
     expect(holeNumericId(holes[0]!.id)).toBe(1);
     expect(holeNumericId(holes[1]!.id)).toBe(2);
@@ -96,13 +96,13 @@ describe('DrillPlan', () => {
   // id generation).
 
   it('createGridPlan produces stable, sequential ids across a full grid', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 2, 2, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 2, 2, 3, 8, 0.15);
     expect(holes.map(h => h.id)).toEqual(['H1', 'H2', 'H3', 'H4']);
   });
 
   it('addHole continues the sequential id counter after a grid plan', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
-    const added = addHole(holeIds, holes, 9, 9, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const added = addHole(holeCounter, holes, 9, 9, 8, 0.15);
     expect(added.id).toBe('H3');
   });
 });

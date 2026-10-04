@@ -10,7 +10,7 @@ import { Random } from '../../../../src/core/math/Random.js';
 import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
 import type { PickResult } from '../../../../src/ui/scene/ScenePicking.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -134,7 +134,7 @@ describe('HoverTag', () => {
   it('shows a hole id and depth for an entity hover', () => {
     const { tag, root } = makeTag();
     const state = makeState();
-    const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     const hover: PickResult = { entity: { kind: 'hole', id: holeNumericId(hole.id), point: new THREE.Vector3(), distance: 1 }, terrain: null };
 
     tag.update(hover, state);
@@ -145,7 +145,7 @@ describe('HoverTag', () => {
   it('shows the sequence delay for a hovered hole once it has one', () => {
     const { tag, root } = makeTag();
     const state = makeState();
-    const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     state.sequenceDelays[hole.id] = 50;
     const hover: PickResult = { entity: { kind: 'hole', id: holeNumericId(hole.id), point: new THREE.Vector3(), distance: 1 }, terrain: null };
 

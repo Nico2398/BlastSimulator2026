@@ -25,7 +25,7 @@ import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
 import { RampArrowLayer } from '../../../src/renderer/RampArrow.js';
 import type { PlannedRamp } from '../../../src/core/state/GameState.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 function makeSurveyResult(overrides: Partial<SurveyResult> = {}): SurveyResult {
   return {
@@ -194,7 +194,7 @@ describe('syncGameRendererEntities() — zone blink tracks live blast threat (#9
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 5, 5);
     state.zone.activeZone = { x1: 0, z1: 0, x2: 10, z2: 10 };
     // Hole at (5,5), margin 15 → danger box (-10,-10)-(20,20), overlaps (0,0)-(10,10).
-    addHole(holeIds, state.drillHoles, 5, 5, 10, 0.1);
+    addHole(holeCounter, state.drillHoles, 5, 5, 10, 0.1);
 
     const characters = new CharacterMesh(new THREE.Scene());
     const spy = vi.spyOn(characters, 'setEvacuating');
@@ -223,7 +223,7 @@ describe('syncGameRendererEntities() — zone blink tracks live blast threat (#9
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 5, 5);
     state.zone.activeZone = { x1: 0, z1: 0, x2: 10, z2: 10 };
     // Hole far away — margin-padded box nowhere near (0,0)-(10,10).
-    addHole(holeIds, state.drillHoles, 1000, 1000, 10, 0.1);
+    addHole(holeCounter, state.drillHoles, 1000, 1000, 10, 0.1);
 
     const characters = new CharacterMesh(new THREE.Scene());
     const spy = vi.spyOn(characters, 'setEvacuating');
@@ -237,7 +237,7 @@ describe('syncGameRendererEntities() — zone blink tracks live blast threat (#9
     const state = createGame({ seed: 42, startingCash: 100_000 });
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 25, 25);
     state.zone.activeZone = { x1: 0, z1: 0, x2: 10, z2: 10 };
-    addHole(holeIds, state.drillHoles, 5, 5, 10, 0.1);
+    addHole(holeCounter, state.drillHoles, 5, 5, 10, 0.1);
 
     const characters = new CharacterMesh(new THREE.Scene());
     const spy = vi.spyOn(characters, 'setEvacuating');
@@ -251,7 +251,7 @@ describe('syncGameRendererEntities() — zone blink tracks live blast threat (#9
     const state = createGame({ seed: 42, startingCash: 100_000 });
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 5, 5);
     state.zone.activeZone = null;
-    addHole(holeIds, state.drillHoles, 5, 5, 10, 0.1);
+    addHole(holeCounter, state.drillHoles, 5, 5, 10, 0.1);
 
     const characters = new CharacterMesh(new THREE.Scene());
     const spy = vi.spyOn(characters, 'setEvacuating');
@@ -265,7 +265,7 @@ describe('syncGameRendererEntities() — zone blink tracks live blast threat (#9
     const state = createGame({ seed: 42, startingCash: 100_000 });
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 5, 5);
     state.zone.activeZone = { x1: 0, z1: 0, x2: 10, z2: 10 };
-    addHole(holeIds, state.drillHoles, 5, 5, 10, 0.1);
+    addHole(holeCounter, state.drillHoles, 5, 5, 10, 0.1);
 
     const characters = new CharacterMesh(new THREE.Scene());
     const spy = vi.spyOn(characters, 'setEvacuating');

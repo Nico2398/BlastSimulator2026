@@ -16,7 +16,7 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { GRAVITY } from '../../../src/core/config/balance.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 function fillRegion(
   grid: VoxelGrid,
@@ -43,7 +43,7 @@ function fillRegion(
   }
 }
 
-beforeEach(() => holeIds.nextHoleId = 1);
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('executeBlast — crater', () => {
   it('breaks through to the surface, so the blast leaves a visible crater', () => {
@@ -51,7 +51,7 @@ describe('executeBlast — crater', () => {
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
 
     // 2×3 grid, spacing 4, origin (12,12) — holes at x∈{12,16,20}, z∈{12,16}.
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -85,7 +85,7 @@ describe('executeBlast — crater', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 30, 5, 25);
 
-    const holes = createGridPlan(holeIds, { x: 15, z: 15 }, 1, 1, 4, 28, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.15);
     const holeDepths: Record<string, number> = { [holes[0]!.id]: holes[0]!.depth };
     const { charges } = batchCharge([holes[0]!.id], holeDepths, 'boomite', 2, 2);
     const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
@@ -105,7 +105,7 @@ describe('executeBlast — crater', () => {
     // (BLAST_ZONE_RADIUS), so nothing should touch it.
     fillRegion(grid, 'molite', 50, 55, 0, 10, 50, 55);
 
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -128,7 +128,7 @@ describe('executeBlast — crater', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, -30, -20, 5, 25, 'blingite', 0.2);
 
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -148,7 +148,7 @@ describe('executeBlast — crater', () => {
 
   it('returns null and leaves terrain untouched for an invalid blast plan', () => {
     const grid = new VoxelGrid(20, 20);
-    const holes = createGridPlan(holeIds, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     fillRegion(grid, 'cruite', 0, 19, 0, 5, 0, 19);
     const plan = assembleBlastPlan(holes, {}, {});
 
@@ -207,7 +207,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
       }
     }
 
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -276,7 +276,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
       }
     }
 
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 1, 1, 4, 1, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 1, 4, 1, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -310,7 +310,7 @@ describe('executeBlast — flooded holes (wetHoleIds, water-sensitive explosive)
   function buildCraterPlan(explosiveId: string) {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -362,7 +362,7 @@ describe('buildBlastReport', () => {
   it('carries the tick, rating, and per-blast totals straight from the result', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -390,7 +390,7 @@ describe('buildBlastReport', () => {
   it('estimates max projection distance as the 45°-launch range of the fastest projected fragment', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
-    const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -495,7 +495,7 @@ describe('villagePositions', () => {
 
 describe('averageVibrationMod', () => {
   function planWith(explosives: Array<string | null>) {
-    const holes = createGridPlan(holeIds, { x: 10, z: 10 }, 1, explosives.length, 4, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 1, explosives.length, 4, 6, 0.15);
     const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {};
     holes.forEach((h, i) => {
       const e = explosives[i];
@@ -534,8 +534,8 @@ describe('averageVibrationMod', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'cruite', 0, 39, 0, 10, 0, 39);
     const run = (explosive: string) => {
-      holeIds.nextHoleId = 1;
-      const holes = createGridPlan(holeIds, { x: 12, z: 12 }, 1, 2, 4, 6, 0.15);
+      holeCounter.nextHoleId = 1;
+      const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 2, 4, 6, 0.15);
       const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {};
       for (const h of holes) charges[h.id] = { explosiveId: explosive, amountKg: 4, stemmingM: 2 };
       const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));

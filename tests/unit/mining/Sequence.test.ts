@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { setDelay, autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
-beforeEach(() => holeIds.nextHoleId = 1);
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('Sequence', () => {
   it('setDelay stores delays correctly', () => {
@@ -16,7 +16,7 @@ describe('Sequence', () => {
   });
 
   it('auto V-pattern generates increasing delays from free face', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
     const delays = autoVPattern(holes, 25);
     // First row (z=0) should have lowest delays
     const firstRowHoles = holes.filter(h => h.z === 0);
@@ -27,7 +27,7 @@ describe('Sequence', () => {
   });
 
   it('auto sequence with delay_step:25ms for 3x4 grid has correct timing', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 3, 4, 3, 8, 0.15);
     const delays = autoVPattern(holes, 25);
     // All 12 holes should have delays
     expect(Object.keys(delays).length).toBe(12);

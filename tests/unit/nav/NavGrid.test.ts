@@ -38,7 +38,7 @@ import { hireEmployee, createEmployeeState, type Employee } from '../../../src/c
 import { Random } from '../../../src/core/math/Random.js';
 import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 const RAMP_WIDTH = RAMP_DEFAULT_WIDTH;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1265,12 +1265,12 @@ describe('NavGrid.patchNavGrid — ramp formation within patch', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('executeBlast — clearedRegion', () => {
-  beforeEach(() => holeIds.nextHoleId = 1);
+  beforeEach(() => { holeCounter.nextHoleId = 1; });
 
   it('returns a BlastResult with clearedRegion reflecting the blast zone', () => {
     const grid = makeTestGrid();                  // 20×10×20, solid y=0..4
     const holes: DrillHole[] = [];
-    addHole(holeIds, holes, 5, 5, 5, 0.15);               // hole at (5,5), depth 5
+    addHole(holeCounter, holes, 5, 5, 5, 0.15);               // hole at (5,5), depth 5
     const plan = makeBlastPlan(holes);
 
     const result = executeBlast(plan, grid, [], 1.0);
@@ -1299,7 +1299,7 @@ describe('executeBlast — clearedRegion', () => {
     // Grid with no blastable rock (all air) → blast clears nothing
     const grid = new VoxelGrid(20, 20);
     const holes: DrillHole[] = [];
-    addHole(holeIds, holes, 5, 5, 5, 0.15);
+    addHole(holeCounter, holes, 5, 5, 5, 0.15);
     const plan = makeBlastPlan(holes);
 
     const result = executeBlast(plan, grid, [], 1.0);

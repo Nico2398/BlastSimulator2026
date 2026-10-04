@@ -3,7 +3,7 @@
 // regeneration `loadCommand` performs on load (the VoxelGrid is not part of
 // the serialized GameState — see saveload.ts's header comment).
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { saveCommand, loadCommand } from '../../../src/console/commands/saveload.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 

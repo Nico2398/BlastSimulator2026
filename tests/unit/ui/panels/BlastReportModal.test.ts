@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../../src/ui/panels/BlastReportModal.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 

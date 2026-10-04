@@ -7,7 +7,7 @@ import { createCharge } from '../../../../../src/core/mining/ChargePlan.js';
 import { SOFTWARE_TIER_COSTS } from '../../../../../src/core/mining/Software.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -24,7 +24,7 @@ function makeStep(): { step: PreviewStep; container: HTMLElement; gameConsole: R
 
 function chargedPlan(): GameState {
   const state = makeState();
-  const hole = addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15);
+  const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
   const charge = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in charge) state.chargesByHole[hole.id] = charge.charge;
   state.sequenceDelays[hole.id] = 0;
@@ -35,7 +35,7 @@ function tierRow(step: PreviewStep, n: number): HTMLElement {
   return step.root.querySelector(`[data-tier="${n}"]`) as HTMLElement;
 }
 
-beforeEach(() => holeIds.nextHoleId = 1);
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('PreviewStep', () => {
   it('renders 4 tier rows, all locked (no checkmark, no buy button) at tier 0 except T1 which is buyable', () => {
@@ -99,7 +99,7 @@ describe('PreviewStep', () => {
   it('disables Run Analysis with a different reason when holes exist but the plan is incomplete', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeIds, state.drillHoles, 10, 10, 8, 0.15); // drilled, not charged/sequenced
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15); // drilled, not charged/sequenced
     step.update(state);
 
     const runBtn = step.root.querySelector('[data-action="run-analysis"]') as HTMLButtonElement;

@@ -4,7 +4,7 @@ import * as path from 'path';
 import { createGame, SAVE_VERSION } from '../../../src/core/state/GameState.js';
 import { createBuildingState, placeBuilding } from '../../../src/core/entities/Building.js';
 import { enterBuilding } from '../../../src/core/engine/Mount.js';
-import { serialize, deserialize, migrateV28ToV29 } from '../../../src/core/state/SaveLoad.js';
+import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
@@ -1875,12 +1875,16 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
     expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
   });
 
-  it('migrateV28ToV29 sets nextHoleId past the max saved id', () => {
-    const obj: Record<string, unknown> = { drillHoles: [hole('H3')], plannedDrillHoles: [], chargesByHole: {}, plannedChargesByHole: {}, sequenceDelays: {} };
-    expect(migrateV28ToV29(obj)['nextHoleId']).toBe(4);
+  it('a v28 save with a single drilled H3 migrates to nextHoleId 4', () => {
+    const parsed = v28Save(p => { p['drillHoles'] = [hole('H3')]; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(4);
   });
 
-  it('migrateV28ToV29 tolerates missing collections', () => {
-    expect(migrateV28ToV29({})['nextHoleId']).toBe(1);
+  it('a v28 save missing its hole collections migrates to nextHoleId 1', () => {
+    const parsed = v28Save(p => {
+      delete p['plannedChargesByHole'];
+      delete p['sequenceDelays'];
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
   });
 });

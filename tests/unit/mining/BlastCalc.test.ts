@@ -22,10 +22,10 @@ import { getRock } from '../../../src/core/world/RockCatalog.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { Random } from '../../../src/core/math/Random.js';
 
-const holeIds = { nextHoleId: 1 };
+const holeCounter = { nextHoleId: 1 };
 
 beforeEach(() => {
-  holeIds.nextHoleId = 1;
+  holeCounter.nextHoleId = 1;
   resetBoulderFragIds();
 });
 
@@ -78,7 +78,7 @@ describe('BlastCalc — vibration', () => {
   });
 
   it('groupChargesByDelay aggregates correctly', () => {
-    const holes = createGridPlan(holeIds, { x: 0, z: 0 }, 1, 3, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 3, 3, 8, 0.15);
     const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {
       [holes[0]!.id]: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
       [holes[1]!.id]: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },

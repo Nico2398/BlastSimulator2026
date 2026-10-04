@@ -3,7 +3,7 @@
 // all trigger the appropriate NavGrid.patchNavGrid() calls — checking the
 // resulting NavGrid cell types directly (NOT via events).
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 import {
   blastCommand,

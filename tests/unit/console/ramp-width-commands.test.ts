@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Console: ramp width on build_ramp and the widen_ramp command (#1298)
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   buildRampCommand, cancelRampCommand, widenRampCommand, type MiningContext,
 } from '../../../src/console/commands/mining.js';
