@@ -88,3 +88,14 @@ export function computeChargeHoleDurationTicks(amountKg: number): number {
     Math.round(CHARGE_HOLE_BASE_DURATION_TICKS * (amountKg / CHARGE_HOLE_REFERENCE_AMOUNT_KG)),
   );
 }
+
+/**
+ * Cash cost of ordering a charge: costPerKg * amountKg. 0 for an unknown
+ * explosive id (#1341).
+ */
+export function chargeOrderCost(explosiveId: string, amountKg: number): number {
+  void explosiveId;
+  void amountKg;
+  // TODO: implement
+  return 0;
+}
