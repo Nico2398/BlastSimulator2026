@@ -26,6 +26,7 @@ const APP_VERSION = '0.1.0';
 export class MainMenu {
   private readonly overlay: HTMLElement;
   private readonly continueBtn: HTMLElement;
+  private readonly resumeBtn: HTMLElement;
   private readonly continueSummaryEl: HTMLElement;
   private readonly loadHintEl: HTMLElement;
   private readonly enPill: HTMLElement;
@@ -39,8 +40,8 @@ export class MainMenu {
   private onTutorial?: OnTutorial;
   private onSandbox?: OnSandbox;
   private onLanguageChange?: OnLanguageChange;
-  protected onResume?: () => void;
-  protected liveGameProbe?: () => boolean;
+  private onResume?: () => void;
+  private liveGameProbe?: () => boolean;
 
   private backend: SaveBackend | null = null;
   private mostRecentSave: SaveMeta | null = null;
@@ -95,6 +96,15 @@ export class MainMenu {
       if (this.mostRecentSave) this.onContinue?.(this.mostRecentSave.slotId);
     });
 
+    const resumeLabel = el('span', { attrs: { style: 'font:800 13px/1 var(--bsx-font-ui);letter-spacing:.16em;text-transform:uppercase' } });
+    this.locale.bindText(resumeLabel, 'menu.resume');
+    this.resumeBtn = el('button', {
+      className: 'bsx-menu-btn-continue',
+      attrs: { id: 'bs-menu-resume', style: 'display:none' },
+      children: [iconEl('play', 18), resumeLabel],
+    });
+    this.resumeBtn.addEventListener('click', () => this.onResume?.());
+
     const newCampaignBtn = this.makeMenuButton('blast', 'menu.new_campaign', () => this.onNewCampaign?.());
     // Stable id (same convention as bs-menu-sandbox below) — scenario defs
     // click this to reach the world map; `.bsx-menu-btn` alone is shared by
@@ -110,7 +120,7 @@ export class MainMenu {
     this.loadHintEl = loadBtn.hintEl;
     const settingsBtn = this.makeMenuButton('settings', 'menu.settings', () => this.onSettings?.());
 
-    buttonCol.append(this.continueBtn, newCampaignBtn.el, sandboxBtn.el, tutorialBtn.el, loadBtn.el, settingsBtn.el);
+    buttonCol.append(this.resumeBtn, this.continueBtn, newCampaignBtn.el, sandboxBtn.el, tutorialBtn.el, loadBtn.el, settingsBtn.el);
 
     // ── Locale/version row ──
     const localeRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:12px' } });
@@ -162,6 +172,7 @@ export class MainMenu {
 
   show(): void {
     this.overlay.style.display = 'flex';
+    this.updateResumeButton();
     this.startTicker();
   }
   hide(): void {
@@ -175,6 +186,7 @@ export class MainMenu {
     this.locale.refresh();
     this.updateLangPills();
     this.updateContinueButton();
+    this.updateResumeButton();
     this.updateLoadHint();
     this.updateTickerText();
   }
@@ -213,6 +225,10 @@ export class MainMenu {
     );
     this.updateContinueButton();
     this.updateLoadHint();
+  }
+
+  private updateResumeButton(): void {
+    this.resumeBtn.style.display = this.liveGameProbe?.() ? 'flex' : 'none';
   }
 
   private updateContinueButton(): void {

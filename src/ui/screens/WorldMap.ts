@@ -28,7 +28,9 @@ export class WorldMap {
 
   private onBack?: () => void;
   private onStartLevel?: (levelId: string) => void;
-  protected onReturnToSite?: () => void;
+  private onReturnToSite?: () => void;
+  private returnAllowed = false;
+  private readonly returnBtn: HTMLElement;
   private lastCampaign: CampaignState | null = null;
   private readonly locale = new LocaleTextRegistry();
 
@@ -56,6 +58,19 @@ export class WorldMap {
     backBtn.appendChild(backLabel);
     backBtn.addEventListener('click', () => this.onBack?.());
 
+    this.returnBtn = el('button', {
+      attrs: {
+        id: 'bs-world-map-back-to-site',
+        style: 'display:none;align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid var(--bsx-amber);'
+          + 'border-radius:5px;background:transparent;color:var(--bsx-amber);font:700 10px/1 var(--bsx-font-ui);'
+          + 'letter-spacing:.12em;cursor:pointer;pointer-events:all',
+      },
+    });
+    const returnLabel = el('span', {});
+    this.locale.bindText(returnLabel, 'ui.portfolio.back_to_site');
+    this.returnBtn.appendChild(returnLabel);
+    this.returnBtn.addEventListener('click', () => this.onReturnToSite?.());
+
     const titleBlock = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px' } });
     const titleEl = el('span', { attrs: { style: 'font:800 16px/1 var(--bsx-font-ui);letter-spacing:.16em;color:var(--bsx-text-primary)' } });
     this.locale.bindText(titleEl, 'ui.portfolio.title');
@@ -72,7 +87,7 @@ export class WorldMap {
     this.starProgressEl = el('span', { attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-amber)' } });
     progressBlock.append(progressLabel, progressTrack, this.starProgressEl);
 
-    header.append(backBtn, titleBlock, progressBlock);
+    header.append(backBtn, this.returnBtn, titleBlock, progressBlock);
 
     // ── Card grid ──
     this.cardGrid = el('div', { attrs: {
@@ -90,12 +105,18 @@ export class WorldMap {
 
   setOnReturnToSite(cb: () => void): void { this.onReturnToSite = cb; }
   /** Whether the map offers a way back to the live site. */
-  get canReturnToSite(): boolean { return false; }
+  get canReturnToSite(): boolean { return this.returnAllowed; }
   /** Returns to the live site when offered; true when it did. */
-  requestReturnToSite(): boolean { return false; }
+  requestReturnToSite(): boolean {
+    if (!this.visible || !this.returnAllowed) return false;
+    this.onReturnToSite?.();
+    return true;
+  }
 
-  show(campaign: CampaignState | null, _opts?: { canReturnToSite?: boolean }): void {
+  show(campaign: CampaignState | null, opts?: { canReturnToSite?: boolean }): void {
     this.lastCampaign = campaign;
+    this.returnAllowed = opts?.canReturnToSite ?? false;
+    this.returnBtn.style.display = this.returnAllowed ? 'flex' : 'none';
     this.render(campaign);
     this.overlay.style.display = 'flex';
   }
