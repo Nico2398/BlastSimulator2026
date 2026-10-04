@@ -21,11 +21,11 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
-import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import type { FragmentData, BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import { runTick, type TickReport } from '../../../src/core/engine/TickPipeline.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { clearEvents } from '../../../src/core/events/EventPool.js';
-import { BANKRUPTCY_GRACE_TICKS, BANKRUPTCY_THRESHOLD } from '../../../src/core/config/balance.js';
+import { BANKRUPTCY_GRACE_TICKS, BANKRUPTCY_THRESHOLD, SCORE_VIBRATION_WINDOW_TICKS } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/tick.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
@@ -343,5 +343,61 @@ describe('runTick — cross-check against the console tick command (no behaviour
       .map(e => ({ id: e.id, x: e.x, z: e.z }))
       .sort((a, b) => a.id - b.id);
     expect(directPositions).toEqual(consolePositions);
+  });
+});
+
+// ── Village vibration feeds the score step (#1343) ──────────────────────────
+
+describe('runTick — recent blast vibration reaches the nuisance score (#1343)', () => {
+  beforeEach(() => {
+    clearEvents();
+    setupEvents();
+  });
+
+  function reportAt(tick: number, maxVibration?: number): BlastReport {
+    return {
+      tick, rating: 'good', clearedVoxels: 10, crackedVoxels: 0, fragmentCount: 10,
+      oversizedFragments: 0, totalRockVolume: 1, projectionCount: 0, maxProjectionDistanceM: 0,
+      totalOreValue: 0, spent: 0, destroyedBuildings: [], accidents: [],
+      ...(maxVibration !== undefined ? { maxVibration } : {}),
+    };
+  }
+
+  /** Nuisance after one tick with the given report installed `ageTicks` before the tick runs. */
+  function nuisanceAfterTick(ageTicks: number, maxVibration?: number): number {
+    const state = createGame({ seed: SEED });
+    state.tickCount = 200;
+    state.lastBlastReport = reportAt(state.tickCount - ageTicks, maxVibration);
+    runOneTick(state, new EventEmitter());
+    return state.scores.nuisance;
+  }
+
+  it('a blast report inside the window lowers nuisance versus a report without vibration', () => {
+    expect(nuisanceAfterTick(0, 50)).toBeLessThan(nuisanceAfterTick(0, undefined));
+  });
+
+  it('a stronger recent vibration lowers nuisance more than a weaker one', () => {
+    expect(nuisanceAfterTick(0, 80)).toBeLessThan(nuisanceAfterTick(0, 10));
+  });
+
+  it('a report older than the window no longer affects nuisance', () => {
+    const stale = nuisanceAfterTick(SCORE_VIBRATION_WINDOW_TICKS + 5, 50);
+    expect(stale).toBeCloseTo(nuisanceAfterTick(0, undefined), 10);
+  });
+
+  it('a report within the window but near its edge still counts', () => {
+    expect(nuisanceAfterTick(SCORE_VIBRATION_WINDOW_TICKS - 1, 50)).toBeLessThan(nuisanceAfterTick(0, undefined));
+  });
+
+  it('a report with maxVibration 0 or absent leaves nuisance unchanged', () => {
+    expect(nuisanceAfterTick(0, 0)).toBeCloseTo(nuisanceAfterTick(0, undefined), 10);
+  });
+
+  it('no blast report at all leaves nuisance unchanged', () => {
+    const state = createGame({ seed: SEED });
+    state.tickCount = 200;
+    state.lastBlastReport = null;
+    runOneTick(state, new EventEmitter());
+    expect(state.scores.nuisance).toBeCloseTo(nuisanceAfterTick(0, undefined), 10);
   });
 });
