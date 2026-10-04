@@ -1,6 +1,6 @@
 {
   "name": "tutorial-evacuate-manual-tab",
-  "description": "#1337: Same Tutorial Pit click path as tutorial-interactive, but the player clicks the Sequence tab by hand before Auto Sequence and reaches Sound the Horn through the Fire tab. The evacuate-zone rail must point at the Fire tab button ([data-step=\"5\"]) while the Fire body is hidden, never fall back to the toolbar Blast button and block that tab.",
+  "description": "#1337: Same Tutorial Pit click path as tutorial-interactive, kept as a regression for the evacuate-zone Fire tab stage. No manual tab click is possible on this path: the Blast Workshop auto-advances (BlastWorkshop.ts suggestStep) to Sequence then Fire while autoAdvance is on, and the rail never permits a tab click while the active tab already shows the stage's control, so the Fire tab stage (tutorialStages.ts 'evacuate-zone') is only reachable when autoAdvance is off, which no rail-legal click sequence produces. The reachable half is proven: with Fire body visible after Auto Sequence, the rail targets Sound the Horn (usable) and never falls back to the toolbar Blast button. The stage list itself is unit-tested (tests/unit/ui/tutorialStages.test.ts, #1337).",
   "skipBlastPlayback": true,
   "shots": [
     {
@@ -793,13 +793,9 @@
     {
       "command": "sequence auto",
       "timeout": 30,
-      "description": "#1337: sequence complete via a manual Sequence tab click (data-step 3, the sequence rail's own target per #926) before Auto Sequence; tutorial advances to evacuate-zone.",
+      "description": "#1337: sequence complete via Auto Sequence alone -- the Sequence body is already showing through the panel's autoAdvance, so the rail targets auto-sequence directly and the Sequence tab stays blocked (no legal manual tab click here); tutorial advances to evacuate-zone.",
       "role": "player",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
@@ -820,19 +816,15 @@
       "command": "tick 1",
       "timeout": 30,
       "role": "player",
-      "description": "#1337: evacuate-zone first stage is the Fire tab. The rail must leave the Fire tab button usable (not blocked by a toolbar-Blast fallback) so the player can click it by hand.",
+      "description": "#1337: evacuate-zone after auto-advance. The panel landed on the Fire tab by itself, so the rail must target Sound the Horn (usable) rather than fall back to the toolbar Blast button. The Fire tab button stage is only reachable with autoAdvance off, which no rail-legal click produces (unit-tested instead).",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
         }
       ],
       "expect": {
-        "usable": "#bs-blast-panel [data-step=\"5\"]",
+        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]",
         "tutorialStep": "evacuate-zone"
       }
     },
