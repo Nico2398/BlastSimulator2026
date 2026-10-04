@@ -6,6 +6,7 @@ import type { Random } from '../math/Random.js';
 import type { CorruptionState } from '../economy/Corruption.js';
 import type { EmployeeState } from '../entities/Employee.js';
 import { killEmployee } from '../entities/Employee.js';
+import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../config/balance.js';
 
 // ── Config ──
 
@@ -56,6 +57,13 @@ export interface MafiaActionResult {
  * Arrange an "accident" for a troublesome employee.
  * Success: employee removed. Failure: investigation event.
  */
+/** Add exposure (capped at 1) and return the delta actually applied. */
+function applyExposure(mafia: MafiaState, nominal: number): number {
+  const before = mafia.exposureRisk;
+  mafia.exposureRisk = Math.min(1, before + nominal);
+  return mafia.exposureRisk - before;
+}
+
 export function arrangeAccident(
   mafia: MafiaState,
   employees: EmployeeState,
@@ -69,10 +77,10 @@ export function arrangeAccident(
       outcomeKey: 'mafia.target_not_found', investigationTriggered: false };
   }
 
-  const exposureIncrease = 0.1;
-  mafia.exposureRisk = Math.min(1, mafia.exposureRisk + exposureIncrease);
+  const succeeded = rng.chance(ACCIDENT_SUCCESS_RATE);
 
-  if (rng.chance(ACCIDENT_SUCCESS_RATE)) {
+  if (succeeded) {
+    const exposureIncrease = applyExposure(mafia, ACCIDENT_EXPOSURE);
     killEmployee(employees, targetId);
     return {
       success: true, cost: ACCIDENT_COST, exposureIncrease,
@@ -81,8 +89,9 @@ export function arrangeAccident(
     };
   }
 
+  const exposureIncrease = applyExposure(mafia, ACCIDENT_EXPOSURE + ACCIDENT_FAILURE_EXPOSURE_EXTRA);
   return {
-    success: false, cost: ACCIDENT_COST, exposureIncrease: exposureIncrease + 0.1,
+    success: false, cost: ACCIDENT_COST, exposureIncrease,
     outcomeKey: 'mafia.accident_failed', outcomeParams: { name: emp.name },
     investigationTriggered: true,
   };
@@ -110,8 +119,7 @@ export function startFraming(
     readyTick: currentTick + FRAME_EVIDENCE_TICKS,
   });
 
-  const exposureIncrease = 0.05;
-  mafia.exposureRisk = Math.min(1, mafia.exposureRisk + exposureIncrease);
+  const exposureIncrease = applyExposure(mafia, 0.05);
 
   return {
     success: true, cost: FRAME_COST, exposureIncrease,
@@ -151,8 +159,7 @@ export function completeFrame(
     };
   }
 
-  const exposureIncrease = 0.15;
-  mafia.exposureRisk = Math.min(1, mafia.exposureRisk + exposureIncrease);
+  const exposureIncrease = applyExposure(mafia, 0.15);
   return {
     success: false, cost: 0, exposureIncrease,
     outcomeKey: 'mafia.frame_detected',
