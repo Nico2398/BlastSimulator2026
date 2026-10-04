@@ -61,3 +61,17 @@ describe('en.json — the equivalent tutorial hire steps use "Hire", unaffected 
     });
   }
 });
+
+describe('ui.shady.exposure_note — #1410 describes the real consequence of exposure', () => {
+  it('en no longer claims arrangements are "more likely to go wrong"', () => {
+    expect(en['ui.shady.exposure_note']).not.toMatch(/more likely to go wrong/i);
+    expect(en['ui.shady.exposure_note']).toMatch(/exposure/i);
+    expect(en['ui.shady.exposure_note']).toMatch(/arrest/i);
+  });
+
+  it('fr no longer claims arrangements are "susceptible de mal tourner"', () => {
+    expect(fr['ui.shady.exposure_note']).not.toMatch(/susceptible de mal tourner/i);
+    expect(fr['ui.shady.exposure_note']).toMatch(/exposition/i);
+    expect(fr['ui.shady.exposure_note']).toMatch(/arrêt/i);
+  });
+});
