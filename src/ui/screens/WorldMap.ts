@@ -20,6 +20,31 @@ const BIOME_STYLE: Record<string, { gradient: string; categoryKey: string }> = {
 };
 const DEFAULT_BIOME_STYLE = { gradient: 'linear-gradient(160deg,#5f6d7a,#2f3a45)', categoryKey: 'ui.portfolio.biome.mountain' };
 
+interface HeaderButtonSpec {
+  id: string;
+  labelKey: string;
+  color: string;
+  border: string;
+  weight: number;
+  display: 'flex' | 'none';
+  icon?: HTMLElement;
+}
+
+/** Outlined header button with a locale-bound label. */
+function makeHeaderButton(spec: HeaderButtonSpec, locale: LocaleTextRegistry): HTMLElement {
+  const label = el('span', {});
+  locale.bindText(label, spec.labelKey);
+  return el('button', {
+    attrs: {
+      id: spec.id,
+      style: `display:${spec.display};align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid ${spec.border};`
+        + `border-radius:5px;background:transparent;color:${spec.color};font:${spec.weight} 10px/1 var(--bsx-font-ui);`
+        + 'letter-spacing:.12em;cursor:pointer;pointer-events:all',
+    },
+    children: spec.icon ? [spec.icon, label] : [label],
+  });
+}
+
 export class WorldMap {
   private readonly overlay: HTMLElement;
   private readonly cardGrid: HTMLElement;
@@ -44,31 +69,25 @@ export class WorldMap {
     // ── Header ──
     const header = el('div', { attrs: { style: 'display:flex;align-items:center;gap:16px;padding:22px 40px' } });
 
-    const backBtn = el('button', {
-      attrs: {
-        id: 'bs-world-map-back',
-        style: 'display:flex;align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid rgba(255,255,255,.12);'
-          + 'border-radius:5px;background:transparent;color:var(--bsx-text-secondary);font:600 10px/1 var(--bsx-font-ui);'
-          + 'letter-spacing:.12em;cursor:pointer;pointer-events:all',
-      },
-      children: [iconEl('chev', 12)],
-    });
-    const backLabel = el('span', {});
-    this.locale.bindText(backLabel, 'ui.portfolio.back');
-    backBtn.appendChild(backLabel);
+    const backBtn = makeHeaderButton({
+      id: 'bs-world-map-back',
+      labelKey: 'ui.portfolio.back',
+      color: 'var(--bsx-text-secondary)',
+      border: 'rgba(255,255,255,.12)',
+      weight: 600,
+      display: 'flex',
+      icon: iconEl('chev', 12),
+    }, this.locale);
     backBtn.addEventListener('click', () => this.onBack?.());
 
-    this.returnBtn = el('button', {
-      attrs: {
-        id: 'bs-world-map-back-to-site',
-        style: 'display:none;align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid var(--bsx-amber);'
-          + 'border-radius:5px;background:transparent;color:var(--bsx-amber);font:700 10px/1 var(--bsx-font-ui);'
-          + 'letter-spacing:.12em;cursor:pointer;pointer-events:all',
-      },
-    });
-    const returnLabel = el('span', {});
-    this.locale.bindText(returnLabel, 'ui.portfolio.back_to_site');
-    this.returnBtn.appendChild(returnLabel);
+    this.returnBtn = makeHeaderButton({
+      id: 'bs-world-map-back-to-site',
+      labelKey: 'ui.portfolio.back_to_site',
+      color: 'var(--bsx-amber)',
+      border: 'var(--bsx-amber)',
+      weight: 700,
+      display: 'none',
+    }, this.locale);
     this.returnBtn.addEventListener('click', () => this.onReturnToSite?.());
 
     const titleBlock = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px' } });

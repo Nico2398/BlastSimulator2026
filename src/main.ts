@@ -1037,16 +1037,17 @@ scenePicking.setSelectChangeHandler((entity) => {
     entityHighlight.hide();
   }
 });
-// Esc on the Site Map returns to the live site (unless a confirm is up — that closes first).
-uiManager.registerEscLayer(() => !uiManager.confirmOpen && worldMap.requestReturnToSite());
 // Esc deselects before falling through to the panel/modal layers beneath it —
-// registered last among the shell's own layers so it's tried first (most
-// recently registered wins, per UIManager.registerEscLayer).
+// registered before the Site Map layer, which outranks it (most recently
+// registered wins, per UIManager.registerEscLayer).
 uiManager.registerEscLayer(() => {
   if (!scenePicking.selection) return false;
   scenePicking.clearSelection();
   return true;
 });
+// Esc on the Site Map returns to the live site (unless a confirm is up — that closes first).
+// Registered after the deselect layer so it is tried first (most recently registered wins).
+uiManager.registerEscLayer(() => !uiManager.confirmOpen && worldMap.requestReturnToSite());
 
 /** Report a failed console command from a selection-bar action as a toast; success is silent (the world visibly changing is the feedback). */
 function reportIfFailed(title: string, result: CommandResult): void {

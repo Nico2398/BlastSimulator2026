@@ -81,28 +81,13 @@ export class MainMenu {
     // ── Buttons ──
     const buttonCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:7px;width:340px' } });
 
-    const continueLabel = el('span', { attrs: { style: 'font:800 13px/1 var(--bsx-font-ui);letter-spacing:.16em;text-transform:uppercase' } });
-    this.locale.bindText(continueLabel, 'menu.continue');
     this.continueSummaryEl = el('span', { attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);opacity:.72' } });
-    this.continueBtn = el('button', {
-      className: 'bsx-menu-btn-continue',
-      attrs: { style: 'display:none' },
-      children: [
-        iconEl('play', 18),
-        el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px' }, children: [continueLabel, this.continueSummaryEl] }),
-      ],
-    });
+    this.continueBtn = this.makeContinueStyleButton('menu.continue', undefined, this.continueSummaryEl);
     this.continueBtn.addEventListener('click', () => {
       if (this.mostRecentSave) this.onContinue?.(this.mostRecentSave.slotId);
     });
 
-    const resumeLabel = el('span', { attrs: { style: 'font:800 13px/1 var(--bsx-font-ui);letter-spacing:.16em;text-transform:uppercase' } });
-    this.locale.bindText(resumeLabel, 'menu.resume');
-    this.resumeBtn = el('button', {
-      className: 'bsx-menu-btn-continue',
-      attrs: { id: 'bs-menu-resume', style: 'display:none' },
-      children: [iconEl('play', 18), resumeLabel],
-    });
+    this.resumeBtn = this.makeContinueStyleButton('menu.resume', 'bs-menu-resume');
     this.resumeBtn.addEventListener('click', () => this.onResume?.());
 
     const newCampaignBtn = this.makeMenuButton('blast', 'menu.new_campaign', () => this.onNewCampaign?.());
@@ -225,6 +210,20 @@ export class MainMenu {
     );
     this.updateContinueButton();
     this.updateLoadHint();
+  }
+
+  /** Hidden-by-default primary-action button; `summaryEl`, when given, sits under the label. */
+  private makeContinueStyleButton(labelKey: string, id?: string, summaryEl?: HTMLElement): HTMLElement {
+    const label = el('span', { attrs: { style: 'font:800 13px/1 var(--bsx-font-ui);letter-spacing:.16em;text-transform:uppercase' } });
+    this.locale.bindText(label, labelKey);
+    const text = summaryEl
+      ? el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px' }, children: [label, summaryEl] })
+      : label;
+    return el('button', {
+      className: 'bsx-menu-btn-continue',
+      attrs: id ? { id, style: 'display:none' } : { style: 'display:none' },
+      children: [iconEl('play', 18), text],
+    });
   }
 
   private updateResumeButton(): void {
