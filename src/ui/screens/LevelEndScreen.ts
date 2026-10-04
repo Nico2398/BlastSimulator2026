@@ -18,7 +18,8 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { getCampaignLevels, isCampaignDone, isFinalCampaignLevel } from '../../core/campaign/Campaign.js';
 import { getLevel } from '../../core/campaign/Level.js';
-import { TICKS_PER_DAY } from '../../core/config/balance.js';
+import { TICKS_PER_DAY, REVOLT_TICKS } from '../../core/config/balance.js';
+import { revoltCause } from '../../core/scores/RevoltCause.js';
 import type { GameState } from '../../core/state/GameState.js';
 
 export type DefeatReason = Exclude<NonNullable<GameState['levelEndReason']>, 'completed'>;
@@ -344,7 +345,10 @@ export class LevelEndScreen {
 
     const days = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
     this.defeatBodyEl.textContent = t(`ui.level_end.defeat.${reason}.body`, { days: `${days}` });
-    this.defeatTipTextEl.textContent = t(`ui.level_end.defeat.${reason}.tip`);
+    this.defeatTipTextEl.textContent = t(
+      this.defeatTipKey(reason, state),
+      reason === 'worker_revolt' ? { hours: String(REVOLT_TICKS) } : undefined,
+    );
 
     this.defeatStatGridEl.replaceChildren(statGrid(this.defeatStats(reason, state), 4));
 
@@ -354,6 +358,14 @@ export class LevelEndScreen {
     this.defeatRetryBtn.appendChild(el('span', {
       text: t('ui.level_end.retry', { level: level ? t(level.nameKey) : '' }),
     }));
+  }
+
+  private defeatTipKey(reason: DefeatReason, state: GameState): string {
+    if (reason === 'worker_revolt') {
+      const hasHousing = state.buildings.buildings.some(b => b.type === 'living_quarters' && b.active);
+      return `ui.level_end.defeat.worker_revolt.tip.${revoltCause(state.sitePolicy.shiftMode, hasHousing)}`;
+    }
+    return `ui.level_end.defeat.${reason}.tip`;
   }
 
   private defeatStats(reason: DefeatReason, state: GameState): { key: string; value: string; color?: string }[] {
