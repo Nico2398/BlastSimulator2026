@@ -1385,6 +1385,12 @@
       ],
       "role": "player",
       "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
         "changedBy": {
           "tickCount": 0
         }
@@ -3670,6 +3676,12 @@
       ],
       "role": "player",
       "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
         "changedBy": {
           "tickCount": 0
         }
