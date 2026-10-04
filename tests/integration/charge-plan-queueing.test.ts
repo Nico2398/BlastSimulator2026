@@ -504,3 +504,38 @@ describe('charge order cash cost (#1341)', () => {
     expect(state.finances.transactions).toHaveLength(txBefore);
   });
 });
+
+describe('charge order funds check with a zero-or-negative net cost (#1341)', () => {
+  it('re-ordering the same charge on a hole is accepted when cash is negative, because the refund covers the new cost', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const holeId = state.drillHoles[0]!.id;
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+
+    state.cash = -8_290;
+    state.finances.cash = -8_290;
+    const again = run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`);
+    expect(again.success).toBe(true);
+    expect(state.cash).toBe(-8_290);
+  });
+
+  it('a cheaper replacement on negative cash is accepted and leaves cash higher', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const holeId = state.drillHoles[0]!.id;
+    expect(run(`charge hole:${holeId} explosive:boomite amount:8 stemming:2`).success).toBe(true);
+    state.cash = -1_000;
+    state.finances.cash = -1_000;
+    expect(run(`charge hole:${holeId} explosive:boomite amount:4 stemming:2`).success).toBe(true);
+    expect(state.cash).toBeGreaterThan(-1_000);
+  });
+
+  it('a new charge with positive net cost on negative cash is still refused', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const holeId = state.drillHoles[0]!.id;
+    state.cash = -100;
+    state.finances.cash = -100;
+    const r = run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`);
+    expect(r.success).toBe(false);
+    expect(r.output).toContain('Insufficient funds');
+    expect(state.cash).toBe(-100);
+  });
+});

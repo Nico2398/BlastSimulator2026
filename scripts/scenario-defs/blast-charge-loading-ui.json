@@ -3,19 +3,19 @@
   "description": "Visual verification of charge loading UI: per-hole charges, explosive types, amounts, charge-all, visual indicators. #554: charging a hole now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly — every commit click here is followed by a wait_until step proving the count only advances once the order actually lands, with a mid-loading screenshot proving the ordered-but-unloaded ghost/ORDERED overlay is visually distinct from a landed charge.",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 cash:100000 staffed:true",
       "timeout": 30,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, a blaster with a bare blasting licence (no vehicle — #554's charge_hole actions are on-foot, requiredVehicleRole: null), plus an unmanned drill_rig, are hired/purchased for free at game-open.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 cash:100000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 100000,
           "holeCount": 0
         }
       }

@@ -81,7 +81,9 @@ function chargeFundsFailure(
     const refund = outstanding ? ((outstanding.payload['orderCost'] as number) ?? 0) : 0;
     need += chargeOrderCost(o.explosiveId, o.amountKg) - refund;
   }
-  if (need <= state.cash) return null;
+  // A replacement costing no more than the refunded order needs no new cash,
+  // even when the balance is negative. Sub-cent residue is float noise.
+  if (need < 0.005 || need <= state.cash) return null;
   return {
     success: false,
     output: t('console.insufficient_funds', { need: formatMoney(need), have: formatMoney(state.cash) }),
