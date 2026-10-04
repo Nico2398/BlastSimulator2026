@@ -19,8 +19,8 @@
 // mock's single site-wide rock tier has no real-data equivalent (rock is
 // per-voxel; holes can sit over different rock), so gating would need new
 // plumbing (grid access no panel currently has) for a comparison the design
-// doc doesn't specify how to make. All 8 explosives stay selectable; the
-// water-sensitivity badge still surfaces (that data is real and per-hole
+// doc doesn't specify how to make. Only the active level's explosives are
+// offered (resolveAvailableExplosives); the water-sensitivity badge still surfaces (that data is real and per-hole
 // derivable via wetHoles()).
 
 import { t } from '../../../core/i18n/I18n.js';
@@ -30,6 +30,7 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
 import { chargeOrderCost } from '../../../core/mining/ChargePlan.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
+import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { TUBING_COST } from '../../../core/mining/Tubing.js';
 import { MIN_STEMMING_M } from '../../../core/config/balance.js';
@@ -56,6 +57,7 @@ export class ChargeStep {
 
   private gameConsole?: GameConsoleFn;
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
+  private allowedIds: readonly string[] = getAllExplosives().map(e => e.id);
   private amountKg = DEFAULT_AMOUNT_KG;
   private stemmingM = DEFAULT_STEMMING_M;
   private lastSignature = '';
@@ -138,7 +140,14 @@ export class ChargeStep {
     const wet = weather ? wetHoles(state, weather) : [];
     const holes = state.drillHoles;
 
+    this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
+    if (!this.allowedIds.includes(this.selectedExplosiveId) && this.allowedIds[0] !== undefined) {
+      this.selectedExplosiveId = this.allowedIds[0];
+      this.clampAmount();
+    }
+
     const signature = JSON.stringify({
+      level: state.campaign.activeLevelId,
       selected: this.selectedExplosiveId, amt: this.amountKg, stem: this.stemmingM,
       // Hole ids *and* their charges, not just a count: a per-hole charge
       // changes neither the hole list nor anything else in the signature, so a
@@ -160,7 +169,8 @@ export class ChargeStep {
   dispose(): void { this.el.remove(); }
 
   private renderProductList(anyWet: boolean): void {
-    this.productListEl.replaceChildren(...getAllExplosives().map(e => this.makeProductCard(e, anyWet)));
+    const offered = getAllExplosives().filter(e => this.allowedIds.includes(e.id));
+    this.productListEl.replaceChildren(...offered.map(e => this.makeProductCard(e, anyWet)));
   }
 
   private makeProductCard(explosive: ExplosiveType, anyWet: boolean): HTMLElement {

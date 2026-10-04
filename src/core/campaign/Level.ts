@@ -264,15 +264,13 @@ export function resolveContractPriceMultiplier(state: GameState): number {
  * `availableExplosives` filtered by catalog membership.
  */
 export function resolveAvailableExplosives(activeLevelId: string | null): readonly string[] {
-  // TODO: implement
-  void activeLevelId;
-  return getAllExplosives().map(e => e.id);
+  const all = getAllExplosives().map(e => e.id);
+  const level = activeLevelId ? getLevel(activeLevelId) : undefined;
+  if (!level) return all;
+  return level.availableExplosives.filter(id => all.includes(id));
 }
 
 /** True when `explosiveId` may be used at the given level. */
 export function isExplosiveAvailable(activeLevelId: string | null, explosiveId: string): boolean {
-  // TODO: implement
-  void activeLevelId;
-  void explosiveId;
-  return true;
+  return resolveAvailableExplosives(activeLevelId).includes(explosiveId);
 }
