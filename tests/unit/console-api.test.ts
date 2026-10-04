@@ -279,6 +279,9 @@ describe('console-api', () => {
       // seal exists on that seed at any reasonable board size/mine type).
       // Seed 77 keeps this exact box flat at the exact same coordinates.
       runner.runner.run('new_game seed:77 cash:500000');
+      // Idle ticking sinks well-being to 0, and 120 such ticks end the level by
+      // worker revolt, which freezes the mine (#1313). Not what this test probes.
+      const holdWellBeing = (): void => { runner.ctx.state!.scores.wellBeing = 50; };
       runner.runner.run('employee hire role:surveyor');
       runner.runner.run('employee hire role:surveyor');
       runner.runner.run('employee hire role:surveyor');
@@ -291,10 +294,13 @@ describe('console-api', () => {
       // reachable from outside at the moment it's ordered, same as a player
       // would have to.
       runner.runner.run('build management_office at:2,0');
+      holdWellBeing();
       runner.runner.run('tick 150');
       runner.runner.run('build management_office at:0,2');
+      holdWellBeing();
       runner.runner.run('tick 150');
       runner.runner.run('build management_office at:2,2');
+      holdWellBeing();
       runner.runner.run('tick 150');
       expect(runner.ctx.state!.plannedBuildings).toHaveLength(0);
       expect(runner.ctx.state!.buildings.buildings).toHaveLength(3);

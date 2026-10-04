@@ -41,7 +41,7 @@ function firedEventIds(engine: ReturnType<typeof createRunner>): string[] {
  * ore_sale contract for dirtite is on offer by its stable material/type name.
  */
 function runFixedSequence(engine: ReturnType<typeof createRunner>): void {
-  runCommand(engine, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true');
+  runCommand(engine, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true cash:5000000');
   for (let i = 0; i < 15; i++) runCommand(engine, 'employee hire role:blaster');
   for (let i = 0; i < 60; i++) runCommand(engine, 'tick 10');
 }
@@ -57,7 +57,7 @@ describe('scenario pacing insulation (#597)', () => {
     // actionCountSinceEvent's cooldown gate (state is not on
     // META_COMMANDS' exempt list) but touches nothing event selection
     // reads — no employee hired, no tick advanced.
-    runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true');
+    runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true cash:5000000');
     runCommand(modified, 'state summary');
     for (let i = 0; i < 15; i++) runCommand(modified, 'employee hire role:blaster');
     for (let i = 0; i < 60; i++) runCommand(modified, 'tick 10');
@@ -71,7 +71,7 @@ describe('scenario pacing insulation (#597)', () => {
     runFixedSequence(baseline);
 
     const modified = createRunner();
-    runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true');
+    runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true cash:5000000');
     runCommand(modified, 'tick 5');
     for (let i = 0; i < 15; i++) runCommand(modified, 'employee hire role:blaster');
     for (let i = 0; i < 60; i++) runCommand(modified, 'tick 10');
@@ -82,7 +82,7 @@ describe('scenario pacing insulation (#597)', () => {
 
   it('a scenario accepts the same contract, named by material/type, whether or not an extra no-op action ran first', () => {
     const baseline = createRunner();
-    runCommand(baseline, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true');
+    runCommand(baseline, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true cash:5000000');
     const listed = runCommand(baseline, 'contract list');
     expect(listed.success).toBe(true);
     // Accept "the ore_sale contract for dirtite" by name — not by whatever
@@ -90,7 +90,7 @@ describe('scenario pacing insulation (#597)', () => {
     const acceptedBaseline = runCommand(baseline, 'contract accept material:dirtite type:ore_sale');
 
     const modified = createRunner();
-    runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true');
+    runCommand(modified, 'new_game mine_type:desert_badlands seed:42 size:32 staffed:true cash:5000000');
     runCommand(modified, 'state summary');
     runCommand(modified, 'contract list');
     const acceptedModified = runCommand(modified, 'contract accept material:dirtite type:ore_sale');

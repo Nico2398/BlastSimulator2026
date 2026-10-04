@@ -77,7 +77,8 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
   it(
     "stamps debris_out_of_reach (never target_unreachable) on exactly the pocket's debris, leaves it queued where physics put it, while the reachable majority is hauled",
     () => {
-      const { run, state } = drillChargeAndBlast(18, 10, 3);
+      // Generous cash: wages over the long wait must not bankrupt the mine, which freezes it (#1313).
+      const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
       const placedAtBlast = new Map(state.logistics.fragments.map(f => [f.fragment.id, { ...f.fragment.position }]));
       expect(placedAtBlast.size).toBeGreaterThan(0);
       crewHaulingAndBuildDepot(run, state);

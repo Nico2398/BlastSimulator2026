@@ -214,6 +214,9 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // dirtite alone is haulable at this seed (single-digit % odds per
     // ore_sale roll), so waiting for it can take a real string of misses.
     for (let attempt = 0; attempt < 60 && rankByHaulable(ctx.state!.contracts.available).length === 0; attempt++) {
+      // A long idle wait sinks well-being to 0 and would end the level by
+      // worker revolt, freezing the mine (#1313) — not what this walkthrough probes.
+      ctx.state!.scores.wellBeing = Math.max(ctx.state!.scores.wellBeing, 50);
       tickWithEvents(ctx, 20);
     }
     const rankedByHaulable = rankByHaulable(ctx.state!.contracts.available);

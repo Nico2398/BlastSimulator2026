@@ -132,7 +132,7 @@ describe('Tutorial pause behaviour (#371)', () => {
   it('haul-debris (#552): TutorialRails never holds the clock while automatic hauling is genuinely in progress', () => {
     const { runner, ctx } = createRunner();
 
-    expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(runner.run('new_game seed:42 size:32 staffed:true cash:500000').success).toBe(true);
     // #1264: this test's staffed crew (multiple drillers/haulers converging
     // on the same drill/charge/haul targets) is exactly the multi-agent
     // shape agent occupancy governs — unconditional since #1207.

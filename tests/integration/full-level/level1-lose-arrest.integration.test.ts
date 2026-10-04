@@ -61,6 +61,11 @@ describe('Level 1 — Lose — Criminal Arrest', () => {
     // Starting exposure should be 0
     expect(ctx.state!.mafia.exposureRisk).toBe(0);
 
+    // Smuggling income would clear the profit target in ~13 ticks and freeze
+    // the mine as 'completed' (#1313) long before exposure reaches the arrest
+    // threshold. Mark the level already completed so the arrest can race alone.
+    ctx.state!.campaign.levels['dusty_hollow']!.completed = true;
+
     // Tick 60 times (need ~45 ticks at +0.02/tick to reach 0.9)
     tickWithEvents(ctx, 60);
 
@@ -70,11 +75,6 @@ describe('Level 1 — Lose — Criminal Arrest', () => {
     // Verify arrest triggered
     expect(ctx.state!.arrest.arrested).toBe(true);
 
-    // No levelEndReason assertion here: at $8000/tick, 45 ticks of smuggling
-    // income (~$360k) clears dusty_hollow's $80k profit target well before
-    // exposureRisk reaches the arrest threshold, so this scenario legitimately
-    // ends via 'completed', not 'arrest'. The reason-attribution mapping for
-    // arrest is covered in isolation by events.integration.test.ts, where a
-    // primed exposureRisk triggers arrest with no profit accumulation to race.
+    expect(ctx.state!.levelEndReason).toBe('arrest');
   });
 });
