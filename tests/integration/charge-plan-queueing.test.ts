@@ -18,6 +18,9 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { tickUntil } from './helpers.js';
+import { getFinancialReport } from '../../src/core/economy/Finance.js';
+import { formatMoney } from '../../src/core/economy/formatMoney.js';
+import { t } from '../../src/core/i18n/I18n.js';
 
 /** Drills a grid and waits for every hole to land in state.drillHoles. */
 function drillAndLand(
@@ -315,5 +318,189 @@ describe('employee cancel <id> — the generic cancel path also releases the pla
     expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
     expect(state.plannedDrillHoles).toHaveLength(0);
     expect(state.drillHoles).toHaveLength(0);
+  });
+});
+
+// ── #1341: explosives cost money ──
+//
+// Loading explosives costs costPerKg x kg, booked at ORDER time as an
+// 'explosives' expense (like ramps/buildings), refunded in full when the
+// order is cancelled (actionOrderCost, TaskCancellation.ts). Landing the
+// charge and firing the blast move no cash for explosives.
+
+type Runner = ReturnType<typeof createRunner>;
+
+/** Staffed game with `rows x cols` drilled holes and plenty of cash, so cost assertions are exact. */
+function setupDrilled(rows: number, cols: number, cash = 500_000): { run: (c: string) => { success: boolean; output: string }; state: NonNullable<Runner['ctx']['state']> } {
+  const { runner, ctx } = createRunner();
+  const run = (cmd: string) => runner.run(cmd);
+  expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+  const state = ctx.state!;
+  drillAndLand(run, state, `rows:${rows} cols:${cols} spacing:4 depth:8 start:12,12`);
+  state.cash = cash;
+  state.finances.cash = cash;
+  return { run, state };
+}
+
+function explosivesTotal(state: { finances: Parameters<typeof getFinancialReport>[0]; tickCount: number }): number {
+  const report = getFinancialReport(state.finances, state.tickCount);
+  return report.expensesByCategory.find(c => c.category === 'explosives')?.total ?? 0;
+}
+
+describe('charge order cash cost (#1341)', () => {
+  it('charge hole:* amount:20kg of a $200/kg explosive on 6 holes lowers cash by exactly $24,000 and books an explosives expense', () => {
+    const { run, state } = setupDrilled(2, 3);
+    expect(state.drillHoles).toHaveLength(6);
+    const cashBefore = state.cash;
+
+    const result = run('charge hole:* explosive:dynatomics amount:20kg stemming:2');
+
+    expect(result.success).toBe(true);
+    expect(state.cash).toBe(cashBefore - 24_000);
+    expect(state.finances.cash).toBe(state.cash);
+    const report = getFinancialReport(state.finances, state.tickCount);
+    expect(report.expensesByCategory).toContainEqual({ category: 'explosives', total: 24_000 });
+  });
+
+  it('a single charge hole:H1 charges once at order time and nothing more when the charge lands', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const holeId = state.drillHoles[0]!.id;
+    const cashBefore = state.cash;
+
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+    expect(state.cash).toBe(cashBefore - 60);
+    expect(explosivesTotal(state)).toBe(60);
+
+    tickUntil(run, () => state.chargesByHole[holeId] !== undefined, 400);
+    expect(state.chargesByHole[holeId]).toBeDefined();
+    expect(explosivesTotal(state)).toBe(60);
+    const explosivesTx = state.finances.transactions.filter(t => t.category === 'explosives');
+    expect(explosivesTx).toHaveLength(1);
+  });
+
+  it('firing the blast books no further explosives cost, and the report spent equals the sum of loaded charge costs', () => {
+    const { run, state } = setupDrilled(1, 2);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    const holes = state.drillHoles.length;
+    tickUntil(run, () => Object.keys(state.chargesByHole).length === holes, 600);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
+    expect(run('sequence auto').success).toBe(true);
+    const expected = holes * 5 * 12;
+    expect(explosivesTotal(state)).toBe(expected);
+
+    const explosivesTxBefore = state.finances.transactions.filter(t => t.category === 'explosives').length;
+    const blast = run('blast');
+    expect(blast.success).toBe(true);
+
+    expect(state.lastBlastReport!.spent).toBe(expected);
+    expect(explosivesTotal(state)).toBe(expected);
+    expect(state.finances.transactions.filter(t => t.category === 'explosives')).toHaveLength(explosivesTxBefore);
+  });
+
+  it('employee cancel <id> refunds the full order cost as a refund income transaction', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const holeId = state.drillHoles[0]!.id;
+    const cashBefore = state.cash;
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+    const action = state.pendingActions.find(a => a.type === 'charge_hole')!;
+    expect(action.payload['orderCost']).toBe(60);
+    expect(state.cash).toBe(cashBefore - 60);
+
+    expect(run(`employee cancel ${action.id}`).success).toBe(true);
+
+    expect(state.cash).toBe(cashBefore);
+    expect(state.finances.cash).toBe(state.cash);
+    const refund = state.finances.transactions.find(t => t.category === 'refund' && t.amount === 60);
+    expect(refund).toBeDefined();
+    expect(refund!.type).toBe('income');
+  });
+
+  it('drill_plan clear refunds every outstanding charge order', () => {
+    const { run, state } = setupDrilled(1, 2);
+    const cashBefore = state.cash;
+    const holes = state.drillHoles.length;
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(state.cash).toBe(cashBefore - holes * 60);
+
+    expect(run('drill_plan clear').success).toBe(true);
+
+    expect(state.cash).toBe(cashBefore);
+    expect(state.finances.cash).toBe(state.cash);
+  });
+
+  it('drill_plan remove hole:<id> refunds only that hole\'s outstanding order', () => {
+    const { run, state } = setupDrilled(1, 2);
+    const [first, second] = state.drillHoles.map(h => h.id);
+    expect(run(`charge hole:${first} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+    expect(run(`charge hole:${second} explosive:boomite amount:3 stemming:2`).success).toBe(true);
+    const cashAfterOrders = state.cash;
+
+    expect(run(`drill_plan remove hole:${first}`).success).toBe(true);
+
+    expect(state.cash).toBe(cashAfterOrders + 60);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(1);
+  });
+
+  it('re-charging a hole with an outstanding order nets new minus old, with one action per hole', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const holeId = state.drillHoles[0]!.id;
+    const cashBefore = state.cash;
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+    expect(run(`charge hole:${holeId} explosive:boomite amount:8 stemming:2`).success).toBe(true);
+
+    expect(state.cash).toBe(cashBefore - 96);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId)).toHaveLength(1);
+    expect(state.finances.cash).toBe(state.cash);
+  });
+
+  it('insufficient funds refuses the charge with console.insufficient_funds, queues nothing and leaves cash unchanged', () => {
+    const { run, state } = setupDrilled(1, 1, 59);
+    const holeId = state.drillHoles[0]!.id;
+
+    const result = run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`);
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('console.insufficient_funds', { need: formatMoney(60), have: formatMoney(59) }));
+    expect(state.cash).toBe(59);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+    expect(state.plannedChargesByHole[holeId]).toBeUndefined();
+  });
+
+  it('cash exactly equal to the cost is allowed', () => {
+    const { run, state } = setupDrilled(1, 1, 60);
+    const holeId = state.drillHoles[0]!.id;
+
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+
+    expect(state.cash).toBe(0);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(1);
+  });
+
+  it('hole:* batch is atomic: when the total is unaffordable no hole is charged', () => {
+    // 3 holes x $60 = $180 needed, only $119 on hand: two would fit, none may be taken.
+    const { run, state } = setupDrilled(1, 3, 119);
+    expect(state.drillHoles).toHaveLength(3);
+
+    const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(state.cash).toBe(119);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+    expect(state.plannedChargesByHole).toEqual({});
+  });
+
+  it('existing refusals (bad explosive, stemming, amount) stay free of cash and ledger side effects', () => {
+    const { run, state } = setupDrilled(1, 1);
+    const holeId = state.drillHoles[0]!.id;
+    const cashBefore = state.cash;
+    const txBefore = state.finances.transactions.length;
+
+    expect(run(`charge hole:${holeId} explosive:nonexistent amount:5 stemming:2`).success).toBe(false);
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:0.2`).success).toBe(false);
+    expect(run(`charge hole:${holeId} explosive:boomite amount:999 stemming:2`).success).toBe(false);
+
+    expect(state.cash).toBe(cashBefore);
+    expect(state.finances.transactions).toHaveLength(txBefore);
   });
 });

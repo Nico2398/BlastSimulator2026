@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks,
+  createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks, chargeOrderCost,
 } from '../../../src/core/mining/ChargePlan.js';
 import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
 import { MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG } from '../../../src/core/config/balance.js';
@@ -140,5 +140,24 @@ describe('computeChargeHoleDurationTicks', () => {
     const light = computeChargeHoleDurationTicks(2);
     const heavy = computeChargeHoleDurationTicks(8);
     expect(heavy).toBeGreaterThan(light);
+  });
+});
+
+describe('chargeOrderCost (#1341)', () => {
+  it('is costPerKg * amountKg for a known explosive', () => {
+    expect(chargeOrderCost('dynatomics', 20)).toBe(4000);
+    expect(chargeOrderCost('boomite', 5)).toBe(60);
+  });
+
+  it('is 0 for zero kg (boundary)', () => {
+    expect(chargeOrderCost('dynatomics', 0)).toBe(0);
+  });
+
+  it('is 0 for an unknown explosive id (rejection)', () => {
+    expect(chargeOrderCost('nonexistent', 10)).toBe(0);
+  });
+
+  it('scales linearly with amount', () => {
+    expect(chargeOrderCost('pop_rock', 2.5)).toBe(12.5);
   });
 });
