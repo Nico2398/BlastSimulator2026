@@ -518,6 +518,15 @@ describe('LevelEndScreen', () => {
       screen.dispose();
     });
 
+    it('shows the finale when the stored flag is false but all 3 real levels are completed', () => {
+      const { container, screen } = mount();
+      const s = finale('treranium_depths', false);
+      for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) s.campaign.levels[id]!.completed = true;
+      screen.update(s);
+      expect(rootText(container)).toContain(t('ui.level_end.campaign_complete.headline'));
+      screen.dispose();
+    });
+
     it.each(['dusty_hollow', 'grumpstone_ridge', 'tutorial_pit'])('victory on %s shows no finale text', id => {
       const { container, screen } = mount();
       screen.update(finale(id, true));
@@ -526,7 +535,7 @@ describe('LevelEndScreen', () => {
       screen.dispose();
     });
 
-    it('a defeat then a normal victory leaves no lingering finale text', () => {
+    it('finale text clears after a defeat render and after a non-final victory', () => {
       const { container, screen } = mount();
       screen.update(finale('treranium_depths', true));
       expect(rootText(container)).toContain(t('ui.level_end.campaign_complete.headline'));

@@ -2574,7 +2574,7 @@
   "ui.level_end.victory.headline": "TARGET REACHED",
   "ui.level_end.victory.recap": "{level} has produced {profit} in profit against a target of {target}. Head office is delighted and has already forgotten your name.",
   "ui.level_end.campaign_complete.headline": "CAMPAIGN COMPLETE",
-  "ui.level_end.campaign_complete.body": "You have extracted every last dollar from all three mines. Head office is sending a plaque, a bill for the plaque, and a new target.",
+  "ui.level_end.campaign_complete.body": "You have extracted every last dollar from every mine in the portfolio. Head office is sending a plaque, a bill for the plaque, and a new target.",
   "ui.level_end.stat.profit": "PROFIT",
   "ui.level_end.stat.days": "DAYS",
   "ui.level_end.stat.blasts": "BLASTS",

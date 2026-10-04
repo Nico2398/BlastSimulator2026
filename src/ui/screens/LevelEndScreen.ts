@@ -16,8 +16,8 @@ import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
-import { isCampaignComplete, isCampaignLevel, isFinalCampaignLevel } from '../../core/campaign/Campaign.js';
-import { getLevel, getAllLevels } from '../../core/campaign/Level.js';
+import { getCampaignLevels, isCampaignDone, isFinalCampaignLevel } from '../../core/campaign/Campaign.js';
+import { getLevel } from '../../core/campaign/Level.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { GameState } from '../../core/state/GameState.js';
 
@@ -237,7 +237,7 @@ export class LevelEndScreen {
   private nextLevelId(state: GameState): string | null {
     const activeId = state.campaign.activeLevelId;
     if (!activeId) return null;
-    const all = getAllLevels().filter(isCampaignLevel);
+    const all = getCampaignLevels();
     const idx = all.findIndex(l => l.id === activeId);
     if (idx < 0 || idx + 1 >= all.length) return null;
     return all[idx + 1]!.id;
@@ -257,7 +257,7 @@ export class LevelEndScreen {
       return star;
     }));
 
-    const campaignDone = activeId !== null && isFinalCampaignLevel(activeId) && (state.campaign.campaignComplete || isCampaignComplete(state.campaign));
+    const campaignDone = activeId !== null && isFinalCampaignLevel(activeId) && isCampaignDone(state.campaign);
     this.headlineEl.textContent = t(campaignDone ? 'ui.level_end.campaign_complete.headline' : 'ui.level_end.victory.headline');
     this.campaignCompleteEl.textContent = campaignDone ? t('ui.level_end.campaign_complete.body') : '';
     this.campaignCompleteEl.style.display = campaignDone ? '' : 'none';
