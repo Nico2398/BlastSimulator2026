@@ -1077,7 +1077,8 @@ function findOrdinaryPath(
   const retryBudget = pathfindingRetryNodeBudget(grid.width, grid.height);
   if (openHeap.size > 0 && budget < retryBudget) {
     const retried = findOrdinaryPath(grid, sx, sz, gx, gz, avoidVehicles, requiredClearance, startPocket, goalPocket, retryBudget);
-    if (retried.found) return retried;
+    // The retry already ran the direct-line fallback on exhaustion.
+    return retried;
   }
 
   // Budget exceeded or open set empty — try direct-line fallback

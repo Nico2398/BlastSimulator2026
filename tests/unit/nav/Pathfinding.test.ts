@@ -1987,7 +1987,7 @@ describe('findRampConnections — climbability (#1305)', () => {
     expect(isStepClimbable(0.25, 0, 1)).toBe(true);
     const conn = findRampConnections(grid).find(r => r.rampX === 2 && r.rampZ === 0);
     expect(conn).toBeDefined();
-    expect(conn!.upperLevel).toBe(1 > 0 ? 1 : 0); // upperLevel is the higher bench-level index
+    expect(conn!.upperLevel).toBe(1); // upperLevel is the higher bench-level index
     expect(conn!.lowerLevel).toBe(0);
   });
 

@@ -242,6 +242,9 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
     expect(hireBuilder.success).toBe(true);
 
+    // #1305: site moved (13,15) -> (9,12); the old site was only reachable
+    // through a ramp connection across an unclimbable step, which
+    // findRampConnections no longer emits.
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '9,12' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
