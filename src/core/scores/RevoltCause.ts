@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Why the workers revolted (drives the defeat tip shown to the player)
 
-import type { ShiftMode } from '../entities/SitePolicy.js';
+import { getShiftDurationTicks, type ShiftMode } from '../entities/SitePolicy.js';
 
 export type RevoltCause = 'no_rest_policy' | 'no_housing' | 'morale_drain';
 
@@ -9,7 +9,8 @@ export type RevoltCause = 'no_rest_policy' | 'no_housing' | 'morale_drain';
  * Planned rules: continuous/custom shift mode -> no_rest_policy;
  * else no active living quarters -> no_housing; else morale_drain.
  */
-export function revoltCause(_shiftMode: ShiftMode, _hasActiveHousing: boolean): RevoltCause {
-  // TODO: implement
+export function revoltCause(shiftMode: ShiftMode, hasActiveHousing: boolean): RevoltCause {
+  if (getShiftDurationTicks(shiftMode) === Infinity) return 'no_rest_policy';
+  if (!hasActiveHousing) return 'no_housing';
   return 'morale_drain';
 }
