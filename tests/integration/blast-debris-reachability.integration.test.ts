@@ -22,6 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
+import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 
 /** Keeps every living employee's fatigue topped up so a long drill/haul run is never derailed by a needs collapse mid-drive (mirrors blast-report-modal-save-load.integration.test.ts's fireBlast helper). */
 function refreshFatigue(state: GameState): void {
@@ -198,30 +199,38 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
 
       const strandedCount = debrisActions(state).length;
       expect(strandedCount).toBeGreaterThan(0);
-      const strandedFragmentIds = debrisActions(state).map(a => a.payload['fragmentId'] as number);
+      const strandedIds = new Set(debrisActions(state).map(a => a.payload['fragmentId'] as number));
+      // Haulable stranded mass recorded BEFORE the ramp (fragment_debris splits pieces, so assert on mass, not ids, at the end).
+      const strandedMassKg = state.logistics.fragments
+        .filter(f => strandedIds.has(f.fragment.id) && f.state === 'on_ground')
+        .reduce((sum, f) => sum + f.fragment.mass, 0);
+      expect(strandedMassKg).toBeGreaterThan(0);
 
       const storedBeforeRamp = state.logistics.storedMassKg;
       expect(run('build_ramp start:27,9 end:17,9 depth:5')).toMatchObject({ success: true });
       tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 800);
       expect(state.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
 
-      // No extra player action: the stamp clears on its own and the crew resumes the work.
-      tickUntilFresh(run, state, () => debrisActions(state).every(a => a.blockedReason === null || a.blockedReason === undefined), 50);
-      expect(debrisActions(state).filter(a => a.blockedReason === 'debris_out_of_reach')).toHaveLength(0);
-      expect(state.pendingActions.some(a => a.blockedReason === 'target_unreachable')).toBe(false);
-      // Resumed: some of the once-stranded pieces are claimed by the crew (or already gone), not left idle in the queue.
-      // (Clearing the whole pocket is not asserted: the debris itself occupies the pocket's one-lane cells, so the
-      // order in which a lone hauler can reach each piece is a path-planning concern outside #1302.)
-      const strandedIds = new Set(strandedFragmentIds);
-      const strandedActions = (): PendingAction[] => debrisActions(state).filter(a => strandedIds.has(a.payload['fragmentId'] as number));
-      // Hauling resumes with no further order: a once-stranded piece is actually picked up and stored.
-      tickUntilFresh(run, state, () => strandedActions().length < strandedCount && state.logistics.storedMassKg > storedBeforeRamp, 1500);
-      expect(strandedActions().length).toBeLessThan(strandedCount);
-      expect(state.logistics.storedMassKg).toBeGreaterThan(storedBeforeRamp);
-      // (Clearing every piece is not asserted: debris fills the pocket's one-lane cells, so a claimed piece can sit
-      // behind another one -- an engine path-planning concern outside #1302.)
+      // From here on, a reason stamped on any action is a regression: the ramp connected the pocket for good.
+      let sawOutOfReach = false;
+      let sawTargetUnreachable = false;
+      tickUntilFresh(run, state, () => {
+        for (const a of state.pendingActions) {
+          if (a.blockedReason === 'debris_out_of_reach') sawOutOfReach = true;
+          if (a.blockedReason === 'target_unreachable') sawTargetUnreachable = true;
+        }
+        return debrisActions(state).length === 0;
+      }, 4000);
+
+      // The crew clears the whole pocket with no further order: no livelock on a repeating route.
+      expect(debrisActions(state)).toHaveLength(0);
+      expect(state.logistics.fragments.filter(f => f.state === 'on_ground' && isPocketCell(Math.round(f.fragment.position.x), Math.round(f.fragment.position.z)))).toHaveLength(0);
+      expect(state.logistics.storedMassKg - storedBeforeRamp).toBeGreaterThanOrEqual(strandedMassKg - 1e-6);
+      expect(sawOutOfReach).toBe(false);
+      expect(sawTargetUnreachable).toBe(false);
+      expectNoWorldInvariantViolations(state);
     },
-    240000,
+    600000,
   );
 
   it(
