@@ -19,7 +19,7 @@
 // (the page.evaluate(__skipBlastPlayback) call inside the per-step try
 // block, after a successful blast step), not a pending TODO.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 
 vi.mock('fs', async (importOriginal) => {
@@ -257,5 +257,104 @@ describe('multi-angle shots camera sync (#1244)', () => {
     );
 
     expect(forceRenderFrameMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ──────────────────────────────────────────────
+// #1224 — capture time never counts against a step's deadline. The deadline
+// covers the step's own interaction actions and its `expect` check; the
+// end-of-step captures (base image, frames, shots) run after it is satisfied,
+// and inline `screenshot` actions run through the `excludeFromDeadline`
+// wrapper handed to executeInteractionActions.
+// ──────────────────────────────────────────────
+describe('step deadline excludes capture time (#1224)', () => {
+  const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+  const okResult = { screenshotPaths: [] as string[], commandOutput: 'ok', gameState: {}, uiState: {} };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fakePage = { evaluate: vi.fn(async () => undefined) };
+    fakePageRef.current = fakePage;
+    initBrowserMock.mockClear();
+    executeInteractionActionsMock.mockReset();
+    executeInteractionActionsMock.mockImplementation(async () => okResult);
+    captureFrameMock.mockReset();
+    captureFrameMock.mockImplementation(async () => {});
+    waitOneFrameMock.mockClear();
+  });
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  async function run(steps: ScenarioStepDef[], shots: ShotDef[], enableScreenshots: boolean, frames = 1) {
+    const p = runScenarioInteraction(
+      'deadline-fixture', steps, shots, 5173, undefined, frames, 200,
+      { width: 1280, height: 720 }, enableScreenshots, '/tmp/screenshots', false,
+    );
+    // Settle the whole run in simulated time; far past any capture below.
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    return p;
+  }
+
+  it('does not time out when base, frame and shot captures each outlast the step deadline', async () => {
+    captureFrameMock.mockImplementation(() => sleep(5000));
+    const results = await run(
+      [genericStep({ timeout: 1, frames: 2 })],
+      [{ name: 'a', yaw: 0, pitch: 45 }, { name: 'b', yaw: 90, pitch: 45 }],
+      true,
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0]!.error).toBeUndefined();
+    // base + 2 frames + 2 shots, all really captured.
+    expect(captureFrameMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('does not charge inline screenshot time passed through excludeFromDeadline', async () => {
+    executeInteractionActionsMock.mockImplementation(async (...args: unknown[]) => {
+      const exclude = args[8] as <T>(work: () => Promise<T>) => Promise<T>;
+      expect(typeof exclude).toBe('function');
+      await exclude(() => sleep(3000));
+      return okResult;
+    });
+    const results = await run([genericStep({ timeout: 1 })], [], true);
+    expect(results[0]!.error).toBeUndefined();
+  });
+
+  it('control: the same time in a non-excluded action times out, naming the last progress', async () => {
+    executeInteractionActionsMock.mockImplementation(async (...args: unknown[]) => {
+      (args[6] as (d: string) => void)('action 1/1 (wait)');
+      await sleep(3000);
+      return okResult;
+    });
+    const results = await run([genericStep({ timeout: 1 })], [], true);
+    expect(results[0]!.error).toMatch(/timed out after 1000ms \(last progress: action 1\/1 \(wait\)\)/);
+  });
+
+  it('gives the same deadline with and without screenshots enabled', async () => {
+    executeInteractionActionsMock.mockImplementation(async () => { await sleep(3000); return okResult; });
+    const withShots = await run([genericStep({ timeout: 1 })], shotsFixture, true);
+    const without = await run([genericStep({ timeout: 1 })], shotsFixture, false);
+    expect(withShots[0]!.error).toMatch(/timed out after 1000ms/);
+    expect(without[0]!.error).toMatch(/timed out after 1000ms/);
+  });
+
+  it('a step whose actions finish in time still passes under screenshots', async () => {
+    executeInteractionActionsMock.mockImplementation(async () => { await sleep(900); return okResult; });
+    const results = await run([genericStep({ timeout: 1 })], shotsFixture, true);
+    expect(results[0]!.error).toBeUndefined();
+  });
+
+  it('fails the step when an end-of-step capture throws after the race', async () => {
+    captureFrameMock.mockRejectedValueOnce(new Error('capture boom'));
+    const results = await run([genericStep({ timeout: 1 })], [], true);
+    expect(results).toHaveLength(1);
+    expect(results[0]!.error).toContain('capture boom');
+  });
+
+  it('stops at the failed capture instead of running later steps', async () => {
+    captureFrameMock.mockRejectedValueOnce(new Error('capture boom'));
+    const results = await run(
+      [genericStep({ timeout: 1 }), genericStep({ command: 'tick 2', timeout: 1 })], [], true,
+    );
+    expect(results).toHaveLength(1);
   });
 });
