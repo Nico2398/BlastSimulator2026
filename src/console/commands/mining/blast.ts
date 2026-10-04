@@ -5,6 +5,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
 import { executeBlast, buildBlastReport, maxVillageVibration } from '../../../core/mining/BlastExecution.js';
+import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
@@ -173,7 +174,11 @@ export function blastCommand(
   // Report figure only: explosives were already paid when each charge order
   // was placed (charge.ts, #1341), so the blast itself never touches cash.
   const spent = plannedChargesCost(state.chargesByHole);
-  state.lastBlastReport = buildBlastReport(result, state.tickCount, spent, thisBlastAccidents);
+  const wetReport = classifyWetChargedHoles(plan.charges, wetHoleIds);
+  state.lastBlastReport = buildBlastReport(
+    result, state.tickCount, spent, thisBlastAccidents,
+    wetReport,
+  );
 
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];
@@ -212,6 +217,9 @@ export function blastCommand(
       `Projections: ${result.projectionCount}`,
       ...(result.vibrationAtVillages.length > 0
         ? [t('mining.blast.max_village_vibration', { value: villageVibration.toFixed(4) })]
+        : []),
+      ...(wetReport.wet.length > 0
+        ? [t('mining.blast.wet_holes', { wet: wetReport.wet.length, fizzled: wetReport.fizzled.length })]
         : []),
       `Furthest throw: ${result.maxThrowDistance.toFixed(1)} m`,
       ...(cancelledDrillOrders > 0

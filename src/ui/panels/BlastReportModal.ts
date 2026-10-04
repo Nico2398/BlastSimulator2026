@@ -250,6 +250,12 @@ export class BlastReportModal {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
         t('ui.blast_workshop.report.oversized_hint', { count: report.oversizedFragments, vehicle: t('vehicle_type.rock_fragmenter') })));
     }
+    if (report.wetHoleIds?.length) {
+      const fizzled = report.fizzledHoleIds?.length ?? 0;
+      const key = fizzled > 0 ? 'ui.blast_workshop.report.wet_holes_fizzled' : 'ui.blast_workshop.report.wet_holes_ok';
+      notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
+        t(key, { wet: report.wetHoleIds.length, fizzled })));
+    }
     this.notesEl.replaceChildren(...notes);
   }
 
