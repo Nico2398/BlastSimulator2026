@@ -61,7 +61,11 @@
       "command": "state",
       "description": "Return to Main Menu, then confirm the modal. The menu must come back with LOAD reachable. `state` is the inert paired command.",
       "interaction": [
-        { "type": "clickLabel", "label": "Return to Main Menu" },
+        { "type": "mousemove", "x": 640, "y": 400 },
+        { "type": "wheel", "deltaX": 0, "deltaY": 2000 },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "clickSelector", "selector": "#bs-settings-panel .bsx-btn-danger" },
+        { "type": "waitForSelector", "selector": ".bs-confirm-overlay .bs-btn-danger" },
         { "type": "clickLabel", "label": "Return to Menu" },
         { "type": "awaitUsable", "selector": "#bs-main-menu #bs-menu-load" }
       ],
