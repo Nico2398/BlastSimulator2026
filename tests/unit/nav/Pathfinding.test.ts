@@ -1018,14 +1018,9 @@ describe('findPath — multi-level routing', () => {
     // z=9 except a ramp at (5,9) connecting level 1<->2, level 2 (z=10..13).
     // No ramp anywhere connects level 0 directly to level 2.
     //
-    // Every level cell sits at surfaceY=0 (flat), but both ramp cells sit at
-    // surfaceY=50 — a cliff on both sides ordinary A*'s own climb-legality
-    // gate (isStepClimbable) refuses to step onto or off of, so the plain
-    // "try ordinary A* first" path (findPath step 5) cannot cross either
-    // wall at all and must fall through to ramp-graph routing (step 6). The
-    // ramp graph itself (findRampConnections/rampEndpoints) never applies a
-    // climb check — a ramp cell is the sanctioned connector regardless of
-    // height — so multi-level routing can still legitimately cross.
+    // Every cell is flat (surfaceY=0), so each ramp column is climbable on both
+    // sides (#1305: findRampConnections omits cliff-adjacent ramp cells) while
+    // void cells wall off the rest of each bench row.
     const width = 10;
     const height = 14;
     const cells: NavCell[][] = [];
@@ -1035,11 +1030,11 @@ describe('findPath — multi-level routing', () => {
         if (z <= 3) {
           row.push(makeCell('walkable', 0, 0));
         } else if (z === 4) {
-          row.push(x === 5 ? makeCell('ramp', 0, 50) : makeCell('void', 0));
+          row.push(x === 5 ? makeCell('ramp', 0, 0) : makeCell('void', 0));
         } else if (z <= 8) {
           row.push(makeCell('walkable', 1, 0));
         } else if (z === 9) {
-          row.push(x === 5 ? makeCell('ramp', 1, 50) : makeCell('void', 1));
+          row.push(x === 5 ? makeCell('ramp', 1, 0) : makeCell('void', 1));
         } else {
           row.push(makeCell('walkable', 2, 0));
         }

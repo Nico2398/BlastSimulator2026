@@ -771,6 +771,7 @@ describe('Economy', () => {
     // haul below with an automatic one.
     for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
 
+    // #1305: (13,15) was only reachable through a ramp connection across an unclimbable step; findRampConnections no longer emits those, so the site moved to (9,12), on the manager's walkable side.
     // 3. Build an active Freight Warehouse now. (13,13), near the drill site
     // rather than (5,5): bigger levels (#458 T6.1/D13) carry far more
     // natural terrain relief than the old ones, fragmenting NavGrid bench
@@ -795,7 +796,7 @@ describe('Economy', () => {
     const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
     expect(hireBuilder.success).toBe(true);
 
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,15' });
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '9,12' });
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);

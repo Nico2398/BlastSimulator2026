@@ -714,7 +714,15 @@ export const RESIDENT_VOXEL_SLABS_AFTER_EVICTION = 384;
 export const PATHFINDING_NODE_BUDGET_MIN = 500;
 export const PATHFINDING_NODE_BUDGET_AREA_DIVISOR = 2;
 /** Divisor for the one retry after the ordinary search exhausts its budget: 1 = whole grid area. */
-export const PATHFINDING_RETRY_BUDGET_AREA_DIVISOR = 1;
+const PATHFINDING_RETRY_BUDGET_AREA_DIVISOR = 1;
+
+/** A* node budget for the one retry after the first budget is exhausted. */
+export function pathfindingRetryNodeBudget(gridWidth: number, gridHeight: number): number {
+  return Math.max(
+    PATHFINDING_NODE_BUDGET_MIN,
+    Math.floor((gridWidth * gridHeight) / PATHFINDING_RETRY_BUDGET_AREA_DIVISOR),
+  );
+}
 
 /** A* node-exploration budget for a grid of the given dimensions. */
 export function pathfindingNodeBudget(gridWidth: number, gridHeight: number): number {
