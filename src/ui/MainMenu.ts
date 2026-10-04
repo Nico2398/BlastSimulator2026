@@ -48,6 +48,9 @@ export class MainMenu {
   private saveCount = 0;
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private tickerIndex = 0;
+  /** Bumped per Continue-summary refresh so an older, slower list() cannot overwrite a newer one. */
+  private summarySeq = 0;
+  private disposed = false;
 
   private readonly locale = new LocaleTextRegistry();
 
@@ -140,9 +143,6 @@ export class MainMenu {
     this.overlay.append(body, ticker);
     container.appendChild(this.overlay);
   }
-
-  private summarySeq = 0;
-  private disposed = false;
 
   setBackend(backend: SaveBackend): void {
     this.backend = backend;
