@@ -22,7 +22,7 @@ export function checkGameOverConditions(state: GameState, emitter: EventEmitter)
   const levelResult = checkLevelComplete(state, state.campaign, emitter);
   let levelCompleted = false;
   if (levelResult.triggered) {
-    state.levelEnded = true;
+    // checkLevelComplete already set levelEnded.
     state.levelEndReason = 'completed';
     levelCompleted = true;
   }

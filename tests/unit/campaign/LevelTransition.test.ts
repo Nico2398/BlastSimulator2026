@@ -72,8 +72,7 @@ describe('Level completion and transition (7.3)', () => {
 
     const emitter = new EventEmitter();
     const result1 = checkLevelComplete(state, campaign, emitter);
-    // The tick pipeline marks the session ended once a level completes (#1310).
-    state.levelEnded = true;
+    expect(state.levelEnded).toBe(true); // checkLevelComplete closes the session itself
     const result2 = checkLevelComplete(state, campaign, emitter);
 
     expect(result1.triggered).toBe(true);
@@ -110,7 +109,7 @@ describe('Level completion and transition (7.3)', () => {
 
     const emitter = new EventEmitter();
     checkLevelComplete(state, campaign, emitter);
-    state.levelEnded = true; // set by the tick pipeline on completion (#1310)
+    expect(state.levelEnded).toBe(true);
 
     // Further calls don't re-trigger
     const result = checkLevelComplete(state, campaign, emitter);
@@ -238,7 +237,7 @@ describe('Level completion and transition (7.3)', () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
-    it('triggers at most once per session once levelEnded is set', () => {
+    it('triggers at most once per session (the trigger sets levelEnded)', () => {
       const threshold = getAllLevels()[0]!.unlockThreshold;
       const { campaign, level } = completeFirstPlay(threshold + 100);
       const state = freshReplay(campaign, level.id, threshold + 5000);
@@ -247,7 +246,7 @@ describe('Level completion and transition (7.3)', () => {
       emitter.on('level:complete', handler);
 
       expect(checkLevelComplete(state, campaign, emitter).triggered).toBe(true);
-      state.levelEnded = true; // set by the tick pipeline
+      expect(state.levelEnded).toBe(true);
       const cumulative = campaign.levels[level.id]!.cumulativeProfit;
 
       for (let i = 0; i < 3; i++) {

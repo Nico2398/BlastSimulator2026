@@ -31,7 +31,9 @@ export interface LevelCompleteResult {
  * Call this each time profit changes (or each tick).
  * Emits 'level:complete' once per session when the threshold is reached, on a
  * first completion and on a replay of an already-completed level alike. The
- * session's `levelEnded` flag (set here on trigger) stops repeat triggers; recordProfit only unlocks on the first completion.
+ * session's `levelEnded` flag (set here on trigger) stops repeat triggers;
+ * recordProfit only unlocks on the first completion. A session already ended
+ * for another reason (e.g. bankruptcy) cannot be won: the flag blocks it.
  */
 export function checkLevelComplete(
   state: GameState,
