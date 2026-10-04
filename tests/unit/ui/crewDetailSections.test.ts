@@ -255,7 +255,7 @@ describe('makePaySection per-hour display (#1373)', () => {
 
   it('shows skill bonus per hour', () => {
     const e = makeEmployee({
-      qualifications: [{ category: 'drilling', proficiencyLevel: 2, xp: 0 }],
+      qualifications: [{ category: 'driving.drill_rig', proficiencyLevel: 2, xp: 0 }],
     });
     expect(pay(e)).toMatch(exactly(`+ skills $${perHour(QUALIFICATION_SALARY_BONUS[2])}`));
   });
@@ -268,8 +268,8 @@ describe('pay i18n keys keep placeholder parity (#1373)', () => {
 
   for (const key of ['ui.crew.pay_base', 'ui.crew.pay_bonus', 'ui.crew.pay_total']) {
     it(`${key} uses the same placeholders in en and fr`, () => {
-      expect(placeholders(fr[key])).toEqual(placeholders(en[key]));
-      expect(placeholders(en[key])).toEqual(['{amount}']);
+      expect(placeholders(fr[key] ?? '')).toEqual(placeholders(en[key] ?? ''));
+      expect(placeholders(en[key] ?? '')).toEqual(['{amount}']);
     });
   }
 
