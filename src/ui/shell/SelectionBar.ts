@@ -62,12 +62,12 @@ const SELECTION_BAR_CONTENT_HEIGHT_PX = 30;
 const SELECTION_BAR_BUTTON_WIDTH_PX = 120;
 /**
  * Widest action set across every entity kind buildActions() renders — the
- * vehicle case (follow, move_here, haul, unassign). Bump this alongside any
+ * employee and building cases (three buttons each). Bump this alongside any
  * new action added to that switch's widest branch.
  */
-const SELECTION_BAR_MAX_ACTIONS = 4;
+const SELECTION_BAR_MAX_ACTIONS = 3;
 
-/** Bottom-center bar, sized for the widest action set (vehicle selection) so the declared envelope covers every entity kind. */
+/** Bottom-center bar, sized for the widest action set (employee and building selection) so the declared envelope covers every entity kind. */
 function selectionBarBounds(viewport: Viewport): Rect {
   const actionsWidth = SELECTION_BAR_MAX_ACTIONS * SELECTION_BAR_BUTTON_WIDTH_PX
     + (SELECTION_BAR_MAX_ACTIONS - 1) * SELECTION_BAR_BUTTON_GAP_PX;
@@ -92,7 +92,7 @@ function selectionBarBounds(viewport: Viewport): Rect {
 // two unrelated flows, so they never share an action name or a data-action.
 export type SelectionAction =
   | 'detail' | 'dispatch_here' | 'train'
-  | 'haul' | 'unassign' | 'follow' | 'move_here'
+  | 'follow' | 'move_here'
   | 'upgrade' | 'move' | 'demolish'
   | 'focus' | 'widen';
 
@@ -219,8 +219,6 @@ export class SelectionBar {
         return [
           button('ghost', t('shell.selection.follow'), { icon: 'eye', dataAction: 'follow', onClick: () => fire('follow') }),
           button('ghost', t('shell.selection.move_here'), { icon: 'locate', dataAction: 'move_here', onClick: () => fire('move_here') }),
-          button('ghost', t('shell.selection.haul'), { icon: 'ore', dataAction: 'haul', onClick: () => fire('haul') }),
-          button('danger', t('shell.selection.unassign'), { icon: 'x', dataAction: 'unassign', onClick: () => fire('unassign') }),
         ];
       case 'building':
         return [

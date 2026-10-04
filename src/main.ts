@@ -1075,11 +1075,6 @@ selectionBar.setActionHandler((action, entity) => {
       // the live hover state, read at the moment the button is clicked.
       const terrain = scenePicking.aim?.terrain;
       if (!terrain) {
-        // `no_move_target` ("point at the ground…"), not `no_haul_target`
-        // ("no fragment nearby to haul") — this step fails because the cursor
-        // is not over terrain, which has nothing to do with fragments. The
-        // haul-specific text was copied here and told the player to look for
-        // the wrong thing.
         uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_move_target') });
         break;
       }
@@ -1106,20 +1101,6 @@ selectionBar.setActionHandler((action, entity) => {
       if (pos) scene.cameraController.focus(pos.x, pos.y, pos.z, action === 'follow' ? 40 : 20);
       break;
     }
-    case 'haul': {
-      // Same live-hover pattern as Dispatch Here: haul whichever fragment the
-      // player is currently pointing at.
-      const hovered = scenePicking.aim?.entity;
-      if (!hovered || hovered.kind !== 'fragment') {
-        uiManager.notify({ severity: 'warn', title: t('shell.selection.haul'), body: t('shell.selection.no_haul_target') });
-        break;
-      }
-      reportIfFailed(t('shell.selection.haul'), window.__gameConsole(`vehicle haul ${entity.id} fragment:${hovered.id}`));
-      break;
-    }
-    case 'unassign':
-      reportIfFailed(t('shell.selection.unassign'), window.__gameConsole(`vehicle driver ${entity.id} none`));
-      break;
     case 'upgrade':
       reportIfFailed(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
       break;
