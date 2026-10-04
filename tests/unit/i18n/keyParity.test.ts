@@ -409,7 +409,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
     // #1342: +2 keys (mining.blast_plan.loaded, mining.blast_plan.load_nothing_new), both locales.
-    expect(Object.keys(en).length).toBe(3575);
+    // #1329: +1 key (tutorial.stage.earn_profit), both locales: 3576.
+    expect(Object.keys(en).length).toBe(3576);
   });
 });
 
