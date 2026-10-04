@@ -140,7 +140,8 @@ import type { RampWidth } from '../config/balance.js';
 // See SaveLoad.ts's migrateV26ToV27.
 // v27 -> v28: EventSystemState gained `jamSilencedUntil` (#1208). A pre-v28
 // save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
-export const SAVE_VERSION = 28;
+// v28 -> v29: nextHoleId (#1352)
+export const SAVE_VERSION = 29;
 
 export interface GameConfig {
   seed: number;
@@ -476,6 +477,8 @@ export interface GameState {
   builtRamps: BuiltRamp[];
   /** Next ID to assign to a BuiltRamp. */
   nextBuiltRampId: number;
+  /** Next numeric part of a generated hole id ("H<n>"); persisted so ids stay unique across save/load (#1352). */
+  nextHoleId: number;
   /** Buildings ordered but not yet built — each queues one `place_building` action and lands in `buildings.buildings` on completion (#556). */
   plannedBuildings: PlannedBuilding[];
   /** Next ID to assign to a newly created PlannedBuilding. */
@@ -598,6 +601,7 @@ export function createGame(config: GameConfig): GameState {
     nextPlannedRampId: 1,
     builtRamps: [],
     nextBuiltRampId: 1,
+    nextHoleId: 1,
     plannedBuildings: [],
     nextPlannedBuildingId: 1,
   };

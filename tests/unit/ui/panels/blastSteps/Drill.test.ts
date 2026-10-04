@@ -2,11 +2,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DrillStep } from '../../../../../src/ui/panels/blastSteps/Drill.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
-import { addHole, resetHoleIds } from '../../../../../src/core/mining/DrillPlan.js';
+import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
 import { DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../../../src/core/config/balance.js';
 import type { PlacementKit } from '../../../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../../../src/ui/scene/PlacementController.js';
+
+const holeCounter = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -50,7 +52,7 @@ function makeStep(): { step: DrillStep; container: HTMLElement; gameConsole: Ret
   return { step, container, gameConsole };
 }
 
-beforeEach(() => resetHoleIds());
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('DrillStep', () => {
   it('shows the empty state when no holes exist', () => {
@@ -62,8 +64,8 @@ describe('DrillStep', () => {
   it('renders one row per hole with id, position, and depth', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 20, 8, 0.15);
-    addHole(state.drillHoles, 13, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 20, 8, 0.15);
 
     step.update(state, 'sunny');
 
@@ -76,7 +78,7 @@ describe('DrillStep', () => {
   it('shows DRY for an untubed hole when it is not raining', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
 
     step.update(state, 'sunny');
 
@@ -88,7 +90,7 @@ describe('DrillStep', () => {
   it('shows WET for an untubed hole while it is raining', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
 
     step.update(state, 'heavy_rain');
 
@@ -98,7 +100,7 @@ describe('DrillStep', () => {
   it('shows TUBED even while raining, once tubing is installed', () => {
     const { step } = makeStep();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 20, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
     buyTubing(state.tubingState, 1, state.cash);
     installTubing(state.tubingState, hole.id, [hole.id]);
 
@@ -111,7 +113,7 @@ describe('DrillStep', () => {
   it('treats missing weather as dry (no crash, no WET chip)', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
 
     expect(() => step.update(state, undefined)).not.toThrow();
     expect(step.root.textContent).toContain('DRY');
@@ -120,7 +122,7 @@ describe('DrillStep', () => {
   it('delete button dispatches drill_plan remove for that hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 20, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
     step.update(state, 'sunny');
 
     const deleteBtn = step.root.querySelector('[data-action="remove-hole"]') as HTMLButtonElement;
@@ -139,7 +141,7 @@ describe('DrillStep', () => {
   it('clicking Clear Plan with holes shows an inline confirm instead of clearing immediately', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
     step.update(state, 'sunny');
 
     const clearBtn = step.root.querySelector('[data-action="clear-holes"]') as HTMLButtonElement;
@@ -152,7 +154,7 @@ describe('DrillStep', () => {
   it('confirming the clear prompt dispatches drill_plan clear', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
     step.update(state, 'sunny');
     (step.root.querySelector('[data-action="clear-holes"]') as HTMLButtonElement).click();
     step.update(state, 'sunny');
@@ -166,7 +168,7 @@ describe('DrillStep', () => {
   it('cancelling the clear prompt dispatches nothing and hides the prompt', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 20, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
     step.update(state, 'sunny');
     (step.root.querySelector('[data-action="clear-holes"]') as HTMLButtonElement).click();
     step.update(state, 'sunny');
@@ -312,7 +314,7 @@ describe('DrillStep — scroll-bounded hole list (#958)', () => {
   it('bounds the hole list to a wrapper with inline overflow-y:auto and a numeric max-height, holding every row', () => {
     const { step } = makeStep();
     const state = makeState();
-    for (let i = 0; i < 50; i++) addHole(state.drillHoles, i, 0, 8, 0.15);
+    for (let i = 0; i < 50; i++) addHole(holeCounter, state.drillHoles, i, 0, 8, 0.15);
     step.update(state, 'sunny');
 
     const wrapper = findHoleListWrapper(step.root);
@@ -323,7 +325,7 @@ describe('DrillStep — scroll-bounded hole list (#958)', () => {
   it('keeps the Saved Plans save/load block reachable as a sibling of the bounded hole-list wrapper', () => {
     const { step } = makeStep();
     const state = makeState();
-    for (let i = 0; i < 50; i++) addHole(state.drillHoles, i, 0, 8, 0.15);
+    for (let i = 0; i < 50; i++) addHole(holeCounter, state.drillHoles, i, 0, 8, 0.15);
     step.update(state, 'sunny');
 
     const wrapper = findHoleListWrapper(step.root)!;

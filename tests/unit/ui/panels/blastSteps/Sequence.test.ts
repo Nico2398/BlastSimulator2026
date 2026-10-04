@@ -2,7 +2,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SequenceStep } from '../../../../../src/ui/panels/blastSteps/Sequence.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
-import { addHole, resetHoleIds } from '../../../../../src/core/mining/DrillPlan.js';
+import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
+
+const holeCounter = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -21,7 +23,7 @@ function row(step: SequenceStep, holeId: string): HTMLElement {
   return step.root.querySelector(`[data-hole="${holeId}"]`) as HTMLElement;
 }
 
-beforeEach(() => resetHoleIds());
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('SequenceStep', () => {
   it('shows the empty state when no holes exist', () => {
@@ -33,7 +35,7 @@ describe('SequenceStep', () => {
   it('renders one row per hole with its tag and an unset ("—") delay', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state);
 
     expect(row(step, 'H1')).not.toBeNull();
@@ -43,7 +45,7 @@ describe('SequenceStep', () => {
   it('shows the real delay once one is set', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     state.sequenceDelays['H1'] = 50;
     step.update(state);
 
@@ -53,9 +55,9 @@ describe('SequenceStep', () => {
   it('groups holes into rows by their real z coordinate, not insertion order', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15); // z=10 → Row 1
-    addHole(state.drillHoles, 13, 10, 8, 0.15); // z=10 → Row 1
-    addHole(state.drillHoles, 10, 13, 8, 0.15); // z=13 → Row 2
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15); // z=10 → Row 1
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15); // z=10 → Row 1
+    addHole(holeCounter, state.drillHoles, 10, 13, 8, 0.15); // z=13 → Row 2
     step.update(state);
 
     expect(row(step, 'H1').textContent).toContain('Row 1');
@@ -99,7 +101,7 @@ describe('SequenceStep', () => {
   it('a hole\'s + button dispatches sequence set, stepping up from unset (treated as 0)', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state);
 
     (row(step, 'H1').querySelector('[data-action="delay-inc"]') as HTMLButtonElement).click();
@@ -110,7 +112,7 @@ describe('SequenceStep', () => {
   it('a hole\'s - button steps down and floors at 0', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     state.sequenceDelays['H1'] = 10;
     step.update(state);
 
@@ -122,8 +124,8 @@ describe('SequenceStep', () => {
   it('per-hole delay buttons only affect their own hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
-    addHole(state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     step.update(state);
 
     (row(step, 'H2').querySelector('[data-action="delay-inc"]') as HTMLButtonElement).click();
@@ -141,7 +143,7 @@ describe('SequenceStep', () => {
   it('refreshLocale() does not throw and keeps rendering', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state);
     expect(() => step.refreshLocale()).not.toThrow();
     step.update(state);

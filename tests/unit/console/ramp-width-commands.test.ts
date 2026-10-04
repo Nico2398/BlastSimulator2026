@@ -1,11 +1,11 @@
 // BlastSimulator2026 — Console: ramp width on build_ramp and the widen_ramp command (#1298)
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   buildRampCommand, cancelRampCommand, widenRampCommand, type MiningContext,
 } from '../../../src/console/commands/mining.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+
 import { RAMP_COST_PER_METER_PER_WIDTH } from '../../../src/core/config/balance.js';
 import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
@@ -24,8 +24,6 @@ function drive(ctx: MiningContext, maxTicks = 600): void {
     tickCommand(ctx, ['1'], {});
   }
 }
-
-beforeEach(() => resetHoleIds());
 
 describe('build_ramp width:', () => {
   it.each([3, 5, 7])('orders a %i wide ramp charging length * width * per-width rate', (width) => {

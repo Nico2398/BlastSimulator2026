@@ -11,13 +11,11 @@
 // value (src/console/commands/saveload.ts), so there is no such literal on
 // that path to route through t() here.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { saveCommand } from '../../../src/console/commands/saveload.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
-import { makeEmptyCtx } from './i18nGuardHelpers.js';
 
-beforeEach(() => resetHoleIds());
+import { makeEmptyCtx } from './i18nGuardHelpers.js';
 afterEach(() => setLocale('en'));
 
 describe('saveload.ts saveCommand no-game guard', () => {

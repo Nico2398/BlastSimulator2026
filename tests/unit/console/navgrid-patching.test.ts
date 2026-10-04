@@ -3,7 +3,7 @@
 // all trigger the appropriate NavGrid.patchNavGrid() calls — checking the
 // resulting NavGrid cell types directly (NOT via events).
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 import {
   blastCommand,
@@ -12,7 +12,7 @@ import {
   sequenceCommand,
   type MiningContext,
 } from '../../../src/console/commands/mining.js';
-import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
@@ -76,8 +76,6 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
     tickCommand(ctx, ['1'], {});
   }
 }
-
-beforeEach(() => resetHoleIds());
 
 /**
  * A cell not covered by any building footprint — passable, but its exact
@@ -598,8 +596,6 @@ describe('NavGrid patching — blast', () => {
     const ctx = makeCtx();
     const nav = ctx.state!.navGrid!;
     expect(nav).toBeTruthy();
-
-    resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
@@ -651,8 +647,6 @@ describe('NavGrid patching — blast', () => {
       for (let y = 0; y < GENERATED_TERRAIN_GRID_SIZE_Y; y++) if (grid.densityAt(x, y, z) > 0) n++;
       return n;
     };
-
-    resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
@@ -671,7 +665,6 @@ describe('NavGrid patching — blast', () => {
     const prevType = nav.cells[0]![0]!.type;
 
     // Create a drill hole but don't charge it — validation should fail
-    resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '8' });
     driveDrillPlanToCompletion(ctx);
 
@@ -761,8 +754,6 @@ describe('NavGrid patching — event names (#1161)', () => {
 
   it('blast emits terrain:updated exactly once (the real carve) and nav:occupancy_changed exactly once (the corrective post-clear patch)', () => {
     const ctx = makeCtx();
-
-    resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
