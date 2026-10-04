@@ -149,3 +149,50 @@ describe('software previews model wet holes like the real blast (#1347)', () => 
     expect(preview.cracked).toBe(report.crackedVoxels);
   });
 });
+
+describe('blast report lists wet and fizzled holes (#1348)', () => {
+  function tubedBlast(weather: string | null, explosiveId: string, tube: boolean) {
+    const game = createRunner();
+    game.runner.run('new_game seed:42 staffed:true');
+    if (weather) game.runner.run(`weather set ${weather}`);
+    game.runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
+    driveDrillPlanToCompletion(game.runner, game.ctx);
+    if (tube) {
+      expect(game.runner.run(`buy amount:${game.ctx.state!.drillHoles.length}`).success).toBe(true);
+      for (const hole of game.ctx.state!.drillHoles) {
+        expect(game.runner.run(`install_tubing hole:${hole.id}`).success).toBe(true);
+      }
+    }
+    game.runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
+    driveChargePlanToCompletion(game.runner, game.ctx);
+    const chargedIds = Object.keys(game.ctx.state!.chargesByHole).sort();
+    game.runner.run('sequence auto delay_step:25');
+    expect(game.runner.run('blast').success).toBe(true);
+    return { report: game.ctx.state!.lastBlastReport!, chargedIds };
+  }
+
+  it('rain + untubed boomite: every charged hole is wet and fizzled', () => {
+    const { report, chargedIds } = tubedBlast('heavy_rain', 'boomite', false);
+    expect(chargedIds.length).toBe(6);
+    expect(report.wetHoleIds).toEqual(chargedIds);
+    expect(report.fizzledHoleIds).toEqual(chargedIds);
+  });
+
+  it('rain + tubed boomite: no wet or fizzled holes reported', () => {
+    const { report } = tubedBlast('heavy_rain', 'boomite', true);
+    expect(report.wetHoleIds ?? []).toEqual([]);
+    expect(report.fizzledHoleIds ?? []).toEqual([]);
+  });
+
+  it('sunny + boomite: no wet or fizzled holes reported', () => {
+    const { report } = tubedBlast(null, 'boomite', false);
+    expect(report.wetHoleIds ?? []).toEqual([]);
+    expect(report.fizzledHoleIds ?? []).toEqual([]);
+  });
+
+  it('rain + krackle (emulsion): holes are wet but none fizzle', () => {
+    const { report, chargedIds } = tubedBlast('heavy_rain', 'krackle', false);
+    expect(report.wetHoleIds).toEqual(chargedIds);
+    expect(report.fizzledHoleIds).toEqual([]);
+  });
+});

@@ -655,3 +655,36 @@ describe('BlastReportModal', () => {
     });
   });
 });
+
+describe('BlastReportModal wet holes note (#1348)', () => {
+  it('shows wet and fizzled counts plus the tubing hint when holes fizzled', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport({ wetHoleIds: ['H1', 'H2', 'H3'], fizzledHoleIds: ['H1', 'H2'] });
+    openReport(modal, state, setNow);
+
+    const text = modal.root.textContent ?? '';
+    expect(text).toMatch(/wet holes: 3 \(2 fizzled\)/i);
+    expect(text).toMatch(/tubing/i);
+  });
+
+  it('shows no wet note for a dry report', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport();
+    openReport(modal, state, setNow);
+
+    expect(modal.root.textContent ?? '').not.toMatch(/wet holes/i);
+  });
+
+  it('shows the ok variant when holes were wet but none fizzled', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport({ wetHoleIds: ['H1', 'H2'], fizzledHoleIds: [] });
+    openReport(modal, state, setNow);
+
+    const text = modal.root.textContent ?? '';
+    expect(text).toMatch(/wet holes: 2/i);
+    expect(text).not.toMatch(/fizzled/i);
+  });
+});
