@@ -25,6 +25,7 @@ const CARD_CONTROLS: Record<string, string[]> = {
   'stage.open_crew': ['shell.rail.employees'],
   'stage.open_survey': ['shell.rail.survey'],
   'stage.open_blast': ['shell.rail.blast'],
+  'stage.sound_horn': ['ui.blast_workshop.fire.sound_horn'],
   'stage.open_contracts': ['shell.rail.contracts'],
   'stage.open_vehicles': ['shell.rail.vehicles'],
   'stage.open_build': ['shell.rail.build'],
@@ -67,8 +68,8 @@ describe.each(Object.keys(LOCALES))('tutorial cards name real controls (%s)', (c
   });
 
   it.each(ROWS.map((r) => [r.cardKey, r.labelKey] as const))('%s quotes %s', (cardKey, labelKey) => {
-    const card = locale[cardKey];
-    const label = locale[labelKey];
+    const card = locale[cardKey] as string;
+    const label = locale[labelKey] as string;
     expect(
       card.includes(label),
       `[${code}] ${cardKey} must contain the exact control label "${label}" (${labelKey}); card reads: "${card}"`,
