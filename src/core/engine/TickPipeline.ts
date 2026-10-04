@@ -131,6 +131,10 @@ function deductExpense(
  * exactly one tick — the repeat-count loop stays in the caller (console
  * `tick.ts`), which decides whether to keep going based on
  * `report.firedEvent`/`report.paused`.
+ *
+ * Callers must not call this after `hasLevelEnded(state)` — the level is
+ * over and the mine frozen; the console `tick` command and the browser
+ * auto-tick gate both check first.
  */
 export function runTick(
   state: GameState,

@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-win",
-  "description": "Level 3 (Treranium Depths): 3 surveys and one real 24-hole blast against a mine that is already legally bankrupt before it fires -- named for an $800k win across 5 patterns (184 holes) with all 10 hired employees dying, but `campaign start level:treranium_depths` fails outright (locked, Findings #58/#59/#61/#62) and #553's queued, vehicle-gated drilling breaks the rest of the premise for real. staffed:true's free driller+drill_rig, stacked on top of this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles total against a $220,000 budget), burns through the bankruptcy threshold before a single hole lands: 'BANKRUPTCY! The mine is seized.' fires at tick 139, 271 ticks before pattern 1's 24 holes -- drilled for real by 2 concurrent driller/drill_rig pairs -- finish landing at tick 410 (#596/#597: retimed from tick 400 by the idempotent event pool and cached cooldown-threshold fixes). The pattern blasts for real anyway (nothing halts a tick or a blast once levelEnded flips): PERFECT rating, 1,507 m3 cleared, 11 of 15 employees dead, 6 of 9 vehicles destroyed. One real contract cycle (accept + storage-empty delivery refusal, via #597's `type:rubble_disposal` stable contract selector) follows; patterns 2-5 (160 more holes, 4 more explosive types) are dropped entirely -- see the final campaign status step for the full measured trajectory. #556: the closing tickCount is 469, not 464, and cash -428,821 rather than -428,646 — the file builds nothing, but the dispatch changes that came with construction sites (an idle employee now falls through to the open action pool rather than returning early on a stale queue entry) settle its one waitUntil five ticks later. Re-measured against the real run; every other checkpoint, including deathCount 12 and the three surveys, is unchanged.",
+  "description": "Level 3 (Treranium Depths) bankruptcy-by-overspend playthrough. Named for an $800k win, but `campaign start level:treranium_depths` fails outright (locked, Findings #58/#59/#61/#62) and queued, vehicle-gated drilling breaks that premise: staffed:true's free driller+drill_rig, stacked on this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles against a $220,000 budget), burns through the bankruptcy threshold before a single hole lands, and BANKRUPTCY fires at tick 139. #1313: the mine freezes the instant the level ends, so the blast, contracts and later patterns this file used to play on top of an already-lost game can no longer run; the file now pins the opening (3 surveys, fleet, hires, drill order) up to the bankruptcy and asserts the frozen state afterwards (cash and tickCount unchanged).",
   "steps": [
     {
       "command": "new_game seed:3666 cash:220000 staffed:true",
@@ -1310,563 +1310,38 @@
         ],
         "equals": {
           "deathCount": 0,
-          "employeeCount": 15
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "increased": [
-          "tickCount"
-        ],
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "increased": [
-          "tickCount"
-        ],
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "increased": [
-          "tickCount"
-        ],
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 30",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 30"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "increased": [
-          "tickCount"
-        ],
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "description": "#1103 (mover rebuild, #1089): cash corrected again, -386,848 -> -387,058 -- same three genuine fixes as level2-playthrough-win.json's own #1103 note (PlanItinerary.ts refuses an itinerary leg whose real pathfound endpoint silently clamped away from its own requested destination instead of installing one that can never arrive; EmployeeDispatchSteps.ts/PlanItinerary.ts both alight a currently-mounted employee before starting an on-foot walk or boarding a DIFFERENT vehicle; VehicleContinuity.ts releases a follow-up action's own pre-existing vehicle reservation before transferring the just-finished vehicle's reservation onto it), each shifting exactly which vehicle drives which trip and when across this file's own concurrent driller/drill_rig pairs, the same cash-only-recalibration shape #1002/#591/#680/#922/#928 below already document for an identical class of dispatch-timing change. tickCount, deathCount, employeeCount, activeContractCount, surveyCount, orderedHoleCount, holeCount, bankrupt, levelEnded, and levelEndReason all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win --report-drift`, command mode; the new number is exact and reproducible run to run. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): cash corrected again, -386,740 -> -386,812 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when across this file's own concurrent driller/drill_rig pairs; that nudges the fuel/payroll costs accumulated over this wait. tickCount, deathCount, employeeCount, activeContractCount, surveyCount, orderedHoleCount, holeCount, bankrupt, levelEnded, and levelEndReason all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win`, command mode; the new number is exact and reproducible run to run. #553: sandbox-measured -- 2 concurrent driller/drill_rig pairs (the free staffed rig and Frank Dusty's hand-bought one) land all 24 holes of this pattern by tick 410 (#596/#597: this figure moves with any change to event-pool/cooldown timing, since a genuinely pending EVENT is what halts a `tick` batch early -- re-measure rather than assume). staffed:true's free composition adds 5 more salaried employees on top of this file's own 10 hires -- a 15-person roster against a $220,000 budget that used to only have to fund 10, plus $165,000 of its own vehicles up front. Cash is already deep under BANKRUPTCY_THRESHOLD ($5,000) within the very first tick chunk of this wait; BANKRUPTCY_GRACE_TICKS (100) later, 'BANKRUPTCY! The mine is seized.' fires at tick 139 -- 271 ticks before this pattern finishes drilling and long before blast 1 ever fires. Nothing in the engine stops a `tick` command from continuing to run a level after levelEnded flips (a genuinely pending EVENT is the only thing that ever halts one), so the mine keeps operating -- legally seized, crew still working -- for the rest of this file. bankrupt/levelEnded/levelEndReason are this file's new real conclusion, first observable here now that the fields are in scope. #591: cash updated -387412->-387190 -- the staffed fleet's spawn spacing widened (SPAWN_TILE_SPACING, GameState.ts) and EntityMovementTick.ts now wires in VehicleOccupancyReroute.ts's stuck-detection/reroute, shifting exact vehicle-pathing/payroll timing without changing tickCount/holeCount or the bankruptcy outcome. #680: cash re-measured -387190->-387256 -- tri-state needs-drain classification ('working'|'idle'|'resting') shifted forced-rest drain timing across the roster's payroll cadence; tickCount/holeCount/bankruptcy outcome unaffected. #922: cash re-measured -387256->-387370 -- a vehicle's driver-employee position now tracks the vehicle for real instead of freezing at its boarding cell for the whole drive, shifting exact vehicle-pathing/payroll timing across the fleet the same way #591/#680 above did; tickCount/holeCount/bankruptcy outcome unaffected. #928: cash re-measured -387370->-387352 -- the single-gauge fatigue model shifts forced-rest/dispatch timing across the roster's payroll cadence the same way #680 above did; tickCount/holeCount/bankruptcy outcome unaffected. #1151: re-baselined against a measured run -- cash -386758 -> -386752. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration, sandbox-measured): cash re-derived -386752 -> -386866 -- occupancy-aware pathing shifts exactly which vehicle drives which trip and when across this file's own two concurrent driller/drill_rig pairs, the same cash-only-recalibration shape as every fix above; tickCount (410) and every other field here reproduce unchanged.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 410,
-          "cash": -386866,
-          "deathCount": 0,
           "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "orderedHoleCount": 0,
-          "holeCount": 24,
           "bankrupt": true,
           "levelEnded": true,
-          "levelEndReason": "bankruptcy"
-        }
+          "levelEndReason": "bankruptcy",
+          "tickCount": 139
+        },
+        "note": "#1313: the level ends here -- the tick command stops on the tick the end lands (139) and the mine is frozen from then on."
       }
     },
     {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15
-        }
-      },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:3",
+      "command": "tick 50",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:3"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "tickCount": 410,
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 24,
-          "sequencedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-step=\"2\"]",
-        "increased": [
-          "orderedChargeCount"
-        ]
-      },
-      "description": "CI finding, this PR (#586): was role: player (issue #515) driving real clicks through the Charge step. It can't be -- `state.bankrupt` flipped true (and levelEndReason to 'bankruptcy') two tick-blocks back, and `LevelEndScreen.update()` (src/main.ts:526, called after every command whenever `!tutorial.isActive`) shows its full-screen `#bs-level-end-screen` overlay -- `position:fixed;inset:0` at `--bsx-z-menu` -- the instant `levelEndReason` goes non-null, for EVERY defeat reason, not just worker_revolt. It stays up: `update()` only clears `rendered` (and re-hides) when `levelEndReason` goes back to null, which a defeated level never does. So `#bs-blast-panel [data-step=\"2\"]` is exactly the covered-by-div failure this PR's other broken scenario files hit for a different reason (crew walkout) -- same overlay class, different trigger. The command still runs (nothing in the engine gates a command on `levelEndReason`, matching this file's own established 'nothing halts a tick or a blast once levelEnded flips' narrative below) and chargedCount still reaches 24 -- only the UI path to get there is gone. `role: guard` + `expect.blocked` proves that honestly instead of asserting a click no real player could make."
-    },
-    {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #601-followup: dropped the speed-button click that used to precede this wait -- it was only ever needed to make the OLD real-time-driven `waitUntil` (auto-tick loop, real wall-clock) advance faster; #601's harness fix replaced that with a loop of the console's own synchronous `tick 1`, which never reads `state.timeScale` at all, so the click has done nothing since #601 landed. It became actively harmful here rather than merely dead: the charge step just above is itself a `role: guard` proving `state.bankrupt` already flipped level-end (see its own note), and `LevelEndScreen`'s full-screen overlay covers the whole page including the HUD the instant that happens -- so `awaitUsable` on the speed button could only ever time out once the level-end timing (already accepted as real and covered, upstream) lands before this step instead of after it.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
-          "sequencedCount": 0,
-          "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
-          "sequencedCount": 24
-        },
-        "blocked": "#bs-blast-panel [data-step=\"3\"]"
-      },
-      "description": "Same #bs-level-end-screen overlay as the Charge step above -- see its description. Was role: player driving a click through the Sequence step; converted to guard for the same reason."
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-step=\"5\"]"
-      },
-      "description": "#553/#554: this file's real 24-hole pattern (the pre-#553 file's own already-corrected grid, Finding #52) is violent enough (PERFECT rating, 1,507 m3 cleared) to kill 12 of the 15 employees on site -- a direct trace shows all 10 of this file's own hand-hires (employees #6-15) dead, plus employee #1 (Gus Rubble, the free staffed driller) and employee #2 (Walt Rockwell, the free staffed blaster), both of whom spent hundreds of ticks physically working this pattern (drilling, then #554's real queued charging). The only 3 survivors are staffed:true's remaining free hires (#3-5: the 3 staffed drivers), who never went anywhere near the pattern. 6 of the file's 9 vehicles are destroyed too: the free staffed drill_rig (#1) and all 5 of this file's own hand-bought vehicles (#5-9), which were parked squarely inside the drill pattern's footprint the whole time. CI finding, this PR (#586): was role: player driving the execute/confirm/report-close click sequence -- same `#bs-level-end-screen` overlay as the Charge and Sequence steps above blocks `#bs-blast-panel [data-step=\"5\"]` (and everything downstream of it) from the moment bankruptcy fires. The blast still detonates for real (command mode and this guard step's own `command` interaction agree on every number above) -- the automated systems, not a player's click, are what fire it, matching this file's own 'legally seized, crew still working' framing. Converted to guard rather than pretending a confirm dialog could be clicked through a full-screen game-over overlay."
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      }
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "wellBeing": 0,
-          "safety": 50,
-          "ecology": 50,
-          "nuisance": 50
-        }
-      },
-      "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
+          "command": "tick 50"
         }
       ],
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -107,
-          "tickCount": 6
+          "cash": 0,
+          "tickCount": 0
         },
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy",
+          "tickCount": 139
+        },
+        "note": "#1313: frozen mine."
       },
-      "description": "#1186: re-measured -- was 0/0 (a pending lucky_strike event froze this tick call at 0 of 6 requested ticks; see the next step's old description). SurveyCalc.ts's estimateSurveyResult now samples a bounded depth window below each column's own surface (SURVEY_DEPTH_BELOW_SURFACE) instead of scanning the whole declared column height, which is the actual, required fix (#1186: column storage has no floor/ceiling any more, so 'the whole column' is unbounded) -- but it also changes how many columns around this file's own seismic/core_sample surveys (step 21-22, x:25 z:25) carry a detectable ore, which changes how many rng.gaussian() noise draws each survey consumes. Same seed, same eventual outcome, different point in the shared PRNG stream from here on: lucky_strike no longer happens to be the very next draw the instant this tick call starts, so all 6 requested ticks actually run instead of 0. Nothing about the blast itself changed -- fragmentedCount/detachedCount/liftedCount/projectionCount for pattern 1's blast are byte-identical to origin/main, direct-verified via a debug trace comparing this branch against a clean origin/main worktree.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "blocked": "#bs-event-dialog .bs-event-choice"
-      },
-      "description": "#1186: re-measured -- was +$10,000 (lucky_strike). With the tick 6 step above now running all 6 real ticks instead of freezing at 0 (see its own description), no event is pending by the time this step runs -- resolveEventIfPending no-ops, same as every other 'event choose 0' step in this file's drilling wait, so cash is unchanged. Previously: resolves lucky_strike (+$10,000, a fixed cash bonus). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 139 (271 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast steps above, just on a dialog instead of a panel. Converted to guard + expect.blocked; the command still runs directly either way.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "contract list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract list"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      }
-    },
-    {
-      "command": "contract accept type:rubble_disposal",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract accept type:rubble_disposal"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 1,
-          "surveyCount": 3
-        },
-        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
-      },
-      "description": "#597: switched from a numeric id (contract accept 19) to the stable `type:rubble_disposal` selector (`ContractSelector`, `Contract.ts`; `parseContractSelector`, `economy.ts`) -- REFRESH_INTERVAL rotates the offer pool on its own clock, and this file's 410-tick drilling wait (up from 400 pre-#596/#597) already once knocked id 19 off the specific contract this step meant (it now names a 410kg 'Deliver rustite ore' offer, not the rubble-disposal one this step is about). `type:rubble_disposal` names the offer by what it actually is, so a future pacing shift moves which id it lands on without renumbering this file again. Verified via a real run: at tick 410 it resolves to contract #20 (Dispose of rubble, 160kg) -- the first rubble_disposal offer `contract list` above holds. CI finding, this PR (#586): was role: player, scoped to `[data-contract-id=\"19\"] .bs-contract-accept` (#513/#581, so command mode and interaction mode couldn't silently accept different contracts) -- converted to guard for the same `#bs-level-end-screen` reason as the Charge/Sequence/blast steps above: `#bs-toolbar [data-panel=\"contracts\"]` itself is covered by the full-screen bankruptcy overlay, so not even opening the panel is reachable, let alone the accept button inside it. The command still runs and activeContractCount still reaches 1 -- the pool refresh and the auto-negotiation systems that make this contract exist don't care about the UI any more than the blast does."
-    },
-    {
-      "command": "contract deliver type:rubble_disposal amount:160",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver type:rubble_disposal amount:160"
-        }
-      ],
-      "role": "guard",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 1,
-          "surveyCount": 3
-        },
-        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-      },
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled -- ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace shows 0.0 kg stored (storedMassKg never leaves 0 anywhere in this file -- both debris_haulers this file buys are destroyed in the blast above, and the free staffed debris_hauler (#2) is never driven either). amount:160 matches the accepted contract's own quantityKg (#20, Dispose of rubble); the console command still caps to whatever's actually owed and returns success:false (\"Not enough stored material: 0.0 kg available, 160.0 kg requested.\") -- command mode only fails a step on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` pins it down instead of asserting something the game correctly forbids. Same `type:rubble_disposal` selector as the accept step above (#597) -- `deliver`'s own resolveContract call matches it against `state.contracts.active`, which holds the same contract #20 accept just put there, so both steps stay pointed at the same contract without hardcoding its id twice. CI finding, this PR (#586): originally also asserted `usable: \"#bs-contract-panel [data-action=\\\"goto-ops\\\"]\"` -- dropped, because that control is covered by the same `#bs-level-end-screen` bankruptcy overlay as everything else on this page from the Charge step onward (see its description); nothing on the page is usable once levelEndReason goes non-null, so that assertion could never have passed and the original 'BLOCKED, deliberately not converted to a click' framing already had the right instinct without knowing why the panel itself was gone too. #554 follow-up (real interaction-mode CI finding): id 20 itself drifted again -- REFRESH_INTERVAL keeps cycling the offer pool and this file now spends more real ticks getting here (the driller/charging changes above), so the hardcoded numeric id from the #597 fix is exactly the moving target that fix already diagnosed for the accept/deliver console commands, just still present in this one CSS selector. Switched to data-contract-type (ContractsPanel.ts, added alongside data-contract-id for exactly this reason) the same way the console commands above already use type:rubble_disposal, instead of renumbering the id again. #585 (this fix): the repo-wide audit (`tests/unit/lint/ScenarioCommandOutcomes.test.ts`) flags this refusal as undeclared. Two sibling files hit the same audit for what looked like the same reason (tutorial-interactive.json, tutorial-steps-visual.json), and the fix there was a timing gap -- their debris_hauler just needed more real ticks before its first delivery landed, so raising a wait step's tick count fixed it. Direct trace here (createGameEngine + runCommand/runWaitUntil, replaying this file's exact command sequence through the accept above, then ticking another 200 ticks -- past the contract's own 87-tick deadline with room to spare) rules that fix out for this file specifically: storedMassKg sampled every tick stays at exactly 0 for the entire 200 ticks, never plateauing at a nonzero figure the way the tutorial files' own trace did. The reason is structural, not timing: HaulingTask.ts's requestHaul refuses to start any haul without `findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', ...)` resolving to a real building (\"No active freight warehouse available\"), and this file issues no `build` command anywhere across its 78 steps -- buildingCount stays 0 for its entire run, since staffed:true (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) grants employees and vehicles only, never a building. The free staffed debris_hauler (#2) and its licensed driver (employee #3, driving.truck) have a vehicle to board but nowhere to ever deliver to -- permanently, independent of tick count. (Ticking further only costs the contract itself: trace confirms it auto-expires and drops out of `contract status` around tick 548, ~88 ticks after accept.) No amount value escapes this either -- consumeStoredOre (Logistics.ts) refuses any positive amount against 0 available, and amount:0 is its own rejection (\"Invalid amount requested\") -- so no `.command` edit makes this succeed. Declared `commandOutcome: 'refused'` instead: this is not the silencing #585 exists to close, since the step's own claim was never that delivery succeeds -- `role: 'guard'` + `expect.blocked` already committed to proving the delivery is correctly forbidden, well before #585 came along to ask every step to declare it explicitly. Same shape, same fix as the `campaign start level:treranium_depths` guard step earlier in this file. Also note, unrelated to this fix: REFRESH_INTERVAL has drifted the resolved contract again since the #554 follow-up note above -- direct trace now shows #22 (370kg) at accept time, not #20 (160kg) -- left as-is, since `type:rubble_disposal` already selects by shape rather than id and every positive amount fails alike at 0kg stored, so the exact figure carries no more meaning here than #20 vs #22's id did.",
-      "commandOutcome": "refused"
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 1,
-          "surveyCount": 3
-        }
-      }
-    },
-    {
-      "command": "stats",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "stats"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 1,
-          "surveyCount": 3,
-          "wellBeing": 0,
-          "safety": 0,
-          "ecology": 50,
-          "nuisance": 50
-        }
-      },
-      "description": "#1186: safety re-measured, 50 -> 0. Not a new incident -- deathCount stays 12, unchanged from pattern 1's own blast, and the blast's own fragmentedCount/detachedCount/liftedCount/projectionCount are byte-identical to origin/main (direct-verified). The cause is entirely upstream, at the 'tick 6' step: main's own PRNG stream happened to queue a pending event on the very first sub-tick after the blast, freezing tickCount there (0 of 6 ticks actually ran) before TickPipeline's own recentAccidents penalty (ScoreManager.ts: `sfDelta -= recentAccidents * 5`, a 10-tick lookback window) ever got a chance to see the 12 fresh death accidents from that same blast. This branch's SurveyCalc.ts fix (see the 'tick 6' step's own description) shifts the PRNG stream enough that no event happens to be pending there any more, so all 6 real ticks run for the first time -- and recentAccidents=12 (or more, counting destroyed vehicles) applied every one of those ticks crashes safety to its floor almost immediately, exactly as the formula says it should for a blast that just killed 12 of 15 employees. Re-measured, not loosened: the old 'safety: 50' value was only ever a byproduct of main's own tick call freezing at 0 ticks by coincidence, not of the blast being any less catastrophic."
+      "description": "#1313: a tick after the level ended advances nothing: cash and tickCount stay put."
     },
     {
       "command": "campaign status",
@@ -1879,21 +1354,16 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 476,
-          "cash": -448473,
-          "deathCount": 12,
-          "employeeCount": 15,
-          "activeContractCount": 1,
-          "surveyCount": 3,
-          "wellBeing": 0,
-          "safety": 0,
-          "ecology": 50,
-          "nuisance": 50,
+          "tickCount": 139,
           "bankrupt": true,
           "levelEnded": true,
-          "levelEndReason": "bankruptcy"
+          "levelEndReason": "bankruptcy",
+          "deathCount": 0,
+          "employeeCount": 15,
+          "surveyCount": 3,
+          "activeContractCount": 0
         },
-        "note": "#1103 (mover rebuild, #1089): cash corrected again, -428,273 -> -428,483 -- same three genuine fixes as this file's own pattern-1 `tick 50` checkpoint's #1103 note above (PlanItinerary.ts's off-navmesh-target refusal, EmployeeDispatchSteps.ts/PlanItinerary.ts's alight-before-walking-away-mounted fix, and VehicleContinuity.ts's stale-reservation release), each shifting exactly which vehicle drives which trip and when across this file's own fleet; tickCount, deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, safety, ecology, nuisance, bankrupt, levelEnded, and levelEndReason all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win --report-drift`, command mode; the new number is exact and reproducible run to run. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): cash corrected again, -428,165 -> -428,237 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when across this file's own fleet; that nudges the fuel/payroll costs accumulated tick-by-tick. tickCount, deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, safety, ecology, nuisance, bankrupt, levelEnded, and levelEndReason all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win`, command mode; the new number is exact and reproducible run to run. #553/#554: this file's real conclusion, retimed by #596/#597 (idempotent event pool + cached cooldown threshold shift when the pending event becomes true) and again by #554 (charging is now real queued work, not instant). Named for an $800,000 win across 5 patterns (184 holes total) and all 10 hired employees dying; `campaign start level:treranium_depths` fails outright (tier-3, locked, unchanged from Findings #58/#59/#61/#62), so the run plays out on the substitute new_game world throughout. Under #553's queued, vehicle-gated drilling, staffed:true's free 5-person/4-vehicle composition stacked on this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles total, $220,000 budget after $165,000 of that goes straight into the fleet) can no longer survive even the first drilling wait: 'BANKRUPTCY! The mine is seized.' fires at tick 139, 271 ticks before pattern 1's 24 holes (drilled for real by 2 concurrent driller/drill_rig pairs -- the free staffed rig plus a hand-hired driller licensed into this file's own idle drill_rig) finish landing at tick 410. Nothing halts a tick or a blast once levelEnded flips, so the mine keeps operating -- legally seized, crew still working. #554: charging is now real queued work too -- the same drillers load all 24 holes' charges over ticks 410-460 before the blast fires. Pattern 1 blasts for real anyway at tick 460: PERFECT rating, 1,507 m3 cleared, and kills 12 of the 15 employees on site -- all 10 of this file's own hand-hires (employees #6-15) plus employee #1 (the free staffed driller) and employee #2 (the free staffed blaster), both of whom worked the pattern through drilling and charging; only staffed:true's 3 drivers (#3-5) survive -- while destroying 6 of the 9 vehicles: the free staffed drill_rig and all 5 of this file's own hand-bought vehicles, all parked squarely inside the pattern's footprint. One real contract cycle follows (accept + a storage-empty delivery refusal, both via #597's `type:rubble_disposal` selector against contract #20 -- storedMassKg never leaves 0; every debris_hauler in play is either destroyed in the blast or, like the free staffed one, never driven). Patterns 2-5 (36+30+30+64 = 160 more holes, the remaining 4 explosive types) are dropped from this file entirely: narrating drill_plan cycles for a mine that is $428,440 in the hole, has 3 employees left, and no fleet capable of drilling or hauling anything would document nothing real -- same resolution level3-playthrough-ecology.json already used for its own unreachable patterns 3-6. cash is exact and reproducible (fixed seed, command-mode measured, no wall-clock dependency); bankrupt/levelEnded/levelEndReason are the file's real ending, not the named $800k target. #554: tickCount moved from 410 to 460 and cash from -377190 to -428440 -- the 50 extra ticks of real queued charge-loading (also killing employee #2, the staffed blaster, who was drilling-then-charging alongside employee #1 at blast time) add payroll/upkeep on top of #591's own -377412->-377190 drill-wait retiming, without changing the bankruptcy outcome. #680: tickCount re-measured 460->464 and cash -428440->-428646 -- tri-state needs-drain classification ('working'|'idle'|'resting') shifted forced-rest timing during the charge-loading window; deathCount/employeeCount/scores/bankruptcy outcome unaffected. #922: tickCount re-measured 469->463 and cash -428821->-428725 -- a vehicle's driver-employee position now tracks the vehicle for real instead of freezing at its boarding cell for the whole drive, shifting exact vehicle-pathing/payroll timing across the fleet the same way #591/#680 above did; deathCount/employeeCount/scores/bankruptcy outcome unaffected. #928: tickCount re-measured 463->465 and cash -428725->-428777 -- the single-gauge fatigue model shifts forced-rest/dispatch timing across the roster the same way #680 above did; deathCount/employeeCount/scores/bankruptcy outcome unaffected. #1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0, plus rest-priority claim ordering): cash re-measured -428237 -> -428273 -- the harder-to-reach collapse floor and the queued-rest-always-wins claim tie-break shift exactly when this file's own crew is mid-task versus mid-rest, nudging the fuel/payroll costs accumulated tick-by-tick; tickCount and every other field here reproduce unchanged -- direct-verified via `npm run scenario -- --scenario level3-playthrough-win`, command mode. #1107 (merge of main into #1089's branch): cash corrected again, -428,483 -> -428,297 (and the `tick 50` checkpoint above, -387,058 -> -386,872, by the same 186) -- tickCollapse's #1096 fix (PR #1107) returns a collapsing employee's unboarded taskQueue vehicle reservation to the pool instead of holding it through the collapse, which changes which vehicle drives which trip and when. Cash is the only field that moves on either checkpoint -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level3-playthrough-win --report-drift`, command mode, standalone and uncontended. #1090-followup (sandbox-measured): cash corrected again, -428,297 -> -428,183 (and the `tick 50` checkpoint above, -386,872 -> -386,758, by the same 114) -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost delegating to planItinerary) shifts exactly which vehicle drives which trip and when across this file's fleet, the same cash-only-recalibration shape as every fix above. Every other field here reproduces unchanged."
+        "note": "#1313: final state is the frozen state at the end tick."
       },
       "description": "#1186: tickCount 461 -> 467, cash -428037 -> -438144, safety 50 -> 0. Same root cause as the 'tick 6' and 'stats' steps above: SurveyCalc.ts's survey-depth-window fix (a required part of #1186 -- unbounded column storage means 'scan the whole column' no longer means anything) shifts the shared PRNG stream enough that the pending event which used to freeze the post-blast 'tick 6' call at 0-of-6 ticks no longer lands there, so all 6 ticks actually run: 6 more ticks of payroll/upkeep (the extra -$10,107 versus the old path, which also isn't offset by lucky_strike's +$10,000 any more) and 6 ticks of the recentAccidents safety penalty seeing pattern 1's own unchanged 12 deaths for the first time. The blast itself (pattern 1, tick 460, PERFECT rating, 1,507 m3 cleared, deathCount 12) is unaffected -- direct-verified byte-identical fragmentedCount/detachedCount/liftedCount/projectionCount against a clean origin/main worktree; only what happens during the ticks *after* it changed. #1151: re-baselined against a measured run -- cash -428043 -> -428037. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration, sandbox-measured): tickCount 467 -> 476, cash -438144 -> -448473 -- occupancy-aware pathing shifts exactly which vehicle drives which trip and when across this file's own fleet (same class as the pattern-1 `tick 50` checkpoint's own #1262-followup note above), plus 9 extra ticks of payroll/upkeep on top of that; deathCount (12), employeeCount, activeContractCount, surveyCount, wellBeing, safety, ecology, nuisance, bankrupt, levelEnded, and levelEndReason all reproduce unchanged -- the mine's real ending (legally seized at tick 139, still working, pattern 1's blast at tick 460 unaffected) is untouched, only the closing tick/cash figures moved."
     }

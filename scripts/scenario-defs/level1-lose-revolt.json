@@ -687,7 +687,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 415,
+          "tickCount": 386,
           "wellBeing": 0,
           "deathCount": 0,
           "employeeCount": 12,
@@ -698,7 +698,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapses here. #596/#597: the revolt's own tick moved 410->415 (sandbox-measured) -- setupEvents idempotency + cooldown-threshold caching shifted when the mid-scenario batches above get interrupted (net +5 ticks by this point), which shifts every tick this level runs including the revolt itself; this is a genuine terminal checkpoint (issue #596's own carve-out: 'tickCount at a shutdown... stays equals, always re-verified against the real numbers') so it stays a pinned absolute, just updated to the real current number rather than converted. The level still ends in an actual worker revolt -- deathCount/employeeCount/revolted/levelEnded/levelEndReason unaffected by the timing shift (sandbox-measured). deathCount stays 0: nobody has ever stood in a blast, since none has fired. #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding)."
+        "note": "REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapses here. #596/#597: the revolt's own tick moved 410->415 (sandbox-measured) -- setupEvents idempotency + cooldown-threshold caching shifted when the mid-scenario batches above get interrupted (net +5 ticks by this point), which shifts every tick this level runs including the revolt itself; this is a genuine terminal checkpoint (issue #596's own carve-out: 'tickCount at a shutdown... stays equals, always re-verified against the real numbers') so it stays a pinned absolute, just updated to the real current number rather than converted. The level still ends in an actual worker revolt -- deathCount/employeeCount/revolted/levelEnded/levelEndReason unaffected by the timing shift (sandbox-measured). deathCount stays 0: nobody has ever stood in a blast, since none has fired. #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding). #1313: the tick command stops on the tick the level ends -- the revolt lands at tick 386 and the rest of this batch (to 415) is not run; the terminal tickCount is the real revolt tick (previously masked because ticking kept going to 415)."
       }
     },
     {
@@ -745,7 +745,7 @@
         "equals": {
           "wellBeing": 0,
           "ecology": 50,
-          "tickCount": 415,
+          "tickCount": 386,
           "revolted": true,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

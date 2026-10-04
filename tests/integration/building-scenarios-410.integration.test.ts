@@ -63,14 +63,16 @@ function isPlacementOrderCommand(command: string): boolean {
  * observed (a T3 research_center order short by ~$14k under the padded
  * cash figure already in these files).
  */
-const CASH_BUFFER = 60000;
+const CASH_BUFFER = 200000; // also keeps the mine out of bankruptcy, which freezes it (#1313)
 
-/** Bumps a `new_game ... cash:N` step's cash by CASH_BUFFER, keeping its own `expect.equals.cash` (if any) in sync. No-op for a step with no `cash:` param. */
+/** Default `new_game` starting cash when a step names no `cash:` param. */
+const DEFAULT_NEW_GAME_CASH = 50000;
+
+/** Bumps a `new_game ... cash:N` step's cash by CASH_BUFFER (a step with no `cash:` param starts from the default), keeping its own `expect.equals.cash` (if any) in sync. */
 function bumpNewGameCash(step: ScenarioStepDef): ScenarioStepDef {
   const match = step.command.match(/cash:(\d+)/);
-  if (!match) return step;
-  const newCash = Number(match[1]) + CASH_BUFFER;
-  const bump = (s: string) => s.replace(/cash:\d+/, `cash:${newCash}`);
+  const newCash = (match ? Number(match[1]) : DEFAULT_NEW_GAME_CASH) + CASH_BUFFER;
+  const bump = (s: string) => (/cash:\d+/.test(s) ? s.replace(/cash:\d+/, `cash:${newCash}`) : `${s} cash:${newCash}`);
   return {
     ...step,
     command: bump(step.command),

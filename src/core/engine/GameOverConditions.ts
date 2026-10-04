@@ -15,8 +15,25 @@ import { checkLevelComplete } from '../campaign/LevelTransition.js';
 import { snapshotStats } from '../campaign/SuccessTracker.js';
 import type { GameOverReport } from './TickPipeline.js';
 
+/** True once the level has ended (win or loss). */
+export function hasLevelEnded(state: Pick<GameState, 'levelEndReason'>): boolean {
+  return state.levelEndReason !== null;
+}
+
 /** Run every win/lose condition check for this tick and report the outcome. */
 export function checkGameOverConditions(state: GameState, emitter: EventEmitter): GameOverReport {
+  // The mine is frozen once the level ended: no events, streaks or snapshots.
+  if (hasLevelEnded(state)) {
+    return {
+      levelCompleted: false,
+      bankrupted: false,
+      ecoShutdown: false,
+      arrested: false,
+      revolted: false,
+      levelEndReason: state.levelEndReason,
+    };
+  }
+
   // 9. Level stats snapshot + campaign profit check
   snapshotStats(state.levelStats, state);
   const levelResult = checkLevelComplete(state, state.campaign, emitter);

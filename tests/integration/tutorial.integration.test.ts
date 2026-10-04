@@ -190,7 +190,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // plus an unmanned drill_rig/debris_hauler/rock_digger/rock_fragmenter
     // fleet — exactly the roster/fleet automatic haul dispatch needs, with
     // no vehicle pre-assigned to anyone.
-    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('new_game seed:42 size:32 staffed:true cash:500000').success).toBe(true);
     // #1264: this test's multiple staffed drivers self-organizing an
     // automatic haul is exactly the multi-agent shape agent occupancy
     // governs — unconditional since #1207.
@@ -546,7 +546,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
 
-    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('new_game seed:42 size:32 staffed:true cash:500000').success).toBe(true);
     expect(run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
     for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
       for (const emp of ctx.state!.employees.employees) {

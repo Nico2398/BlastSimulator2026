@@ -3438,6 +3438,7 @@
   "eventResolution.usage": "Usage: event (status|choose|timers|fire)",
   "tick.pending_event_refusal": "Pending event! Resolve it first: \"event choose <index>\".",
   "tick.advanced_no_events": "Advanced {advanced} tick(s). Now at tick {tick}. No events fired.",
+  "tick.level_ended": "Level over — the mine is frozen. No ticks advanced.",
   "tick.advanced_partial": "(Advanced {advanced} of {count} requested ticks)",
   "console.staffed_suffix": " Staffed.",
   "campaign.no_active_level": "No active level. Use campaign start level:<id> first.",

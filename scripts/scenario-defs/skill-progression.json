@@ -1,6 +1,6 @@
 {
   "name": "skill-progression",
-  "description": "Chapter 3: Hire driller, assign drilling skill, and verify skill progression after 700 nominal ticks of continuous work with no rest building (#549: real completions now include genuine collapse/rest cost, so the driller reaches Level 3, not the original Level 5).",
+  "description": "Chapter 3: Hire driller, assign drilling skill, and verify skill progression under continuous work with no rest building (#549: real completions include genuine collapse/rest cost). #1313: with no living quarters the lone driller's collapse crashes wellBeing to its floor and the worker revolt ends the level at tick 301 -- the mine freezes there, so the run no longer reaches the 700-tick budget or the 1 (blasting) + 3 (driving.excavator) = 4 proficiency it used to; it stops at driving.excavator level 2 (total 3), reached at tick 178. Everything after the revolt asserts the frozen state.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -631,102 +631,17 @@
           "command": "tick 50"
         }
       ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "revolted": true,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "tickCount": 301,
+          "proficiencyTotal": 3
+        },
+        "note": "#1313: the level ends here -- the tick command stops on the tick the end lands (301) and the mine is frozen from then on."
+      }
     },
     {
       "command": "tick 50",
@@ -738,32 +653,20 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "proficiencyTotal": 4
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
         },
-        "note": "1 (blasting, unraised) + 3 (driving.excavator) -- not the original scenario name's Level 5 goal: with no living_quarters ever built here, #549's now-correct interrupt/resume means the driller's periodic collapses genuinely cost rest ticks (no more free background progress while nominally resting), so real XP-earning work ticks fall short of Level 5's threshold inside the same 700-tick nominal budget (580 real ticks land, after one block's requested ticks are cut short by an unresolved event, per this file's own tick-chunking note above)"
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "employee list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
-        }
-      ],
-      "role": "observe"
+        "equals": {
+          "revolted": true,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "tickCount": 301,
+          "proficiencyTotal": 3
+        },
+        "note": "#1313: frozen mine."
+      },
+      "description": "#1313: a tick after the level ended advances nothing: cash and tickCount stay put."
     },
     {
       "command": "state full",
@@ -773,7 +676,18 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 301,
+          "revolted": true,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "proficiencyTotal": 3,
+          "employeeCount": 1
+        },
+        "note": "#1313: final state is the frozen state at the end tick."
+      }
     }
   ]
 }

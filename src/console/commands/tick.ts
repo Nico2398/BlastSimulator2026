@@ -10,6 +10,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { runTick, type TickReport, type RunTickOptions, type FiredEventReport } from '../../core/engine/TickPipeline.js';
+import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { openMovementTrails } from '../../core/engine/Locomotion.js';
 import { requireGame } from './commandUtils.js';
 import { pushEventOptionLines } from './eventResolution.js';
@@ -40,10 +41,17 @@ export function tickCommand(
   const isProd = viteEnv?.PROD === true;
   const options: RunTickOptions = { checkInvariants: !isProd };
 
+  // A finished level is frozen: nothing to advance, nothing to trail.
+  if (hasLevelEnded(state)) {
+    return { success: true, output: t('tick.level_ended') };
+  }
+
   // One batch = one result the renderer draws: its walk trails cover exactly this command's ticks (#1199).
   openMovementTrails(state);
 
   for (let i = 0; i < count; i++) {
+    // A mid-batch end stops the batch at the ending tick.
+    if (hasLevelEnded(state)) break;
     const report: TickReport = runTick(state, ctx.grid ?? null, rng, emitter, options);
     ticksAdvanced++;
 

@@ -16,6 +16,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import type { SaveBackend, SaveMeta } from '../../core/state/SaveBackend.js';
 import { SAVE_SLOT_COUNT, AUTO_SAVE_INTERVAL_TICKS } from '../../core/config/balance.js';
+import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { getLevel } from '../../core/campaign/Level.js';
 
 export type OnLoadCallback = (state: GameState) => void;
@@ -118,6 +119,7 @@ export class SavesModal {
 
   /** Called each tick to trigger auto-save. `state` only times it — what gets saved comes from `getState`. */
   onTick(state: GameState): void {
+    if (hasLevelEnded(state)) return;
     if (state.tickCount - this.lastAutoSaveTick >= AUTO_SAVE_INTERVAL_TICKS) {
       this.lastAutoSaveTick = state.tickCount;
       void this.autoSave();
@@ -139,7 +141,7 @@ export class SavesModal {
   private async autoSave(): Promise<void> {
     if (!this.backend || !this.getState) return;
     const state = this.getState();
-    if (!state) return;
+    if (!state || hasLevelEnded(state)) return;
     try {
       const data = serialize(state);
       const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;

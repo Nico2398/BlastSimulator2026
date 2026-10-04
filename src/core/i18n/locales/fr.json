@@ -3438,6 +3438,7 @@
   "eventResolution.usage": "Utilisation : event (status|choose|timers|fire)",
   "tick.pending_event_refusal": "Événement en attente ! Résolvez-le d'abord : « event choose <index> ».",
   "tick.advanced_no_events": "{advanced} tick(s) avancé(s). Actuellement au tick {tick}. Aucun événement déclenché.",
+  "tick.level_ended": "Niveau terminé — la mine est figée. Aucun tick avancé.",
   "tick.advanced_partial": "({advanced} tick(s) avancé(s) sur {count} demandé(s))",
   "console.staffed_suffix": " Personnel affecté.",
   "campaign.no_active_level": "Aucun niveau actif. Utilisez d'abord campaign start level:<id>.",
