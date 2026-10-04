@@ -29,6 +29,10 @@ export interface ChargeHoleActionPayload {
  * first so a re-charge replaces rather than stacks (#554, mirrors drillPlan
  * grid/add's drill_hole dispatch). Charges the explosives cost now (the
  * caller has already verified funds via `chargeFundsFailure`).
+ *
+ * Re-charging a hole whose earlier charge already landed pays the new order
+ * in full and does not refund the loaded charge (that explosive is consumed)
+ * — intentional default.
  */
 function dispatchChargeAction(
   ctx: MiningContext,

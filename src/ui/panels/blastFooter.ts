@@ -13,7 +13,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
-import { chargeOrderCost } from '../../core/mining/ChargePlan.js';
+import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
 import { blockingOccupantCount } from '../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 
@@ -88,7 +88,7 @@ export class BlastFooter {
     const hasHoles = plan.holes.length > 0;
     const baseFireOk = hasHoles && errors.length === 0;
 
-    const planCost = Object.values(state.chargesByHole).reduce((sum, charge) => sum + chargeOrderCost(charge.explosiveId, charge.amountKg), 0);
+    const planCost = plannedChargesCost(state.chargesByHole);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
     const margin = estValue - planCost;
 

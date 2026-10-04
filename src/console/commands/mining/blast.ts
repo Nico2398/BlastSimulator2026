@@ -5,7 +5,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, assembleValidBlastPlan } from './shared.js';
 import { executeBlast, buildBlastReport } from '../../../core/mining/BlastExecution.js';
-import { chargeOrderCost } from '../../../core/mining/ChargePlan.js';
+import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { killEmployee } from '../../../core/entities/Employee.js';
@@ -168,10 +168,7 @@ export function blastCommand(
 
   // Report figure only: explosives were already paid when each charge order
   // was placed (charge.ts, #1341), so the blast itself never touches cash.
-  let spent = 0;
-  for (const charge of Object.values(state.chargesByHole)) {
-    spent += chargeOrderCost(charge.explosiveId, charge.amountKg);
-  }
+  const spent = plannedChargesCost(state.chargesByHole);
   state.lastBlastReport = buildBlastReport(result, state.tickCount, spent, thisBlastAccidents);
 
   // Clear drill plan after blast (holes are consumed)

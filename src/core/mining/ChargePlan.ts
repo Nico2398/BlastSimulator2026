@@ -97,3 +97,8 @@ export function chargeOrderCost(explosiveId: string, amountKg: number): number {
   const explosive = getExplosive(explosiveId);
   return explosive ? explosive.costPerKg * amountKg : 0;
 }
+
+/** Total cash cost of every charge in a per-hole charge map. */
+export function plannedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): number {
+  return Object.values(chargesByHole).reduce((sum, c) => sum + chargeOrderCost(c.explosiveId, c.amountKg), 0);
+}

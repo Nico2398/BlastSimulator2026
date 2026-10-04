@@ -42,8 +42,9 @@ function clearHoleCharges(state: GameState, holeId: string): void {
  * (`plannedDrillHoles` and `drillHoles`), plus any per-hole charge/sequence
  * state keyed by hole id (#553). Cancellation is routed through the shared
  * `cancelAction` (#548) so an in-flight employee/vehicle is released back to
- * idle and any order-time cost is refunded — `drill_hole` carries none today
- * (only `survey` charges upfront), so the refund is always 0 in practice.
+ * idle and any order-time cost is refunded — `drill_hole` carries none, but an
+ * outstanding `charge_hole` refunds its `orderCost` (#1341). Charges already
+ * loaded (landed) are wiped without refund: that explosive is consumed.
  * Returns the total number of holes cleared (ordered + drilled).
  */
 export function clearDrillPlan(ctx: MiningContext): number {

@@ -54,15 +54,16 @@ export function resolveHoleId(
     : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
 }
 
+/** The outstanding `charge_hole` PendingAction for `holeId`, if any. */
+export function findOutstandingChargeAction(state: GameState, holeId: string): PendingAction | undefined {
+  return state.pendingActions.find(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId);
+}
+
 /**
  * Cancel the outstanding `charge_hole` PendingAction for `holeId`, if any
  * (#554, mirrors drill_hole's cancel-before-replace pattern). A no-op when
  * the hole has no order in flight.
  */
-export function findOutstandingChargeAction(state: GameState, holeId: string): PendingAction | undefined {
-  return state.pendingActions.find(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId);
-}
-
 export function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
   const action = findOutstandingChargeAction(state, holeId);
   if (action) cancelAction(state, action.id);
