@@ -100,6 +100,7 @@ describe('KeyboardShortcuts (12.7)', () => {
     const partialKs = new KeyboardShortcuts(partialCallbacks);
     expect(() => fireKey('KeyN')).not.toThrow();
     partialKs.dispose();
+    ks.dispose();
   });
 
   it('KeyO triggers onToggleSurveyOverlay (#496)', () => {
@@ -119,6 +120,7 @@ describe('KeyboardShortcuts (12.7)', () => {
     const partialKs = new KeyboardShortcuts(partialCallbacks);
     expect(() => fireKey('KeyO')).not.toThrow();
     partialKs.dispose();
+    ks.dispose();
   });
 
   it('KeyO does not trigger the panel-toggle callback (guards against a future key collision) (#496)', () => {
