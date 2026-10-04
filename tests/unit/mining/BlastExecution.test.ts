@@ -11,8 +11,9 @@ import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
-import { executeBlast, buildBlastReport, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport, villagePositions, averageVibrationMod, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { GRAVITY } from '../../../src/core/config/balance.js';
 
 function fillRegion(
@@ -429,5 +430,84 @@ describe('buildBlastReport', () => {
     };
     const report = buildBlastReport(result, 0, 0);
     expect(report.maxProjectionDistanceM).toBe(0);
+  });
+});
+
+// ── Village vibration targets (#1343) ───────────────────────────────────────
+
+describe('villagePositions', () => {
+  const village = (x: number, z: number) => ({ x, z, radius: 20, houses: [] });
+
+  it('maps each village to a target with id village-<index> at ground level', () => {
+    const targets = villagePositions([village(350, -420), village(-100, 60)]);
+    expect(targets).toHaveLength(2);
+    expect(targets[0]!.id).toBe('village-0');
+    expect(targets[0]!.position).toEqual({ x: 350, y: 0, z: -420 });
+    expect(targets[1]!.id).toBe('village-1');
+    expect(targets[1]!.position).toEqual({ x: -100, y: 0, z: 60 });
+  });
+
+  it('returns an empty list when there are no villages', () => {
+    expect(villagePositions([])).toEqual([]);
+  });
+
+  it('gives every target a unique id', () => {
+    const ids = villagePositions([village(1, 1), village(2, 2), village(3, 3)]).map(t => t.id);
+    expect(new Set(ids).size).toBe(3);
+  });
+});
+
+describe('averageVibrationMod', () => {
+  function planWith(explosives: Array<string | null>) {
+    const holes = createGridPlan({ x: 10, z: 10 }, 1, explosives.length, 4, 6, 0.15);
+    const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {};
+    holes.forEach((h, i) => {
+      const e = explosives[i];
+      if (e) charges[h.id] = { explosiveId: e, amountKg: 5, stemmingM: 2 };
+    });
+    return assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+  }
+
+  it('returns the explosive vibrationMod when every hole holds the same explosive', () => {
+    const plan = planWith(['pop_rock', 'pop_rock']);
+    expect(averageVibrationMod(plan, new Set())).toBeCloseTo(getExplosive('pop_rock')!.vibrationMod, 10);
+  });
+
+  it('averages mods across mixed explosives, holes weighted equally', () => {
+    const plan = planWith(['pop_rock', 'big_bada_boom']);
+    const expected = (getExplosive('pop_rock')!.vibrationMod + getExplosive('big_bada_boom')!.vibrationMod) / 2;
+    expect(averageVibrationMod(plan, new Set())).toBeCloseTo(expected, 10);
+  });
+
+  it('differs between low-vibration and high-vibration explosives', () => {
+    const low = averageVibrationMod(planWith(['pop_rock']), new Set());
+    const high = averageVibrationMod(planWith(['big_bada_boom']), new Set());
+    expect(low).not.toBeCloseTo(high, 5);
+  });
+
+  it('skips uncharged holes', () => {
+    const plan = planWith(['pop_rock', null]);
+    expect(averageVibrationMod(plan, new Set())).toBeCloseTo(getExplosive('pop_rock')!.vibrationMod, 10);
+  });
+
+  it('returns 1 when no hole is charged', () => {
+    expect(averageVibrationMod(planWith([null, null]), new Set())).toBe(1);
+  });
+
+  it('matches the factor executeBlast applies: report vibration scales with the plan mod', () => {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'cruite', 0, 39, 0, 10, 0, 39);
+    const run = (explosive: string) => {
+      resetHoleIds();
+      const holes = createGridPlan({ x: 12, z: 12 }, 1, 2, 4, 6, 0.15);
+      const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {};
+      for (const h of holes) charges[h.id] = { explosiveId: explosive, amountKg: 4, stemmingM: 2 };
+      const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+      const result = executeBlast(plan, grid, [{ id: 'v', position: { x: 300, y: 0, z: 300 } }]);
+      return { mod: averageVibrationMod(plan, new Set()), vib: result!.vibrationAtVillages[0]!.vibration };
+    };
+    const a = run('pop_rock');
+    const b = run('big_bada_boom');
+    expect(a.vib / a.mod).toBeCloseTo(b.vib / b.mod, 6);
   });
 });

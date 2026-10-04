@@ -3371,6 +3371,7 @@
   "mining.sequence.usage": "Utilisation : sequence auto|set|show [options]",
   "mining.sequence.none_set": "Aucune séquence définie.",
   "mining.blast.report_header": "=== RAPPORT DE TIR ===",
+  "mining.blast.max_village_vibration": "Vibration maximale au village : {value} mm/s",
   "mining.blast.preview_header": "=== APERÇU DU TIR ===",
   "mining.blast.no_drill_plan": "Aucun plan de forage. Créez-en un avec drill_plan grid ou drill_plan add.",
   "mining.blast.execution_failed": "Échec de l'exécution du tir.",

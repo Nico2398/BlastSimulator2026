@@ -1577,3 +1577,19 @@ export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'u
   ambient: 0.4,
   ui: 0.6,
 };
+
+/**
+ * Score gain per unit of village vibration (#1343). The PPV law falls off as
+ * distance^-1.5, so a Grumpstone Ridge village 445 m away sees only ~4e-4 mm/s
+ * from an ordinary 6 x 10 kg blast (~1.4e-3 from an oversized 9 x 60 kg one).
+ * Scaled so recordVibration plus the windowed per-tick term (~0.27 nuisance per
+ * scaled unit in total) cost an ordinary blast ~1-3 nuisance points and an
+ * oversized one ~5.
+ */
+export const VILLAGE_VIBRATION_SCORE_GAIN = 15000;
+
+/** Nuisance added per projected fragment (#1343). */
+export const BLAST_PROJECTION_NUISANCE_PER_PROJECTION = 0.5;
+
+/** Ticks over which vibration score effects are applied (#1343). */
+export const SCORE_VIBRATION_WINDOW_TICKS = 10;

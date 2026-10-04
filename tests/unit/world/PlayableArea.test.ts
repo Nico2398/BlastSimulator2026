@@ -474,3 +474,39 @@ describe('PlayableArea.previewClaim', () => {
     expect(grid.chunkCount).toBe(before);
   });
 });
+
+describe('PlayableArea.villages (#1343)', () => {
+  const RIDGE: Partial<TerrainConfig> = { seed: 2277, sizeX: 128, sizeZ: 128, datum: 30, climateBias: [-0.7, 0.1] };
+
+  it('returns the villages of the level seed, each with a position and houses', () => {
+    const { area } = makeArea(RIDGE);
+    const villages = area.villages();
+    expect(villages.length).toBeGreaterThan(0);
+    for (const v of villages) {
+      expect(Number.isFinite(v.x)).toBe(true);
+      expect(Number.isFinite(v.z)).toBe(true);
+      expect(v.radius).toBeGreaterThan(0);
+      expect(v.houses.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('is deterministic across repeated calls and across areas built from the same config', () => {
+    const a = makeArea(RIDGE).area;
+    const b = makeArea(RIDGE).area;
+    expect(a.villages()).toEqual(a.villages());
+    expect(a.villages().map(v => [v.x, v.z])).toEqual(b.villages().map(v => [v.x, v.z]));
+  });
+
+  it('returns the adopted structures villages when a protected set was handed over', () => {
+    const { area } = makeArea();
+    const village = { x: 500, z: -500, radius: 20, houses: [] };
+    area.adoptStructures({ rivers: [], villages: [village], landmarks: [] });
+    expect(area.villages()).toEqual([village]);
+  });
+
+  it('returns an empty list when the adopted set holds no villages', () => {
+    const { area } = makeArea();
+    area.adoptStructures({ rivers: [], villages: [], landmarks: [] });
+    expect(area.villages()).toEqual([]);
+  });
+});

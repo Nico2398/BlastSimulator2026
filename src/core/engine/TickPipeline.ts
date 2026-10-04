@@ -44,7 +44,7 @@ import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { checkDeadlines, generateContracts } from '../economy/Contract.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
-import { CONTRACT_REFRESH_INTERVAL } from '../config/balance.js';
+import { CONTRACT_REFRESH_INTERVAL, SCORE_VIBRATION_WINDOW_TICKS, VILLAGE_VIBRATION_SCORE_GAIN } from '../config/balance.js';
 import { isExposed, processSmuggling } from '../events/MafiaActions.js';
 import { resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
@@ -110,6 +110,13 @@ export interface TickReport {
 
 export interface RunTickOptions {
   checkInvariants: boolean;
+}
+
+/** Village vibration (score units) of the last blast while it is within the score window, else 0. */
+function recentVillageVibration(state: GameState): number {
+  const report = state.lastBlastReport;
+  if (!report?.maxVibration || state.tickCount - report.tick > SCORE_VIBRATION_WINDOW_TICKS) return 0;
+  return report.maxVibration * VILLAGE_VIBRATION_SCORE_GAIN;
 }
 
 /** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
@@ -189,7 +196,7 @@ export function runTick(
     avgMorale,
     recentAccidents: state.damage.accidents.filter(a => a.tick >= state.tickCount - 10).length,
     hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'management_office'),
-    maxRecentVibration: 0,
+    maxRecentVibration: recentVillageVibration(state),
     employeeCount: state.employees.employees.length,
   };
   updateScores(state.scores, scoreInputs);
