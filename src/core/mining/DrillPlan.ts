@@ -97,12 +97,14 @@ export function holeNumericId(holeId: string): number {
   return parseInt(holeId.slice(1), 10);
 }
 
-/** Highest numeric hole id ("H7" → 7) among `ids`; 0 when empty. */
+/** Highest numeric hole id ("H7" → 7) among `ids`; 0 when empty. Ids whose number is not a safe integer are ignored. */
 export function maxHoleNumericId(ids: Iterable<string>): number {
   let max = 0;
   for (const id of ids) {
     const m = /^H(\d+)$/.exec(id);
-    if (m) max = Math.max(max, parseInt(m[1]!, 10));
+    if (!m) continue;
+    const n = parseInt(m[1]!, 10);
+    if (Number.isSafeInteger(n)) max = Math.max(max, n);
   }
   return max;
 }

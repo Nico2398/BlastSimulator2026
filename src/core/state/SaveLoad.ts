@@ -483,10 +483,14 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
 function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
   const current = obj['nextHoleId'];
-  if (typeof current === 'number' && Number.isFinite(current) && current >= 1) return obj;
+  if (typeof current === 'number' && Number.isSafeInteger(current) && current >= 1) return obj;
   const ids: string[] = [];
   const addIds = (v: unknown): void => {
-    if (Array.isArray(v)) for (const h of v) ids.push((h as { id: string }).id);
+    if (!Array.isArray(v)) return;
+    for (const h of v) {
+      const id = (h as { id?: unknown } | null)?.id;
+      if (typeof id === 'string') ids.push(id);
+    }
   };
   const addKeys = (v: unknown): void => {
     if (typeof v === 'object' && v !== null) ids.push(...Object.keys(v));
@@ -498,7 +502,8 @@ function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> 
   addKeys(obj['sequenceDelays']);
   const installed = (obj['tubingState'] as { installedHoles?: unknown } | undefined)?.installedHoles;
   if (Array.isArray(installed) || installed instanceof Set) ids.push(...(installed as Iterable<string>));
-  obj['nextHoleId'] = 1 + maxHoleNumericId(ids);
+  const next = 1 + maxHoleNumericId(ids);
+  obj['nextHoleId'] = Number.isSafeInteger(next) ? next : 1;
   return obj;
 }
 

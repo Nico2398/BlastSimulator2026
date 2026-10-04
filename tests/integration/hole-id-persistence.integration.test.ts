@@ -53,6 +53,7 @@ describe('hole id uniqueness (#1352)', () => {
     expect(ctx.state!.drillHoles.filter(h => h.id === 'H1')).toHaveLength(1);
     expect(allIds(ctx).filter(id => id === 'H1')).toHaveLength(1);
     const result = runner.run('charge hole:H1 explosive:boomite amount:5 stemming:2');
+    expect(result.success).toBe(true);
     expect(result.output).not.toMatch(/ambiguous|duplicate/i);
   });
 
@@ -76,7 +77,7 @@ describe('hole id uniqueness (#1352)', () => {
     expect(ctx.state!.nextHoleId).toBe(4);
   });
 
-  it('removing the highest hole does not reuse its id', () => {
+  it('drill_plan clear does not reset the id counter', () => {
     const { runner } = newGame();
     for (const x of [10, 14]) runner.run(`drill_plan add x:${x} z:10`);
     runner.run('drill_plan clear');

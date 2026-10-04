@@ -205,7 +205,7 @@ budget is ~300 ms.
 
 `blast_plan load name:X` queues orders; it never writes finished holes. Each saved hole becomes a planned hole (fresh unique id, `addHole` skips ids live in `drillHoles`/`plannedDrillHoles`) with one `drill_hole` order; each saved charge becomes one `charge_hole` order (cost deducted, `plannedChargesByHole` filled), sequence delays are re-keyed to the new ids. Saved holes at an x,z already drilled or planned are skipped; orphan charges are skipped. Pre-checks (claim, `createCharge`, funds) are all-or-nothing. Charge-after-drill gate: `isChargeHoleClaimable` (ActionSelection.ts) keeps a `charge_hole` unclaimable while its hole is still in `plannedDrillHoles`, applied in targeted, pool and starvation claim paths. Removing the planned hole cancels and refunds its charge order.
 
-Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration backfills it); removing a hole never reuses an id (#1352).
+Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration backfills it) except `drill_plan grid`, which replaces the plan and restarts at H1; removing a hole never reuses an id (#1352).
 
 ## Undrilled holes at fire time (#1346)
 

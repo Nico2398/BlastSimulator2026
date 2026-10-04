@@ -1137,7 +1137,7 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1200,7 +1200,7 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1281,7 +1281,7 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // to the fragment, mid-break, or never hauling at all) gets `payload: null`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1374,7 +1374,7 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 // truth since v19) left exactly as they were.
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1460,7 +1460,7 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
 // taken mid vehicle-gated action doesn't forget which vehicle it claimed.
 
 describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1608,7 +1608,7 @@ describe('serialize — walk trail is transient (#1199)', () => {
 // locomotion put them.
 
 describe('deserialize — v23→v24 migration for building occupancy (#1202)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1652,7 +1652,7 @@ describe('deserialize — v23→v24 migration for building occupancy (#1202)', (
 // `pendingTrainingState: null`.
 
 describe('deserialize — v24→v25 migration for training walk-in (#1203)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1690,7 +1690,7 @@ describe('deserialize — v24→v25 migration for training walk-in (#1203)', () 
 // unconditionally.
 
 describe('deserialize — v25→v26 migration for agentOccupancyEnabled removal (#1207)', () => {
-  it('SAVE_VERSION is 28', () => {
+  it('SAVE_VERSION is 29', () => {
     expect(SAVE_VERSION).toBe(29);
   });
 
@@ -1875,9 +1875,24 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
     expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
   });
 
-  it('a v28 save with a single drilled H3 migrates to nextHoleId 4', () => {
-    const parsed = v28Save(p => { p['drillHoles'] = [hole('H3')]; });
-    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(4);
+  it('ignores a huge-digit hole id instead of yielding an unsafe counter', () => {
+    const parsed = v28Save(p => { p['drillHoles'] = [hole('H2'), hole('H100000000000000000000')]; });
+    const id = deserialize(JSON.stringify(parsed)).nextHoleId;
+    expect(Number.isSafeInteger(id)).toBe(true);
+    expect(id).toBe(3);
+  });
+
+  it('tolerates null and non-object entries in hole arrays', () => {
+    const parsed = v28Save(p => {
+      p['drillHoles'] = [null, 7, hole('H2')];
+      p['plannedDrillHoles'] = [null];
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(3);
+  });
+
+  it('replaces an unsafe-integer nextHoleId with the recomputed value', () => {
+    const parsed = v28Save(p => { p['nextHoleId'] = 1e21; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
   });
 
   it('a v28 save missing its hole collections migrates to nextHoleId 1', () => {
