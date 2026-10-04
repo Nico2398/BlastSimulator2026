@@ -257,7 +257,7 @@ export class LevelEndScreen {
       return star;
     }));
 
-    const campaignDone = activeId !== null && isFinalCampaignLevel(activeId) && isCampaignComplete(state.campaign);
+    const campaignDone = activeId !== null && isFinalCampaignLevel(activeId) && (state.campaign.campaignComplete || isCampaignComplete(state.campaign));
     this.headlineEl.textContent = t(campaignDone ? 'ui.level_end.campaign_complete.headline' : 'ui.level_end.victory.headline');
     this.campaignCompleteEl.textContent = campaignDone ? t('ui.level_end.campaign_complete.body') : '';
     this.campaignCompleteEl.style.display = campaignDone ? '' : 'none';

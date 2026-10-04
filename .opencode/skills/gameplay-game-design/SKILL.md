@@ -153,7 +153,7 @@ Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-
 ### Win/Lose per Level
 - **Lose:** Bankruptcy, arrest (corruption), ecology=0, well-being=0
 - **Win:** Reach profit threshold → next level unlocked
-- **Campaign complete:** All 3 levels done
+- **Campaign complete:** All 3 campaign levels (tier > 0; the tutorial level is excluded) completed. The final level's victory screen announces it.
 - **Site Map and the live game (#1314):** a *live game* is a state that exists and whose level has not ended. While one is live: the main menu shows RESUME (`#bs-menu-resume`) above CONTINUE; the Site Map opened from the top bar shows BACK TO SITE (`#bs-world-map-back-to-site`) and Esc does the same (a confirm closes first); Start on a level card asks for confirmation first, since it restarts that level from scratch. The map's Site Map entry from the level-end screen offers no way back. Both returns change no game state.
 
 ## Save System
