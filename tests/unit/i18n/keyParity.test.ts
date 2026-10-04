@@ -408,7 +408,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // console.debug_occupancy_off, console.invalid_agent_occupancy_flag),
     // both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3559);
+    expect(Object.keys(en).length).toBe(3560);
   });
 });
 
