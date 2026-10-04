@@ -45,20 +45,20 @@ export const CONTRACTS_PER_REFRESH = 3;
 /** Max contracts available at once. */
 export const MAX_AVAILABLE_CONTRACTS = 8;
 
-/** Ore contract prices per kg ($). Blingite/sparkium are rare/valuable; dirtite is common. */
+/** Ore contract base prices per kg ($), slightly above catalog. Key order is rarity order: supply contracts use the first four. */
 export const ORE_PRICES = {
-  dirtite: 2,
-  rustite: 4,
-  blingite: 12,
-  gloomium: 7,
-  sparkium: 15,
-  craktonite: 6,
-  absurdium: 20,
-  treranium: 9,
+  dirtite: 3,
+  rustite: 12,
+  blingite: 35,
+  gloomium: 80,
+  sparkium: 200,
+  craktonite: 450,
+  absurdium: 1000,
+  treranium: 2500,
 } as const;
 
-/** Rubble disposal price per kg ($). Negative = cost to haul; positive = revenue from sale. */
-export const RUBBLE_DISPOSAL_PRICE = 0.5;
+/** Rubble disposal price range per kg ($) used when generating contract offers. */
+export const RUBBLE_DISPOSAL_PRICE_RANGE = { min: 0.5, max: 2.0 } as const;
 
 // ─── Corruption ────────────────────────────────────────────────────────────────
 
@@ -443,6 +443,17 @@ export const SOLID_VOXEL_DENSITY_THRESHOLD = 0.5;
  *  to get the region actually affected — used both for BlastExecution's own cleared-
  *  region computation and, expanded further, for TerrainBody's collider-building scope. */
 export const BLAST_ZONE_RADIUS = 5;
+
+/** Pre-fire estimate: horizontal radius (m) around a hole within which columns are
+ *  assumed to break. Calibrated with BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR (#1354). */
+export const BLAST_ESTIMATE_BREAK_RADIUS_M = 4;
+
+/** Pre-fire estimate: fraction of the deepest covering hole's depth assumed to break
+ *  in a column within the break radius. Calibration (#1354): 3x3 grid, spacing 4,
+ *  depth 8, boomite, uniform 0.2 blingite survey over a 40x40 grid, executeBlast
+ *  realises ~$5.06M; radius 4 + factor 0.2 estimates ~0.96x of that. Across spacing
+ *  3-5 and depth 6-10 the estimate stays within 0.55x..1.55x of realised. */
+export const BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR = 0.2;
 
 // ─── Fragment generation (blast step 3) ────────────────────────────────────────
 

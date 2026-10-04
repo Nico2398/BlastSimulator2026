@@ -12,7 +12,7 @@ import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining, isSchoolFull, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
-import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS } from '../core/config/balance.js';
+import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS, PAY_CYCLE_TICKS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 
 /** Quick-raise amounts offered in the PAY block — flat $ presets, not derived from any per-role scale. */
@@ -217,6 +217,11 @@ export function makeSkillsSection(e: Employee): HTMLElement {
 
 // ── PAY ──
 
+/** Stored salary is per pay cycle; 1 tick = 1 game-hour, so the hourly rate is salary / PAY_CYCLE_TICKS (1 decimal, no trailing .0). */
+function perHour(perCycle: number): number {
+  return Math.round((perCycle / PAY_CYCLE_TICKS) * 10) / 10;
+}
+
 /**
  * A raise costs nothing upfront — giveRaise only raises the ongoing salary
  * and immediately lifts morale — so unlike training there is no affordability
@@ -230,15 +235,15 @@ export function makePaySection(e: Employee, onRaise: (amount: number) => void): 
   const bonus = e.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
   const breakdownRow = el('div', { className: 'bsx-mono', attrs: { style: 'display:flex;font-size:10px;color:var(--bsx-text-muted)' } });
   breakdownRow.append(
-    el('span', { text: t('ui.crew.pay_base', { amount: base }) }),
-    el('span', { text: t('ui.crew.pay_bonus', { amount: bonus }), attrs: { style: 'margin-left:8px' } }),
-    el('span', { text: t('ui.crew.pay_total', { amount: e.salary }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }),
+    el('span', { text: t('ui.crew.pay_base', { amount: perHour(base) }) }),
+    el('span', { text: t('ui.crew.pay_bonus', { amount: perHour(bonus) }), attrs: { style: 'margin-left:8px' } }),
+    el('span', { text: t('ui.crew.pay_total', { amount: perHour(e.salary) }), attrs: { style: 'margin-left:auto;color:var(--bsx-text-primary);font-weight:600' } }),
   );
 
   const raiseRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:6px' } });
   raiseRow.appendChild(el('span', { text: t('ui.crew.give_raise'), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
   for (const amount of RAISE_PRESETS) {
-    const btn = button('ghost', t('ui.crew.raise_amount', { amount }));
+    const btn = button('ghost', t('ui.crew.raise_amount', { amount: perHour(amount) }));
     btn.style.cssText = 'height:26px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
     btn.addEventListener('click', () => onRaise(amount));
     raiseRow.appendChild(btn);

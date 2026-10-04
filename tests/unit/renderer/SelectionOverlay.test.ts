@@ -231,3 +231,49 @@ describe('SelectionOverlay — ramp line preview (#1211)', () => {
     expect(loops).toBe(1);
   });
 });
+
+describe('SelectionOverlay — refused tint (#1396)', () => {
+  const BLOCKED = 0xff6a5a;
+
+  /** Opaque-RGB of the first ground-tint vertex colour, as 0xRRGGBB. */
+  function firstTintHex(): number {
+    let hex = -1;
+    scene.traverse((o) => {
+      if (hex !== -1 || !(o instanceof THREE.Mesh)) return;
+      const col = o.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+      if (!col || col.count === 0) return;
+      hex = new THREE.Color(col.getX(0), col.getY(0), col.getZ(0)).getHex();
+    });
+    return hex;
+  }
+
+  function lineColors(): number[] {
+    const out: number[] = [];
+    scene.traverse((o) => {
+      if (o instanceof THREE.Line) out.push((o.material as THREE.LineBasicMaterial).color.getHex());
+    });
+    return out;
+  }
+
+  it('a refused point footprint is tinted COLOR_BLOCKED, differing from the default', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+    overlay.update({ shape: 'point', x: 5, z: 5, footprintCells: [[0, 0]] });
+    const okTint = firstTintHex();
+    overlay.update({ shape: 'point', x: 5, z: 5, footprintCells: [[0, 0]], refused: true });
+    const refusedTint = firstTintHex();
+    expect(refusedTint).not.toBe(okTint);
+    expect(refusedTint).toBe(new THREE.Color(BLOCKED).getHex());
+  });
+
+  it('a refused cells selection tints and outlines in COLOR_BLOCKED', () => {
+    const overlay = new SelectionOverlay(scene, () => 0, () => 0);
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 2, z2: 2 });
+    const okTint = firstTintHex();
+    overlay.update({ shape: 'rect', x1: 0, z1: 0, x2: 2, z2: 2, refused: true });
+    expect(firstTintHex()).not.toBe(okTint);
+    expect(firstTintHex()).toBe(new THREE.Color(BLOCKED).getHex());
+    const colors = lineColors();
+    expect(colors.length).toBeGreaterThan(0);
+    expect(colors.every((c) => c === BLOCKED)).toBe(true);
+  });
+});

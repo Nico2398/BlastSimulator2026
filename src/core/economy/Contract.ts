@@ -2,6 +2,13 @@
 // Contracts define material delivery requirements with deadlines, payments, and penalties.
 
 import { Random } from '../math/Random.js';
+import {
+  CONTRACT_REFRESH_INTERVAL,
+  CONTRACTS_PER_REFRESH,
+  MAX_AVAILABLE_CONTRACTS,
+  ORE_PRICES,
+  RUBBLE_DISPOSAL_PRICE_RANGE,
+} from '../config/balance.js';
 
 // ── Contract types ──
 
@@ -73,22 +80,9 @@ export function createContractState(): ContractState {
   };
 }
 
-// ── Config ──
-
-/** How often new contracts appear (in ticks). */
-const REFRESH_INTERVAL = 20;
-/** Number of contracts generated per refresh. */
-const CONTRACTS_PER_REFRESH = 3;
-/** Max available contracts at once. */
-const MAX_AVAILABLE = 8;
-
-// Ore IDs that can appear in contracts
-const CONTRACT_ORES = ['dirtite', 'rustite', 'blingite', 'gloomium', 'sparkium', 'craktonite', 'absurdium', 'treranium'];
-// Base prices per kg (slightly above catalog to give player profit margin)
-const ORE_CONTRACT_PRICES: Record<string, number> = {
-  dirtite: 3, rustite: 12, blingite: 35, gloomium: 80,
-  sparkium: 200, craktonite: 450, absurdium: 1000, treranium: 2500,
-};
+// Ore IDs that can appear in contracts, in rarity order.
+const CONTRACT_ORES = Object.keys(ORE_PRICES);
+const ORE_BASE_PRICES: Record<string, number> = ORE_PRICES;
 
 // ── Generation ──
 
@@ -101,15 +95,13 @@ export function generateContracts(
   priceMultiplier: number = 1,
 ): void {
   // Only refresh if enough time has passed
-  if (currentTick - state.lastRefreshTick < REFRESH_INTERVAL && state.available.length > 0) return;
+  if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
 
-  // Remove oldest contracts if at max
-  while (state.available.length >= MAX_AVAILABLE) {
-    state.available.shift();
-  }
+  // Evict oldest offers so exactly CONTRACTS_PER_REFRESH new ones fit.
+  const overflow = state.available.length + CONTRACTS_PER_REFRESH - MAX_AVAILABLE_CONTRACTS;
+  if (overflow > 0) state.available.splice(0, overflow);
 
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    if (state.available.length >= MAX_AVAILABLE) break;
     state.available.push(generateOneContract(state, rng, priceMultiplier));
   }
   state.lastRefreshTick = currentTick;
@@ -126,19 +118,19 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
     // Ore sale contract
     type = 'ore_sale';
     materialId = rng.pick(CONTRACT_ORES);
-    pricePerKg = (ORE_CONTRACT_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
+    pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
     description = `Deliver ${materialId} ore`;
   } else if (typeRoll < 0.8) {
     // Rubble disposal
     type = 'rubble_disposal';
     materialId = '';
-    pricePerKg = rng.nextFloat(0.5, 2.0);
+    pricePerKg = rng.nextFloat(RUBBLE_DISPOSAL_PRICE_RANGE.min, RUBBLE_DISPOSAL_PRICE_RANGE.max);
     description = 'Dispose of rubble';
   } else {
     // Supply contract (recurring, higher quantity, lower price)
     type = 'supply';
     materialId = rng.pick(CONTRACT_ORES.slice(0, 4)); // Only common ores for supply
-    pricePerKg = (ORE_CONTRACT_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
+    pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
     description = `Supply ${materialId} (bulk)`;
   }
 
@@ -252,7 +244,7 @@ export interface ContractSelector {
  * question.
  *
  * Both halves of the answer move on their own: `generateContracts` re-rolls
- * which ore is asked for and how much every `REFRESH_INTERVAL` ticks, while
+ * which ore is asked for and how much every `CONTRACT_REFRESH_INTERVAL` ticks, while
  * the haulers change what is in storage. That is why this is a condition to
  * wait on (the state dumps expose it as `fillableOreSaleOffered`) rather
  * than a tick count to guess at.
@@ -271,7 +263,7 @@ export function hasFillableOreSaleOffer(
  *
  * Exists for the same reason `hasFillableOreSaleOffer` does (issue #1263
  * CI-fix): `generateContracts` re-rolls the pool's contents every
- * `REFRESH_INTERVAL` ticks, so which absolute tick first carries a
+ * `CONTRACT_REFRESH_INTERVAL` ticks, so which absolute tick first carries a
  * `rubble_disposal` instance is a property of that RNG stream, not of the
  * player's own path to this point in the tutorial. `tutorial-interactive.json`
  * used to pin a fixed `tick N` pad to "wherever the offer happened to sit"
@@ -328,4 +320,3 @@ export function checkDeadlines(
   return penalties;
 }
 
-export { REFRESH_INTERVAL, MAX_AVAILABLE };

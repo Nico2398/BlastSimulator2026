@@ -24,6 +24,7 @@ import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
 /** Cost per metre of a default-width ramp. */
@@ -243,6 +244,7 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
   let selection: PlacementSelection | null = null;
   let confirmHandler: PlacementConfirmHandler | null = null;
   let changeHandler: PlacementChangeHandler | null = null;
+  let hoveredTile: { x: number; z: number } | null = null;
   const activeRegion = options?.activeRegion ?? null;
 
   const controller = {
@@ -250,6 +252,7 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
     get currentPhase() { return phase; },
     get selection() { return selection; },
     get activeRegion() { return activeRegion; },
+    get hoveredTile() { return hoveredTile; },
     get canConfirm() { return selection !== null; },
     setConfirmHandler: (cb: PlacementConfirmHandler) => { confirmHandler = cb; },
     setCancelHandler: vi.fn(),
@@ -258,6 +261,7 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
     arm: (_config: PlacementArmConfig) => { armed = true; phase = 'armed'; },
     cancel: () => { armed = false; phase = 'idle'; selection = null; changeHandler?.(); },
     simulateSelect(sel: PlacementSelection) { selection = sel; phase = 'selected'; changeHandler?.(); },
+    simulateHover(tile: { x: number; z: number } | null) { hoveredTile = tile; changeHandler?.(); },
     simulateConfirm() { return selection ? confirmHandler?.(selection) : undefined; },
   };
   const overlay = { update: vi.fn(), clear: vi.fn(), flashConfirm: vi.fn() };
@@ -724,5 +728,291 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     closeBtn.click();
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── #1396: refused ghost before any click; failed confirm keeps the tool open ──
+
+describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+  let gameConsole: ReturnType<typeof vi.fn<[string], CommandResult>>;
+  const FOOTPRINT = getBuildingDef('management_office', 1).footprint;
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+    gameConsole = vi.fn<[string], CommandResult>().mockReturnValue({ success: true, output: '' });
+    menu.setGameConsole(gameConsole);
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+  });
+
+  function armCatalog(kit: PlacementKit, type = 'management_office'): void {
+    menu.setPlacementKit(kit);
+    container.querySelector<HTMLButtonElement>(`[data-build-type="${type}"] .bs-build-buy-btn`)!.click();
+  }
+
+  function stateWithBuildingAt(x: number, z: number): GameState {
+    const state = makeMockState();
+    state.buildings.buildings = [makeBuilding({ id: 7, type: 'management_office', tier: 1, x, z })];
+    return state;
+  }
+
+  const lastOverlay = (overlay: ReturnType<typeof makeMockKit>['overlay']) => overlay.update.mock.calls.at(-1)![0];
+  const lastStrip = (strip: ReturnType<typeof makeMockKit>['strip']) => strip.show.mock.calls.at(-1)![0];
+
+  describe('point tool ghost', () => {
+    it('hovering an existing building refuses the ghost before any click', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      controller.simulateHover({ x: 5, z: 5 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'point', footprintCells: FOOTPRINT, refused: true }));
+    });
+
+    it('hovering a tile whose footprint merely reaches into a building refuses the ghost', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      controller.simulateHover({ x: 4, z: 4 }); // 2x2 covers (4..5, 4..5)
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+    });
+
+    it('hovering free flat ground is not refused', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      controller.simulateHover({ x: 20, z: 20 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'point', refused: false }));
+    });
+
+    it('a footprint edge-adjacent to a building is not refused', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      controller.simulateHover({ x: 7, z: 5 }); // building covers x 5..6, ghost covers 7..8
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: false }));
+    });
+
+    it('a planned (under-construction) building refuses the ghost too', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      const state = makeMockState();
+      state.plannedBuildings.push({ id: 1, buildingId: 1, type: 'management_office', tier: 1, x: 12, z: 12, actionId: 1, cost: 1000 });
+      menu.update(state);
+      armCatalog(kit);
+      controller.simulateHover({ x: 12, z: 12 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+    });
+
+    it('a selected (clicked) tile over a building is refused as well', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      controller.simulateSelect({ x1: 5, z1: 5, x2: 5, z2: 5 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+    });
+
+    it('the refused ghost shows a disabled Confirm with the occupied reason', () => {
+      const { kit, controller, strip } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      controller.simulateHover({ x: 5, z: 5 });
+      expect(lastStrip(strip)).toEqual(expect.objectContaining({
+        confirmEnabled: false,
+        confirmDisabledReason: t('shell.placement.refused_occupied'),
+      }));
+    });
+
+    it('a free selection keeps Confirm enabled with no reason', () => {
+      const { kit, controller, strip } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      controller.simulateSelect({ x1: 20, z1: 20, x2: 20, z2: 20 });
+      expect(lastStrip(strip).confirmEnabled).toBe(true);
+      expect(lastStrip(strip).confirmDisabledReason).toBeUndefined();
+    });
+
+    it('Move tool excludes the moving building itself, but still refuses other buildings', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.setPlacementKit(kit);
+      const state = makeMockState();
+      state.buildings.buildings = [
+        makeBuilding({ id: 7, type: 'management_office', tier: 1, x: 5, z: 5 }),
+        makeBuilding({ id: 8, type: 'management_office', tier: 1, x: 20, z: 20 }),
+      ];
+      menu.update(state);
+      findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-move-btn')!.click();
+
+      controller.simulateHover({ x: 5, z: 5 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: false }));
+      controller.simulateHover({ x: 20, z: 20 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+    });
+
+    it('a claim preview refusing ANY footprint cell (not only the anchor) refuses the ghost', () => {
+      const { kit, controller, overlay, strip } = makeMockKit();
+      // Refuses only rects that extend past the anchor cell on x (cell x+1 is protected).
+      const preview = vi.fn<[{ minX: number; minZ: number; maxX: number; maxZ: number }], ClaimRefusalReason | null>(
+        (rect) => (rect.maxX > 21 ? 'protected_structure' : null),
+      );
+      menu.setClaimAreaPreview(preview);
+      menu.update(makeMockState());
+      armCatalog(kit);
+      controller.simulateHover({ x: 20, z: 20 });
+      expect(preview).toHaveBeenCalled();
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+      expect(lastStrip(strip).confirmEnabled).toBe(false);
+    });
+
+    it('a claim preview returning null leaves the ghost accepted', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.setClaimAreaPreview(() => null);
+      menu.update(makeMockState());
+      armCatalog(kit);
+      controller.simulateHover({ x: 20, z: 20 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: false }));
+    });
+  });
+
+  describe('building confirm handler', () => {
+    it('returns false, sets the console output as status, skips the flash, and keeps the tool armed on failure', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(makeMockState());
+      armCatalog(kit);
+      gameConsole.mockReturnValue({ success: false, output: 'Space is occupied' });
+      controller.simulateSelect({ x1: 10, z1: 12, x2: 10, z2: 12 });
+
+      const result = controller.simulateConfirm();
+
+      expect(result).toBe(false);
+      expect(overlay.flashConfirm).not.toHaveBeenCalled();
+      expect(container.querySelector('#bs-build-panel')!.textContent).toContain('Space is occupied');
+      expect(controller.isArmed).toBe(true);
+    });
+
+    it('returns true and flashes on success', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(makeMockState());
+      armCatalog(kit);
+      controller.simulateSelect({ x1: 10, z1: 12, x2: 10, z2: 12 });
+
+      expect(controller.simulateConfirm()).toBe(true);
+      expect(overlay.flashConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it('Move confirm also returns false without flashing when the move is refused', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.setPlacementKit(kit);
+      menu.update(stateWithBuildingAt(5, 5));
+      findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-move-btn')!.click();
+      gameConsole.mockReturnValue({ success: false, output: 'Move refused' });
+      controller.simulateSelect({ x1: 20, z1: 21, x2: 20, z2: 21 });
+
+      expect(controller.simulateConfirm()).toBe(false);
+      expect(overlay.flashConfirm).not.toHaveBeenCalled();
+      expect(controller.isArmed).toBe(true);
+    });
+
+    it('Enter on a pre-refused selection: the handler runs, returns false, and the tool stays open', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armCatalog(kit);
+      gameConsole.mockReturnValue({ success: false, output: 'Space is occupied' });
+      controller.simulateSelect({ x1: 5, z1: 5, x2: 5, z2: 5 });
+
+      const result = controller.simulateConfirm();
+
+      expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('build management_office at:5,5'));
+      expect(result).toBe(false);
+      expect(overlay.flashConfirm).not.toHaveBeenCalled();
+      expect(controller.isArmed).toBe(true);
+    });
+  });
+
+  describe('level-ground tool', () => {
+    function armLevel(kit: PlacementKit): void {
+      menu.setPlacementKit(kit);
+      container.querySelector<HTMLButtonElement>('.bs-build-level-ground-btn')!.click();
+    }
+
+    it('a rect overlapping a building paints the rect refused, with the occupied reason and Confirm disabled', () => {
+      const { kit, controller, overlay, strip } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armLevel(kit);
+      controller.simulateSelect({ x1: 6, z1: 6, x2: 9, z2: 9 }); // inclusive max 9 covers building cell (6,6)
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'rect', refused: true }));
+      expect(lastStrip(strip)).toEqual(expect.objectContaining({
+        confirmEnabled: false,
+        confirmDisabledReason: t('shell.placement.refused_occupied'),
+      }));
+    });
+
+    it('a rect whose inclusive max cell touches the building is refused; one cell further away is not', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5)); // covers x,z 5..6
+      armLevel(kit);
+      controller.simulateSelect({ x1: 1, z1: 1, x2: 5, z2: 5 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+      controller.simulateSelect({ x1: 1, z1: 1, x2: 4, z2: 4 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: false }));
+    });
+
+    it('a rect over a planned site is refused', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      const state = makeMockState();
+      state.plannedBuildings.push({ id: 1, buildingId: 1, type: 'management_office', tier: 1, x: 12, z: 12, actionId: 1, cost: 1000 });
+      menu.update(state);
+      armLevel(kit);
+      controller.simulateSelect({ x1: 11, z1: 11, x2: 12, z2: 12 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: true }));
+    });
+
+    it('a free rect is not refused and keeps Confirm enabled', () => {
+      const { kit, controller, overlay, strip } = makeMockKit();
+      menu.update(stateWithBuildingAt(5, 5));
+      armLevel(kit);
+      controller.simulateSelect({ x1: 20, z1: 20, x2: 24, z2: 24 });
+      expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: false }));
+      expect(lastStrip(strip).confirmEnabled).toBe(true);
+    });
+
+    it('confirm returns false, shows the console output, skips the flash on failure', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(makeMockState());
+      armLevel(kit);
+      gameConsole.mockReturnValue({ success: false, output: 'Area too large' });
+      controller.simulateSelect({ x1: 0, z1: 0, x2: 30, z2: 30 });
+
+      expect(controller.simulateConfirm()).toBe(false);
+      expect(overlay.flashConfirm).not.toHaveBeenCalled();
+      expect(container.querySelector('#bs-build-panel')!.textContent).toContain('Area too large');
+      expect(controller.isArmed).toBe(true);
+    });
+
+    it('confirm returns true and flashes on success', () => {
+      const { kit, controller, overlay } = makeMockKit();
+      menu.update(makeMockState());
+      armLevel(kit);
+      controller.simulateSelect({ x1: 20, z1: 20, x2: 24, z2: 24 });
+
+      expect(controller.simulateConfirm()).toBe(true);
+      expect(overlay.flashConfirm).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('Ramp confirm stays unchanged: failure returns false without flashing, success flashes', () => {
+    const { kit, controller, overlay } = makeMockKit();
+    menu.setPlacementKit(kit);
+    container.querySelector<HTMLButtonElement>('.bs-build-ramp-btn')!.click();
+    controller.simulateSelect({ x1: 5, z1: 5, x2: 10, z2: 5 });
+    gameConsole.mockReturnValue({ success: false, output: 'Ramp order refused' });
+    expect(controller.simulateConfirm()).toBe(false);
+    expect(overlay.flashConfirm).not.toHaveBeenCalled();
+    gameConsole.mockReturnValue({ success: true, output: '' });
+    expect(controller.simulateConfirm()).toBe(true);
+    expect(overlay.flashConfirm).toHaveBeenCalledTimes(1);
   });
 });

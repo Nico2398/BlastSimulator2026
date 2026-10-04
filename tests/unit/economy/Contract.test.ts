@@ -10,6 +10,11 @@ import {
   hasFillableOreSaleOffer,
   hasRubbleDisposalOffer,
 } from '../../../src/core/economy/Contract.js';
+import {
+  CONTRACT_REFRESH_INTERVAL,
+  CONTRACTS_PER_REFRESH,
+  MAX_AVAILABLE_CONTRACTS,
+} from '../../../src/core/config/balance.js';
 import type { Contract } from '../../../src/core/economy/Contract.js';
 
 /** A minimal offered contract — only the fields hasFillableOreSaleOffer reads carry meaning. */
@@ -331,6 +336,113 @@ describe('Contract system', () => {
         offer({ id: 3, type: 'supply' }),
       ];
       expect(hasRubbleDisposalOffer(pool)).toBe(true);
+    });
+  });
+
+  // ── Refresh batch size (#1365) ──────────────────────────────────────────
+  // Every refresh must add exactly CONTRACTS_PER_REFRESH offers, evicting the
+  // oldest first on overflow. Old behaviour evicted one when full, so new
+  // offers per refresh went 3,3,2,1,1,1.
+  describe('refresh batch size (#1365)', () => {
+    const ids = (s: { available: Contract[] }) => s.available.map(c => c.id);
+
+    it('uses the documented tunables', () => {
+      expect(CONTRACTS_PER_REFRESH).toBe(3);
+      expect(MAX_AVAILABLE_CONTRACTS).toBe(8);
+      expect(CONTRACT_REFRESH_INTERVAL).toBe(20);
+    });
+
+    it('first refresh on an empty board yields exactly 3 offers', () => {
+      const state = createContractState();
+      generateContracts(state, new Random(42), 0);
+      expect(state.available).toHaveLength(3);
+    });
+
+    it('a full board (8) evicts exactly the 3 oldest, keeps the 5 newest in order, appends 3 new ids', () => {
+      const state = createContractState();
+      state.available = Array.from({ length: 8 }, (_, i) => offer({ id: i + 1 }));
+      state.nextId = 9;
+      state.lastRefreshTick = 0;
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL);
+      expect(ids(state)).toEqual([4, 5, 6, 7, 8, 9, 10, 11]);
+    });
+
+    it('a partially full board (6) ends at 8, evicting only 1', () => {
+      const state = createContractState();
+      state.available = Array.from({ length: 6 }, (_, i) => offer({ id: i + 1 }));
+      state.nextId = 7;
+      state.lastRefreshTick = 0;
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL);
+      expect(ids(state)).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
+    });
+
+    it('a board with room for the whole batch (5) evicts nothing', () => {
+      const state = createContractState();
+      state.available = Array.from({ length: 5 }, (_, i) => offer({ id: i + 1 }));
+      state.nextId = 6;
+      state.lastRefreshTick = 0;
+      generateContracts(state, new Random(42), CONTRACT_REFRESH_INTERVAL);
+      expect(ids(state)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    });
+
+    it('7 consecutive refreshes each add exactly 3 new ids and the board never exceeds 8', () => {
+      const state = createContractState();
+      const rng = new Random(42);
+      for (let n = 0; n < 7; n++) {
+        const before = new Set(ids(state));
+        generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL);
+        const added = ids(state).filter(id => !before.has(id));
+        expect(added, `refresh ${n}`).toHaveLength(3);
+        expect(state.available.length).toBeLessThanOrEqual(MAX_AVAILABLE_CONTRACTS);
+      }
+      expect(state.available).toHaveLength(8);
+    });
+
+    it('refresh before the interval elapsed on a non-empty board is a no-op', () => {
+      const state = createContractState();
+      const rng = new Random(42);
+      generateContracts(state, rng, 0);
+      const before = ids(state);
+      generateContracts(state, rng, CONTRACT_REFRESH_INTERVAL - 1);
+      expect(ids(state)).toEqual(before);
+      expect(state.nextId).toBe(4);
+    });
+
+    it('ore_sale prices stay in the x0.8-1.3 band of base (gloomium base $80)', () => {
+      const base: Record<string, number> = { gloomium: 80, dirtite: 3, rustite: 12, blingite: 35 };
+      let sawGloomium = false;
+      for (let seed = 1; seed <= 60; seed++) {
+        const state = createContractState();
+        const rng = new Random(seed);
+        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL);
+        for (const c of state.available.filter(o => o.type === 'ore_sale')) {
+          const b = base[c.materialId];
+          if (b === undefined) continue;
+          if (c.materialId === 'gloomium') {
+            sawGloomium = true;
+            expect(c.pricePerKg).toBeGreaterThanOrEqual(80 * 0.8);
+            expect(c.pricePerKg).toBeLessThanOrEqual(80 * 1.3);
+          }
+          expect(c.pricePerKg).toBeGreaterThanOrEqual(b * 0.8);
+          expect(c.pricePerKg).toBeLessThanOrEqual(b * 1.3);
+        }
+      }
+      expect(sawGloomium).toBe(true);
+    });
+
+    it('rubble_disposal prices stay within 0.5-2.0', () => {
+      let saw = false;
+      for (let seed = 1; seed <= 30; seed++) {
+        const state = createContractState();
+        const rng = new Random(seed);
+        for (let n = 0; n < 8; n++) generateContracts(state, rng, n * CONTRACT_REFRESH_INTERVAL);
+        for (const c of state.available.filter(o => o.type === 'rubble_disposal')) {
+          saw = true;
+          expect(c.pricePerKg).toBeGreaterThanOrEqual(0.5);
+          expect(c.pricePerKg).toBeLessThanOrEqual(2.0);
+        }
+      }
+      expect(saw).toBe(true);
     });
   });
 });
