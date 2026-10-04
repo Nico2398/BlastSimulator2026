@@ -1,6 +1,7 @@
 {
   "blast.fragments": "{count} fragments detected",
   "blast.no_casualties": "No casualties.",
+  "blast.overlay.delay_ms": "{ms} ms",
   "blast.oversized_alert": "Oversized fragments: {count}",
   "blast.projections": "{count} projections detected (max distance: {maxDist}m)",
   "blast.rating.bad": "Bad",
