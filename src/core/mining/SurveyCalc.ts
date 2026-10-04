@@ -213,9 +213,6 @@ export function isSurveyStale(result: SurveyResult, currentTick: number): boolea
   return currentTick - result.completedTick > SURVEY_STALE_TICKS;
 }
 
-// Column lookup lives in SurveyColumn.ts; re-exported so existing importers keep working.
-export { findSurveyForColumn } from './SurveyColumn.js';
-
 export { applySeismicSurveyDamage } from './SeismicSurveyDamage.js';
 
 /** Input parameters for {@link runSurvey}. */
