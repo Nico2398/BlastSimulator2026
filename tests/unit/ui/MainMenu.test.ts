@@ -216,6 +216,24 @@ describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
     menu.dispose();
   });
 
+  it('show() refreshes CONTINUE for a save made after construction (#1326)', async () => {
+    const saves: SaveMeta[] = [];
+    const backend = fakeBackend(saves);
+    (backend.list as ReturnType<typeof vi.fn>).mockImplementation(async () => [...saves]);
+    const menu = new MainMenu(container);
+    menu.setBackend(backend);
+    await new Promise(r => setTimeout(r, 0));
+    const continueBtn = container.querySelector<HTMLButtonElement>('#bs-menu-continue')!;
+    expect(continueBtn.style.display).toBe('none');
+
+    saves.push({ slotId: 'slot_1', name: 'Slot 1', timestamp: 1000, version: 7, campaignSummary: '$9,000 — Day 2', levelId: 'dusty_hollow' });
+    menu.show();
+    await new Promise(r => setTimeout(r, 0));
+    expect(continueBtn.style.display).toBe('flex');
+    expect(container.textContent).toContain('$9,000 — Day 2');
+    menu.dispose();
+  });
+
   it('LOAD button hints the real save count once resolved', async () => {
     const menu = new MainMenu(container);
     menu.setBackend(fakeBackend([

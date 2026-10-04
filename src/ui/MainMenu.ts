@@ -141,6 +141,9 @@ export class MainMenu {
     container.appendChild(this.overlay);
   }
 
+  private summarySeq = 0;
+  private disposed = false;
+
   setBackend(backend: SaveBackend): void {
     this.backend = backend;
     void this.refreshContinueSummary();
@@ -160,6 +163,8 @@ export class MainMenu {
     this.overlay.style.display = 'flex';
     this.updateResumeButton();
     this.startTicker();
+    // Saves made since construction (Saves modal -> Return to Menu) must surface.
+    void this.refreshContinueSummary();
   }
   hide(): void {
     this.overlay.style.display = 'none';
@@ -179,6 +184,7 @@ export class MainMenu {
 
   dispose(): void {
     this.stopTicker();
+    this.disposed = true;
     this.overlay.remove();
   }
 
@@ -203,7 +209,9 @@ export class MainMenu {
 
   private async refreshContinueSummary(): Promise<void> {
     if (!this.backend) return;
+    const seq = ++this.summarySeq;
     const metas = await this.backend.list();
+    if (this.disposed || seq !== this.summarySeq) return; // stale or unmounted
     this.saveCount = metas.length;
     this.mostRecentSave = metas.reduce<SaveMeta | null>(
       (best, m) => (!best || m.timestamp > best.timestamp) ? m : best,
