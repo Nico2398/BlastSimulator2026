@@ -38,7 +38,7 @@
       "description": "Player clicks back-to-site; the world map closes and the same game continues untouched.",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-world-map-back-to-site" },
-        { "type": "waitForProperty", "selector": "#bs-world-map", "property": "style.display", "expectedValue": "none" }
+        { "type": "waitForProperty", "selector": "#bs-world-map-back-to-site", "property": "offsetParent", "expectedValue": null }
       ],
       "role": "player",
       "expect": {
