@@ -62,10 +62,9 @@
     },
     {
       "command": "state",
-      "description": "Tutorial must be inactive on the live level, read from the game's own tutorial probe.",
+      "description": "Tutorial card must still be absent on the live level: expect.blocked on #bs-tutorial-overlay fails unless the probe reports it absent or hidden.",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "assert", "selector": "#bs-tutorial-overlay", "property": "visible", "expectedValue": false }
+        { "type": "command", "command": "state" }
       ],
       "role": "observe",
       "expect": {
