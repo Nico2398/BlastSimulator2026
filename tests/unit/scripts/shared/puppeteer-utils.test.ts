@@ -111,15 +111,16 @@ describe('executeInteractionActions — excludeFromDeadline (#1224)', () => {
       evaluate: vi.fn(async () => ({ gameState: null, uiState: null })),
       screenshot: vi.fn(async () => { state.screenshotsInside.push(state.inside > 0); }),
     } as unknown as Page;
-    const exclude = vi.fn(async <T,>(work: () => Promise<T>): Promise<T> => {
+    const excludeMock = vi.fn(async (work: () => Promise<unknown>): Promise<unknown> => {
       state.inside++;
       try { return await work(); } finally { state.inside--; }
     });
+    const exclude = excludeMock as unknown as <T>(work: () => Promise<T>) => Promise<T>;
     return { page, state, exclude };
   }
 
   const step = (interaction: ScenarioStepDef['interaction']): ScenarioStepDef =>
-    ({ command: 'tick 1', role: 'setup', interaction });
+    ({ command: 'tick 1', role: 'setup', ...(interaction !== undefined ? { interaction } : {}) });
 
   it('routes an inline screenshot capture through the wrapper', async () => {
     const { page, state, exclude } = capturePage();
