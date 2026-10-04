@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, assembleValidBlastPlan } from './shared.js';
-import { executeBlast, buildBlastReport } from '../../../core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport, villagePositions } from '../../../core/mining/BlastExecution.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
@@ -19,7 +19,7 @@ import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
-import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
+import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
 export function blastCommand(
   ctx: MiningContext,
@@ -53,7 +53,8 @@ export function blastCommand(
   // correct fallback either way, since createWeatherCycle's own initial
   // state is always 'sunny' regardless of seed.
   const wetHoleIds = new Set(wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny'));
-  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
+  const villages = villagePositions(ctx.playableArea?.villages() ?? []);
+  const result = executeBlast(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
   if (!result) return { success: false, output: t('mining.blast.execution_failed') };
 
   // Store fragment data for renderer (localized remesh + mesh spawning)
@@ -81,7 +82,11 @@ export function blastCommand(
 
   // Update scores based on blast outcome
   if (result.projectionCount > 0) {
-    recordVibration(state.scores, result.projectionCount * 0.5);
+    recordVibration(state.scores, result.projectionCount * BLAST_PROJECTION_NUISANCE_PER_PROJECTION);
+  }
+  const maxVillageVibration = result.vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0);
+  if (maxVillageVibration > 0) {
+    recordVibration(state.scores, maxVillageVibration * VILLAGE_VIBRATION_SCORE_GAIN);
   }
 
   // Standing on the rock when it goes is not survivable, whatever the charge:
@@ -202,6 +207,9 @@ export function blastCommand(
       `Average fragment size: ${result.averageFragmentSize.toFixed(3)} m³`,
       `Oversized fragments: ${result.oversizedFragments}`,
       `Projections: ${result.projectionCount}`,
+      ...(result.vibrationAtVillages.length > 0
+        ? [t('mining.blast.max_village_vibration', { value: maxVillageVibration.toFixed(4) })]
+        : []),
       `Furthest throw: ${result.maxThrowDistance.toFixed(1)} m`,
       `Total rock volume: ${result.totalRockVolume.toFixed(1)} m³`,
       `Total ore value: $${result.totalOreValue.toFixed(0)}`,

@@ -146,9 +146,9 @@ export class PlayableArea {
     return this.protectedStructures !== null;
   }
 
-  /** Villages of this level's seed (stub, #1343). */
+  /** Villages of this level's structure set (lazy; honours adopted structures). */
   villages(): readonly Village[] {
-    return []; // TODO: implement
+    return this.structures().villages;
   }
 
   /** True when the site owns the column at (x, z). */

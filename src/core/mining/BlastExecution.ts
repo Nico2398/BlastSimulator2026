@@ -4,7 +4,7 @@
 
 import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
-import { length as vecLength } from '../math/Vec3.js';
+import { length as vecLength, vec3 } from '../math/Vec3.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
 import type { BlastPlan } from './BlastPlan.js';
@@ -185,6 +185,9 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     spent,
     destroyedBuildings: result.destroyedBuildings,
     accidents,
+    ...(result.vibrationAtVillages.length > 0
+      ? { maxVibration: result.vibrationAtVillages.reduce((m, v) => Math.max(m, v.vibration), 0) }
+      : {}),
   };
 }
 
@@ -195,16 +198,26 @@ export interface VillagePosition {
   position: Vec3;
 }
 
-/** Map villages to vibration targets (stub, #1343). */
+/** Map villages to vibration targets (ground level, ids `village-<index>`). */
 export function villagePositions(villages: readonly Village[]): VillagePosition[] {
-  void villages;
-  return []; // TODO: implement
+  return villages.map((v, i) => ({ id: `village-${i}`, position: vec3(v.x, 0, v.z) }));
 }
 
-/** Mean per-hole vibration modifier of a plan; wet holes dampen differently (stub, #1343). */
+/**
+ * Mean per-hole vibration modifier of a plan: charged holes only, equal
+ * weight; 1 when no hole is charged. The executed blast and the tier-4
+ * preview both scale the ground factor by this so they agree.
+ */
 export function averageVibrationMod(plan: BlastPlan, wetHoleIds: ReadonlySet<string>): number {
-  void plan; void wetHoleIds;
-  return 1; // TODO: implement
+  let sum = 0;
+  let count = 0;
+  for (const hole of plan.holes) {
+    const charge = plan.charges[hole.id];
+    if (!charge) continue;
+    sum += effectiveHoleEnergy(charge, hole.depth, wetHoleIds.has(hole.id), false).vibrationMod;
+    count++;
+  }
+  return count > 0 ? sum / count : 1;
 }
 
 // ── Pipeline ──
@@ -413,16 +426,7 @@ export function executeBlast(
 
   // 6. Calculate vibrations at villages
   // Apply per-explosive vibrationMod: average across all charged holes weighted equally.
-  let vibModSum = 0;
-  let vibModCount = 0;
-  for (const hole of plan.holes) {
-    const charge = plan.charges[hole.id];
-    if (!charge) continue;
-    const energy = effectiveHoleEnergy(charge, hole.depth, wetHoleIds.has(hole.id), false);
-    vibModSum += energy.vibrationMod;
-    vibModCount++;
-  }
-  const effectiveGroundFactor = groundFactor * (vibModCount > 0 ? vibModSum / vibModCount : 1);
+  const effectiveGroundFactor = groundFactor * averageVibrationMod(plan, wetHoleIds);
 
   const chargePerDelay = groupChargesByDelay(plan.holes, plan.charges, plan.delays);
   const vibrationAtVillages: VillageVibration[] = villages.map(v => {

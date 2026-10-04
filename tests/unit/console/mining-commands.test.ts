@@ -750,7 +750,7 @@ describe('blast_preview — state.lastBlastPreview', () => {
     expect(projections.collapseFragments).toBeGreaterThanOrEqual(0);
   });
 
-  it('tier 4 — vibrations populated (0 affected villages: none are wired into this command yet)', () => {
+  it("tier 4 — vibrations populated at the level's villages (#1343)", () => {
     const ctx = makeMiningContext();
     makePlan(ctx, 4);
 
@@ -758,7 +758,7 @@ describe('blast_preview — state.lastBlastPreview', () => {
 
     const preview = ctx.state!.lastBlastPreview!;
     expect(preview.vibrations).not.toBeNull();
-    expect(preview.vibrations!.affectedVillages).toBe(0);
+    expect(preview.vibrations!.affectedVillages).toBe(ctx.playableArea?.villages().length ?? 0);
     expect(preview.fragments).not.toBeNull();
     expect(preview.projections).not.toBeNull();
   });

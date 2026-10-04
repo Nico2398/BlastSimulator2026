@@ -293,7 +293,10 @@ export function previewHoleDetails(
   return result;
 }
 
-/** Preview vibrations at villages. Requires software tier >= 4. */
+/**
+ * Preview vibrations at villages. Requires software tier >= 4.
+ * `groundFactor` must be the one executeBlast uses (base factor x averageVibrationMod) for the preview to equal the blast.
+ */
 export function previewVibrations(
   plan: BlastPlan,
   villages: readonly VillagePosition[],
@@ -305,6 +308,10 @@ export function previewVibrations(
   const chargePerDelay = groupChargesByDelay(plan.holes, plan.charges, plan.delays);
   let cx = 0, cz = 0;
   for (const h of plan.holes) { cx += h.x; cz += h.z; }
+  // No holes: no blast centre, so no vibration (avoids NaN distances).
+  if (plan.holes.length === 0) {
+    return { villages: villages.map(v => ({ villageId: v.id, vibration: 0 })), maxVibration: 0 };
+  }
   cx /= plan.holes.length;
   cz /= plan.holes.length;
 
