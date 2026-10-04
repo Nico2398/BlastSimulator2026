@@ -213,7 +213,12 @@ export function levelVillagePositions(ctx: MiningContext): VillagePosition[] {
  * Cancel every pending `drill_hole` action and empty `state.plannedDrillHoles`.
  * Returns the number of ordered holes cancelled. Other action types untouched.
  */
-export function cancelOutstandingDrillActions(_state: GameState): number {
-  // TODO: implement
-  return 0;
+export function cancelOutstandingDrillActions(state: GameState): number {
+  const ordered = state.plannedDrillHoles.length;
+  // Snapshot: cancelAction splices state.pendingActions.
+  for (const action of state.pendingActions.filter(a => a.type === 'drill_hole')) {
+    cancelAction(state, action.id);
+  }
+  state.plannedDrillHoles = [];
+  return ordered;
 }
