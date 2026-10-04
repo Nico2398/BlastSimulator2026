@@ -89,7 +89,7 @@ export interface SerializableGameState {
    * can be accepted and filled in full right now, which is what completes a
    * sale rather than part-delivering one. Both halves of it are random and
    * moving: which ore the pool asks for and how much (Contract.ts's
-   * `generateContracts`, rotating every `REFRESH_INTERVAL` ticks and keeping
+   * `generateContracts`, rotating every `CONTRACT_REFRESH_INTERVAL` ticks and keeping
    * only the most recent handful), against however much of that ore the
    * haulers have brought in so far. So this is the condition a scenario
    * waits on before clicking Accept, instead of a fixed tick count that only

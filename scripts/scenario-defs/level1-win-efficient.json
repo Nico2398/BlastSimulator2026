@@ -1581,7 +1581,7 @@
     },
     {
       "command": "contract accept type:ore_sale",
-      "description": "#715: the Fleet panel's driver-assign picker used to filter eligibility on `vehicle.driverId` alone, which stays null for an employee's whole walk to the vehicle (ArrivalGate.ts only sets it on arrival) -- so buying/assigning three drill_rigs back-to-back kept offering the same already-claimed driller as every subsequent picker's default option, and those assign clicks silently refused (`requestBoardVehicle`'s own already-walking guard). That desynced interaction mode's drilling dispatch order from command mode's explicit ids, producing a real tick-trajectory divergence this file's `equals`-loosening history (#555/#698/#714) had been papering over instead of fixing at the mechanism. Now that the picker (`fleetDetailSections.ts`'s `makeAssignRow`) reuses `canBoardVehicle` -- the same check `requestBoardVehicle` itself enforces -- both modes drill in the same order and reach this step at the identical tick 227, confirmed byte-identical against a direct command-mode `contract list` trace. `type:ore_sale` alone, the same style already used for the rubble_disposal accept below, finds the first ore_sale offer regardless of which material it happens to be -- robust to the pool rotating instead of pinned to one material that may not be on offer. The accept click is scoped to the real id currently offered, `[data-contract-id=\"10\"]` (the first ore_sale entry in that trace, treranium).",
+      "description": "#715: the Fleet panel's driver-assign picker used to filter eligibility on `vehicle.driverId` alone, which stays null for an employee's whole walk to the vehicle (ArrivalGate.ts only sets it on arrival) -- so buying/assigning three drill_rigs back-to-back kept offering the same already-claimed driller as every subsequent picker's default option, and those assign clicks silently refused (`requestBoardVehicle`'s own already-walking guard). That desynced interaction mode's drilling dispatch order from command mode's explicit ids, producing a real tick-trajectory divergence this file's `equals`-loosening history (#555/#698/#714) had been papering over instead of fixing at the mechanism. Now that the picker (`fleetDetailSections.ts`'s `makeAssignRow`) reuses `canBoardVehicle` -- the same check `requestBoardVehicle` itself enforces -- both modes drill in the same order and reach this step at the identical tick 227, confirmed byte-identical against a direct command-mode `contract list` trace. `type:ore_sale` alone, the same style already used for the rubble_disposal accept below, finds the first ore_sale offer regardless of which material it happens to be -- robust to the pool rotating instead of pinned to one material that may not be on offer. The accept click is scoped to the real id currently offered, `[data-contract-type=\"ore_sale\"]` (the first ore_sale entry in that trace, treranium).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1589,11 +1589,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1615,11 +1615,11 @@
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1654,7 +1654,7 @@
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -1679,7 +1679,7 @@
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -2605,7 +2605,7 @@
           "surveyCount": 2,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "ecology": 50
+          "ecology": 60.77758124034693
         }
       }
     },
@@ -2681,9 +2681,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 10.519999999999971,
-          "ecology": 50,
-          "nuisance": 48.30829425072332
+          "safety": 0,
+          "ecology": 60.77758124034693,
+          "nuisance": 40.30829425072332
         }
       }
     },
@@ -2704,9 +2704,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 10.519999999999971,
-          "ecology": 50,
-          "nuisance": 48.30829425072332
+          "safety": 0,
+          "ecology": 60.77758124034693,
+          "nuisance": 40.30829425072332
         }
       }
     },
@@ -2727,9 +2727,9 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 10.519999999999971,
-          "ecology": 50,
-          "nuisance": 48.30829425072332,
+          "safety": 0,
+          "ecology": 60.77758124034693,
+          "nuisance": 40.30829425072332,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

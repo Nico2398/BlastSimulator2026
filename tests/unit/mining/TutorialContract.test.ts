@@ -58,7 +58,7 @@ describe('Tutorial contract availability (Issue #328)', () => {
 
     // Assert: contracts still available (no premature refresh)
     expect(state.contracts.available.length).toBeGreaterThan(0);
-    // The refresh interval (REFRESH_INTERVAL = 20) has not elapsed,
+    // The refresh interval (CONTRACT_REFRESH_INTERVAL = 20) has not elapsed,
     // so lastRefreshTick should remain 0
     expect(state.contracts.lastRefreshTick).toBe(0);
     // No contracts should have been added or removed
