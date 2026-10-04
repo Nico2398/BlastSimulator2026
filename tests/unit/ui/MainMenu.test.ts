@@ -674,3 +674,49 @@ describe('MainMenu — RESUME live game (#1314)', () => {
     menu.dispose();
   });
 });
+
+// ── Locale persistence (#1324) ───────────────────────────────────────────────
+
+describe('MainMenu — locale persistence (#1324)', () => {
+  let container: HTMLDivElement;
+  beforeEach(() => {
+    localStorage.clear();
+    setLocale('en');
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+  afterEach(() => {
+    localStorage.clear();
+    setLocale('en');
+    container.remove();
+  });
+
+  it('clicking the FR pill persists locale fr', () => {
+    const menu = new MainMenu(container);
+    const fr = Array.from(container.querySelectorAll<HTMLButtonElement>('.bsx-menu-lang-pill'))
+      .find((p) => p.textContent === 'FR')!;
+    fr.click();
+    expect(JSON.parse(localStorage.getItem('bs_settings_v1') ?? '{}').locale).toBe('fr');
+    menu.dispose();
+  });
+
+  it('clicking the EN pill after FR persists locale en', () => {
+    const menu = new MainMenu(container);
+    const pill = (l: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('.bsx-menu-lang-pill'))
+      .find((p) => p.textContent === l)!;
+    pill('FR').click();
+    pill('EN').click();
+    expect(JSON.parse(localStorage.getItem('bs_settings_v1') ?? '{}').locale).toBe('en');
+    menu.dispose();
+  });
+
+  it('constructing after setLocale(fr) renders French', () => {
+    setLocale('fr');
+    const menu = new MainMenu(container);
+    menu.show();
+    expect(container.textContent).toContain(t('menu.subtitle'));
+    expect(container.textContent).not.toContain('dig');
+    expect(getLocale()).toBe('fr');
+    menu.dispose();
+  });
+});
