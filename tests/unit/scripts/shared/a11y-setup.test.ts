@@ -5,7 +5,7 @@
 // (console commands issued, selectors awaited, clicks, style writes), not on how
 // the implementation queries the DOM.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   A11Y_PANELS,
   A11Y_START_COMMAND,
@@ -15,6 +15,7 @@ import {
   assertRegionsPopulated,
   type A11yPage,
 } from '../../../../scripts/shared/a11y-setup.js';
+import { PANEL_ELEMENT_ID } from '../../../../scripts/shared/interaction-executor.js';
 
 interface FakeOpts {
   /** Panel ids visible before the test acts. */
@@ -296,5 +297,12 @@ describe('assertRegionsPopulated', () => {
 
   it('does not complain about unrequired empty regions', () => {
     expect(() => assertRegionsPopulated({ hud: 2, extra: 0 }, ['hud'])).not.toThrow();
+  });
+});
+
+describe('A11Y_PANELS', () => {
+  it('matches the scenario executor PANEL_ELEMENT_ID map', () => {
+    const fromPanels = A11Y_PANELS.map((p) => [p.rail, p.panelId]).sort();
+    expect(fromPanels).toEqual(Object.entries(PANEL_ELEMENT_ID).sort());
   });
 });

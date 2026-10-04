@@ -8,6 +8,8 @@ import {
   relativeLuminance,
   contrastRatio,
   rgbToHex,
+  analyzeElement,
+  type RawElement,
   type Rgba,
 } from '../../../../scripts/shared/a11y-contrast.js';
 
@@ -148,5 +150,28 @@ describe('resolveBackground', () => {
   it('ignores the fallback when an opaque layer exists', () => {
     expect(resolveBackground([opaque(1, 2, 3)], [200, 200, 200]))
       .toEqual({ color: [1, 2, 3], resolved: true });
+  });
+});
+
+describe('analyzeElement', () => {
+  const raw = (color: string, layers: string[]): RawElement => ({
+    tag: 'span', text: 't', region: 'R', fontSize: '12px', fontWeight: '400', color, layers,
+  });
+
+  it('black text over an opaque #111111 layer fails AA', () => {
+    const r = analyzeElement(raw('rgba(0, 0, 0, 1)', ['rgba(0, 0, 0, 0)', 'rgb(17, 17, 17)']));
+    expect(r).not.toBeNull();
+    expect(r!.background).toBe('#111111');
+    expect(r!.wcagAANormal).toBe(false);
+  });
+
+  it('returns null (unresolved, not white) when every layer is transparent', () => {
+    expect(analyzeElement(raw('rgb(255, 255, 255)', ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)']))).toBeNull();
+  });
+
+  it('composites a translucent foreground over the background', () => {
+    const r = analyzeElement(raw('rgba(255, 255, 255, 0.5)', ['rgb(0, 0, 0)']));
+    expect(r!.foreground).toBe('#808080');
+    expect(r!.background).toBe('#000000');
   });
 });

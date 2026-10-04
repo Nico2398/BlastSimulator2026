@@ -1,9 +1,9 @@
 // BlastSimulator2026 — WCAG contrast helpers for the a11y check (#1419).
 
 export type Rgba = readonly [number, number, number, number];
-export type Rgb = readonly [number, number, number];
+type Rgb = readonly [number, number, number];
 
-export interface ResolvedBackground {
+interface ResolvedBackground {
   color: Rgb;
   /** false when no opaque layer was found and no fallback was given. */
   resolved: boolean;
@@ -73,5 +73,61 @@ export function rgbToHex(css: string): string | null {
   if (/^#[0-9a-f]{6}$/i.test(css)) return css.toLowerCase();
   const c = parseRgba(css);
   if (!c) return null;
-  return `#${c.slice(0, 3).map(v => Math.min(255, v).toString(16).padStart(2, '0')).join('')}`;
+  return rgbToHexColor([c[0], c[1], c[2]]);
+}
+
+/** Opaque RGB triple to `#rrggbb`. */
+function rgbToHexColor(c: Rgb): string {
+  return `#${c.map(v => Math.min(255, v).toString(16).padStart(2, '0')).join('')}`;
+}
+
+export interface TextElement {
+  tag: string;
+  text: string;
+  /** Region the element was measured in: TopBar, ToolRail or a panel id. */
+  region: string;
+  fontSize: string;
+  fontWeight: string;
+  foreground: string;
+  background: string;
+  contrastRatio: number;
+  wcagAALarge: boolean;
+  wcagAANormal: boolean;
+  wcagAAALarge: boolean;
+  wcagAAANormal: boolean;
+}
+
+/** Raw in-page measurement; colours resolved in Node by this module's pure logic. */
+export interface RawElement {
+  tag: string;
+  text: string;
+  region: string;
+  fontSize: string;
+  fontWeight: string;
+  color: string;
+  /** Ancestor background-color strings, innermost first. */
+  layers: string[];
+}
+
+/** Contrast of one raw element, or null when its background is not opaque-resolvable. */
+export function analyzeElement(raw: RawElement): TextElement | null {
+  const fg = parseRgba(raw.color);
+  if (!fg || fg[3] === 0) return null;
+  const layers = raw.layers.map(parseRgba).filter((l): l is Rgba => l !== null);
+  const bg = resolveBackground(layers, null);
+  if (!bg || !bg.resolved) return null;
+  const fgRgb: Rgb = fg[3] < 1 ? composite(fg, bg.color) : [fg[0], fg[1], fg[2]];
+  const fgHex = rgbToHexColor(fgRgb);
+  const bgHex = rgbToHexColor(bg.color);
+  const ratio = contrastRatio(fgHex, bgHex);
+  return {
+    tag: raw.tag, text: raw.text, region: raw.region,
+    fontSize: raw.fontSize, fontWeight: raw.fontWeight,
+    foreground: fgHex, background: bgHex,
+    contrastRatio: Math.round(ratio * 100) / 100,
+    wcagAALarge: ratio >= 3.0,
+    wcagAANormal: ratio >= 4.5,
+    wcagAAALarge: ratio >= 4.5,
+    wcagAAANormal: ratio >= 7.0,
+  };
 }

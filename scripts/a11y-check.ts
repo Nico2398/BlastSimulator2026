@@ -23,42 +23,11 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
 import { initBrowser } from './shared/puppeteer-utils.js';
-import {
-  composite, contrastRatio, parseRgba, resolveBackground, rgbToHex,
-  type Rgb, type Rgba,
-} from './shared/a11y-contrast.js';
+import { analyzeElement, parseRgba, type RawElement, type TextElement } from './shared/a11y-contrast.js';
 import {
   A11Y_PANELS, assertRegionsPopulated, closePanelViaRail, openPanelViaRail, startGame,
   type A11yPage,
 } from './shared/a11y-setup.js';
-
-interface TextElement {
-  tag: string;
-  text: string;
-  /** Region the element was measured in: TopBar, ToolRail or a panel id. */
-  region: string;
-  fontSize: string;
-  fontWeight: string;
-  foreground: string;
-  background: string;
-  contrastRatio: number;
-  wcagAALarge: boolean;
-  wcagAANormal: boolean;
-  wcagAAALarge: boolean;
-  wcagAAANormal: boolean;
-}
-
-/** Raw in-page measurement; colours resolved in Node by the shared pure logic. */
-interface RawElement {
-  tag: string;
-  text: string;
-  region: string;
-  fontSize: string;
-  fontWeight: string;
-  color: string;
-  /** Ancestor background-color strings, innermost first. */
-  layers: string[];
-}
 
 interface UnresolvedElement { tag: string; text: string; region: string }
 
@@ -69,11 +38,21 @@ interface A11yReport {
   totalElements: number;
   failures: TextElement[];
   unresolvedBackground: UnresolvedElement[];
+  /** Elements actually judged (resolved background) per region. */
   regionCounts: Record<string, number>;
   passCount: number;
   failCount: number;
   summary: string;
 }
+
+/**
+ * esbuild (via tsx) rewrites named functions to `__name(fn, "fn")`. That helper
+ * is module-scoped in Node and does not travel with a serialized page.evaluate
+ * body, so any helper function declared in a page function would throw
+ * "__name is not defined" in the browser. An identity shim installed as a raw
+ * string stays out of esbuild's reach.
+ */
+const NAME_SHIM = 'globalThis.__name = globalThis.__name || function (fn) { return fn; }';
 
 const TOP_BAR = 'TopBar';
 const TOOL_RAIL = 'ToolRail';
@@ -84,7 +63,7 @@ const PRINT_CAP_PER_REGION = 15;
 /**
  * In-page collection of visible text under `rootSelector`. Returns raw colour
  * strings and ancestor layers; no contrast logic runs here because a page
- * function cannot import (see the `__name` note in runA11yCheck).
+ * function cannot import (see `NAME_SHIM`).
  */
 function collectRegion(rootSelector: string, region: string): RawElement[] {
   const root = document.querySelector(rootSelector);
@@ -120,29 +99,6 @@ function collectRegion(rootSelector: string, region: string): RawElement[] {
   return results;
 }
 
-/** Contrast of one raw element, or null when its background is not opaque-resolvable. */
-export function analyzeElement(raw: RawElement): TextElement | null {
-  const fg = parseRgba(raw.color);
-  if (!fg || fg[3] === 0) return null;
-  const layers = raw.layers.map(parseRgba).filter((l): l is Rgba => l !== null);
-  const bg = resolveBackground(layers, null);
-  if (!bg || !bg.resolved) return null;
-  const fgRgb: Rgb = fg[3] < 1 ? composite(fg, bg.color) : [fg[0], fg[1], fg[2]];
-  const fgHex = rgbToHex(`rgb(${fgRgb.join(',')})`)!;
-  const bgHex = rgbToHex(`rgb(${bg.color.join(',')})`)!;
-  const ratio = contrastRatio(fgHex, bgHex);
-  return {
-    tag: raw.tag, text: raw.text, region: raw.region,
-    fontSize: raw.fontSize, fontWeight: raw.fontWeight,
-    foreground: fgHex, background: bgHex,
-    contrastRatio: Math.round(ratio * 100) / 100,
-    wcagAALarge: ratio >= 3.0,
-    wcagAANormal: ratio >= 4.5,
-    wcagAAALarge: ratio >= 4.5,
-    wcagAAANormal: ratio >= 7.0,
-  };
-}
-
 function parseArgs(): { port: number; viewport: { width: number; height: number } } {
   const args = process.argv.slice(2);
   let port = 5173;
@@ -170,18 +126,12 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
   const { browser, page } = await initBrowser({ port, viewport });
 
   try {
-    // esbuild (via tsx) rewrites named functions to `__name(fn, "fn")` to
-    // preserve Function.name. That helper is module-scoped in Node and does not
-    // travel with a serialized page.evaluate body, so any helper function
-    // declared in a page function would throw "__name is not defined" in the
-    // browser. Installing an identity shim as a raw string keeps it out of
-    // esbuild's reach.
-    await page.evaluate('globalThis.__name = globalThis.__name || function (fn) { return fn; }');
+    await page.evaluate(NAME_SHIM);
 
     // Real UI: start a staffed game, then drive panels through the tool rail.
     const a11yPage = page as unknown as A11yPage;
     await startGame(a11yPage);
-    await page.evaluate('globalThis.__name = globalThis.__name || function (fn) { return fn; }');
+    await page.evaluate(NAME_SHIM);
     // Tutorial overlay would cover and pollute the measured UI.
     await page.evaluate("localStorage.setItem('bs_tutorial_done', '1'); document.getElementById('bs-tutorial-overlay')?.remove();");
 
@@ -199,12 +149,9 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
       await closePanelViaRail(a11yPage, rail, panelId);
     }
 
-    const regionCounts: Record<string, number> = {};
-    for (const el of raw) regionCounts[el.region] = (regionCounts[el.region] ?? 0) + 1;
-    assertRegionsPopulated(regionCounts, [TOP_BAR, TOOL_RAIL, ...A11Y_PANELS.map(p => p.panelId)]);
-
     const failures: TextElement[] = [];
     const unresolvedBackground: UnresolvedElement[] = [];
+    const regionCounts: Record<string, number> = {};
     let measured = 0;
     for (const el of raw) {
       const analyzed = analyzeElement(el);
@@ -213,8 +160,12 @@ async function runA11yCheck(port: number, viewport: { width: number; height: num
         continue;
       }
       measured++;
+      regionCounts[el.region] = (regionCounts[el.region] ?? 0) + 1;
       if (!analyzed.wcagAANormal) failures.push(analyzed);
     }
+    // Count judged elements only: a region whose every element had an
+    // unresolvable background must fail the run, not pass silently.
+    assertRegionsPopulated(regionCounts, [TOP_BAR, TOOL_RAIL, ...A11Y_PANELS.map(p => p.panelId)]);
 
     const unresolvedNote = unresolvedBackground.length > 0
       ? ` ${unresolvedBackground.length} element(s) had no opaque background and were not judged.`
