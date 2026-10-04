@@ -29,8 +29,11 @@ export interface LevelCompleteResult {
 /**
  * Check whether the current level's profit threshold has been crossed.
  * Call this each time profit changes (or each tick).
- * Emits 'level:complete' event if newly completed.
- * Returns the completion result (triggered=true once, then false on subsequent calls).
+ * Emits 'level:complete' once per session when the threshold is reached, on a
+ * first completion and on a replay of an already-completed level alike. The
+ * session's `levelEnded` flag (set here on trigger) stops repeat triggers;
+ * recordProfit only unlocks on the first completion. A session already ended
+ * for another reason (e.g. bankruptcy) cannot be won: the flag blocks it.
  */
 export function checkLevelComplete(
   state: GameState,
@@ -40,9 +43,11 @@ export function checkLevelComplete(
   const levelId = campaign.activeLevelId;
   if (!levelId) return { triggered: false, summary: null };
 
-  // Only trigger once (before recordProfit sets completed=true)
+  // Once per session: a trigger sets levelEnded.
+  if (state.levelEnded) return { triggered: false, summary: null };
+
   const entry = campaign.levels[levelId];
-  if (!entry || entry.completed) return { triggered: false, summary: null };
+  if (!entry) return { triggered: false, summary: null };
 
   const level = getLevel(levelId);
   if (!level) return { triggered: false, summary: null };
@@ -51,7 +56,8 @@ export function checkLevelComplete(
   const profit = report.netProfit;
   if (profit < level.unlockThreshold) return { triggered: false, summary: null };
 
-  // Threshold reached — record and build summary
+  // Threshold reached — close the session (guards repeat triggers), record, build summary
+  state.levelEnded = true;
   recordProfit(campaign, levelId, profit);
 
   const summary: LevelCompleteSummary = {
