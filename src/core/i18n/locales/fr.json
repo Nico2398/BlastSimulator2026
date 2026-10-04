@@ -2876,7 +2876,7 @@
   "ui.shady.select_employee": "Choisissez quelqu'un…",
   "menu.level_locked": "Verrouillé — nécessite {threshold} sur {level} pour être débloqué",
   "menu.level_start": "Démarrer le niveau",
-  "menu.level_resume": "Reprendre",
+  "menu.level_replay": "Rejouer",
   "shortcuts.title": "Raccourcis clavier",
   "shortcuts.pause": "Espace : Pause / Reprendre",
   "shortcuts.speed": "1-4 : Vitesse du jeu",

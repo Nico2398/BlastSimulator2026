@@ -25,6 +25,7 @@ function makeCampaign(overrides: Partial<CampaignState['levels']> = {}): Campaig
 
 describe('WorldMap', () => {
   afterEach(() => {
+    document.body.innerHTML = ''; // a failed assertion skips dispose(); don't leak a #bs-world-map into later tests
     setLocale('en');
   });
 
@@ -58,13 +59,38 @@ describe('WorldMap', () => {
     container.remove();
   });
 
-  it('shows a lock block with the real threshold and previous-level name for a locked level', () => {
-    const { container, map } = mount();
-    map.show(makeCampaign());
-    const text = container.textContent ?? '';
-    expect(text).toContain('250,000'); // grumpstone_ridge's unlockThreshold
-    expect(text).toContain(t('level.grumpstone_ridge.name')); // the level treranium_depths is locked behind
-    map.dispose();
+  describe('lock block', () => {
+    const bothLocked = (): CampaignState => makeCampaign({
+      grumpstone_ridge: { levelId: 'grumpstone_ridge', unlocked: false, completed: false, cumulativeProfit: 0, bestSessionProfit: 0 },
+    });
+    const lockText = (container: HTMLElement, id: string): string => {
+      const lock = container.querySelector(`#bs-world-map [data-level="${id}"] [data-role="lock"]`);
+      expect(lock, `no lock block for ${id}`).not.toBeNull();
+      return lock!.textContent ?? '';
+    };
+
+    it("grumpstone_ridge's lock names its own threshold and the previous level, not the next level's", () => {
+      const { container, map } = mount();
+      map.show(bothLocked());
+      const text = lockText(container, 'grumpstone_ridge');
+      expect(text).toContain('$80,000');
+      expect(text).toContain(t('level.dusty_hollow.name'));
+      expect(text).toContain('Dusty Hollow');
+      expect(text).not.toContain('$250,000');
+      map.dispose();
+      container.remove();
+    });
+
+    it("treranium_depths' lock names the threshold of the level before it", () => {
+      const { container, map } = mount();
+      map.show(bothLocked());
+      const text = lockText(container, 'treranium_depths');
+      expect(text).toContain('$250,000');
+      expect(text).toContain('Grumpstone Ridge');
+      expect(text).not.toContain('$800,000');
+      map.dispose();
+      container.remove();
+    });
   });
 
   it('locked-level requirement text in French does not leak the standalone English word "on"', () => {
@@ -100,8 +126,23 @@ describe('WorldMap', () => {
   it('shows REPLAY (not START LEVEL) for an already-completed, unlocked level', () => {
     const { container, map } = mount();
     map.show(makeCampaign());
-    expect(container.textContent).toContain(t('menu.level_resume'));
+    expect(container.textContent).toContain(t('menu.level_replay'));
+    const btn = container.querySelector('#bs-world-map [data-level="dusty_hollow"] [data-action="start-level"]');
+    expect(btn!.textContent).toBe(t('menu.level_replay'));
+    expect(btn!.textContent).toBe('Replay');
+    const open = container.querySelector('#bs-world-map [data-level="grumpstone_ridge"] [data-action="start-level"]');
+    expect(open!.textContent).toBe(t('menu.level_start'));
     map.dispose();
+  });
+
+  it('shows Rejouer for a completed level in French', () => {
+    setLocale('fr');
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    const btn = container.querySelector('#bs-world-map [data-level="dusty_hollow"] [data-action="start-level"]');
+    expect(btn!.textContent).toBe('Rejouer');
+    map.dispose();
+    container.remove();
   });
 
   it('clicking a level\'s start button routes to onStartLevel with that level\'s id', () => {
@@ -142,13 +183,13 @@ describe('WorldMap', () => {
     const { container, map } = mount();
     map.show(makeCampaign());
     expect(container.textContent).toContain('THE PORTFOLIO');
-    expect(container.textContent).toContain(t('menu.level_resume'));
+    expect(container.textContent).toContain(t('menu.level_replay'));
 
     setLocale('fr');
     map.refreshLocale();
 
     expect(container.textContent).toContain('LE PORTEFEUILLE');
-    expect(container.textContent).toContain(t('menu.level_resume'));
+    expect(container.textContent).toContain(t('menu.level_replay'));
     map.dispose();
     container.remove();
   });
