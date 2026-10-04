@@ -30,6 +30,11 @@ export interface DrillHole {
  */
 export type PlannedHole = DrillHole;
 
+/** Narrowest input for id generation: anything carrying the next hole number (GameState does). */
+export interface HoleIdCounter {
+  nextHoleId: number;
+}
+
 let nextHoleId = 1;
 
 /** Reset hole ID counter (for tests). */
@@ -39,6 +44,7 @@ export function resetHoleIds(): void {
 
 /** Create a grid drill pattern. */
 export function createGridPlan(
+  _counter: HoleIdCounter,
   origin: { x: number; z: number },
   rows: number,
   cols: number,
@@ -63,6 +69,7 @@ export function createGridPlan(
 
 /** Add a single hole to an existing plan. */
 export function addHole(
+  _counter: HoleIdCounter,
   holes: DrillHole[],
   x: number,
   z: number,
@@ -95,6 +102,12 @@ export function removeHole(holes: DrillHole[], holeId: string): boolean {
  */
 export function holeNumericId(holeId: string): number {
   return parseInt(holeId.slice(1), 10);
+}
+
+/** Highest numeric hole id ("H7" → 7) among `ids`; 0 when empty. */
+export function maxHoleNumericId(_ids: Iterable<string>): number {
+  // TODO: implement
+  return undefined as unknown as number;
 }
 
 /**

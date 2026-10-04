@@ -124,6 +124,7 @@ export function drillPlanCommand(
 
     resetHoleIds();
     const planned = createGridPlan(
+      ctx.state!,
       { x: origin[0] ?? 0, z: origin[1] ?? 0 },
       rows, cols, spacing, depth, diameter,
     );
@@ -162,7 +163,7 @@ export function drillPlanCommand(
     if (!claim.ok) return { success: false, output: claim.output! };
 
     // Additive — unlike 'grid' above, does not clear the existing plan.
-    const hole = addHole(ctx.state!.plannedDrillHoles, x, z, depth, diameter);
+    const hole = addHole(ctx.state!, ctx.state!.plannedDrillHoles, x, z, depth, diameter);
     dispatchDrillHoleAction(ctx, hole);
 
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };

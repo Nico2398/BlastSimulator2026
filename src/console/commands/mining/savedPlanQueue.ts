@@ -47,7 +47,7 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
   // Commit.
   const idMap = new Map<string, string>();
   for (const h of fresh) {
-    const hole = addHole(state.plannedDrillHoles, h.x, h.z, h.depth, h.diameter, state.drillHoles);
+    const hole = addHole(state, state.plannedDrillHoles, h.x, h.z, h.depth, h.diameter, state.drillHoles);
     idMap.set(h.id, hole.id);
     dispatchDrillHoleAction(ctx, hole);
   }

@@ -479,6 +479,12 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
+export function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
+  // TODO: implement
+  return obj;
+}
+
 /**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
@@ -736,6 +742,11 @@ export function deserialize(json: string): GameState {
   // v27 -> v28: EventSystemState.jamSilencedUntil (#1208).
   if ((obj['version'] as number) < 28) {
     migrateV27ToV28(obj);
+  }
+
+  // v28 -> v29: GameState.nextHoleId (#1352).
+  if ((obj['version'] as number) < 29) {
+    migrateV28ToV29(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
