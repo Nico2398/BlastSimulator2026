@@ -77,20 +77,21 @@ export function previewCommand(
 
   const plan = assembleCurrentBlastPlan(ctx.state!);
   const tier = ctx.state!.softwareTier;
+  const wetHoleIds = wetHoleIdSet(ctx);
   const sub = args[0];
 
   if (sub === 'energy') {
-    const result = previewEnergy(plan, ctx.grid!, tier);
+    const result = previewEnergy(plan, ctx.grid!, tier, wetHoleIds);
     if (!result) return { success: false, output: `Requires software tier 1+ (current: ${tier})` };
     return { success: true, output: `Energy preview: ${result.energyMap.size} voxels, max=${result.maxEnergy.toFixed(1)}, min=${result.minEnergy.toFixed(1)}` };
   }
   if (sub === 'fragments') {
-    const result = previewFragments(plan, ctx.grid!, tier);
+    const result = previewFragments(plan, ctx.grid!, tier, wetHoleIds);
     if (!result) return { success: false, output: `Requires software tier 2+ (current: ${tier})` };
     return { success: true, output: `Fragment preview: ${result.fracturedCount} fractured, ${result.crackedCount} cracked, ${result.unaffectedCount} unaffected, avg size ${result.avgFragmentSize.toFixed(2)}` };
   }
   if (sub === 'projections') {
-    const result = previewProjections(plan, ctx.grid!, tier);
+    const result = previewProjections(plan, ctx.grid!, tier, wetHoleIds);
     if (!result) return { success: false, output: `Requires software tier 3+ (current: ${tier})` };
     return { success: true, output: `Projection preview: ${result.projectionZoneCount} voxels in projection zone` };
   }
@@ -125,9 +126,10 @@ export function blastPreviewCommand(
   const plan = assembled.plan;
 
   const tier = ctx.state!.softwareTier;
-  const energyPreview = previewEnergy(plan, ctx.grid!, tier);
-  const fragmentPreview = previewFragments(plan, ctx.grid!, tier);
-  const projectionPreview = previewProjections(plan, ctx.grid!, tier);
+  const wetHoleIds = wetHoleIdSet(ctx);
+  const energyPreview = previewEnergy(plan, ctx.grid!, tier, wetHoleIds);
+  const fragmentPreview = previewFragments(plan, ctx.grid!, tier, wetHoleIds);
+  const projectionPreview = previewProjections(plan, ctx.grid!, tier, wetHoleIds);
   const vibrationPreview = previewVibrations(plan, levelVillagePositions(ctx), tier, vibrationFactor(ctx, plan));
 
   ctx.state!.lastBlastPreview = {

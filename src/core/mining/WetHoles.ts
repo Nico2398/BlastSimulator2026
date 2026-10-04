@@ -14,3 +14,8 @@ export function wetHoles(state: GameState, weather: WeatherState): string[] {
     .filter(hole => !state.tubingState.installedHoles.has(hole.id))
     .map(hole => hole.id);
 }
+
+/** Ids of wet holes as a set, for callers that test membership (previews, execution). */
+export function wetHoleIdsFor(state: GameState, weather: WeatherState): Set<string> {
+  return new Set(wetHoles(state, weather));
+}

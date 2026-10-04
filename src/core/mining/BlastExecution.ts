@@ -527,12 +527,16 @@ function throwFractionAt(origin: Vec3, plan: BlastPlan): number {
  * Returns null when the blast zone falls entirely outside the ground the site
  * owns — nothing to propagate through.
  */
-export function buildPlanEnergyField(plan: BlastPlan, grid: VoxelGrid): EnergyField | null {
+export function buildPlanEnergyField(
+  plan: BlastPlan,
+  grid: VoxelGrid,
+  wetHoleIds: ReadonlySet<string> = new Set(),
+): EnergyField | null {
   const holeSurfaceYs: Record<string, number> = {};
   for (const hole of plan.holes) {
     holeSurfaceYs[hole.id] = firstEmptyLayerAboveGround(grid, hole.x, hole.z);
   }
-  return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs);
+  return buildBlastEnergyField(plan, grid, calculateBlastZone(plan.holes, holeSurfaceYs), holeSurfaceYs, wetHoleIds);
 }
 
 export function buildBlastEnergyField(

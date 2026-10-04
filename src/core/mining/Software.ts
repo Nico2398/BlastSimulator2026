@@ -128,15 +128,20 @@ export function purchaseSoftware(
 
 // ── Preview functions ──
 
-/** Preview energy field. Requires software tier >= 1. */
+/**
+ * Preview energy field. Requires software tier >= 1.
+ * Previews take the same `wetHoleIds` set executeBlast receives (wetHoleIdsFor), so a
+ * water-sensitive charge in a wet hole is predicted as weakened as the blast will be.
+ */
 export function previewEnergy(
   plan: BlastPlan,
   grid: VoxelGrid,
   softwareTier: number,
+  wetHoleIds: ReadonlySet<string> = new Set(),
 ): EnergyPreview | null {
   if (softwareTier < 1) return null;
 
-  const field = buildPlanEnergyField(plan, grid);
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return { energyMap: new Map(), maxEnergy: 0, minEnergy: 0 };
 
   const ctx = computeHoleContext(plan, grid);
@@ -162,10 +167,11 @@ export function previewFragments(
   plan: BlastPlan,
   grid: VoxelGrid,
   softwareTier: number,
+  wetHoleIds: ReadonlySet<string> = new Set(),
 ): FragmentPreview | null {
   if (softwareTier < 2) return null;
 
-  const field = buildPlanEnergyField(plan, grid);
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return { fracturedCount: 0, crackedCount: 0, unaffectedCount: 0, avgFragmentSize: 1 };
 
   const ctx = computeHoleContext(plan, grid);
@@ -200,10 +206,11 @@ export function previewProjections(
   plan: BlastPlan,
   grid: VoxelGrid,
   softwareTier: number,
+  wetHoleIds: ReadonlySet<string> = new Set(),
 ): ProjectionPreview | null {
   if (softwareTier < 3) return null;
 
-  const field = buildPlanEnergyField(plan, grid);
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return { projectionZoneCount: 0, projectionZonePositions: [] };
 
   const ctx = computeHoleContext(plan, grid);
@@ -249,11 +256,12 @@ export function previewHoleDetails(
   plan: BlastPlan,
   grid: VoxelGrid,
   softwareTier: number,
+  wetHoleIds: ReadonlySet<string> = new Set(),
 ): Record<string, HolePreviewDetail> {
   const result: Record<string, HolePreviewDetail> = {};
   if (softwareTier < 2) return result;
 
-  const field = buildPlanEnergyField(plan, grid);
+  const field = buildPlanEnergyField(plan, grid, wetHoleIds);
   if (!field) return result;
   const ctx = computeHoleContext(plan, grid);
 

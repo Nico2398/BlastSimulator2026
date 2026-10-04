@@ -14,7 +14,7 @@ import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
-import { wetHoles } from '../../../core/mining/WetHoles.js';
+import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { placementRefusalReason, type PlacementKit } from '../../scene/PlacementKit.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import {
@@ -135,7 +135,7 @@ export class DrillStep {
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;
     this.lastHoleCount = totalCount;
-    const wet = new Set(weather ? wetHoles(state, weather) : []);
+    const wet = weather ? wetHoleIdsFor(state, weather) : new Set<string>();
 
     const signature = JSON.stringify({
       holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),

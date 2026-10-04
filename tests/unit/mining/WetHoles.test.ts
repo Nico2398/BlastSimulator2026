@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { wetHoles } from '../../../src/core/mining/WetHoles.js';
+import { wetHoles, wetHoleIdsFor } from '../../../src/core/mining/WetHoles.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 
 function makeHole(id: string): DrillHole {
@@ -42,5 +42,36 @@ describe('wetHoles', () => {
     state.drillHoles = [];
 
     expect(wetHoles(state, 'light_rain')).toEqual([]);
+  });
+});
+
+describe('wetHoleIdsFor', () => {
+  it('returns the untubed hole ids as a set while raining', () => {
+    const state = createGame({ seed: 42 });
+    state.drillHoles = [makeHole('H1'), makeHole('H2'), makeHole('H3')];
+    state.tubingState.installedHoles = new Set(['H2']);
+
+    const ids = wetHoleIdsFor(state, 'heavy_rain');
+    expect(ids).toBeInstanceOf(Set);
+    expect([...ids].sort()).toEqual(['H1', 'H3']);
+  });
+
+  it('is empty when sunny', () => {
+    const state = createGame({ seed: 42 });
+    state.drillHoles = [makeHole('H1')];
+    expect(wetHoleIdsFor(state, 'sunny').size).toBe(0);
+  });
+
+  it('is empty with no holes', () => {
+    const state = createGame({ seed: 42 });
+    state.drillHoles = [];
+    expect(wetHoleIdsFor(state, 'storm').size).toBe(0);
+  });
+
+  it('is empty when every hole is tubed', () => {
+    const state = createGame({ seed: 42 });
+    state.drillHoles = [makeHole('H1'), makeHole('H2')];
+    state.tubingState.installedHoles = new Set(['H1', 'H2']);
+    expect(wetHoleIdsFor(state, 'light_rain').size).toBe(0);
   });
 });
