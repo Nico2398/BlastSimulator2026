@@ -21,6 +21,7 @@ import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels, type LevelDef } from './core/campaign/Level.js';
 import { formatMoney } from './core/economy/formatMoney.js';
 import { SANDBOX_DEFAULTS, sandboxLevelDef, type SandboxConfig } from './core/campaign/Sandbox.js';
+import { loadSettings } from './ui/userSettings.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -71,6 +72,13 @@ const modelsReady = preloadModels(modelLibrary, fetchModelBytes, { yieldBetween:
 
 // --- Game Renderer (bridges console commands → Three.js) ---
 const gameRenderer = new GameRenderer(scene);
+
+// --- Stored player settings ---
+// Reads are skipped in scenario mode so a shared browser's leftover settings never reach a scenario run.
+// Writes still happen there but are never read back in scenario mode.
+const scenarioMode = new URLSearchParams(window.location.search).get('scenarioMode') === '1';
+const storedSettings = scenarioMode ? {} : loadSettings();
+if (storedSettings.locale) setLocale(storedSettings.locale);
 
 // --- UI ---
 const uiContainer = document.getElementById('bs-ui-root') ?? document.body;
@@ -407,6 +415,7 @@ sandboxPanel.setOnStart((config) => {
 
 // --- Audio ---
 const audioMgr = new AudioManager();
+if (storedSettings.volumes) audioMgr.applyVolumes(storedSettings.volumes);
 uiManager.setAudioManager(audioMgr);
 const audioHooks = new AudioHooks(audioMgr);
 // Resume AudioContext on first user interaction (browser autoplay policy)
@@ -747,7 +756,6 @@ window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 // simulation time — otherwise the render loop's own real-time ticking races
 // scripted checkpoints and desyncs them (see #406). Exposed as a bridge too,
 // for a mode that wants to flip it after load.
-const scenarioMode = new URLSearchParams(window.location.search).get('scenarioMode') === '1';
 let autoTickEnabled = !scenarioMode;
 window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
 
@@ -1174,7 +1182,7 @@ new KeyboardShortcuts({
   // its click handler is the other path into the same preference, and the
   // two must never disagree the next time the panel opens.
   onToggleSurveyOverlay: () => uiManager.setSurveyOverlayVisible(gameRenderer.toggleSurveyOverlayVisible()),
-});
+}, { isSuppressed: fullScreenMenuUp });
 
 // --- Render loop + game tick timer ---
 // The game ticks at BASE_TICK_MS intervals, adjusted for time scale.
@@ -1185,7 +1193,7 @@ let hadPendingEvent = false;
 
 /** A full-screen menu covers the mine; the simulation must not run behind it. */
 function fullScreenMenuUp(): boolean {
-  return mainMenu.visible || worldMap.visible || levelEndScreen.visible || loadingScreen.visible;
+  return mainMenu.visible || worldMap.visible || levelEndScreen.visible || loadingScreen.visible || sandboxPanel.visible;
 }
 
 scene.start((dt) => {

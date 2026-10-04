@@ -3,7 +3,12 @@
 // Categories: master, effects, ambient, ui.
 // Designed so placeholder oscillator sounds can be replaced with audio files later.
 
+import { AUDIO_DEFAULT_VOLUMES } from '../core/config/balance.js';
+
 export type AudioCategory = 'effects' | 'ambient' | 'ui';
+
+/** A volume slider target: the master bus or one category. */
+export type VolumeChannel = 'master' | AudioCategory;
 
 export interface SoundHandle {
   /** Stop the sound (for looping sounds). */
@@ -17,12 +22,7 @@ export class AudioManager {
   private readonly masterGain: GainNode;
   private readonly categoryGains: Record<AudioCategory, GainNode>;
   private muted = false;
-  private volumes: Record<'master' | AudioCategory, number> = {
-    master: 1.0,
-    effects: 1.0,
-    ambient: 0.4,
-    ui: 0.6,
-  };
+  private volumes: Record<'master' | AudioCategory, number> = { ...AUDIO_DEFAULT_VOLUMES };
 
   constructor() {
     this.ctx = new AudioContext();
@@ -84,6 +84,14 @@ export class AudioManager {
       if (!this.muted) this.masterGain.gain.value = clamped;
     } else {
       if (!this.muted) this.categoryGains[channel].gain.value = clamped;
+    }
+  }
+
+  /** Apply several stored volumes at once (0–1 each); absent channels keep their value. */
+  applyVolumes(volumes: Partial<Record<VolumeChannel, number>>): void {
+    for (const channel of Object.keys(volumes) as VolumeChannel[]) {
+      const v = volumes[channel];
+      if (v !== undefined) this.setVolume(channel, v);
     }
   }
 

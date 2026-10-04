@@ -1565,3 +1565,15 @@ export const BLAST_DELAY_LABEL_COLOR_BUCKET_MS = 100;
  * entry): white, cyan, yellow, orange, red.
  */
 export const BLAST_DELAY_LABEL_COLORS: readonly number[] = [0xffffff, 0x44ffff, 0xffff44, 0xff8844, 0xff4444];
+
+/**
+ * Default volume (0–1) per audio channel, before any stored player setting applies.
+ * Keys must match the audio layer's `VolumeChannel` exactly: userSettings.ts derives
+ * its list of persistable channels from them.
+ */
+export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'ui', number> = {
+  master: 1,
+  effects: 1,
+  ambient: 0.4,
+  ui: 0.6,
+};

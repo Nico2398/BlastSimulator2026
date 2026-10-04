@@ -64,6 +64,35 @@
       "commandOutcome": "either"
     },
     {
+      "command": "state",
+      "description": "#1323: gameplay hotkeys are inert while the main menu is up. A player presses Space (pause), KeyB (blast panel) and F5 (quick save) on the bare menu: none may act, so the menu stays on screen and no blast panel opens. 'state' is the paired command for this UI-only step; no game exists yet so the console outcome is genuinely either (same as the neighbouring steps, issue #585). isPaused cannot be asserted here because no game state exists before new_game; the unit tests in tests/unit/ui/KeyboardShortcuts.test.ts cover the callback-level guarantee.",
+      "interaction": [
+        {
+          "type": "keypress",
+          "key": "Space"
+        },
+        {
+          "type": "keypress",
+          "key": "KeyB"
+        },
+        {
+          "type": "keypress",
+          "key": "F5"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-new-campaign",
+        "blocked": "#bs-blast-panel",
+        "note": "the main menu is still the live surface and the B hotkey did not open the blast panel behind it"
+      },
+      "commandOutcome": "either"
+    },
+    {
       "command": "new_game seed:42",
       "timeout": 40,
       "interaction": [
