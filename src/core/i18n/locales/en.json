@@ -3372,6 +3372,7 @@
   "mining.sequence.usage": "Usage: sequence auto|set|show [options]",
   "mining.sequence.none_set": "No sequence set.",
   "mining.blast.report_header": "=== BLAST REPORT ===",
+  "mining.blast.max_village_vibration": "Max village vibration: {value} mm/s",
   "mining.blast.preview_header": "=== BLAST PREVIEW ===",
   "mining.blast.no_drill_plan": "No drill plan. Create one with drill_plan grid or drill_plan add.",
   "mining.blast.execution_failed": "Blast execution failed.",

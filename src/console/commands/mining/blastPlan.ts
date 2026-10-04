@@ -3,7 +3,7 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, requireGameWithSub, assembleCurrentBlastPlan, assembleValidBlastPlan } from './shared.js';
+import { requireGame, requireGameWithSub, assembleCurrentBlastPlan, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
 import {
   previewEnergy,
   previewFragments,
@@ -11,6 +11,8 @@ import {
   previewVibrations,
   purchaseSoftware,
 } from '../../../core/mining/Software.js';
+import { averageVibrationMod } from '../../../core/mining/BlastExecution.js';
+import type { BlastPlan } from '../../../core/mining/BlastPlan.js';
 import { VOXEL_SIZE_CM } from '../../../core/config/balance.js';
 import { queueSavedBlastPlan } from './savedPlanQueue.js';
 import { addExpense } from '../../../core/economy/Finance.js';
@@ -60,6 +62,11 @@ export function blastPlanCommand(
 
 // ── Preview commands ──
 
+/** Ground factor executeBlast would use for this plan (base 1 x mean explosive vibrationMod), so preview equals blast. */
+function vibrationFactor(ctx: MiningContext, plan: BlastPlan): number {
+  return averageVibrationMod(plan, wetHoleIdSet(ctx));
+}
+
 export function previewCommand(
   ctx: MiningContext,
   args: string[],
@@ -88,7 +95,7 @@ export function previewCommand(
     return { success: true, output: `Projection preview: ${result.projectionZoneCount} voxels in projection zone` };
   }
   if (sub === 'vibrations') {
-    const result = previewVibrations(plan, [], tier);
+    const result = previewVibrations(plan, levelVillagePositions(ctx), tier, vibrationFactor(ctx, plan));
     if (!result) return { success: false, output: `Requires software tier 4+ (current: ${tier})` };
     return { success: true, output: `Vibration preview: max=${result.maxVibration.toFixed(4)}` };
   }
@@ -121,7 +128,7 @@ export function blastPreviewCommand(
   const energyPreview = previewEnergy(plan, ctx.grid!, tier);
   const fragmentPreview = previewFragments(plan, ctx.grid!, tier);
   const projectionPreview = previewProjections(plan, ctx.grid!, tier);
-  const vibrationPreview = previewVibrations(plan, [], tier);
+  const vibrationPreview = previewVibrations(plan, levelVillagePositions(ctx), tier, vibrationFactor(ctx, plan));
 
   ctx.state!.lastBlastPreview = {
     tier,

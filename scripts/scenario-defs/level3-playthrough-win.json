@@ -1995,8 +1995,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 50,
-          "ecology": 50,
-          "nuisance": 50
+          "ecology": 49.974440199652854,
+          "nuisance": 49.93610049913214
         }
       },
       "description": "wellBeing already at its floor (11 deaths' morale hit) -- safety/ecology still the fresh-game baseline here, same reasoning as tutorial-playthrough.json's own post-blast scores step: the recentAccidents/vibration penalties only start applying once ticking resumes."

@@ -16,6 +16,7 @@ import {
   buildProtectedStructures,
   rectTouchesProtectedStructure,
   type ProtectedStructures,
+  type Village,
 } from './Structures.js';
 import type { Rect } from './WorldGen.js';
 import { MAX_CLAIM_BRIDGE_CHUNKS } from '../config/balance.js';
@@ -143,6 +144,11 @@ export class PlayableArea {
    */
   hasStructures(): boolean {
     return this.protectedStructures !== null;
+  }
+
+  /** Villages of this level's structure set (lazy; honours adopted structures). */
+  villages(): readonly Village[] {
+    return this.structures().villages;
   }
 
   /** True when the site owns the column at (x, z). */

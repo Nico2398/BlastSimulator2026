@@ -2,14 +2,14 @@
 // Covers multi-rock composition, energy propagation, fragment classification,
 // extending the existing blast-execution.test.ts with more edge cases.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan, resetHoleIds } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
-import { executeBlast } from '../../src/core/mining/BlastExecution.js';
+import { executeBlast, villagePositions } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import {
   computeThreshold,
@@ -26,6 +26,11 @@ import {
 import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
 import { createRunner } from '../../src/console/createRunner.js';
+import { tickUntilFresh } from '../helpers/blastFixtures.js';
+import { recordProfit } from '../../src/core/campaign/Campaign.js';
+import { tickCommand } from '../../src/console/commands/tick.js';
+import { blastCommand, blastPreviewCommand } from '../../src/console/commands/mining.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -354,5 +359,151 @@ describe('Blast enhanced', () => {
     const orderedId = state.plannedDrillHoles[0]!.id;
     const chargeResult = run(`charge hole:${orderedId} explosive:boomite amount:6 stemming:1.5`);
     expect(chargeResult.success).toBe(false);
+  });
+});
+
+// ── Village vibration on Grumpstone Ridge (#1343) ───────────────────────────
+//
+// Grumpstone Ridge (seed 2277) has villages a few hundred metres from the
+// pit. Blasts and Analysis-Suite previews must measure vibration there and
+// the blast must feed the nuisance score.
+
+describe('Blast enhanced — village vibration (#1343)', () => {
+  beforeEach(() => resetHoleIds());
+
+  /** A Grumpstone Ridge game (unlocked through the campaign) with a 2x2 plan drilled and charged, ready to preview/blast. */
+  function chargedRidge(opts: { tier?: number; explosive?: string; noVillages?: boolean } = {}): GameContext {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32').success).toBe(true);
+    recordProfit(ctx.state!.campaign, 'tutorial_pit', 5000);
+    recordProfit(ctx.state!.campaign, 'dusty_hollow', 80000);
+    expect(run('campaign start level:grumpstone_ridge cash:500000').success).toBe(true);
+    const state = ctx.state!;
+    state.softwareTier = opts.tier ?? 4;
+    if (opts.noVillages) vi.spyOn(ctx.playableArea!, 'villages').mockReturnValue([]);
+
+    expect(run('employee hire role:driller').success).toBe(true);
+    const driller = state.employees.employees.find(e => e.role === 'driller')!;
+    expect(run('vehicle buy drill_rig').success).toBe(true);
+    expect(run(`employee assign_skill ${driller.id} skill:driving.drill_rig level:1`).success).toBe(true);
+
+    expect(run('drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:18,10 diameter:0.089').success).toBe(true);
+    tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 800);
+    expect(state.drillHoles.length).toBe(4);
+
+    expect(run(`charge hole:* explosive:${opts.explosive ?? 'boomite'} amount:3 stemming:2`).success).toBe(true);
+    tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
+    expect(Object.keys(state.chargesByHole).length).toBe(4);
+    for (const h of state.drillHoles) state.sequenceDelays[h.id] = 0;
+    return ctx;
+  }
+
+  /** Overwrite the firing sequence: delay per hole index. */
+  function setDelays(ctx: GameContext, delayOf: (index: number) => number): void {
+    ctx.state!.drillHoles.forEach((h, i) => { ctx.state!.sequenceDelays[h.id] = delayOf(i); });
+  }
+
+  function previewMax(ctx: GameContext): number | null {
+    const r = blastPreviewCommand(ctx as any, [], {});
+    expect(r.success).toBe(true);
+    const v = ctx.state!.lastBlastPreview!.vibrations;
+    return v === null ? null : v.maxVibration;
+  }
+
+  function fire(ctx: GameContext): number {
+    const r = blastCommand(ctx as any, [], {});
+    expect(r.success).toBe(true);
+    return ctx.state!.lastBlastReport!.maxVibration ?? 0;
+  }
+
+  it('the level exposes villages through its playable area', () => {
+    const ctx = chargedRidge();
+    expect(ctx.playableArea!.villages().length).toBeGreaterThan(0);
+  });
+
+  it('tier 4 preview measures a positive vibration at the villages', () => {
+    const ctx = chargedRidge();
+    const max = previewMax(ctx);
+    expect(max).not.toBeNull();
+    expect(max!).toBeGreaterThan(0);
+    expect(ctx.state!.lastBlastPreview!.vibrations!.affectedVillages).toBe(ctx.playableArea!.villages().length);
+  });
+
+  it('a preview below tier 4 reports no vibration data', () => {
+    const ctx = chargedRidge({ tier: 3 });
+    expect(previewMax(ctx)).toBeNull();
+  });
+
+  it('the blast records a positive maxVibration on the report', () => {
+    const ctx = chargedRidge();
+    expect(fire(ctx)).toBeGreaterThan(0);
+  });
+
+  it('the blast measures vibration even below tier 4 (the tier gates only the preview)', () => {
+    const ctx = chargedRidge({ tier: 1 });
+    expect(fire(ctx)).toBeGreaterThan(0);
+  });
+
+  it('executeBlast reports one vibration entry per village', () => {
+    const ctx = chargedRidge();
+    const targets = villagePositions(ctx.playableArea!.villages());
+    expect(targets.length).toBeGreaterThan(0);
+
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'cruite', 0, 39, 0, 10, 0, 39);
+    const holes = createGridPlan({ x: 12, z: 12 }, 2, 2, 4, 6, 0.15);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'boomite', 5, 1.5);
+    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+
+    const result = executeBlast(plan, grid, targets);
+    expect(result!.vibrationAtVillages).toHaveLength(targets.length);
+    for (const v of result!.vibrationAtVillages) expect(v.vibration).toBeGreaterThan(0);
+  });
+
+  it('village vibration lowers the nuisance score compared with a level whose villages are absent', () => {
+    const withVillages = chargedRidge();
+    const baseline = chargedRidge({ noVillages: true });
+    fire(withVillages);
+    fire(baseline);
+    // A few ticks so any windowed score effect is applied too.
+    tickCommand(withVillages, ['3'], {});
+    tickCommand(baseline, ['3'], {});
+    expect(withVillages.state!.scores.nuisance).toBeLessThan(baseline.state!.scores.nuisance);
+  });
+
+  for (const explosive of ['pop_rock', 'big_bada_boom']) {
+    it(`preview max equals the blast max for ${explosive}`, () => {
+      const ctx = chargedRidge({ explosive });
+      const previewed = previewMax(ctx);
+      const fired = fire(ctx);
+      expect(previewed).not.toBeNull();
+      expect(fired).toBeGreaterThan(0);
+      expect(fired).toBeCloseTo(previewed!, 8);
+    });
+  }
+
+  it('explosives with different vibrationMod produce different vibration for the same plan', () => {
+    const quiet = previewMax(chargedRidge({ explosive: 'pop_rock' }));
+    const loud = previewMax(chargedRidge({ explosive: 'big_bada_boom' }));
+    expect(quiet).not.toBeNull();
+    expect(loud).not.toBeNull();
+    expect(quiet!).not.toBeCloseTo(loud!, 8);
+  });
+
+  it('spreading the charges over more delay groups gives a lower maxVibration', () => {
+    const together = chargedRidge();
+    setDelays(together, () => 0);
+    const staggered = chargedRidge();
+    setDelays(staggered, i => i * 25);
+    expect(fire(staggered)).toBeLessThan(fire(together));
+  });
+
+  it('a level without villages records zero vibration and does not crash', () => {
+    const ctx = chargedRidge({ noVillages: true });
+    expect(previewMax(ctx)).toBe(0);
+    expect(fire(ctx)).toBe(0);
   });
 });
