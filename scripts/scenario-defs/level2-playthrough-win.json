@@ -4704,6 +4704,7 @@
         }
       ],
       "role": "setup",
+      "timeout": 125,
       "expect": {
         "equals": {
           "deathCount": 13,
