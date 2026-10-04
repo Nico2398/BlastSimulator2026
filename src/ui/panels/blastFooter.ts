@@ -97,7 +97,9 @@ export class BlastFooter {
     // the command it dispatches never disagree on whether to refuse or on
     // the count they report. Outside the tutorial this never applies — an
     // occupied zone stays fireable, preflight-warning-only, exactly as
-    // before this issue.
+    // before this issue. Likewise undrilled (ordered, not yet landed) holes
+    // are a PreflightModal warning only, never a FIRE gate: the blast cancels
+    // their drill orders (#1346).
     const zoneOccupiedCount = tutorialActive && baseFireOk
       ? blockingOccupantCount(state.drillHoles, BLAST_DANGER_MARGIN_M, state.vehicles, state.employees)
       : null;

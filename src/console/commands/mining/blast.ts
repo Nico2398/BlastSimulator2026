@@ -3,7 +3,7 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
+import { requireGame, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
 import { executeBlast, buildBlastReport, maxVillageVibration } from '../../../core/mining/BlastExecution.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
@@ -181,6 +181,10 @@ export function blastCommand(
   state.plannedChargesByHole = {};
   state.sequenceDelays = {};
 
+  // Leftover drill orders target holes the blast no longer waits for: cancel
+  // them (preflight warns first, FIRE is not gated on them — #1346).
+  const cancelledDrillOrders = cancelOutstandingDrillActions(state);
+
   // Re-emit for the cleared region now that the consumed holes are gone from
   // state.drillHoles: executeBlast's own `terrain:updated` emit (above, inside
   // executeBlast) fires before this clear, so NavGridSync's patch from that
@@ -210,6 +214,9 @@ export function blastCommand(
         ? [t('mining.blast.max_village_vibration', { value: villageVibration.toFixed(4) })]
         : []),
       `Furthest throw: ${result.maxThrowDistance.toFixed(1)} m`,
+      ...(cancelledDrillOrders > 0
+        ? [t('mining.blast.cancelled_drill_orders', { count: cancelledDrillOrders })]
+        : []),
       `Total rock volume: ${result.totalRockVolume.toFixed(1)} m³`,
       `Total ore value: $${result.totalOreValue.toFixed(0)}`,
       ...(result.destroyedBuildings.length > 0

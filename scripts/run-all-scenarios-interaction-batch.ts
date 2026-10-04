@@ -22,6 +22,7 @@ import {
   executeInteractionActions,
   suspendDrawing,
   resetOriginStorage,
+  waitForGameBridge,
   CANVAS_READY_TIMEOUT_MS,
   DEFAULT_STEP_TIMEOUT,
   SCREENSHOT_DIR,
@@ -84,6 +85,9 @@ export async function runBatchInteraction(
         // of a batch pays that cold start on top. Same budget as
         // initBrowser()'s own canvas wait, from the one constant (#1021).
         await page.waitForSelector('#game-canvas, canvas', { timeout: CANVAS_READY_TIMEOUT_MS });
+        // main.ts assigns __gameState only after the canvas exists; every
+        // scenario's first step reads it, so wait here (not only in initBrowser).
+        await waitForGameBridge(page, CANVAS_READY_TIMEOUT_MS);
         // Main menu starts visible, same as initBrowser() — each scenario's
         // own `new_game` first step tears it down (main.ts console bridge).
         // Batch mode passes enableScreenshots=false, so nothing here reads
