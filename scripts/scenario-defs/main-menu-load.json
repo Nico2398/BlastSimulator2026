@@ -1,0 +1,104 @@
+{
+  "name": "main-menu-load",
+  "description": "Issue #1315: loading a save from the main menu's LOAD button hides the menu and lands the player in a usable HUD with the saved state. Saves slot 1 through the Saves modal, mutates the live game, returns to the main menu through Settings (with its confirmation), then clicks LOAD and the slot's own Load button. Only interaction mode proves the menu really closes and the HUD is reachable; command mode checks the state numbers.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:120000",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 cash:120000" }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "cash": 120000 } },
+      "description": "Opening game whose cash ($120,000) is the figure the load must bring back."
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        { "type": "command", "command": "time resume" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "state",
+      "description": "Open the Saves modal from the top bar. `state` is the inert paired command for this UI-only step.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-saveload-btn" },
+        { "type": "waitForSelector", "selector": "#bs-saves-modal" }
+      ],
+      "role": "player",
+      "expect": { "changedBy": { "cash": 0 } }
+    },
+    {
+      "command": "state",
+      "description": "SAVE HERE on slot 1; the modal closes itself once the save completes, so wait on the modal's own save-here button vanishing is not needed -- awaitUsable on the top-bar Saves button proves the modal no longer covers the HUD.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]" },
+        { "type": "awaitUsable", "selector": "#bs-saveload-btn" }
+      ],
+      "role": "player",
+      "expect": { "changedBy": { "cash": 0 } }
+    },
+    {
+      "command": "new_game seed:7 cash:5000",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:7 cash:5000" }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "cash": 5000 } },
+      "description": "Mutate the live game so the later load has something to visibly restore (cash 5,000 instead of 120,000)."
+    },
+    {
+      "command": "state",
+      "description": "Open Settings from the tool rail. `state` is the inert paired command.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "type": "waitForSelector", "selector": "#bs-settings-panel" }
+      ],
+      "role": "player",
+      "expect": { "changedBy": { "cash": 0 } }
+    },
+    {
+      "command": "state",
+      "description": "Return to Main Menu, then confirm the modal. The menu must come back with LOAD reachable. `state` is the inert paired command.",
+      "interaction": [
+        { "type": "clickLabel", "label": "Return to Main Menu" },
+        { "type": "clickLabel", "label": "Return to Menu" },
+        { "type": "awaitUsable", "selector": "#bs-main-menu #bs-menu-load" }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-load",
+        "changedBy": { "cash": 0 }
+      }
+    },
+    {
+      "command": "new_game seed:42 cash:120000",
+      "description": "Click the menu's LOAD button, then slot 1's own Load button. Command mode has no menu, so its command rebuilds the saved opening (same +115,000 cash delta); interaction mode must reach the same state through the click path alone. The menu must be gone and the HUD usable afterwards -- before #1315 the load succeeded behind a menu that stayed up.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-main-menu #bs-menu-load" },
+        { "type": "waitForSelector", "selector": "#bs-saves-modal" },
+        { "type": "clickSelector", "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"load\"]" },
+        { "type": "awaitUsable", "selector": "#bs-saveload-btn" }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": { "cash": 120000 },
+        "changedBy": { "cash": 115000 },
+        "usable": "#bs-saveload-btn",
+        "blocked": "#bs-main-menu #bs-menu-load",
+        "note": "cash back to the saved 120,000; main menu hidden so its LOAD button is no longer reachable; HUD Saves button reachable (not covered)."
+      }
+    },
+    {
+      "command": "state",
+      "interaction": [
+        { "type": "command", "command": "state" }
+      ],
+      "role": "observe",
+      "expect": { "equals": { "cash": 120000 } }
+    }
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 }
+  ]
+}

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { SavesModal } from '../../../../src/ui/panels/SavesModal.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -257,7 +257,7 @@ describe('SavesModal', () => {
     const { container, modal } = mount();
     modal.setBackend(backend);
     let loaded: GameState | null = null;
-    modal.setOnLoad((state) => { loaded = state; });
+    modal.setOnLoad((state) => { loaded = state; return null; });
     modal.show();
     await flush();
 
@@ -308,6 +308,163 @@ describe('SavesModal', () => {
     const { container, modal } = mount();
     modal.dispose();
     expect(container.querySelector('#bs-saves-modal')).toBeNull();
+  });
+
+  // Issue #1315: load outcome contract. onLoad returns null (loaded) or a refusal reason.
+  describe('load outcome (#1315)', () => {
+    async function setup(onLoad: (s: GameState) => string | null, slot = true) {
+      const backend = makeBackend();
+      if (slot) {
+        const original = createGame({ seed: 7, mineType: 'desert' });
+        original.cash = 4242;
+        await backend.save('slot_1', 'Slot 1', serialize(original), '$4,242 — Day 1', null);
+      }
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      const calls: GameState[] = [];
+      modal.setOnLoad((s) => { calls.push(s); return onLoad(s); });
+      return { backend, container, modal, calls };
+    }
+    const statusOf = (modal: SavesModal): string =>
+      (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent ?? '';
+
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('success: onLoad called once, modal hides, status says loaded, returns true', async () => {
+      const { modal, calls } = await setup(() => null);
+      modal.show();
+      await flush();
+      const result = await modal.loadFromSlot('slot_1');
+      expect(result).toBe(true);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.cash).toBe(4242);
+      expect(modal.visible).toBe(false);
+      expect(statusOf(modal)).toBe(t('saveload.loaded'));
+      modal.dispose();
+    });
+
+    it('refusal: modal stays visible, status carries the reason, no loaded status, returns false', async () => {
+      const { modal } = await setup(() => 'level is locked');
+      modal.show();
+      await flush();
+      const result = await modal.loadFromSlot('slot_1');
+      expect(result).toBe(false);
+      expect(modal.visible).toBe(true);
+      expect(statusOf(modal)).toBe(t('saveload.load_refused', { reason: 'level is locked' }));
+      expect(statusOf(modal)).not.toBe(t('saveload.loaded'));
+      modal.dispose();
+    });
+
+    it('refusal status persists past the 4s auto-clear', async () => {
+      const { modal } = await setup(() => 'level is locked');
+      modal.show();
+      await flush();
+      vi.useFakeTimers();
+      await modal.loadFromSlot('slot_1');
+      vi.advanceTimersByTime(10_000);
+      expect(statusOf(modal)).toContain('level is locked');
+      modal.dispose();
+    });
+
+    it('refusal clicked through the real Load button leaves the modal open with the reason', async () => {
+      const { modal } = await setup(() => 'nope');
+      modal.show();
+      await flush();
+      modal.root.querySelector<HTMLButtonElement>('[data-slot="slot_1"] [data-action="load"]')!.click();
+      await flush();
+      expect(modal.visible).toBe(true);
+      expect(statusOf(modal)).toContain('nope');
+      modal.dispose();
+    });
+
+    it('missing slot: modal stays visible with not_found, onLoad never called, returns false', async () => {
+      const { modal, calls } = await setup(() => null, false);
+      modal.show();
+      await flush();
+      const result = await modal.loadFromSlot('slot_3');
+      expect(result).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect(modal.visible).toBe(true);
+      expect(statusOf(modal)).toBe(t('saveload.not_found'));
+      modal.dispose();
+    });
+
+    it('corrupt slot data: modal stays visible with saveload.error, returns false', async () => {
+      const { backend, modal, calls } = await setup(() => null);
+      await backend.save('slot_2', 'Slot 2', 'not json {{{', 'x', null);
+      modal.show();
+      await flush();
+      const result = await modal.loadFromSlot('slot_2');
+      expect(result).toBe(false);
+      expect(calls).toHaveLength(0);
+      expect(modal.visible).toBe(true);
+      expect(statusOf(modal)).toContain(t('saveload.error', { msg: '' }).replace(/\s+$/, ''));
+      modal.dispose();
+    });
+
+    it('a refusal while the modal is hidden (CONTINUE path) makes it visible', async () => {
+      const { modal } = await setup(() => 'level is locked');
+      expect(modal.visible).toBe(false);
+      const result = await modal.loadFromSlot('slot_1');
+      expect(result).toBe(false);
+      expect(modal.visible).toBe(true);
+      expect(statusOf(modal)).toContain('level is locked');
+      modal.dispose();
+    });
+
+    it('a failure while the modal is hidden also makes it visible', async () => {
+      const { modal } = await setup(() => null, false);
+      const result = await modal.loadFromSlot('slot_1');
+      expect(result).toBe(false);
+      expect(modal.visible).toBe(true);
+      modal.dispose();
+    });
+
+    it('returns false without a backend or onLoad', async () => {
+      const { modal } = mount();
+      expect(await modal.loadFromSlot('slot_1')).toBe(false);
+      modal.dispose();
+    });
+
+    describe('import', () => {
+      async function importFile(modal: SavesModal, content: string): Promise<void> {
+        const input = modal.root.querySelector<HTMLInputElement>('input[type="file"]')!;
+        const file = new File([content], 'save.json', { type: 'application/json' });
+        Object.defineProperty(input, 'files', { value: [file], configurable: true });
+        input.dispatchEvent(new Event('change'));
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      it('success: hides and shows imported status', async () => {
+        const { modal, calls } = await setup(() => null);
+        const original = createGame({ seed: 3, mineType: 'desert' });
+        modal.show();
+        await importFile(modal, serialize(original));
+        expect(calls).toHaveLength(1);
+        expect(modal.visible).toBe(false);
+        expect(statusOf(modal)).toBe(t('saveload.imported'));
+        modal.dispose();
+      });
+
+      it('refusal: stays visible with the reason, no imported status', async () => {
+        const { modal } = await setup(() => 'level is locked');
+        const original = createGame({ seed: 3, mineType: 'desert' });
+        modal.show();
+        await importFile(modal, serialize(original));
+        expect(modal.visible).toBe(true);
+        expect(statusOf(modal)).toContain('level is locked');
+        expect(statusOf(modal)).not.toBe(t('saveload.imported'));
+        modal.dispose();
+      });
+
+      it('refusal while hidden makes the modal visible', async () => {
+        const { modal } = await setup(() => 'level is locked');
+        const original = createGame({ seed: 3, mineType: 'desert' });
+        await importFile(modal, serialize(original));
+        expect(modal.visible).toBe(true);
+        modal.dispose();
+      });
+    });
   });
 
   // These slots already carried `data-slot` + `data-action` (save-here/load/
@@ -367,7 +524,7 @@ describe('SavesModal', () => {
       let loaded: GameState | null = null;
       const { container, modal } = mount();
       modal.setBackend(backend);
-      modal.setOnLoad(s => { loaded = s; });
+      modal.setOnLoad(s => { loaded = s; return null; });
       modal.show();
       await flush();
 
