@@ -197,6 +197,9 @@ export interface InteractionStepResult {
  *   actions actually issue (a `command` action, or one entry per tick of a
  *   `waitUntil` action's internal loop) — diagnostic-only (issue #674);
  *   omitted by every existing caller, which sees no change.
+ * @param excludeFromDeadline - Optional wrapper (a step deadline's `excluding`)
+ *   run around the inline `screenshot` action's capture only, so capture time
+ *   does not count against the step's deadline. Defaults to identity.
  * @returns Interaction step result with state and screenshots.
  */
 export async function executeInteractionActions(
@@ -208,6 +211,7 @@ export async function executeInteractionActions(
   cmdSlug: string,
   onProgress?: (detail: string) => void,
   onTrace?: (entry: CommandTraceEntry) => void,
+  excludeFromDeadline: <T>(work: () => Promise<T>) => Promise<T> = (work) => work(),
 ): Promise<InteractionStepResult> {
   const screenshotPaths: string[] = [];
   let screenshotIndex = 0;
@@ -222,7 +226,7 @@ export async function executeInteractionActions(
     const action = step.interaction[i]!;
     if (action.type === 'screenshot' && enableScreenshots) {
       const ssPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-ss${screenshotIndex}.png`);
-      await captureFrame(page, ssPath);
+      await excludeFromDeadline(() => captureFrame(page, ssPath));
       screenshotPaths.push(ssPath);
       console.log(`  Screenshot [${screenshotIndex}]: ${ssPath}`);
       screenshotIndex++;

@@ -9,7 +9,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Page } from 'puppeteer';
-import { CANVAS_READY_TIMEOUT_MS, resetOriginStorage, forceRenderFrame } from '../../../../scripts/shared/puppeteer-utils.js';
+import { CANVAS_READY_TIMEOUT_MS, resetOriginStorage, forceRenderFrame, executeInteractionActions } from '../../../../scripts/shared/puppeteer-utils.js';
+import type { ScenarioStepDef } from '../../../../scripts/shared/scenario-types.js';
 
 /** Minimal CDP-capable page double: records what was sent and whether it detached. */
 function fakePage(sendImpl?: (method: string, params: { storageTypes: string }) => Promise<void>) {
@@ -99,5 +100,73 @@ describe('forceRenderFrame (#1244)', () => {
 
     const [fn] = (fakeEvaluatePage.evaluate as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(String(fn)).toContain('__renderFrame');
+  });
+});
+
+describe('executeInteractionActions — excludeFromDeadline (#1224)', () => {
+  /** Page double whose screenshot() records whether it ran inside the exclusion wrapper. */
+  function capturePage() {
+    const state = { inside: 0, screenshotsInside: [] as boolean[] };
+    const page = {
+      evaluate: vi.fn(async () => ({ gameState: null, uiState: null })),
+      screenshot: vi.fn(async () => { state.screenshotsInside.push(state.inside > 0); }),
+    } as unknown as Page;
+    const excludeMock = vi.fn(async (work: () => Promise<unknown>): Promise<unknown> => {
+      state.inside++;
+      try { return await work(); } finally { state.inside--; }
+    });
+    const exclude = excludeMock as unknown as <T>(work: () => Promise<T>) => Promise<T>;
+    return { page, state, exclude };
+  }
+
+  const step = (interaction: ScenarioStepDef['interaction']): ScenarioStepDef =>
+    ({ command: 'tick 1', role: 'setup', ...(interaction !== undefined ? { interaction } : {}) });
+
+  it('routes an inline screenshot capture through the wrapper', async () => {
+    const { page, state, exclude } = capturePage();
+    await executeInteractionActions(
+      page, step([{ type: 'screenshot' }]), true, '/tmp/out', '00', 'tick',
+      undefined, undefined, exclude,
+    );
+    expect(exclude).toHaveBeenCalledTimes(1);
+    expect(state.screenshotsInside).toEqual([true]);
+  });
+
+  it('wraps each inline screenshot separately', async () => {
+    const { page, state, exclude } = capturePage();
+    const r = await executeInteractionActions(
+      page, step([{ type: 'screenshot' }, { type: 'wait', durationMs: 0 }, { type: 'screenshot' }]),
+      true, '/tmp/out', '00', 'tick', undefined, undefined, exclude,
+    );
+    expect(exclude).toHaveBeenCalledTimes(2);
+    expect(state.screenshotsInside).toEqual([true, true]);
+    expect(r.screenshotPaths).toHaveLength(2);
+  });
+
+  it('does not wrap actions other than screenshot', async () => {
+    const { page, exclude } = capturePage();
+    await executeInteractionActions(
+      page, step([{ type: 'wait', durationMs: 0 }]), true, '/tmp/out', '00', 'tick',
+      undefined, undefined, exclude,
+    );
+    expect(exclude).not.toHaveBeenCalled();
+  });
+
+  it('does not call the wrapper when screenshots are disabled', async () => {
+    const { page, exclude } = capturePage();
+    await executeInteractionActions(
+      page, step([{ type: 'screenshot' }]), false, '/tmp/out', '00', 'tick',
+      undefined, undefined, exclude,
+    );
+    expect(exclude).not.toHaveBeenCalled();
+  });
+
+  it('captures as before when the wrapper is omitted', async () => {
+    const { page, state } = capturePage();
+    const r = await executeInteractionActions(
+      page, step([{ type: 'screenshot' }]), true, '/tmp/out', '00', 'tick',
+    );
+    expect(state.screenshotsInside).toEqual([false]);
+    expect(r.screenshotPaths).toHaveLength(1);
   });
 });

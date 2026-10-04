@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from '../../../scripts/shared/scenario-types.js';
-import { captureCostFloorMs, effectiveStepTimeoutMs, loadScenarioDef, SCENARIO_DIR, TIMEOUT_MARGIN_MS } from '../../../scripts/shared/scenario-utils.js';
+import { effectiveStepTimeoutMs, loadScenarioDef, SCENARIO_DIR, TIMEOUT_MARGIN_MS } from '../../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
 
 // Dual-play scenario steps — interaction array validation (data-driven) —
@@ -267,32 +267,6 @@ describe('Dual-play scenario steps — data-driven validation', () => {
         }
       }
     });
-
-    // Generalizes issue #704's narrow, single-file lock (blast-visual-full.json
-    // only) to every scenario file, per issue #725: in interaction mode with
-    // `--screenshots`, each step also pays a capture cost
-    // (SOFTWARE_RASTER_FRAME_COST_MS per frame, software rasterization, no
-    // GPU, #475) for 1 base capture, each inline `{type:'screenshot'}`
-    // interaction action, the scenario-level `shots.length` (orbit angles
-    // captured every step when the scenario declares `shots`), and
-    // `step.frames`. A step whose declared `timeout` sits below this floor
-    // false-timeouts the instant `--screenshots` is used, regardless of
-    // whether the step's own work would have finished in time.
-    it(`${name} — declared step timeout covers interaction-mode --screenshots capture-cost floor (#725)`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      const shotsCount = scenario.shots?.length ?? 0;
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        const floorMs = captureCostFloorMs(stepObj, shotsCount);
-        const declaredMs = (stepObj.timeout ?? 60) * 1000;
-        expect(
-          declaredMs,
-          `step[${i}] "${stepObj.command}" declared timeout ${declaredMs}ms is below the --screenshots capture-cost floor ${floorMs}ms`,
-        ).toBeGreaterThanOrEqual(floorMs);
-      }
-    });
   }
 });
 
@@ -503,7 +477,9 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
 // its tight default `timeout: 30` and stalled interaction-mode CI a fourth
 // time. A planner audit of the whole post-blast window (steps 32-46)
 // concluded the underlying cost isn't specific to any one action type: the
-// scenario-wide `shots: ["overview","birdseye"]` setting captures 2
+// scenario-wide `shots: ["overview","birdseye"]` setting (#1224: capture no
+// longer counts against the deadline; this is the history behind the raised
+// timeouts, which stay) captures 2
 // screenshots + a state dump after *every* step, and the muck pile spawned
 // by the blast at step 31 (994 fragments) plausibly never fully clears
 // within this scenario's remaining steps — hauling only starts at step 39,
@@ -559,6 +535,8 @@ describe('tutorial-interactive.json — every post-blast step has a declared tim
 //
 // Distinct from block 14 above: that block covers this file's post-blast
 // window (from the `blast` step to EOF) via a dynamically-located range.
+// (#1224: capture time is no longer charged to a step's deadline, so the
+// capture-cost reasoning below is history; the declared timeouts stay as raised.)
 // This block covers an earlier, non-contiguous set of steps scattered
 // through the pre-blast portion of the file (hiring, training, building,
 // drilling, charging) whose declared `timeout` (30s, or 40s for the

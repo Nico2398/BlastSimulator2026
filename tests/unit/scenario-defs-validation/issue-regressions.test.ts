@@ -150,8 +150,6 @@ describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole 
 });
 
 // Issue #704's blast-visual-full.json-only capture-cost timeout lock was
-// generalized to every scenario file by issue #725 — see
-// `tests/unit/scenario-defs-validation/interaction-actions.test.ts`'s
-// "declared step timeout covers interaction-mode --screenshots capture-cost
-// floor (#725)" check, which covers blast-visual-full.json too (it is a
-// member of VISUAL_SCENARIO_NAMES ⊂ ALL_SCENARIO_NAMES).
+// generalized by #725 and then removed by #1224: capture time no longer counts
+// against a step's deadline (scripts/shared/step-deadline.ts), so no declared
+// timeout has to cover it and nothing here pins one to a capture-cost floor.
