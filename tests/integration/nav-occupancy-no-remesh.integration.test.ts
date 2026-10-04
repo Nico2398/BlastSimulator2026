@@ -30,7 +30,6 @@ import {
   sequenceCommand,
   type MiningContext,
 } from '../../src/console/commands/mining.js';
-import { resetHoleIds } from '../../src/core/mining/DrillPlan.js';
 
 // ── Helpers (mirror tests/unit/console/navgrid-patching.test.ts) ───────────
 
@@ -108,8 +107,6 @@ describe('nav:occupancy_changed never triggers a terrain remesh (#1161)', () => 
     const ctx = makeCtx();
     const renderer = wireRenderer(ctx);
     const spy = vi.spyOn(renderer, 'remeshTerrainRegion');
-
-    resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });

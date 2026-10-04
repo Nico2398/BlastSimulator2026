@@ -2,10 +2,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ChargeStep } from '../../../../../src/ui/panels/blastSteps/Charge.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
-import { addHole, resetHoleIds } from '../../../../../src/core/mining/DrillPlan.js';
+import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { getExplosive } from '../../../../../src/core/world/ExplosiveCatalog.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
+
+const holeCounter = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -24,7 +26,7 @@ function card(step: ChargeStep, explosiveId: string): HTMLButtonElement {
   return step.root.querySelector(`[data-explosive="${explosiveId}"]`) as HTMLButtonElement;
 }
 
-beforeEach(() => resetHoleIds());
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('ChargeStep', () => {
   it('renders a product card for every explosive in the catalog, with its cost', () => {
@@ -41,7 +43,7 @@ describe('ChargeStep', () => {
   it('clicking a product card selects it without dispatching a charge command', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state, 'sunny');
 
     card(step, 'krackle').click();
@@ -57,7 +59,7 @@ describe('ChargeStep', () => {
   it('shows the WATER-SENSITIVE badge only for water-sensitive explosives while a hole is wet', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
 
     step.update(state, 'sunny'); // not raining — no wet holes
     const waterSensitiveId = ['pop_rock', 'krackle', 'shatternite', 'obliviax'].find(id => getExplosive(id)?.waterSensitive)!;
@@ -70,7 +72,7 @@ describe('ChargeStep', () => {
   it('never shows the badge on a non-water-sensitive explosive, even while raining', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state, 'heavy_rain');
 
     const dryId = ['boomite', 'big_bada_boom', 'rumblox', 'dynatomics'].find(id => getExplosive(id)?.waterSensitive === false)!;
@@ -95,8 +97,8 @@ describe('ChargeStep', () => {
   it('renders one per-hole row per drill hole, keyed by data-hole, each with its own charge button', () => {
     const { step } = makeStep();
     const state = makeState();
-    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(state.drillHoles, 13, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     step.update(state, 'sunny');
 
     expect(step.root.querySelectorAll('[data-action="charge-hole"]')).toHaveLength(2);
@@ -107,8 +109,8 @@ describe('ChargeStep', () => {
   it('a per-hole Charge button dispatches charge for that hole alone, with the panel\'s selected explosive/amount/stemming', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     step.update(state, 'sunny');
     card(step, 'krackle').click();
 
@@ -121,7 +123,7 @@ describe('ChargeStep', () => {
   it('a per-hole Charge button picks up the amount/stemming steppers, not the defaults', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state, 'sunny');
 
     const amountIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[1] as HTMLButtonElement;
@@ -137,8 +139,8 @@ describe('ChargeStep', () => {
   it('marks a charged hole distinguishable from an uncharged one and shows its charge', () => {
     const { step } = makeStep();
     const state = makeState();
-    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(state.drillHoles, 13, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     state.chargesByHole[h1.id] = { explosiveId: 'krackle', amountKg: 7, stemmingM: 2 };
     step.update(state, 'sunny');
 
@@ -154,7 +156,7 @@ describe('ChargeStep', () => {
   it('re-renders the hole rows once a charge lands, so a row cannot go stale', () => {
     const { step } = makeStep();
     const state = makeState();
-    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state, 'sunny');
     expect((step.root.querySelector(`[data-hole="${h1.id}"]`) as HTMLElement).dataset['charged']).toBe('false');
 
@@ -197,7 +199,7 @@ describe('ChargeStep', () => {
   it('shows the tubing "settled" card when no hole is wet', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
 
     step.update(state, 'sunny');
 
@@ -208,8 +210,8 @@ describe('ChargeStep', () => {
   it('shows the tubing "needed" card with the wet count once it starts raining', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
-    addHole(state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
 
     step.update(state, 'heavy_rain');
 
@@ -222,7 +224,7 @@ describe('ChargeStep', () => {
   it('Buy Tubing dispatches the registered buy command', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state, 'heavy_rain');
 
     (step.root.querySelector('[data-action="tubing-buy"]') as HTMLButtonElement).click();
@@ -233,7 +235,7 @@ describe('ChargeStep', () => {
   it('the Buy Tubing button shows the real cost (10 × TUBING_COST), not a stale price', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     step.update(state, 'heavy_rain');
 
     const buyBtn = step.root.querySelector('[data-action="tubing-buy"]') as HTMLButtonElement;
@@ -243,8 +245,8 @@ describe('ChargeStep', () => {
   it('Install Tubing dispatches one install_tubing per wet hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
-    const h2 = addHole(state.drillHoles, 13, 10, 8, 0.15);
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     state.tubingState.inventory = 5;
     step.update(state, 'heavy_rain');
 
@@ -258,8 +260,8 @@ describe('ChargeStep', () => {
   it('disables Install Tubing when stock is short, with a reason line', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
-    addHole(state.drillHoles, 13, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     state.tubingState.inventory = 1; // 2 holes wet, only 1 tube in stock
     step.update(state, 'heavy_rain');
 

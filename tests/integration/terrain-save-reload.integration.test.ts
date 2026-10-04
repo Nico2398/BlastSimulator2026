@@ -19,12 +19,14 @@ import { saveCommand, loadCommand } from '../../src/console/commands/saveload.js
 import { claimForAction } from '../../src/console/commands/siteExpansion.js';
 import { buildNavGridSyncTarget, type GameContext } from '../../src/console/commands/world.js';
 import { subscribeNavGridToUpdates } from '../../src/core/nav/NavGridSync.js';
-import { resetHoleIds, createGridPlan } from '../../src/core/mining/DrillPlan.js';
+import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { computeVoxelColumnSurfaceY, MAX_TERRAIN_GEN_DIMENSION, type VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+
+const holeCounter = { nextHoleId: 1 };
 
 const BLAST_ORIGIN_X = 20;
 const BLAST_ORIGIN_Z = 20;
@@ -65,12 +67,12 @@ function startTreraniumDepths(): GameContext {
 
 /** Runs the identical blast + site-expansion sequence against `ctx`'s grid. */
 function runBlastAndExpansion(ctx: GameContext): void {
-  resetHoleIds();
+  holeCounter.nextHoleId = 1;
 
   const blastSurfaceY = computeVoxelColumnSurfaceY(ctx.grid!, BLAST_ORIGIN_X, BLAST_ORIGIN_Z);
   expect(blastSurfaceY, 'expected solid ground under the blast pattern').toBeGreaterThanOrEqual(0);
 
-  const holes = createGridPlan({ x: BLAST_ORIGIN_X, z: BLAST_ORIGIN_Z }, 2, 3, 4, 8, 0.15);
+  const holes = createGridPlan(holeCounter, { x: BLAST_ORIGIN_X, z: BLAST_ORIGIN_Z }, 2, 3, 4, 8, 0.15);
   const holeIds = holes.map(h => h.id);
   const holeDepths: Record<string, number> = {};
   for (const h of holes) holeDepths[h.id] = h.depth;

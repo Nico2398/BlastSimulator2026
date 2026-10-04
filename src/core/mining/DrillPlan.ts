@@ -30,15 +30,14 @@ export interface DrillHole {
  */
 export type PlannedHole = DrillHole;
 
-let nextHoleId = 1;
-
-/** Reset hole ID counter (for tests). */
-export function resetHoleIds(): void {
-  nextHoleId = 1;
+/** Narrowest input for id generation: anything carrying the next hole number (GameState does). */
+interface HoleIdCounter {
+  nextHoleId: number;
 }
 
 /** Create a grid drill pattern. */
 export function createGridPlan(
+  counter: HoleIdCounter,
   origin: { x: number; z: number },
   rows: number,
   cols: number,
@@ -50,7 +49,7 @@ export function createGridPlan(
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       holes.push({
-        id: `H${nextHoleId++}`,
+        id: `H${counter.nextHoleId++}`,
         x: origin.x + c * spacing,
         z: origin.z + r * spacing,
         depth,
@@ -63,6 +62,7 @@ export function createGridPlan(
 
 /** Add a single hole to an existing plan. */
 export function addHole(
+  counter: HoleIdCounter,
   holes: DrillHole[],
   x: number,
   z: number,
@@ -72,8 +72,8 @@ export function addHole(
 ): PlannedHole {
   // Never hand out an id a live hole (planned here or drilled elsewhere) holds.
   const isTaken = (id: string): boolean => holes.some(h => h.id === id) || reservedHoles.some(h => h.id === id);
-  while (isTaken(`H${nextHoleId}`)) nextHoleId++;
-  const hole: DrillHole = { id: `H${nextHoleId++}`, x, z, depth, diameter };
+  while (isTaken(`H${counter.nextHoleId}`)) counter.nextHoleId++;
+  const hole: DrillHole = { id: `H${counter.nextHoleId++}`, x, z, depth, diameter };
   holes.push(hole);
   return hole;
 }
@@ -95,6 +95,18 @@ export function removeHole(holes: DrillHole[], holeId: string): boolean {
  */
 export function holeNumericId(holeId: string): number {
   return parseInt(holeId.slice(1), 10);
+}
+
+/** Highest numeric hole id ("H7" → 7) among `ids`; 0 when empty. Ids whose number is not a safe integer are ignored. */
+export function maxHoleNumericId(ids: Iterable<string>): number {
+  let max = 0;
+  for (const id of ids) {
+    const m = /^H(\d+)$/.exec(id);
+    if (!m) continue;
+    const n = parseInt(m[1]!, 10);
+    if (Number.isSafeInteger(n)) max = Math.max(max, n);
+  }
+  return max;
 }
 
 /**

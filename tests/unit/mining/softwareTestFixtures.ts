@@ -6,6 +6,8 @@ import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan, type BlastPlan } from '../../../src/core/mining/BlastPlan.js';
 
+const holeCounter = { nextHoleId: 1 };
+
 /** A 30x30 grid filled solid from y=0..8 with a 4x4 hole pattern, charged and sequenced. */
 export function makeTestPlan(): { grid: VoxelGrid; plan: BlastPlan } {
   const grid = new VoxelGrid(30, 30);
@@ -14,7 +16,7 @@ export function makeTestPlan(): { grid: VoxelGrid; plan: BlastPlan } {
       for (let x = 5; x <= 20; x++)
         grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
 
-  const holes = createGridPlan({ x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
+  const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
   const holeIds = holes.map(h => h.id);
   const holeDepths: Record<string, number> = {};
   for (const h of holes) holeDepths[h.id] = h.depth;

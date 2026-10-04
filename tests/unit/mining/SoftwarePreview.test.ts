@@ -9,13 +9,15 @@ import {
 } from '../../../src/core/mining/SoftwarePreview.js';
 import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
 import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
-import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
-beforeEach(() => resetHoleIds());
+const holeCounter = { nextHoleId: 1 };
+
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('SoftwarePreview — computeHoleContext', () => {
   it('maps every hole to its depth and a surface Y', () => {
@@ -29,7 +31,7 @@ describe('SoftwarePreview — computeHoleContext', () => {
 
   it('surface Y is 0 for a hole above an empty column', () => {
     const grid = new VoxelGrid(5, 5);
-    const holes = createGridPlan({ x: 2, z: 2 }, 1, 1, 3, 2, 0.1);
+    const holes = createGridPlan(holeCounter, { x: 2, z: 2 }, 1, 1, 3, 2, 0.1);
     const plan = assembleBlastPlan(holes, {}, {});
     const ctx = computeHoleContext(plan, grid);
     expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(0);
@@ -48,7 +50,7 @@ describe('SoftwarePreview — computeHoleContext', () => {
       oreDensities: {},
       fractureModifier: 1.0,
     });
-    const holes = createGridPlan({ x: 3, z: 3 }, 1, 1, 3, 2, 0.1);
+    const holes = createGridPlan(holeCounter, { x: 3, z: 3 }, 1, 1, 3, 2, 0.1);
     const plan = assembleBlastPlan(holes, {}, {});
 
     const ctx = computeHoleContext(plan, grid);
@@ -132,7 +134,7 @@ describe('SoftwarePreview — getBlastBBox', () => {
       }
     }
 
-    const holes = createGridPlan({ x: 10, z: 10 }, 1, 1, 3, 4, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 1, 1, 3, 4, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -167,7 +169,7 @@ describe('SoftwarePreview — getBlastBBox', () => {
       fractureModifier: 1.0,
     });
 
-    const holes = createGridPlan({ x: -5, z: 5 }, 1, 1, 3, 4, 0.15);
+    const holes = createGridPlan(holeCounter, { x: -5, z: 5 }, 1, 1, 3, 4, 0.15);
     const plan = assembleBlastPlan(holes, {}, {});
 
     const ctx = computeHoleContext(plan, grid);

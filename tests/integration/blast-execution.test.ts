@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
-import { createGridPlan, resetHoleIds } from '../../src/core/mining/DrillPlan.js';
+import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
@@ -9,6 +9,8 @@ import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { createRunner } from '../../src/console/createRunner.js';
+
+const holeCounter = { nextHoleId: 1 };
 
 // Helper: fill a region of the grid with a rock type
 function fillRegion(
@@ -40,7 +42,7 @@ const VILLAGE_FAR: VillagePosition[] = [
   { id: 'testville', position: vec3(200, 0, 200) },
 ];
 
-beforeEach(() => resetHoleIds());
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('Blast execution — integration', () => {
   it('well-designed plan on soft rock → fragments, good/perfect rating', () => {
@@ -56,7 +58,7 @@ describe('Blast execution — integration', () => {
     // Boomite 8kg (max): 340×8=2720E. Stemming 2m, depth 8: downward ≈ 2494E.
     // At hole pos (EPSILON=4): 2494/4 = 624. Ratio = 624/500 = 1.25 → good frag.
     // With neighbor contributions at midpoints, ratio ~1.5-2.5 → good to fine frag.
-    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -77,7 +79,7 @@ describe('Blast execution — integration', () => {
     fillRegion(grid, 'cruite', 5, 25, 0, 10, 5, 25);
 
     // Overcharge: dynatomics (1300 E/kg) × 25kg on soft cruite (threshold 200)
-    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -98,7 +100,7 @@ describe('Blast execution — integration', () => {
     fillRegion(grid, 'titanite', 5, 25, 0, 10, 5, 25);
 
     // Undercharge: pop_rock (200 E/kg) × 2kg — way too weak
-    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 3, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -122,7 +124,7 @@ describe('Blast execution — integration', () => {
     const beforeVoxel = grid.getVoxel(12, 2, 12);
     expect(beforeVoxel?.density).toBe(1.0);
 
-    const holes = createGridPlan({ x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -152,7 +154,7 @@ describe('Blast execution — integration', () => {
     const grid = new VoxelGrid(30, 30);
     fillRegion(grid, 'cruite', 8, 20, 0, 8, 8, 20, 'blingite', 0.5);
 
-    const holes = createGridPlan({ x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 2, 3, 6, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -173,7 +175,7 @@ describe('Blast execution — integration', () => {
 
   it('returns null for invalid blast plan', () => {
     const grid = new VoxelGrid(20, 20);
-    const holes = createGridPlan({ x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     // No charges → invalid
     const plan = assembleBlastPlan(holes, {}, {});
     const result = executeBlast(plan, grid, []);

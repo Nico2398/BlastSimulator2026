@@ -4,6 +4,7 @@
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
 import { SCORE_DECAY_RATE } from '../config/balance.js';
+import { maxHoleNumericId } from '../mining/DrillPlan.js';
 
 /**
  * Serialize a GameState to a JSON string.
@@ -479,6 +480,33 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
+function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
+  const current = obj['nextHoleId'];
+  if (typeof current === 'number' && Number.isSafeInteger(current) && current >= 1) return obj;
+  const ids: string[] = [];
+  const addIds = (v: unknown): void => {
+    if (!Array.isArray(v)) return;
+    for (const h of v) {
+      const id = (h as { id?: unknown } | null)?.id;
+      if (typeof id === 'string') ids.push(id);
+    }
+  };
+  const addKeys = (v: unknown): void => {
+    if (typeof v === 'object' && v !== null) ids.push(...Object.keys(v));
+  };
+  addIds(obj['drillHoles']);
+  addIds(obj['plannedDrillHoles']);
+  addKeys(obj['chargesByHole']);
+  addKeys(obj['plannedChargesByHole']);
+  addKeys(obj['sequenceDelays']);
+  const installed = (obj['tubingState'] as { installedHoles?: unknown } | undefined)?.installedHoles;
+  if (Array.isArray(installed) || installed instanceof Set) ids.push(...(installed as Iterable<string>));
+  const next = 1 + maxHoleNumericId(ids);
+  obj['nextHoleId'] = Number.isSafeInteger(next) ? next : 1;
+  return obj;
+}
+
 /**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
@@ -737,6 +765,10 @@ export function deserialize(json: string): GameState {
   if ((obj['version'] as number) < 28) {
     migrateV27ToV28(obj);
   }
+
+  // v28 -> v29: GameState.nextHoleId (#1352). Idempotent, so also guards
+  // current-version saves that lack a valid counter.
+  migrateV28ToV29(obj);
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The

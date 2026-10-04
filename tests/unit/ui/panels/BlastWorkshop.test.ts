@@ -2,8 +2,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BlastWorkshop } from '../../../../src/ui/panels/BlastWorkshop.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { addHole, resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
+import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
+
+const holeCounter = { nextHoleId: 1 };
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -22,7 +24,7 @@ function tabButton(root: HTMLElement, label: string): HTMLButtonElement {
 }
 
 beforeEach(() => {
-  resetHoleIds();
+  holeCounter.nextHoleId = 1;
   document.body.innerHTML = '';
 });
 
@@ -86,7 +88,7 @@ describe('BlastWorkshop', () => {
     const { workshop } = makeWorkshop();
     workshop.show();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     const chargeResult = createCharge('boomite', 5, 2, hole.depth);
     if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
 
@@ -99,7 +101,7 @@ describe('BlastWorkshop', () => {
     const { workshop } = makeWorkshop();
     workshop.show();
     const state = makeState();
-    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
 
     workshop.update(state, 'sunny');
 
@@ -111,7 +113,7 @@ describe('BlastWorkshop', () => {
     const { workshop } = makeWorkshop();
     workshop.show();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     const chargeResult = createCharge('boomite', 5, 2, hole.depth);
     if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
 
@@ -125,7 +127,7 @@ describe('BlastWorkshop', () => {
     const { workshop } = makeWorkshop();
     workshop.show();
     const state = makeState();
-    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     const chargeResult = createCharge('boomite', 5, 2, hole.depth);
     if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
     state.sequenceDelays[hole.id] = 0;
@@ -143,7 +145,7 @@ describe('BlastWorkshop', () => {
     workshop.update(state, 'sunny');
 
     tabButton(workshop.root, 'Preview').click();
-    addHole(state.drillHoles, 10, 10, 8, 0.15); // would normally auto-suggest Drill (already there) then Charge
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15); // would normally auto-suggest Drill (already there) then Charge
     workshop.update(state, 'sunny');
 
     const previewText = workshop.root.textContent ?? '';
@@ -209,7 +211,7 @@ describe('BlastWorkshop', () => {
     expect(emptyBodyEl.style.overflowY).toBe('auto');
 
     const state = makeState();
-    for (let i = 0; i < 50; i++) addHole(state.drillHoles, i, 0, 8, 0.15);
+    for (let i = 0; i < 50; i++) addHole(holeCounter, state.drillHoles, i, 0, 8, 0.15);
     workshop.update(state, 'sunny');
 
     const fullBodyEl = workshop.root.querySelector('#bs-panel-body') as HTMLElement;

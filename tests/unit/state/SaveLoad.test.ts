@@ -1137,8 +1137,8 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1200,8 +1200,8 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1281,8 +1281,8 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // to the fragment, mid-break, or never hauling at all) gets `payload: null`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {
@@ -1374,8 +1374,8 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 // truth since v19) left exactly as they were.
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
@@ -1460,8 +1460,8 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
 // taken mid vehicle-gated action doesn't forget which vehicle it claimed.
 
 describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it('a v21 vehicle with reservedForActionId set migrates its reservation into VehicleState.reservations, with none of the seven other fields on the restored Vehicle', () => {
@@ -1608,8 +1608,8 @@ describe('serialize — walk trail is transient (#1199)', () => {
 // locomotion put them.
 
 describe('deserialize — v23→v24 migration for building occupancy (#1202)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it('a pre-v24 save loads with every building empty and everyone outside', () => {
@@ -1652,8 +1652,8 @@ describe('deserialize — v23→v24 migration for building occupancy (#1202)', (
 // `pendingTrainingState: null`.
 
 describe('deserialize — v24→v25 migration for training walk-in (#1203)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it('a pre-v25 save loads with every employee\'s pendingTrainingState defaulted to null', () => {
@@ -1690,8 +1690,8 @@ describe('deserialize — v24→v25 migration for training walk-in (#1203)', () 
 // unconditionally.
 
 describe('deserialize — v25→v26 migration for agentOccupancyEnabled removal (#1207)', () => {
-  it('SAVE_VERSION is 28', () => {
-    expect(SAVE_VERSION).toBe(28);
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
   });
 
   it('a pre-v26 save with agentOccupancyEnabled: true loads with the field stripped', () => {
@@ -1774,5 +1774,132 @@ describe('deserialize — v26→v27 migration for builtRamps (#1298)', () => {
     state.plannedRamps.push({ id: 1, def, footprint: { minX: 0, maxX: 1, minZ: 0, maxZ: 1 }, segments: [], widenOf: 2 });
     const restored = deserialize(serialize(state));
     expect(restored.plannedRamps[0]!.widenOf).toBe(2);
+  });
+});
+
+// ── v28→v29 migration for GameState.nextHoleId (#1352) ──────────────────────
+//
+// The hole id counter used to be module-level, so a reload restarted it at H1
+// and handed out ids that live holes already held. It is now saved state; a
+// v28 save backfills it past every hole id found anywhere in the save.
+
+describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
+  const hole = (id: string) => ({ id, x: 1, z: 1, depth: 8, diameter: 0.15 });
+
+  function v28Save(mutate: (parsed: Record<string, unknown>) => void): Record<string, unknown> {
+    const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, unknown>;
+    parsed['version'] = 28;
+    delete parsed['nextHoleId'];
+    mutate(parsed);
+    return parsed;
+  }
+
+  it('SAVE_VERSION is 29', () => {
+    expect(SAVE_VERSION).toBe(29);
+  });
+
+  it('a fresh game starts with nextHoleId 1', () => {
+    expect(createGame({ seed: 42 }).nextHoleId).toBe(1);
+  });
+
+  it('round-trips nextHoleId', () => {
+    const state = createGame({ seed: 42 });
+    state.nextHoleId = 17;
+    expect(deserialize(serialize(state)).nextHoleId).toBe(17);
+  });
+
+  it('a v28 save with drilled H1..H3 migrates to nextHoleId 4', () => {
+    const parsed = v28Save(p => { p['drillHoles'] = [hole('H1'), hole('H2'), hole('H3')]; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(4);
+  });
+
+  it('a v28 save with no holes migrates to nextHoleId 1', () => {
+    expect(deserialize(JSON.stringify(v28Save(() => {}))).nextHoleId).toBe(1);
+  });
+
+  it('planned holes count toward the max', () => {
+    const parsed = v28Save(p => { p['plannedDrillHoles'] = [hole('H2'), hole('H9')]; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(10);
+  });
+
+  it('chargesByHole keys count toward the max', () => {
+    const parsed = v28Save(p => {
+      p['chargesByHole'] = { H12: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 } };
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(13);
+  });
+
+  it('plannedChargesByHole keys count toward the max', () => {
+    const parsed = v28Save(p => {
+      p['plannedChargesByHole'] = { H20: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 } };
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(21);
+  });
+
+  it('sequenceDelays keys count toward the max', () => {
+    const parsed = v28Save(p => { p['sequenceDelays'] = { H30: 100 }; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(31);
+  });
+
+  it('tubingState.installedHoles counts toward the max', () => {
+    const parsed = v28Save(p => {
+      p['tubingState'] = { inventory: 0, installedHoles: { __type: 'Set', values: ['H40', 'H2'] } };
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(41);
+  });
+
+  it('takes the highest id across every source', () => {
+    const parsed = v28Save(p => {
+      p['drillHoles'] = [hole('H3')];
+      p['plannedDrillHoles'] = [hole('H5')];
+      p['sequenceDelays'] = { H8: 10 };
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(9);
+  });
+
+  it('ignores non-H<n> ids', () => {
+    const parsed = v28Save(p => { p['drillHoles'] = [hole('weird'), hole('H2')]; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(3);
+  });
+
+  it('replaces a non-number nextHoleId with the seed value', () => {
+    const parsed = v28Save(p => {
+      p['drillHoles'] = [hole('H6')];
+      p['nextHoleId'] = 'banana';
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(7);
+  });
+
+  it('replaces a negative nextHoleId with the seed value', () => {
+    const parsed = v28Save(p => { p['nextHoleId'] = -5; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
+  });
+
+  it('ignores a huge-digit hole id instead of yielding an unsafe counter', () => {
+    const parsed = v28Save(p => { p['drillHoles'] = [hole('H2'), hole('H100000000000000000000')]; });
+    const id = deserialize(JSON.stringify(parsed)).nextHoleId;
+    expect(Number.isSafeInteger(id)).toBe(true);
+    expect(id).toBe(3);
+  });
+
+  it('tolerates null and non-object entries in hole arrays', () => {
+    const parsed = v28Save(p => {
+      p['drillHoles'] = [null, 7, hole('H2')];
+      p['plannedDrillHoles'] = [null];
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(3);
+  });
+
+  it('replaces an unsafe-integer nextHoleId with the recomputed value', () => {
+    const parsed = v28Save(p => { p['nextHoleId'] = 1e21; });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
+  });
+
+  it('a v28 save missing its hole collections migrates to nextHoleId 1', () => {
+    const parsed = v28Save(p => {
+      delete p['plannedChargesByHole'];
+      delete p['sequenceDelays'];
+    });
+    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
   });
 });

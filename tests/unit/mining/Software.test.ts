@@ -9,7 +9,7 @@ import {
   MAX_SOFTWARE_TIER,
 } from '../../../src/core/mining/Software.js';
 import { MAX_PROJECTION_VELOCITY } from '../../../src/core/config/balance.js';
-import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
+import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
@@ -18,7 +18,9 @@ import { vec3 } from '../../../src/core/math/Vec3.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
-beforeEach(() => resetHoleIds());
+const holeCounter = { nextHoleId: 1 };
+
+beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('Software — purchase', () => {
   it('purchase tier 1 succeeds with enough cash', () => {
@@ -126,7 +128,7 @@ describe('Software — previewHoleDetails', () => {
         for (let x = 5; x <= 20; x++)
           grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'molite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 });
 
-    const holes = createGridPlan({ x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
@@ -148,7 +150,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   /** Same grid/pattern as makeTestPlan, but charged with the given explosive. */
   function planWith(explosiveId: string, amountKg = 8, stemmingM = 0.5) {
     const { grid } = makeTestPlan();
-    const holes = createGridPlan({ x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
+    const holes = createGridPlan(holeCounter, { x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), depths, explosiveId, amountKg, stemmingM);

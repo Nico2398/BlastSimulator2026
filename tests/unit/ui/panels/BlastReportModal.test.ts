@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../../src/ui/panels/BlastReportModal.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import { resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
+
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { BlastReport } from '../../../../src/core/mining/BlastExecution.js';
 import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
@@ -70,8 +70,6 @@ function openReport(modal: BlastReportModal, state: GameState, setNow: (v: numbe
   setNow(BLAST_REPORT_DELAY_MS);
   modal.update(state);
 }
-
-beforeEach(() => resetHoleIds());
 
 describe('BlastReportModal', () => {
   it('is hidden until a blast report appears', () => {
