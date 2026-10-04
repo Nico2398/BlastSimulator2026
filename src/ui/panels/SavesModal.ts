@@ -40,10 +40,10 @@ export function relativeTime(timestampMs: number): string {
 
 type ConfirmKind = 'overwrite' | 'delete' | 'load';
 // Keys stay literal so check:i18n sees them.
-const CONFIRM_TEXT: Record<ConfirmKind, { title: string; body: string; confirmLabel: string }> = {
-  overwrite: { title: 'ui.saves.confirm_overwrite_title', body: 'ui.saves.confirm_overwrite_body', confirmLabel: 'ui.saves.overwrite' },
-  delete: { title: 'ui.saves.confirm_delete_title', body: 'ui.saves.confirm_delete_body', confirmLabel: 'ui.saves.delete' },
-  load: { title: 'ui.saves.confirm_load_title', body: 'ui.saves.confirm_load_body', confirmLabel: 'saveload.load' },
+const CONFIRM_TEXT: Record<ConfirmKind, { titleKey: string; bodyKey: string; labelKey: string }> = {
+  overwrite: { titleKey: 'ui.saves.confirm_overwrite_title', bodyKey: 'ui.saves.confirm_overwrite_body', labelKey: 'ui.saves.overwrite' },
+  delete: { titleKey: 'ui.saves.confirm_delete_title', bodyKey: 'ui.saves.confirm_delete_body', labelKey: 'ui.saves.delete' },
+  load: { titleKey: 'ui.saves.confirm_load_title', bodyKey: 'ui.saves.confirm_load_body', labelKey: 'saveload.load' },
 };
 
 export class SavesModal {
@@ -147,8 +147,8 @@ export class SavesModal {
   /** Runs `action` after the player confirms; straight away when no confirm handler is wired. */
   private confirmThen(kind: ConfirmKind, icon: string, action: () => void): void {
     if (!this.confirmHandler) { action(); return; }
-    const { title, body, confirmLabel } = CONFIRM_TEXT[kind];
-    this.confirmHandler({ icon, title: t(title), body: t(body), confirmLabel: t(confirmLabel), onConfirm: action });
+    const { titleKey, bodyKey, labelKey } = CONFIRM_TEXT[kind];
+    this.confirmHandler({ icon, title: t(titleKey), body: t(bodyKey), confirmLabel: t(labelKey), onConfirm: action });
   }
 
   get root(): HTMLElement { return this.overlay; }
