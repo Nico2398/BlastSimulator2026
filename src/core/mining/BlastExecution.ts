@@ -39,7 +39,6 @@ import { getBuildingDef, destroyBuilding, type BuildingState, type Building, typ
 import type { AccidentRecord } from '../entities/Damage.js';
 import {
   BLAST_ZONE_RADIUS,
-  GRAVITY,
   OVERSIZED_FRAGMENT_THRESHOLD,
   EXPLOSIVE_ENERGY_SCALE,
   PROJECTION_SPEED_THRESHOLD,
@@ -150,13 +149,9 @@ export interface BlastReport {
   totalRockVolume: number;
   projectionCount: number;
   /**
-   * Estimated maximum throw distance in metres, from the fastest projected
-   * fragment's launch speed — standard unresisted 45°-launch range
-   * (v² / g), the angle that maximises range and the one already implied by
-   * `computeFragmentVelocity`'s 45° default. An estimate, not a traced
-   * trajectory: real fragments launch at whatever angle the blast geometry
-   * gives them and lose speed to drag, so this is an upper bound a report
-   * card can show next to the count, not a per-fragment prediction.
+   * Furthest horizontal throw in metres, traced from the fragment flights.
+   * Same value as `BlastResult.maxThrowDistance` (0 when nothing was thrown),
+   * so the report modal, console and rating agree.
    */
   maxProjectionDistanceM: number;
   /** Total value of ore actually recovered, per BlastCalc's pricing. */
@@ -185,7 +180,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     oversizedFragments: result.oversizedFragments,
     totalRockVolume: result.totalRockVolume,
     projectionCount: result.projectionCount,
-    maxProjectionDistanceM: (result.maxProjectionSpeed * result.maxProjectionSpeed) / Math.abs(GRAVITY),
+    maxProjectionDistanceM: result.maxThrowDistance,
     totalOreValue: result.totalOreValue,
     spent,
     destroyedBuildings: result.destroyedBuildings,

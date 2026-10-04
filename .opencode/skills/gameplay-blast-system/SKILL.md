@@ -158,7 +158,8 @@ expose it as `muckPile`, so a browser harness and a headless run read the same n
 
 Rating is driven by **how far rock was actually thrown** (`THROW_DISTANCE_BAD` /
 `THROW_DISTANCE_CATASTROPHIC`), projection share and vibration — not by speed. Rock that lands back
-in its own muck pile is a good blast however fast it left.
+in its own muck pile is a good blast however fast it left. `BlastReport.maxProjectionDistanceM` is that
+traced `maxThrowDistance`, so the report modal, console and rating agree.
 
 ## Playback
 
