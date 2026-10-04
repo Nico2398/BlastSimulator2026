@@ -100,7 +100,7 @@ Searching costs one command. Filing a duplicate costs a run.
 
 An issue held for confirmation carries an `## Open question` section naming exactly what a human must answer and what changes with each answer. Without it the issue is a hunch nobody can act on, and it waits until someone re-derives the question you already knew.
 
-Leave `ready` off while you are uncertain. An issue carrying `agent-task` alone loses nothing — it keeps its number, its body and its place — and gains `ready` the moment a human agrees.
+**Every issue you file leaves with exactly one hold-or-go marker: `ready`, an `## Open question` section, or `decision-review`.** Leaving `ready` off is a decision, and the body has to carry its reason — a held issue states its question, a decision states its default. An issue with none of the three is a filing error. Nothing in the pipeline tells a human to look at it — `agentic-intake.yml` checks only issues that already carry `ready` — so it sits out of the queue with nobody deciding it, while the run that filed it reports the follow-up handled. #1305 is the worked case: a defect reproduced down to its geometry and tick counts, `Blocked by: None`, no open question, filed with `agent-task` and its scopes alone, and stranded until a human noticed. Before `gh issue create`, read your own body: no `## Open question` and not a decision means `--label ready` is on the command.
 
 ### Scope labels — where the diff will stay
 
@@ -176,7 +176,7 @@ The last four sections are provenance and are omitted for planned work. `## Wher
 9. **SMART compliance.** Specific (one clear goal), Measurable (verifiable outcome), Achievable (within an agent's capabilities), Relevant (part of the larger feature), Time-bound (a single atomic task).
 10. **No label decides which CI jobs run.** Every `ci.yml` job runs on every pull request. An issue names, in its Verification section, which scenario drives the change — that is what the reviewer and the `visual` channel read — and nothing about what CI proves.
 11. **Search before filing, and update what already exists.** An open issue covering the same problem is updated rather than duplicated — procedure above.
-12. **`ready` states confidence, not hope.** It goes on an issue whose work is verified real and whose description is good enough to start from. Anything short of that is `agent-task` alone, with an `## Open question` section naming what a human must answer.
+12. **`ready` states confidence, not hope — and its absence states a question.** It goes on an issue whose work is verified real and whose description is good enough to start from. Anything short of that is `agent-task` alone, with an `## Open question` section naming what a human must answer. No open question and not a decision means the issue is `ready`.
 13. **Label transfer.** A lifecycle label the PR needs at birth (`paused`, for a handover) is passed on the same `gh pr create` call that opens it — never a follow-up `gh pr edit --add-label`, which raises no `pull_request` event of its own (#615). See `agentic-pipeline-finalization`'s `open-pr` step.
 14. **An issue that owns a bypass says so, and says where.** A `TODO(#N)` in the codebase and issue #N are one unit: the comment points at the issue, and the issue's `## Bypass to remove` and `## Files` point back at the comment. Either half alone rots — a bare `TODO` nobody can queue, or an issue that lands and leaves its workaround in place. Closing the issue deletes the comment.
 15. **A blocker filed from inside a run comes first.** Something that stopped or diverted a live run is reproduced, specified and urgent by construction — another issue is queued behind it. File it `ready` unless you genuinely could not characterise it.
@@ -311,7 +311,8 @@ recorded can be picked up in that window.
 - [ ] An issue that must stay out of the queue carries its own lifecycle label
 - [ ] Verification names the scenario that drives the change, if one does — CI runs every scenario in both modes on every PR regardless
 - [ ] Open issues searched for this problem — none covers it, or the existing one was updated instead of a new one filed
-- [ ] Labels set on creation per the Labels table: `ready` only at high confidence, `agent-task` alone otherwise, unless the human specified something else
+- [ ] Labels set on creation per the Labels table: `ready` at high confidence, `agent-task` alone otherwise, unless the human specified something else
+- [ ] Exactly one of `ready`, `## Open question` or `decision-review` on every issue filed — none of the three is a filing error
 - [ ] Every `scope:*` label the change falls into, on every issue filed — `ready` or not
 - [ ] `ready` only when every line of the Definition of Ready holds
 - [ ] An issue held for confirmation carries `## Open question`
