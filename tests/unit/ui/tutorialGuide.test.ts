@@ -901,6 +901,27 @@ describe('decideClock', () => {
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
   });
 
+  // -- #1336: the sell-ore step must never hold the clock while the board
+  // has no fillable ore_sale offer; only advancing time can produce one.
+  it('clockMustRun overrides the hold when the allowance is far spent with no work', () => {
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, true).hold).toBe(false);
+  });
+
+  it('clockMustRun overrides the hold on a step that does not wait on work', () => {
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, false, undefined, true).hold).toBe(false);
+  });
+
+  it('clockMustRun=false keeps the normal hold', () => {
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true, undefined, false).hold).toBe(true);
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, false).hold).toBe(true);
+  });
+
   it('counts from the tick the step started, not from zero', () => {
     const s = state();
     s.tickCount = 100;
@@ -1295,5 +1316,50 @@ describe('decideClock', () => {
       // this must still read as outstanding work and not hold.
       expect(decideClock(s, 0, budget, true).hold).toBe(false);
     });
+  });
+});
+
+describe('sell-ore step clockMustRun (#1336)', () => {
+  const step = TUTORIAL_STEPS.find(x => x.id === 'sell-ore')!;
+  const offer = (materialId: string, quantityKg: number) =>
+    ({ id: 1, type: 'ore_sale', materialId, quantityKg } as never);
+
+  function withBoard(available: unknown[], collectedOre: Record<string, number>): GameState {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    s.contracts.available = available as never;
+    s.collectedOre = collectedOre;
+    return s;
+  }
+
+  it('is defined on the sell-ore step', () => {
+    expect(typeof step.clockMustRun).toBe('function');
+  });
+
+  it('is true when the board is empty', () => {
+    expect(step.clockMustRun!(withBoard([], { iron: 5000 }))).toBe(true);
+  });
+
+  it('is true when an offer exists but stored ore is below its quantity', () => {
+    expect(step.clockMustRun!(withBoard([offer('iron', 1000)], { iron: 999 }))).toBe(true);
+  });
+
+  it('is true when the only offer is for an ore not in storage', () => {
+    expect(step.clockMustRun!(withBoard([offer('gold', 10)], { iron: 5000 }))).toBe(true);
+  });
+
+  it('is false when a fillable offer exists (boundary: stored equals quantity)', () => {
+    expect(step.clockMustRun!(withBoard([offer('iron', 1000)], { iron: 1000 }))).toBe(false);
+  });
+
+  it('is true, without crashing, when contracts and collectedOre are undefined', () => {
+    const s = createGame({ seed: 42, mineType: 'desert' });
+    (s as unknown as Record<string, unknown>).contracts = undefined;
+    (s as unknown as Record<string, unknown>).collectedOre = undefined;
+    expect(step.clockMustRun!(s)).toBe(true);
+  });
+
+  it('is set on no other step', () => {
+    const others = TUTORIAL_STEPS.filter(x => x.id !== 'sell-ore' && x.clockMustRun !== undefined);
+    expect(others.map(x => x.id)).toEqual([]);
   });
 });
