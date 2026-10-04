@@ -82,7 +82,7 @@ export class MainMenu {
     const buttonCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:7px;width:340px' } });
 
     this.continueSummaryEl = el('span', { attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);opacity:.72' } });
-    this.continueBtn = this.makeContinueStyleButton('menu.continue', undefined, this.continueSummaryEl);
+    this.continueBtn = this.makeContinueStyleButton('menu.continue', 'bs-menu-continue', this.continueSummaryEl);
     this.continueBtn.addEventListener('click', () => {
       if (this.mostRecentSave) this.onContinue?.(this.mostRecentSave.slotId);
     });
