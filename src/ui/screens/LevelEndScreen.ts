@@ -344,7 +344,7 @@ export class LevelEndScreen {
 
     const days = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
     this.defeatBodyEl.textContent = t(`ui.level_end.defeat.${reason}.body`, { days: `${days}` });
-    this.defeatTipTextEl.textContent = t(`ui.level_end.defeat.${reason}.tip`);
+    this.defeatTipTextEl.textContent = t(this.defeatTipKey(reason, state));
 
     this.defeatStatGridEl.replaceChildren(statGrid(this.defeatStats(reason, state), 4));
 
@@ -354,6 +354,11 @@ export class LevelEndScreen {
     this.defeatRetryBtn.appendChild(el('span', {
       text: t('ui.level_end.retry', { level: level ? t(level.nameKey) : '' }),
     }));
+  }
+
+  private defeatTipKey(reason: DefeatReason, _state: GameState): string {
+    // TODO: pick the tip by revoltCause for the worker-revolt defeat
+    return `ui.level_end.defeat.${reason}.tip`;
   }
 
   private defeatStats(reason: DefeatReason, state: GameState): { key: string; value: string; color?: string }[] {
