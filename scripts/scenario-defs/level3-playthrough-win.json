@@ -1807,9 +1807,6 @@
       ],
       "role": "player",
       "expect": {
-        "changedBy": {
-          "cash": 0
-        },
         "equals": {
           "tickCount": 461,
           "deathCount": 0,
@@ -1821,6 +1818,9 @@
         },
         "increased": [
           "orderedChargeCount"
+        ],
+        "decreased": [
+          "cash"
         ]
       }
     },

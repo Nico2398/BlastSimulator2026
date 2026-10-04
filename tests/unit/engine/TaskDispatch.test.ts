@@ -1620,3 +1620,48 @@ describe('backfillGhostBuildings (#1306)', () => {
     expect(state.ghostPreviewsRevision).toBe(revision);
   });
 });
+
+// ── cancelAction refunds a queued charge_hole action (#1341) ──
+//   actionOrderCost (TaskCancellation.ts) refunds payload.orderCost in full.
+
+describe('cancelAction — refunds a queued charge_hole action in full (#1341)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('refunds payload.orderCost, credits state.cash and records a refund income transaction', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const beforeCash = state.cash;
+    const action = makePendingAction({
+      id: 400, requiredSkill: null,
+      payload: { holeId: 'H1', explosiveId: 'dynatomics', amountKg: 20, stemmingM: 2, durationTicks: 10, orderCost: 4000 },
+    });
+    (action as any).type = 'charge_hole';
+    dispatchPendingAction(state, action);
+
+    const result = cancelAction(state, 400);
+
+    expect(result.success).toBe(true);
+    expect(result.refunded).toBe(4000);
+    expect(state.cash).toBe(beforeCash + 4000);
+    const refundTx = state.finances.transactions.find(t => t.category === 'refund');
+    expect(refundTx).toBeDefined();
+    expect(refundTx!.amount).toBe(4000);
+  });
+
+  it('refunds 0 when payload.orderCost is absent (boundary)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const beforeCash = state.cash;
+    const action = makePendingAction({ id: 401, requiredSkill: null, payload: { holeId: 'H1' } });
+    (action as any).type = 'charge_hole';
+    dispatchPendingAction(state, action);
+
+    const result = cancelAction(state, 401);
+
+    expect(result.success).toBe(true);
+    expect(result.refunded).toBe(0);
+    expect(state.cash).toBe(beforeCash);
+  });
+});

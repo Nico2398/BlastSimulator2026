@@ -19,7 +19,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
-import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
+import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
@@ -112,10 +112,7 @@ export class PreflightModal {
     if (!this.open) return;
 
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
-    const planCost = Object.values(state.chargesByHole).reduce((sum, charge) => {
-      const explosive = getExplosive(charge.explosiveId);
-      return sum + (explosive ? explosive.costPerKg * charge.amountKg : 0);
-    }, 0);
+    const planCost = plannedChargesCost(state.chargesByHole);
     const chargeKg = Object.values(state.chargesByHole).reduce((sum, c) => sum + c.amountKg, 0);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
 

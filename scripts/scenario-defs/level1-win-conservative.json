@@ -268,7 +268,6 @@
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
       "expect": {
         "changedBy": {
-          "cash": 0,
           "tickCount": 0
         },
         "equals": {
@@ -280,6 +279,9 @@
         },
         "increased": [
           "orderedChargeCount"
+        ],
+        "decreased": [
+          "cash"
         ]
       },
       "role": "player"

@@ -3,19 +3,19 @@
   "description": "Visual check of building destruction via blast: drill, charge, sequence, and detonate near warehouses. #553: drill_plan no longer writes holes instantly — a staffed driller/drill_rig must physically reach and drill each hole, so the two holes are ordered ON OPEN GROUND (via drill_plan add, one per building origin) and landed BEFORE either warehouse is built. Building a warehouse first would leave its footprint permanently un-navigable to the not-yet-drilled hole underneath it (buildings occupy blocked NavGrid cells; only an already-drilled hole's cell reclassifies to the walkable 'drill_hole' type) — a driller/drill_rig sent to drill under a standing building can never physically arrive there, so drill-then-build is not just tidier ordering here but the only sequence that can complete at all.",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 cash:100000 staffed:true",
       "timeout": 70,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — exactly what #553's automatic drill dispatch needs.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 cash:100000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 100000,
           "holeCount": 0,
           "orderedHoleCount": 0,
           "buildingCount": 0
