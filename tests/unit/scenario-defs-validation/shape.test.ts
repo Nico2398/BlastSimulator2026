@@ -242,6 +242,7 @@ describe('Scenario skipBlastPlayback field is a boolean when present (#761)', ()
   // GPU (#475) — real budget a scenario pays for nothing it actually checks.
   const SKIP_BLAST_PLAYBACK_SCENARIOS: Record<string, string> = {
     'tutorial-interactive': 'functional/bootstrap flow, no blast-visual checkpoint',
+    'tutorial-evacuate-manual-tab': 'functional click-path variant of tutorial-interactive (#1337), no blast-visual checkpoint',
     'tutorial-steps-visual': 'per-step shots are static settled-aftermath orbits (no frames/interval mid-collapse capture) — identical shape to tutorial-interactive\'s own blast step, just via its own shots array instead of inline screenshot actions; without this its blast step (9 holes/994 fragments, same pattern as tutorial-interactive) blew its 65s effective timeout every run (CI regression)',
   };
 
