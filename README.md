@@ -316,7 +316,7 @@ src/
   physics/      Cannon-es rigid body simulation (active only during blasts)
   ui/           HTML overlay panels (reads from GameState)
   audio/        Web Audio API sound system
-  persistence/  Save backends: FilePersistence, IndexedDBPersistence, DownloadPersistence
+  persistence/  Save backends: FilePersistence, IndexedDBPersistence, InMemoryPersistence
   console/      CLI mode — same core logic as the browser UI
   main.ts       Browser entry point
   console.ts    CLI entry point

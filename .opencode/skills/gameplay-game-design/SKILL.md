@@ -163,6 +163,7 @@ Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-
 - **Multiple slots** with full GameState + campaign progression + metadata
 - **Auto-save** every 2 game minutes in dedicated slot
 - **Cross-session persistence** via IndexedDB
+- **Fallback and confirms (#1325):** when IndexedDB fails its startup probe (missing, blocked, errored, 3 s timeout) saves go to a session-only in-memory backend — never a file download per save; the Saves modal shows a persistent notice and save status says "this session only". Autosave failure shows one error per failure streak. Overwrite (filled manual slots only; the auto slot has none), Delete, and Load ask for confirmation; Load confirms only when a live, unfinished game would be discarded. Empty SAVE HERE and MainMenu CONTINUE never confirm. Manual `.json` export remains the durable escape hatch.
 - **Save size tracks play, not level size** (v7): a save stores the claimed-chunk set plus the voxel data of the chunks play actually changed. Every other chunk is regenerated from the seed on load, which is exact because generation is a pure function of position and seed.
 
 ## Time Management

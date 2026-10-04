@@ -22,7 +22,7 @@ export interface SaveSlot {
 
 /**
  * Persistence backend for save/load.
- * Implementations: FilePersistence, IndexedDBPersistence, DownloadPersistence.
+ * Implementations: FilePersistence, IndexedDBPersistence, InMemoryPersistence.
  */
 export interface SaveBackend {
   /** Save serialized state to a slot. */

@@ -411,6 +411,14 @@
           "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"load\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
           "type": "wait",
           "durationMs": 300
         }
