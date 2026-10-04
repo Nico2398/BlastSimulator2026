@@ -175,6 +175,7 @@ const savesModal = new SavesModal(uiContainer);
 savesModal.setBackend(saveBackend);
 savesModal.setBackendKind(saveBackendKind);
 savesModal.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
+savesModal.setOnAutoSaveFailed(() => uiManager.notify({ severity: 'warn', title: t('ui.saves.autosave_failed'), body: '' }));
 // Every save SavesModal takes — manual slots, auto-save and quick-save — reads
 // its state here: a snapshot carrying the terrain encoded from the live grid
 // at that moment (#458 T0.3). SavesModal only sees GameState; it has no idea

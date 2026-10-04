@@ -870,10 +870,11 @@ describe('SavesModal', () => {
       });
 
       it('a successful autosave never touches an unrelated status', async () => {
-        const { failing, modal } = await autosaveSetup();
+        const { failing, modal, state } = await autosaveSetup();
         failing.on = false;
         (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent = 'other';
-        await modal.quickSave();
+        modal.onTick(state);
+        await flush();
         expect(statusOf(modal)).toBe('other');
       });
     });

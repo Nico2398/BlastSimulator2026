@@ -55,12 +55,20 @@ export class SavesModal {
   private confirmHandler?: (config: ConfirmModalConfig) => void;
   private readonly fallbackNotice: HTMLElement;
   private autoSaveFailing = false;
+  private onAutoSaveFailed?: () => void;
+
+  /** Surface an autosave failure outside the modal (it may be closed when the save fails). */
+  setOnAutoSaveFailed(cb: () => void): void {
+    this.onAutoSaveFailed = cb;
+  }
   private writing = false;
 
   /** Tell the modal which backend is active so it can show a fallback notice. */
   setBackendKind(kind: SaveBackendKind): void {
-    this.fallbackNotice.style.display = kind === 'memory' ? '' : 'none';
     this.sessionOnly = kind === 'memory';
+    // Only in the DOM while the memory fallback is active, so hidden text never lingers.
+    if (this.sessionOnly) this.slotList.before(this.fallbackNotice);
+    else this.fallbackNotice.remove();
   }
   private sessionOnly = false;
 
@@ -115,7 +123,7 @@ export class SavesModal {
     this.slotList = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:8px' } });
 
     this.fallbackNotice = el('div', { attrs: {
-      style: 'display:none;padding:8px 10px;border-radius:4px;border:1px solid rgba(255,176,46,.34);'
+      style: 'padding:8px 10px;border-radius:4px;border:1px solid rgba(255,176,46,.34);'
         + 'background:rgba(255,176,46,.07);font:500 11px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)',
     } });
     this.fallbackNotice.dataset['role'] = 'fallback-notice';
@@ -134,7 +142,7 @@ export class SavesModal {
     this.locale.bindText(importBtn, 'ui.saves.import');
     const footer = el('div', { attrs: { style: 'display:flex;gap:8px;padding-top:6px' }, children: [exportBtn, importBtn, importInput] });
 
-    body.append(this.fallbackNotice, this.slotList, this.statusEl, footer);
+    body.append(this.slotList, this.statusEl, footer);
     box.append(header, body);
     this.overlay.appendChild(box);
     container.appendChild(this.overlay);
@@ -209,6 +217,7 @@ export class SavesModal {
       if (!this.autoSaveFailing) {
         this.autoSaveFailing = true;
         this.setStatus(t('ui.saves.autosave_failed'), 'error');
+        this.onAutoSaveFailed?.();
       }
     }
   }
