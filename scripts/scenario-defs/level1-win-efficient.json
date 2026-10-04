@@ -1308,7 +1308,7 @@
           "tickCount": 0
         }
       },
-      "description": " #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically \u2014 e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame."
+      "description": " #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically — e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame."
     },
     {
       "command": "blast",
@@ -1416,8 +1416,8 @@
           "surveyCount": 2,
           "wellBeing": 16.377499999999984,
           "safety": 50,
-          "ecology": 46.43,
-          "nuisance": 41.075
+          "ecology": 46.40626354005784,
+          "nuisance": 41.015658850144604
         },
         "changedBy": {
           "tickCount": 0
@@ -1442,8 +1442,8 @@
           "surveyCount": 2,
           "wellBeing": 16.377499999999984,
           "safety": 50,
-          "ecology": 46.43,
-          "nuisance": 41.075
+          "ecology": 46.40626354005784,
+          "nuisance": 41.015658850144604
         },
         "changedBy": {
           "tickCount": 0
@@ -2683,7 +2683,7 @@
           "wellBeing": 0,
           "safety": 10.519999999999971,
           "ecology": 50,
-          "nuisance": 48.60500000000029
+          "nuisance": 48.30829425072332
         }
       }
     },
@@ -2706,7 +2706,7 @@
           "wellBeing": 0,
           "safety": 10.519999999999971,
           "ecology": 50,
-          "nuisance": 48.60500000000029
+          "nuisance": 48.30829425072332
         }
       }
     },
@@ -2729,7 +2729,7 @@
           "wellBeing": 0,
           "safety": 10.519999999999971,
           "ecology": 50,
-          "nuisance": 48.60500000000029,
+          "nuisance": 48.30829425072332,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

@@ -213,11 +213,24 @@ budget is ~300 ms.
 | 1 | "BlastView Basic" | Energy heatmap |
 | 2 | "FragPredict" | Expected fragment size |
 | 3 | "ProjectoScan" | Projection risk zones |
-| 4 | "VibroMap Pro" | Vibration at villages |
+| 4 | "VibroMap Pro" | Vibration at the level's villages |
 
 Previews run the **same** propagation the blast does (`buildPlanEnergyField`) and the same seeding
 and velocity maths. A preview that models the rock differently from the game is worse than no
 preview — never reintroduce a separate approximation.
+
+### Village vibration (#1343)
+
+Villages come from the level's structure set (`PlayableArea.villages()`, the same set the renderer
+draws; ids `village-<i>`, ground level). Both `executeBlast` and `previewVibrations` measure from the
+mean hole position (distance clamped to 1 m) with ground factor = base x `averageVibrationMod`
+(charged holes, equal weight, wet holes included), so preview equals blast; callers pass the factor.
+The blast report carries `maxVibration`; `blast` costs nuisance `maxVibration x
+VILLAGE_VIBRATION_SCORE_GAIN` via `recordVibration`, separate from the projection term
+(`BLAST_PROJECTION_NUISANCE_PER_PROJECTION`). For `SCORE_VIBRATION_WINDOW_TICKS` ticks after the blast the tick pipeline
+also feeds the same scaled value to `updateScores`. The gain is large (15000) because PPV falls off as
+distance^-1.5 (~4e-4 mm/s at 445 m for an ordinary Grumpstone Ridge blast); it targets ~1-3 nuisance
+points for an ordinary blast and ~5 for an oversized one.
 
 ## Working on this pipeline
 

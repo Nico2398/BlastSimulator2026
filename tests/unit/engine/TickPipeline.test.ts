@@ -377,7 +377,8 @@ describe('runTick — recent blast vibration reaches the nuisance score (#1343)'
   });
 
   it('a stronger recent vibration lowers nuisance more than a weaker one', () => {
-    expect(nuisanceAfterTick(0, 80)).toBeLessThan(nuisanceAfterTick(0, 10));
+    // Realistic village PPV (mm/s): raw values like 80 x VILLAGE_VIBRATION_SCORE_GAIN clamp nuisance at 0.
+    expect(nuisanceAfterTick(0, 4e-4)).toBeLessThan(nuisanceAfterTick(0, 1e-4));
   });
 
   it('a report older than the window no longer affects nuisance', () => {
