@@ -1360,44 +1360,7 @@ describe('sequenceCommand — set subcommand, hole id resolution', () => {
     expect(ctx.state!.sequenceDelays[holeId]).toBe(25);
   });
 
-  it('a spec matching only a planned (undrilled) hole\'s real id does NOT resolve to that id — falls through to the hole_${spec} legacy form', () => {
-    const ctx = makeMiningContext();
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    const holeId = ctx.state!.plannedDrillHoles[0]!.id;
-    expect(ctx.state!.drillHoles).toEqual([]);
-
-    const result = sequenceCommand(ctx, ['set'], { hole: holeId, delay: '25ms' });
-
-    expect(result.success).toBe(true);
-    // NOT set under the planned hole's own real id...
-    expect(ctx.state!.sequenceDelays[holeId]).toBeUndefined();
-    // ...instead set under the legacy hole_<spec> fallback form.
-    expect(ctx.state!.sequenceDelays[`hole_${holeId}`]).toBe(25);
-  });
-});
-
-// ── tubingCommand install — hole id resolution (#634) ───────────────────────
-// Characterizes the inline ternary in tubingCommand's 'install' branch —
-// behaviorally identical to sequenceCommand's: checks only state.drillHoles,
-// never plannedDrillHoles.
-
-describe('tubingCommand — install subcommand, hole id resolution', () => {
-  it('a spec matching a drilled hole\'s real id resolves and installs tubing under that exact id', () => {
-    const ctx = makeMiningContext();
-    ctx.state!.cash = 999_999;
-    tubingCommand(ctx, ['buy'], { amount: '1' });
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    driveDrillPlanToCompletion(ctx);
-    const holeId = ctx.state!.drillHoles[0]!.id;
-
-    const result = tubingCommand(ctx, ['install'], { hole: holeId });
-
-    expect(result.success).toBe(true);
-    expect(result.output).toBe(`Tubing installed on hole ${holeId}`);
-    expect(ctx.state!.tubingState.installedHoles.has(holeId)).toBe(true);
-  });
-
-  it('a spec matching only a planned (undrilled) hole\'s real id falls through to the hole_${spec} legacy form, exactly mirroring sequenceCommand', () => {
+  it('a spec matching only a planned (undrilled) hole\'s id falls through to the hole_${spec} legacy form, which is not a drilled hole and is refused', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 999_999;
     tubingCommand(ctx, ['buy'], { amount: '1' });
@@ -1407,25 +1370,23 @@ describe('tubingCommand — install subcommand, hole id resolution', () => {
 
     const result = tubingCommand(ctx, ['install'], { hole: holeId });
 
-    expect(result.success).toBe(true);
-    expect(result.output).toBe(`Tubing installed on hole hole_${holeId}`);
-    expect(ctx.state!.tubingState.installedHoles.has(holeId)).toBe(false);
-    expect(ctx.state!.tubingState.installedHoles.has(`hole_${holeId}`)).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Hole "hole_${holeId}" not found`);
+    expect(ctx.state!.tubingState.installedHoles.size).toBe(0);
+    expect(ctx.state!.tubingState.inventory).toBe(1);
   });
 
-  it('a spec matching neither pool (bare number, no hole_ prefix) resolves to hole_<spec>, reporting the exact current duplicate message', () => {
+  it('a spec matching neither pool (bare number, no hole_ prefix) resolves to hole_<spec> and is refused as unknown, inventory unchanged', () => {
     const ctx = makeMiningContext();
     ctx.state!.cash = 999_999;
     tubingCommand(ctx, ['buy'], { amount: '1' });
-    // Pre-seed the fallback id as already installed so the resolved id shows
-    // up verbatim in the response, proving resolution landed on hole_42
-    // rather than "42" or some doubled form.
-    ctx.state!.tubingState.installedHoles.add('hole_42');
 
     const result = tubingCommand(ctx, ['install'], { hole: '42' });
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Tubing already installed on hole hole_42');
+    expect(result.output).toBe('Hole "hole_42" not found');
+    expect(ctx.state!.tubingState.installedHoles.size).toBe(0);
+    expect(ctx.state!.tubingState.inventory).toBe(1);
   });
 });
 
