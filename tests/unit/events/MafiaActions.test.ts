@@ -10,6 +10,7 @@ import {
 } from '../../../src/core/events/MafiaActions.js';
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
+import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../../../src/core/config/balance.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 const EMPLOYEE_DEFAULTS = {
@@ -142,5 +143,88 @@ describe('Mafia gameplay mechanics', () => {
 
     setLocale('fr');
     expect(t(result.outcomeKey, result.outcomeParams)).not.toBe(NO_READY_FRAME_EN);
+  });
+
+  // ── exposureIncrease equals the applied delta — issue #1410 ─────────────
+  function accidentRun(wantSuccess: boolean, startExposure: number) {
+    for (let seed = 0; seed < 50; seed++) {
+      const mafia = createMafiaState();
+      mafia.exposureRisk = startExposure;
+      const employees = createEmployeeState();
+      const emp = addTestEmployee(employees);
+      const result = arrangeAccident(mafia, employees, createCorruptionState(), emp.id, new Random(seed));
+      if (result.success === wantSuccess) return { mafia, result };
+    }
+    return expect.unreachable(`No ${wantSuccess ? 'successful' : 'failed'} accident in 50 seeds`);
+  }
+
+  it('failed accident raises exposureRisk by exactly result.exposureIncrease', () => {
+    const { mafia, result } = accidentRun(false, 0);
+    expect(result.exposureIncrease).toBeCloseTo(ACCIDENT_EXPOSURE + ACCIDENT_FAILURE_EXPOSURE_EXTRA, 10);
+    expect(mafia.exposureRisk).toBeCloseTo(result.exposureIncrease, 10);
+    expect(mafia.exposureRisk).toBeCloseTo(0.2, 10);
+  });
+
+  it('successful accident raises exposureRisk by exactly result.exposureIncrease', () => {
+    const { mafia, result } = accidentRun(true, 0);
+    expect(result.exposureIncrease).toBeCloseTo(ACCIDENT_EXPOSURE, 10);
+    expect(mafia.exposureRisk).toBeCloseTo(result.exposureIncrease, 10);
+    expect(mafia.exposureRisk).toBeCloseTo(0.1, 10);
+  });
+
+  it('failed accident near the cap clamps to 1 and reports the applied delta', () => {
+    const { mafia, result } = accidentRun(false, 0.95);
+    expect(mafia.exposureRisk).toBe(1);
+    expect(result.exposureIncrease).toBeCloseTo(1 - 0.95, 10);
+  });
+
+  it('accident on an unknown target changes no exposure', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 0.3;
+    const result = arrangeAccident(mafia, createEmployeeState(), createCorruptionState(), 999, new Random(1));
+    expect(result.exposureIncrease).toBe(0);
+    expect(mafia.exposureRisk).toBe(0.3);
+  });
+
+  it('accident on a dead target changes no exposure', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 0.3;
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees);
+    emp.alive = false;
+    const result = arrangeAccident(mafia, employees, createCorruptionState(), emp.id, new Random(1));
+    expect(result.exposureIncrease).toBe(0);
+    expect(mafia.exposureRisk).toBe(0.3);
+  });
+
+  it('startFraming exposureIncrease equals the applied delta, also near the cap', () => {
+    for (const start of [0, 0.98]) {
+      const mafia = createMafiaState();
+      mafia.exposureRisk = start;
+      const employees = createEmployeeState();
+      const emp = addTestEmployee(employees);
+      const before = mafia.exposureRisk;
+      const result = startFraming(mafia, employees, emp.id, 100);
+      expect(mafia.exposureRisk - before).toBeCloseTo(result.exposureIncrease, 10);
+    }
+  });
+
+  it('detected completeFrame exposureIncrease equals the applied delta, also near the cap', () => {
+    for (const start of [0, 0.95]) {
+      let found = false;
+      for (let seed = 0; seed < 50 && !found; seed++) {
+        const mafia = createMafiaState();
+        const employees = createEmployeeState();
+        const emp = addTestEmployee(employees);
+        startFraming(mafia, employees, emp.id, 0);
+        mafia.exposureRisk = start;
+        const result = completeFrame(mafia, employees, emp.id, 1_000_000, new Random(seed));
+        if (result.outcomeKey === 'mafia.frame_detected') {
+          found = true;
+          expect(mafia.exposureRisk - start).toBeCloseTo(result.exposureIncrease, 10);
+        }
+      }
+      expect(found, `no detected frame in 50 seeds at start ${start}`).toBe(true);
+    }
   });
 });
