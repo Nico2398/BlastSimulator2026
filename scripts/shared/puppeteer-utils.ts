@@ -208,6 +208,7 @@ export async function executeInteractionActions(
   cmdSlug: string,
   onProgress?: (detail: string) => void,
   onTrace?: (entry: CommandTraceEntry) => void,
+  excludeFromDeadline?: <T>(work: () => Promise<T>) => Promise<T>,
 ): Promise<InteractionStepResult> {
   const screenshotPaths: string[] = [];
   let screenshotIndex = 0;
