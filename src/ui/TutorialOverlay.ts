@@ -109,6 +109,15 @@ export class TutorialOverlay {
     return this.rails.progress;
   }
 
+  /**
+   * First-run auto-start rule: the steps are tuned to tutorial_pit's map
+   * (tutorialStages.ts REGION), so only that level auto-starts them — never a
+   * campaign level picked from the Portfolio.
+   */
+  static shouldAutoStart(levelId: string): boolean {
+    return levelId === 'tutorial_pit' && !TutorialOverlay.isCompleted();
+  }
+
   static isCompleted(): boolean {
     return !!localStorage.getItem('bs_tutorial_done');
   }
