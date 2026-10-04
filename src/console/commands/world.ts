@@ -1,6 +1,8 @@
 // BlastSimulator2026 — Console commands for world creation and inspection
 
 import type { CommandResult } from '../ConsoleRunner.js';
+import { refreshOrderReachability } from '../../core/engine/OrderReachability.js';
+import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
@@ -250,6 +252,7 @@ export function regenerateGrid(
     buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
   }
   snapAgentsToNavigableGround(ctx.state);
+  refreshOrderReachability(ctx.state);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
 
@@ -309,6 +312,10 @@ function restoreGrid(ctx: GameContext, grid: VoxelGrid): void {
   ctx.playableArea = config ? new PlayableArea(ctx.grid, config) : null;
   syncWorldBounds(ctx.state, ctx.grid);
   buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
+  // Saves from before #1306 carry no building info on their ghosts; colours
+  // are derived, so they are recomputed here rather than saved (#1306).
+  backfillGhostBuildings(ctx.state);
+  refreshOrderReachability(ctx.state);
   ctx.emitter.emit('terrain:updated', { region: gridDirtyRegion(ctx.grid) });
 }
 

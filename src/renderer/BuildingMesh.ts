@@ -7,7 +7,7 @@
 // the roof corners so the two doors read from any camera angle.
 
 import * as THREE from 'three';
-import type { Building, BuildingType } from '../core/entities/Building.js';
+import type { Building, BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
@@ -42,6 +42,23 @@ interface BuildingEntry {
   instance: ModelInstance;
   markers: THREE.Mesh[];
   building: Building;
+}
+
+/**
+ * Instantiate and tint the (intact) model for a building type/tier from `library`,
+ * sized to its footprint. Shared by the real building and the queued-order
+ * hologram (#1306), so both draw the same asset at the same size.
+ */
+export function instantiateBuildingModel(
+  library: ModelLibrary,
+  type: BuildingType,
+  tier: BuildingTier,
+): ModelInstance {
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
+  return library.instantiate(buildingModelId(type, tier), {
+    size: [sizeX, FALLBACK_BASE + FALLBACK_STOREY * tier, sizeZ],
+    tint: BODY_TINT,
+  });
 }
 
 // ---------- Main class ----------
@@ -171,10 +188,9 @@ export class BuildingMesh {
     const def = getBuildingDef(building.type, building.tier);
     const { sizeX, sizeZ } = getDefSize(def);
     const isDestroyed = building.hp <= 0;
-    const instance = this.library.instantiate(modelIdFor(building), {
-      size: [sizeX, isDestroyed ? RUIN_HEIGHT_MIN : FALLBACK_BASE + FALLBACK_STOREY * building.tier, sizeZ],
-      tint: BODY_TINT,
-    });
+    const instance = isDestroyed
+      ? this.library.instantiate(BUILDING_RUIN_MODEL_ID, { size: [sizeX, RUIN_HEIGHT_MIN, sizeZ], tint: BODY_TINT })
+      : instantiateBuildingModel(this.library, building.type as BuildingType, building.tier);
     group.add(instance.root);
 
     if (isDestroyed) {

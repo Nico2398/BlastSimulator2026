@@ -1,0 +1,819 @@
+{
+  "name": "ghost-reachability-visual",
+  "description": "#1306: a queued order's ghost is red when none of the actors able to perform THAT action can reach it, or none exists, and blue otherwise; a queued building shows its own model as a fresnel hologram. Flow (paused explicitly by a `pause` step; campaign start does not pause) on tutorial_pit (the stranded-pocket blast of blast-debris-stranded-ramp.json): a warehouse is ordered with nobody hired (red hologram, accepted and charged anyway), hiring turns it blue while the game is paused, a blast leaves debris no hauler exists for (red), a ramp ordered before any excavator crew exists reads red and turns blue when the licensed driver and a rock_digger appear, and once the haul crew exists and the ramp connects the pocket nothing is red. Every colour change is observed through unreachableGhostCount (state dump) and the screenshots of the hologram and ramp ghosts.",
+  "steps": [
+    {
+      "command": "campaign start level:tutorial_pit cash:2000000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:tutorial_pit cash:2000000"
+        }
+      ],
+      "description": "Open tutorial_pit with a large purse and an empty roster. campaign start leaves the game paused, so every colour check below is made with no tick running (#1306: changes the player makes while paused show immediately).",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 2000000
+        }
+      }
+    },
+    {
+      "command": "time pause",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "description": "Pause explicitly: campaign start leaves the game running (isPaused false at tick 0), and the no-tick colour checks below need a paused game.",
+      "role": "setup"
+    },
+    {
+      "command": "build freight_warehouse at:1,8",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 1,
+          "z": 8
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 1,
+          "unreachableGhostCount": 1
+        },
+        "note": "Red because no actor exists, not because the site is cut off."
+      },
+      "description": "Order the freight warehouse at (1,8) with nobody on the roster. The order is accepted and charged, nothing refuses it, and its ghost is the warehouse's own model drawn as a fresnel hologram. No employee exists to build it, so the hologram is RED (unreachableGhostCount 1) at once, with the game still paused."
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1,
+          "unreachableGhostCount": 0
+        }
+      },
+      "description": "Hire the driller. The hire happens while paused and the hologram turns BLUE with no tick: an employee now exists who can walk to the site (unreachableGhostCount 0)."
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "timeout": 130,
+      "description": "The driller builds the warehouse; the hologram is replaced by the real building.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:blasting level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:blasting level:5"
+        }
+      ],
+      "description": "Bootstrap blasting proficiency so the driller can charge.",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "Buy the drill rig.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+        }
+      ],
+      "description": "Licence the driller for the drill rig.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:18,10 diameter:0.089",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 18,
+          "z1": 10,
+          "x2": 18,
+          "z2": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1,
+          "holeCount": 0
+        }
+      },
+      "description": "A single hole at (18,10). With charge amount:3 stemming:2 this blast leaves the three cells (18,9), (19,10), (18,10) in a pocket the ground crew cannot reach (traced in tests/integration/blast-debris-reachability.integration.test.ts). Stranded debris is a normal outcome the player owns (#1302), not a defect: the blast physics decides where debris lands."
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:600",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the driller to drill the ordered hole.",
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 1
+        }
+      },
+      "timeout": 125
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Defensive: a `tick N` step silently completes fewer ticks than requested if a random event fires mid-wait, and every subsequent tick then refuses until the event is resolved. No-op when nothing is pending.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:3 stemming:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 3
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Charge the hole: boomite 3 kg, stemming 2 m.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 1
+        }
+      },
+      "description": "Sequence the single hole."
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "description": "Fire the blast. Debris lands wherever physics puts it; part of it ends up in a pocket nobody can drive to. No reachability check touches fragment placement (#1302)."
+    },
+    {
+      "command": "tick 1",
+      "description": "One tick after the blast. Debris is queued for hauling but the roster has no hauler or fragmenter driver and the fleet no debris vehicles, so every debris ghost reads RED: no actor able to perform that action exists.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "unreachableGhostCount"
+        ]
+      }
+    },
+    {
+      "command": "time pause",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "description": "Pause again (the speed button used while draining charges unpauses) so the ramp ordering and hires below are observed with no tick running.",
+      "role": "setup"
+    },
+    {
+      "command": "build_ramp start:27,9 end:17,9 depth:5",
+      "description": "Order the ramp into the stranded pocket (10 m from (27,9) down to the crater at (17,9), depth 5) before anyone can dig. Accepted and charged; every layer ghost is RED because the roster holds no excavator driver and the fleet no rock_digger. Ghosts are never blocked at order time, only coloured.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 5
+        },
+        {
+          "type": "focusTile",
+          "x": 22,
+          "z": 9,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 27,
+          "z1": 9,
+          "x2": 17,
+          "z2": 9
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "unreachableGhostCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "description": "Hire the driver who will crew the rock digger.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.excavator level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.excavator level:5"
+        }
+      ],
+      "description": "Bootstrap the excavator licence for the digger driver.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle buy rock_digger",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "Buy the rock digger. The excavator-licensed driver and a rock_digger now both exist, so the ramp's layers turn BLUE with no tick (the purchase happens while paused).",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash",
+          "unreachableGhostCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 2 2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 2 2"
+        }
+      ],
+      "description": "Crew the rock digger (vehicle 2) with driver 2.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
+      "timeout": 250,
+      "description": "Drain every queued dig_ramp_segment layer: the ramp is carved end to end and now connects the pocket.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0,
+          "builtRampCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "description": "Hire the driver for the debris hauler.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.truck level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.truck level:5"
+        }
+      ],
+      "description": "Licence the hauler driver.",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "description": "Hire the driver for the rock fragmenter.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 4
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.excavator level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.excavator level:5"
+        }
+      ],
+      "description": "Excavator licence for the fragmenter driver.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle buy rock_fragmenter",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "Buy the rock fragmenter.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 3 4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 3 4"
+        }
+      ],
+      "description": "Crew the fragmenter (vehicle 3) with driver 4.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "description": "Resume the game paused for the no-tick colour checks, so the final haul runs.",
+      "role": "setup"
+    },
+    {
+      "command": "tick 5",
+      "description": "#553: lets the rock_fragmenter's driver board and drive off toward its first boulder, clearing its spawn tile before the debris_hauler purchase below ever lands a vehicle there.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "Buy the debris hauler.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 4 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 4 3"
+        }
+      ],
+      "description": "Crew the debris hauler (vehicle 4) with driver 3.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "description": "With the ramp built and the haul crew in place, the debris is hauled with no further order -- the debris that sat in the pocket is reachable now (#1302). storedMassKg grows from 0. Once the haul crew exists and the ramp connects the pocket, no debris ghost is red any more (#1306: red -> blue as actors and the navmesh change).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedMassKg"
+        ],
+        "equals": {
+          "unreachableGhostCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "warehouse-hologram",
+      "yaw": 45,
+      "pitch": 30,
+      "target": [
+        2,
+        9
+      ],
+      "distance": 9
+    },
+    {
+      "name": "pocket-overview",
+      "yaw": 0,
+      "pitch": 60,
+      "target": [
+        22,
+        9
+      ],
+      "distance": 24
+    }
+  ]
+}

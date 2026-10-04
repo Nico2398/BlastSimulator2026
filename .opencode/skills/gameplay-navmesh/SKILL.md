@@ -96,15 +96,16 @@ Two `NavGrid` static queries, beyond `findPath`, for picking a destination that 
 - `findNearestTraversableCell(navGrid, x, z)` — nearest walkable/ramp/drill_hole cell to (x, z) by pure distance, searching outward in rings. Can land on a traversable pocket a blast crater walled off from the rest of the map with `void` on every side — distance-only, no connectivity check.
 - `findNearestReachableCell(navGrid, anchorX, anchorZ, targetX, targetZ)` — BFS flood fill (8-directional adjacency, no climb gate) from an `anchorX/anchorZ` known to sit in the map's main connected region (a world corner works), returning the cell nearest `targetX/targetZ` that is actually path-connected to it. Use this, not `findNearestTraversableCell`, wherever a mover must be guaranteed to path away from the point afterward — e.g. snapping a new hire's or purchased vehicle's spawn point off a blast-cleared void or isolated pocket.
 - `computeReachableSet(navGrid, anchorX, anchorZ)` / `computeClimbReachableSet(...)` — every cell connected to the anchor, without and with the per-step climb gate. The climb-aware one is the exact set a real `findPath` from that anchor can resolve against, which is what lets a caller screen candidate destinations without paying for a pathfind (`selectBestActionForEmployee`, ActionSelection.ts).
+- `computeClimbReachableSetFromSources(navGrid, sources, clearance)` — the climb-aware set flooded from several sources at once (#1306): reachable from any of them, one fill whatever the source count. Sources clamp into the grid; a stranded source reaches its own cell. `OrderReachability.ts` uses it so a ghost's colour costs one fill per actor key, not one per actor (`gameplay-employee-skills`).
 - `findNearestNavigableCell(navGrid, targetX, targetZ)` — nearest cell inside the grid's **largest climb-connected region**, with no anchor to assume. Spawn points are chosen before terrain exists (a staffed roster, a campaign level's literals), and with a climb limit in force a fixed coordinate can land on a one-cell island atop a peak. `regenerateGrid` snaps every employee and vehicle through this once the grid is built (`snapAgentsToNavigableGround`, GameState.ts); an agent already on the main ground is left untouched.
 
 ## Stranded Debris (#1302)
 
-Debris outside the ground-crew reachable set is a legitimate state, not a defect. Auto-generated
+Debris no actor able to haul it can reach (per-action actors, no depot anchor, #1306) is a legitimate state, not a defect. Auto-generated
 `haul_debris` / `fragment_debris` work there waits (blockedReason `debris_out_of_reach`) without
 counting as a failure or a blocked order, is shown as a single summary indication (neutral top-bar
 pip, no toast or log entry), and resumes on its own once connected. Player-ordered unreachable
-actions (survey, place_building, ...) still get `target_unreachable` and the per-order warning.
+actions (survey, place_building, ramp layers, ...) still get `target_unreachable` and the per-order warning. Every unreachable queued action, debris included, also draws a red ghost.
 
 ## Building Approach Cells
 

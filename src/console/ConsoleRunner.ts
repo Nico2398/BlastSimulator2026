@@ -57,8 +57,16 @@ export function parseCommand(input: string): ParsedCommand {
   return { command, args, namedArgs };
 }
 
+/** Options for ConsoleRunner (#1306). */
+interface ConsoleRunnerOptions {
+  /** Called after each command runs, with the raw input and its result. */
+  afterCommand?: (input: string, result: CommandResult) => void;
+}
+
 /** Registry of command handlers keyed by command name. */
 export class ConsoleRunner {
+  constructor(readonly options: ConsoleRunnerOptions = {}) {}
+
   private readonly handlers = new Map<string, CommandHandler>();
   private readonly descriptions = new Map<string, string>();
 
@@ -87,6 +95,12 @@ export class ConsoleRunner {
 
   /** Run a raw command string. Returns a CommandResult. */
   run(input: string): CommandResult {
+    const result = this.dispatch(input);
+    this.options.afterCommand?.(input, result);
+    return result;
+  }
+
+  private dispatch(input: string): CommandResult {
     const parsed = parseCommand(input);
 
     if (!parsed.command) {

@@ -414,6 +414,14 @@ export function calculateSalary(employee: Employee): number {
     employee.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
 }
 
+/** True when `requiredSkill` is null (no requirement) or the employee holds a qualification in it. */
+export function holdsRequiredSkill(
+  employee: Pick<Employee, 'qualifications'>,
+  requiredSkill: SkillCategory | null,
+): boolean {
+  return requiredSkill === null || employee.qualifications.some(q => q.category === requiredSkill);
+}
+
 /**
  * The living roster — every employee still `alive`. Shared filter for any
  * aggregate/threshold computed over the roster (headcount-style stats,

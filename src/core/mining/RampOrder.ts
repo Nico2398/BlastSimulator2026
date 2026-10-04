@@ -4,6 +4,7 @@
 
 import type { GameState, PlannedRamp, RampFootprint } from '../state/GameState.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
+import { refreshOrderReachability } from '../engine/OrderReachability.js';
 import { addExpense } from '../economy/Finance.js';
 import type { RampDef, RampSegmentDef } from './Ramp.js';
 
@@ -57,7 +58,7 @@ export function queueRampOrder(
         rampId, segmentIndex: segment.index, cells: segment.cells, region: segment.region, segmentCost,
       } satisfies RampSegmentActionPayload,
       targetEmployeeId: null,
-    }, { skipQualificationCheck: true });
+    }, { skipQualificationCheck: true, deferClassification: true });
 
     plannedRamp.segments.push({
       index: segment.index, actionId, cells: segment.cells, region: segment.region, done: false, carvedCount: 0,
@@ -65,5 +66,8 @@ export function queueRampOrder(
   }
 
   state.plannedRamps.push(plannedRamp);
+  // Layers were dispatched uncoloured: judge them once, as one ramp, now that it
+  // exists (#1306) — one classification pass instead of one per layer.
+  refreshOrderReachability(state);
   return rampId;
 }

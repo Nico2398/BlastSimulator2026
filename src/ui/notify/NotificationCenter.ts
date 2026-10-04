@@ -189,10 +189,20 @@ export class NotificationCenter {
     );
     const strandedCount = queuedBlocked.filter(a => a.blockedReason === 'debris_out_of_reach').length;
     const blockedActions = queuedBlocked.filter(a => a.blockedReason !== 'debris_out_of_reach');
+    // A ramp's layers are judged together (#1306), so one unreachable ramp
+    // would otherwise toast once per layer: warn once per ramp instead.
+    const siblingActionIds = new Map<number, readonly number[]>();
+    for (const ramp of state.plannedRamps) {
+      const ids = ramp.segments.map(s => s.actionId);
+      for (const id of ids) siblingActionIds.set(id, ids);
+    }
     for (const action of blockedActions) {
       const reason = action.blockedReason as BlockedOrderReason;
       if (this.warnedBlockedOrders.get(action.id) === reason) continue;
+      const alreadyWarnedForRamp = (siblingActionIds.get(action.id) ?? [])
+        .some(id => this.warnedBlockedOrders.get(id) === reason);
       this.warnedBlockedOrders.set(action.id, reason);
+      if (alreadyWarnedForRamp) continue;
       this.notify({
         severity: 'warn',
         icon: 'warn',

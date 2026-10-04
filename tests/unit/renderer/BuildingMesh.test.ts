@@ -4,7 +4,9 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Building } from '../../../src/core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
-import { BuildingMesh } from '../../../src/renderer/BuildingMesh.js';
+import { BuildingMesh, instantiateBuildingModel, BODY_TINT } from '../../../src/renderer/BuildingMesh.js';
+import { ModelLibrary } from '../../../src/renderer/models/ModelLibrary.js';
+import { buildingModelId } from '../../../src/renderer/models/ModelIds.js';
 import { BUILDING_RUIN_MODEL_ID } from '../../../src/renderer/models/ModelIds.js';
 import { loadedModelLibrary } from '../../helpers/models.js';
 
@@ -213,5 +215,51 @@ describe('BuildingMesh — model refresh (real assets)', () => {
     const pins = group.children.slice(1) as THREE.Mesh[];
     for (const pin of pins) expect(pin.position.y).toBeGreaterThan(inst.bounds.max.y);
     bm.dispose();
+  });
+});
+
+describe('instantiateBuildingModel (#1306)', () => {
+  it('returns the loaded model of the requested type and tier, not a stand-in', async () => {
+    const library = await loadedModelLibrary([buildingModelId('living_quarters', 2)]);
+    const instance = instantiateBuildingModel(library, 'living_quarters', 2);
+    expect(instance.isFallback).toBe(false);
+    expect(instance.root.name).toBe(buildingModelId('living_quarters', 2));
+    expect(instance.tints.has(BODY_TINT)).toBe(true);
+    instance.dispose();
+  });
+
+  it('falls back to a footprint-sized stand-in box when the model is not loaded', () => {
+    const instance = instantiateBuildingModel(new ModelLibrary(), 'management_office', 2);
+    expect(instance.isFallback).toBe(true);
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef('management_office', 2));
+    const size = instance.bounds.getSize(new THREE.Vector3());
+    expect(size.x).toBeCloseTo(sizeX);
+    expect(size.z).toBeCloseTo(sizeZ);
+    instance.dispose();
+  });
+
+  it('is the same instance a real building of that type and tier draws (BuildingMesh shares the path)', async () => {
+    const library = await loadedModelLibrary([buildingModelId('research_center', 1)]);
+    const bm = new BuildingMesh(new THREE.Scene(), library);
+    bm.addBuilding(makeBuilding(1, 'research_center'));
+    const viaMesh = bm.getInstance(1)!;
+    const direct = instantiateBuildingModel(library, 'research_center', 1);
+    expect(direct.root.name).toBe(viaMesh.root.name);
+    expect(direct.bounds.equals(viaMesh.bounds)).toBe(true);
+    direct.dispose();
+    bm.dispose();
+  });
+
+  it('every building type and tier instantiates without throwing', () => {
+    const library = new ModelLibrary();
+    const types: Building['type'][] = [
+      'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
+      'research_center', 'living_quarters', 'explosive_warehouse', 'freight_warehouse', 'vehicle_depot',
+    ];
+    for (const type of types) {
+      for (const tier of [1, 2, 3] as const) {
+        expect(() => instantiateBuildingModel(library, type, tier).dispose()).not.toThrow();
+      }
+    }
   });
 });
