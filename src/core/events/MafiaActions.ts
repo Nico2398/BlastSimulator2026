@@ -6,7 +6,13 @@ import type { Random } from '../math/Random.js';
 import type { CorruptionState } from '../economy/Corruption.js';
 import type { EmployeeState } from '../entities/Employee.js';
 import { killEmployee } from '../entities/Employee.js';
-import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../config/balance.js';
+import {
+  ACCIDENT_EXPOSURE,
+  ACCIDENT_FAILURE_EXPOSURE_EXTRA,
+  FRAMING_START_EXPOSURE,
+  FRAMING_DETECTED_EXPOSURE,
+  SMUGGLING_EXPOSURE_PER_TICK,
+} from '../config/balance.js';
 
 // ── Config ──
 
@@ -53,10 +59,6 @@ export interface MafiaActionResult {
   investigationTriggered: boolean;
 }
 
-/**
- * Arrange an "accident" for a troublesome employee.
- * Success: employee removed. Failure: investigation event.
- */
 /** Add exposure (capped at 1) and return the delta actually applied. */
 function applyExposure(mafia: MafiaState, nominal: number): number {
   const before = mafia.exposureRisk;
@@ -64,6 +66,10 @@ function applyExposure(mafia: MafiaState, nominal: number): number {
   return mafia.exposureRisk - before;
 }
 
+/**
+ * Arrange an "accident" for a troublesome employee.
+ * Success: employee removed. Failure: investigation event.
+ */
 export function arrangeAccident(
   mafia: MafiaState,
   employees: EmployeeState,
@@ -119,7 +125,7 @@ export function startFraming(
     readyTick: currentTick + FRAME_EVIDENCE_TICKS,
   });
 
-  const exposureIncrease = applyExposure(mafia, 0.05);
+  const exposureIncrease = applyExposure(mafia, FRAMING_START_EXPOSURE);
 
   return {
     success: true, cost: FRAME_COST, exposureIncrease,
@@ -159,7 +165,7 @@ export function completeFrame(
     };
   }
 
-  const exposureIncrease = applyExposure(mafia, 0.15);
+  const exposureIncrease = applyExposure(mafia, FRAMING_DETECTED_EXPOSURE);
   return {
     success: false, cost: 0, exposureIncrease,
     outcomeKey: 'mafia.frame_detected',
@@ -185,7 +191,7 @@ export function processSmuggling(
 ): { income: number; exposed: boolean } {
   if (!mafia.smugglingActive) return { income: 0, exposed: false };
 
-  mafia.exposureRisk = Math.min(1, mafia.exposureRisk + 0.02);
+  applyExposure(mafia, SMUGGLING_EXPOSURE_PER_TICK);
   const exposed = rng.chance(SMUGGLE_EXPOSURE_RISK * mafia.exposureRisk);
 
   return { income: mafia.smugglingIncome, exposed };

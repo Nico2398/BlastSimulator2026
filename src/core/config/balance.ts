@@ -120,6 +120,15 @@ export const ACCIDENT_EXPOSURE = 0.1;
 /** Extra exposure added on top of ACCIDENT_EXPOSURE when an arranged accident fails. */
 export const ACCIDENT_FAILURE_EXPOSURE_EXTRA = 0.1;
 
+/** Exposure added when a framing is started (evidence planted). */
+export const FRAMING_START_EXPOSURE = 0.05;
+
+/** Exposure added when a framing is detected on completion. */
+export const FRAMING_DETECTED_EXPOSURE = 0.15;
+
+/** Exposure added per tick while smuggling is active. */
+export const SMUGGLING_EXPOSURE_PER_TICK = 0.02;
+
 /** Ticks of worker morale crisis before revolt. */
 export const REVOLT_TICKS = 120;
 /** Ticks before revolt at which warning is shown. */
