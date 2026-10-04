@@ -225,7 +225,12 @@ worldMap.setOnBack(() => {
   worldMap.hide();
   mainMenu.show();
 });
-worldMap.setOnStartLevel((levelId) => {
+/** A live game: a state exists and its level has not ended. */
+const isLiveGame = (): boolean => !!ctx.state && !hasLevelEnded(ctx.state);
+mainMenu.setLiveGameProbe(isLiveGame);
+mainMenu.setOnResume(() => { mainMenu.hide(); uiManager.show(); });
+worldMap.setOnReturnToSite(() => { worldMap.hide(); uiManager.show(); });
+function startLevel(levelId: string): void {
   worldMap.hide();
   // `campaign start` builds its own CampaignState when none exists yet, so a
   // first-ever level entry needs no priming new_game (and no throwaway
@@ -235,6 +240,16 @@ worldMap.setOnStartLevel((levelId) => {
     // First-time players get tutorial guidance once their level is actually
     // loaded, not while still picking one from the world map.
     if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+  });
+}
+worldMap.setOnStartLevel((levelId) => {
+  if (!isLiveGame()) { startLevel(levelId); return; }
+  uiManager.showConfirm({
+    icon: 'blast',
+    title: t('ui.portfolio.restart_confirm_title'),
+    body: t('ui.portfolio.restart_confirm_body'),
+    confirmLabel: t('ui.portfolio.restart_confirm_button'),
+    onConfirm: () => startLevel(levelId),
   });
 });
 
@@ -987,7 +1002,9 @@ uiManager.setQuitHandler(() => {
 // folded in from two ad-hoc floating buttons that used to collide with the
 // paused/event chip (spec §5 defect).
 uiManager.setSiteMapHandler(() => {
-  worldMap.show(ctx.state?.campaign ?? null);
+  savesModal.hide();
+  uiManager.closeActivePanel();
+  worldMap.show(ctx.state?.campaign ?? null, { canReturnToSite: isLiveGame() });
 });
 uiManager.setOpenSavesHandler(() => savesModal.show());
 uiManager.setMapFocusHandler((x, z) => {
@@ -1021,13 +1038,16 @@ scenePicking.setSelectChangeHandler((entity) => {
   }
 });
 // Esc deselects before falling through to the panel/modal layers beneath it —
-// registered last among the shell's own layers so it's tried first (most
-// recently registered wins, per UIManager.registerEscLayer).
+// registered before the Site Map layer, which outranks it (most recently
+// registered wins, per UIManager.registerEscLayer).
 uiManager.registerEscLayer(() => {
   if (!scenePicking.selection) return false;
   scenePicking.clearSelection();
   return true;
 });
+// Esc on the Site Map returns to the live site (unless a confirm is up — that closes first).
+// Registered after the deselect layer so it is tried first (most recently registered wins).
+uiManager.registerEscLayer(() => !uiManager.confirmOpen && worldMap.requestReturnToSite());
 
 /** Report a failed console command from a selection-bar action as a toast; success is silent (the world visibly changing is the feedback). */
 function reportIfFailed(title: string, result: CommandResult): void {

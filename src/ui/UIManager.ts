@@ -7,7 +7,7 @@ import { registerIcons } from './icons.js';
 import { BlastWorkshop } from './panels/BlastWorkshop.js';
 import { PreflightModal } from './panels/PreflightModal.js';
 import { BlastReportModal } from './panels/BlastReportModal.js';
-import { ConfirmModal } from './panels/ConfirmModal.js';
+import { ConfirmModal, type ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { ContractsPanel } from './panels/ContractsPanel.js';
 import { FinancesPanel } from './panels/FinancesPanel.js';
 import { OperationsPanel } from './panels/OperationsPanel.js';
@@ -262,6 +262,9 @@ export class UIManager {
     this.onTogglePauseCb = cb;
   }
 
+  showConfirm(config: ConfirmModalConfig): void { this.confirmModal.show(config); }
+  get confirmOpen(): boolean { return this.confirmModal.visible; }
+
   /** Return-to-main-menu, requested from Settings' own confirm-gated button. */
   setQuitHandler(cb: () => void): void {
     this.settingsPanel.setReturnToMenuHandler(cb);
@@ -494,6 +497,9 @@ export class UIManager {
     this.showPanel('employees');
     this.crewPanel.expandEmployee(id);
   }
+
+  /** Close whichever panel is open (no-op when none). */
+  closeActivePanel(): void { this.hideAllPanels(); }
 
   togglePanel(name: PanelName): void {
     if (this.activePanel === name) {

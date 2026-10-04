@@ -20,6 +20,31 @@ const BIOME_STYLE: Record<string, { gradient: string; categoryKey: string }> = {
 };
 const DEFAULT_BIOME_STYLE = { gradient: 'linear-gradient(160deg,#5f6d7a,#2f3a45)', categoryKey: 'ui.portfolio.biome.mountain' };
 
+interface HeaderButtonSpec {
+  id: string;
+  labelKey: string;
+  color: string;
+  border: string;
+  weight: number;
+  display: 'flex' | 'none';
+  icon?: HTMLElement;
+}
+
+/** Outlined header button with a locale-bound label. */
+function makeHeaderButton(spec: HeaderButtonSpec, locale: LocaleTextRegistry): HTMLElement {
+  const label = el('span', {});
+  locale.bindText(label, spec.labelKey);
+  return el('button', {
+    attrs: {
+      id: spec.id,
+      style: `display:${spec.display};align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid ${spec.border};`
+        + `border-radius:5px;background:transparent;color:${spec.color};font:${spec.weight} 10px/1 var(--bsx-font-ui);`
+        + 'letter-spacing:.12em;cursor:pointer;pointer-events:all',
+    },
+    children: spec.icon ? [spec.icon, label] : [label],
+  });
+}
+
 export class WorldMap {
   private readonly overlay: HTMLElement;
   private readonly cardGrid: HTMLElement;
@@ -28,6 +53,9 @@ export class WorldMap {
 
   private onBack?: () => void;
   private onStartLevel?: (levelId: string) => void;
+  private onReturnToSite?: () => void;
+  private returnAllowed = false;
+  private readonly returnBtn: HTMLElement;
   private lastCampaign: CampaignState | null = null;
   private readonly locale = new LocaleTextRegistry();
 
@@ -41,19 +69,26 @@ export class WorldMap {
     // ── Header ──
     const header = el('div', { attrs: { style: 'display:flex;align-items:center;gap:16px;padding:22px 40px' } });
 
-    const backBtn = el('button', {
-      attrs: {
-        id: 'bs-world-map-back',
-        style: 'display:flex;align-items:center;gap:8px;height:34px;padding:0 13px;border:1px solid rgba(255,255,255,.12);'
-          + 'border-radius:5px;background:transparent;color:var(--bsx-text-secondary);font:600 10px/1 var(--bsx-font-ui);'
-          + 'letter-spacing:.12em;cursor:pointer;pointer-events:all',
-      },
-      children: [iconEl('chev', 12)],
-    });
-    const backLabel = el('span', {});
-    this.locale.bindText(backLabel, 'ui.portfolio.back');
-    backBtn.appendChild(backLabel);
+    const backBtn = makeHeaderButton({
+      id: 'bs-world-map-back',
+      labelKey: 'ui.portfolio.back',
+      color: 'var(--bsx-text-secondary)',
+      border: 'rgba(255,255,255,.12)',
+      weight: 600,
+      display: 'flex',
+      icon: iconEl('chev', 12),
+    }, this.locale);
     backBtn.addEventListener('click', () => this.onBack?.());
+
+    this.returnBtn = makeHeaderButton({
+      id: 'bs-world-map-back-to-site',
+      labelKey: 'ui.portfolio.back_to_site',
+      color: 'var(--bsx-amber)',
+      border: 'var(--bsx-amber)',
+      weight: 700,
+      display: 'none',
+    }, this.locale);
+    this.returnBtn.addEventListener('click', () => this.onReturnToSite?.());
 
     const titleBlock = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px' } });
     const titleEl = el('span', { attrs: { style: 'font:800 16px/1 var(--bsx-font-ui);letter-spacing:.16em;color:var(--bsx-text-primary)' } });
@@ -71,7 +106,7 @@ export class WorldMap {
     this.starProgressEl = el('span', { attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-amber)' } });
     progressBlock.append(progressLabel, progressTrack, this.starProgressEl);
 
-    header.append(backBtn, titleBlock, progressBlock);
+    header.append(backBtn, this.returnBtn, titleBlock, progressBlock);
 
     // ── Card grid ──
     this.cardGrid = el('div', { attrs: {
@@ -87,8 +122,20 @@ export class WorldMap {
   setOnBack(cb: () => void): void { this.onBack = cb; }
   setOnStartLevel(cb: (levelId: string) => void): void { this.onStartLevel = cb; }
 
-  show(campaign: CampaignState | null): void {
+  setOnReturnToSite(cb: () => void): void { this.onReturnToSite = cb; }
+  /** Whether the map offers a way back to the live site. */
+  get canReturnToSite(): boolean { return this.returnAllowed; }
+  /** Returns to the live site when offered; true when it did. */
+  requestReturnToSite(): boolean {
+    if (!this.visible || !this.returnAllowed) return false;
+    this.onReturnToSite?.();
+    return true;
+  }
+
+  show(campaign: CampaignState | null, opts?: { canReturnToSite?: boolean }): void {
     this.lastCampaign = campaign;
+    this.returnAllowed = opts?.canReturnToSite ?? false;
+    this.returnBtn.style.display = this.returnAllowed ? 'flex' : 'none';
     this.render(campaign);
     this.overlay.style.display = 'flex';
   }

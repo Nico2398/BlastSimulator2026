@@ -216,3 +216,97 @@ describe('WorldMap', () => {
     container.remove();
   });
 });
+
+describe('WorldMap — back to site (#1314)', () => {
+  afterEach(() => { setLocale('en'); });
+  const btnOf = (c: HTMLElement) => c.querySelector<HTMLButtonElement>('#bs-world-map-back-to-site');
+  const shown = (b: HTMLElement | null) => b !== null && b.style.display !== 'none';
+
+  it('show with canReturnToSite:true reveals the button and click fires onReturnToSite once', () => {
+    const { container, map } = mount();
+    const cb = vi.fn();
+    map.setOnReturnToSite(cb);
+    map.show(makeCampaign(), { canReturnToSite: true });
+    expect(shown(btnOf(container))).toBe(true);
+    expect(map.canReturnToSite).toBe(true);
+    btnOf(container)!.click();
+    expect(cb).toHaveBeenCalledTimes(1);
+    map.dispose();
+  });
+
+  it('show without opts or with canReturnToSite:false hides the button', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign());
+    expect(shown(btnOf(container))).toBe(false);
+    expect(map.canReturnToSite).toBe(false);
+    map.show(makeCampaign(), { canReturnToSite: false });
+    expect(shown(btnOf(container))).toBe(false);
+    map.dispose();
+  });
+
+  it('requestReturnToSite returns false without firing when not offered', () => {
+    const { map } = mount();
+    const cb = vi.fn();
+    map.setOnReturnToSite(cb);
+    map.show(makeCampaign());
+    expect(map.requestReturnToSite()).toBe(false);
+    expect(cb).not.toHaveBeenCalled();
+    map.dispose();
+  });
+
+  it('requestReturnToSite fires and returns true when offered', () => {
+    const { map } = mount();
+    const cb = vi.fn();
+    map.setOnReturnToSite(cb);
+    map.show(makeCampaign(), { canReturnToSite: true });
+    expect(map.requestReturnToSite()).toBe(true);
+    expect(cb).toHaveBeenCalledTimes(1);
+    map.dispose();
+  });
+
+  it('requestReturnToSite is false while hidden', () => {
+    const { map } = mount();
+    const cb = vi.fn();
+    map.setOnReturnToSite(cb);
+    map.show(makeCampaign(), { canReturnToSite: true });
+    map.hide();
+    expect(map.requestReturnToSite()).toBe(false);
+    expect(cb).not.toHaveBeenCalled();
+    map.dispose();
+  });
+
+  it('the offer does not leak across hide() then show() without opts', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign(), { canReturnToSite: true });
+    map.hide();
+    map.show(makeCampaign());
+    expect(shown(btnOf(container))).toBe(false);
+    expect(map.canReturnToSite).toBe(false);
+    map.dispose();
+  });
+
+  it('the MENU back button still fires onBack, not onReturnToSite', () => {
+    const { container, map } = mount();
+    const back = vi.fn();
+    const site = vi.fn();
+    map.setOnBack(back);
+    map.setOnReturnToSite(site);
+    map.show(makeCampaign(), { canReturnToSite: true });
+    container.querySelector<HTMLButtonElement>('#bs-world-map-back')!.click();
+    expect(back).toHaveBeenCalledOnce();
+    expect(site).not.toHaveBeenCalled();
+    map.dispose();
+  });
+
+  it('label is localized and follows setLocale + refreshLocale', () => {
+    const { container, map } = mount();
+    map.show(makeCampaign(), { canReturnToSite: true });
+    expect(btnOf(container)!.textContent).toContain(t('ui.portfolio.back_to_site'));
+    const en = t('ui.portfolio.back_to_site');
+    setLocale('fr');
+    map.refreshLocale();
+    expect(t('ui.portfolio.back_to_site')).not.toBe(en);
+    expect(btnOf(container)!.textContent).toContain(t('ui.portfolio.back_to_site'));
+    map.dispose();
+  });
+});

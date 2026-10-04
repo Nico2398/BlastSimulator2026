@@ -377,3 +377,56 @@ describe('MainMenu — language pill initial state (#492 section 2)', () => {
     menu.dispose();
   });
 });
+
+describe('MainMenu — RESUME live game (#1314)', () => {
+  let container: HTMLDivElement;
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+  afterEach(() => { container.remove(); setLocale('en'); });
+  const resumeBtn = () => container.querySelector<HTMLButtonElement>('#bs-menu-resume');
+  const shown = () => resumeBtn() !== null && resumeBtn()!.style.display !== 'none';
+
+  it('is hidden by default', () => {
+    const menu = new MainMenu(container);
+    menu.show();
+    expect(shown()).toBe(false);
+    menu.dispose();
+  });
+
+  it('is visible only when the probe reports a live game, re-evaluated on every show()', () => {
+    let live = false;
+    const menu = new MainMenu(container);
+    menu.setLiveGameProbe(() => live);
+    menu.show();
+    expect(shown()).toBe(false);
+    live = true;
+    menu.show();
+    expect(shown()).toBe(true);
+    live = false;
+    menu.show();
+    expect(shown()).toBe(false);
+    menu.dispose();
+  });
+
+  it('click fires onResume', () => {
+    const cb = vi.fn();
+    const menu = new MainMenu(container);
+    menu.setLiveGameProbe(() => true);
+    menu.setOnResume(cb);
+    menu.show();
+    resumeBtn()!.click();
+    expect(cb).toHaveBeenCalledOnce();
+    menu.dispose();
+  });
+
+  it('label uses menu.resume', () => {
+    const menu = new MainMenu(container);
+    menu.setLiveGameProbe(() => true);
+    menu.show();
+    expect(resumeBtn()!.textContent).toContain(t('menu.resume'));
+    expect(t('menu.resume')).not.toBe('menu.resume');
+    menu.dispose();
+  });
+});
