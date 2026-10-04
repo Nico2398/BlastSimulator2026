@@ -211,7 +211,9 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 800);
       expect(state.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
 
-      // From here on, a reason stamped on any action is a regression: the ramp connected the pocket for good.
+      // Classification runs at the start of each employee tick, so the stamps from before the final segment completed
+      // are refreshed one tick later. Let one pass run, then any stamp is a regression: the ramp connected the pocket for good.
+      tickUntilFresh(run, state, () => false, 1);
       let sawOutOfReach = false;
       let sawTargetUnreachable = false;
       tickUntilFresh(run, state, () => {
