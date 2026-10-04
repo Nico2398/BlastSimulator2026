@@ -1141,7 +1141,7 @@ savesModal.setOnLoad((state) => {
   const refusal = loadGridForState(ctx, state);
   if (refusal) {
     uiManager.notify({ severity: 'warn', title: t('ui.saves.title'), body: refusal });
-    return;
+    return null;
   }
   // Close any overlay whose visibility is a stale carry-over from the
   // previous session's ended state (e.g. BlastReportModal left open from an
@@ -1153,6 +1153,7 @@ savesModal.setOnLoad((state) => {
   // call, and `state` here is already known non-null.
   uiManager.closeStaleLevelOverlays(state);
   gameRenderer.syncFromContext(ctx);
+  return null;
 });
 
 // --- Keyboard Shortcuts ---

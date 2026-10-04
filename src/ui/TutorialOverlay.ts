@@ -286,6 +286,11 @@ export class TutorialOverlay {
     }
   }
 
+  /** Ends the tutorial like finish() but does not record bs_tutorial_done. */
+  abandon(): void {
+    // TODO: implement
+  }
+
   private finish(): void {
     this.stopGuide();
     this.clearAutoAdvance();
