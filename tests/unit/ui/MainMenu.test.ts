@@ -247,9 +247,9 @@ describe('MainMenu — CONTINUE live save summary (redesign P8)', () => {
     menu.show();              // list call #2 (fast)
     expect(resolvers).toHaveLength(2);
 
-    resolvers[1]([newer]);
+    resolvers[1]!([newer]);
     await new Promise(r => setTimeout(r, 0));
-    resolvers[0]([older]);
+    resolvers[0]!([older]);
     await new Promise(r => setTimeout(r, 0));
 
     expect(container.textContent).toContain('NEWER-SUMMARY');
