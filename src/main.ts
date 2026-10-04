@@ -1057,6 +1057,8 @@ uiManager.registerEscLayer(() => {
 // Esc on the Site Map returns to the live site (unless a confirm is up — that closes first).
 // Registered after the deselect layer so it is tried first (most recently registered wins).
 uiManager.registerEscLayer(() => !uiManager.confirmOpen && worldMap.requestReturnToSite());
+// Esc closes the Saves modal, outranking deselect/Site Map; a confirm or event modal on top keeps Esc.
+uiManager.registerEscLayer(() => !uiManager.confirmOpen && !uiManager.eventModalVisible && savesModal.handleEscape());
 
 /** Report a failed console command from a selection-bar action as a toast; success is silent (the world visibly changing is the feedback). */
 function reportIfFailed(title: string, result: CommandResult): void {

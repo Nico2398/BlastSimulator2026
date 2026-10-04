@@ -175,8 +175,9 @@ export class SavesModal {
 
   /** Esc handler: closes the modal when open. Returns true when it consumed the key. */
   handleEscape(): boolean {
-    // TODO: implement
-    return false;
+    if (!this.visible) return false;
+    this.hide();
+    return true;
   }
 
   /**
