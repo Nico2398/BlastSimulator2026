@@ -80,8 +80,7 @@
       "expect": {
         "changedBy": { "cash": 0 },
         "usable": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]",
-        "blocked": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"overwrite\"]",
-        "note": "slot 1 is empty again: SAVE HERE offered, OVERWRITE gone"
+        "note": "slot 1 is empty again: SAVE HERE offered in place of OVERWRITE"
       }
     }
   ],
