@@ -4,7 +4,10 @@
 // fills uncovered holes": a hole reads as wet exactly when it's currently
 // raining and has no tubing installed — stateless, recomputed on demand.
 
+import type { HoleCharge } from './ChargePlan.js';
 import type { GameState } from '../state/GameState.js';
+import { getExplosive } from '../world/ExplosiveCatalog.js';
+import { waterEffect } from './BlastCalc.js';
 import { isRaining, type WeatherState } from '../weather/WeatherCycle.js';
 
 /** IDs of drill holes currently full of water: raining, and no tubing installed. */
@@ -18,4 +21,23 @@ export function wetHoles(state: GameState, weather: WeatherState): string[] {
 /** Ids of wet holes as a set, for callers that test membership (previews, execution). */
 export function wetHoleIdsFor(state: GameState, weather: WeatherState): Set<string> {
   return new Set(wetHoles(state, weather));
+}
+
+/** Wet charged holes in a blast: `wet` = wet ids carrying a charge (sorted); `fizzled` = the subset whose explosive is water-sensitive. */
+export interface WetBlastHoles {
+  wet: string[];
+  fizzled: string[];
+}
+
+/** Split a blast's charges into wet holes and the ones whose water-sensitive explosive fizzles. Unknown explosive => not fizzled. */
+export function classifyWetChargedHoles(
+  charges: Readonly<Record<string, HoleCharge>>,
+  wetHoleIds: ReadonlySet<string>,
+): WetBlastHoles {
+  const wet = [...wetHoleIds].filter(id => charges[id] !== undefined).sort();
+  const fizzled = wet.filter(id => {
+    const explosive = getExplosive(charges[id]!.explosiveId);
+    return explosive !== undefined && waterEffect(true, explosive.waterSensitive, false) < 1;
+  });
+  return { wet, fizzled };
 }

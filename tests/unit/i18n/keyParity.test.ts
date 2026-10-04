@@ -414,7 +414,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1400: -3 keys (shell.selection.haul, shell.selection.unassign, shell.selection.no_haul_target), both locales.
     // #1346: +2 keys (mining.blast.cancelled_drill_orders, ui.blast_workshop.preflight.warn_undrilled), both locales: 3576.
     // #1337: +1 key (tutorial.stage.open_fire_tab), both locales: 3577.
-    expect(Object.keys(en).length).toBe(3577);
+    // #1348: +3 keys (ui.blast_workshop.report.wet_holes_fizzled, ui.blast_workshop.report.wet_holes_ok, mining.blast.wet_holes), both locales: 3580.
+    expect(Object.keys(en).length).toBe(3580);
   });
 });
 

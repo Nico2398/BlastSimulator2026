@@ -1,0 +1,221 @@
+{
+  "name": "blast-report-wet-holes",
+  "description": "Issue #1348: a rain blast firing untubed boomite charges shows the amber \"Wet holes: N (M fizzled)\" note card in the Blast Report modal.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 20,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:15,15",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(20,20) rectangle computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 5
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 20,
+          "z2": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 90",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 88).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 90"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        },
+        "note": "All 4 holes have landed -- none lost, none left ordered forever."
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
+    },
+    {
+      "command": "weather set heavy_rain",
+      "description": "Force rain right before firing (wetness is recomputed on demand: raining and no tubing). Bootstrap: weather has no UI control.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set heavy_rain"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "blast",
+      "timeout": 70,
+      "frames": 1,
+      "interval": 50,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1000
+        },
+        {
+          "type": "wait",
+          "durationMs": 2500
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1500
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      },
+      "description": "Fire; report modal opens with wet-hole note card (screenshot taken before closing). The 1500ms wait only lets the modal entrance animation finish; nothing queryable."
+    },
+    {
+      "command": "weather set sunny",
+      "description": "Restore clear weather. The batch runner shares one engine across scenarios and new_game does not reset the weather cycle in command mode, so a leftover heavy_rain would wet holes in every later scenario. Bootstrap: weather has no UI control.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "role": "bootstrap"
+    }
+  ]
+}
