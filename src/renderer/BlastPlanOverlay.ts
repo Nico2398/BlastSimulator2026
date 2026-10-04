@@ -150,6 +150,11 @@ export class BlastPlanOverlay {
     }
   }
 
+  /** Face delay labels toward the camera; no-op while hidden. */
+  update(_camera: THREE.Camera): void {
+    // TODO: implement
+  }
+
   hide(): void {
     this.group.visible = false;
     this.heatmapLayer.setVisible(false);
