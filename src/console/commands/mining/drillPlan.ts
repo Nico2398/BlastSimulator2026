@@ -12,6 +12,7 @@ import {
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
+import { clearTubing, removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -55,6 +56,7 @@ export function clearDrillPlan(ctx: MiningContext): number {
   cancelOutstandingDrillActions(state);
 
   state.drillHoles = [];
+  clearTubing(state.tubingState);
   state.chargesByHole = {};
   state.plannedChargesByHole = {};
   state.sequenceDelays = {};
@@ -182,6 +184,7 @@ export function drillPlanCommand(
     if (removeHole(state.drillHoles, holeId)) {
       cancelOutstandingChargeAction(state, holeId);
       clearHoleCharges(state, holeId);
+      removeHoleTubing(state.tubingState, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 
@@ -192,6 +195,7 @@ export function drillPlanCommand(
       cancelOutstandingChargeAction(state, holeId);
       state.plannedDrillHoles.splice(plannedIdx, 1);
       clearHoleCharges(state, holeId);
+      removeHoleTubing(state.tubingState, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 
