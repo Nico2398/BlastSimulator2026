@@ -15,6 +15,7 @@ import {
   runRepeatedInteraction,
   type ReportableStep,
 } from './shared/scenario-utils.js';
+import { createStepDeadline } from './shared/step-deadline.js';
 import { findWaitUntilAction } from './shared/command-runner.js';
 import {
   initBrowser,
@@ -106,7 +107,6 @@ export async function runScenarioInteraction(
       const paddedIdx = formatStepIndex(i);
       const cmdSlug = formatCommandSlug(step.command);
       console.log(`\n--- Step ${i}: ${step.command} ---`);
-      let timedOut = false;
       // Last "where this step stands" string reported by whichever action is
       // currently running — read by the timeout race below so a step that
       // times out on the outer deadline names what was actually in flight,
@@ -116,20 +116,15 @@ export async function runScenarioInteraction(
       // specific error; this covers the residual case where several actions'
       // combined time — none individually stalling — exceeds the outer budget.
       let lastProgress = 'no interaction action has started yet';
-      const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT, {
-        enabled: enableScreenshots,
-        shotsCount: shots.length,
-      });
-      const timeoutPromise = new Promise<void>((_, reject) =>
-        setTimeout(() => {
-          timedOut = true;
-          reject(new Error(`Step ${i} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`));
-        }, stepTimeout)
+      const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
+      const deadline = createStepDeadline(
+        stepTimeout,
+        () => `Step ${i} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`,
       );
       const stepScreenshotPaths: string[] = [];
 
       try {
-        await Promise.race([
+        const interactionResult = await Promise.race([
           (async () => {
             // Captured before the step's own actions run, so `expect.increased`
             // (below) measures this step's effect and not everything before it.
@@ -146,6 +141,8 @@ export async function runScenarioInteraction(
                 const r = await executeInteractionActions(
                   page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
                   (detail) => { lastProgress = detail; },
+                  undefined,
+                  deadline.excluding,
                 );
                 stepScreenshotPaths.push(...r.screenshotPaths);
                 return r;
@@ -179,6 +176,14 @@ export async function runScenarioInteraction(
               }
             }
 
+            return interactionResult;
+          })(),
+          deadline.expired,
+        ]);
+
+        // Capture runs after the race: its time never counts against the deadline,
+        // and a capture failure still fails the step.
+        {
             let screenshotPath = '';
             let sizeWarn: string | undefined;
             if (enableScreenshots) {
@@ -267,9 +272,7 @@ export async function runScenarioInteraction(
                 w.__skipBlastPlayback?.();
               });
             }
-          })(),
-          timeoutPromise,
-        ]);
+        }
       } catch (err: unknown) {
         const errorMsg = describeStepFailure(step, err);
         console.error(`  ERROR: ${errorMsg}`);
@@ -288,10 +291,12 @@ export async function runScenarioInteraction(
         // continuing past it, as this used to, produced cascading unrelated
         // failures and (scenario-test.ts always exiting 0 regardless) a run
         // that reported success no matter what this loop actually did.
-        console.error(timedOut
+        console.error(deadline.timedOut
           ? '  Step timed out. Stopping — a step must complete to prove anything.'
           : '  Step failed. Stopping — a step must complete to prove anything.');
         break;
+      } finally {
+        deadline.stop();
       }
     }
 

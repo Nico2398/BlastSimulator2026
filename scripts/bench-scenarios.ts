@@ -36,6 +36,7 @@ import {
   loadScenarioDef, scenarioFiles, formatStepIndex, formatCommandSlug, effectiveStepTimeoutMs, SCENARIO_DIR,
 } from './shared/scenario-utils.js';
 import type { ScenarioStepDef } from './shared/scenario-types.js';
+import { createStepDeadline } from './shared/step-deadline.js';
 
 const INTERACTION_SETTLE_MS = 300;
 const SETTLE_AFTER = new Set([
@@ -176,13 +177,14 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
 
       for (let s = 0; s < steps.length; s++) {
         const step = steps[s]!;
-        const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT, {
-          enabled: screenshots,
-          shotsCount: 0,
-        });
+        const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
         // See scenario-interaction-runner.ts's own copy of this comment
         // (PR #616 review round, item 5).
         let lastProgress = 'no interaction action has started yet';
+        const deadline = createStepDeadline(
+          stepTimeout,
+          () => `step ${s} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`,
+        );
         try {
           await Promise.race([
             (async () => {
@@ -194,25 +196,24 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
                 await timed(ops, 'expect.checkGoal', () =>
                   checkGoal(page, step.expect!, before, (lastState as Record<string, unknown> | null) ?? undefined));
               }
-              if (screenshots) {
-                await timed(ops, 'screenshot.capture', () => captureFrame(page,
-                  resolve(OUT_DIR, `${name}-${formatStepIndex(s)}-${formatCommandSlug(step.command)}.png`)));
-              }
-              timedSync('io.writeState', () => {
-                writeFileSync(resolve(OUT_DIR, `${name}-${formatStepIndex(s)}.json`),
-                  JSON.stringify({ step: s, command: step.command, gameState: lastState }, null, 2));
-              });
             })(),
-            new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error(`step ${s} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`)),
-                stepTimeout,
-              )),
+            deadline.expired,
           ]);
+          // Capture runs after the race: its time never counts against the deadline.
+          if (screenshots) {
+            await timed(ops, 'screenshot.capture', () => captureFrame(page,
+              resolve(OUT_DIR, `${name}-${formatStepIndex(s)}-${formatCommandSlug(step.command)}.png`)));
+          }
+          timedSync('io.writeState', () => {
+            writeFileSync(resolve(OUT_DIR, `${name}-${formatStepIndex(s)}.json`),
+              JSON.stringify({ step: s, command: step.command, gameState: lastState }, null, 2));
+          });
         } catch (err: unknown) {
           failedAt = s;
           error = err instanceof Error ? err.message.split('\n')[0] : String(err);
           break;
+        } finally {
+          deadline.stop();
         }
       }
 

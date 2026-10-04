@@ -108,6 +108,8 @@ npm run scenario -- --scenario blast-basic --mode interaction
 
 # With screenshots for visual inspection
 npm run scenario -- --scenario blast-basic --mode interaction --screenshots
+# Capture time is excluded from each step's deadline (scripts/shared/step-deadline.ts):
+# a step's `timeout` need not cover screenshot/shot/frame capture.
 
 # Inline commands
 npm run scenario -- --name blast-test \
