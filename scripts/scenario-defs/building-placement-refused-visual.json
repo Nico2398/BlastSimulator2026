@@ -80,8 +80,8 @@
       }
     },
     {
-      "command": "build management_office at:2,6",
-      "description": "Arm a second catalog building and pick the tile building A stands on. The ghost is refused before any Confirm click: Confirm is unreachable and the tool stays armed (strip still present). Screenshot shows the red ghost.",
+      "command": "build management_office at:4,6",
+      "description": "Arm a second catalog building and pick a tile beside building A (A's mesh would occlude its own tiles from a real click) whose footprint overlaps it. The ghost is refused before any Confirm click: Confirm is unreachable and the tool stays armed (strip still present). Screenshot shows the red ghost.",
       "timeout": 60,
       "interaction": [
         {
@@ -93,8 +93,15 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 4,
+          "z": 6,
+          "distance": 25,
+          "pitch": 88
+        },
+        {
           "type": "pickTile",
-          "x": 2,
+          "x": 4,
           "z": 6
         },
         {
@@ -112,7 +119,7 @@
       }
     },
     {
-      "command": "build management_office at:2,6",
+      "command": "build management_office at:4,6",
       "description": "Press Enter on the refused pick: nothing is ordered, cash is unchanged, and the tool is still open (Confirm still present, still blocked).",
       "timeout": 60,
       "interaction": [
