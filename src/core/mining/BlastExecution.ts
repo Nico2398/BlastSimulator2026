@@ -5,6 +5,7 @@
 import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
+import type { WetBlastHoles } from './WetHoles.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
 import type { BlastPlan } from './BlastPlan.js';
@@ -167,10 +168,14 @@ export interface BlastReport {
   accidents?: AccidentRecord[];
   /** Peak vibration at any village (#1343). Optional: omitted when no village was measured. */
   maxVibration?: number;
+  /** Ids of charged holes that were wet at firing. Optional: omitted by pre-existing fixtures. */
+  wetHoleIds?: string[];
+  /** Ids of wet holes whose water-sensitive explosive fizzled. Optional like `wetHoleIds`. */
+  fizzledHoleIds?: string[];
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = []): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], _wetHoles: WetBlastHoles = { wet: [], fizzled: [] }): BlastReport {
   return {
     tick,
     rating: result.rating,
