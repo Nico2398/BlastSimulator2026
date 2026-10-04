@@ -478,6 +478,10 @@ console.log = (...args: unknown[]) => {
 function onLevelStateReplaced(state: GameState): void {
   mainMenu.hide();
   uiManager.closeStaleLevelOverlays(state);
+  // Selection, armed placement and the ended-state screen belong to the old level (#1322).
+  scenePicking.clearSelection();
+  placementController.cancel();
+  levelEndScreen.reset();
   ctx.weatherCycle = createWeatherCycle(state.seed);
   ctx.rng = new Random(state.seed + 1000);
   // The tutorial's steps are tuned to its own map: a swap to any other level
@@ -1144,7 +1148,6 @@ savesModal.setOnLoad((state) => {
   // `ctx.state`: loadGridForState assigned it, but TS cannot see that.
   onLevelStateReplaced(state);
   if (tutorial.isActive) tutorial.abandon();
-  scenePicking.clearSelection();
   worldMap.hide();
   levelEndScreen.hide();
   uiManager.show();

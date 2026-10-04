@@ -182,7 +182,9 @@ export class LevelEndScreen {
 
   /** Hides the screen and clears the render cache so the next update() re-renders from scratch. */
   reset(): void {
-    // TODO: implement
+    this.hide();
+    this.rendered = false;
+    this.lastState = null;
   }
 
   update(state: GameState): void {
