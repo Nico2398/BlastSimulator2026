@@ -4,6 +4,7 @@
 // GameState is reset when starting a new level.
 
 import { getAllLevels, getLevel } from './Level.js';
+import type { LevelDef } from './Level.js';
 
 // ── Types ──
 
@@ -103,6 +104,24 @@ function _unlockNext(campaign: CampaignState, completedId: string): void {
 function _checkCampaignComplete(campaign: CampaignState): void {
   const all = getAllLevels();
   campaign.campaignComplete = all.every(l => campaign.levels[l.id]?.completed === true);
+}
+
+/** True when the level counts toward campaign completion (tier > 0; the tutorial does not). */
+export function isCampaignLevel(_level: Pick<LevelDef, 'difficultyTier'>): boolean {
+  // TODO: implement
+  return true;
+}
+
+/** True when levelId is the last campaign level (highest-ordered tier > 0 level). */
+export function isFinalCampaignLevel(_levelId: string): boolean {
+  // TODO: implement
+  return false;
+}
+
+/** True when every campaign level (tier > 0) is completed. */
+export function isCampaignComplete(_campaign: CampaignState): boolean {
+  // TODO: implement
+  return false;
 }
 
 /**
