@@ -2874,7 +2874,7 @@
   "ui.shady.smuggling_stop": "STOP SMUGGLING",
   "ui.shady.smuggling_note": "Off the books, on somebody else's ledger. Raises exposure a little every tick it runs.",
   "ui.shady.exposure_label": "EXPOSURE",
-  "ui.shady.exposure_note": "How much attention you have attracted. High exposure makes every arrangement more likely to go wrong.",
+  "ui.shady.exposure_note": "How much attention you have attracted. Shady deals raise your exposure, and failed accidents raise it even more. Too much exposure gets you arrested, which ends the game.",
   "ui.shady.accident_label": "ARRANGE AN ACCIDENT",
   "ui.shady.accident_note": "{rate}% chance the problem goes away permanently. Failure means an investigation.",
   "ui.shady.accident_button": "ARRANGE IT",

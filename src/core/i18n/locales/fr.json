@@ -2874,7 +2874,7 @@
   "ui.shady.smuggling_stop": "ARRÊTER LA CONTREBANDE",
   "ui.shady.smuggling_note": "Hors des livres, sur le registre de quelqu'un d'autre. Augmente légèrement l'exposition à chaque tick d'activité.",
   "ui.shady.exposure_label": "EXPOSITION",
-  "ui.shady.exposure_note": "L'attention que vous avez attirée. Une exposition élevée rend chaque arrangement plus susceptible de mal tourner.",
+  "ui.shady.exposure_note": "L'attention que vous avez attirée. Les affaires louches augmentent votre exposition, et les accidents ratés l'augmentent encore plus. Trop d'exposition et vous vous faites arrêter, ce qui met fin à la partie.",
   "ui.shady.accident_label": "PROVOQUER UN ACCIDENT",
   "ui.shady.accident_note": "{rate} % de chances que le problème disparaisse pour de bon. En cas d'échec, une enquête s'ouvre.",
   "ui.shady.accident_button": "L'ORGANISER",
