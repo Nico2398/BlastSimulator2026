@@ -808,3 +808,35 @@ describe('UIManager — setPlacementKit Esc-cascade layer', () => {
     expect(buildPanel.style.display).toBe('none');
   });
 });
+
+describe('UIManager — showConfirm / confirmOpen (#1314)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+  });
+  afterEach(() => {
+    uiManager.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('confirmOpen is false until showConfirm, then true with the supplied copy', () => {
+    expect(uiManager.confirmOpen).toBe(false);
+    uiManager.showConfirm({ icon: 'map', title: 'RESTART?', body: 'Body text', confirmLabel: 'GO', onConfirm: () => {} });
+    expect(uiManager.confirmOpen).toBe(true);
+    expect(container.textContent).toContain('RESTART?');
+    expect(container.textContent).toContain('GO');
+  });
+
+  it('confirming fires onConfirm and closes the modal', () => {
+    const onConfirm = vi.fn();
+    uiManager.showConfirm({ icon: 'map', title: 'T', body: 'B', confirmLabel: 'GO', onConfirm });
+    container.querySelector<HTMLButtonElement>('[data-action="confirm-yes"]')!.click();
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(uiManager.confirmOpen).toBe(false);
+  });
+});

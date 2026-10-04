@@ -26,6 +26,7 @@ const APP_VERSION = '0.1.0';
 export class MainMenu {
   private readonly overlay: HTMLElement;
   private readonly continueBtn: HTMLElement;
+  private readonly resumeBtn: HTMLElement;
   private readonly continueSummaryEl: HTMLElement;
   private readonly loadHintEl: HTMLElement;
   private readonly enPill: HTMLElement;
@@ -39,6 +40,8 @@ export class MainMenu {
   private onTutorial?: OnTutorial;
   private onSandbox?: OnSandbox;
   private onLanguageChange?: OnLanguageChange;
+  private onResume?: () => void;
+  private liveGameProbe?: () => boolean;
 
   private backend: SaveBackend | null = null;
   private mostRecentSave: SaveMeta | null = null;
@@ -78,20 +81,14 @@ export class MainMenu {
     // ── Buttons ──
     const buttonCol = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:7px;width:340px' } });
 
-    const continueLabel = el('span', { attrs: { style: 'font:800 13px/1 var(--bsx-font-ui);letter-spacing:.16em;text-transform:uppercase' } });
-    this.locale.bindText(continueLabel, 'menu.continue');
     this.continueSummaryEl = el('span', { attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);opacity:.72' } });
-    this.continueBtn = el('button', {
-      className: 'bsx-menu-btn-continue',
-      attrs: { style: 'display:none' },
-      children: [
-        iconEl('play', 18),
-        el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px' }, children: [continueLabel, this.continueSummaryEl] }),
-      ],
-    });
+    this.continueBtn = this.makeContinueStyleButton('menu.continue', undefined, this.continueSummaryEl);
     this.continueBtn.addEventListener('click', () => {
       if (this.mostRecentSave) this.onContinue?.(this.mostRecentSave.slotId);
     });
+
+    this.resumeBtn = this.makeContinueStyleButton('menu.resume', 'bs-menu-resume');
+    this.resumeBtn.addEventListener('click', () => this.onResume?.());
 
     const newCampaignBtn = this.makeMenuButton('blast', 'menu.new_campaign', () => this.onNewCampaign?.());
     // Stable id (same convention as bs-menu-sandbox below) — scenario defs
@@ -108,7 +105,7 @@ export class MainMenu {
     this.loadHintEl = loadBtn.hintEl;
     const settingsBtn = this.makeMenuButton('settings', 'menu.settings', () => this.onSettings?.());
 
-    buttonCol.append(this.continueBtn, newCampaignBtn.el, sandboxBtn.el, tutorialBtn.el, loadBtn.el, settingsBtn.el);
+    buttonCol.append(this.resumeBtn, this.continueBtn, newCampaignBtn.el, sandboxBtn.el, tutorialBtn.el, loadBtn.el, settingsBtn.el);
 
     // ── Locale/version row ──
     const localeRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:12px' } });
@@ -155,9 +152,12 @@ export class MainMenu {
   setOnTutorial(fn: OnTutorial): void { this.onTutorial = fn; }
   setOnSandbox(fn: OnSandbox): void { this.onSandbox = fn; }
   setOnLanguageChange(fn: OnLanguageChange): void { this.onLanguageChange = fn; }
+  setOnResume(fn: () => void): void { this.onResume = fn; }
+  setLiveGameProbe(fn: () => boolean): void { this.liveGameProbe = fn; }
 
   show(): void {
     this.overlay.style.display = 'flex';
+    this.updateResumeButton();
     this.startTicker();
   }
   hide(): void {
@@ -171,6 +171,7 @@ export class MainMenu {
     this.locale.refresh();
     this.updateLangPills();
     this.updateContinueButton();
+    this.updateResumeButton();
     this.updateLoadHint();
     this.updateTickerText();
   }
@@ -209,6 +210,24 @@ export class MainMenu {
     );
     this.updateContinueButton();
     this.updateLoadHint();
+  }
+
+  /** Hidden-by-default primary-action button; `summaryEl`, when given, sits under the label. */
+  private makeContinueStyleButton(labelKey: string, id?: string, summaryEl?: HTMLElement): HTMLElement {
+    const label = el('span', { attrs: { style: 'font:800 13px/1 var(--bsx-font-ui);letter-spacing:.16em;text-transform:uppercase' } });
+    this.locale.bindText(label, labelKey);
+    const text = summaryEl
+      ? el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px' }, children: [label, summaryEl] })
+      : label;
+    return el('button', {
+      className: 'bsx-menu-btn-continue',
+      attrs: id ? { id, style: 'display:none' } : { style: 'display:none' },
+      children: [iconEl('play', 18), text],
+    });
+  }
+
+  private updateResumeButton(): void {
+    this.resumeBtn.style.display = this.liveGameProbe?.() ? 'flex' : 'none';
   }
 
   private updateContinueButton(): void {
