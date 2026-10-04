@@ -252,7 +252,7 @@ export class SavesModal {
   private async saveToSlot(slotId: string): Promise<void> {
     if (!this.backend || !this.getState) return;
     const state = this.getState();
-    if (!state) { this.setStatus(t('saveload.no_game')); return; }
+    if (!state) { this.setStatus(t('saveload.no_game'), 'error'); return; }
     try {
       const data = serialize(state);
       const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;
@@ -262,7 +262,7 @@ export class SavesModal {
       await this.refreshSlotList();
       this.hide();
     } catch (e) {
-      this.setStatus(t('saveload.error', { msg: String(e) }));
+      this.setStatus(t('saveload.error', { msg: String(e) }), 'error');
     }
   }
 
@@ -283,7 +283,7 @@ export class SavesModal {
   }
 
   /** Shared by loadFromSlot and handleImport: hands state to onLoad; true when loaded, false when refused. */
-  protected applyLoaded(state: GameState, successKey: string): boolean {
+  private applyLoaded(state: GameState, successKey: string): boolean {
     const refusal = this.onLoad!(state);
     if (refusal !== null) {
       this.failLoad(t('saveload.load_refused', { reason: refusal }));
@@ -297,14 +297,7 @@ export class SavesModal {
   /** Shows the modal (it may be hidden, e.g. after Continue) with a persistent error. */
   private failLoad(msg: string): void {
     this.show();
-    this.setErrorStatus(msg);
-  }
-
-  /** Persistent, critical-colour status (does not auto-clear). */
-  protected setErrorStatus(msg: string): void {
-    this.statusEl.textContent = msg;
-    this.statusEl.style.color = 'var(--bsx-critical-text)';
-    this.errorShown = true;
+    this.setStatus(msg, 'error');
   }
 
   private async deleteSlot(slotId: string): Promise<void> {
@@ -316,7 +309,7 @@ export class SavesModal {
   private exportSave(): void {
     if (!this.getState) return;
     const state = this.getState();
-    if (!state) { this.setStatus(t('saveload.no_game')); return; }
+    if (!state) { this.setStatus(t('saveload.no_game'), 'error'); return; }
     const data = serialize(state);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -336,18 +329,19 @@ export class SavesModal {
       try {
         this.applyLoaded(deserialize(reader.result as string), 'saveload.imported');
       } catch (e) {
-        this.setErrorStatus(t('saveload.error', { msg: String(e) }));
+        this.failLoad(t('saveload.error', { msg: String(e) }));
       }
     };
     reader.readAsText(file);
     input.value = '';
   }
 
-  private setStatus(msg: string): void {
+  /** Success messages auto-clear after 4s; error messages are critical-coloured and persist until replaced or the modal hides. */
+  private setStatus(msg: string, kind: 'success' | 'error' = 'success'): void {
     this.statusEl.textContent = msg;
-    this.statusEl.style.color = 'var(--bsx-positive)';
-    this.errorShown = false;
-    if (!msg) return;
+    this.statusEl.style.color = kind === 'error' ? 'var(--bsx-critical-text)' : 'var(--bsx-positive)';
+    this.errorShown = kind === 'error';
+    if (!msg || kind === 'error') return;
     setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 4000);
   }
 }

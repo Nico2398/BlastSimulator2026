@@ -328,6 +328,9 @@ describe('SavesModal', () => {
     const statusOf = (modal: SavesModal): string =>
       (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent ?? '';
 
+    const colorOf = (modal: SavesModal): string =>
+      (modal as unknown as { statusEl: HTMLElement }).statusEl.style.color;
+
     afterEach(() => { vi.useRealTimers(); });
 
     it('success: onLoad called once, modal hides, status says loaded, returns true', async () => {
@@ -399,6 +402,8 @@ describe('SavesModal', () => {
       expect(calls).toHaveLength(0);
       expect(modal.visible).toBe(true);
       expect(statusOf(modal)).toContain(t('saveload.error', { msg: '' }).replace(/\s+$/, ''));
+      expect(statusOf(modal)).toContain('SyntaxError');
+      expect(colorOf(modal)).toBe('var(--bsx-critical-text)');
       modal.dispose();
     });
 
@@ -423,6 +428,68 @@ describe('SavesModal', () => {
     it('returns false without a backend or onLoad', async () => {
       const { modal } = mount();
       expect(await modal.loadFromSlot('slot_1')).toBe(false);
+      modal.dispose();
+    });
+
+    it('returns false when a backend is set but onLoad is missing', async () => {
+      const { modal } = mount();
+      modal.setBackend(makeBackend());
+      expect(await modal.loadFromSlot('slot_1')).toBe(false);
+      modal.dispose();
+    });
+
+    it('a second loadFromSlot while one is in flight returns false and does not call onLoad twice', async () => {
+      const { modal, calls } = await setup(() => null);
+      const first = modal.loadFromSlot('slot_1');
+      const second = await modal.loadFromSlot('slot_1');
+      expect(second).toBe(false);
+      expect(await first).toBe(true);
+      expect(calls).toHaveLength(1);
+      modal.dispose();
+    });
+
+    it('hide() clears a persistent error status', async () => {
+      const { modal } = await setup(() => 'level is locked');
+      await modal.loadFromSlot('slot_1');
+      expect(statusOf(modal)).toContain('level is locked');
+      modal.hide();
+      expect(statusOf(modal)).toBe('');
+      modal.dispose();
+    });
+
+    it('a success status is positive-coloured; a refusal is critical-coloured', async () => {
+      const ok = await setup(() => null);
+      await ok.modal.loadFromSlot('slot_1');
+      expect(colorOf(ok.modal)).toBe('var(--bsx-positive)');
+      ok.modal.dispose();
+      const bad = await setup(() => 'nope');
+      await bad.modal.loadFromSlot('slot_1');
+      expect(colorOf(bad.modal)).toBe('var(--bsx-critical-text)');
+      bad.modal.dispose();
+    });
+
+    it('a failing save reports saveload.error in the critical colour', async () => {
+      const { backend, modal } = await setup(() => null);
+      backend.save = async () => { throw new Error('disk full'); };
+      modal.setGetState(() => createGame({ seed: 1, mineType: 'desert' }));
+      modal.show();
+      await flush();
+      modal.root.querySelector<HTMLButtonElement>('[data-slot="slot_2"] [data-action="save-here"]')!.click();
+      await flush();
+      expect(statusOf(modal)).toContain('disk full');
+      expect(colorOf(modal)).toBe('var(--bsx-critical-text)');
+      modal.dispose();
+    });
+
+    it('save with no active game reports no_game in the critical colour', async () => {
+      const { modal } = await setup(() => null);
+      modal.setGetState(() => null);
+      modal.show();
+      await flush();
+      modal.root.querySelector<HTMLButtonElement>('[data-slot="slot_2"] [data-action="save-here"]')!.click();
+      await flush();
+      expect(statusOf(modal)).toBe(t('saveload.no_game'));
+      expect(colorOf(modal)).toBe('var(--bsx-critical-text)');
       modal.dispose();
     });
 
@@ -454,6 +521,16 @@ describe('SavesModal', () => {
         expect(modal.visible).toBe(true);
         expect(statusOf(modal)).toContain('level is locked');
         expect(statusOf(modal)).not.toBe(t('saveload.imported'));
+        modal.dispose();
+      });
+
+      it('corrupt file: shows the modal with a persistent critical saveload.error, onLoad never called', async () => {
+        const { modal, calls } = await setup(() => null);
+        await importFile(modal, 'not json {{{');
+        expect(calls).toHaveLength(0);
+        expect(modal.visible).toBe(true);
+        expect(statusOf(modal)).toContain('SyntaxError');
+        expect(colorOf(modal)).toBe('var(--bsx-critical-text)');
         modal.dispose();
       });
 
