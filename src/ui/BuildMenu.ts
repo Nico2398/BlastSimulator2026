@@ -56,6 +56,7 @@ import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js'
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, type RampWidth } from '../core/config/balance.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
+import { buildDemolishConfirm } from './demolishConfirm.js';
 
 export class BuildMenu extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -97,9 +98,9 @@ export class BuildMenu extends PanelBase {
 
   /** Routes the placed-row Demolish click to a confirm modal (#1399); unset means the click does nothing. */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
-    void cb;
-    // TODO: implement
+    this.onConfirmRequestCb = cb;
   }
+  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-build-panel'));
@@ -666,8 +667,10 @@ export class BuildMenu extends PanelBase {
     demolishBtn.title = `$${def.demolishCost}`;
     demolishBtn.disabled = this.lastCash < getDemolishCost(b);
     demolishBtn.addEventListener('click', () => {
-      const cmdResult = this.gameConsole?.(`build destroy ${b.id}`);
-      this.setStatus(cmdResult?.success ? t('ui.build.demolished') : (cmdResult?.output ?? ''));
+      this.onConfirmRequestCb?.(buildDemolishConfirm(b, () => {
+        const cmdResult = this.gameConsole?.(`build destroy ${b.id}`);
+        this.setStatus(cmdResult?.success ? t('ui.build.demolished') : (cmdResult?.output ?? ''));
+      }));
     });
 
     row.append(info, moveBtn, upgradeBtn, researchBtn, demolishBtn);
