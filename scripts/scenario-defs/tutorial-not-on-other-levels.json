@@ -1,0 +1,80 @@
+{
+  "name": "tutorial-not-on-other-levels",
+  "description": "Issue #1319: the guided tutorial only runs on tutorial_pit. A first-time player (fresh storage, bs_tutorial_done unset) clicks New Campaign and starts Dusty Hollow from the Portfolio. The loading screen clears, the HUD is usable and no tutorial card is on screen. Before the fix the tutorial auto-started on whichever level a first-timer entered first and covered the HUD on a map it was not written for. Command mode only proves the level loads; the card is a DOM claim checked in interaction mode.",
+  "steps": [
+    {
+      "command": "help",
+      "description": "Fresh page: the main menu is up, no loading overlay and no tutorial card.",
+      "interaction": [
+        { "type": "command", "command": "help" },
+        { "type": "waitForSelector", "selector": "#bs-main-menu" }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-new-campaign",
+        "blocked": "#bs-tutorial-overlay",
+        "note": "first-time player, nothing started yet"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Click New Campaign to reach the Portfolio. `state` is the inert paired command (no game exists yet in a fresh browser; a shared command-mode engine may carry one over, so either outcome is genuine, issue #585).",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-main-menu #bs-menu-new-campaign" },
+        { "type": "awaitUsable", "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]" }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]",
+        "note": "Dusty Hollow (tier 1) is unlocked on a fresh campaign and offers a Start button"
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "new_game seed:1138 size:24",
+      "description": "Command mode only: a base game must exist before a campaign level can start. In the browser the Portfolio Start button does this itself, so the interaction array only confirms the Portfolio is still showing.",
+      "interaction": [
+        { "type": "waitForSelector", "selector": "#bs-world-map" }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "cash": 50000 },
+        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]",
+        "note": "browser: the Portfolio is still up awaiting the player's Start click; command mode: base game exists"
+      }
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "description": "Click Start on the Dusty Hollow card. Wait for the loading overlay to clear and the HUD to become reachable. The tutorial card must stay hidden: it is a first-time-player aid for tutorial_pit only.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]" },
+        { "type": "waitForProperty", "selector": "#bs-loading-screen", "property": "visible", "expectedValue": false, "timeoutMs": 90000 },
+        { "type": "awaitUsable", "selector": "#bs-saveload-btn" }
+      ],
+      "role": "player",
+      "timeout": 120,
+      "expect": {
+        "equals": { "worldSizeX": 96, "worldSizeZ": 96 },
+        "usable": "#bs-saveload-btn",
+        "blocked": "#bs-tutorial-overlay",
+        "note": "Dusty Hollow's own 96x96 terrain is loaded, the HUD Saves button is reachable (nothing covers it) and the tutorial card is hidden"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Tutorial must be inactive on the live level, read from the game's own tutorial probe.",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "assert", "selector": "#bs-tutorial-overlay", "property": "visible", "expectedValue": false }
+      ],
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-tutorial-overlay",
+        "usable": "#bs-saveload-btn"
+      }
+    }
+  ],
+  "shots": [
+    { "name": "overview", "yaw": 0, "pitch": 45 }
+  ]
+}
