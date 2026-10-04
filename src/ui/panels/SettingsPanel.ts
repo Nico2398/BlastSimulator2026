@@ -110,8 +110,14 @@ export class SettingsPanel extends PanelBase {
     this.locale.bindText(frBtn, 'ui.settings.french');
     this.enLangPill = enBtn;
     this.frLangPill = frBtn;
-    enBtn.addEventListener('click', () => { setLocale('en'); saveLocale('en'); this.updateLangPills(); this.onLanguageChangeCb?.('en'); });
-    frBtn.addEventListener('click', () => { setLocale('fr'); saveLocale('fr'); this.updateLangPills(); this.onLanguageChangeCb?.('fr'); });
+    const switchTo = (lang: 'en' | 'fr'): void => {
+      setLocale(lang);
+      saveLocale(lang);
+      this.updateLangPills();
+      this.onLanguageChangeCb?.(lang);
+    };
+    enBtn.addEventListener('click', () => switchTo('en'));
+    frBtn.addEventListener('click', () => switchTo('fr'));
     this.updateLangPills();
     const langRow = el('div', {
       attrs: { style: 'display:flex;gap:3px;padding:3px;border-radius:5px;background:var(--bsx-well)' },

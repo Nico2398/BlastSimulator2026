@@ -74,7 +74,8 @@ const modelsReady = preloadModels(modelLibrary, fetchModelBytes, { yieldBetween:
 const gameRenderer = new GameRenderer(scene);
 
 // --- Stored player settings ---
-// Skipped in scenario mode so shared-browser scenario runs neither read nor leak settings.
+// Reads are skipped in scenario mode so a shared browser's leftover settings never reach a scenario run.
+// Writes still happen there but are never read back in scenario mode.
 const scenarioMode = new URLSearchParams(window.location.search).get('scenarioMode') === '1';
 const storedSettings = scenarioMode ? {} : loadSettings();
 if (storedSettings.locale) setLocale(storedSettings.locale);

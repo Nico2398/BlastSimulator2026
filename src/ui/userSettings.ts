@@ -2,6 +2,7 @@
 
 import type { Locale } from '../core/i18n/I18n.js';
 import type { VolumeChannel } from '../audio/AudioManager.js';
+import { AUDIO_DEFAULT_VOLUMES } from '../core/config/balance.js';
 
 export const SETTINGS_STORAGE_KEY = 'bs_settings_v1';
 
@@ -12,7 +13,11 @@ interface StoredSettings {
 
 export type SettingsStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
-const VOLUME_CHANNELS: readonly VolumeChannel[] = ['master', 'effects', 'ambient', 'ui'];
+const VOLUME_CHANNELS = Object.keys(AUDIO_DEFAULT_VOLUMES) as VolumeChannel[];
+
+function clampVolume(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
 
 function resolveStorage(storage?: SettingsStorage | null): SettingsStorage | null {
   if (storage !== undefined) return storage;
@@ -38,7 +43,7 @@ export function loadSettings(storage?: SettingsStorage | null): StoredSettings {
       const volumes: Partial<Record<VolumeChannel, number>> = {};
       for (const ch of VOLUME_CHANNELS) {
         const v = src[ch];
-        if (typeof v === 'number' && Number.isFinite(v)) volumes[ch] = Math.max(0, Math.min(1, v));
+        if (typeof v === 'number' && Number.isFinite(v)) volumes[ch] = clampVolume(v);
       }
       out.volumes = volumes;
     }
@@ -66,5 +71,5 @@ export function saveLocale(locale: Locale, storage?: SettingsStorage | null): vo
 
 export function saveVolume(channel: VolumeChannel, value: number, storage?: SettingsStorage | null): void {
   if (!Number.isFinite(value)) return;
-  writeSettings(s => { s.volumes = { ...s.volumes, [channel]: Math.max(0, Math.min(1, value)) }; }, storage);
+  writeSettings(s => { s.volumes = { ...s.volumes, [channel]: clampVolume(value) }; }, storage);
 }

@@ -489,14 +489,22 @@ describe('MainMenu — subtitle goes through i18n (issue #457)', () => {
   });
 
   it('subtitle switches to the French translation when locale is fr', () => {
+    setLocale('en');
+    const enMenu = new MainMenu(container);
+    enMenu.show();
+    const englishText = container.textContent ?? '';
+    const englishSubtitle = t('menu.subtitle');
+    enMenu.dispose();
+
     setLocale('fr');
     const menu = new MainMenu(container);
     menu.show();
     const text = container.textContent ?? '';
     expect(text).toContain(t('menu.subtitle'));
-    // The hardcoded English literal must not leak into the French render.
-    expect(text).not.toContain('dig');
-    expect(text).not.toContain('profit');
+    // The English subtitle must not leak into the French render.
+    expect(t('menu.subtitle')).not.toBe(englishSubtitle);
+    expect(text).not.toContain(englishSubtitle);
+    expect(englishText).toContain(englishSubtitle);
     menu.dispose();
     setLocale('en');
   });
