@@ -42,7 +42,7 @@ const CHARGE_COLORS: readonly number[] = [
 ];
 
 // Sequence label
-const LABEL_OFFSET = 2.5;     // Y above hole marker
+const LABEL_OFFSET = 0.5;     // Y above hole marker; close enough that a label reads as its hole's
 
 // Heatmap
 const HEATMAP_MAX_RADIUS = 8; // metres of energy influence

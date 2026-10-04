@@ -5,8 +5,8 @@ import * as THREE from 'three';
 import { t } from '../core/i18n/I18n.js';
 import { BLAST_DELAY_LABEL_COLOR_BUCKET_MS, BLAST_DELAY_LABEL_COLORS } from '../core/config/balance.js';
 
-const LABEL_WIDTH = 2.0;
-const LABEL_HEIGHT = 1.0;
+const LABEL_WIDTH = 1.0; // under the ~1-tile hole spacing so neighbours do not overlap
+const LABEL_HEIGHT = 0.5;
 const LABEL_RENDER_ORDER = 15;
 const CANVAS_WIDTH = 128;
 const CANVAS_HEIGHT = 64;
