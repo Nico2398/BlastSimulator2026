@@ -44,6 +44,8 @@ export class SavesModal {
   private backend: SaveBackend | null = null;
   private getState?: GetStateCallback;
   private onLoad?: OnLoadCallback;
+  private loading = false;
+  private errorShown = false;
   private lastAutoSaveTick = -AUTO_SAVE_INTERVAL_TICKS;
   private readonly locale = new LocaleTextRegistry();
 
@@ -115,7 +117,10 @@ export class SavesModal {
     this.overlay.style.display = '';
     void this.refreshSlotList();
   }
-  hide(): void { this.overlay.style.display = 'none'; }
+  hide(): void {
+    this.overlay.style.display = 'none';
+    if (this.errorShown) this.setStatus('');
+  }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
   /** Called each tick to trigger auto-save. `state` only times it — what gets saved comes from `getState`. */
@@ -261,32 +266,45 @@ export class SavesModal {
     }
   }
 
-  /** Public: also used by MainMenu's CONTINUE button to resume the most recent save directly. */
+  /** Public: also used by MainMenu's CONTINUE button. Resolves true only when the save was loaded. */
   async loadFromSlot(slotId: string): Promise<boolean> {
-    if (!this.backend || !this.onLoad) return false;
+    if (!this.backend || !this.onLoad || this.loading) return false;
+    this.loading = true;
     try {
       const slot = await this.backend.load(slotId);
-      if (!slot) { this.setStatus(t('saveload.not_found')); return false; }
-      const state = deserialize(slot.data);
-      this.onLoad(state);
-      this.setStatus(t('saveload.loaded'));
-      this.hide();
-      return false; // TODO: implement (return applyLoaded result)
+      if (!slot) { this.failLoad(t('saveload.not_found')); return false; }
+      return this.applyLoaded(deserialize(slot.data), 'saveload.loaded');
     } catch (e) {
-      this.setStatus(t('saveload.error', { msg: String(e) }));
+      this.failLoad(t('saveload.error', { msg: String(e) }));
       return false;
+    } finally {
+      this.loading = false;
     }
   }
 
   /** Shared by loadFromSlot and handleImport: hands state to onLoad; true when loaded, false when refused. */
-  protected applyLoaded(_state: GameState): boolean {
-    // TODO: implement
-    return false;
+  protected applyLoaded(state: GameState, successKey: string): boolean {
+    const refusal = this.onLoad!(state);
+    if (refusal !== null) {
+      this.failLoad(t('saveload.load_refused', { reason: refusal }));
+      return false;
+    }
+    this.setStatus(t(successKey));
+    this.hide();
+    return true;
+  }
+
+  /** Shows the modal (it may be hidden, e.g. after Continue) with a persistent error. */
+  private failLoad(msg: string): void {
+    this.show();
+    this.setErrorStatus(msg);
   }
 
   /** Persistent, critical-colour status (does not auto-clear). */
-  protected setErrorStatus(_msg: string): void {
-    // TODO: implement
+  protected setErrorStatus(msg: string): void {
+    this.statusEl.textContent = msg;
+    this.statusEl.style.color = 'var(--bsx-critical-text)';
+    this.errorShown = true;
   }
 
   private async deleteSlot(slotId: string): Promise<void> {
@@ -316,12 +334,9 @@ export class SavesModal {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const state = deserialize(reader.result as string);
-        this.onLoad!(state);
-        this.setStatus(t('saveload.imported'));
-        this.hide();
+        this.applyLoaded(deserialize(reader.result as string), 'saveload.imported');
       } catch (e) {
-        this.setStatus(t('saveload.error', { msg: String(e) }));
+        this.setErrorStatus(t('saveload.error', { msg: String(e) }));
       }
     };
     reader.readAsText(file);
@@ -330,6 +345,9 @@ export class SavesModal {
 
   private setStatus(msg: string): void {
     this.statusEl.textContent = msg;
+    this.statusEl.style.color = 'var(--bsx-positive)';
+    this.errorShown = false;
+    if (!msg) return;
     setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 4000);
   }
 }
