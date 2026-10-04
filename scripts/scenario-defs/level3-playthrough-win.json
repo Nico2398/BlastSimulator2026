@@ -515,6 +515,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 25,
+          "z": 25,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
           "type": "pickTile",
           "x": 25,
           "z": 25
@@ -557,6 +565,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 25,
+          "z": 25,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
           "type": "pickTile",
           "x": 25,
           "z": 25
@@ -597,6 +613,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 25,
+          "z": 25,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "pickTile",
@@ -1185,6 +1209,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 48,
+          "z": 48,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
           "type": "pickTile",
           "x": 48,
           "z": 48
@@ -1216,6 +1248,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 44,
+          "z": 48,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "pickTile",
@@ -1251,6 +1291,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 48,
+          "z": 52,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
           "type": "pickTile",
           "x": 48,
           "z": 52
@@ -1282,6 +1330,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 44,
+          "z": 52,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "pickTile",
@@ -1338,6 +1394,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 33,
+          "z": 30,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "dragTiles",
