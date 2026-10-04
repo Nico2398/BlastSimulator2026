@@ -568,4 +568,50 @@ describe('LevelEndScreen', () => {
       screen.dispose();
     });
   });
+
+  describe('reset (#1322)', () => {
+    // A failing assertion skips screen.dispose(); clear leaked roots so one failure cannot cascade.
+    afterEach(() => { document.body.innerHTML = ''; });
+
+    it('hides a visible screen', () => {
+      const { screen } = mount();
+      screen.update(stateAtLevelEnd(THREE_STAR));
+      expect(screen.visible).toBe(true);
+      screen.reset();
+      expect(screen.visible).toBe(false);
+      screen.dispose();
+    });
+
+    it('does not throw and stays hidden on a never-shown screen', () => {
+      const { screen } = mount();
+      expect(() => screen.reset()).not.toThrow();
+      expect(screen.visible).toBe(false);
+      screen.dispose();
+    });
+
+    it('re-renders and shows again for the same ended state after reset', () => {
+      const { container, screen } = mount();
+      const ended = stateAtLevelEnd(THREE_STAR);
+      screen.update(ended);
+      screen.reset();
+      expect(screen.visible).toBe(false);
+      screen.update(ended);
+      expect(screen.visible).toBe(true);
+      expect(container.querySelector('#bs-level-end-screen')!.textContent).toContain('TARGET REACHED');
+      screen.dispose();
+    });
+
+    it('shows victory content, not stale defeat text, when a victory follows a reset defeat', () => {
+      const { container, screen } = mount();
+      screen.update(stateAtDefeat('bankruptcy'));
+      expect(container.querySelector('#bs-level-end-screen')!.textContent).not.toContain('TARGET REACHED');
+      screen.reset();
+      screen.update(stateAtLevelEnd(THREE_STAR));
+      expect(screen.visible).toBe(true);
+      const text = container.querySelector('#bs-level-end-screen')!.textContent!;
+      expect(text).toContain('TARGET REACHED');
+      expect(text).toContain('100,000');
+      screen.dispose();
+    });
+  });
 });
