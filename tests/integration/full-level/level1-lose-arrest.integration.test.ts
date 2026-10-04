@@ -63,8 +63,9 @@ describe('Level 1 — Lose — Criminal Arrest', () => {
 
     // Smuggling income would clear the profit target in ~13 ticks and freeze
     // the mine as 'completed' (#1313) long before exposure reaches the arrest
-    // threshold. Mark the level already completed so the arrest can race alone.
-    ctx.state!.campaign.levels['dusty_hollow']!.completed = true;
+    // threshold. Replaying a completed level still ends in victory (#1310), so
+    // detach the active level instead: no profit target, arrest races alone.
+    ctx.state!.campaign.activeLevelId = null;
 
     // Tick 60 times (need ~45 ticks at +0.02/tick to reach 0.9)
     tickWithEvents(ctx, 60);

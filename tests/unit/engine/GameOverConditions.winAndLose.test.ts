@@ -5,8 +5,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
+// Like the real one, a trigger sets levelEnded (single writer, #1310).
 vi.mock('../../../src/core/campaign/LevelTransition.js', () => ({
-  checkLevelComplete: () => ({ triggered: true }),
+  checkLevelComplete: (state: { levelEnded: boolean }) => {
+    state.levelEnded = true;
+    return { triggered: true };
+  },
 }));
 
 import { checkGameOverConditions } from '../../../src/core/engine/GameOverConditions.js';
