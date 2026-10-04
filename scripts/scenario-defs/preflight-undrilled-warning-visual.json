@@ -1,0 +1,237 @@
+{
+  "name": "preflight-undrilled-warning-visual",
+  "description": "#1346: FIRE with holes ordered but not drilled shows the non-blocking undrilled warning in PreflightModal; DETONATE cancels the leftover drill orders.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        10,
+        10
+      ],
+      "distance": 15
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 staffed:true",
+      "timeout": 30,
+      "description": "Setup: a fresh site. Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
+      "timeout": 30,
+      "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) — giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran. No dragTiles-based grid-tool conversion was attempted here for that reason, not because one doesn't exist for a 1x1 grid. #553: confirming the grid queues 1 drill_hole PendingAction and pushes 1 PlannedHole into plannedDrillHoles — not drilled yet, so holeCount stays 0 right after confirm.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1,
+          "holeCount": 0
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 30",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands the single hole well inside this pad (sandbox-measured landing at tick 20).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
+      "timeout": 30,
+      "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here rather than three steps later; autoAdvance is untouched (no tab is clicked anywhere in this file), so the panel still walks itself Drill -> Charge -> Sequence -> Fire as the plan completes, which is what the Fire step below checks.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "5 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence set hole:H1 delay:0ms",
+      "timeout": 30,
+      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. H1 has no delay at all at this point (Auto Sequence never ran in this file), and adjustHoleDelay reads an absent delay as 0 and floors the result at 0 — so one decrement dispatches exactly the declared `sequence set hole:H1 delay:0ms`. Charging the only hole moved the panel to Sequence by itself, so no tab click is needed.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"delay-dec\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"delay-dec\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "sequencedCount": 1
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "drill_plan add x:34 z:10 depth:6",
+      "timeout": 30,
+      "description": "role: bootstrap (same reason as the first drill_plan): order 1 more hole that stays undrilled (no tick follows), so plannedDrillHoles stays > 0 when FIRE is clicked (#1346).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan add x:34 z:10 depth:6"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "FIRE with undrilled holes opens PreflightModal showing the non-blocking warning row about undrilled holes (#1346); DETONATE stays usable.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 5
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "[data-action=\"preflight-detonate\"]",
+        "equals": {
+          "orderedHoleCount": 1
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "description": "DETONATE fires and cancels the leftover drill orders (#1346): orderedHoleCount back to 0.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 0
+        }
+      }
+    }
+  ]
+}

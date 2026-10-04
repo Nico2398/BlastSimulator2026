@@ -124,8 +124,11 @@ export class PreflightModal {
     const validationErrors = validateBlastPlan(plan, loadingHoleIds);
     const loadingCount = state.drillHoles.filter(h => loadingHoleIds.has(h.id) && !state.chargesByHole[h.id]).length;
 
+    // Warning only, never a detonate gate: firing cancels these drill orders (#1346).
+    const undrilledCount = state.plannedDrillHoles.length;
+
     const signature = JSON.stringify({
-      holes: state.drillHoles.length, chargeKg, planCost, estValue,
+      undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
       protectedCount: protectedHoles.length, loadingCount, errorCount: validationErrors.length,
     });
@@ -150,6 +153,9 @@ export class PreflightModal {
         : []),
       ...(loadingCount > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_charge_loading', { count: loadingCount }) }]
+        : []),
+      ...(undrilledCount > 0
+        ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_undrilled', { count: undrilledCount }) }]
         : []),
       wet.length > 0
         ? { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: wet.length }) }

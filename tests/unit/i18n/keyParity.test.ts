@@ -412,7 +412,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1343: +1 key (village vibration), both locales.
     // #1329: +1 key (tutorial.stage.earn_profit), both locales.
     // #1400: -3 keys (shell.selection.haul, shell.selection.unassign, shell.selection.no_haul_target), both locales.
-    expect(Object.keys(en).length).toBe(3574);
+    // #1346: +2 keys (mining.blast.cancelled_drill_orders, ui.blast_workshop.preflight.warn_undrilled), both locales: 3576.
+    expect(Object.keys(en).length).toBe(3576);
   });
 });
 

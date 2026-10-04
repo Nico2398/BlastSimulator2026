@@ -1535,7 +1535,7 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Finding #62 (this pass): ordering a plan is free and unrestricted -- drill_plan itself never checks cash or crew, so this still succeeds and queues 20 ghost holes exactly as declared. What changes is everything downstream: there is no licensed, equipped driller left -- the only driving.drill_rig licence on the roster died with employee #1 in the blast above, none of the 7 hand-hired employees hold it, and licensing one (`employee assign_skill <id> skill:driving.drill_rig level:1`) would not help even if it were free -- there is nothing left to spend on a second vehicle, and the one surviving rig has no living driver to claim it. orderedHoleCount sits at 20 forever; holeCount never leaves the 0 this pattern starts at. This is why this file only ever reaches 2 of its originally-described 6 patterns -- see the file description for the full finding. #586-followup: `levelEnded`/`levelEndReason` corrected to false/null -- the mine is no longer bankrupt (this session's padding fix, see the wait_until step's own note above), it simply has no driller left to work this second pattern.",
+      "description": "Finding #62 (this pass): ordering a plan is free and unrestricted -- drill_plan itself never checks cash or crew, so this still succeeds and queues 20 ghost holes exactly as declared. What changes is everything downstream: there is no licensed, equipped driller left -- the only driving.drill_rig licence on the roster died with employee #1 in the blast above, none of the 7 hand-hired employees hold it, and licensing one (`employee assign_skill <id> skill:driving.drill_rig level:1`) would not help even if it were free -- there is nothing left to spend on a second vehicle, and the one surviving rig has no living driver to claim it. orderedHoleCount stays at 20 until the hollow blast step below, which cancels the undrilled orders (#1346: a successful blast cancels outstanding drill orders) and leaves it at 0; holeCount never leaves the 0 this pattern starts at. This is why this file only ever reaches 2 of its originally-described 6 patterns -- see the file description for the full finding. #586-followup: `levelEnded`/`levelEndReason` corrected to false/null -- the mine is no longer bankrupt (this session's padding fix, see the wait_until step's own note above), it simply has no driller left to work this second pattern.",
       "role": "player",
       "expect": {
         "equals": {
@@ -1618,12 +1618,12 @@
           "command": "blast"
         }
       ],
-      "description": "Left as a command: with nothing drilled, charged or sequenced there is no Fire step to reach, let alone execute. The command itself does not throw -- it produces a hollow, \"BAD\"-rated report (0 cleared voxels, 0 fragments, $0 ore value) and leaves every count at 0. No employee is anywhere near a blast that never really happens: deathCount and ecology are unchanged from the real blast above.",
+      "description": "Left as a command: #1346 -- the hollow blast also cancels the 20 undrilled drill orders (orderedHoleCount 20 -> 0). With nothing drilled, charged or sequenced there is no Fire step to reach, let alone execute. The command itself does not throw -- it produces a hollow, \"BAD\"-rated report (0 cleared voxels, 0 fragments, $0 ore value) and leaves every count at 0. No employee is anywhere near a blast that never really happens: deathCount and ecology are unchanged from the real blast above.",
       "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "orderedHoleCount": 20,
+          "orderedHoleCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
           "deathCount": 11,
@@ -1701,7 +1701,7 @@
         "equals": {
           "tickCount": 334,
           "holeCount": 0,
-          "orderedHoleCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1722,7 +1722,7 @@
         "equals": {
           "tickCount": 334,
           "holeCount": 0,
-          "orderedHoleCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 11,
           "employeeCount": 12,
           "wellBeing": 0,
