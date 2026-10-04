@@ -233,9 +233,9 @@ function startLevel(levelId: string): void {
   // terrain generation for a sandbox world this never shows).
   const level = getLevel(levelId);
   void enterLevel([`campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined).then(() => {
-    // First-time players get tutorial guidance once their level is actually
-    // loaded, not while still picking one from the world map.
-    if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
+    // First-time players get tutorial guidance only on the level it is built
+    // for (tutorial_pit), never on a campaign level picked from the Portfolio.
+    if (TutorialOverlay.shouldAutoStart(levelId)) tutorial.start(ctx.state ?? undefined);
   });
 }
 worldMap.setOnStartLevel((levelId) => {
