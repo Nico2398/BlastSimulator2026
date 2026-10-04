@@ -2105,20 +2105,11 @@
       "command": "contract deliver type:ore_sale amount:160",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-amount"
-        },
-        {
-          "type": "set",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-amount",
-          "value": "160"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "type": "command",
+          "command": "contract deliver type:ore_sale amount:160"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "changedBy": {
           "cash": 0,
@@ -2129,9 +2120,12 @@
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
-        }
+        },
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
-      "commandOutcome": "refused"
+      "commandOutcome": "refused",
+      "description": "BLOCKED, deliberately not a click: this blast breaks rock but nothing has been hauled into storage yet, so ContractsPanel disables the amount box, Max and Deliver together (maxDeliverable = min(remaining, stored) is 0). Command mode agrees: the console refuses the delivery (commandOutcome refused). The old player step awaited a usable amount box and failed in interaction mode (CI shard 7/10) because no ore exists to deliver. The win itself comes from the closing `campaign complete` step, not from delivery."
     },
     {
       "command": "finances",
