@@ -210,7 +210,7 @@ describe('PreflightModal — undrilled-holes warning (#1346)', () => {
     modal.update(chargedPlan(), 'sunny');
     expect(modal.root.textContent).not.toContain(warnText(0));
     expect(modal.root.textContent).not.toContain(KEY);
-    const tpl = readLocale('en')[KEY]!.split('{count}')[0]!;
+    const tpl = readLocale('en')[KEY]!.split('{count}')[1]!;
     expect(tpl.length).toBeGreaterThan(0);
     expect(modal.root.textContent).not.toContain(tpl);
   });
@@ -238,7 +238,7 @@ describe('PreflightModal — undrilled-holes warning (#1346)', () => {
 
     state.plannedDrillHoles = [];
     modal.update(state, 'sunny');
-    const tpl = readLocale('en')[KEY]!.split('{count}')[0]!;
+    const tpl = readLocale('en')[KEY]!.split('{count}')[1]!;
     expect(modal.root.textContent).not.toContain(tpl);
   });
 });
