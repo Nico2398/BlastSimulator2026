@@ -114,6 +114,12 @@ export const ECOLOGICAL_WARNING_TICKS = 50;
 /** Corruption exposure threshold (0–1) for criminal arrest. */
 export const ARREST_EXPOSURE_THRESHOLD = 0.9;
 
+/** Exposure added by arranging an accident (applies on success and failure). */
+export const ACCIDENT_EXPOSURE = 0.1;
+
+/** Extra exposure added on top of ACCIDENT_EXPOSURE when an arranged accident fails. */
+export const ACCIDENT_FAILURE_EXPOSURE_EXTRA = 0.1;
+
 /** Ticks of worker morale crisis before revolt. */
 export const REVOLT_TICKS = 120;
 /** Ticks before revolt at which warning is shown. */
