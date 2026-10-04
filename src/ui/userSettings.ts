@@ -5,7 +5,7 @@ import type { VolumeChannel } from '../audio/AudioManager.js';
 
 export const SETTINGS_STORAGE_KEY = 'bs_settings_v1';
 
-export interface StoredSettings {
+interface StoredSettings {
   locale?: Locale;
   volumes?: Partial<Record<VolumeChannel, number>>;
 }
