@@ -1,0 +1,52 @@
+{
+  "name": "site-map-return",
+  "description": "Leaving a live site through the TopBar map button and coming back via the world map's back-to-site button resumes the same game: tick and cash are untouched and the world map closes (#1314).",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 40,
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 staffed:true" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        { "type": "command", "command": "tick 5" }
+      ],
+      "role": "setup",
+      "expect": { "increased": ["tickCount"] }
+    },
+    {
+      "command": "state",
+      "description": "Player opens the site map from the TopBar; the world map must offer a way back to the live site. 'state' is the paired command for this UI-only step.",
+      "interaction": [
+        { "type": "clickSelector", "selector": ".bs-return-map" },
+        { "type": "awaitUsable", "selector": "#bs-world-map-back-to-site" }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map-back-to-site",
+        "changedBy": { "tickCount": 0, "cash": 0 },
+        "note": "opening the map from a live site must not touch the simulation"
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "description": "Player clicks back-to-site; the world map closes and the same game continues untouched.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-world-map-back-to-site" },
+        { "type": "waitForProperty", "selector": "#bs-world-map", "property": "style.display", "expectedValue": "none" }
+      ],
+      "role": "player",
+      "expect": {
+        "blocked": "#bs-world-map-back-to-site",
+        "changedBy": { "tickCount": 0, "cash": 0 },
+        "note": "no restart: tick and cash unchanged, map hidden"
+      },
+      "commandOutcome": "either"
+    }
+  ]
+}
