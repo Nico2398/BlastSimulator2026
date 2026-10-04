@@ -8,6 +8,8 @@ import type { HoleCharge } from '../core/mining/ChargePlan.js';
 import { tagPickable } from './Pickable.js';
 import { disposeGroup } from './MeshUtils.js';
 import { GroundTintLayer, FallbackSurfaceSampler, type GroundTintPatch, type SurfaceHeightSampler } from './GroundTint.js';
+import { createHoleDelayLabel, holeDelayLabelSpec } from './HoleDelayLabel.js';
+import { faceCamera } from './Billboard.js';
 import { confidenceToColor } from './SurveyConfidenceOverlay.js';
 
 // ---------- Config ----------
@@ -86,6 +88,7 @@ export class BlastPlanOverlay {
   private readonly scene: THREE.Scene;
   private readonly group = new THREE.Group();
   /** Surface-anchor position per hole (numeric id, see holeNumericId), for scene-picking's entityWorldPosition. */
+  private readonly delayLabels: THREE.Mesh[] = [];
   private readonly holePositions = new Map<number, THREE.Vector3>();
 
   /**
@@ -151,8 +154,9 @@ export class BlastPlanOverlay {
   }
 
   /** Face delay labels toward the camera; no-op while hidden. */
-  update(_camera: THREE.Camera): void {
-    // TODO: implement
+  update(camera: THREE.Camera): void {
+    if (!this.group.visible) return;
+    for (const label of this.delayLabels) faceCamera(label, camera);
   }
 
   hide(): void {
@@ -167,12 +171,15 @@ export class BlastPlanOverlay {
       this.group.remove(child);
       if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
         child.geometry.dispose();
-        (child.material as THREE.Material).dispose();
+        const material = child.material as THREE.Material & { map?: THREE.Texture | null };
+        material.map?.dispose();
+        material.dispose();
       } else if (child instanceof THREE.Group) {
         disposeGroup(child);
       }
     }
     this.holePositions.clear();
+    this.delayLabels.length = 0;
   }
 
   dispose(): void {
@@ -245,9 +252,10 @@ export class BlastPlanOverlay {
     }
 
     // Delay label above hole
-    if (delayMs >= 0) {
-      const label = this.makeDelayLabel(delayMs);
-      label.renderOrder = 15;
+    const spec = holeDelayLabelSpec(delayMs);
+    if (spec) {
+      const label = createHoleDelayLabel(spec);
+      this.delayLabels.push(label);
       label.position.set(x, base + HOLE_HEIGHT + LABEL_OFFSET, z);
       tagPickable(label, 'hole', pickId);
       this.group.add(label);
@@ -372,17 +380,6 @@ export class BlastPlanOverlay {
   }
 
   // ---------- Helpers ----------
-
-  private makeDelayLabel(delayMs: number): THREE.Mesh {
-    // Flat box as a stand-in for a text label (canvas text labels require DOM)
-    // Color-codes by delay bucket: 0ms=white, 50ms=cyan, 100ms=yellow, 500ms+=red
-    const level = Math.min(4, Math.floor(delayMs / 100));
-    const colors = [0xffffff, 0x44ffff, 0xffff44, 0xff8844, 0xff4444];
-    const color = colors[level]!;
-    const geo = new THREE.BoxGeometry(2.0, 1.0, 0.15);
-    const mat = new THREE.MeshBasicMaterial({ color, depthTest: false });
-    return new THREE.Mesh(geo, mat);
-  }
 
   private makeProjectionArc(hx: number, hz: number, surfaceY: number, speed: number): THREE.Line {
     // Simple parabola: y = v² sin(2θ)/g, θ=45°

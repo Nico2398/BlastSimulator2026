@@ -154,7 +154,7 @@ export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext)
       ...drillHoles.map(h => {
         const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {
           hole: h,
-          delayMs: sequenceDelays[h.id] ?? 0,
+          delayMs: sequenceDelays[h.id] ?? -1, // unsequenced: no label
           surfaceY: deps.getTerrainSurfaceY(h.x, h.z),
           drilled: true,
           chargeOrdered: h.id in plannedChargesByHole,

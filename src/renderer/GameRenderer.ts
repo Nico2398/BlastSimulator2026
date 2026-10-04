@@ -406,6 +406,7 @@ export class GameRenderer {
     this.taskProgress?.update(dt);
     this.pictograms?.update(dt);
     this.buildingOccupancyLabels?.update(dt);
+    this.blastOverlay?.update(cam);
 
     if (this.vehicles && this.lastState) {
       this.vehicles.update(
