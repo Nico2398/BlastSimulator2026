@@ -195,6 +195,30 @@ describe('TutorialRails', () => {
     expect(rails.updateClock(s)).toBe(false);
   });
 
+  it('releases a held clock when the step reports clockMustRun (#1336)', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    let mustRun = false;
+    rails.beginStep({ id: 'hire-surveyor', waitsOnWork: true, clockMustRun: () => mustRun }, s);
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+    expect(rails.updateClock(s)).toBe(true);
+    expect(s.isPaused).toBe(true);
+
+    mustRun = true;
+    expect(rails.updateClock(s)).toBe(false);
+    expect(s.isPaused).toBe(false);
+    expect(rails.clockHeld).toBe(false);
+  });
+
+  it('never holds while clockMustRun stays true past the allowance (#1336)', () => {
+    const s = state();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor', clockMustRun: () => true }, s);
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS * 10;
+    expect(rails.updateClock(s)).toBe(false);
+    expect(s.isPaused).toBe(false);
+  });
+
   it('lets the clock go again when the step moves on', () => {
     const s = state();
     const rails = new TutorialRails();
