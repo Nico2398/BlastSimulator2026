@@ -94,6 +94,23 @@
       }
     },
     {
+      "command": "campaign start level:treranium_depths",
+      "description": "Setup: open Treranium Depths (unlocked by the prior wins, campaign progress carried) so the finale level-end screen is built for the final level, not left over from Dusty Hollow.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:treranium_depths"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": false
+        }
+      },
+      "timeout": 120
+    },
+    {
       "command": "campaign complete level:treranium_depths",
       "description": "Debug force-win: the 3 real levels are done, so the campaign is complete without the tutorial (#1320).",
       "interaction": [
