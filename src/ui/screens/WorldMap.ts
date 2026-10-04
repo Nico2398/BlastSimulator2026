@@ -220,6 +220,7 @@ export class WorldMap {
 
     if (!unlocked) {
       const lockBlock = el('div', { attrs: {
+        'data-role': 'lock',
         style: 'margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:5px;'
           + 'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)',
       } });
