@@ -4,6 +4,7 @@
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
 import { SCORE_DECAY_RATE } from '../config/balance.js';
+import { maxHoleNumericId } from '../mining/DrillPlan.js';
 
 /**
  * Serialize a GameState to a JSON string.
@@ -480,8 +481,24 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
-export function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO: implement
+function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
+  const current = obj['nextHoleId'];
+  if (typeof current === 'number' && Number.isFinite(current) && current >= 1) return obj;
+  const ids: string[] = [];
+  const addIds = (v: unknown): void => {
+    if (Array.isArray(v)) for (const h of v) ids.push((h as { id: string }).id);
+  };
+  const addKeys = (v: unknown): void => {
+    if (typeof v === 'object' && v !== null) ids.push(...Object.keys(v));
+  };
+  addIds(obj['drillHoles']);
+  addIds(obj['plannedDrillHoles']);
+  addKeys(obj['chargesByHole']);
+  addKeys(obj['plannedChargesByHole']);
+  addKeys(obj['sequenceDelays']);
+  const installed = (obj['tubingState'] as { installedHoles?: unknown } | undefined)?.installedHoles;
+  if (Array.isArray(installed) || installed instanceof Set) ids.push(...(installed as Iterable<string>));
+  obj['nextHoleId'] = 1 + maxHoleNumericId(ids);
   return obj;
 }
 
@@ -744,10 +761,9 @@ export function deserialize(json: string): GameState {
     migrateV27ToV28(obj);
   }
 
-  // v28 -> v29: GameState.nextHoleId (#1352).
-  if ((obj['version'] as number) < 29) {
-    migrateV28ToV29(obj);
-  }
+  // v28 -> v29: GameState.nextHoleId (#1352). Idempotent, so also guards
+  // current-version saves that lack a valid counter.
+  migrateV28ToV29(obj);
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The

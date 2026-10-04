@@ -6,7 +6,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState } from './shared.js';
 import {
-  createGridPlan, addHole, removeHole, resetHoleIds,
+  createGridPlan, addHole, removeHole,
   computeDrillHoleDurationTicks,
 } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
@@ -122,9 +122,10 @@ export function drillPlanCommand(
       };
     }
 
-    resetHoleIds();
+    // Local counter: state is only touched once the claim succeeds.
+    const counter = { nextHoleId: 1 };
     const planned = createGridPlan(
-      ctx.state!,
+      counter,
       { x: origin[0] ?? 0, z: origin[1] ?? 0 },
       rows, cols, spacing, depth, diameter,
     );
@@ -133,15 +134,15 @@ export function drillPlanCommand(
     // cannot have is refused whole, rather than landing half on the map.
     const claim = claimForAction(ctx, planned.map(h => ({ x: h.x, z: h.z })), 'drill');
     if (!claim.ok) {
-      resetHoleIds();
       return { success: false, output: claim.output! };
     }
 
     // A grid replaces the whole plan (#553): drop every hole (ordered or
     // already drilled) and any drill_hole action still outstanding for them
-    // first, so resetHoleIds()'s restart-at-H1 above never collides with an
-    // id still live in pendingActions/plannedDrillHoles.
+    // first, so the restart-at-H1 above never collides with an id still live
+    // in pendingActions/plannedDrillHoles.
     clearDrillPlan(ctx);
+    ctx.state!.nextHoleId = counter.nextHoleId;
 
     for (const hole of planned) {
       dispatchDrillHoleAction(ctx, hole);
@@ -163,7 +164,7 @@ export function drillPlanCommand(
     if (!claim.ok) return { success: false, output: claim.output! };
 
     // Additive — unlike 'grid' above, does not clear the existing plan.
-    const hole = addHole(ctx.state!, ctx.state!.plannedDrillHoles, x, z, depth, diameter);
+    const hole = addHole(ctx.state!, ctx.state!.plannedDrillHoles, x, z, depth, diameter, ctx.state!.drillHoles);
     dispatchDrillHoleAction(ctx, hole);
 
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect  } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { cancelOutstandingDrillActions } from '../../../src/console/commands/mining/shared.js';
 

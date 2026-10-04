@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import {
   blastCommand,

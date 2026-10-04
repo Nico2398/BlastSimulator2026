@@ -31,20 +31,13 @@ export interface DrillHole {
 export type PlannedHole = DrillHole;
 
 /** Narrowest input for id generation: anything carrying the next hole number (GameState does). */
-export interface HoleIdCounter {
+interface HoleIdCounter {
   nextHoleId: number;
-}
-
-let nextHoleId = 1;
-
-/** Reset hole ID counter (for tests). */
-export function resetHoleIds(): void {
-  nextHoleId = 1;
 }
 
 /** Create a grid drill pattern. */
 export function createGridPlan(
-  _counter: HoleIdCounter,
+  counter: HoleIdCounter,
   origin: { x: number; z: number },
   rows: number,
   cols: number,
@@ -56,7 +49,7 @@ export function createGridPlan(
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       holes.push({
-        id: `H${nextHoleId++}`,
+        id: `H${counter.nextHoleId++}`,
         x: origin.x + c * spacing,
         z: origin.z + r * spacing,
         depth,
@@ -69,7 +62,7 @@ export function createGridPlan(
 
 /** Add a single hole to an existing plan. */
 export function addHole(
-  _counter: HoleIdCounter,
+  counter: HoleIdCounter,
   holes: DrillHole[],
   x: number,
   z: number,
@@ -79,8 +72,8 @@ export function addHole(
 ): PlannedHole {
   // Never hand out an id a live hole (planned here or drilled elsewhere) holds.
   const isTaken = (id: string): boolean => holes.some(h => h.id === id) || reservedHoles.some(h => h.id === id);
-  while (isTaken(`H${nextHoleId}`)) nextHoleId++;
-  const hole: DrillHole = { id: `H${nextHoleId++}`, x, z, depth, diameter };
+  while (isTaken(`H${counter.nextHoleId}`)) counter.nextHoleId++;
+  const hole: DrillHole = { id: `H${counter.nextHoleId++}`, x, z, depth, diameter };
   holes.push(hole);
   return hole;
 }
@@ -105,9 +98,13 @@ export function holeNumericId(holeId: string): number {
 }
 
 /** Highest numeric hole id ("H7" → 7) among `ids`; 0 when empty. */
-export function maxHoleNumericId(_ids: Iterable<string>): number {
-  // TODO: implement
-  return undefined as unknown as number;
+export function maxHoleNumericId(ids: Iterable<string>): number {
+  let max = 0;
+  for (const id of ids) {
+    const m = /^H(\d+)$/.exec(id);
+    if (m) max = Math.max(max, parseInt(m[1]!, 10));
+  }
+  return max;
 }
 
 /**
