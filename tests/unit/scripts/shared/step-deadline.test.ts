@@ -4,7 +4,7 @@
 // `excluding(...)` (inline screenshot capture) is not charged to the budget.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createStepDeadline } from '../../../../scripts/shared/step-deadline.js';
+import { createStepDeadline, raceStepDeadline, StepTimeoutError } from '../../../../scripts/shared/step-deadline.js';
 
 /** Observes how `expired` settles without leaving an unhandled rejection. */
 function watch(p: Promise<unknown>) {
@@ -169,5 +169,44 @@ describe('createStepDeadline — injected clock', () => {
     const w = watch(d.expired);
     await vi.advanceTimersByTimeAsync(1000);
     expect(w.rejected).toBe(true);
+  });
+});
+
+describe('raceStepDeadline', () => {
+  it('resolves with the work result and leaves no timer behind', async () => {
+    await expect(raceStepDeadline(1000, 'Step 1', async () => 7)).resolves.toBe(7);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('rejects with a StepTimeoutError naming label, budget and last progress', async () => {
+    const run = raceStepDeadline(1000, 'Step 3', async ({ reportProgress }) => {
+      reportProgress('action 1/2 (click)');
+      return new Promise<never>(() => {});
+    });
+    const w = watch(run);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(w.error).toBeInstanceOf(StepTimeoutError);
+    expect(w.error!.message).toBe('Step 3 timed out after 1000ms (last progress: action 1/2 (click))');
+  });
+
+  it('reports a default progress when no action reported anything', async () => {
+    const w = watch(raceStepDeadline(500, 'step 0', () => new Promise<never>(() => {})));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(w.error!.message).toBe('step 0 timed out after 500ms (last progress: no interaction action has started yet)');
+  });
+
+  it('does not charge work wrapped in excluding()', async () => {
+    const run = raceStepDeadline(1000, 'Step 2', async ({ excluding }) => {
+      await excluding(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      return 'done';
+    });
+    await expect(run).resolves.toBe('done');
+  });
+
+  it('propagates the work\'s own error as-is, not as a timeout', async () => {
+    const err = await raceStepDeadline(1000, 'Step 1', async () => { throw new Error('boom'); }).catch((e: Error) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(StepTimeoutError);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

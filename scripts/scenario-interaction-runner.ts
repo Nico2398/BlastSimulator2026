@@ -6,6 +6,7 @@
 
 import { mkdirSync, writeFileSync, statSync } from 'fs';
 import { resolve } from 'path';
+import type { Page } from 'puppeteer';
 import type { ScenarioStepDef, StepResult } from './shared/scenario-types.js';
 import {
   formatStepIndex,
@@ -15,11 +16,12 @@ import {
   runRepeatedInteraction,
   type ReportableStep,
 } from './shared/scenario-utils.js';
-import { createStepDeadline } from './shared/step-deadline.js';
+import { raceStepDeadline, StepTimeoutError } from './shared/step-deadline.js';
 import { findWaitUntilAction } from './shared/command-runner.js';
 import {
   initBrowser,
   executeInteractionActions,
+  type InteractionStepResult,
   waitOneFrame,
   DEFAULT_STEP_TIMEOUT,
   captureFrame,
@@ -73,6 +75,121 @@ function checkScreenshotSize(filepath: string): string | undefined {
   return undefined;
 }
 
+/** Everything the post-step capture needs. */
+interface StepCaptureContext {
+  page: Page;
+  step: ScenarioStepDef;
+  stepIndex: number;
+  paddedIdx: string;
+  cmdSlug: string;
+  interactionResult: InteractionStepResult;
+  stepScreenshotPaths: string[];
+  outDir: string;
+  enableScreenshots: boolean;
+  frames: number;
+  intervalMs: number;
+  shots: ShotDef[];
+  skipBlastPlayback: boolean;
+  results: StepResult[];
+}
+
+/** Captures screenshots and state for a finished step, records its result, and skips blast playback. */
+async function captureStepEvidence(ctx: StepCaptureContext): Promise<void> {
+  const {
+    page, step, stepIndex: i, paddedIdx, cmdSlug, interactionResult, stepScreenshotPaths,
+    outDir, enableScreenshots, frames, intervalMs, shots, skipBlastPlayback,
+  } = ctx;
+  let screenshotPath = '';
+  let sizeWarn: string | undefined;
+  if (enableScreenshots) {
+    await waitOneFrame(page);
+    screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
+    await captureFrame(page, screenshotPath);
+    sizeWarn = checkScreenshotSize(screenshotPath);
+    if (sizeWarn) console.warn(`  WARNING: ${sizeWarn}`);
+  }
+
+  const stepFrames = step.frames ?? frames;
+  const stepInterval = step.interval ?? intervalMs;
+  if (enableScreenshots && stepFrames > 1) {
+    for (let f = 0; f < stepFrames; f++) {
+      await new Promise(r => setTimeout(r, stepInterval));
+      await waitOneFrame(page);
+      const framePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-f${f}.png`);
+      await captureFrame(page, framePath);
+      console.log(`  Frame ${f}: ${framePath} (interval=${stepInterval}ms)`);
+      const fSizeWarn = checkScreenshotSize(framePath);
+      if (fSizeWarn) console.warn(`  WARNING: ${fSizeWarn}`);
+    }
+  }
+
+  const stateData = { step: i, command: step.command, commandOutput: interactionResult.commandOutput,
+    gameState: interactionResult.gameState, uiState: interactionResult.uiState,
+    screenshots: stepScreenshotPaths.length > 0 ? stepScreenshotPaths : undefined };
+  const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
+  writeFileSync(statePath, JSON.stringify(stateData, null, 2));
+  if (screenshotPath) console.log(`  Screenshot: ${screenshotPath}`);
+  console.log(`  State: ${statePath}`);
+
+  if (enableScreenshots) {
+    for (const shot of shots) {
+      if (shot.target && shot.distance !== undefined) {
+        await page.evaluate(({ x, z, d }: { x: number; z: number; d: number }) => {
+          (window as any).__cameraFocus(x, z, d);
+        }, { x: shot.target[0], z: shot.target[1], d: shot.distance });
+      }
+      await page.evaluate(({ y, p }: { y: number; p: number }) => {
+        (window as any).__cameraOrbit(y, p);
+      }, { y: shot.yaw, p: shot.pitch });
+      await waitOneFrame(page);
+      const shotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-${shot.name}.png`);
+      await captureFrame(page, shotPath);
+      console.log(`  Shot [${shot.name}]: ${shotPath}`);
+      const sSizeWarn = checkScreenshotSize(shotPath);
+      if (sSizeWarn) console.warn(`  WARNING: ${sSizeWarn}`);
+    }
+    if (shots.length > 0) {
+      await page.evaluate(() => (window as any).__cameraReset());
+      await forceRenderFrame(page);
+      await waitOneFrame(page);
+    }
+  }
+
+  if (interactionResult.gameState) {
+    const gs = interactionResult.gameState as Record<string, unknown>;
+    console.log(`  Holes: ${gs.holeCount ?? 0}, Charged: ${gs.chargedCount ?? 0}, Sequenced: ${gs.sequencedCount ?? 0}`);
+  }
+
+  ctx.results.push({
+    step: i,
+    command: step.command,
+    commandOutput: interactionResult.commandOutput,
+    gameState: interactionResult.gameState,
+    uiState: interactionResult.uiState,
+    screenshotPath,
+    statePath,
+    ...(sizeWarn !== undefined ? { warning: sizeWarn } : {}),
+  });
+
+  // Skip the fragment-collapse playback after a successful blast step
+  // (#761) — reaching this line already means the step's own actions
+  // ran without throwing, mirroring how src/main.ts's runGameCommand
+  // gates its own onBlast() effects on `cmdName === 'blast' &&
+  // result.success`. The verb is read via the same `cmdSlug`
+  // (formatCommandSlug's first-token extraction) already computed
+  // above for screenshot/state filenames — a player step's
+  // `interaction` array never contains a `command` action
+  // (scenario-defs.md), so the step's declared command is the only
+  // place the verb is known in interaction mode.
+  if (skipBlastPlayback && cmdSlug === 'blast') {
+    await page.evaluate(() => {
+      const w = window as unknown as { __skipBlastPlayback?: () => void };
+      w.__skipBlastPlayback?.();
+    });
+  }
+        
+}
+
 /** Run scenario in interaction mode (Puppeteer + Chrome). */
 export async function runScenarioInteraction(
   name: string, steps: ScenarioStepDef[], shots: ShotDef[],
@@ -107,25 +224,18 @@ export async function runScenarioInteraction(
       const paddedIdx = formatStepIndex(i);
       const cmdSlug = formatCommandSlug(step.command);
       console.log(`\n--- Step ${i}: ${step.command} ---`);
-      // Last "where this step stands" string reported by whichever action is
-      // currently running — read by the timeout race below so a step that
-      // times out on the outer deadline names what was actually in flight,
-      // instead of a bare "Step N timed out after Xms" (PR #616 review round,
-      // item 5). effectiveStepTimeoutMs already makes a single waitUntil/
-      // waitForTutorialStep's own deadline fire first with its own, more
-      // specific error; this covers the residual case where several actions'
-      // combined time — none individually stalling — exceeds the outer budget.
-      let lastProgress = 'no interaction action has started yet';
       const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
-      const deadline = createStepDeadline(
-        stepTimeout,
-        () => `Step ${i} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`,
-      );
       const stepScreenshotPaths: string[] = [];
 
       try {
-        const interactionResult = await Promise.race([
-          (async () => {
+        // A step that exceeds the outer budget names the action in flight (last
+        // reported progress), not a bare "Step N timed out" (PR #616 review).
+        // effectiveStepTimeoutMs lets a single waitUntil/waitForTutorialStep's
+        // own deadline fire first; this covers several actions that each stay
+        // in budget but together exceed it.
+        const interactionResult = await raceStepDeadline(
+          stepTimeout, `Step ${i}`,
+          async ({ reportProgress, excluding }) => {
             // Captured before the step's own actions run, so `expect.increased`
             // (below) measures this step's effect and not everything before it.
             const before = step.expect ? await gameState(page) : {};
@@ -140,9 +250,9 @@ export async function runScenarioInteraction(
               async () => {
                 const r = await executeInteractionActions(
                   page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
-                  (detail) => { lastProgress = detail; },
+                  reportProgress,
                   undefined,
-                  deadline.excluding,
+                  excluding,
                 );
                 stepScreenshotPaths.push(...r.screenshotPaths);
                 return r;
@@ -177,102 +287,15 @@ export async function runScenarioInteraction(
             }
 
             return interactionResult;
-          })(),
-          deadline.expired,
-        ]);
+          },
+        );
 
         // Capture runs after the race: its time never counts against the deadline,
         // and a capture failure still fails the step.
-        {
-            let screenshotPath = '';
-            let sizeWarn: string | undefined;
-            if (enableScreenshots) {
-              await waitOneFrame(page);
-              screenshotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.png`);
-              await captureFrame(page, screenshotPath);
-              sizeWarn = checkScreenshotSize(screenshotPath);
-              if (sizeWarn) console.warn(`  WARNING: ${sizeWarn}`);
-            }
-
-            const stepFrames = step.frames ?? frames;
-            const stepInterval = step.interval ?? intervalMs;
-            if (enableScreenshots && stepFrames > 1) {
-              for (let f = 0; f < stepFrames; f++) {
-                await new Promise(r => setTimeout(r, stepInterval));
-                await waitOneFrame(page);
-                const framePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-f${f}.png`);
-                await captureFrame(page, framePath);
-                console.log(`  Frame ${f}: ${framePath} (interval=${stepInterval}ms)`);
-                const fSizeWarn = checkScreenshotSize(framePath);
-                if (fSizeWarn) console.warn(`  WARNING: ${fSizeWarn}`);
-              }
-            }
-
-            const stateData = { step: i, command: step.command, commandOutput: interactionResult.commandOutput,
-              gameState: interactionResult.gameState, uiState: interactionResult.uiState,
-              screenshots: stepScreenshotPaths.length > 0 ? stepScreenshotPaths : undefined };
-            const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
-            writeFileSync(statePath, JSON.stringify(stateData, null, 2));
-            if (screenshotPath) console.log(`  Screenshot: ${screenshotPath}`);
-            console.log(`  State: ${statePath}`);
-
-            if (enableScreenshots) {
-              for (const shot of shots) {
-                if (shot.target && shot.distance !== undefined) {
-                  await page.evaluate(({ x, z, d }: { x: number; z: number; d: number }) => {
-                    (window as any).__cameraFocus(x, z, d);
-                  }, { x: shot.target[0], z: shot.target[1], d: shot.distance });
-                }
-                await page.evaluate(({ y, p }: { y: number; p: number }) => {
-                  (window as any).__cameraOrbit(y, p);
-                }, { y: shot.yaw, p: shot.pitch });
-                await waitOneFrame(page);
-                const shotPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-${shot.name}.png`);
-                await captureFrame(page, shotPath);
-                console.log(`  Shot [${shot.name}]: ${shotPath}`);
-                const sSizeWarn = checkScreenshotSize(shotPath);
-                if (sSizeWarn) console.warn(`  WARNING: ${sSizeWarn}`);
-              }
-              if (shots.length > 0) {
-                await page.evaluate(() => (window as any).__cameraReset());
-                await forceRenderFrame(page);
-                await waitOneFrame(page);
-              }
-            }
-
-            if (interactionResult.gameState) {
-              const gs = interactionResult.gameState as Record<string, unknown>;
-              console.log(`  Holes: ${gs.holeCount ?? 0}, Charged: ${gs.chargedCount ?? 0}, Sequenced: ${gs.sequencedCount ?? 0}`);
-            }
-
-            results.push({
-              step: i,
-              command: step.command,
-              commandOutput: interactionResult.commandOutput,
-              gameState: interactionResult.gameState,
-              uiState: interactionResult.uiState,
-              screenshotPath,
-              statePath,
-              ...(sizeWarn !== undefined ? { warning: sizeWarn } : {}),
-            });
-
-            // Skip the fragment-collapse playback after a successful blast step
-            // (#761) — reaching this line already means the step's own actions
-            // ran without throwing, mirroring how src/main.ts's runGameCommand
-            // gates its own onBlast() effects on `cmdName === 'blast' &&
-            // result.success`. The verb is read via the same `cmdSlug`
-            // (formatCommandSlug's first-token extraction) already computed
-            // above for screenshot/state filenames — a player step's
-            // `interaction` array never contains a `command` action
-            // (scenario-defs.md), so the step's declared command is the only
-            // place the verb is known in interaction mode.
-            if (skipBlastPlayback && cmdSlug === 'blast') {
-              await page.evaluate(() => {
-                const w = window as unknown as { __skipBlastPlayback?: () => void };
-                w.__skipBlastPlayback?.();
-              });
-            }
-        }
+        await captureStepEvidence({
+          page, step, stepIndex: i, paddedIdx, cmdSlug, interactionResult, stepScreenshotPaths,
+          outDir, enableScreenshots, frames, intervalMs, shots, skipBlastPlayback, results,
+        });
       } catch (err: unknown) {
         const errorMsg = describeStepFailure(step, err);
         console.error(`  ERROR: ${errorMsg}`);
@@ -291,12 +314,10 @@ export async function runScenarioInteraction(
         // continuing past it, as this used to, produced cascading unrelated
         // failures and (scenario-test.ts always exiting 0 regardless) a run
         // that reported success no matter what this loop actually did.
-        console.error(deadline.timedOut
+        console.error(err instanceof StepTimeoutError
           ? '  Step timed out. Stopping — a step must complete to prove anything.'
           : '  Step failed. Stopping — a step must complete to prove anything.');
         break;
-      } finally {
-        deadline.stop();
       }
     }
 

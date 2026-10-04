@@ -36,7 +36,7 @@ import {
   loadScenarioDef, scenarioFiles, formatStepIndex, formatCommandSlug, effectiveStepTimeoutMs, SCENARIO_DIR,
 } from './shared/scenario-utils.js';
 import type { ScenarioStepDef } from './shared/scenario-types.js';
-import { createStepDeadline } from './shared/step-deadline.js';
+import { raceStepDeadline } from './shared/step-deadline.js';
 
 const INTERACTION_SETTLE_MS = 300;
 const SETTLE_AFTER = new Set([
@@ -178,27 +178,17 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
       for (let s = 0; s < steps.length; s++) {
         const step = steps[s]!;
         const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
-        // See scenario-interaction-runner.ts's own copy of this comment
-        // (PR #616 review round, item 5).
-        let lastProgress = 'no interaction action has started yet';
-        const deadline = createStepDeadline(
-          stepTimeout,
-          () => `step ${s} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`,
-        );
         try {
-          await Promise.race([
-            (async () => {
-              const before = step.expect
-                ? await timed(ops, 'state.before', () => gameState(page))
-                : {};
-              await runStepActions(page, step, (detail) => { lastProgress = detail; });
-              if (step.expect) {
-                await timed(ops, 'expect.checkGoal', () =>
-                  checkGoal(page, step.expect!, before, (lastState as Record<string, unknown> | null) ?? undefined));
-              }
-            })(),
-            deadline.expired,
-          ]);
+          await raceStepDeadline(stepTimeout, `step ${s}`, async ({ reportProgress }) => {
+            const before = step.expect
+              ? await timed(ops, 'state.before', () => gameState(page))
+              : {};
+            await runStepActions(page, step, reportProgress);
+            if (step.expect) {
+              await timed(ops, 'expect.checkGoal', () =>
+                checkGoal(page, step.expect!, before, (lastState as Record<string, unknown> | null) ?? undefined));
+            }
+          });
           // Capture runs after the race: its time never counts against the deadline.
           if (screenshots) {
             await timed(ops, 'screenshot.capture', () => captureFrame(page,
@@ -212,8 +202,6 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
           failedAt = s;
           error = err instanceof Error ? err.message.split('\n')[0] : String(err);
           break;
-        } finally {
-          deadline.stop();
         }
       }
 
