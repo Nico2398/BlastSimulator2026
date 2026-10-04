@@ -57,6 +57,26 @@ export function placementRefusalReason(controller: PlacementController): string 
   return t('shell.placement.outside_region');
 }
 
+/**
+ * Hover refusal for a placement with a footprint: the controller's own refusal
+ * (claim / uneven ground / outside region) and an extra reason the caller
+ * computed for the footprint rect (occupied, unclaimed). A real controller
+ * refusal wins the text; otherwise the rect reason outranks the generic
+ * `pick_first` prompt, which is a prompt rather than a refusal and never
+ * paints `refused`.
+ */
+export function hoverRefusal(
+  controller: PlacementController,
+  rectReason: string | null,
+): { refused: boolean; reason: string | undefined } {
+  const controllerReason = placementRefusalReason(controller);
+  const controllerRefused = !!controller.refusalReason || controller.footprintInvalid || !!controller.refusedTile;
+  return {
+    refused: controllerRefused || !!rectReason,
+    reason: controllerRefused ? controllerReason : rectReason ?? controllerReason,
+  };
+}
+
 /** What a single-tile pick differs by, panel to panel — everything else about the flow is identical. Deliberately not exported: callers pass an object literal to `armPointPick` and never name the type. */
 interface PointPickSpec {
   /** Strip header icon. */

@@ -25,6 +25,7 @@ import { Toasts } from './shell/Toasts.js';
 import { ActivityLog } from './shell/ActivityLog.js';
 import { NotificationCenter, type NotifyInput } from './notify/NotificationCenter.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
+import type { Rect } from '../core/world/WorldGen.js';
 import type { PlacementKit } from './scene/PlacementKit.js';
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
@@ -247,7 +248,7 @@ export class UIManager {
 
   /** Passes the non-mutating claim preview down to the Build panel (#1396). */
   setClaimAreaPreview(
-    fn: (rect: { minX: number; minZ: number; maxX: number; maxZ: number }) => ClaimRefusalReason | null,
+    fn: (rect: Rect) => ClaimRefusalReason | null,
   ): void {
     this.buildMenu.setClaimAreaPreview(fn);
   }

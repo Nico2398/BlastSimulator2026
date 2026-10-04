@@ -4,6 +4,7 @@
 // Placement grid helpers: BuildingPlacement.ts
 // Research Center queue: BuildingResearch.ts
 
+import type { Rect } from '../world/WorldGen.js';
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
@@ -484,7 +485,7 @@ export interface FootprintOccupant {
 /** Whether the inclusive-min / exclusive-max world rect overlaps any occupant's footprint (#1396). */
 export function rectOverlapsOccupants(
   occupants: ReadonlyArray<FootprintOccupant>,
-  rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+  rect: Rect,
 ): boolean {
   for (const occ of occupants) {
     const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));

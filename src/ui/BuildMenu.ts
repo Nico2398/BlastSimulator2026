@@ -33,6 +33,8 @@ import { iconEl } from './icons.js';
 import { LocaleTextRegistry } from './localeText.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
 import type { GameState } from '../core/state/GameState.js';
+import type { Rect } from '../core/world/WorldGen.js';
+import { buildingFootprintOccupants } from '../core/nav/NavGridSync.js';
 import {
   getAllBuildingTypes,
   getBuildingDef,
@@ -45,20 +47,14 @@ import {
   isFootprintBuildable,
   type BuildingType,
   type BuildingTier,
-  rectOverlapsOccupants,
   type Building,
+  rectOverlapsOccupants,
 } from '../core/entities/Building.js';
-import { placementRefusalReason, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
+import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, type RampWidth } from '../core/config/balance.js';
-
-import { buildingFootprintOccupants } from '../core/nav/NavGridSync.js';
-
 import type { GameConsoleFn } from './gameConsole.js';
-
-/** World rect, min inclusive / max exclusive. */
-type PlacementRect = { minX: number; minZ: number; maxX: number; maxZ: number };
 
 export class BuildMenu extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -69,7 +65,7 @@ export class BuildMenu extends PanelBase {
   /** Ground-truth height sampler (#1008) used to refuse a footprint over uneven ground; unset means no footprint check runs. */
   private surfaceHeightSampler: ((x: number, z: number) => number) | null = null;
   /** Non-mutating claim preview for a footprint rect (#1396); unset skips the claim check. */
-  private claimAreaPreview: ((rect: PlacementRect) => ClaimRefusalReason | null) | null = null;
+  private claimAreaPreview: ((rect: Rect) => ClaimRefusalReason | null) | null = null;
   private rampDepth = 8;
   private rampWidth: RampWidth = RAMP_DEFAULT_WIDTH;
   private gameConsole?: GameConsoleFn;
@@ -139,7 +135,7 @@ export class BuildMenu extends PanelBase {
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
   /** Register the non-mutating claim preview for a footprint rect, used to show a refused ghost before Confirm (#1396). */
   setClaimAreaPreview(
-    fn: (rect: { minX: number; minZ: number; maxX: number; maxZ: number }) => ClaimRefusalReason | null,
+    fn: (rect: Rect) => ClaimRefusalReason | null,
   ): void {
     this.claimAreaPreview = fn;
   }
@@ -274,7 +270,7 @@ export class BuildMenu extends PanelBase {
    * over the whole rect, or a building / construction site already covering part of it. Null when
    * clear. `movingId` is a building being moved, which does not block its own new spot.
    */
-  private rectRefusal(rect: PlacementRect, movingId?: number): string | null {
+  private rectRefusal(rect: Rect, movingId?: number): string | null {
     const claim = this.claimAreaPreview?.(rect) ?? null;
     if (claim) return claimRefusalText(claim);
     if (!this.lastState) return null;
@@ -418,16 +414,13 @@ export class BuildMenu extends PanelBase {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
       const sel = controller.selection;
       const at = sel ? { x: sel.x1, z: sel.z1 } : controller.hoveredTile;
-      const controllerReason = placementRefusalReason(controller);
       let rectReason: string | null = null;
       if (at) {
         const { sizeX, sizeZ } = getDefSize(def);
         rectReason = this.rectRefusal({ minX: at.x, minZ: at.z, maxX: at.x + sizeX, maxZ: at.z + sizeZ }, movingId);
       }
-      // `pick_first` (nothing hovered/selected yet) is a prompt, not a refusal — only a real controller refusal paints red.
-      const controllerRefused = !!controller.refusalReason || controller.footprintInvalid || !!controller.refusedTile;
-      const refused = !!at && (controllerRefused || !!rectReason);
-      overlay.update(at ? { shape: 'point', x: at.x, z: at.z, footprintCells: def.footprint, refused } : null);
+      const hover = hoverRefusal(controller, rectReason);
+      overlay.update(at ? { shape: 'point', x: at.x, z: at.z, footprintCells: def.footprint, refused: hover.refused } : null);
       strip.show({
         icon: 'build',
         title,
@@ -435,8 +428,7 @@ export class BuildMenu extends PanelBase {
         fields: [],
         result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
         confirmEnabled: controller.canConfirm && !rectReason,
-        // A specific occupied/claim refusal on hover outranks the generic pick-first prompt.
-        confirmDisabledReason: (controllerRefused ? controllerReason : rectReason ?? controllerReason) ?? undefined,
+        confirmDisabledReason: hover.reason,
         instruction: t('ui.build.place_instruction'),
       });
     };

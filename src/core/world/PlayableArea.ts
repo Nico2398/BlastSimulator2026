@@ -312,7 +312,7 @@ export class PlayableArea {
    * Whether claiming every chunk the rect touches would be refused, and why —
    * non-mutating (#1396).
    */
-  previewClaimArea(rect: { minX: number; minZ: number; maxX: number; maxZ: number }): ClaimRefusalReason | null {
+  previewClaimArea(rect: Rect): ClaimRefusalReason | null {
     const cx0 = Math.floor(rect.minX / CHUNK_SIZE);
     const cz0 = Math.floor(rect.minZ / CHUNK_SIZE);
     // maxX/maxZ are exclusive: the last covered tile is max - 1.
