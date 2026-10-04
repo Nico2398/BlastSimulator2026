@@ -1,13 +1,14 @@
 // BlastSimulator2026 — Download/upload save backend (browser fallback)
-// Exports saves as downloadable JSON, imports via file picker.
-// Lives OUTSIDE src/core/ — uses DOM APIs.
+// In-memory session fallback when IndexedDB is unavailable.
+// Lives OUTSIDE src/core/.
 
 import type { SaveBackend, SaveMeta, SaveSlot } from '../core/state/SaveBackend.js';
 import { buildSaveSlot } from './SaveSlotBuilder.js';
 
 /**
- * Download-based persistence: saves trigger a file download,
- * loads prompt a file picker. Slots are held in memory during the session.
+ * Session-only persistence: slots live in memory until the page closes.
+ * Saving never triggers a download (autosave would spam the player);
+ * manual export lives in SavesModal.exportSave.
  */
 export class DownloadPersistence implements SaveBackend {
   private readonly slots = new Map<string, SaveSlot>();
@@ -15,17 +16,6 @@ export class DownloadPersistence implements SaveBackend {
   async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
     const slot = buildSaveSlot(slotId, name, data, campaignSummary, levelId);
     this.slots.set(slotId, slot);
-
-    // Trigger browser download
-    if (typeof document !== 'undefined') {
-      const blob = new Blob([JSON.stringify(slot)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `blast-save-${slotId}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
   }
 
   async load(slotId: string): Promise<SaveSlot | null> {

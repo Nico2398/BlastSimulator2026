@@ -1,7 +1,9 @@
 // BlastSimulator2026 — Save backend selection with in-memory fallback.
-// Lives OUTSIDE src/core/. Stub — implementation pending.
+// Lives OUTSIDE src/core/.
 
 import type { SaveBackend } from '../core/state/SaveBackend.js';
+import { IndexedDBPersistence } from './IndexedDBPersistence.js';
+import { DownloadPersistence } from './DownloadPersistence.js';
 
 export type SaveBackendKind = 'indexeddb' | 'memory';
 
@@ -10,12 +12,23 @@ export interface SaveBackendFactory {
   fallback: () => SaveBackend;
 }
 
+const DEFAULT_FACTORY: SaveBackendFactory = {
+  idb: () => new IndexedDBPersistence(),
+  fallback: () => new DownloadPersistence(),
+};
+
 /**
  * Pick IndexedDB when its probe resolves, otherwise the in-memory fallback.
  * Never throws.
  */
 export async function selectSaveBackend(
-  _factory?: SaveBackendFactory,
+  factory: SaveBackendFactory = DEFAULT_FACTORY,
 ): Promise<{ backend: SaveBackend; kind: SaveBackendKind }> {
-  throw new Error('not implemented');
+  try {
+    const idb = factory.idb();
+    await idb.probe();
+    return { backend: idb, kind: 'indexeddb' };
+  } catch {
+    return { backend: factory.fallback(), kind: 'memory' };
+  }
 }

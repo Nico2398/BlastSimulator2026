@@ -52,14 +52,33 @@ export class SavesModal {
   private timedState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
 
+  private confirmHandler?: (config: ConfirmModalConfig) => void;
+  private readonly fallbackNotice: HTMLElement;
+  private autoSaveFailing = false;
+  private writing = false;
+
   /** Tell the modal which backend is active so it can show a fallback notice. */
-  setBackendKind(_kind: SaveBackendKind): void {
-    // TODO: implement
+  setBackendKind(kind: SaveBackendKind): void {
+    this.fallbackNotice.style.display = kind === 'memory' ? '' : 'none';
+    this.sessionOnly = kind === 'memory';
   }
+  private sessionOnly = false;
 
   /** Route overwrite/delete/load confirmations through the shared confirm modal. */
-  setConfirmHandler(_cb: (config: ConfirmModalConfig) => void): void {
-    // TODO: implement
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    this.confirmHandler = cb;
+  }
+
+  /** Runs `action` after the player confirms; straight away when no confirm handler is wired. */
+  private confirmThen(kind: 'overwrite' | 'delete' | 'load', icon: string, action: () => void): void {
+    if (!this.confirmHandler) { action(); return; }
+    this.confirmHandler({
+      icon,
+      title: t(`ui.saves.confirm_${kind}_title`),
+      body: t(`ui.saves.confirm_${kind}_body`),
+      confirmLabel: t(kind === 'overwrite' ? 'ui.saves.overwrite' : kind === 'delete' ? 'ui.saves.confirm_delete_title' : 'saveload.load'),
+      onConfirm: action,
+    });
   }
 
   constructor(container: HTMLElement) {
@@ -95,6 +114,13 @@ export class SavesModal {
     const body = el('div', { attrs: { style: 'padding:14px 20px;display:flex;flex-direction:column;gap:8px;overflow-y:auto' } });
     this.slotList = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:8px' } });
 
+    this.fallbackNotice = el('div', { attrs: {
+      style: 'display:none;padding:8px 10px;border-radius:4px;border:1px solid rgba(255,176,46,.34);'
+        + 'background:rgba(255,176,46,.07);font:500 11px/1.4 var(--bsx-font-ui);color:var(--bsx-amber)',
+    } });
+    this.fallbackNotice.dataset['role'] = 'fallback-notice';
+    this.locale.bindText(this.fallbackNotice, 'ui.saves.fallback_notice');
+
     this.statusEl = el('div', { attrs: { style: 'font:500 11px/1.4 var(--bsx-font-ui);color:var(--bsx-positive);min-height:14px' } });
 
     const exportBtn = button('ghost', t('ui.saves.export'), { onClick: () => this.exportSave() });
@@ -108,7 +134,7 @@ export class SavesModal {
     this.locale.bindText(importBtn, 'ui.saves.import');
     const footer = el('div', { attrs: { style: 'display:flex;gap:8px;padding-top:6px' }, children: [exportBtn, importBtn, importInput] });
 
-    body.append(this.slotList, this.statusEl, footer);
+    body.append(this.fallbackNotice, this.slotList, this.statusEl, footer);
     box.append(header, body);
     this.overlay.appendChild(box);
     container.appendChild(this.overlay);
@@ -155,7 +181,7 @@ export class SavesModal {
 
   /** Save to the auto slot now — the quick-save shortcut. */
   quickSave(): Promise<void> {
-    return this.autoSave();
+    return this.autoSave(true);
   }
 
   dispose(): void { this.overlay.remove(); }
@@ -165,7 +191,7 @@ export class SavesModal {
    * manual slot uses — the live state alone lacks the encoded terrain, so
    * saving it directly lost every terrain edit.
    */
-  private async autoSave(): Promise<void> {
+  private async autoSave(announce = false): Promise<void> {
     if (!this.backend || !this.getState) return;
     const state = this.getState();
     if (!state || hasLevelEnded(state)) return;
@@ -173,8 +199,17 @@ export class SavesModal {
       const data = serialize(state);
       const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;
       await this.backend.save(AUTO_SAVE_SLOT, t('saveload.auto_name'), data, summary, state.campaign.activeLevelId);
+      if (this.autoSaveFailing) {
+        this.autoSaveFailing = false;
+        if (this.statusEl.textContent === t('ui.saves.autosave_failed')) this.setStatus('');
+      }
+      if (announce) this.setStatus(t('saveload.quick_saved'));
     } catch {
-      // Silent auto-save failure
+      // One notice per failure streak; the next success re-arms it.
+      if (!this.autoSaveFailing) {
+        this.autoSaveFailing = true;
+        this.setStatus(t('ui.saves.autosave_failed'), 'error');
+      }
     }
   }
 
@@ -188,7 +223,13 @@ export class SavesModal {
       return;
     }
 
-    const metas = await this.backend.list();
+    let metas: SaveMeta[];
+    try {
+      metas = await this.backend.list();
+    } catch (e) {
+      this.setStatus(t('saveload.error', { msg: String(e) }), 'error');
+      return;
+    }
     const byId = new Map(metas.map(m => [m.slotId, m]));
     const slotIds = [AUTO_SAVE_SLOT, ...Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => `slot_${i + 1}`)];
 
@@ -252,38 +293,60 @@ export class SavesModal {
 
     const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' }, children: [nameRow, summary] });
 
-    const loadBtn = button('ghost', t('saveload.load'), { onClick: () => void this.loadFromSlot(slotId) });
+    const loadBtn = button('ghost', t('saveload.load'), { onClick: () => this.requestLoad(slotId) });
     loadBtn.dataset['action'] = 'load';
     card.append(thumb, info, loadBtn);
 
     if (!isAuto) {
+      const overwriteBtn = button('ghost', t('ui.saves.overwrite'), { onClick: () => this.requestOverwrite(slotId) });
+      overwriteBtn.dataset['action'] = 'overwrite';
+      card.appendChild(overwriteBtn);
       const deleteBtn = el('button', { attrs: {
         style: 'width:28px;height:28px;display:flex;align-items:center;justify-content:center;'
           + 'border:1px solid rgba(255,91,76,.3);border-radius:4px;background:transparent;color:var(--bsx-critical-text);cursor:pointer',
       } });
       deleteBtn.dataset['action'] = 'delete';
       deleteBtn.appendChild(iconEl('trash', 11));
-      deleteBtn.addEventListener('click', () => void this.deleteSlot(slotId));
+      deleteBtn.addEventListener('click', () => this.confirmThen('delete', 'trash', () => void this.deleteSlot(slotId)));
       card.appendChild(deleteBtn);
     }
 
     return card;
   }
 
+  /** Load button: confirm only when it would discard a live, unfinished game. */
+  private requestLoad(slotId: string): void {
+    const state = this.getState?.() ?? null;
+    if (state && !hasLevelEnded(state)) {
+      this.confirmThen('load', 'save', () => void this.loadFromSlot(slotId));
+    } else {
+      void this.loadFromSlot(slotId);
+    }
+  }
+
+  /** Overwrite button on a filled manual slot: no game means nothing to confirm. */
+  private requestOverwrite(slotId: string): void {
+    if (!this.getState?.()) { this.setStatus(t('saveload.no_game'), 'error'); return; }
+    this.confirmThen('overwrite', 'save', () => void this.saveToSlot(slotId));
+  }
+
   private async saveToSlot(slotId: string): Promise<void> {
-    if (!this.backend || !this.getState) return;
+    if (!this.backend || !this.getState || this.writing) return;
     const state = this.getState();
     if (!state) { this.setStatus(t('saveload.no_game'), 'error'); return; }
+    this.writing = true;
     try {
       const data = serialize(state);
       const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;
       const slotNum = slotId.replace('slot_', '');
       await this.backend.save(slotId, t('saveload.slot_name', { n: slotNum }), data, summary, state.campaign.activeLevelId);
-      this.setStatus(t('saveload.saved'));
+      this.setStatus(t(this.sessionOnly ? 'saveload.saved_session_only' : 'saveload.saved'));
       await this.refreshSlotList();
       this.hide();
     } catch (e) {
       this.setStatus(t('saveload.error', { msg: String(e) }), 'error');
+    } finally {
+      this.writing = false;
     }
   }
 
@@ -323,7 +386,12 @@ export class SavesModal {
 
   private async deleteSlot(slotId: string): Promise<void> {
     if (!this.backend) return;
-    await this.backend.delete(slotId);
+    try {
+      await this.backend.delete(slotId);
+    } catch {
+      this.setStatus(t('saveload.delete_error'), 'error');
+      return;
+    }
     await this.refreshSlotList();
   }
 
@@ -331,15 +399,19 @@ export class SavesModal {
     if (!this.getState) return;
     const state = this.getState();
     if (!state) { this.setStatus(t('saveload.no_game'), 'error'); return; }
-    const data = serialize(state);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `blastsim_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    this.setStatus(t('saveload.exported'));
+    try {
+      const data = serialize(state);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `blastsim_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.setStatus(t('saveload.exported'));
+    } catch (e) {
+      this.setStatus(t('saveload.error', { msg: String(e) }), 'error');
+    }
   }
 
   private handleImport(input: HTMLInputElement): void {

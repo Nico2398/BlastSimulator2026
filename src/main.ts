@@ -24,8 +24,7 @@ import { SANDBOX_DEFAULTS, sandboxLevelDef, type SandboxConfig } from './core/ca
 import { loadSettings } from './ui/userSettings.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
-import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
-import { DownloadPersistence } from './persistence/DownloadPersistence.js';
+import { selectSaveBackend } from './persistence/selectBackend.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
@@ -167,16 +166,15 @@ uiManager.setSurveyOverlayToggleHandler((visible) => { gameRenderer.setSurveyOve
 uiManager.setSurveyOverlayVisible(gameRenderer.surveyOverlayVisible);
 
 // --- Persistence ---
-let saveBackend;
-try {
-  saveBackend = new IndexedDBPersistence();
-} catch {
-  saveBackend = new DownloadPersistence();
-}
+// IndexedDB construction never throws; failures surface when it opens, so probe it
+// and fall back to a session-only in-memory backend (#1325).
+const { backend: saveBackend, kind: saveBackendKind } = await selectSaveBackend();
 
 // --- Saves Modal (redesign P8) ---
 const savesModal = new SavesModal(uiContainer);
 savesModal.setBackend(saveBackend);
+savesModal.setBackendKind(saveBackendKind);
+savesModal.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 // Every save SavesModal takes — manual slots, auto-save and quick-save — reads
 // its state here: a snapshot carrying the terrain encoded from the live grid
 // at that moment (#458 T0.3). SavesModal only sees GameState; it has no idea
