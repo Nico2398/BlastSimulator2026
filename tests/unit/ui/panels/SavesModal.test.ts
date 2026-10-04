@@ -6,6 +6,7 @@ import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { SaveBackend, SaveMeta } from '../../../../src/core/state/SaveBackend.js';
 import { AUTO_SAVE_INTERVAL_TICKS } from '../../../../src/core/config/balance.js';
 import { serialize } from '../../../../src/core/state/SaveLoad.js';
+import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 
 function makeBackend(): SaveBackend & { store: Map<string, { meta: SaveMeta; data: string }> } {
@@ -714,6 +715,363 @@ describe('SavesModal', () => {
       expect(modal.visible).toBe(false);
       modal.dispose();
       container.remove();
+    });
+  });
+
+  // Issue #1325: fallback notice, visible failures, overwrite/delete/load confirms.
+  describe('fallback, failures and confirmations (#1325)', () => {
+    const statusOf = (modal: SavesModal): string =>
+      (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent ?? '';
+
+    const colorOf = (modal: SavesModal): string =>
+      (modal as unknown as { statusEl: HTMLElement }).statusEl.style.color;
+
+    function failingBackend(failing: { on: boolean }): SaveBackend {
+      const inner = makeBackend();
+      return {
+        ...inner,
+        async save(...args: Parameters<SaveBackend['save']>) {
+          if (failing.on) throw new Error('quota');
+          return inner.save(...args);
+        },
+      };
+    }
+
+    async function filledSetup(opts: { getState?: (() => GameState | null) | null; handler?: boolean } = {}) {
+      const backend = makeBackend();
+      const original = createGame({ seed: 7, mineType: 'desert' });
+      original.cash = 4242;
+      await backend.save('slot_1', 'Slot 1', serialize(original), '$4,242 — Day 1', null);
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      const live = createGame({ seed: 3, mineType: 'desert' });
+      live.cash = 777;
+      if (opts.getState !== null) modal.setGetState(opts.getState ?? (() => live));
+      const configs: ConfirmModalConfig[] = [];
+      if (opts.handler !== false) modal.setConfirmHandler(c => { configs.push(c); });
+      const loaded: GameState[] = [];
+      modal.setOnLoad(s => { loaded.push(s); return null; });
+      modal.show();
+      await flush();
+      return { backend, container, modal, configs, loaded, live };
+    }
+
+    const click = (modal: SavesModal, sel: string): void => {
+      modal.root.querySelector<HTMLButtonElement>(sel)!.click();
+    };
+
+    describe('fallback notice', () => {
+      it('memory kind shows the fallback notice', async () => {
+        const { container, modal } = mount();
+        modal.setBackend(makeBackend());
+        modal.setBackendKind('memory');
+        modal.show();
+        await flush();
+        expect(modal.root.textContent).toContain(t('ui.saves.fallback_notice'));
+        modal.dispose();
+        container.remove();
+      });
+
+      it('indexeddb kind shows no fallback notice', async () => {
+        const { container, modal } = mount();
+        modal.setBackend(makeBackend());
+        modal.setBackendKind('indexeddb');
+        modal.show();
+        await flush();
+        expect(modal.root.textContent).not.toContain(t('ui.saves.fallback_notice'));
+        modal.dispose();
+        container.remove();
+      });
+
+      it('no kind set shows no fallback notice', async () => {
+        const { container, modal } = mount();
+        modal.setBackend(makeBackend());
+        modal.show();
+        await flush();
+        expect(modal.root.textContent).not.toContain(t('ui.saves.fallback_notice'));
+        modal.dispose();
+        container.remove();
+      });
+
+      it('saving in memory mode reports a session-only save', async () => {
+        const state = createGame({ seed: 1, mineType: 'desert' });
+        const { container, modal } = mount();
+        modal.setBackend(makeBackend());
+        modal.setBackendKind('memory');
+        modal.setGetState(() => state);
+        modal.show();
+        await flush();
+        click(modal, '[data-slot="slot_1"] [data-action="save-here"]');
+        await flush();
+        expect(statusOf(modal)).toBe(t('saveload.saved_session_only'));
+        modal.dispose();
+        container.remove();
+      });
+
+      it('saving in indexeddb mode keeps the plain saved status', async () => {
+        const state = createGame({ seed: 1, mineType: 'desert' });
+        const { container, modal } = mount();
+        modal.setBackend(makeBackend());
+        modal.setBackendKind('indexeddb');
+        modal.setGetState(() => state);
+        modal.show();
+        await flush();
+        click(modal, '[data-slot="slot_1"] [data-action="save-here"]');
+        await flush();
+        expect(statusOf(modal)).toBe(t('saveload.saved'));
+        modal.dispose();
+        container.remove();
+      });
+    });
+
+    describe('autosave failure visibility', () => {
+      async function autosaveSetup() {
+        const failing = { on: true };
+        const { container, modal } = mount();
+        modal.setBackend(failingBackend(failing));
+        const state = createGame({ seed: 1, mineType: 'desert' });
+        modal.setGetState(() => state);
+        return { failing, container, modal, state };
+      }
+
+      it('a failed autosave shows the failure in the critical colour', async () => {
+        const { modal, state } = await autosaveSetup();
+        modal.onTick(state);
+        await flush();
+        expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
+        expect(colorOf(modal)).toBe('var(--bsx-critical-text)');
+      });
+
+      it('a failed quick-save shows the failure too', async () => {
+        const { modal } = await autosaveSetup();
+        await modal.quickSave();
+        expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
+      });
+
+      it('shows the failure once per streak: a second failure does not re-announce it', async () => {
+        const { modal } = await autosaveSetup();
+        await modal.quickSave();
+        expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
+        (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent = '';
+        await modal.quickSave();
+        expect(statusOf(modal)).toBe('');
+      });
+
+      it('the next successful autosave clears the failure, and a later failure shows again', async () => {
+        const { failing, modal } = await autosaveSetup();
+        await modal.quickSave();
+        expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
+        failing.on = false;
+        await modal.quickSave();
+        expect(statusOf(modal)).not.toBe(t('ui.saves.autosave_failed'));
+        failing.on = true;
+        await modal.quickSave();
+        expect(statusOf(modal)).toBe(t('ui.saves.autosave_failed'));
+      });
+
+      it('a successful autosave never touches an unrelated status', async () => {
+        const { failing, modal } = await autosaveSetup();
+        failing.on = false;
+        (modal as unknown as { statusEl: HTMLElement }).statusEl.textContent = 'other';
+        await modal.quickSave();
+        expect(statusOf(modal)).toBe('other');
+      });
+    });
+
+    describe('backend.list() rejection', () => {
+      function listFailing(): SaveBackend {
+        return { ...makeBackend(), async list() { throw new Error('idb dead'); } };
+      }
+
+      it('show() with a rejecting list produces no unhandled rejection', async () => {
+        const seen: unknown[] = [];
+        const onRej = (e: unknown): void => { seen.push(e); };
+        process.on('unhandledRejection', onRej);
+        try {
+          const { container, modal } = mount();
+          modal.setBackend(listFailing());
+          modal.show();
+          await flush();
+          await flush();
+          expect(seen).toEqual([]);
+          expect(modal.visible).toBe(true);
+          modal.dispose();
+          container.remove();
+        } finally {
+          process.off('unhandledRejection', onRej);
+        }
+      });
+
+      it('refreshLocale() with a rejecting list produces no unhandled rejection', async () => {
+        const seen: unknown[] = [];
+        const onRej = (e: unknown): void => { seen.push(e); };
+        process.on('unhandledRejection', onRej);
+        try {
+          const { container, modal } = mount();
+          modal.setBackend(listFailing());
+          modal.show();
+          await flush();
+          modal.refreshLocale();
+          await flush();
+          await flush();
+          expect(seen).toEqual([]);
+          modal.dispose();
+          container.remove();
+        } finally {
+          process.off('unhandledRejection', onRej);
+        }
+      });
+
+      it('a rejecting list is reported in the critical colour', async () => {
+        const { container, modal } = mount();
+        modal.setBackend(listFailing());
+        modal.show();
+        await flush();
+        expect(statusOf(modal)).toContain('idb dead');
+        expect(colorOf(modal)).toBe('var(--bsx-critical-text)');
+        modal.dispose();
+        container.remove();
+      });
+    });
+
+    describe('overwrite', () => {
+      it('a filled manual slot offers OVERWRITE, an empty one does not', async () => {
+        const { modal } = await filledSetup();
+        expect(modal.root.querySelector('[data-slot="slot_1"] [data-action="overwrite"]')).not.toBeNull();
+        expect(modal.root.querySelector('[data-slot="slot_2"] [data-action="overwrite"]')).toBeNull();
+      });
+
+      it('the auto slot never offers OVERWRITE', async () => {
+        const { backend, modal } = await filledSetup();
+        const live = createGame({ seed: 1, mineType: 'desert' });
+        await backend.save('auto', 'Auto-Save', serialize(live), '$1 — Day 1', null);
+        modal.show();
+        await flush();
+        expect(modal.root.querySelector('[data-slot="auto"] [data-action="overwrite"]')).toBeNull();
+      });
+
+      it('clicking OVERWRITE asks the confirm handler once and writes nothing yet', async () => {
+        const { backend, modal, configs } = await filledSetup();
+        const before = backend.store.get('slot_1')!.data;
+        click(modal, '[data-slot="slot_1"] [data-action="overwrite"]');
+        await flush();
+        expect(configs).toHaveLength(1);
+        expect(configs[0]!.title).toBe(t('ui.saves.confirm_overwrite_title'));
+        expect(configs[0]!.body).toBe(t('ui.saves.confirm_overwrite_body'));
+        expect(configs[0]!.confirmLabel).toBe(t('ui.saves.overwrite'));
+        expect(backend.store.get('slot_1')!.data).toBe(before);
+      });
+
+      it('invoking onConfirm replaces the slot content with the live state', async () => {
+        const { backend, modal, configs, live } = await filledSetup();
+        const before = backend.store.get('slot_1')!.data;
+        click(modal, '[data-slot="slot_1"] [data-action="overwrite"]');
+        configs[0]!.onConfirm();
+        await flush();
+        const after = backend.store.get('slot_1')!.data;
+        expect(after).not.toBe(before);
+        expect(after).toBe(serialize(live));
+        expect(backend.store.get('slot_1')!.meta.campaignSummary).toContain('777');
+      });
+
+      it('SAVE HERE on an empty slot writes without asking for confirmation', async () => {
+        const { backend, modal, configs } = await filledSetup();
+        click(modal, '[data-slot="slot_2"] [data-action="save-here"]');
+        await flush();
+        expect(configs).toHaveLength(0);
+        expect(backend.store.has('slot_2')).toBe(true);
+      });
+    });
+
+    describe('delete', () => {
+      it('with a confirm handler, Delete asks first and removes only after onConfirm', async () => {
+        const { backend, modal, configs } = await filledSetup();
+        click(modal, '[data-slot="slot_1"] [data-action="delete"]');
+        await flush();
+        expect(configs).toHaveLength(1);
+        expect(configs[0]!.title).toBe(t('ui.saves.confirm_delete_title'));
+        expect(configs[0]!.body).toBe(t('ui.saves.confirm_delete_body'));
+        expect(backend.store.has('slot_1')).toBe(true);
+        configs[0]!.onConfirm();
+        await flush();
+        expect(backend.store.has('slot_1')).toBe(false);
+        expect(modal.root.querySelector('[data-slot="slot_1"] [data-action="save-here"]')).not.toBeNull();
+      });
+
+      it('without a confirm handler, Delete acts directly', async () => {
+        const { backend, modal } = await filledSetup({ handler: false });
+        click(modal, '[data-slot="slot_1"] [data-action="delete"]');
+        await flush();
+        expect(backend.store.has('slot_1')).toBe(false);
+      });
+
+      it('a failing delete shows an error status and does not reject', async () => {
+        const { backend, modal, configs } = await filledSetup();
+        backend.delete = async () => { throw new Error('locked'); };
+        click(modal, '[data-slot="slot_1"] [data-action="delete"]');
+        configs[0]!.onConfirm();
+        await flush();
+        await flush();
+        expect(statusOf(modal)).toContain(t('saveload.delete_error'));
+        expect(colorOf(modal)).toBe('var(--bsx-critical-text)');
+      });
+    });
+
+    describe('load confirmation', () => {
+      it('Load with a live game asks first and loads only after onConfirm', async () => {
+        const { modal, configs, loaded } = await filledSetup();
+        click(modal, '[data-slot="slot_1"] [data-action="load"]');
+        await flush();
+        expect(configs).toHaveLength(1);
+        expect(configs[0]!.title).toBe(t('ui.saves.confirm_load_title'));
+        expect(configs[0]!.body).toBe(t('ui.saves.confirm_load_body'));
+        expect(loaded).toHaveLength(0);
+        configs[0]!.onConfirm();
+        await flush();
+        expect(loaded).toHaveLength(1);
+        expect(loaded[0]!.cash).toBe(4242);
+      });
+
+      it('Load with getState returning null loads directly', async () => {
+        const { modal, configs, loaded } = await filledSetup({ getState: () => null });
+        click(modal, '[data-slot="slot_1"] [data-action="load"]');
+        await flush();
+        expect(configs).toHaveLength(0);
+        expect(loaded).toHaveLength(1);
+      });
+
+      it('Load with no getState callback loads directly', async () => {
+        const { modal, configs, loaded } = await filledSetup({ getState: null });
+        click(modal, '[data-slot="slot_1"] [data-action="load"]');
+        await flush();
+        expect(configs).toHaveLength(0);
+        expect(loaded).toHaveLength(1);
+      });
+
+      it('Load when the live level already ended loads directly', async () => {
+        const ended = createGame({ seed: 3, mineType: 'desert' });
+        ended.levelEndReason = 'bankruptcy';
+        const { modal, configs, loaded } = await filledSetup({ getState: () => ended });
+        click(modal, '[data-slot="slot_1"] [data-action="load"]');
+        await flush();
+        expect(configs).toHaveLength(0);
+        expect(loaded).toHaveLength(1);
+      });
+
+      it('Load with a live game but no confirm handler loads directly', async () => {
+        const { modal, loaded } = await filledSetup({ handler: false });
+        click(modal, '[data-slot="slot_1"] [data-action="load"]');
+        await flush();
+        expect(loaded).toHaveLength(1);
+      });
+
+      it('loadFromSlot() called directly never confirms (CONTINUE path)', async () => {
+        const { modal, configs, loaded } = await filledSetup();
+        const ok = await modal.loadFromSlot('slot_1');
+        expect(ok).toBe(true);
+        expect(configs).toHaveLength(0);
+        expect(loaded).toHaveLength(1);
+      });
     });
   });
 });

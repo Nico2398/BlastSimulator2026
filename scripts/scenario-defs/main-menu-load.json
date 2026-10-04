@@ -82,6 +82,8 @@
         { "type": "clickSelector", "selector": "#bs-main-menu #bs-menu-load" },
         { "type": "waitForSelector", "selector": "#bs-saves-modal" },
         { "type": "clickSelector", "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"load\"]" },
+        { "type": "waitForSelector", "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]" },
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]" },
         { "type": "awaitUsable", "selector": "#bs-saveload-btn" }
       ],
       "role": "player",
