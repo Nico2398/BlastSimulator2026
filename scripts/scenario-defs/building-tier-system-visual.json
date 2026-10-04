@@ -345,6 +345,14 @@
           "selector": "#bs-build-panel [data-building-id=\"5\"] .bs-build-demolish-btn"
         },
         {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
           "type": "wait",
           "durationMs": 300
         }

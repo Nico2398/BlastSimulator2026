@@ -685,17 +685,57 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
   });
 
-  it('placed row Demolish button dispatches build destroy', () => {
+  it('placed row Demolish click hands a confirm config to the handler and does not destroy (#1399)', () => {
+    const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [building];
+    const handler = vi.fn();
+    menu.setConfirmHandler(handler);
+    menu.update(state);
+
+    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(gameConsole).not.toHaveBeenCalledWith('build destroy 11');
+    const config = handler.mock.calls[0]![0];
+    expect(config.confirmLabel).toBe(t('ui.build.demolish'));
+  });
+
+  it('confirming the handed config runs build destroy and reports demolished (#1399)', () => {
+    const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [building];
+    const handler = vi.fn();
+    menu.setConfirmHandler(handler);
+    menu.update(state);
+    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
+
+    handler.mock.calls[0]![0].onConfirm();
+
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole).toHaveBeenCalledWith('build destroy 11');
+  });
+
+  it('cancelling (never confirming) leaves gameConsole untouched (#1399)', () => {
+    const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [building];
+    menu.setConfirmHandler(vi.fn());
+    menu.update(state);
+    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
+
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('Demolish click with no confirm handler does nothing (#1399)', () => {
     const building = makeBuilding({ id: 11, type: 'management_office', tier: 1 });
     const state = makeMockState();
     state.buildings.buildings = [building];
     menu.update(state);
 
-    const row = findPlacedRow(container, 11);
-    const demolishBtn = row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!;
-    demolishBtn.click();
+    findPlacedRow(container, 11).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.click();
 
-    expect(gameConsole).toHaveBeenCalledWith('build destroy 11');
+    expect(gameConsole).not.toHaveBeenCalled();
   });
 
   it('refreshUnderConstructionCounts shows the per-type count once a building enters plannedBuildings', () => {

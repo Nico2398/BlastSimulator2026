@@ -343,6 +343,14 @@
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
       "role": "player",
@@ -365,6 +373,14 @@
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
       "role": "player",
@@ -388,6 +404,14 @@
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
       "role": "player",
