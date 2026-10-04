@@ -61,6 +61,8 @@ Ores not spread homogeneously. Each ore type has separate Simplex field with hig
 
 ## Ore Grade Reporting Post-Blast
 
+Post-blast report reads estimates at each fragment's `origin` (never landing `position`), floor-keyed column via `surveyColumnKey`/`findSurveyForColumn` in `SurveyColumn.ts`.
+
 After a blast, `computeBlastOreReport()` calculates actual ore yield from destroyed voxels and compares to pre-blast survey estimate:
 
 | Condition | Event | Effect |

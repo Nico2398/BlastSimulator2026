@@ -9,7 +9,8 @@ import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
-import { findSurveyForColumn, isSurveyStale } from '../../core/mining/SurveyCalc.js';
+import { isSurveyStale } from '../../core/mining/SurveyCalc.js';
+import { findSurveyForColumn, surveyColumnKey } from '../../core/mining/SurveyColumn.js';
 import { describeRamp } from '../describeRamp.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 import type { PickResult } from './ScenePicking.js';
@@ -151,7 +152,7 @@ export class HoverTag {
     }));
 
     const survey = findSurveyForColumn(state.surveyResults, terrain.tileX, terrain.tileZ);
-    const colEstimates = survey?.estimates[`${terrain.tileX},${terrain.tileZ}`];
+    const colEstimates = survey?.estimates[surveyColumnKey(terrain.tileX, terrain.tileZ)];
     if (!survey || !colEstimates || Object.keys(colEstimates).length === 0) {
       wrap.appendChild(el('div', { text: t('shell.hovertag.no_survey'), attrs: { style: 'font-size:11px;color:var(--bsx-text-muted)' } }));
       return wrap;

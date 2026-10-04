@@ -277,3 +277,12 @@ describe('BlastResolve — guarantees', () => {
     expect(maxThrowDistance).toBe(0);
   });
 });
+
+describe('BlastResolve — origin is never rewritten by landing (#1355)', () => {
+  it('leaves a fragment origin untouched while moving its position', () => {
+    const f = { ...fragment(0, [10, 14, 10], [30, 5, 0]), origin: { x: 10, y: 14, z: 10 } };
+    resolve([f]);
+    expect(f.origin).toEqual({ x: 10, y: 14, z: 10 });
+    expect(f.position.x).not.toBe(10);
+  });
+});

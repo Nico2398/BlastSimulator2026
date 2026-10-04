@@ -57,6 +57,7 @@ function makeFragment(
     isProjection: false,
     halfExtents: vec3(0.25, 0.25, 0.25),
     shapeSeed: 0,
+    origin: position,
   };
 }
 
