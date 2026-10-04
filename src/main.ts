@@ -480,7 +480,7 @@ function onLevelStateReplaced(state: GameState): void {
   uiManager.closeStaleLevelOverlays(state);
   // Selection, armed placement and the ended-state screen belong to the old level (#1322).
   scenePicking.clearSelection();
-  placementController.cancel();
+  placementController.disarm();
   levelEndScreen.reset();
   ctx.weatherCycle = createWeatherCycle(state.seed);
   ctx.rng = new Random(state.seed + 1000);
@@ -1149,7 +1149,6 @@ savesModal.setOnLoad((state) => {
   onLevelStateReplaced(state);
   if (tutorial.isActive) tutorial.abandon();
   worldMap.hide();
-  levelEndScreen.hide();
   uiManager.show();
   gameRenderer.syncFromContext(ctx);
   return null;
