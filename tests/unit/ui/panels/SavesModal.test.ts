@@ -1145,12 +1145,11 @@ describe('SavesModal', () => {
     });
 
     it('sets the root display to none', () => {
-      const { container, modal } = mount();
+      const { modal } = mount();
       modal.setBackend(makeBackend());
       modal.show();
       modal.handleEscape();
-      const root = container.querySelector('#bs-saves-modal') as HTMLElement;
-      expect(root.style.display).toBe('none');
+      expect(modal.root.style.display).toBe('none');
       modal.dispose();
     });
 
