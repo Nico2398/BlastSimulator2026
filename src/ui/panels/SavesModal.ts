@@ -173,6 +173,12 @@ export class SavesModal {
   }
   get visible(): boolean { return this.overlay.style.display !== 'none'; }
 
+  /** Esc handler: closes the modal when open. Returns true when it consumed the key. */
+  handleEscape(): boolean {
+    // TODO: implement
+    return false;
+  }
+
   /**
    * Called each tick to trigger auto-save. `state` only times it — what gets saved comes from `getState`.
    * The interval baseline is per state object: a replaced state restarts tickCount at 0, so the swap
