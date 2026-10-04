@@ -17,6 +17,7 @@ import { el, button, sectionHeader } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { syncLangPills } from '../langPills.js';
+import { saveLocale, saveVolume } from '../userSettings.js';
 import type { AudioManager, AudioCategory } from '../../audio/AudioManager.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SaveBackend } from '../../core/state/SaveBackend.js';
@@ -109,8 +110,8 @@ export class SettingsPanel extends PanelBase {
     this.locale.bindText(frBtn, 'ui.settings.french');
     this.enLangPill = enBtn;
     this.frLangPill = frBtn;
-    enBtn.addEventListener('click', () => { setLocale('en'); this.updateLangPills(); this.onLanguageChangeCb?.('en'); });
-    frBtn.addEventListener('click', () => { setLocale('fr'); this.updateLangPills(); this.onLanguageChangeCb?.('fr'); });
+    enBtn.addEventListener('click', () => { setLocale('en'); saveLocale('en'); this.updateLangPills(); this.onLanguageChangeCb?.('en'); });
+    frBtn.addEventListener('click', () => { setLocale('fr'); saveLocale('fr'); this.updateLangPills(); this.onLanguageChangeCb?.('fr'); });
     this.updateLangPills();
     const langRow = el('div', {
       attrs: { style: 'display:flex;gap:3px;padding:3px;border-radius:5px;background:var(--bsx-well)' },
@@ -221,6 +222,7 @@ export class SettingsPanel extends PanelBase {
     input.addEventListener('input', () => {
       readout.textContent = input.value;
       this.audioManager?.setVolume(channel, Number(input.value) / 100);
+      saveVolume(channel, Number(input.value) / 100);
     });
     this.volumeEls[channel] = { input, readout };
 

@@ -21,6 +21,7 @@ import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels, type LevelDef } from './core/campaign/Level.js';
 import { formatMoney } from './core/economy/formatMoney.js';
 import { SANDBOX_DEFAULTS, sandboxLevelDef, type SandboxConfig } from './core/campaign/Sandbox.js';
+import { loadSettings } from './ui/userSettings.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -71,6 +72,12 @@ const modelsReady = preloadModels(modelLibrary, fetchModelBytes, { yieldBetween:
 
 // --- Game Renderer (bridges console commands → Three.js) ---
 const gameRenderer = new GameRenderer(scene);
+
+// --- Stored player settings ---
+// Skipped in scenario mode so shared-browser scenario runs neither read nor leak settings.
+const scenarioMode = new URLSearchParams(window.location.search).get('scenarioMode') === '1';
+const storedSettings = scenarioMode ? {} : loadSettings();
+if (storedSettings.locale) setLocale(storedSettings.locale);
 
 // --- UI ---
 const uiContainer = document.getElementById('bs-ui-root') ?? document.body;
@@ -407,6 +414,7 @@ sandboxPanel.setOnStart((config) => {
 
 // --- Audio ---
 const audioMgr = new AudioManager();
+if (storedSettings.volumes) audioMgr.applyVolumes(storedSettings.volumes);
 uiManager.setAudioManager(audioMgr);
 const audioHooks = new AudioHooks(audioMgr);
 // Resume AudioContext on first user interaction (browser autoplay policy)
@@ -747,7 +755,6 @@ window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 // simulation time — otherwise the render loop's own real-time ticking races
 // scripted checkpoints and desyncs them (see #406). Exposed as a bridge too,
 // for a mode that wants to flip it after load.
-const scenarioMode = new URLSearchParams(window.location.search).get('scenarioMode') === '1';
 let autoTickEnabled = !scenarioMode;
 window.__setAutoTick = (enabled: boolean) => { autoTickEnabled = enabled; };
 
