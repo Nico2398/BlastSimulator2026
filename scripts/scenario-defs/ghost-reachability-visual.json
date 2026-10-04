@@ -1,6 +1,6 @@
 {
   "name": "ghost-reachability-visual",
-  "description": "#1306: a queued order's ghost is red when none of the actors able to perform THAT action can reach it, or none exists, and blue otherwise; a queued building shows its own model as a fresnel hologram. Flow on tutorial_pit (the stranded-pocket blast of blast-debris-stranded-ramp.json): a warehouse is ordered with nobody hired (red hologram, accepted and charged anyway), hiring turns it blue while the game is paused, a blast leaves debris no hauler exists for (red), a ramp ordered before any excavator crew exists reads red and turns blue when the licensed driver and a rock_digger appear, and once the haul crew exists and the ramp connects the pocket nothing is red. Every colour change is observed through unreachableGhostCount (state dump) and the screenshots of the hologram and ramp ghosts.",
+  "description": "#1306: a queued order's ghost is red when none of the actors able to perform THAT action can reach it, or none exists, and blue otherwise; a queued building shows its own model as a fresnel hologram. Flow (paused explicitly by a `pause` step; campaign start does not pause) on tutorial_pit (the stranded-pocket blast of blast-debris-stranded-ramp.json): a warehouse is ordered with nobody hired (red hologram, accepted and charged anyway), hiring turns it blue while the game is paused, a blast leaves debris no hauler exists for (red), a ramp ordered before any excavator crew exists reads red and turns blue when the licensed driver and a rock_digger appear, and once the haul crew exists and the ramp connects the pocket nothing is red. Every colour change is observed through unreachableGhostCount (state dump) and the screenshots of the hologram and ramp ghosts.",
   "steps": [
     {
       "command": "campaign start level:tutorial_pit cash:2000000",
@@ -17,6 +17,17 @@
           "cash": 2000000
         }
       }
+    },
+    {
+      "command": "time pause",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "description": "Pause explicitly: campaign start leaves the game running (isPaused false at tick 0), and the no-tick colour checks below need a paused game.",
+      "role": "setup"
     },
     {
       "command": "build freight_warehouse at:1,8",
@@ -386,6 +397,17 @@
       }
     },
     {
+      "command": "time pause",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "description": "Pause again (the speed button used while draining charges unpauses) so the ramp ordering and hires below are observed with no tick running.",
+      "role": "setup"
+    },
+    {
       "command": "build_ramp start:27,9 end:17,9 depth:5",
       "description": "Order the ramp into the stranded pocket (10 m from (27,9) down to the crater at (17,9), depth 5) before anyone can dig. Accepted and charged; every layer ghost is RED because the roster holds no excavator driver and the fleet no rock_digger. Ghosts are never blocked at order time, only coloured.",
       "interaction": [
@@ -678,6 +700,17 @@
           "cash": 0
         }
       }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "description": "Resume the game paused for the no-tick colour checks, so the final haul runs.",
+      "role": "setup"
     },
     {
       "command": "tick 5",
