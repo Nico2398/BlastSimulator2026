@@ -58,6 +58,11 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // a11y check contract (#1419): part of the pure-module surface its unit
+  // tests pin; the scan does not read tests, and production uses are internal.
+  'scripts/shared/a11y-contrast.ts:ResolvedBackground',
+  'scripts/shared/a11y-contrast.ts:relativeLuminance',
+  'scripts/shared/a11y-setup.ts:A11Y_START_COMMAND',
   // Read off `window` by the scenario harness, never imported.
   'src/ui/uiActionProbe.ts:probeUiAction',
   'src/ui/tutorialStateProbe.ts:probeTutorialState',
