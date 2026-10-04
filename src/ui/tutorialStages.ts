@@ -438,8 +438,14 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   // reachable once the panel is open made this stage indistinguishable from
   // the one before it, so the rail could never actually highlight the real
   // Sound the Horn control.
+  // #1337: same shape as `sequence` (#926) -- the horn lives in the Fire tab's
+  // body, hidden whenever the player has clicked another Blast Workshop tab,
+  // which left it unreachable and the rail blocking the Fire tab button. The
+  // tab button (`data-step="5"`) is part of the always-reachable strip, so the
+  // middle stage lets the player switch to Fire themselves.
   'evacuate-zone': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
+    { target: '#bs-blast-panel [data-step="5"]', hintKey: 'tutorial.stage.open_fire_tab' },
     { target: '#bs-blast-panel [data-action="sound-horn"]', hintKey: 'tutorial.stage.sound_horn' },
   ],
 
