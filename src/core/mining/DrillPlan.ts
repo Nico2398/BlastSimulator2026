@@ -68,10 +68,10 @@ export function addHole(
   z: number,
   depth: number,
   diameter: number,
-  alsoInUse: ReadonlyArray<DrillHole> = [],
+  reservedHoles: ReadonlyArray<DrillHole> = [],
 ): PlannedHole {
   // Never hand out an id a live hole (planned here or drilled elsewhere) holds.
-  const isTaken = (id: string): boolean => holes.some(h => h.id === id) || alsoInUse.some(h => h.id === id);
+  const isTaken = (id: string): boolean => holes.some(h => h.id === id) || reservedHoles.some(h => h.id === id);
   while (isTaken(`H${nextHoleId}`)) nextHoleId++;
   const hole: DrillHole = { id: `H${nextHoleId++}`, x, z, depth, diameter };
   holes.push(hole);
