@@ -435,7 +435,8 @@ export class BuildMenu extends PanelBase {
         fields: [],
         result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
         confirmEnabled: controller.canConfirm && !rectReason,
-        confirmDisabledReason: controllerReason ?? rectReason ?? undefined,
+        // A specific occupied/claim refusal on hover outranks the generic pick-first prompt.
+        confirmDisabledReason: (controllerRefused ? controllerReason : rectReason ?? controllerReason) ?? undefined,
         instruction: t('ui.build.place_instruction'),
       });
     };
