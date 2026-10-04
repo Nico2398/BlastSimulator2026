@@ -835,7 +835,7 @@ describe('UIManager — showConfirm / confirmOpen (#1314)', () => {
   it('confirming fires onConfirm and closes the modal', () => {
     const onConfirm = vi.fn();
     uiManager.showConfirm({ icon: 'map', title: 'T', body: 'B', confirmLabel: 'GO', onConfirm });
-    container.querySelector<HTMLButtonElement>('.bs-confirm-overlay .bs-btn-danger')!.click();
+    container.querySelector<HTMLButtonElement>('[data-action="confirm-yes"]')!.click();
     expect(onConfirm).toHaveBeenCalledOnce();
     expect(uiManager.confirmOpen).toBe(false);
   });
