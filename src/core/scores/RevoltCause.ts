@@ -6,8 +6,9 @@ type RevoltCause = 'no_rest_policy' | 'no_housing' | 'morale_drain';
 
 /**
  * Classify the root cause of a worker revolt.
- * Planned rules: continuous/custom shift mode -> no_rest_policy;
- * else no active living quarters -> no_housing; else morale_drain.
+ * Rules, in precedence order: a shift mode with no end (continuous/custom)
+ * -> no_rest_policy; else no active living quarters -> no_housing;
+ * else morale_drain.
  */
 export function revoltCause(shiftMode: ShiftMode, hasActiveHousing: boolean): RevoltCause {
   if (getShiftDurationTicks(shiftMode) === Infinity) return 'no_rest_policy';
