@@ -11,6 +11,7 @@ import {
 } from '../core/config/balance.js';
 import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
 import { previewHoleDetails } from '../core/mining/Software.js';
+import { wetHoleIdSet } from '../console/commands/mining/shared.js';
 import { boundingBoxXZ, getBlastOriginSurfaceY } from './BlastOriginSampling.js';
 import type { TerrainMesh } from './TerrainMesh.js';
 import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
@@ -144,7 +145,7 @@ export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext)
   let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
   if (softwareTier >= 2 && ctx.grid && drillHoles.length > 0) {
     const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
-    holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier);
+    holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier, wetHoleIdSet(ctx));
   }
 
   deps.blastOverlay.show({

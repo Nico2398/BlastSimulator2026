@@ -111,3 +111,41 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
       .toBe(dry.ctx.state!.lastBlastReport!.clearedVoxels);
   });
 });
+
+describe('software previews model wet holes like the real blast (#1347)', () => {
+  function previewCounts(output: string): { fractured: number; cracked: number } {
+    const m = /(\d+) fractured, (\d+) cracked/.exec(output);
+    if (!m) throw new Error(`unexpected preview output: ${output}`);
+    return { fractured: Number(m[1]), cracked: Number(m[2]) };
+  }
+
+  function stagePlan(weather: string | null) {
+    const game = createRunner();
+    game.runner.run('new_game seed:42 staffed:true');
+    if (weather) game.runner.run(`weather set ${weather}`);
+    game.runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
+    driveDrillPlanToCompletion(game.runner, game.ctx);
+    game.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
+    driveChargePlanToCompletion(game.runner, game.ctx);
+    game.runner.run('sequence auto delay_step:25');
+    game.ctx.state!.softwareTier = 3;
+    return game;
+  }
+
+  it('preview fragments during rain shows fewer fractured voxels than the same plan dry', () => {
+    const dry = stagePlan(null);
+    const wet = stagePlan('heavy_rain');
+    const dryCounts = previewCounts(dry.runner.run('preview fragments').output);
+    const wetCounts = previewCounts(wet.runner.run('preview fragments').output);
+    expect(wetCounts.fractured).toBeLessThan(dryCounts.fractured);
+  });
+
+  it('preview fragments during rain equals the result of the subsequent blast', () => {
+    const wet = stagePlan('heavy_rain');
+    const preview = previewCounts(wet.runner.run('preview fragments').output);
+    expect(wet.runner.run('blast').success).toBe(true);
+    const report = wet.ctx.state!.lastBlastReport!;
+    expect(preview.fractured).toBe(report.clearedVoxels);
+    expect(preview.cracked).toBe(report.crackedVoxels);
+  });
+});
