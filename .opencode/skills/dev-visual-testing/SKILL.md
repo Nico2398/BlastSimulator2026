@@ -181,10 +181,12 @@ A real failure this diagnostic order was built to catch: `hireEmployee` created 
 ### Supporting Checks
 
 ```bash
-npm run a11y             # WCAG AA contrast analysis of every visible text element
+npm run a11y             # WCAG AA contrast of TopBar, ToolRail and every rail-opened panel in a staffed game
 npm run validate:state   # State JSON schema validation
 npm run ui:diagnostic    # Clicks every UI button, reports computed styles and dead controls
 ```
+
+`npm run a11y` (#1419) needs the dev server. It starts a staffed game (`new_game seed:42 staffed:true`, one tick), measures the TopBar and ToolRail, then opens each panel by clicking its real rail button, measures it and closes it. It never hides the main menu or forces a panel visible. An element whose ancestors have no opaque background is listed under `unresolvedBackground`, never assumed white. A region that measures no text throws. It is not wired into CI or `validate`; it exits 1 while a black-on-dark defect (clock, roster labels) is on screen, until the colour fix lands.
 
 ## What to Evaluate
 

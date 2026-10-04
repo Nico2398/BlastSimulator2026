@@ -56,8 +56,10 @@ export function createCampaignState(): CampaignState {
 // ── Progression ──
 
 /**
- * Record profit earned during a session. Returns true if the level was
- * just completed (threshold reached for the first time this call).
+ * Record profit earned during a session; also called on replays of completed
+ * levels. Raises bestSessionProfit only when exceeded. Returns true only if the
+ * level was just completed (threshold reached for the first time this call);
+ * completion, next-level unlock and campaignComplete never repeat.
  */
 export function recordProfit(
   campaign: CampaignState,

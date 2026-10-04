@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { checkGameOverConditions } from '../../../src/core/engine/GameOverConditions.js';
 import { checkLevelComplete, createGameForLevel } from '../../../src/core/campaign/LevelTransition.js';
 import { createCampaignState, startLevel } from '../../../src/core/campaign/Campaign.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -71,10 +72,11 @@ describe('Level completion and transition (7.3)', () => {
 
     const emitter = new EventEmitter();
     const result1 = checkLevelComplete(state, campaign, emitter);
+    expect(state.levelEnded).toBe(true); // checkLevelComplete closes the session itself
     const result2 = checkLevelComplete(state, campaign, emitter);
 
     expect(result1.triggered).toBe(true);
-    expect(result2.triggered).toBe(false); // Already completed
+    expect(result2.triggered).toBe(false); // Session already ended
   });
 
   it('starting a new level resets GameState but preserves campaign state', () => {
@@ -107,6 +109,7 @@ describe('Level completion and transition (7.3)', () => {
 
     const emitter = new EventEmitter();
     checkLevelComplete(state, campaign, emitter);
+    expect(state.levelEnded).toBe(true);
 
     // Further calls don't re-trigger
     const result = checkLevelComplete(state, campaign, emitter);
@@ -114,5 +117,145 @@ describe('Level completion and transition (7.3)', () => {
 
     // State still has the level active (player can keep playing)
     expect(campaign.activeLevelId).toBe(level.id);
+  });
+
+  describe('replay of an already-completed level (#1310)', () => {
+    /** Complete level 1 once with session profit `p1`; returns campaign + level. */
+    function completeFirstPlay(p1: number) {
+      const campaign = createCampaignState();
+      const level = getAllLevels()[0]!;
+      startLevel(campaign, level.id);
+      const first = createGame({ seed: 42 });
+      addIncome(first.finances, p1, 'sales', 'test', 0);
+      const r = checkLevelComplete(first, campaign, new EventEmitter());
+      expect(r.triggered).toBe(true);
+      return { campaign, level };
+    }
+
+    /** Fresh game on the already-completed level with `income` earned. */
+    function freshReplay(campaign: ReturnType<typeof createCampaignState>, levelId: string, income: number) {
+      startLevel(campaign, levelId);
+      const state = createGame({ seed: 42 });
+      state.campaign = campaign;
+      if (income > 0) addIncome(state.finances, income, 'sales', 'test', 0);
+      return state;
+    }
+
+    it('replay beating best profit triggers victory and updates bestSessionProfit', () => {
+      const threshold = getAllLevels()[0]!.unlockThreshold;
+      const p1 = threshold + 100;
+      const p2 = threshold + 5000;
+      const { campaign, level } = completeFirstPlay(p1);
+      expect(campaign.levels[level.id]!.bestSessionProfit).toBe(p1);
+
+      const state = freshReplay(campaign, level.id, p2);
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+      emitter.on('level:complete', handler);
+
+      const result = checkLevelComplete(state, campaign, emitter);
+      expect(result.triggered).toBe(true);
+      expect(result.summary).not.toBeNull();
+      expect(result.summary!.totalProfit).toBe(p2);
+      expect(campaign.levels[level.id]!.bestSessionProfit).toBe(p2);
+      expect(handler).toHaveBeenCalledOnce();
+    });
+
+    it('replay through checkGameOverConditions ends the level as completed', () => {
+      const threshold = getAllLevels()[0]!.unlockThreshold;
+      const { campaign, level } = completeFirstPlay(threshold + 100);
+      const state = freshReplay(campaign, level.id, threshold + 5000);
+
+      const report = checkGameOverConditions(state, new EventEmitter());
+      expect(report.levelCompleted).toBe(true);
+      expect(state.levelEnded).toBe(true);
+      expect(state.levelEndReason).toBe('completed');
+    });
+
+    it('lower replay at or above threshold still wins but keeps the best profit', () => {
+      const threshold = getAllLevels()[0]!.unlockThreshold;
+      const p1 = threshold + 5000;
+      const p2 = threshold + 10;
+      const { campaign, level } = completeFirstPlay(p1);
+      const state = freshReplay(campaign, level.id, p2);
+
+      const result = checkLevelComplete(state, campaign, new EventEmitter());
+      expect(result.triggered).toBe(true);
+      expect(result.summary!.totalProfit).toBe(p2);
+      expect(campaign.levels[level.id]!.bestSessionProfit).toBe(p1);
+    });
+
+    it('replay never re-unlocks levels or flips campaignComplete twice', () => {
+      const all = getAllLevels();
+      const threshold = all[0]!.unlockThreshold;
+      const { campaign, level } = completeFirstPlay(threshold + 100);
+      const next = all[1]!;
+      const later = all[2]!;
+      expect(campaign.levels[next.id]!.unlocked).toBe(true);
+      // Simulate state that a second unlock would visibly overwrite.
+      campaign.levels[next.id]!.unlocked = false;
+      campaign.levels[later.id]!.unlocked = false;
+      campaign.campaignComplete = false;
+
+      const state = freshReplay(campaign, level.id, threshold + 5000);
+      const result = checkLevelComplete(state, campaign, new EventEmitter());
+
+      expect(result.triggered).toBe(true);
+      expect(campaign.levels[next.id]!.unlocked).toBe(false);
+      expect(campaign.levels[later.id]!.unlocked).toBe(false);
+      expect(campaign.campaignComplete).toBe(false);
+    });
+
+    it('replay keeps campaignComplete true once the whole campaign is done', () => {
+      const all = getAllLevels();
+      const threshold = all[0]!.unlockThreshold;
+      const { campaign, level } = completeFirstPlay(threshold + 100);
+      for (const l of all) campaign.levels[l.id]!.completed = true;
+      campaign.campaignComplete = true;
+
+      const state = freshReplay(campaign, level.id, threshold + 5000);
+      expect(checkLevelComplete(state, campaign, new EventEmitter()).triggered).toBe(true);
+      expect(campaign.campaignComplete).toBe(true);
+    });
+
+    it('replay below threshold does not trigger and leaves best profit unchanged', () => {
+      const threshold = getAllLevels()[0]!.unlockThreshold;
+      const p1 = threshold + 100;
+      const { campaign, level } = completeFirstPlay(p1);
+      const before = campaign.levels[level.id]!.cumulativeProfit;
+      const state = freshReplay(campaign, level.id, threshold - 1);
+
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+      emitter.on('level:complete', handler);
+      const result = checkLevelComplete(state, campaign, emitter);
+
+      expect(result.triggered).toBe(false);
+      expect(result.summary).toBeNull();
+      expect(campaign.levels[level.id]!.bestSessionProfit).toBe(p1);
+      expect(campaign.levels[level.id]!.cumulativeProfit).toBe(before);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('triggers at most once per session (the trigger sets levelEnded)', () => {
+      const threshold = getAllLevels()[0]!.unlockThreshold;
+      const { campaign, level } = completeFirstPlay(threshold + 100);
+      const state = freshReplay(campaign, level.id, threshold + 5000);
+      const emitter = new EventEmitter();
+      const handler = vi.fn();
+      emitter.on('level:complete', handler);
+
+      expect(checkLevelComplete(state, campaign, emitter).triggered).toBe(true);
+      expect(state.levelEnded).toBe(true);
+      const cumulative = campaign.levels[level.id]!.cumulativeProfit;
+
+      for (let i = 0; i < 3; i++) {
+        const again = checkLevelComplete(state, campaign, emitter);
+        expect(again.triggered).toBe(false);
+        expect(again.summary).toBeNull();
+      }
+      expect(campaign.levels[level.id]!.cumulativeProfit).toBe(cumulative);
+      expect(handler).toHaveBeenCalledOnce();
+    });
   });
 });
