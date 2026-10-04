@@ -547,6 +547,25 @@ describe('Campaign', () => {
     expect(ctx.state!.cash).toBeGreaterThanOrEqual(TUTORIAL_START_CASH + 5000);
   });
 
+  it('campaign complete level:<id> activates a locked level on a running game and wins with profit at the threshold', () => {
+    addExpense(ctx.state!.finances, 90000, 'salaries', 'test', 0);
+    const threshold = getLevel('grumpstone_ridge')!.unlockThreshold;
+
+    const result = campaignCompleteCommand(ctx, [], { level: 'grumpstone_ridge' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.campaign.activeLevelId).toBe('grumpstone_ridge');
+    expect(ctx.state!.levelEnded).toBe(true);
+    expect(ctx.state!.levelEndReason).toBe('completed');
+    expect(ctx.state!.levelStats.totalWealth).toBe(threshold);
+    expect(ctx.state!.campaign.levels['grumpstone_ridge']!.completed).toBe(true);
+  });
+
+  it('campaign complete level:<id> rejects an unknown level', () => {
+    const result = campaignCompleteCommand(ctx, [], { level: 'nowhere' });
+    expect(result.success).toBe(false);
+    expect(ctx.state!.levelEnded).toBe(false);
+  });
+
   // ── 14. stats command output ───────────────────────────────────────────────
 
   it('stats command shows level statistics and star rating', () => {

@@ -284,7 +284,7 @@ export function createRunner(): RunnerWithContext {
   );
 
   // --- Campaign commands (Phase 7) ---
-  runner.register('campaign', 'Campaign (status|start level:<id>|complete)', (args, named): CommandResult => {
+  runner.register('campaign', 'Campaign (status|start level:<id>|complete [level:<id>])', (args, named): CommandResult => {
     const sub = args[0] ?? named['sub'] ?? 'status';
     const rest = args.slice(1);
     if (sub === 'status') return campaignStatusCommand(ctx, rest, named);

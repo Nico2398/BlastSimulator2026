@@ -110,20 +110,26 @@ const OUTCOME_VALIDATORS: Record<string, OutcomeValidator> = {
     check: (s) => s.levelEndReason === 'completed' && (s.profit ?? 0) > 0,
   },
   'level1-playthrough-revolt': {
-    label: 'revolted === true',
-    check: (s) => s.revolted === true,
+    label: 'levelEndReason === "worker_revolt", revolted, not bankrupt',
+    check: (s) => s.levelEndReason === 'worker_revolt' && s.revolted === true && s.bankrupt !== true,
+  },
+  'skill-progression': {
+    label: 'proficiencyTotal === 4, level not ended, not bankrupt',
+    check: (s) => s.proficiencyTotal === 4 && s.levelEnded !== true && s.bankrupt !== true,
   },
   'level2-playthrough-win': {
-    label: 'levelEndReason === "completed" and profit > 0',
-    check: (s) => s.levelEndReason === 'completed' && (s.profit ?? 0) > 0,
+    label: 'levelEnded, levelEndReason === "completed", not bankrupt, profit > 0',
+    check: (s) =>
+      s.levelEnded === true && s.levelEndReason === 'completed' && s.bankrupt !== true && (s.profit ?? 0) > 0,
   },
   'level2-playthrough-bankruptcy': {
     label: 'bankrupt === true OR levelEndReason === "bankruptcy"',
     check: (s) => s.bankrupt === true || s.levelEndReason === 'bankruptcy',
   },
   'level3-playthrough-win': {
-    label: 'levelEndReason === "completed" and profit > 0',
-    check: (s) => s.levelEndReason === 'completed' && (s.profit ?? 0) > 0,
+    label: 'levelEnded, levelEndReason === "completed", not bankrupt, profit > 0',
+    check: (s) =>
+      s.levelEnded === true && s.levelEndReason === 'completed' && s.bankrupt !== true && (s.profit ?? 0) > 0,
   },
   'level3-playthrough-ecology': {
     label: 'ecologicalShutdown === true OR levelEndReason === "ecological_shutdown"',
@@ -373,6 +379,16 @@ describe('Level Playthrough Scenarios', () => {
     const validator = OUTCOME_VALIDATORS['level3-playthrough-ecology']!;
 
     console.log(`  Final state: ecologicalShutdown=${finalState.ecologicalShutdown}, levelEndReason=${finalState.levelEndReason}`);
+
+    expect(validator.check(finalState)).toBe(true);
+  }, 180000);
+
+  // ── Skill progression: runs on, never ends the level ──
+  it('skill-progression — ends with proficiencyTotal 4 and no level end', async () => {
+    const finalState = await runScenario('skill-progression');
+    const validator = OUTCOME_VALIDATORS['skill-progression']!;
+
+    console.log(`  Final state: proficiencyTotal=${finalState.proficiencyTotal}, levelEnded=${finalState.levelEnded}, bankrupt=${finalState.bankrupt}`);
 
     expect(validator.check(finalState)).toBe(true);
   }, 180000);

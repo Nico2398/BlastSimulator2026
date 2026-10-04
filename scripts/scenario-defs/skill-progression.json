@@ -1,6 +1,6 @@
 {
   "name": "skill-progression",
-  "description": "Chapter 3: Hire driller, assign drilling skill, and verify skill progression under continuous work with no rest building (#549: real completions include genuine collapse/rest cost). #1313: with no living quarters the lone driller's collapse crashes wellBeing to its floor and the worker revolt ends the level at tick 301 -- the mine freezes there, so the run no longer reaches the 700-tick budget or the 1 (blasting) + 3 (driving.excavator) = 4 proficiency it used to; it stops at driving.excavator level 2 (total 3), reached at tick 178. Everything after the revolt asserts the frozen state.",
+  "description": "Chapter 3: Hire driller, assign drilling skill, build five living quarters, and verify skill progression after 600 ticks of continuous work (#549: real completions include genuine collapse/rest cost, so the driller reaches excavator Level 3). #1431: one worker at constant work drives morale to 0, so five quarters keep the wellBeing score up and the level never ends in a worker revolt (#1313 freezes the mine at level end); the run stays solvent on its $200,000 start.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
@@ -31,7 +31,8 @@
         "increased": [
           "worldSizeX"
         ]
-      }
+      },
+      "description": "Starts with extra cash ($200,000) so the five living quarters and the 700-tick run stay solvent."
     },
     {
       "command": "time resume",
@@ -47,8 +48,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -84,6 +85,192 @@
         }
       },
       "role": "bootstrap"
+    },
+    {
+      "command": "build living_quarters at:15,17",
+      "description": "#1431: living quarters keep the lone driller rested and wellBeing up, so the level never ends in a worker revolt (#1313 freezes the mine at level end) and the run reaches its full tick budget.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 17
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:25,17",
+      "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 17
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:25,22",
+      "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 22
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:5,22",
+      "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 22
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:30,17",
+      "description": "Another living quarters: one lone driller at constant work drags morale to 0, so five quarters (+0.2 wellBeing each per tick) are what keep the wellBeing score above 0 and the worker revolt away (#1431).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 30,
+          "z": 17
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:600",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the driller to finish the living quarters before queuing the dispatch work, so it is not stuck behind it.",
+      "role": "setup",
+      "timeout": 150,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0,
+          "buildingCount": 5
+        }
+      }
     },
     {
       "command": "employee list",
@@ -497,15 +684,15 @@
       "role": "bootstrap"
     },
     {
-      "command": "tick 50",
+      "command": "tick 35",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 35"
         }
       ],
       "role": "setup",
-      "description": "A single `tick 700` step silently under-runs: a random event can fire mid-batch and the tick command stops advancing right there (`Advanced N of 700 requested ticks`) rather than queuing the remainder, and `tick` itself refuses to advance at all while an event is pending. Chunked into 14× (tick 50, event choose 0) instead, the same pattern already used everywhere else in this file's sibling scenarios, so no requested ticks are silently dropped waiting on an unresolved dialog."
+      "description": "A single `tick 700` step silently under-runs: a random event can fire mid-batch and the tick command stops advancing right there (`Advanced N of 700 requested ticks`) rather than queuing the remainder, and `tick` itself refuses to advance at all while an event is pending. Chunked into 14\u00d7 (tick 50, event choose 0) instead, the same pattern already used everywhere else in this file's sibling scenarios, so no requested ticks are silently dropped waiting on an unresolved dialog."
     },
     {
       "command": "event choose 0",
@@ -519,11 +706,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 50",
+      "command": "tick 35",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 35"
         }
       ],
       "role": "setup"
@@ -540,11 +727,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 50",
+      "command": "tick 35",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 35"
         }
       ],
       "role": "setup"
@@ -561,11 +748,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 50",
+      "command": "tick 35",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 35"
         }
       ],
       "role": "setup"
@@ -582,11 +769,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 50",
+      "command": "tick 35",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 35"
         }
       ],
       "role": "setup"
@@ -603,11 +790,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 50",
+      "command": "tick 35",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 35"
         }
       ],
       "role": "setup"
@@ -624,49 +811,148 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 50",
+      "command": "tick 35",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 35"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 35"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 35"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 35"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 35"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 35",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 35"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "revolted": true,
-          "levelEnded": true,
-          "levelEndReason": "worker_revolt",
-          "tickCount": 301,
-          "proficiencyTotal": 3
+          "proficiencyTotal": 4,
+          "levelEnded": false,
+          "bankrupt": false
         },
-        "note": "#1313: the level ends here -- the tick command stops on the tick the end lands (301) and the mine is frozen from then on."
+        "note": "1 (blasting, unraised) + 3 (driving.excavator): Level 3 lands around tick 494, Level 4 not before ~tick 694, after this run ends."
       }
     },
     {
-      "command": "tick 50",
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee list",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "employee list"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "revolted": true,
-          "levelEnded": true,
-          "levelEndReason": "worker_revolt",
-          "tickCount": 301,
-          "proficiencyTotal": 3
-        },
-        "note": "#1313: frozen mine."
-      },
-      "description": "#1313: a tick after the level ended advances nothing: cash and tickCount stay put."
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -676,18 +962,7 @@
           "command": "state full"
         }
       ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 301,
-          "revolted": true,
-          "levelEnded": true,
-          "levelEndReason": "worker_revolt",
-          "proficiencyTotal": 3,
-          "employeeCount": 1
-        },
-        "note": "#1313: final state is the frozen state at the end tick."
-      }
+      "role": "observe"
     }
   ]
 }

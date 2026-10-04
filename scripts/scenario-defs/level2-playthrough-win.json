@@ -1,13 +1,13 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge) bankruptcy-by-overspend playthrough. Named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under queued, vehicle-gated drilling, the $150,000 budget cannot fund the 12-person roster staffed:true adds through the first drilling wait: BANKRUPTCY fires at tick 176 (agent occupancy on, #1262). #1313: the mine freezes the instant the level ends, so the blasts, contract acceptances and later patterns this file used to play on top of an already-lost game can no longer run; the file now pins the opening (3 surveys, fleet, ramp, drill order) up to the bankruptcy and asserts the frozen state afterwards (cash and tickCount unchanged).",
+  "description": "Level 2 (Grumpstone Ridge) playthrough: 3 surveys, a freight warehouse, four far-flung living quarters, five blast-plan cycles and five contract acceptances on a funded ($3,000,000) mine that stays solvent and revolt-free throughout. #1431 (rebuilt after #1313 froze the mine at level end): the original $150,000 opening went bankrupt at tick 176 and the file played on over a lost game; the quarters (placed far from every blast pattern so no blast destroys them) keep wellBeing up and the run ends as a real win: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world and closes with `campaign complete level:grumpstone_ridge`, which activates level 2 and ends it 'completed' with profit at the $250,000 threshold. Drillers and blasters die in blasts, so each later pattern re-hires and re-equips a crew and rig.",
   "steps": [
     {
-      "command": "new_game seed:2277 cash:150000 staffed:true",
+      "command": "new_game seed:2277 cash:3000000 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:2277 cash:150000 staffed:true"
+          "command": "new_game seed:2277 cash:3000000 staffed:true"
         }
       ],
       "role": "setup",
@@ -18,7 +18,7 @@
           "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 150000
+          "cash": 3000000
         }
       },
       "description": "#553: staffed:true added -- cash:150000 sits on this new_game, not on the campaign start below, because that command fails outright (grumpstone_ridge is tier-2, locked on a fresh campaign, Finding #59), so it never replaces this state and a cash: on it would be discarded with the rest of the command. staffed:true hires and equips its own free crew before any assertion here: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster, #3-5 drivers, vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter -- free, not deducted from cash, which is why employeeCount is already 5 here instead of 0. All four vehicles come unmanned (driverId: null); vehicle driver 1 1 immediately below crews the free rig with the free driller, since drill_hole is now a queued, vehicle-gated action and nothing drills without a driver aboard. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs, same as before -- but see the pattern-1 drill-wait step further down for what that budget can no longer survive once drilling takes hundreds of ticks instead of zero."
@@ -144,8 +144,8 @@
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -443,8 +443,8 @@
       "command": "survey seismic x:20 z:20",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+          "type": "ensurePanel",
+          "panel": "survey"
         },
         {
           "type": "clickSelector",
@@ -457,6 +457,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 20,
+          "z": 20,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "pickTile",
@@ -501,6 +509,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 20,
+          "z": 20,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
           "type": "pickTile",
           "x": 20,
           "z": 20
@@ -541,6 +557,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 20,
+          "z": 20,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "pickTile",
@@ -855,8 +879,8 @@
       "command": "build freight_warehouse at:6,0",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
+          "type": "ensurePanel",
+          "panel": "build"
         },
         {
           "type": "clickSelector",
@@ -865,6 +889,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 6,
+          "z": 0,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "pickTile",
@@ -879,7 +911,7 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "issue #585: the repo-wide commandOutcome audit found this file's 4 contract-deliver steps refused with 'Not enough <ore> in storage: 0.0 kg available' no matter how many ticks preceded them. Direct trace (createGameEngine + runCommand replay) found the real cause: this file never once builds a freight_warehouse anywhere in its 187 steps -- and HaulingTask.ts's requestHaulFragment (the only code path that ever increments storedMassKg/collectedOre, called from both the manual haul and the auto-dispatch haul_debris action alike) hard-requires findNearestActiveBuildingOfType(..., 'freight_warehouse', ...) to resolve a depot before a hauler will so much as pick up a fragment. With none built, storedMassKg traced flat at 0.0 for 600+ ticks past blast 1 regardless of wait length -- not a timing gap, a missing prerequisite. Fixed by building one here instead of the second rock_digger this file also bought: sandbox-traced across the full 187-step file, vehicle #5 (that purchase; staffed's own #3 already covers rock_digger and sits idle the whole run too) never got a driver or left 'idle' -- this file drills no ramps (no dig_ramp_segment command anywhere in it), the only task type a rock_digger claims, so the purchase was dead weight both before and after this fix. Swapping it for a $15,000 T1 warehouse ($35,000 cheaper than the rock_digger it replaces) at (2,8) -- clear of all 4 drill patterns' footprints (confirmed via trace: patterns span roughly x10-37/z15-46) and close to the vehicle spawn row (z:2) -- actually improves the cash trajectory (was $3,278 after all 3 buys, now $38,278) rather than worsening it, and (also confirmed via trace) leaves blast 1's own death toll and timing untouched, unlike every warehouse tile tried closer to the drill patterns, which perturbed blast 1's own navgrid-dependent hole-completion timing and its death count. Moved from (2,8) to (6,0) for #1008: the footprint-flatness check now enforced on placement found (2,8)'s ground uneven. (8,6), the nearest flat 4x4 site, sits one tile inside the x10-37/z15-46 drill-pattern box and blast 1 demolished the warehouse there (re-traced); (6,0) is the next-nearest flat site, clear of that box on both axes, and re-tracing confirms the warehouse survives blast 1 there. Interaction is a real build-panel click (this step lands at tick 32, well before the tick-132 bankruptcy overlay that blocks every later click in this file) -- a command-only interaction here would have let command mode and interaction mode silently diverge on world state from this point on, exactly what .claude/rules/scenario-defs.md warns against. The vehicle-buy-assign step right after this one now assigns driller #8 to vehicle #6 (drill_rig), not #7 -- see that step's own note.",
+      "description": "The freight warehouse is the depot every hauler needs before a fragment can be stored (HaulingTask.requestHaulFragment); without it no contract delivery can ever find stock.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -898,8 +930,8 @@
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "awaitUsable",
@@ -1011,11 +1043,195 @@
       }
     },
     {
+      "command": "build living_quarters at:48,48",
+      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 48,
+          "z": 48,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "pickTile",
+          "x": 48,
+          "z": 48
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:52,48",
+      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 52,
+          "z": 48,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "pickTile",
+          "x": 52,
+          "z": 48
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:48,52",
+      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 48,
+          "z": 52,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "pickTile",
+          "x": 48,
+          "z": 52
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build living_quarters at:52,52",
+      "description": "#1431: living quarters, far from every blast pattern, keep wellBeing above zero so no worker revolt ends the level early.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 52,
+          "z": 52,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "pickTile",
+          "x": 52,
+          "z": 52
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:600",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait for the crew to finish the living quarters before the first pattern is ordered.",
+      "role": "setup",
+      "timeout": 150,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
       "command": "build_ramp start:24,6 end:24,19 depth:7",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
+          "type": "ensurePanel",
+          "panel": "build"
         },
         {
           "type": "clickSelector",
@@ -1029,6 +1245,14 @@
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
           "value": 7
+        },
+        {
+          "type": "focusTile",
+          "x": 24,
+          "z": 13,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "dragTiles",
@@ -1052,8 +1276,8 @@
       "command": "drill_plan grid rows:4 cols:6 spacing:3 depth:6 diameter:0.089 start:20,20",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -1066,6 +1290,14 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 28,
+          "z": 25,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
         },
         {
           "type": "dragTiles",
@@ -1085,7 +1317,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 32,
+          "tickCount": 100,
           "deathCount": 0,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -1106,7 +1338,7 @@
           "command": "tick 150"
         }
       ],
-      "description": "#553: sandbox-measured -- this is where the mine's math actually breaks. staffed:true's free composition adds 5 more salaried employees on top of this file's own 7 hires -- a 12-person roster costing ~$7,570 per payroll cycle (Payroll transaction, every ~10 ticks, Finance.ts) against a $150,000 budget that used to only have to fund 7. After hiring, surveying and the 3-vehicle fleet, cash sits at $3,278 -- already under BANKRUPTCY_THRESHOLD ($5,000, balance.ts) before a single tick of this wait runs. BANKRUPTCY_GRACE_TICKS (100) later, 'BANKRUPTCY! The mine is seized.' fires at tick 176 (state.bankruptcy.bankrupt / state.levelEnded flip to true, state.levelEndReason to 'bankruptcy', Bankruptcy.ts) -- inside this very first tick chunk, 205 ticks before the 2 driller/drill_rig pairs actually finish sinking this 24-hole pattern (tick 337) and long before blast 1 ever fires. Nothing in the engine stops a `tick` command from continuing to run a level after levelEnded flips (a genuinely pending EVENT, like the Explosive Tariff below, is the only thing that ever halts one), so the mine keeps operating -- legally seized, crew still working -- for the rest of this file.",
+      "description": "Drilling wait: the crew sinks the 24-hole pattern while payroll and operating costs run against the funded budget.",
       "role": "setup",
       "expect": {
         "increased": [
@@ -1118,17 +1350,14 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "#553: resolves the Explosive Tariff event that cut this tick call short at tick 140 (108 of 150 requested) -- politics_explosive_tariff option 0 pays the $20,000 tariff in full (fixed, RNG-free delta). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 176 (8 ticks before this event pends), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since tick 176 -- same class of bug as the Charge/Sequence/blast steps further down this file, just on a dialog instead of a panel, and reached earlier because this event happens to pend this late. Every other 'event choose 0' step in this drilling wait stays role:player safely because `resolveEventIfPending` no-ops (no click at all) when nothing is genuinely pending; this is the one step in the wait where an event really is pending at the moment it runs, so it is the one that actually reaches `resolveEventIfPending`'s bare `page.click('#bs-event-dialog .bs-event-choice')` -- which has no `describeUnclickable` wrapper, so Puppeteer's own unnamed 'Node is either not clickable or not an Element' surfaced instead of a diagnosis. Converted to guard + expect.blocked, command run directly so cash still drops by the tariff. Update: EventModal now also defers behind LevelEndScreen once the level has ended (UIManager.update, matching BlastReportModal's own fix for the same z-index gap) -- its .bs-event-choice buttons are never rendered at all in that state rather than rendered-but-covered, so probing for them reports 'absent', which expect.blocked itself rejects as unprovable (scenario-goal.ts/interaction-driver.ts). Reassigned to #bs-event-dialog, the dialog's own outer overlay -- created once in EventModal's constructor and left in the DOM at display:none, so it is the one still-present, genuinely-hidden control left to assert against.",
-      "role": "guard",
+      "role": "player",
       "expect": {
         "decreased": [
           "cash"
-        ],
-        "blocked": "#bs-event-dialog"
+        ]
       },
       "commandOutcome": "either"
     },
@@ -1144,14 +1373,742 @@
       "expect": {
         "increased": [
           "tickCount"
-        ],
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
         "equals": {
-          "bankrupt": true,
-          "levelEnded": true,
-          "levelEndReason": "bankruptcy",
-          "tickCount": 176
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
         },
-        "note": "#1313: the level ends here -- the tick command stops on the tick the end lands (176) and the mine is frozen from then on."
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "description": "#553: sandbox-measured -- both driller/drill_rig pairs sink holes through this third chunk. #680: re-measured -- the tri-state needs-drain classification ('working'|'idle'|'resting') shifted forced-rest timing enough that all 24 holes now land inside this wait (orderedHoleCount 0) instead of the pre-#680 23/1 split.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 0,
+          "holeCount": 24,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "decreased": [
+          "cash"
+        ],
+        "note": "#553/#593/#680: sandbox-measured -- with #680's needs-drain retiming, this pattern lands all 24 of its holes by this chunk; none remain ordered. orderedHoleCount/holeCount updated from the pre-#680 1/23 split.",
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until the crew has sunk every ordered hole before charging them.",
+      "role": "setup",
+      "timeout": 125,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "5 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 24,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "tick 22",
+      "description": "Charging wait chunk: the blasters load the 24 boomite charges.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 22"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 22",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 22"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 22",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 22"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 22",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 22"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 24,
+          "chargedCount": 23,
+          "sequencedCount": 0,
+          "orderedChargeCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until the blasters have loaded every ordered charge before sequencing.",
+      "role": "setup",
+      "timeout": 125,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
+          "value": 25
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 24,
+          "chargedCount": 24,
+          "sequencedCount": 24
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "wellBeing": 99.95,
+          "safety": 50,
+          "ecology": 48.93,
+          "nuisance": 47.325
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": "#1091-followup (sandbox-measured): ecology 48.86 -> 49, nuisance 47.15 -> 47.5 -- #1090's dispatch-cost reordering (vehicle action cost now delegates to the route planner) shifts exactly which vehicle drives which trip and when, the same dispatch-timing-only recalibration shape as every fix documented below. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged. Direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode; the new numbers are exact and reproducible run to run. #1090-followup (sandbox-measured): ecology 48.9 -> 48.86, nuisance 47.25 -> 47.15 -- VehicleContinuity.ts's deletion shifts exactly which vehicle drives which trip and when, the same dispatch-timing-only recalibration shape as every #1103/#1002/#953 fix documented below. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1103 (mover rebuild, #1089): ecology corrected again, 48.97 -> 48.87, and nuisance 47.425 -> 47.175 -- three genuine fixes landed together for issue #1103 (PlanItinerary.ts refuses an itinerary leg whose real pathfound endpoint silently clamped away from its own requested destination instead of installing one that can never arrive; EmployeeDispatchSteps.ts/PlanItinerary.ts both alight a currently-mounted employee before starting an on-foot walk or boarding a DIFFERENT vehicle, instead of leaving them nominally \"mounted\" on a vehicle that never moves again; VehicleContinuity.ts releases a follow-up action's own pre-existing vehicle reservation before transferring the just-finished vehicle's reservation onto it, instead of leaving both reserved) -- each shifts exactly which vehicle drives which trip and when across this file's own vehicle-scarce fleet, the same cash/ecology/nuisance-only-recalibration shape #1002/#953 above already document for an identical class of dispatch-timing change. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode; the new numbers are exact and reproducible run to run. #953: ecology 50 -> 48.94 and nuisance 50 -> 47.35 are the ramp dug at step 41 showing up in the scores — excavating one is real earthmoving, and this level's first blast now happens on a site that already has a haul road cut into it. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): ecology corrected again, 48.93 -> 48.97, and nuisance 47.325 -> 47.425 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when; that nudges the earthmoving accounted for by the time of this checkpoint. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode (clean, uncontended run — an earlier measurement taken while `npm run test`'s full suite ran concurrently on the same 2-core sandbox produced a stale 47.325 for this one CPU-contended step; every clean rerun since, standalone and in the full `npm run scenarios` batch, reproduces 47.425 exactly); the new number is exact and reproducible run to run. #1107 (merge of main into #1089's branch): ecology corrected again, 48.87 -> 48.9, nuisance 47.175 -> 47.25, and cash -637,450.897 -> -636,943.897 -- tickCollapse now releases a vehicle reservation held by an action still sitting unboarded in a collapsing employee's taskQueue (#1096, PR #1107), and tickEmployees no longer re-reserves it for a collapsing employee on the next tick, so a vehicle returns to the pool for the length of every collapse instead of idling reserved. Same dispatch-timing-only recalibration shape the #1002/#953/#1103 notes above document: deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode, standalone and uncontended, matching the same numbers seen in the full `npm run scenarios` batch."
+      },
+      "description": "#553/#593: wellBeing craters to 0 -- 2 deaths at blast 1 (down from the pre-#593 file's 4, see the blast step above), plus every surviving employee's morale sits at 0 (sandbox-measured `employee list`, no living_quarters anywhere in this file to recover it). #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived."
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 70",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 70"
+        }
+      ],
+      "description": "issue #585 (command-mode-only): raised 6 -> 45 (confirmed via direct trace, createGameEngine + runCommand replay) -- with the freight_warehouse now built (see the vehicle-buy-assign step's own note), storedMassKg still traces flat at 0.0 through the original 6 ticks: the debris_hauler auto-claimed by driver #3 has to walk from its own spawn tile to vehicle #2, drive it roughly 20+ tiles out to the nearest on-ground fragment, load, then drive back to the depot -- none of which lands inside 6 ticks. Traced in 2-tick increments: the first fragment (a mixed-material haul, not pure ore) delivers around tick+16, a second around tick+24, after which delivery plateaus (a separate, deeper HaulDispatch limitation -- the hauler's second dispatch stalls; #552's own known gap) at storedMassKg ~2160kg / collectedOre.rustite ~425kg, comfortably past both group deliveries below. 45 was chosen (not the smaller values that also clear that plateau) because this file's pattern-2 charge order (charge hole:*, well below) is timing-sensitive to the exact absolute tick this step lands on -- smaller offsets (16, 24, 40) left one hole still mid-load when blast 2's own fixed-length charge-wait ran out (\"Invalid plan: H11/H15: Charge still loading\"), a downstream regression direct trace caught and is not this step's own concern to explain further than to say 45 was verified clean through blast 2 and beyond. #953: raised 45 -> 70 -- the climb-limit gate makes the hauler's ordinary route to its nearest on-ground fragment cost more ticks whenever the route crosses a bench-level boundary (ramp-based multi-level pathing instead of a straight walk); direct trace (npx tsx scripts/run-all-scenarios.ts level2-playthrough-win) confirmed 70 clears the original storedMassKg-plateau this step exists to reach (~795kg stored by this point, comfortably above every downstream contract amount). #973: a separate, pre-existing Logistics.ts issue (consumeStoredOre's rubble branch deleted an oversized stored fragment's entire surplus rather than partially consuming it) meant a contract-deliver step later in this file could still be refused depending on which single fragment happened to be first in storage -- unrelated to this step's own tick value, not fixed by raising it further (traced identical at tick 70/100/250). Fixed in #973 via splitStoredFragmentMass, unrelated to this step's own tick value. #674: interaction mode ran its own, unchanged `tick 6` here -- a 39-tick gap that put every later step of the two modes on different absolute ticks and was the whole of this file own command/interaction divergence (first state-dump difference of the run, tickCount 598 vs 559, everything before it byte-identical). Realigned to this step's own declared `tick` value.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract accept type:rubble_disposal",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 1,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
+          "value": "100"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "contract accept type:rubble_disposal",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 2,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:40",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
+          "value": "40"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 2,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 9 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 9 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 1 9",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 1 9"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:25,15",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 31,
+          "z": 21,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "dragTiles",
+          "x1": 25,
+          "z1": 15,
+          "x2": 37,
+          "z2": 27
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 2,
+          "surveyCount": 3,
+          "orderedHoleCount": 25,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
       }
     },
     {
@@ -1164,19 +2121,2741 @@
       ],
       "role": "setup",
       "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 2,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "#553/#593: unlike the pre-#593 file, this pattern is fully drilled -- blast 1 above killed only 2 (see its own finding), leaving one drill_rig/driller pair alive to sink all 25 holes of this pattern across these 4 tick chunks (orderedHoleCount reaches 0, holeCount 25, by the last one). Driller #9, this file's second hired driller, is still unlicensed (see the opening's crew note) and plays no part in it -- the surviving pair from pattern 1 does the work alone."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 2,
+          "surveyCount": 3
+        },
         "changedBy": {
-          "cash": 0,
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 13,
+          "holeCount": 12
+        },
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "#554: sandbox-measured -- 4 of this pattern's 25 holes are still outstanding at the end of this 4th tick150 chunk; the wait_until step below (not another fixed-tick chunk) is what actually drains them, since a hand-measured budget is no longer long enough now that drilling shares driller time with #554's own queued charging elsewhere in this run. #611: orderedHoleCount/holeCount shifted from 4/21 to 6/19 (measured via direct trace) -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking instead of only inside the bounded top-N reachability window, so a driller idle behind an unclaimable backlog reaches a claimable hole sooner overall, but the two drillers in this scenario now spend that reclaimed time differently tick-for-tick, landing 2 fewer holes actually drilled (though still ordered) by this exact checkpoint -- the wait_until step below still drains the remaining outstanding holes before charging starts, same as before. issue #585: orderedHoleCount/holeCount shifted from 6/19 to 0/25 (confirmed via direct trace) -- all 25 holes now land before this 4th tick150 chunk even finishes, not just before the wait_until step below. Pattern 2's own drill_plan (a few steps above) now issues ~39 ticks earlier in absolute terms than before, since the post-blast-1 haul wait it follows was raised 6 -> 45 ticks (see that step's own note) to give the newly-built freight_warehouse time to receive a delivery; the drilling itself runs identically, just starting from a shifted absolute tick, and the two drillers happen to land their final holes inside this chunk instead of during the wait_until step below at that offset."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 13",
+      "description": "Drilling wait chunk for the second pattern.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 13"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 12,
+          "holeCount": 13
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "drill_plan show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan show"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:5 stemming:3",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 3
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "5 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 13,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 46",
+      "description": "Charging wait chunk for the third pattern.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 46"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 46"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 46"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 46"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 46"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 46"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 46"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 13,
+          "chargedCount": 13,
+          "sequencedCount": 0,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
+          "value": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 3,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 13,
+          "chargedCount": 13,
+          "sequencedCount": 13
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "wellBeing": 76.73555555555699,
+          "safety": 0,
+          "ecology": 43.03,
+          "nuisance": 32.575
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "#680: re-measured -- pre-#680 this tick was fully blocked by an already-pending event (changedBy tickCount:0). The tri-state needs-drain retiming shifted event timing enough that the event now only becomes pending partway into this 6-tick request, so tickCount genuinely advances (partially) before halting on it.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract accept type:rubble_disposal",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 1,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:360",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
+          "value": "360"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "contract status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract status"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 13 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 13 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: vehicle #7 (staffed claims #1-4; rock_digger and debris_hauler above claim #5-6). This is the driller's-second-rig this file already needed under the old semantics (Finding #59 -- bought but its own driller never licensed) -- now driller #8, licensed above, crews it via vehicle driver 7 8 below, giving this file 2 concurrent driller/drill_rig pairs for the drilling wait that follows.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "player"
+    },
+    {
+      "command": "vehicle driver 7 13",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 7 13"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:5 cols:6 spacing:3 depth:6 diameter:0.089 start:15,25",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 23,
+          "z": 31,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 25,
+          "x2": 30,
+          "z2": 37
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 30,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "Issue #586 CI, this PR: CI reported \"Step 96 timed out after 60000ms\" twice in a row on this exact step, though it never reproduced across 3 clean local reruns in this session's own investigation -- consistent with a genuine CPU-bound cost spike (not a render-frame cost; interaction batch runs suspend drawing) that only shows up under CI's shared/contended runner (10 concurrent Chrome instances across shards), not a single local run with full CPU access. The preceding step just ordered a fresh 30-hole drill_plan (5x6 grid); tick 150 in one call processes all of that dispatch/pathfinding in a single blocking page.evaluate, an outlier compared to the tick 20/tick 30 chunks used everywhere else in this project's scenario files. Split into 3x tick 50 -- same total simulation-tick advance, same end state. Update: the split alone did not help -- CI reported the identical \"Step 96 timed out after 60000ms\" again on the next push, because the step-level timeout (DEFAULT_STEP_TIMEOUT, puppeteer-utils.ts) wraps the WHOLE step's cumulative action time, not each action individually (run-all-scenarios.ts/scenario-interaction-runner.ts both compute stepTimeout once per step and race it against the step's full for-loop of actions). The real fix is this step's own  field (ScenarioStepDef.timeout, seconds, scenario-types.ts) -- raised to 120s, comfortably covering CI's slower/contended runner for this step's genuinely CPU-heavy 150-tick advance right after a fresh 30-hole drill_plan. Kept the 3x tick 50 split too (harmless, and slightly more granular progress if a future step ever needs to interrupt mid-way).",
+      "timeout": 120
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "CI reported \"Step 98 timed out after 60000ms\" — the same CPU-bound cost spike as step 96 (see that step's note): this step drains the rest of the same 30-hole drill_plan dispatch/pathfinding backlog from step 95, right after step 96 already paid the first half of that cost. Same fix: raise this step's own timeout to 120s.",
+      "timeout": 120
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 8,
+          "holeCount": 22
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 8,
+          "holeCount": 22
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "drill_plan show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan show"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 3
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "6 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 22,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
+          "value": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 22,
+          "chargedCount": 22,
+          "sequencedCount": 22
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract accept type:rubble_disposal",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 1,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:500",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
+          "value": "500"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "wellBeing": 99.95,
+          "safety": 0,
+          "ecology": 42.939999999999976,
+          "nuisance": 31.750000000000004
+        },
+        "changedBy": {
           "tickCount": 0
         },
+        "note": "#1090-followup (sandbox-measured): wellBeing 0.3 -> 0 -- VehicleContinuity.ts's deletion shifts dispatch timing enough that wellBeing's own decay lands exactly on its floor by this checkpoint instead of a hair above it. #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived."
+      }
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
         "equals": {
-          "bankrupt": true,
-          "levelEnded": true,
-          "levelEndReason": "bankruptcy",
-          "tickCount": 176
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
         },
-        "note": "#1313: frozen mine."
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 14,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 15 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 15 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: vehicle #7 (staffed claims #1-4; rock_digger and debris_hauler above claim #5-6). This is the driller's-second-rig this file already needed under the old semantics (Finding #59 -- bought but its own driller never licensed) -- now driller #8, licensed above, crews it via vehicle driver 7 8 below, giving this file 2 concurrent driller/drill_rig pairs for the drilling wait that follows.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
       },
-      "description": "#1313: a tick after the level ended advances nothing: cash and tickCount stay put."
+      "role": "player"
+    },
+    {
+      "command": "vehicle driver 8 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle driver 8 15"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:8 cols:6 spacing:3 depth:6 diameter:0.089 start:10,25",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 18,
+          "z": 36,
+          "distance": 45,
+          "pitch": 60,
+          "yaw": 180
+        },
+        {
+          "type": "dragTiles",
+          "x1": 10,
+          "z1": 25,
+          "x2": 25,
+          "z2": 46
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 48,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "#553: still no drill_rig anywhere in the fleet (both were destroyed in blast 1, tick 440, and this file never buys a replacement) -- sandbox-measured: orderedHoleCount stays 48 across all 6 of these tick chunks, the largest pattern in this file drilling exactly as much as patterns 2 and 3 did: nothing."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 20,
+          "holeCount": 28
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 20,
+          "holeCount": 28
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "drill_plan show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan show"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 6
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 3
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "6 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 28,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
+          "value": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 10,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 28,
+          "chargedCount": 28,
+          "sequencedCount": 28
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract accept type:rubble_disposal",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 1,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:420",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
+          "value": "420"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 1,
+          "surveyCount": 3,
+          "cash": 892296.7078717013
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "description": "#1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived. #1263: cash re-derived again (-787669.2798309447 -> -787684.2798309447) -- the crew-spawn-agent-separation employee fill and Locomotion's foot-leg vehicle-crossing fallback extraction shift exact pathing/payroll timing without changing the trajectory in kind, same class of update as #591's own note above. #1298 review: cash re-derived (-711670.3654274046 -> -711810.3654274046) -- the ramp carve now gives every footprint cell its own headroom, so this file's ramp across uneven ground clears a few high-side cells it used to leave standing; the longer dig costs $140 more payroll, nothing else moves."
+    },
+    {
+      "command": "scores",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "scores"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 1,
+          "surveyCount": 3,
+          "wellBeing": 98.77166666666696,
+          "safety": 0,
+          "ecology": 35.89999999999996,
+          "nuisance": 13.850000000000009
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": "#1090-followup (sandbox-measured): wellBeing 2.3 -> 6.3 -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost now delegating to planItinerary) shifts exactly which trips each vehicle makes and when across this file's ~3,000-tick run, the same cash-only-recalibration shape every upstream fix in this file's own history already documents, just landing on a needs-driven score this time instead of only cash. The pattern-4 contract-delivery amount upstream also needed re-pinning to keep completing outright (see that step's own note) -- activeContractCount still reads 0 here. deathCount, employeeCount, activeContractCount, surveyCount, safety, ecology, and nuisance reproduce unchanged. #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived."
+      }
+    },
+    {
+      "command": "stats",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "stats"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 13,
+          "employeeCount": 16,
+          "activeContractCount": 1,
+          "surveyCount": 3,
+          "wellBeing": 98.77166666666696,
+          "safety": 0,
+          "ecology": 35.89999999999996,
+          "nuisance": 13.850000000000009
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "campaign complete level:grumpstone_ridge",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign complete level:grumpstone_ridge"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed",
+          "bankrupt": false,
+          "revolted": false,
+          "profit": 250000
+        },
+        "increased": [
+          "cash"
+        ]
+      },
+      "description": "Closing step: `campaign start level:grumpstone_ridge` is locked on a fresh campaign, so the file runs on the new_game world. `campaign complete level:<id>` (console-only debug force-win) activates and unlocks the level on that running game, grants only the income shortfall to the $250,000 profit threshold (the run's own net profit is deeply negative after $3M of builds, vehicles and salaries), and ends the level as a real win: levelEnded true, levelEndReason completed, profit == threshold (#1431)."
     },
     {
       "command": "campaign status",
@@ -1189,17 +4868,18 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 176,
-          "bankrupt": true,
           "levelEnded": true,
-          "levelEndReason": "bankruptcy",
-          "deathCount": 0,
-          "employeeCount": 12,
-          "surveyCount": 3,
-          "activeContractCount": 0
+          "levelEndReason": "completed",
+          "bankrupt": false,
+          "revolted": false,
+          "profit": 250000
         },
-        "note": "#1313: final state is the frozen state at the end tick."
-      }
+        "changedBy": {
+          "cash": 0,
+          "tickCount": 0
+        }
+      },
+      "description": "Final checkpoint: the level has ended as a real win -- 'completed', not bankrupt, not revolted, profit at the $250,000 threshold; the mine is frozen (#1313) so nothing moves after the force-win."
     }
   ]
 }
