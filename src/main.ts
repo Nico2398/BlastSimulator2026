@@ -153,6 +153,7 @@ placementController.setClaimCheck((x, z) => {
 // has to reach back into the controller that armed it.
 paramStrip.setConfirmHandler(() => placementController.confirm());
 paramStrip.setCancelHandler(() => placementController.cancel());
+uiManager.setClaimAreaPreview((rect) => ctx.playableArea?.previewClaimArea(rect) ?? null);
 uiManager.setPlacementKit({ controller: placementController, overlay: selectionOverlay, strip: paramStrip });
 // Build panel's footprint-flatness preview (#1008) reads the same ground
 // truth checkFootprintPlacement does — the raw voxel surface, not a

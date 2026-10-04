@@ -309,6 +309,25 @@ export class PlayableArea {
   }
 
   /**
+   * Whether claiming every chunk the rect touches would be refused, and why —
+   * non-mutating (#1396).
+   */
+  previewClaimArea(rect: Rect): ClaimRefusalReason | null {
+    const cx0 = Math.floor(rect.minX / CHUNK_SIZE);
+    const cz0 = Math.floor(rect.minZ / CHUNK_SIZE);
+    // maxX/maxZ are exclusive: the last covered tile is max - 1.
+    const cx1 = Math.floor((rect.maxX - 1) / CHUNK_SIZE);
+    const cz1 = Math.floor((rect.maxZ - 1) / CHUNK_SIZE);
+    for (let cz = cz0; cz <= cz1; cz++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const reason = this.previewClaim(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
+        if (reason) return reason;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Every chunk adjacent to the site that a claim would refuse — the frontier
    * the border wall marks (#473 D6/P4). Returned as world rects, max
    * exclusive, in chunk coordinates order.

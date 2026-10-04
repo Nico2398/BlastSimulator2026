@@ -19,6 +19,7 @@ import {
   getMoveCost,
   moveBuilding,
   checkFootprintPlacement,
+  rectOverlapsOccupants,
   BUILDING_DEFS,
 } from '../../../src/core/entities/Building.js';
 import type { Building, FootprintOccupant } from '../../../src/core/entities/Building.js';
@@ -754,5 +755,43 @@ describe('getBuildingPeopleCapacity (#1202)', () => {
     const state = createBuildingState();
     const { building } = placeBuilding(state, 'driving_center', 5, 5, 64, 64);
     expect(building!.occupantIds).toEqual([]);
+  });
+});
+
+describe('rectOverlapsOccupants (#1396)', () => {
+  // management_office T1 is 2x2: an occupant at (4,4) covers world [4,6) x [4,6).
+  const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 4, z: 4 }];
+
+  it('is true for a rect that overlaps the occupant footprint', () => {
+    expect(rectOverlapsOccupants(occupants, { minX: 5, minZ: 5, maxX: 8, maxZ: 8 })).toBe(true);
+  });
+
+  it('is true for a rect fully inside the footprint', () => {
+    expect(rectOverlapsOccupants(occupants, { minX: 4, minZ: 4, maxX: 5, maxZ: 5 })).toBe(true);
+  });
+
+  it('is false for a rect edge-adjacent on the max side (rect min is exclusive of the footprint end)', () => {
+    expect(rectOverlapsOccupants(occupants, { minX: 6, minZ: 4, maxX: 8, maxZ: 6 })).toBe(false);
+  });
+
+  it('is false for a rect edge-adjacent on the min side (rect max is exclusive)', () => {
+    expect(rectOverlapsOccupants(occupants, { minX: 2, minZ: 4, maxX: 4, maxZ: 6 })).toBe(false);
+    expect(rectOverlapsOccupants(occupants, { minX: 4, minZ: 2, maxX: 6, maxZ: 4 })).toBe(false);
+  });
+
+  it('is false for a rect far from every occupant', () => {
+    expect(rectOverlapsOccupants(occupants, { minX: 30, minZ: 30, maxX: 34, maxZ: 34 })).toBe(false);
+  });
+
+  it('is false with no occupants', () => {
+    expect(rectOverlapsOccupants([], { minX: 0, minZ: 0, maxX: 64, maxZ: 64 })).toBe(false);
+  });
+
+  it('is true when any one of several occupants overlaps', () => {
+    const many: FootprintOccupant[] = [
+      { type: 'management_office', tier: 1, x: 40, z: 40 },
+      ...occupants,
+    ];
+    expect(rectOverlapsOccupants(many, { minX: 5, minZ: 4, maxX: 7, maxZ: 5 })).toBe(true);
   });
 });
