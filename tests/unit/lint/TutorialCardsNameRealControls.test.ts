@@ -55,7 +55,7 @@ const ROWS = Object.entries(CARD_CONTROLS).flatMap(([card, labels]) =>
 );
 
 describe.each(Object.keys(LOCALES))('tutorial cards name real controls (%s)', (code) => {
-  const locale = LOCALES[code];
+  const locale = LOCALES[code] as Record<string, string>;
 
   it('every card key and label key exists (no vacuous pass)', () => {
     const missing: string[] = [];
