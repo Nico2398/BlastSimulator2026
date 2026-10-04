@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // Demolish confirmation modal config (#1399).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildDemolishConfirm } from '../../../src/ui/demolishConfirm.js';

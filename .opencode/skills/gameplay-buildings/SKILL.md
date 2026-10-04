@@ -47,6 +47,7 @@ Research task shape:
 Higher tiers: larger capacity, better performance, larger physical footprint.
 Upgrading: demolish old building → construct new tier on same/adjacent cleared ground.
 Both construction and demolition carry a cost.
+Demolish is confirmed (#1399) from the Build menu row and the selection bar via `ConfirmModal`: it names the building, the cost, that nothing is refunded and it cannot be undone, plus the kg of stored explosives lost when any.
 
 ## Training Buildings
 
