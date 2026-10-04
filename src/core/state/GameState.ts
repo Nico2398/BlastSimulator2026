@@ -230,6 +230,10 @@ export interface GhostPreview {
    * instead of a single point (#556). Absent for every other action type.
    */
   footprint?: ReadonlyArray<readonly [number, number]>;
+  /** True while no qualified actor can path to the target (#1306). */
+  unreachable?: boolean;
+  /** For a `place_building` ghost: what is being built, so the renderer can draw its model (#1306). */
+  building?: { type: BuildingType; tier: BuildingTier; x: number; z: number };
 }
 
 /** A pending action waiting for a qualified employee to execute it. */

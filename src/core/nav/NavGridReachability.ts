@@ -613,3 +613,15 @@ function floodFillReachable(
   lastFillCount = count;
   return { width, height, count };
 }
+
+/**
+ * Climb-aware reachable set flooded from several source cells at once (#1306).
+ * Skeleton stub — implementation lands in the green phase.
+ */
+export function computeClimbReachableSetFromSources(
+  _navGrid: NavGrid,
+  _sources: ReadonlyArray<{ x: number; z: number }>,
+  _requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+): ReachableSet {
+  return EMPTY_REACHABLE_SET;
+}

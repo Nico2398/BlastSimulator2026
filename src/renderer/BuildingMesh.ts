@@ -7,7 +7,7 @@
 // the roof corners so the two doors read from any camera angle.
 
 import * as THREE from 'three';
-import type { Building, BuildingType } from '../core/entities/Building.js';
+import type { Building, BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
@@ -227,4 +227,13 @@ function makeMarker(localX: number, localZ: number, color: number, roofY: number
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(localX, roofY + MARKER_CLEARANCE, localZ);
   return mesh;
+}
+
+/** Instantiate and tint the model for a building type/tier from `library` (#1306). Skeleton stub. */
+export function instantiateBuildingModel(
+  _library: ModelLibrary,
+  _type: BuildingType,
+  _tier: BuildingTier,
+): ModelInstance {
+  throw new Error('not implemented');
 }

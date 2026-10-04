@@ -24,6 +24,13 @@ export const GHOST_SIZE = 0.9;           // box half-extent in metres
  */
 export const GHOST_RENDER_ORDER = 10;
 
+// Unreachable-order ghost look (#1306) — skeleton placeholders, tuned in green.
+export const GHOST_UNREACHABLE_COLOR = new THREE.Color(0xcc3322);
+export const GHOST_UNREACHABLE_EMISSIVE = new THREE.Color(0xcc1111);
+export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0xff5544);
+export const GHOST_UNREACHABLE_OPACITY_MIN = 0.2;
+export const GHOST_UNREACHABLE_OPACITY_MAX = 0.6;
+
 // Claimed ghosts (an employee has claimed the action and is en route/working
 // it, #547) read distinctly from unclaimed ones — dimmer and pulsing slower —
 // while staying the same blue. Roughly half the opacity range and half the
