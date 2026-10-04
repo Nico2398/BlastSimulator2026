@@ -55,6 +55,7 @@ import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, type RampWidth } from '../core/config/balance.js';
 import type { GameConsoleFn } from './gameConsole.js';
+import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 
 export class BuildMenu extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -93,6 +94,12 @@ export class BuildMenu extends PanelBase {
   /** Per-type under-construction count span, populated by makeCatalogRow. */
   private readonly underConstructionEls = new Map<BuildingType, HTMLElement>();
   private readonly locale = new LocaleTextRegistry();
+
+  /** Routes the placed-row Demolish click to a confirm modal (#1399); unset means the click does nothing. */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    void cb;
+    // TODO: implement
+  }
 
   constructor(container: HTMLElement) {
     super(panelRoot('bs-build-panel'));
