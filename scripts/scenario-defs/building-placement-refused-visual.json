@@ -1,0 +1,199 @@
+{
+  "name": "building-placement-refused-visual",
+  "description": "#1396: a building placement ghost over an occupied spot is refused BEFORE any click on Confirm -- Confirm is disabled with the occupied reason, and pressing Enter on the refused pick neither spends cash nor closes the tool. Picking a free tile in the same still-armed tool then enables Confirm and the order goes through. Every click is a real player step (BuildMenu catalog + tile picker).",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "description": "Staffed opening (#551) so the first building has a roster to build it.",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:2,6",
+      "description": "Order building A through the real catalog + tile picker, so a site (then a building) occupies (2,6).",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 6
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive building A to completion so a real building stands at (2,6).",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build management_office at:4,6",
+      "description": "Arm a second catalog building and pick a tile beside building A (A's mesh would occlude its own tiles from a real click) whose footprint overlaps it. The ghost is refused before any Confirm click: Confirm is unreachable and the tool stays armed (strip still present). Screenshot shows the red ghost.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 4,
+          "z": 6,
+          "distance": 25,
+          "pitch": 85
+        },
+        {
+          "type": "pickTile",
+          "x": 4,
+          "z": 6
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "guard",
+      "commandOutcome": "refused",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        },
+        "blocked": "#bs-tile-select-confirm",
+        "note": "#1396 -- occupied footprint leaves Confirm disabled before any click."
+      }
+    },
+    {
+      "command": "build management_office at:4,6",
+      "description": "Press Enter on the refused pick: nothing is ordered, cash is unchanged, and the tool is still open (Confirm still present, still blocked).",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "keypress",
+          "key": "Enter"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "guard",
+      "commandOutcome": "refused",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "orderedBuildingCount": 0
+        },
+        "blocked": "#bs-tile-select-confirm",
+        "note": "#1396 -- Enter on a refused selection keeps the tool open and orders nothing."
+      }
+    },
+    {
+      "command": "build management_office at:10,11",
+      "description": "Same still-armed tool: pick a free tile, Confirm becomes usable and the order goes through.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 11
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -8000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        },
+        "note": "#1396 -- a free tile confirms normally after the refused attempts."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "placement-area",
+      "yaw": 0,
+      "pitch": 60
+    }
+  ]
+}

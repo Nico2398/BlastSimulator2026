@@ -4,6 +4,7 @@
 // Placement grid helpers: BuildingPlacement.ts
 // Research Center queue: BuildingResearch.ts
 
+import type { Rect } from '../world/WorldGen.js';
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
@@ -481,6 +482,21 @@ export interface FootprintOccupant {
   z: number;
 }
 
+/** Whether the inclusive-min / exclusive-max world rect overlaps any occupant's footprint (#1396). */
+export function rectOverlapsOccupants(
+  occupants: ReadonlyArray<FootprintOccupant>,
+  rect: Rect,
+): boolean {
+  for (const occ of occupants) {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(occ.type, occ.tier));
+    if (rect.minX < occ.x + sizeX && rect.maxX > occ.x &&
+        rect.minZ < occ.z + sizeZ && rect.maxZ > occ.z) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Whether a building of `type`/`tier` can be placed at (x, z) given the
  * current occupants (live buildings AND planned-but-not-yet-built ones) —
@@ -512,13 +528,8 @@ export function checkFootprintPlacement(
     return { valid: false, error: 'Out of bounds' };
   }
 
-  for (const occ of occupants) {
-    const occDef = getBuildingDef(occ.type, occ.tier);
-    const { sizeX: oSX, sizeZ: oSZ } = getDefSize(occDef);
-    if (x < occ.x + oSX && x + sizeX > occ.x &&
-        z < occ.z + oSZ && z + sizeZ > occ.z) {
-      return { valid: false, error: 'Space is occupied' };
-    }
+  if (rectOverlapsOccupants(occupants, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ })) {
+    return { valid: false, error: 'Space is occupied' };
   }
 
   if (voxelGrid !== undefined) {

@@ -26,6 +26,11 @@ const CLAIM_REFUSAL_KEY: Record<ClaimRefusalReason, string> = {
   not_adjacent: 'shell.placement.refused_too_far',
 };
 
+/** Player-facing text for a site-claim refusal. */
+export function claimRefusalText(reason: ClaimRefusalReason): string {
+  return t(CLAIM_REFUSAL_KEY[reason]);
+}
+
 export interface PlacementKit {
   readonly controller: PlacementController;
   readonly overlay: SelectionOverlay;
@@ -43,13 +48,33 @@ export interface PlacementKit {
  */
 export function placementRefusalReason(controller: PlacementController): string | undefined {
   if (controller.canConfirm) return undefined;
-  if (controller.refusalReason) return t(CLAIM_REFUSAL_KEY[controller.refusalReason]);
+  if (controller.refusalReason) return claimRefusalText(controller.refusalReason);
   if (controller.footprintInvalid) {
     return t('shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
   }
   if (controller.refusedTile) return t('shell.placement.outside_region');
   if (!controller.selection) return t('shell.placement.pick_first');
   return t('shell.placement.outside_region');
+}
+
+/**
+ * Hover refusal for a placement with a footprint: the controller's own refusal
+ * (claim / uneven ground / outside region) and an extra reason the caller
+ * computed for the footprint rect (occupied, unclaimed). A real controller
+ * refusal wins the text; otherwise the rect reason outranks the generic
+ * `pick_first` prompt, which is a prompt rather than a refusal and never
+ * paints `refused`.
+ */
+export function hoverRefusal(
+  controller: PlacementController,
+  rectReason: string | null,
+): { refused: boolean; reason: string | undefined } {
+  const controllerReason = placementRefusalReason(controller);
+  const controllerRefused = !!controller.refusalReason || controller.footprintInvalid || !!controller.refusedTile;
+  return {
+    refused: controllerRefused || !!rectReason,
+    reason: controllerRefused ? controllerReason : rectReason ?? controllerReason,
+  };
 }
 
 /** What a single-tile pick differs by, panel to panel — everything else about the flow is identical. Deliberately not exported: callers pass an object literal to `armPointPick` and never name the type. */
