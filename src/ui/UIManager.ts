@@ -356,8 +356,7 @@ export class UIManager {
    * PreflightModal/ConfirmModal are excluded on purpose: both are
    * request/response dialogs the player just triggered, never state-derived,
    * so a level transition mid-dialog is not this bug's shape. LevelEndScreen
-   * is excluded too — its update() already closes itself the instant
-   * state.levelEndReason reads null, which a fresh level's state always is.
+   * is excluded too — main.ts onLevelStateReplaced resets it directly.
    */
   closeStaleLevelOverlays(state: GameState): void {
     this.blastReportModal.reset(state.lastBlastReport);
