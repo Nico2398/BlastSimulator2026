@@ -1492,8 +1492,8 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 2.9641666666666575,
-          "safety": 50.55000000000014,
+          "wellBeing": 3.9641666666666557,
+          "safety": 50,
           "ecology": 29.533877826223282,
           "nuisance": 0,
           "levelEnded": false,
@@ -1502,7 +1502,8 @@
         "changedBy": {
           "cash": 0,
           "tickCount": 0
-        }
+        },
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3)."
       }
     },
     {
@@ -1674,8 +1675,8 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 2.9641666666666575,
-          "safety": 50.55000000000014,
+          "wellBeing": 3.9641666666666557,
+          "safety": 50,
           "ecology": 29.533877826223282,
           "nuisance": 0,
           "levelEnded": false,
@@ -1684,7 +1685,8 @@
         "changedBy": {
           "cash": 0,
           "tickCount": 0
-        }
+        },
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-265 random event is union_miner_month (+6 wellBeing) instead of union_rename_explosives (+5); wellBeing re-measured 2.96 -> 3.96. safety re-measured 50.55 -> 50 (miner_month option 0 has no safety effect; rename_explosives gave +3)."
       }
     },
     {
