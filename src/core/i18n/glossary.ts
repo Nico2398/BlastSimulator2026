@@ -132,7 +132,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     en: { canonical: 'Blast Workshop', forbiddenSynonyms: ['Blast Plan panel', 'Blast Plan'] },
     fr: { canonical: 'Atelier de tir', forbiddenSynonyms: ['panneau du plan de tir', 'plan de tir'] },
     relevantKeys: ['ui.blast_workshop.title', 'shell.rail.blast', 'tutorial.step5', 'shortcuts.blast'],
-    note: "The panel's actual rendered title (src/ui/panels/BlastWorkshop.ts) is ui.blast_workshop.title = 'Blast Workshop'/'Atelier de tir'. shell.rail.blast's short 'Blast'/'Minage' and tutorial.stage.open_blast's 'Blast panel'/'panneau Tir' are accepted abbreviations of that title (same pattern as Ops abbreviating Operations) and are NOT forbidden. Only the invented 'Blast Plan' wording — used in tutorial.step5 and duplicated in shortcuts.blast ('B: Blast Plan'/'B : Plan de tir') — names something that doesn't exist as a panel title in either locale.",
+    note: "The panel's actual rendered title (src/ui/panels/BlastWorkshop.ts) is ui.blast_workshop.title = 'Blast Workshop'/'Atelier de tir'. shell.rail.blast's short 'Blast'/'Minage' and tutorial.stage.open_blast's 'Blast panel'/'panneau Minage' are accepted abbreviations of that title (same pattern as Ops abbreviating Operations) and are NOT forbidden. Only the invented 'Blast Plan' wording — used in tutorial.step5 and duplicated in shortcuts.blast ('B: Blast Plan'/'B : Plan de tir') — names something that doesn't exist as a panel title in either locale.",
   },
   {
     concept: 'panel_build',
