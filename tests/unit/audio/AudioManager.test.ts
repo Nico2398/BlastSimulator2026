@@ -50,6 +50,7 @@ vi.stubGlobal('AudioContext', vi.fn(() => mockCtx));
 
 // Import after mock setup
 import { AudioManager } from '../../../src/audio/AudioManager.js';
+import { AUDIO_DEFAULT_VOLUMES } from '../../../src/core/config/balance.js';
 
 describe('AudioManager (11.1)', () => {
   beforeEach(() => {
@@ -121,6 +122,45 @@ describe('AudioManager (11.1)', () => {
     mgr.playBuffer(buf, 'effects');
     // No new source should be created
     expect(mockCtx.createBufferSource.mock.calls.length).toBe(sourceBefore);
+    mgr.dispose();
+  });
+});
+
+describe('AudioManager.applyVolumes (#1324)', () => {
+  beforeEach(() => { vi.clearAllMocks(); mockCtx.state = 'running'; });
+
+  it('default volumes equal AUDIO_DEFAULT_VOLUMES', () => {
+    const mgr = new AudioManager();
+    for (const ch of Object.keys(AUDIO_DEFAULT_VOLUMES) as Array<keyof typeof AUDIO_DEFAULT_VOLUMES>) {
+      expect(mgr.getVolume(ch)).toBe(AUDIO_DEFAULT_VOLUMES[ch]);
+    }
+    mgr.dispose();
+  });
+
+  it('sets every provided channel', () => {
+    const mgr = new AudioManager();
+    mgr.applyVolumes({ master: 0.5, effects: 0.25, ambient: 0.1, ui: 0 });
+    expect(mgr.getVolume('master')).toBe(0.5);
+    expect(mgr.getVolume('effects')).toBe(0.25);
+    expect(mgr.getVolume('ambient')).toBe(0.1);
+    expect(mgr.getVolume('ui')).toBe(0);
+    mgr.dispose();
+  });
+
+  it('absent channels keep their value', () => {
+    const mgr = new AudioManager();
+    mgr.applyVolumes({ master: 0.3 });
+    expect(mgr.getVolume('master')).toBe(0.3);
+    expect(mgr.getVolume('ambient')).toBe(AUDIO_DEFAULT_VOLUMES.ambient);
+    mgr.dispose();
+  });
+
+  it('applies to the gain nodes, clamped', () => {
+    const mgr = new AudioManager();
+    mgr.applyVolumes({ ui: 7, effects: -2 });
+    expect(mgr.getVolume('ui')).toBe(1);
+    expect(mgr.getVolume('effects')).toBe(0);
+    expect(mgr.getCategoryGain('ui').gain.value).toBe(1);
     mgr.dispose();
   });
 });

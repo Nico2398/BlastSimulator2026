@@ -4,6 +4,7 @@
 // used to render inline here — it's now its own sibling screen, WorldMap.ts.
 
 import { t, setLocale, getLocale } from '../core/i18n/I18n.js';
+import { saveLocale } from './userSettings.js';
 import { LocaleTextRegistry } from './localeText.js';
 import { syncLangPills } from './langPills.js';
 import { el } from './dom.js';
@@ -200,6 +201,7 @@ export class MainMenu {
 
   private switchLanguage(lang: 'en' | 'fr'): void {
     setLocale(lang);
+    saveLocale(lang);
     this.refreshLocale();
     this.onLanguageChange?.(lang);
   }

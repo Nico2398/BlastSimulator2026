@@ -421,3 +421,71 @@ describe('SettingsPanel — language pill initial state and sync (#492 section 2
     panel.dispose();
   });
 });
+
+// ── Persistence (#1324) ──────────────────────────────────────────────────────
+
+describe('SettingsPanel — persists locale and volumes (#1324)', () => {
+  const stored = (): { locale?: string; volumes?: Record<string, number> } =>
+    JSON.parse(localStorage.getItem('bs_settings_v1') ?? '{}');
+
+  beforeEach(() => { localStorage.clear(); setLocale('en'); });
+  afterEach(() => { localStorage.clear(); setLocale('en'); });
+
+  it('clicking FR writes locale fr to localStorage', () => {
+    const { panel } = mount();
+    findButtonByText(panel.root, t('ui.settings.french')).click();
+    expect(stored().locale).toBe('fr');
+    panel.dispose();
+  });
+
+  it('clicking EN after FR writes locale en', () => {
+    const { panel } = mount();
+    findButtonByText(panel.root, t('ui.settings.french')).click();
+    findButtonByText(panel.root, t('ui.settings.english')).click();
+    expect(stored().locale).toBe('en');
+    panel.dispose();
+  });
+
+  it('a slider input event writes that channel volume as a 0..1 fraction', () => {
+    const { container, panel } = mount();
+    panel.setAudioManager(fakeAudioManager());
+    const sliders = Array.from(container.querySelectorAll('input[type="range"]')) as HTMLInputElement[];
+    sliders[2]!.value = '10'; // ambient
+    sliders[2]!.dispatchEvent(new Event('input'));
+    expect(stored().volumes?.ambient).toBeCloseTo(0.1);
+    panel.dispose();
+  });
+
+  it('a slider dragged to 0 persists 0', () => {
+    const { container, panel } = mount();
+    panel.setAudioManager(fakeAudioManager());
+    const sliders = Array.from(container.querySelectorAll('input[type="range"]')) as HTMLInputElement[];
+    sliders[0]!.value = '0'; // master
+    sliders[0]!.dispatchEvent(new Event('input'));
+    expect(stored().volumes?.master).toBe(0);
+    panel.dispose();
+  });
+
+  it('volume saves keep the saved locale', () => {
+    const { container, panel } = mount();
+    panel.setAudioManager(fakeAudioManager());
+    findButtonByText(panel.root, t('ui.settings.french')).click();
+    const sliders = Array.from(container.querySelectorAll('input[type="range"]')) as HTMLInputElement[];
+    sliders[1]!.value = '30'; // effects
+    sliders[1]!.dispatchEvent(new Event('input'));
+    expect(stored().locale).toBe('fr');
+    expect(stored().volumes?.effects).toBeCloseTo(0.3);
+    panel.dispose();
+  });
+
+  it('sliders show applied volumes after setAudioManager', () => {
+    const { container, panel } = mount();
+    const mgr = fakeAudioManager();
+    const volumes = { master: 0.8, effects: 0.6, ambient: 0.2, ui: 0 };
+    for (const [ch, v] of Object.entries(volumes)) mgr.setVolume(ch as 'master', v);
+    panel.setAudioManager(mgr);
+    const sliders = Array.from(container.querySelectorAll('input[type="range"]')) as HTMLInputElement[];
+    expect(sliders.map((s) => s.value)).toEqual(['80', '60', '20', '0']);
+    panel.dispose();
+  });
+});
