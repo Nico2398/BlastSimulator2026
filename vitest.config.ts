@@ -44,7 +44,7 @@ export default defineConfig({
         'src/renderer/post/PostPipeline.ts',
         'src/audio/AudioHooks.ts',
         'src/persistence/IndexedDBPersistence.ts',
-        'src/persistence/DownloadPersistence.ts',
+        'src/persistence/InMemoryPersistence.ts',
 
       ],
       thresholds: {

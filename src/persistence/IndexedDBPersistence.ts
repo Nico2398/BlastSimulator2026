@@ -19,21 +19,42 @@ function openDB(): Promise<IDBDatabase> {
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('IndexedDB open blocked'));
   });
 }
+
+/** Longest the startup probe waits for IndexedDB before the caller falls back. */
+const PROBE_TIMEOUT_MS = 3000;
 
 function txn(db: IDBDatabase, mode: IDBTransactionMode): IDBObjectStore {
   return db.transaction(STORE_NAME, mode).objectStore(STORE_NAME);
 }
 
 export class IndexedDBPersistence implements SaveBackend {
+  /** Resolves when IndexedDB is usable; rejects when missing, blocked, errored or timed out. */
+  async probe(): Promise<void> {
+    if (typeof indexedDB === 'undefined') throw new Error('IndexedDB unavailable');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('IndexedDB probe timed out')), PROBE_TIMEOUT_MS);
+    });
+    try {
+      await Promise.race([this.list(), timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async save(slotId: string, name: string, data: string, campaignSummary: string, levelId: string | null): Promise<void> {
     const slot = buildSaveSlot(slotId, name, data, campaignSummary, levelId);
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const req = txn(db, 'readwrite').put(slot);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(slot);
+      // Resolve on commit, not on the request: a quota failure aborts the txn after onsuccess.
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('IndexedDB save failed'));
+      tx.onabort = () => reject(tx.error ?? new Error('IndexedDB save aborted'));
     });
   }
 
