@@ -2,10 +2,12 @@
 
 import type { SurveyResult } from './SurveyCalc.js';
 
-/** Key of the survey estimate column containing world position `(x, z)`. */
-export function surveyColumnKey(_x: number, _z: number): string {
-  // TODO: implement
-  return undefined as unknown as string;
+/**
+ * Key of the survey estimate column containing world position `(x, z)`.
+ * Floors, so every reader of `SurveyResult.estimates` rounds the same way.
+ */
+export function surveyColumnKey(x: number, z: number): string {
+  return `${Math.floor(x)},${Math.floor(z)}`;
 }
 
 /**
@@ -13,10 +15,16 @@ export function surveyColumnKey(_x: number, _z: number): string {
  * `(x, z)`, or `undefined` when none covers it.
  */
 export function findSurveyForColumn(
-  _surveys: readonly SurveyResult[],
-  _x: number,
-  _z: number,
+  surveys: readonly SurveyResult[],
+  x: number,
+  z: number,
 ): SurveyResult | undefined {
-  // TODO: implement
-  return undefined;
+  const colKey = surveyColumnKey(x, z);
+  let best: SurveyResult | undefined;
+  for (const survey of surveys) {
+    if (colKey in survey.estimates) {
+      if (!best || survey.completedTick > best.completedTick) best = survey;
+    }
+  }
+  return best;
 }

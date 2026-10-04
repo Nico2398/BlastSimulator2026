@@ -2,6 +2,7 @@
 
 import type { FragmentData } from './BlastExecution.js';
 import type { SurveyResult } from './SurveyCalc.js';
+import { findSurveyForColumn, surveyColumnKey } from './SurveyColumn.js';
 import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -28,35 +29,19 @@ export interface BlastOreReport {
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /**
- * Return the most recently completed survey from `surveys` that contains an
- * estimate entry for `colKey`, or `undefined` if none covers the column.
- */
-function findBestSurveyForColumn(
-  surveys: readonly SurveyResult[],
-  colKey: string,
-): SurveyResult | undefined {
-  let best: SurveyResult | undefined;
-  for (const survey of surveys) {
-    if (colKey in survey.estimates) {
-      if (!best || survey.completedTick > best.completedTick) best = survey;
-    }
-  }
-  return best;
-}
-
-/**
  * Sum the estimated ore mass (kg) for a single fragment's grid column by
- * looking up the most recent matching survey entry.
+ * looking up the most recent matching survey entry at the fragment's immutable
+ * `origin` (where the rock sat), never its landing `position`.
  * Returns 0 when no survey covers the fragment's column.
  */
 function fragmentColumnEstimateKg(
   fragment: OreReportFragment,
   surveys: readonly SurveyResult[],
 ): number {
-  const colKey = `${Math.round(fragment.origin.x)},${Math.round(fragment.origin.z)}`;
-  const survey = findBestSurveyForColumn(surveys, colKey);
+  const { x, z } = fragment.origin;
+  const survey = findSurveyForColumn(surveys, x, z);
   if (!survey) return 0;
-  const colEstimates = survey.estimates[colKey];
+  const colEstimates = survey.estimates[surveyColumnKey(x, z)];
   if (!colEstimates) return 0;
   const colAcc: Record<string, number> = {};
   accumulateOreMass(colAcc, fragment.volume, colEstimates);
@@ -107,7 +92,7 @@ export function fragmentHasOre(oreDensities: Record<string, number>): boolean {
  * Ore mass per fragment: mass = fragment.volume × oreDensity × ORE_DENSITY_KG_M3
  *
  * When `surveyResults` are provided, estimated ore mass is derived from the most
- * recent survey that covers each fragment's column `"${round(x)},${round(z)}"`.
+ * recent survey that covers each fragment's origin column (`surveyColumnKey`, floor-keyed).
  * `yieldRatio` is actual / estimated; defaults to 1.0 when no estimate exists.
  */
 export function computeBlastOreReport(

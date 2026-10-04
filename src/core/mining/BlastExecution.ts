@@ -316,7 +316,7 @@ export function executeBlast(
         isProjection: vecLength(velocity) > PROJECTION_SPEED_THRESHOLD,
         halfExtents: gen.halfExtents,
         shapeSeed: gen.shapeSeed,
-        origin: { ...gen.origin }, // TODO: implement (stub copies position)
+        origin: { ...gen.origin }, // copy: position is overwritten on landing, origin never is
       });
 
       if (gen.volumeM3 > OVERSIZED_FRAGMENT_THRESHOLD) oversizedFragments++;
