@@ -25,7 +25,7 @@ export interface CampaignState {
   levels: Record<string, LevelProgress>;
   /** ID of the currently active level, or null if on world map. */
   activeLevelId: string | null;
-  /** True when all 3 levels have been completed. */
+  /** True when all campaign levels (tier > 0; the tutorial is excluded) have been completed. */
   campaignComplete: boolean;
 }
 
@@ -100,28 +100,27 @@ function _unlockNext(campaign: CampaignState, completedId: string): void {
   if (entry) entry.unlocked = true;
 }
 
-/** Check if all levels are completed; set campaignComplete flag. */
+/** Check if all campaign levels (tutorial excluded) are completed; set campaignComplete flag. */
 function _checkCampaignComplete(campaign: CampaignState): void {
-  const all = getAllLevels();
-  campaign.campaignComplete = all.every(l => campaign.levels[l.id]?.completed === true);
+  campaign.campaignComplete = isCampaignComplete(campaign);
 }
 
 /** True when the level counts toward campaign completion (tier > 0; the tutorial does not). */
-export function isCampaignLevel(_level: Pick<LevelDef, 'difficultyTier'>): boolean {
-  // TODO: implement
-  return true;
+export function isCampaignLevel(level: Pick<LevelDef, 'difficultyTier'>): boolean {
+  return level.difficultyTier > 0;
 }
 
 /** True when levelId is the last campaign level (highest-ordered tier > 0 level). */
-export function isFinalCampaignLevel(_levelId: string): boolean {
-  // TODO: implement
-  return false;
+export function isFinalCampaignLevel(levelId: string): boolean {
+  const campaignLevels = getAllLevels().filter(isCampaignLevel);
+  return campaignLevels[campaignLevels.length - 1]?.id === levelId;
 }
 
 /** True when every campaign level (tier > 0) is completed. */
-export function isCampaignComplete(_campaign: CampaignState): boolean {
-  // TODO: implement
-  return false;
+export function isCampaignComplete(campaign: CampaignState): boolean {
+  const campaignLevels = getAllLevels().filter(isCampaignLevel);
+  return campaignLevels.length > 0
+    && campaignLevels.every(l => campaign.levels[l.id]?.completed === true);
 }
 
 /**

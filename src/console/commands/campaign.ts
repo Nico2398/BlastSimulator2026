@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
-import { getLevelProgress, createCampaignState, recordProfit } from '../../core/campaign/Campaign.js';
+import { getLevelProgress, createCampaignState, recordProfit, isCampaignComplete } from '../../core/campaign/Campaign.js';
 import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
 import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
@@ -35,8 +35,8 @@ export function campaignStatusCommand(
     const threshold = getLevel(lvl.id)?.unlockThreshold.toLocaleString('en-US') ?? '?';
     lines.push(`  [${lvl.difficultyTier}★] ${lvl.id} — ${status} | Profit: $${profit}/$${threshold}`);
   }
-  if (campaign.campaignComplete) {
-    lines.push('🏆 CAMPAIGN COMPLETE!');
+  if (campaign.campaignComplete || isCampaignComplete(campaign)) {
+    lines.push(t('campaign.status_complete'));
   }
   const active = campaign.activeLevelId ?? '(world map)';
   lines.push(`Active: ${active}`);
