@@ -39,6 +39,8 @@ export class MainMenu {
   private onTutorial?: OnTutorial;
   private onSandbox?: OnSandbox;
   private onLanguageChange?: OnLanguageChange;
+  protected onResume?: () => void;
+  protected liveGameProbe?: () => boolean;
 
   private backend: SaveBackend | null = null;
   private mostRecentSave: SaveMeta | null = null;
@@ -155,6 +157,8 @@ export class MainMenu {
   setOnTutorial(fn: OnTutorial): void { this.onTutorial = fn; }
   setOnSandbox(fn: OnSandbox): void { this.onSandbox = fn; }
   setOnLanguageChange(fn: OnLanguageChange): void { this.onLanguageChange = fn; }
+  setOnResume(fn: () => void): void { this.onResume = fn; }
+  setLiveGameProbe(fn: () => boolean): void { this.liveGameProbe = fn; }
 
   show(): void {
     this.overlay.style.display = 'flex';

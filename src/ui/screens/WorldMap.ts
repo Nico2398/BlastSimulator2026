@@ -28,6 +28,7 @@ export class WorldMap {
 
   private onBack?: () => void;
   private onStartLevel?: (levelId: string) => void;
+  protected onReturnToSite?: () => void;
   private lastCampaign: CampaignState | null = null;
   private readonly locale = new LocaleTextRegistry();
 
@@ -87,7 +88,13 @@ export class WorldMap {
   setOnBack(cb: () => void): void { this.onBack = cb; }
   setOnStartLevel(cb: (levelId: string) => void): void { this.onStartLevel = cb; }
 
-  show(campaign: CampaignState | null): void {
+  setOnReturnToSite(cb: () => void): void { this.onReturnToSite = cb; }
+  /** Whether the map offers a way back to the live site. */
+  get canReturnToSite(): boolean { return false; }
+  /** Returns to the live site when offered; true when it did. */
+  requestReturnToSite(): boolean { return false; }
+
+  show(campaign: CampaignState | null, _opts?: { canReturnToSite?: boolean }): void {
     this.lastCampaign = campaign;
     this.render(campaign);
     this.overlay.style.display = 'flex';

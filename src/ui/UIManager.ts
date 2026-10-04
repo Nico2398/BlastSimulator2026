@@ -7,7 +7,7 @@ import { registerIcons } from './icons.js';
 import { BlastWorkshop } from './panels/BlastWorkshop.js';
 import { PreflightModal } from './panels/PreflightModal.js';
 import { BlastReportModal } from './panels/BlastReportModal.js';
-import { ConfirmModal } from './panels/ConfirmModal.js';
+import { ConfirmModal, type ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { ContractsPanel } from './panels/ContractsPanel.js';
 import { FinancesPanel } from './panels/FinancesPanel.js';
 import { OperationsPanel } from './panels/OperationsPanel.js';
@@ -261,6 +261,9 @@ export class UIManager {
   setTogglePauseHandler(cb: () => void): void {
     this.onTogglePauseCb = cb;
   }
+
+  showConfirm(_config: ConfirmModalConfig): void { /* TODO: implement */ }
+  get confirmOpen(): boolean { return false; }
 
   /** Return-to-main-menu, requested from Settings' own confirm-gated button. */
   setQuitHandler(cb: () => void): void {
