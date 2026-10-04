@@ -23,6 +23,7 @@ import {
   recordBlastResult,
   calculateStarRating,
 } from '../../src/core/campaign/SuccessTracker.js';
+import { t } from '../../src/core/i18n/I18n.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { addIncome, addExpense } from '../../src/core/economy/Finance.js';
 import { STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
@@ -647,5 +648,39 @@ describe('Campaign', () => {
     const campaign = createCampaignState();
     const result = recordProfit(campaign, 'nonexistent', 1000);
     expect(result).toBe(false);
+  });
+});
+
+describe('campaign status finale line (#1320)', () => {
+  const REAL = ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths'];
+
+  it('status_complete key resolves and carries CAMPAIGN COMPLETE', () => {
+    expect(t('campaign.status_complete')).toContain('CAMPAIGN COMPLETE');
+  });
+
+  it('status has no complete line on a fresh campaign', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
+    expect(campaignStatusCommand(ctx, [], {}).output).not.toContain('CAMPAIGN COMPLETE');
+  });
+
+  it('status has no complete line after only the tutorial', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
+    campaignCompleteCommand(ctx, [], { level: 'tutorial_pit' });
+    expect(campaignStatusCommand(ctx, [], {}).output).not.toContain('CAMPAIGN COMPLETE');
+  });
+
+  it('status has no complete line after two real levels', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
+    for (const id of REAL.slice(0, 2)) campaignCompleteCommand(ctx, [], { level: id });
+    expect(campaignStatusCommand(ctx, [], {}).output).not.toContain('CAMPAIGN COMPLETE');
+  });
+
+  it('status prints the complete line after the 3 real levels, tutorial untouched', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
+    for (const id of REAL) campaignCompleteCommand(ctx, [], { level: id });
+    expect(ctx.state!.campaign.levels['tutorial_pit']!.completed).toBe(false);
+    const out = campaignStatusCommand(ctx, [], {}).output;
+    expect(out).toContain('CAMPAIGN COMPLETE');
+    expect(out).toContain(t('campaign.status_complete'));
   });
 });
