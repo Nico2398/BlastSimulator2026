@@ -87,8 +87,8 @@ export interface BlastPlanOverlayOptions {
 export class BlastPlanOverlay {
   private readonly scene: THREE.Scene;
   private readonly group = new THREE.Group();
-  /** Surface-anchor position per hole (numeric id, see holeNumericId), for scene-picking's entityWorldPosition. */
   private readonly delayLabels: THREE.Mesh[] = [];
+  /** Surface-anchor position per hole (numeric id, see holeNumericId), for scene-picking's entityWorldPosition. */
   private readonly holePositions = new Map<number, THREE.Vector3>();
 
   /**
