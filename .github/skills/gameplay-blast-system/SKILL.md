@@ -221,7 +221,7 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 
 Previews run the **same** propagation the blast does (`buildPlanEnergyField`) and the same seeding
 and velocity maths. A preview that models the rock differently from the game is worse than no
-preview — never reintroduce a separate approximation.
+preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in rained-on untubed holes are predicted weakened.
 
 ### Village vibration (#1343)
 

@@ -146,21 +146,25 @@ describe('Software — wet-hole modelling (#1347)', () => {
   const allWet = (plan: { holes: Array<{ id: string }> }) => new Set(plan.holes.map(h => h.id));
 
   /** Same grid/pattern as makeTestPlan, but charged with the given explosive. */
-  function planWith(explosiveId: string) {
+  function planWith(explosiveId: string, amountKg = 8, stemmingM = 0.5) {
     const { grid } = makeTestPlan();
     const holes = createGridPlan({ x: 10, z: 10 }, 2, 2, 3, 6, 0.15);
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
-    const { charges } = batchCharge(holes.map(h => h.id), depths, explosiveId, 5, 2);
+    const { charges } = batchCharge(holes.map(h => h.id), depths, explosiveId, amountKg, stemmingM);
     return { grid, plan: assembleBlastPlan(holes, charges, autoVPattern(holes, 25)) };
   }
 
-  it('previewEnergy max and min are lower when holes are wet (water-sensitive explosive)', () => {
+  it('previewEnergy retains less total energy over a smaller footprint when holes are wet (water-sensitive explosive)', () => {
+    // Per-voxel energy saturates at the rock's absorption threshold, so max/min can
+    // coincide; the total retained and the number of energised voxels do not.
     const { grid, plan } = planWith('boomite');
     const dry = previewEnergy(plan, grid, 1)!;
     const wet = previewEnergy(plan, grid, 1, allWet(plan))!;
-    expect(wet.maxEnergy).toBeLessThan(dry.maxEnergy);
-    expect(wet.minEnergy).toBeLessThan(dry.minEnergy);
+    const total = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+    expect(wet.energyMap.size).toBeLessThan(dry.energyMap.size);
+    expect(total(wet.energyMap)).toBeLessThan(total(dry.energyMap));
+    expect(wet.maxEnergy).toBeLessThanOrEqual(dry.maxEnergy);
   });
 
   it('previewFragments reports fewer fractured voxels wet than dry', () => {
@@ -170,15 +174,19 @@ describe('Software — wet-hole modelling (#1347)', () => {
     expect(wet.fracturedCount).toBeLessThan(dry.fracturedCount);
   });
 
-  it('previewFragments wet counts match what executeBlast actually breaks with the same wet set', () => {
+  it('previewFragments wet cracked count matches executeBlast with the same wet set, and both drop vs dry', () => {
     const { grid, plan } = planWith('boomite');
     const wetIds = allWet(plan);
     const dry = previewFragments(plan, grid, 2)!;
     const preview = previewFragments(plan, grid, 2, wetIds)!;
-    const result = executeBlast(plan, grid.clone(), [], undefined, undefined, undefined, wetIds)!;
-    // Guard: wet must differ from dry, else equality below proves nothing.
+    const result = executeBlast(plan, makeTestPlan().grid, [], undefined, undefined, undefined, wetIds)!;
+    const dryResult = executeBlast(plan, makeTestPlan().grid, [])!;
+    // Guard: wet must differ from dry, else the checks below prove nothing.
     expect(preview.fracturedCount).not.toBe(dry.fracturedCount);
-    expect(preview.fracturedCount).toBe(result.clearedVoxels);
+    expect(preview.crackedCount).not.toBe(dry.crackedCount);
+    // clearedVoxels also counts voxels cleared beyond the fractured set, so only the
+    // direction is comparable; the cracked count is the exact cross-check.
+    expect(result.clearedVoxels).toBeLessThan(dryResult.clearedVoxels);
     expect(preview.crackedCount).toBe(result.crackedVoxels);
   });
 
@@ -190,7 +198,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('previewHoleDetails reflects wet holes: coarser fragments or no projection', () => {
-    const { grid, plan } = planWith('boomite');
+    const { grid, plan } = planWith('big_bada_boom', 12, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
     const dry = previewHoleDetails(plan, grid, 3);
     const wet = previewHoleDetails(plan, grid, 3, allWet(plan));
     const changed = plan.holes.some(h => {
@@ -206,7 +214,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('only the wet holes are weakened in previewHoleDetails', () => {
-    const { grid, plan } = planWith('boomite');
+    const { grid, plan } = planWith('big_bada_boom', 12, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
     const dry = previewHoleDetails(plan, grid, 2);
     const first = plan.holes[0]!.id;
     const wet = previewHoleDetails(plan, grid, 2, new Set([first]));
