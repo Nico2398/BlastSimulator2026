@@ -179,6 +179,81 @@ describe('SavesModal', () => {
     modal.dispose();
   });
 
+  describe('autosave baseline on state swap (#1316)', () => {
+    function setup() {
+      const backend = makeBackend();
+      const a = createGame({ seed: 1, mineType: 'desert' });
+      a.cash = 111;
+      const b = createGame({ seed: 1, mineType: 'desert' });
+      b.cash = 222;
+      let current: GameState = a;
+      const { modal } = mount();
+      modal.setBackend(backend);
+      modal.setGetState(() => current);
+      const tick = async (s: GameState, n: number) => {
+        s.tickCount = n;
+        current = s;
+        modal.onTick(s);
+        await flush();
+      };
+      return { backend, a, b, modal, tick };
+    }
+
+    it('autosaves at once when a fresh state at tick 0 replaces one at tick 2000, then every interval', async () => {
+      const { backend, a, b, modal, tick } = setup();
+      await tick(a, 2000);
+      expect(backend.store.has('auto')).toBe(true);
+
+      backend.store.clear();
+      await tick(b, 0);
+      expect(backend.store.has('auto')).toBe(true);
+      expect(backend.store.get('auto')!.meta.campaignSummary).toContain('222');
+
+      backend.store.clear();
+      await tick(b, AUTO_SAVE_INTERVAL_TICKS - 1);
+      expect(backend.store.has('auto')).toBe(false);
+
+      b.cash = 333;
+      await tick(b, AUTO_SAVE_INTERVAL_TICKS);
+      expect(backend.store.has('auto')).toBe(true);
+      expect(backend.store.get('auto')!.meta.campaignSummary).toContain('333');
+      modal.dispose();
+    });
+
+    it('saves exactly once on a swap to a higher tick, then waits a full interval', async () => {
+      const { backend, a, b, modal, tick } = setup();
+      await tick(a, 100);
+      const saveSpy = vi.spyOn(backend, 'save');
+      saveSpy.mockClear();
+
+      await tick(b, 5000);
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+
+      await tick(b, 5000 + AUTO_SAVE_INTERVAL_TICKS - 1);
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+
+      await tick(b, 5000 + AUTO_SAVE_INTERVAL_TICKS);
+      expect(saveSpy).toHaveBeenCalledTimes(2);
+      modal.dispose();
+    });
+
+    it('never re-baselines while the same state object keeps ticking', async () => {
+      const { backend, a, modal, tick } = setup();
+      await tick(a, 0);
+      const saveSpy = vi.spyOn(backend, 'save');
+      saveSpy.mockClear();
+
+      for (const n of [1, 50, 150, AUTO_SAVE_INTERVAL_TICKS - 1]) await tick(a, n);
+      expect(saveSpy).not.toHaveBeenCalled();
+
+      await tick(a, AUTO_SAVE_INTERVAL_TICKS);
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      await tick(a, AUTO_SAVE_INTERVAL_TICKS + 1);
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      modal.dispose();
+    });
+  });
+
   it('auto-save and quick-save write the getState snapshot, not the bare state onTick was handed', async () => {
     const backend = makeBackend();
     const live = createGame({ seed: 1, mineType: 'desert' });
