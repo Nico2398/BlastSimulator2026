@@ -90,7 +90,7 @@ function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
 const SERIALIZED_FIELDS = [
   'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'researchQueueLength', 'chargedCount',
+  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'rubbleDisposalOffered', 'deathCount',
@@ -129,6 +129,20 @@ describe('console-api', () => {
 
       expect(state).not.toBeNull();
       expect(Object.keys(state!).sort()).toEqual([...SERIALIZED_FIELDS].sort());
+    });
+
+    it('unreachableGhostCount counts the red (unreachable) ghost previews (#1306)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const ctx = runner.ctx as MiningContext;
+      expect(serializeGameState(ctx)!['unreachableGhostCount']).toBe(0);
+      const base = { type: 'survey' as const, targetX: 1, targetZ: 1, targetY: 0, claimed: false };
+      ctx.state!.ghostPreviews.push(
+        { id: 901, ...base, unreachable: true },
+        { id: 902, ...base, unreachable: true },
+        { id: 903, ...base, unreachable: false },
+        { id: 904, ...base },
+      );
+      expect(serializeGameState(ctx)!['unreachableGhostCount']).toBe(2);
     });
 
     it('reports the seed and mine type the game was created with', () => {
