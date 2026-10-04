@@ -416,7 +416,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1337: +1 key (tutorial.stage.open_fire_tab), both locales: 3577.
     // #1348: +3 keys (ui.blast_workshop.report.wet_holes_fizzled, ui.blast_workshop.report.wet_holes_ok, mining.blast.wet_holes), both locales: 3580.
     // #1421: worker_revolt tip key replaced by 3 cause keys (net +2): 3582.
-    expect(Object.keys(en).length).toBe(3582);
+    // #1351: +1 key (mining.tubing.install_usage), both locales: 3583.
+    expect(Object.keys(en).length).toBe(3583);
   });
 });
 

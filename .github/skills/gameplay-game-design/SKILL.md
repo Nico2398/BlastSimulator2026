@@ -134,6 +134,7 @@ Fictional humorous names. "Treranium" (très rare, high value), common ores, exo
 Procedural cycle: sunny → cloudy → rain → heavy rain → storm → heat wave → cold snap.
 Rain fills drill holes. Water-sensitive explosives fail without tubing. Porous rock = faster water infiltration.
 Tubing is purchasable per-hole waterproofing.
+Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing a hole or firing the blast drops its tubing record with no refund; unused inventory persists.
 
 ## Safety & Projection Profiles
 

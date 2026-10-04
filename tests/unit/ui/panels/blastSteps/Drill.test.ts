@@ -100,7 +100,7 @@ describe('DrillStep', () => {
     const state = makeState();
     const hole = addHole(state.drillHoles, 10, 20, 8, 0.15);
     buyTubing(state.tubingState, 1, state.cash);
-    installTubing(state.tubingState, hole.id);
+    installTubing(state.tubingState, hole.id, [hole.id]);
 
     step.update(state, 'heavy_rain');
 

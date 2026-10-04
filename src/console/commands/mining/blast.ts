@@ -3,7 +3,7 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
+import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
 import { executeBlast, buildBlastReport, maxVillageVibration } from '../../../core/mining/BlastExecution.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
@@ -181,10 +181,7 @@ export function blastCommand(
   );
 
   // Clear drill plan after blast (holes are consumed)
-  state.drillHoles = [];
-  state.chargesByHole = {};
-  state.plannedChargesByHole = {};
-  state.sequenceDelays = {};
+  resetPlanState(state);
 
   // Leftover drill orders target holes the blast no longer waits for: cancel
   // them (preflight warns first, FIRE is not gated on them — #1346).

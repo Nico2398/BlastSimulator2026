@@ -11,6 +11,7 @@ import type { MiningContext } from './types.js';
 import type { GameContext } from '../world.js';
 import { villagePositions } from '../../../core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../../core/mining/BlastExecution.js';
+import { clearTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 
@@ -226,4 +227,17 @@ export function cancelOutstandingDrillActions(state: GameState): number {
   cancelPendingActionsOfType(state, 'drill_hole');
   state.plannedDrillHoles = [];
   return ordered;
+}
+
+/**
+ * Reset every plan-scoped record: drilled holes, tubing (inventory kept),
+ * charges and sequence delays. Shared by `drill_plan clear` and the
+ * post-blast cleanup so the two cannot drift apart (#1351).
+ */
+export function resetPlanState(state: GameState): void {
+  state.drillHoles = [];
+  clearTubing(state.tubingState);
+  state.chargesByHole = {};
+  state.plannedChargesByHole = {};
+  state.sequenceDelays = {};
 }
