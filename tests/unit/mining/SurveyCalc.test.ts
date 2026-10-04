@@ -11,6 +11,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
 // ── Task 4.6 additions ────────────────────────────────────────────────────────
 import { createGame } from '../../../src/core/state/GameState.js';
+import { ORE_DENSITY_KG_M3 } from '../../../src/core/config/balance.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import {
@@ -887,6 +888,35 @@ describe('SurveyCalc — computeBlastOreReport (4.7)', () => {
       confidence: 0.8,
     };
   }
+
+  // ── #1355: estimate lookup uses fragment origin, floored ────────────────────
+
+  function fragmentAt(origin: ReturnType<typeof vec3>, position: ReturnType<typeof vec3>): FragmentData {
+    return { ...makeFragment(1, position, 2.0, { grumpite: 0.5 }), origin };
+  }
+
+  it('looks the estimate up at the fragment origin column, not the landing position', () => {
+    const survey = makeSurvey({ '12,8': { grumpite: 0.4 } });
+    const frag = fragmentAt(vec3(12.6, 4, 8.4), vec3(30, 2, 30));
+    const report = computeBlastOreReport([frag], [survey]);
+    // 2.0 m3 * 0.4 * ORE_DENSITY_KG_M3
+    expect(report.estimatedYieldKg).toBeCloseTo(2.0 * 0.4 * ORE_DENSITY_KG_M3, 6);
+  });
+
+  it('floors origin x=12.9 onto column 12, not 13', () => {
+    const survey = makeSurvey({ '12,8': { grumpite: 0.4 }, '13,8': { grumpite: 0.1 } });
+    const frag = fragmentAt(vec3(12.9, 4, 8.1), vec3(12.9, 4, 8.1));
+    const report = computeBlastOreReport([frag], [survey]);
+    expect(report.estimatedYieldKg).toBeCloseTo(2.0 * 0.4 * ORE_DENSITY_KG_M3, 6);
+  });
+
+  it('an origin outside every survey contributes no estimate, whatever the landing position', () => {
+    const survey = makeSurvey({ '12,8': { grumpite: 0.4 } });
+    const frag = fragmentAt(vec3(50.2, 4, 50.2), vec3(12.5, 2, 8.5));
+    const report = computeBlastOreReport([frag], [survey]);
+    expect(report.estimatedYieldKg).toBe(0);
+    expect(report.yieldRatio).toBe(1.0);
+  });
 
   // ── a. Export presence ───────────────────────────────────────────────────────
 
