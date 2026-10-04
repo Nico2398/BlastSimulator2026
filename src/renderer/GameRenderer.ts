@@ -389,6 +389,7 @@ export class GameRenderer {
     if (modelLibrary.revision !== this.lastModelRevision) {
       this.lastModelRevision = modelLibrary.revision;
       this.buildings?.refreshModels();
+      this.ghosts?.refreshModels();
       if (this.vehicles && this.lastState) {
         this.vehicles.refreshModels(this.lastState.vehicles, this.lastState.employees.employees);
       }

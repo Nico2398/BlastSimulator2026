@@ -44,6 +44,23 @@ interface BuildingEntry {
   building: Building;
 }
 
+/**
+ * Instantiate and tint the (intact) model for a building type/tier from `library`,
+ * sized to its footprint. Shared by the real building and the queued-order
+ * hologram (#1306), so both draw the same asset at the same size.
+ */
+export function instantiateBuildingModel(
+  library: ModelLibrary,
+  type: BuildingType,
+  tier: BuildingTier,
+): ModelInstance {
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
+  return library.instantiate(buildingModelId(type, tier), {
+    size: [sizeX, FALLBACK_BASE + FALLBACK_STOREY * tier, sizeZ],
+    tint: BODY_TINT,
+  });
+}
+
 // ---------- Main class ----------
 
 export class BuildingMesh {
@@ -171,10 +188,9 @@ export class BuildingMesh {
     const def = getBuildingDef(building.type, building.tier);
     const { sizeX, sizeZ } = getDefSize(def);
     const isDestroyed = building.hp <= 0;
-    const instance = this.library.instantiate(modelIdFor(building), {
-      size: [sizeX, isDestroyed ? RUIN_HEIGHT_MIN : FALLBACK_BASE + FALLBACK_STOREY * building.tier, sizeZ],
-      tint: BODY_TINT,
-    });
+    const instance = isDestroyed
+      ? this.library.instantiate(BUILDING_RUIN_MODEL_ID, { size: [sizeX, RUIN_HEIGHT_MIN, sizeZ], tint: BODY_TINT })
+      : instantiateBuildingModel(this.library, building.type as BuildingType, building.tier);
     group.add(instance.root);
 
     if (isDestroyed) {
@@ -227,13 +243,4 @@ function makeMarker(localX: number, localZ: number, color: number, roofY: number
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(localX, roofY + MARKER_CLEARANCE, localZ);
   return mesh;
-}
-
-/** Instantiate and tint the model for a building type/tier from `library` (#1306). Skeleton stub. */
-export function instantiateBuildingModel(
-  _library: ModelLibrary,
-  _type: BuildingType,
-  _tier: BuildingTier,
-): ModelInstance {
-  throw new Error('not implemented');
 }

@@ -5,8 +5,10 @@
 
 import * as THREE from 'three';
 import type { GhostPreview } from '../core/state/GameState.js';
-import { getFootprintSize } from '../core/entities/Building.js';
+import { getBuildingDef, getDefSize, getFootprintSize } from '../core/entities/Building.js';
 import { footprintCenterCoord } from './MeshUtils.js';
+import { instantiateBuildingModel } from './BuildingMesh.js';
+import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { markSceneOverlay } from './post/SceneOverlay.js';
 
 // ---------- Config ----------
@@ -24,12 +26,14 @@ export const GHOST_SIZE = 0.9;           // box half-extent in metres
  */
 export const GHOST_RENDER_ORDER = 10;
 
-// Unreachable-order ghost look (#1306) — skeleton placeholders, tuned in green.
-export const GHOST_UNREACHABLE_COLOR = new THREE.Color(0xcc3322);
-export const GHOST_UNREACHABLE_EMISSIVE = new THREE.Color(0xcc1111);
-export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0xff5544);
-export const GHOST_UNREACHABLE_OPACITY_MIN = 0.2;
-export const GHOST_UNREACHABLE_OPACITY_MAX = 0.6;
+// Unreachable-order ghost look (#1306): a rose-leaning red, kept >= 15 degrees
+// of hue from the building exit marker (0xff4400, ~16 deg) and >= 30 degrees from
+// the ramp arrow (0xffd21f, ~49 deg) so none of the three can be mistaken for another.
+export const GHOST_UNREACHABLE_COLOR = new THREE.Color(0xff2a88);
+const GHOST_UNREACHABLE_EMISSIVE = new THREE.Color(0xcc1166);
+export const GHOST_UNREACHABLE_RIM_COLOR = new THREE.Color(0xff4a98);
+const GHOST_UNREACHABLE_OPACITY_MIN = 0.25;
+const GHOST_UNREACHABLE_OPACITY_MAX = 0.65;
 
 // Claimed ghosts (an employee has claimed the action and is en route/working
 // it, #547) read distinctly from unclaimed ones — dimmer and pulsing slower —
@@ -55,17 +59,30 @@ const CLAIMED_PULSE_SPEED = 1.1;         // radians / second, claimed
 // approaches 0). Original tuning (RIM_INTENSITY 1.0, no compensation) pixel-
 // sampled only a ~6-8% grazing-angle brightness delta — imperceptible at
 // normal viewing distance (#613 visual feedback).
-const RIM_COLOR         = new THREE.Color(GHOST_COLOR); // reuses ghost base color
+const RIM_COLOR         = new THREE.Color(GHOST_COLOR); // reuses ghost base color (the unreachable variant swaps in GHOST_UNREACHABLE_RIM_COLOR)
 const RIM_POWER         = 1.5;           // fresnel exponent — widened vs 2.0 so the glow band reads as an edge, not a sliver
 const RIM_INTENSITY     = 2.2;           // additive glow multiplier
 const RIM_OPACITY_FLOOR = 0.25;          // floor for the opacity-compensation divisor (caps compensation at 4x)
 
+/** Colours of one ghost look: the blue default, or the red unreachable variant (#1306). */
+interface GhostPalette {
+  color: THREE.ColorRepresentation;
+  emissive: THREE.Color;
+  rim: THREE.Color;
+}
+
+const BLUE_PALETTE: GhostPalette = { color: GHOST_COLOR, emissive: EMISSIVE_COLOR, rim: RIM_COLOR };
+const RED_PALETTE: GhostPalette = {
+  color: GHOST_UNREACHABLE_COLOR, emissive: GHOST_UNREACHABLE_EMISSIVE, rim: GHOST_UNREACHABLE_RIM_COLOR,
+};
+
 /** Builds a ghost mesh material at the given starting opacity — the unclaimed
- *  and claimed materials differ only in that value (#547 review). */
-function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
+ *  and claimed materials differ only in that value (#547 review); the red
+ *  variant also differs in palette (#1306). */
+function createGhostMaterial(opacity: number, palette: GhostPalette = BLUE_PALETTE): THREE.MeshPhongMaterial {
   const material = new THREE.MeshPhongMaterial({
-    color: GHOST_COLOR,
-    emissive: EMISSIVE_COLOR,
+    color: palette.color,
+    emissive: palette.emissive,
     emissiveIntensity: 0.5,
     transparent: true,
     opacity,
@@ -78,7 +95,7 @@ function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
   // opacity pulse driven from update(). Identical GLSL for both claimed and
   // unclaimed materials; only opacity/pulse-speed differ between them.
   material.onBeforeCompile = (shader) => {
-    shader.uniforms['rimColor'] = { value: RIM_COLOR };
+    shader.uniforms['rimColor'] = { value: palette.rim };
     shader.uniforms['rimPower'] = { value: RIM_POWER };
     shader.uniforms['rimIntensity'] = { value: RIM_INTENSITY };
     shader.uniforms['rimOpacityFloor'] = { value: RIM_OPACITY_FLOOR };
@@ -103,84 +120,174 @@ function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
 
 // ---------- Main class ----------
 
+/** One drawn ghost: a bare box mesh, or a group wearing a building model (#1306). */
+interface GhostEntry {
+  root: THREE.Object3D;
+  /** Every mesh that wears a ghost material. */
+  meshes: THREE.Mesh[];
+  /** Model instance behind a building hologram; null for a box. */
+  instance: ModelInstance | null;
+  /** A `place_building` box drawn only until its model has loaded. */
+  standIn: boolean;
+  preview: GhostPreview;
+}
+
 export class GhostMesh {
   private readonly scene: THREE.Scene;
-  private readonly meshes = new Map<number, THREE.Mesh>();
+  private readonly library: ModelLibrary;
+  private readonly entries = new Map<number, GhostEntry>();
   /** Material for unclaimed ghosts — brighter, faster pulse. */
   private readonly material: THREE.MeshPhongMaterial;
   /** Material for claimed ghosts (#547) — dimmer, slower pulse, still blue. */
   private readonly claimedMaterial: THREE.MeshPhongMaterial;
+  /** Material for unclaimed ghosts no capable actor can reach (#1306) — red, same pulse as unclaimed. */
+  private readonly unreachableMaterial: THREE.MeshPhongMaterial;
   private time = 0;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, library: ModelLibrary = modelLibrary) {
     this.scene = scene;
+    this.library = library;
     this.material = createGhostMaterial(OPACITY_MIN);
     this.claimedMaterial = createGhostMaterial(CLAIMED_OPACITY_MIN);
+    this.unreachableMaterial = createGhostMaterial(GHOST_UNREACHABLE_OPACITY_MIN, RED_PALETTE);
+  }
+
+  /** A claimed ghost is never red — an employee is already on the way (#1306). */
+  private materialFor(preview: GhostPreview): THREE.MeshPhongMaterial {
+    if (preview.claimed) return this.claimedMaterial;
+    return preview.unreachable === true ? this.unreachableMaterial : this.material;
   }
 
   /**
    * Sync ghost meshes against the current ghost preview list.
    * Adds meshes for new previews and removes meshes for gone ones. A preview
-   * whose `claimed` flag flips in place (same id, existing mesh) updates that
-   * mesh's material rather than recreating it (#547).
+   * whose `claimed`/`unreachable` flag flips in place (same id, existing mesh)
+   * swaps that mesh's material rather than recreating it (#547, #1306).
    * Call after syncFromContext() whenever ghostPreviews may have changed.
    */
   sync(previews: GhostPreview[]): void {
     const activeIds = new Set(previews.map(p => p.id));
 
-    // Remove stale ghosts
-    for (const [id, mesh] of this.meshes) {
-      if (!activeIds.has(id)) {
-        this.scene.remove(mesh);
-        mesh.geometry.dispose();
-        this.meshes.delete(id);
-      }
+    for (const [id, entry] of this.entries) {
+      if (!activeIds.has(id)) this.removeEntry(id, entry);
     }
 
     for (const preview of previews) {
-      const targetMaterial = preview.claimed ? this.claimedMaterial : this.material;
-      const existing = this.meshes.get(preview.id);
+      const existing = this.entries.get(preview.id);
       if (existing) {
-        // Update material in place on a claimed/unclaimed transition —
-        // never recreate the mesh for this.
-        if (existing.material !== targetMaterial) existing.material = targetMaterial;
+        existing.preview = preview;
+        this.applyMaterial(existing);
         continue;
       }
-
-      // A `place_building` ghost carries its real footprint (#556) — size and
-      // center the box to the site's full bounding box instead of the fixed
-      // single-point cube every other action type still gets. Mirrors how
-      // BuildingMesh.ts centers a real building's box on its own footprint:
-      // group position at footprintCenterCoord(x, sizeX)/footprintCenterCoord(z, sizeZ),
-      // box sized sizeX x sizeZ (#1198).
-      if (preview.footprint) {
-        const { sizeX, sizeZ } = getFootprintSize(preview.footprint);
-        const geo = new THREE.BoxGeometry(sizeX, GHOST_SIZE, sizeZ);
-        const mesh = new THREE.Mesh(geo, targetMaterial);
-        mesh.renderOrder = GHOST_RENDER_ORDER;
-        markSceneOverlay(mesh);
-        mesh.position.set(
-          footprintCenterCoord(preview.targetX, sizeX),
-          preview.targetY + GHOST_SIZE / 2,
-          footprintCenterCoord(preview.targetZ, sizeZ),
-        );
-        this.scene.add(mesh);
-        this.meshes.set(preview.id, mesh);
-        continue;
-      }
-
-      const geo = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
-      const mesh = new THREE.Mesh(geo, targetMaterial);
-      mesh.renderOrder = GHOST_RENDER_ORDER;
-      markSceneOverlay(mesh);
-      mesh.position.set(
-        preview.targetX,
-        preview.targetY + GHOST_SIZE / 2,
-        preview.targetZ,
-      );
-      this.scene.add(mesh);
-      this.meshes.set(preview.id, mesh);
+      const entry = this.createEntry(preview);
+      this.entries.set(preview.id, entry);
+      this.scene.add(entry.root);
     }
+  }
+
+  /**
+   * Swap every building stand-in box for its model once the library has loaded
+   * it (#1306). Call when `library.revision` changes.
+   */
+  refreshModels(): void {
+    for (const [id, entry] of this.entries) {
+      if (!entry.standIn) continue;
+      const fresh = this.createEntry(entry.preview);
+      if (fresh.standIn) {
+        this.disposeEntry(fresh);
+        continue;
+      }
+      this.removeEntry(id, entry);
+      this.entries.set(id, fresh);
+      this.scene.add(fresh.root);
+    }
+  }
+
+  private applyMaterial(entry: GhostEntry): void {
+    const material = this.materialFor(entry.preview);
+    for (const mesh of entry.meshes) {
+      if (mesh.material !== material) mesh.material = material;
+    }
+  }
+
+  private createEntry(preview: GhostPreview): GhostEntry {
+    const entry = preview.building !== undefined
+      ? this.createBuildingEntry(preview, preview.building)
+      : this.createBoxEntry(preview);
+    this.applyMaterial(entry);
+    return entry;
+  }
+
+  private createBoxEntry(preview: GhostPreview, standIn = false): GhostEntry {
+    // A `place_building` ghost carries its real footprint (#556) — size and
+    // center the box to the site's full bounding box instead of the fixed
+    // single-point cube every other action type still gets. Mirrors how
+    // BuildingMesh.ts centers a real building's box on its own footprint:
+    // group position at footprintCenterCoord(x, sizeX)/footprintCenterCoord(z, sizeZ),
+    // box sized sizeX x sizeZ (#1198).
+    const mesh = new THREE.Mesh();
+    if (preview.footprint) {
+      const { sizeX, sizeZ } = getFootprintSize(preview.footprint);
+      mesh.geometry = new THREE.BoxGeometry(sizeX, GHOST_SIZE, sizeZ);
+      const origin = preview.building ?? { x: preview.targetX, z: preview.targetZ };
+      mesh.position.set(
+        footprintCenterCoord(origin.x, sizeX),
+        preview.targetY + GHOST_SIZE / 2,
+        footprintCenterCoord(origin.z, sizeZ),
+      );
+    } else {
+      mesh.geometry = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
+      mesh.position.set(preview.targetX, preview.targetY + GHOST_SIZE / 2, preview.targetZ);
+    }
+    mesh.renderOrder = GHOST_RENDER_ORDER;
+    markSceneOverlay(mesh);
+    return { root: mesh, meshes: [mesh], instance: null, standIn, preview };
+  }
+
+  /**
+   * A queued building draws its own model as the hologram (#1306): every mesh
+   * of the model wears the shared ghost material, standing where the real
+   * building will (same footprint centring as BuildingMesh.addBuilding). While
+   * the model has not loaded, the footprint box stands in.
+   */
+  private createBuildingEntry(preview: GhostPreview, building: NonNullable<GhostPreview['building']>): GhostEntry {
+    const instance = instantiateBuildingModel(this.library, building.type, building.tier);
+    if (instance.isFallback) {
+      instance.dispose();
+      return this.createBoxEntry(preview, true);
+    }
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
+    const group = new THREE.Group();
+    group.add(instance.root);
+    group.position.set(
+      footprintCenterCoord(building.x, sizeX),
+      preview.targetY,
+      footprintCenterCoord(building.z, sizeZ),
+    );
+    const meshes: THREE.Mesh[] = [];
+    instance.root.traverse(obj => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      obj.renderOrder = GHOST_RENDER_ORDER;
+      markSceneOverlay(obj);
+      meshes.push(obj);
+    });
+    markSceneOverlay(group);
+    return { root: group, meshes, instance, standIn: false, preview };
+  }
+
+  private removeEntry(id: number, entry: GhostEntry): void {
+    this.scene.remove(entry.root);
+    this.disposeEntry(entry);
+    this.entries.delete(id);
+  }
+
+  /** Box geometry is the ghost's own; a model's geometry is shared with the library and stays. */
+  private disposeEntry(entry: GhostEntry): void {
+    if (entry.instance !== null) {
+      entry.instance.dispose();
+      return;
+    }
+    for (const mesh of entry.meshes) mesh.geometry.dispose();
   }
 
   /**
@@ -188,41 +295,40 @@ export class GhostMesh {
    * Claimed and unclaimed ghosts pulse independently (#547).
    */
   update(dt: number): void {
-    if (this.meshes.size === 0) return;
+    if (this.entries.size === 0) return;
     this.time += dt;
     const t = (Math.sin(this.time * PULSE_SPEED) + 1) * 0.5; // 0..1
     this.material.opacity = OPACITY_MIN + t * (OPACITY_MAX - OPACITY_MIN);
+    this.unreachableMaterial.opacity = GHOST_UNREACHABLE_OPACITY_MIN
+      + t * (GHOST_UNREACHABLE_OPACITY_MAX - GHOST_UNREACHABLE_OPACITY_MIN);
     const tc = (Math.sin(this.time * CLAIMED_PULSE_SPEED) + 1) * 0.5; // 0..1
     this.claimedMaterial.opacity = CLAIMED_OPACITY_MIN + tc * (CLAIMED_OPACITY_MAX - CLAIMED_OPACITY_MIN);
   }
 
   /** Remove all ghost meshes from the scene. */
   clearAll(): void {
-    for (const mesh of this.meshes.values()) {
-      this.scene.remove(mesh);
-      mesh.geometry.dispose();
-    }
-    this.meshes.clear();
+    for (const [id, entry] of [...this.entries]) this.removeEntry(id, entry);
   }
 
   /** Number of ghost meshes currently rendered. */
   get count(): number {
-    return this.meshes.size;
+    return this.entries.size;
   }
 
   /**
-   * THREE.Object3D anchor for the ghost mesh with pending-action id `id`, or
+   * THREE.Object3D anchor for the ghost with pending-action id `id`, or
    * null when none exists (site not yet synced this frame, or gone). Lets
    * other renderer modules parent world-space UI to a construction site
    * without duplicating GhostMesh's own footprint-centering math (#1012).
    */
   getGroup(id: number): THREE.Object3D | null {
-    return this.meshes.get(id) ?? null;
+    return this.entries.get(id)?.root ?? null;
   }
 
   dispose(): void {
     this.clearAll();
     this.material.dispose();
     this.claimedMaterial.dispose();
+    this.unreachableMaterial.dispose();
   }
 }

@@ -59,6 +59,8 @@ export interface SerializableGameState {
   surveyCount: number;
   /** Queued-but-not-yet-claimed PendingActions (state.pendingActions) — includes auto-inserted rest tasks. */
   pendingActionCount: number;
+  /** Ghost previews drawn red because no actor able to perform their action can reach them (#1306). */
+  unreachableGhostCount: number;
   buildingCount: number;
   vehicleCount: number;
   /** Active traffic jams at chokepoints, silencing ignored (findTrafficJams, #1208). */
@@ -177,6 +179,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
+    unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     trafficJamCount: jams.length,

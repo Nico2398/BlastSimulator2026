@@ -4,6 +4,7 @@
 
 import type { GameState, PlannedRamp, RampFootprint } from '../state/GameState.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
+import { refreshOrderReachability } from '../engine/OrderReachability.js';
 import { addExpense } from '../economy/Finance.js';
 import type { RampDef, RampSegmentDef } from './Ramp.js';
 
@@ -65,5 +66,8 @@ export function queueRampOrder(
   }
 
   state.plannedRamps.push(plannedRamp);
+  // The layers were coloured one by one as they were dispatched, before the ramp
+  // existed to judge them together — re-judge them as one ramp (#1306).
+  refreshOrderReachability(state);
   return rampId;
 }

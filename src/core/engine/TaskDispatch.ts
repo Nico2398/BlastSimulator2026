@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Task Dispatch engine
 // Routes pending actions to qualified employees.
 
-import { isFootprintAction, type GameState, type PendingAction } from '../state/GameState.js';
+import { isFootprintAction, type GameState, type GhostPreview, type PendingAction } from '../state/GameState.js';
+import { classifyNewOrder } from './OrderReachability.js';
 
 export type { PendingAction };
 
@@ -80,8 +81,11 @@ export function dispatchPendingAction(
     targetY: action.targetY,
     claimed: false,
     ...(footprint !== undefined ? { footprint } : {}),
+    ...buildingInfoForGhost(state, action),
   });
   state.ghostPreviewsRevision++;
+  // Colour the new ghost now, not on the next tick — a paused game never ticks (#1306).
+  classifyNewOrder(state, action.id);
   return { success: true };
 }
 
@@ -114,4 +118,28 @@ export function claimPendingAction(
   }
 
   return action;
+}
+
+/** What a `place_building` ghost draws as its hologram (#1306); `{}` for every other action. */
+function buildingInfoForGhost(
+  state: GameState,
+  action: Pick<PendingAction, 'type' | 'payload'>,
+): Pick<GhostPreview, 'building'> {
+  if (action.type !== 'place_building') return {};
+  const order = state.plannedBuildings.find(pb => pb.id === action.payload['buildingOrderId']);
+  return order === undefined ? {} : { building: { type: order.type, tier: order.tier, x: order.x, z: order.z } };
+}
+
+/** Fill in `building` on `place_building` ghosts restored from a save that predates it (#1306). */
+export function backfillGhostBuildings(state: GameState): void {
+  const actionById = new Map(state.pendingActions.map(a => [a.id, a]));
+  for (const ghost of state.ghostPreviews) {
+    const action = actionById.get(ghost.id);
+    if (ghost.building !== undefined || action === undefined) continue;
+    const info = buildingInfoForGhost(state, action);
+    if (info.building !== undefined) {
+      ghost.building = info.building;
+      state.ghostPreviewsRevision++;
+    }
+  }
 }

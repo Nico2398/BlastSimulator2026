@@ -609,6 +609,7 @@ window.__gameState = () => {
     researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
+    unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     // Mirrors serializeGameState (console-api.ts): active jams, silencing ignored (#1208).

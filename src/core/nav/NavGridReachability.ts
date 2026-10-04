@@ -282,8 +282,16 @@ function reachableSetFrom(
   const ax = Math.round(anchorX);
   const az = Math.round(anchorZ);
   if (!navGrid.cellAt(ax, az)) return EMPTY_REACHABLE_SET;
+  return snapshotFill(navGrid, [{ x: ax, z: az }], climbAware, requiredClearance);
+}
 
-  const { width, height, count } = floodFillReachable(navGrid, ax, az, climbAware, false, requiredClearance);
+function snapshotFill(
+  navGrid: NavGrid,
+  sources: ReadonlyArray<{ x: number; z: number }>,
+  climbAware: boolean,
+  requiredClearance: number,
+): ReachableSet {
+  const { width, height, count } = floodFillFromSources(navGrid, sources, climbAware, false, requiredClearance);
   const { originX, originZ } = navGrid;
   // Independent snapshot: floodFillReachable's next call reuses the shared
   // scratch buffer, so a wrapper aliasing it directly would go stale (or
@@ -568,6 +576,22 @@ function floodFillReachable(
   avoidOccupancy: boolean = false,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
 ): { width: number; height: number; count: number } {
+  return floodFillFromSources(navGrid, [{ x: anchorX, z: anchorZ }], climbAware, avoidOccupancy, requiredClearance);
+}
+
+/**
+ * `floodFillReachable`'s body, seeded from several in-grid source cells at once
+ * (#1306): one fill answers "reachable from ANY source" at a cost bounded by the
+ * grid, never by the number of sources. A single source is exactly the old
+ * single-anchor fill.
+ */
+function floodFillFromSources(
+  navGrid: NavGrid,
+  sources: ReadonlyArray<{ x: number; z: number }>,
+  climbAware: boolean,
+  avoidOccupancy: boolean,
+  requiredClearance: number,
+): { width: number; height: number; count: number } {
   const width = navGrid.width;
   const height = navGrid.height;
   ensureReachabilityScratch(width * height);
@@ -576,9 +600,12 @@ function floodFillReachable(
   for (let i = 0; i < lastFillCount; i++) visitedArr[queueArr[i]!] = 0;
 
   let count = 0;
-  const startIdx = (anchorZ - navGrid.originZ) * width + (anchorX - navGrid.originX);
-  visitedArr[startIdx] = 1;
-  queueArr[count++] = startIdx;
+  for (const source of sources) {
+    const startIdx = (source.z - navGrid.originZ) * width + (source.x - navGrid.originX);
+    if (visitedArr[startIdx]) continue;
+    visitedArr[startIdx] = 1;
+    queueArr[count++] = startIdx;
+  }
 
   for (let head = 0; head < count; head++) {
     const idx = queueArr[head]!;
@@ -615,13 +642,20 @@ function floodFillReachable(
 }
 
 /**
- * Climb-aware reachable set flooded from several source cells at once (#1306).
- * Skeleton stub — implementation lands in the green phase.
+ * `computeClimbReachableSet` flooded from several sources at once (#1306): a cell
+ * is in the set when it is climb-reachable from at least one source. Each source
+ * is clamped into the grid like `computeClimbReachableSet`'s anchor, and a
+ * stranded source reaches at least its own cell. No sources: the empty set.
  */
 export function computeClimbReachableSetFromSources(
-  _navGrid: NavGrid,
-  _sources: ReadonlyArray<{ x: number; z: number }>,
-  _requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  navGrid: NavGrid,
+  sources: ReadonlyArray<{ x: number; z: number }>,
+  requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
 ): ReachableSet {
-  return EMPTY_REACHABLE_SET;
+  if (sources.length === 0) return EMPTY_REACHABLE_SET;
+  const cells = sources.map(s => ({
+    x: Math.round(navGrid.clampX(s.x)),
+    z: Math.round(navGrid.clampZ(s.z)),
+  }));
+  return snapshotFill(navGrid, cells, true, requiredClearance);
 }

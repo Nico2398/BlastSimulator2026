@@ -3,6 +3,7 @@
 // Used by both console.ts (CLI mode) and main.ts (browser console bridge).
 
 import { ConsoleRunner, parseCommand, type CommandResult } from './ConsoleRunner.js';
+import { refreshOrderReachability } from '../core/engine/OrderReachability.js';
 import { incrementActionCount } from '../core/events/EventSystem.js';
 import {
   newGameCommand,
@@ -145,8 +146,17 @@ export function createRunner(): RunnerWithContext {
   setupEvents();
 
   const emitter = new EventEmitter();
-  const runner = new ConsoleRunner();
   const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter };
+  // A paused game never ticks, so a hire, fire, purchase, sale or new order made
+  // by command would leave ghost colours stale until resume (#1306). A running
+  // game re-classifies on its next tick, and a bare `tick` does so itself.
+  const runner = new ConsoleRunner({
+    afterCommand: input => {
+      const state = ctx.state;
+      if (state === null || !state.isPaused || parseCommand(input).command === 'tick') return;
+      if (state.pendingActions.some(a => a.status === 'queued')) refreshOrderReachability(state);
+    },
+  });
 
   // Single subscription keeps NavGrid in sync with every terrain/occupancy
   // write, wherever it happens (#1146) — replaces the scattered manual

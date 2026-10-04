@@ -50,6 +50,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   sequencedCount: { type: 'number' },
   researchQueueLength: { type: 'number', description: 'Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length)' },
   surveyCount: { type: 'number', description: 'Completed survey results (state.surveyResults.length)' },
+  unreachableGhostCount: { type: 'number', description: 'Ghost previews flagged unreachable (drawn red): no actor able to perform the action can reach it (state.ghostPreviews with unreachable === true)' },
   pendingActionCount: { type: 'number', description: 'Queued-but-not-yet-claimed PendingActions, including auto-inserted rest tasks (state.pendingActions.length)' },
   buildingCount: { type: 'number' },
   vehicleCount: { type: 'number' },

@@ -15,16 +15,12 @@ import {
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
 import { clearResolvedEvacuationHolds, isMidEvacuation } from './Evacuation.js';
-import { isLicensedForRole, hasBlockedQueuedActionForVehicleRole } from './VehicleReservation.js';
+import { hasBlockedQueuedActionForVehicleRole } from './VehicleReservation.js';
+import { classifyQueuedOrders } from './OrderReachability.js';
 import { isMidCollapseOrForcedRest } from './RestActionHelpers.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { alightIfMounted } from './Mount.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
-import { NavGrid } from '../nav/NavGrid.js';
-import type { ReachableSet } from '../nav/NavGridReachability.js';
-import { findHaulDepotApproach } from '../economy/HaulingTask.js';
-import { isAutoDebrisAction } from '../economy/HaulDispatch.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -74,85 +70,17 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     emp => emp.alive && !emp.injured && emp.trainingState === null,
   );
 
-  // Actions no eligible employee could ever perform, computed once up front —
-  // qualification doesn't change during this tick's dispatch pass. A
-  // vehicle-gated action (requiredVehicleRole !== null, e.g. HaulDispatch's
-  // haul_debris/fragment_debris, #552) is never flagged here regardless of
-  // roster headcount — its real gate is vehicle/driver availability at claim
-  // time (findVehicleForClaim, VehicleReservation.ts), not this employee-skill
-  // check. Treating "zero employees on the whole roster" as "unqualified" for
-  // these would auto-pause a fresh, unstaffed site with an unresolvable
-  // unqualified_task_error every single tick forever (no option on that event
-  // actually removes the action) the instant a blast leaves debris on the
-  // ground — HaulDispatch.ts's own doc comment already promises these sit
-  // queued silently until a hauler/driver exists; requiredSkill===null alone
-  // doesn't deliver that promise when the roster is completely empty.
-  // Same pass also stamps action.blockedReason (#1061) — a live diagnostic
-  // NotificationCenter.ts surfaces as a non-blocking player warning, entirely
-  // separate from the unqualifiedIds/result.unqualified heavy-modal channel
-  // above: a vehicle-gated action is NEVER added to unqualifiedIds/
-  // result.unqualified (see the doc comment above), but it still gets a
-  // blockedReason when nobody can currently work it (no vehicle of that role
-  // in the fleet, nobody licensed to drive one, or — matching the real claim
-  // requirement in findVehicleForClaim/claimOnePoolCandidate,
-  // EmployeeDispatchSteps.ts — nobody who is BOTH licensed for the role AND
-  // holds action.requiredSkill, e.g. drill_hole needs driving.drill_rig AND
-  // blasting on the same employee).
-  // Computed once per tickEmployees call, fresh from live state every time —
-  // never cached across ticks, so a pocket that becomes reachable later (a
-  // ramp connects it) clears on its own the very next classification pass
-  // (#1231). Two variants, one per clearance: a vehicle-gated action needs
-  // NAV_CLEARANCE_VEHICLE_CELLS (the vehicle has to physically fit through
-  // every cell of the route), while an on-foot action only needs
-  // NAV_CLEARANCE_EMPLOYEE_CELLS — a corridor wide enough for a person but
-  // too narrow for a vehicle must not stamp a foot order (survey,
-  // place_building, rest, ...) as unreachable just because no vehicle could
-  // ever drive through it (#1231 review round 3).
-  const reachableForVehicle = computeGroundCrewReachableSet(state, NAV_CLEARANCE_VEHICLE_CELLS);
-  const reachableForFoot = computeGroundCrewReachableSet(state, NAV_CLEARANCE_EMPLOYEE_CELLS);
-
-  const unqualifiedIds = new Set<number>();
-  for (const action of state.pendingActions) {
-    if (action.status !== 'queued') continue;
-    const reachableTargets = action.requiredVehicleRole !== null ? reachableForVehicle : reachableForFoot;
-    // A dig_ramp_segment's target is legitimately climb-unreachable from
-    // above until the segment above it is dug — top-down excavation order,
-    // not a defect (#1231) — so it's exempt from the unreachable check below.
-    if (
-      reachableTargets !== null && action.type !== 'dig_ramp_segment'
-      && !reachableTargets.has(action.targetX, action.targetZ)
-    ) {
-      // Auto-generated debris work outside the reachable set is a normal,
-      // player-owned state (#1302), not a failed order: it waits silently and
-      // resumes once the player connects it. Player orders keep the warning.
-      action.blockedReason = isAutoDebrisAction(action.type) ? 'debris_out_of_reach' : 'target_unreachable';
-      continue;
-    }
-    // Shared shape between the vehicle-gated and plain branches below: an
-    // action with no requiredSkill just needs a warm body from `emps`;
-    // otherwise at least one of `emps` must hold the skill.
-    const holdsRequiredSkill = (emps: Employee[]): boolean => action.requiredSkill === null
-      ? emps.length > 0
-      : emps.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
-    if (action.requiredVehicleRole !== null) {
-      const role = action.requiredVehicleRole;
-      const hasVehicle = state.vehicles.vehicles.some(v => v.type === role);
-      const licensed = eligible.filter(emp => isLicensedForRole(emp, role));
-      const hasQualifiedLicensed = holdsRequiredSkill(licensed);
-      action.blockedReason = !hasVehicle
-        ? 'no_vehicle_in_fleet'
-        : licensed.length === 0 ? 'no_licensed_driver'
-        : !hasQualifiedLicensed ? 'no_qualified_employee'
-        : null;
-      continue;
-    }
-    const hasQualified = holdsRequiredSkill(eligible);
-    if (!hasQualified) {
-      unqualifiedIds.add(action.id);
-      result.unqualified.push(action.id);
-    }
-    action.blockedReason = hasQualified ? null : 'no_qualified_employee';
-  }
+  // Reachability and availability classification of every queued action — see
+  // OrderReachability.ts: a ghost reads red when none of the actors able to
+  // perform THAT action can reach it (#1306), and blockedReason (#1061) feeds
+  // NotificationCenter's non-blocking warnings, entirely separate from the
+  // unqualifiedIds/result.unqualified heavy-modal channel. A vehicle-gated
+  // action is never added to unqualifiedIds regardless of roster headcount:
+  // its real gate is vehicle/driver availability at claim time
+  // (findVehicleForClaim), and flagging an unstaffed site would auto-pause it
+  // with an unresolvable unqualified_task_error every tick (#552).
+  const { unqualifiedIds } = classifyQueuedOrders(state);
+  for (const id of unqualifiedIds) result.unqualified.push(id);
 
   const orderedEmployees = [...eligible].sort((a, b) => a.id - b.id);
   for (const employee of orderedEmployees) {
@@ -275,53 +203,6 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   }
 
   return result;
-}
-
-/**
- * blockedReason reachability classification support (#1231): a
- * PendingAction whose target cell sits outside the ground crew's reachable
- * region (behind #1197's diagonal-corner cut) makes no progress until the
- * player connects it. A player order there is stamped `target_unreachable`;
- * auto-generated haul/fragment debris is stamped `debris_out_of_reach` —
- * stranded debris is a normal, player-owned state (#1302), not a defect.
- * Anchors NavGrid.computeClimbReachableSet at the nearest active freight_warehouse's approach cell (findHaulDepotApproach,
- * HaulingTask.ts) — the reference point passed in is a neutral grid origin,
- * not any one employee's position, since this reflects what ground crew as a
- * whole can reach, not one individual's route. Returns a *reachable*-set —
- * `.has(x, z)` true means the cell IS reachable at the given clearance — the
- * name says so explicitly after review round 3 flagged the previous
- * `computeUnreachableTargets` name as backwards.
- *
- * `clearance` must match the action family the caller is classifying:
- * `NAV_CLEARANCE_VEHICLE_CELLS` for a vehicle-gated action (haul_debris/
- * fragment_debris/dig_ramp_segment — the vehicle has to physically fit
- * through every cell of the route) and `NAV_CLEARANCE_EMPLOYEE_CELLS` for an
- * on-foot action (survey, place_building, rest, ...) — a corridor wide enough
- * for a person but too narrow for a vehicle must not read as unreachable for
- * a foot order just because no vehicle could ever drive through it (#1231
- * review round 3). tickEmployees calls this once per clearance value, per
- * tick, rather than once per action.
- *
- * Returns null when there's no navGrid yet, or no active depot to anchor
- * from — both cases where the existing three-reason classification runs
- * unchanged (tickEmployees).
- *
- * Known limitation: with 2+ active freight_warehouses in genuinely separate
- * connected regions, anchoring from a single nearest-to-corner depot
- * (findHaulDepotApproach) can misclassify a target only reachable via the
- * OTHER depot's region as unreachable — untested and out of scope for #1231,
- * left for whoever adds real multi-depot support.
- *
- * Exported for `tests/unit/engine/EmployeeDispatch.test.ts`, which calls it
- * standalone to check the returned set's shape in isolation (a real external
- * caller — the earlier unexported version broke that suite, #1231 review).
- */
-export function computeGroundCrewReachableSet(state: GameState, clearance: number): ReachableSet | null {
-  const navGrid = state.navGrid;
-  if (navGrid === null) return null;
-  const approach = findHaulDepotApproach(state, navGrid.originX, navGrid.originZ);
-  if (approach === null) return null;
-  return NavGrid.computeClimbReachableSet(navGrid, approach.x, approach.z, clearance);
 }
 
 /**

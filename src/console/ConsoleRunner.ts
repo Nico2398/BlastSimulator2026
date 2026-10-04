@@ -58,7 +58,7 @@ export function parseCommand(input: string): ParsedCommand {
 }
 
 /** Options for ConsoleRunner (#1306). */
-export interface ConsoleRunnerOptions {
+interface ConsoleRunnerOptions {
   /** Called after each command runs, with the raw input and its result. */
   afterCommand?: (input: string, result: CommandResult) => void;
 }
@@ -95,6 +95,12 @@ export class ConsoleRunner {
 
   /** Run a raw command string. Returns a CommandResult. */
   run(input: string): CommandResult {
+    const result = this.dispatch(input);
+    this.options.afterCommand?.(input, result);
+    return result;
+  }
+
+  private dispatch(input: string): CommandResult {
     const parsed = parseCommand(input);
 
     if (!parsed.command) {
