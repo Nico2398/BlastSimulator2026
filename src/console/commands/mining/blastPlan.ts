@@ -12,6 +12,7 @@ import {
   purchaseSoftware,
 } from '../../../core/mining/Software.js';
 import { VOXEL_SIZE_CM } from '../../../core/config/balance.js';
+import { queueSavedBlastPlan } from './savedPlanQueue.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 
 // ── Blast plan save/load/validate ──
@@ -39,10 +40,7 @@ export function blastPlanCommand(
     const name = named['name'] ?? 'default';
     const saved = ctx.state!.savedPlans[name];
     if (!saved) return { success: false, output: `No saved plan "${name}"` };
-    ctx.state!.drillHoles = [...saved.drillHoles];
-    ctx.state!.chargesByHole = { ...saved.chargesByHole };
-    ctx.state!.sequenceDelays = { ...saved.sequenceDelays };
-    return { success: true, output: `Plan "${name}" loaded` };
+    return queueSavedBlastPlan(ctx, saved, name);
   }
 
   if (sub === 'validate') {

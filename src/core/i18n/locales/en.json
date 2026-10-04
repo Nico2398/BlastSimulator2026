@@ -3367,6 +3367,8 @@
   "mining.blast_plan.invalid_plan_header": "Invalid plan",
   "mining.blast_plan.validation_issues_header": "Validation issues",
   "mining.blast_plan.valid": "Plan is valid and ready to blast.",
+  "mining.blast_plan.loaded": "Plan \"{name}\" loaded: {holes} drill orders and {charges} charge orders queued ({cost}), {skipped} holes skipped.",
+  "mining.blast_plan.load_nothing_new": "Plan \"{name}\" adds nothing new: every hole is already drilled or ordered.",
   "mining.preview.usage": "Usage: preview energy|fragments|projections|vibrations",
   "mining.build_ramp.cancel_usage": "Usage: build_ramp cancel id:<ramp-id>",
   "mining.build_ramp.invalid_length": "Invalid ramp length: length must be a finite positive number.",
