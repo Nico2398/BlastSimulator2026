@@ -2705,6 +2705,7 @@
   "saveload.not_found": "Sauvegarde introuvable.",
   "saveload.no_backend": "Système de sauvegarde indisponible.",
   "saveload.error": "Erreur : {msg}",
+  "saveload.load_refused": "Impossible de charger cette sauvegarde : {reason}",
   "saveload.slot_name": "Créneau {n}",
   "saveload.empty_slot": "— Créneau vide {n} —",
   "saveload.auto_slot": "Sauvegarde auto",

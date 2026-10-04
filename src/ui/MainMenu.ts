@@ -102,6 +102,7 @@ export class MainMenu {
     const tutorialBtn = this.makeMenuButton('training', 'menu.tutorial', () => this.onTutorial?.());
     this.locale.bindText(tutorialBtn.hintEl, 'ui.menu.hint_steps', { n: TUTORIAL_STEPS.length });
     const loadBtn = this.makeMenuButton('save', 'menu.load', () => this.onLoad?.());
+    loadBtn.el.id = 'bs-menu-load';
     this.loadHintEl = loadBtn.hintEl;
     const settingsBtn = this.makeMenuButton('settings', 'menu.settings', () => this.onSettings?.());
 

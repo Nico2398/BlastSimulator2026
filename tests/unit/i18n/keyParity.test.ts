@@ -399,6 +399,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1313 adds 1 key (tick.level_ended): 3549.
     // #1420 adds 1 key (blast.overlay.delay_ms hole delay label): 3550.
     // #1314 adds 5 keys (site-map return, Resume, restart confirm): 3555.
+    // #1315 adds 1 key (saveload.load_refused): 3556.
     // Baseline is now 3528 (down from 3532): #1207 flips
     // AGENT_OCCUPANCY_ENABLED_DEFAULT to true and deletes the flag along
     // with the now-dead `debug occupancy` console command — drops 4 keys
@@ -406,7 +407,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // console.debug_occupancy_off, console.invalid_agent_occupancy_flag),
     // both locales.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3555);
+    expect(Object.keys(en).length).toBe(3556);
   });
 });
 

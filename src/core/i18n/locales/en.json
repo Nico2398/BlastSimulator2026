@@ -2705,6 +2705,7 @@
   "saveload.not_found": "Save not found.",
   "saveload.no_backend": "Save system unavailable.",
   "saveload.error": "Error: {msg}",
+  "saveload.load_refused": "Can't load this save: {reason}",
   "saveload.slot_name": "Slot {n}",
   "saveload.empty_slot": "— Empty Slot {n} —",
   "saveload.auto_slot": "Auto-Save",

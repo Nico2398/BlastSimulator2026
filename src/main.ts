@@ -185,14 +185,10 @@ mainMenu.setOnNewCampaign(() => {
   worldMap.show(null);
 });
 mainMenu.setOnContinue((slotId) => {
-  // Keep the menu up while the async load runs: it is the gate
-  // (fullScreenMenuUp) that stops the previous ctx.state ticking/autosaving
-  // before the loaded state replaces it. Hide only once the state was swapped;
-  // a missing/failed/refused load leaves the menu showing.
-  const stateBeforeLoad = ctx.state;
-  void savesModal.loadFromSlot(slotId).then(() => {
-    if (ctx.state !== stateBeforeLoad) mainMenu.hide();
-  });
+  // The menu stays up until the load succeeds (onLoad hides it): it is the gate
+  // (fullScreenMenuUp) that stops the previous ctx.state ticking/autosaving.
+  // A missing/failed/refused load leaves the menu showing with the reason.
+  void savesModal.loadFromSlot(slotId);
 });
 mainMenu.setOnLoad(() => { savesModal.show(); });
 mainMenu.setOnSettings(() => { uiManager.showPanel('settings'); });
@@ -473,6 +469,19 @@ console.log = (...args: unknown[]) => {
 };
 
 /**
+ * Level-entry fix-ups shared by every path that replaces ctx.state: hide the
+ * splash menu, close stale overlays from the previous level's ended state
+ * (#504), and reseed weather + RNG so a second game never keeps the first
+ * game's cycle at the wrong seed.
+ */
+function onLevelStateReplaced(state: GameState): void {
+  mainMenu.hide();
+  uiManager.closeStaleLevelOverlays(state);
+  ctx.weatherCycle = createWeatherCycle(state.seed);
+  ctx.rng = new Random(state.seed + 1000);
+}
+
+/**
  * Run a console command.
  *
  * `syncRenderer: false` runs everything except the scene rebuild, so a level
@@ -510,22 +519,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // state (e.g. BlastReportModal left open from an earlier site's last
   // blast) — a second `sandbox start` otherwise left that site's "Rating:
   // Perfect" dialog covering the new site's terrain (#504).
-  if (enteredNewLevel && ctx.state) {
-    mainMenu.hide();
-    uiManager.closeStaleLevelOverlays(ctx.state);
-  }
-
-  // (Re)seed the weather cycle whenever ctx.state was replaced with a new
-  // object. Previously ctx.weatherCycle only ever got created lazily inside
-  // weatherCommand (the `weather` console command, which nothing
-  // player-facing calls), so outside of manual console/test use the weather
-  // popover would have had nothing real to show, and a second game in the
-  // same session would have kept the first game's weather cycle at the wrong
-  // seed.
-  if (enteredNewLevel && ctx.state) {
-    ctx.weatherCycle = createWeatherCycle(ctx.state.seed);
-    ctx.rng = new Random(ctx.state.seed + 1000);
-  }
+  if (enteredNewLevel && ctx.state) onLevelStateReplaced(ctx.state);
 
   // Trigger blast effects after a blast (terrain remesh already happened via
   // the terrain:updated subscription above, fired from inside executeBlast).
@@ -1140,19 +1134,18 @@ savesModal.setOnLoad((state) => {
   // generator version doesn't match this build is refused outright instead.
   const refusal = loadGridForState(ctx, state);
   if (refusal) {
-    uiManager.notify({ severity: 'warn', title: t('ui.saves.title'), body: refusal });
-    return;
+    return refusal;
   }
-  // Close any overlay whose visibility is a stale carry-over from the
-  // previous session's ended state (e.g. BlastReportModal left open from an
-  // earlier blast) — same fixup runGameCommand's enteredNewLevel branch does
-  // for the console `load` command; this is the Saves modal's Load button,
-  // the only other real path that swaps ctx.state (#571).
-  // `state`, not `ctx.state` — `loadGridForState` just assigned `ctx.state =
-  // state` on this success path, but TS can't see that mutation through the
-  // call, and `state` here is already known non-null.
-  uiManager.closeStaleLevelOverlays(state);
+  // Same level-entry fix-ups as starting a level (#571, #1315). `state`, not
+  // `ctx.state`: loadGridForState assigned it, but TS cannot see that.
+  onLevelStateReplaced(state);
+  if (tutorial.isActive) tutorial.abandon();
+  scenePicking.clearSelection();
+  worldMap.hide();
+  levelEndScreen.hide();
+  uiManager.show();
   gameRenderer.syncFromContext(ctx);
+  return null;
 });
 
 // --- Keyboard Shortcuts ---
