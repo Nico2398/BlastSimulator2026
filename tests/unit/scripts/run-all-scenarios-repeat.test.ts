@@ -107,6 +107,7 @@ vi.mock('../../../scripts/shared/puppeteer-utils.js', () => ({
   executeInteractionActions: executeInteractionActionsMock,
   suspendDrawing: suspendDrawingMock,
   resetOriginStorage: resetOriginStorageMock,
+  waitForGameBridge: vi.fn().mockResolvedValue(undefined),
   CANVAS_READY_TIMEOUT_MS: 30000,
   DEFAULT_STEP_TIMEOUT: 60,
   SCREENSHOT_DIR: '/tmp/bs2026-run-all-scenarios-repeat-fixture-screenshots',
