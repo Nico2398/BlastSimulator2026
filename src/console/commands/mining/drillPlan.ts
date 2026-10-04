@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions } from './shared.js';
+import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType } from './shared.js';
 import {
   createGridPlan, addHole, removeHole, resetHoleIds,
   computeDrillHoleDurationTicks,
@@ -51,9 +51,7 @@ export function clearDrillPlan(ctx: MiningContext): number {
   const state = ctx.state!;
   const clearedCount = state.drillHoles.length + state.plannedDrillHoles.length;
 
-  for (const action of state.pendingActions.filter(a => a.type === 'charge_hole')) {
-    cancelAction(state, action.id);
-  }
+  cancelPendingActionsOfType(state, 'charge_hole');
   cancelOutstandingDrillActions(state);
 
   state.drillHoles = [];

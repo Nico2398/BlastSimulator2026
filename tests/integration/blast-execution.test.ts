@@ -386,7 +386,7 @@ describe('Blast execution — #1346', () => {
     const result = run('blast');
 
     expect(result.success).toBe(true);
-    // key is absent from locales today, so t() echoes the key; either way no line may appear.
+    // No drill orders outstanding: neither the raw key nor the localized line may appear.
     expect(result.output).not.toContain('cancelled_drill_orders');
     expect(result.output).not.toContain(t('mining.blast.cancelled_drill_orders', { count: 0 }));
   });
