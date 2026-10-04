@@ -57,8 +57,8 @@ export const ORE_PRICES = {
   treranium: 9,
 } as const;
 
-/** Rubble disposal price per kg ($). Negative = cost to haul; positive = revenue from sale. */
-export const RUBBLE_DISPOSAL_PRICE = 0.5;
+/** Rubble disposal price range per kg ($) used when generating contract offers. */
+export const RUBBLE_DISPOSAL_PRICE_RANGE = { min: 0.5, max: 2.0 } as const;
 
 // ─── Corruption ────────────────────────────────────────────────────────────────
 
