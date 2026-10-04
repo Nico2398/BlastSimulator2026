@@ -1,0 +1,123 @@
+{
+  "name": "level-switch-clears-selection",
+  "description": "Issue #1322: switching level must drop per-level UI state. Player selects an employee by clicking them in the 3D scene (selection bar shows), the level is won, and the player clicks Continue into the next level; the old level's selection bar must be gone (display none) instead of pointing at an employee that no longer exists.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow staffed:true",
+      "description": "Start Dusty Hollow with the staffed roster so employee 1 exists to click.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": false
+        }
+      },
+      "timeout": 120
+    },
+    {
+      "command": "state",
+      "description": "Player clicks a hired employee in the 3D scene (clickEntity by kind+id); the selection bar must appear. `state` is the inert paired command.",
+      "interaction": [
+        {
+          "type": "clickEntity",
+          "kind": "employee",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+        }
+      ],
+      "role": "player",
+      "timeout": 60,
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "campaign complete level:dusty_hollow",
+      "description": "Debug force-win (console-only, #1431): ends Dusty Hollow completed and unlocks Grumpstone Ridge.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign complete level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Gate: level-end Continue must become usable. First-run tutorial can defer the screen, hence the generous timeoutMs.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-level-end-screen [data-action=\"continue\"]",
+          "timeoutMs": 30000
+        }
+      ],
+      "role": "observe",
+      "timeout": 60,
+      "expect": {
+        "usable": "#bs-level-end-screen [data-action=\"continue\"]"
+      }
+    },
+    {
+      "command": "campaign start level:grumpstone_ridge",
+      "description": "Player clicks Continue; Grumpstone Ridge starts. Paired command starts that level in command mode.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-level-end-screen [data-action=\"continue\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-return-map",
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "player",
+      "timeout": 120,
+      "expect": {
+        "usable": ".bs-return-map",
+        "equals": {
+          "levelEnded": false
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "The previous level's selection bar must be hidden (display none) after the switch; a stale bar would point at an employee from the old level.",
+      "interaction": [
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-selection-bar",
+          "property": "style.display",
+          "expectedValue": "none",
+          "timeoutMs": 10000
+        }
+      ],
+      "role": "observe",
+      "timeout": 30,
+      "expect": {
+        "blocked": "#bs-selection-bar [data-action=\"detail\"]",
+        "equals": {
+          "levelEnded": false
+        }
+      }
+    }
+  ]
+}
