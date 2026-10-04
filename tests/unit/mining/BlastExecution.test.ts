@@ -387,22 +387,36 @@ describe('buildBlastReport', () => {
     expect(report.destroyedBuildings).toBe(result!.destroyedBuildings);
   });
 
-  it('estimates max projection distance as the 45°-launch range of the fastest projected fragment', () => {
+  it('reports max projection distance as the traced max throw', () => {
     const grid = new VoxelGrid(40, 40);
     fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
     const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
-    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+    // Light stemming so the blast actually throws rock (traced throw > 0).
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 0.5);
     const delays = autoVPattern(holes, 25);
     const plan = assembleBlastPlan(holes, charges, delays);
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
 
     const report = buildBlastReport(result!, 0, 0);
-    const expectedRange = (result!.maxProjectionSpeed * result!.maxProjectionSpeed) / Math.abs(GRAVITY);
-    expect(report.maxProjectionDistanceM).toBeCloseTo(expectedRange, 6);
+    expect(report.maxProjectionDistanceM).toBe(result!.maxThrowDistance);
+    expect(report.maxProjectionDistanceM).toBeGreaterThan(0);
+    // Must not be the ballistic v²/g estimate from the fastest fragment.
+    const estimate = (result!.maxProjectionSpeed * result!.maxProjectionSpeed) / Math.abs(GRAVITY);
+    expect(report.maxProjectionDistanceM).not.toBeCloseTo(estimate, 6);
+  });
+
+  it('reports zero projection distance when nothing was traced, whatever the projection speed', () => {
+    const report = buildBlastReport({ ...emptyBlastResult(), maxProjectionSpeed: 5, maxThrowDistance: 0 }, 0, 0);
+    expect(report.maxProjectionDistanceM).toBe(0);
+  });
+
+  it('reports the traced throw distance even when maxProjectionSpeed is zero', () => {
+    const report = buildBlastReport({ ...emptyBlastResult(), maxProjectionSpeed: 0, maxThrowDistance: 12.5 }, 0, 0);
+    expect(report.maxProjectionDistanceM).toBe(12.5);
   });
 
   it('reports zero projection distance when nothing was projected', () => {
@@ -434,6 +448,16 @@ describe('buildBlastReport', () => {
     expect(report.maxProjectionDistanceM).toBe(0);
   });
 });
+
+function emptyBlastResult(): BlastResult {
+  return {
+    fragments: [], fragmentCount: 0, averageFragmentSize: 0, oversizedFragments: 0,
+    projectionCount: 0, maxProjectionSpeed: 0, vibrationAtVillages: [], totalRockVolume: 0,
+    totalOreValue: 0, rating: 'mediocre', crackedVoxels: 0, clearedVoxels: 0,
+    clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, destroyedBuildings: [],
+    secondaryBlastEvents: [], maxThrowDistance: 0, projectileCount: 0, flights: [], clearedColumns: [],
+  };
+}
 
 describe('buildBlastReport wet holes (#1348)', () => {
   const emptyResult: BlastResult = {
