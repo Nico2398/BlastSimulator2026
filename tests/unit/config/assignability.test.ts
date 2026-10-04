@@ -714,6 +714,21 @@ describe('running several issues at once', () => {
 
     // Runs alone is now something an issue says, not something it forgets to
     // say: an unscoped issue does not meet the Definition of Ready at all.
+    // `scope:ui` is the shared base every UI area builds on: it clashes with
+    // each of them, while two different UI areas run side by side.
+    it('clashes a UI area with `scope:ui` but not with another UI area', () => {
+      const claim = (scope: string) => rules.scopeClaim({ labels: [`scope:${scope}`] });
+      expect(rules.claimsConflict(claim('panels'), claim('ui'))).toBe(true);
+      expect(rules.claimsConflict(claim('ui'), claim('tutorial'))).toBe(true);
+      expect(rules.claimsConflict(claim('panels'), claim('panels'))).toBe(true);
+      expect(rules.claimsConflict(claim('panels'), claim('tutorial'))).toBe(false);
+      expect(rules.claimsConflict(claim('hud'), claim('nav'))).toBe(false);
+      for (const [child, parent] of Object.entries(rules.SCOPE_PARENTS as Record<string, string>)) {
+        expect(rules.SCOPES, child).toHaveProperty(child);
+        expect(rules.SCOPES, parent).toHaveProperty(parent);
+      }
+    });
+
     it('runs `scope:global` alone', () => {
       const claim = rules.scopeClaim({ labels: ['scope:global'] });
       expect(claim.exclusive).toBe(true);
@@ -762,6 +777,33 @@ describe('running several issues at once', () => {
     expect(numbers(await selectUpTo(api, 3))).toEqual([35]);
   });
 
+  // A hold is one level deep. #25 waits on live #20 and holds `engine`; #30
+  // waits only on #25's hold, so its `nav` stays free and #35 starts. Chained
+  // holds left one session running with four slots on 4 Oct 2026.
+  it('lets an issue waiting only on a waiting issue hold nothing', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:ui', 'scope:economy'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:economy', 'scope:engine'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:engine', 'scope:nav'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 4))).toEqual([35]);
+  });
+
+  // Clashing with a waiting issue and with a running one is a clash with a
+  // running one: #30 holds `nav`, so #35 waits behind it.
+  it('holds a place when any clash is with a running claim', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:world'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:world', 'scope:engine'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:engine', 'scope:world', 'scope:nav'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:nav'] },
+    ]);
+    const result = await selectUpTo(api, 4);
+    expect(result.issues).toEqual([]);
+    expect(result.reason).toContain('can start beside');
+  });
+
   // An older unlabelled issue holds everything: the queue drains until it can
   // run alone, rather than letting younger scoped work starve it.
   it('drains the queue for an older issue that runs alone', async () => {
@@ -795,6 +837,23 @@ describe('running several issues at once', () => {
       { number: 24, labels: ['ready', 'agent-task', 'scope:world'] },
     ]);
     expect(numbers(await selectUpTo(api, 3))).toEqual([20, 21, 23]);
+  });
+
+  it('starts two UI areas side by side, and holds both back from `scope:ui`', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:panels'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:ui'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:tutorial'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:hud'] },
+    ]);
+    // #25 waits on live #20 and holds all of `ui`, so neither UI area starts.
+    expect(numbers(await selectUpTo(api, 4))).toEqual([]);
+    const withoutBase = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:panels'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:tutorial'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:hud'] },
+    ]);
+    expect(numbers(await selectUpTo(withoutBase, 4))).toEqual([30, 35]);
   });
 
   it('assigns an issue that runs alone, and nothing beside it', async () => {
@@ -864,7 +923,19 @@ describe('which scopes a live run holds', () => {
     const holders = rules.scopeHolders([{ number: 1283, labels: ['in-progress', 'scope:nav', 'scope:engine'] }]);
     expect(holders.nav).toBe(1283);
     expect(holders.pipeline).toBe(1283);
-    expect(free(holders)).toEqual(['economy', 'world', 'ui', 'renderer', 'console', 'scenarios']);
+    expect(free(holders)).toEqual([
+      'economy', 'world', 'ui', 'hud', 'panels', 'workshop', 'scene', 'tutorial', 'screens',
+      'renderer', 'console', 'scenarios',
+    ]);
+  });
+
+  it('holds `scope:ui` while any UI area is live, and every UI area while `scope:ui` is', () => {
+    const area = rules.scopeHolders([{ number: 40, labels: ['in-progress', 'scope:hud'] }]);
+    expect(area.hud).toBe(40);
+    expect(area.ui).toBe(40);
+    expect(area.panels).toBeNull();
+    const base = rules.scopeHolders([{ number: 41, labels: ['in-progress', 'scope:ui'] }]);
+    for (const child of Object.keys(rules.SCOPE_PARENTS)) expect(base[child], child).toBe(41);
   });
 
   it('holds every scope while an exclusive or unscoped run is live', () => {

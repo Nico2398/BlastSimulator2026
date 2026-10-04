@@ -104,7 +104,7 @@ An issue held for confirmation carries an `## Open question` section naming exac
 
 ### Scope labels — where the diff will stay
 
-Part of the Definition of Ready. With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the queue runs issues side by side only when their `scope:*` labels are disjoint. Add every scope the `## Files` section falls into — or, for an intent issue, every area the change will reach; several are allowed:
+Part of the Definition of Ready. With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the queue runs issues side by side only when their `scope:*` labels do not overlap. **Declare the areas the diff will edit, and only those** — several are allowed:
 
 | Label | Covers |
 |-------|--------|
@@ -112,14 +112,30 @@ Part of the Definition of Ready. With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the q
 | `scope:nav` | `src/core/nav`, `src/core/mining` |
 | `scope:economy` | `src/core/economy`, `src/core/campaign`, `src/core/scores` |
 | `scope:world` | `src/core/world`, `src/core/weather`, `src/core/events` |
-| `scope:ui` | `src/ui` |
+| `scope:ui` | All of `src/ui`, or its shared base: `UIManager`, `PanelBase`, `dom`, `styles`, `tokens`, `icons` — clashes with every UI area below |
+| `scope:hud` | `src/ui/shell` (top bar, tool rail, selection bar, toasts, activity log), `src/ui/notify`, `MiniMap*`, `KeyboardShortcuts`, `gameConsole` |
+| `scope:panels` | Management panels and modals in `src/ui/panels` (crew, fleet, contracts, finances, operations, shady, survey, settings, saves, event, confirm), `crewDetailSections`, `fleetDetailSections`, `accidentLookup` |
+| `scope:workshop` | Blast planning UI: `BlastWorkshop`, `src/ui/panels/blastSteps`, `blastFooter`, `BlastReportModal`, `PreflightModal` |
+| `scope:scene` | In-scene interaction: `src/ui/scene` (placement, picking, hover tags), `BuildMenu`, `describeRamp` |
+| `scope:tutorial` | `TutorialOverlay`, `src/ui/tutorial*.ts` |
+| `scope:screens` | Full screens: `MainMenu`, `LoadingScreen` and `loading*`, `src/ui/screens` (world map, level end), `SandboxPanel`, `langPills` |
 | `scope:renderer` | `src/renderer`, `src/audio`, 3D models |
 | `scope:console` | `src/console` |
 | `scope:scenarios` | `scripts/scenario-defs` and the scenario runners |
 | `scope:pipeline` | The agentic layer: `.github/workflows`, `.github/actions`, `.github/scripts`, agent definitions, hooks, `agentic-*` skills — always runs alone |
 | `scope:global` | Many areas at once — a cross-cutting refactor or rename — always runs alone |
 
-A `gameplay-*` or `dev-*` skill takes the scope of the code it documents, not `scope:pipeline`. Files every area touches — `balance.ts`, the locale files, `main.ts` — need no scope of their own; name the feature's scope and let the merge gate handle the overlap. **Between two scopes, add both; across many, `scope:global`.** A scope too narrow costs a conflict round when the run strays outside it; one too wide costs only parallelism. The taxonomy lives in `SCOPES` in `.github/scripts/assignability.cjs` — a label naming anything else fails the Definition of Ready.
+**Derive the labels from the `## Files` section, file by file.** Each file the change will *modify or create* contributes its area; the labels are the union of those, nothing more:
+
+- **Edited, not touched.** An area the change only imports from, calls into, reads state from, or that the bug was observed through adds no scope. A UI bug whose fix is in `src/core/economy` is `scope:economy` alone — the panel that showed the wrong number is not edited.
+- **Tests follow their code.** `tests/unit/...` and `tests/integration/...` take the scope of the code they test, and add none of their own. A new scenario definition under `scripts/scenario-defs` is `scope:scenarios` only when the scenario *runners* change or the scenario is the deliverable; a scenario that proves a fix rides the fix's scope.
+- **Shared files need no scope.** `balance.ts`, the locale files, `main.ts`, `GameState.ts` — name the feature's scope and let the merge gate handle the overlap.
+- **The narrowest UI area wins.** Pick `scope:hud`, `scope:panels`, `scope:workshop`, `scope:scene`, `scope:tutorial` or `scope:screens`. `scope:ui` is for an edit to the shared UI base, or a change spread across three or more UI areas — it blocks every UI area at once.
+- **`scope:global` is for cross-cutting changes only** — a refactor or rename across most of the tree. It runs alone, so a change that edits four named areas lists those four rather than reaching for it.
+
+**Every extra scope costs the whole queue, not just this issue.** An issue that cannot start because one of its scopes is in flight *holds* all of its other scopes for the rest of the pass, so nothing younger overlapping it starts first (`agentic-autonomous-pipeline`). A spurious `scope:engine` on a UI issue therefore keeps every engine issue waiting too. A scope too narrow costs one conflict round when the run strays outside it — the merge gate catches it; a scope too wide silently costs a parallel slot for as long as the issue waits. When unsure whether the diff will reach an area, leave it out.
+
+A `gameplay-*` or `dev-*` skill takes the scope of the code it documents, not `scope:pipeline`. The taxonomy lives in `SCOPES` in `.github/scripts/assignability.cjs`, and `SCOPE_PARENTS` there says which scope sits inside which — a label naming anything else fails the Definition of Ready.
 
 ## Issue Body Template
 
@@ -313,7 +329,7 @@ recorded can be picked up in that window.
 - [ ] Open issues searched for this problem — none covers it, or the existing one was updated instead of a new one filed
 - [ ] Labels set on creation per the Labels table: `ready` at high confidence, `agent-task` alone otherwise, unless the human specified something else
 - [ ] Exactly one of `ready`, `## Open question` or `decision-review` on every issue filed — none of the three is a filing error
-- [ ] Every `scope:*` label the change falls into, on every issue filed — `ready` or not
+- [ ] Exactly the `scope:*` labels of the areas the change edits — the narrowest UI area, no scope for an area only read or tested through — on every issue filed, `ready` or not
 - [ ] `ready` only when every line of the Definition of Ready holds
 - [ ] An issue held for confirmation carries `## Open question`
 - [ ] A finding or a scope cut carries `## Where found` and `## Why not fixed here`
