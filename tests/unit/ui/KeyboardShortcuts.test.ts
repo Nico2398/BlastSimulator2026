@@ -100,6 +100,7 @@ describe('KeyboardShortcuts (12.7)', () => {
     const partialKs = new KeyboardShortcuts(partialCallbacks);
     expect(() => fireKey('KeyN')).not.toThrow();
     partialKs.dispose();
+    ks.dispose();
   });
 
   it('KeyO triggers onToggleSurveyOverlay (#496)', () => {
@@ -119,6 +120,7 @@ describe('KeyboardShortcuts (12.7)', () => {
     const partialKs = new KeyboardShortcuts(partialCallbacks);
     expect(() => fireKey('KeyO')).not.toThrow();
     partialKs.dispose();
+    ks.dispose();
   });
 
   it('KeyO does not trigger the panel-toggle callback (guards against a future key collision) (#496)', () => {
@@ -144,6 +146,148 @@ describe('KeyboardShortcuts (12.7)', () => {
     ks.dispose();
     fireKey('Space');
     expect(callbacks.togglePause).not.toHaveBeenCalled();
+  });
+
+  describe('isSuppressed option (#1323)', () => {
+    function fireCancelable(code: string, target?: EventTarget): KeyboardEvent {
+      const event = new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true });
+      if (target) Object.defineProperty(event, 'target', { value: target });
+      window.dispatchEvent(event);
+      return event;
+    }
+
+    function allCallbacksSilent(): boolean {
+      return callbacks.togglePause.mock.calls.length === 0
+        && callbacks.setSpeed.mock.calls.length === 0
+        && callbacks.togglePanel.mock.calls.length === 0
+        && callbacks.quickSave.mock.calls.length === 0
+        && callbacks.onToggleNavGrid.mock.calls.length === 0
+        && callbacks.onToggleSurveyOverlay.mock.calls.length === 0;
+    }
+
+    const SUPPRESSED_CODES = [
+      'Space', 'F5', 'Digit1', 'Digit2', 'Digit3', 'Digit4',
+      'KeyB', 'KeyC', 'KeyG', 'KeyV', 'KeyE', 'KeyS', 'KeyN', 'KeyO',
+    ];
+
+    beforeEach(() => { ks.dispose(); });
+
+    it.each(SUPPRESSED_CODES)('%s invokes no callback while suppressed', (code) => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => true });
+      fireCancelable(code);
+      expect(allCallbacksSilent()).toBe(true);
+      sut.dispose();
+    });
+
+    it('Space and F5 are not defaultPrevented while suppressed', () => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => true });
+      expect(fireCancelable('Space').defaultPrevented).toBe(false);
+      expect(fireCancelable('F5').defaultPrevented).toBe(false);
+      sut.dispose();
+    });
+
+    it('Space and F5 are defaultPrevented when not suppressed', () => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => false });
+      expect(fireCancelable('Space').defaultPrevented).toBe(true);
+      expect(fireCancelable('F5').defaultPrevented).toBe(true);
+      sut.dispose();
+    });
+
+    it('Escape still calls onEscape while suppressed', () => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => true });
+      fireCancelable('Escape');
+      expect(callbacks.onEscape).toHaveBeenCalledOnce();
+      sut.dispose();
+    });
+
+    it('keys work again when the predicate flips back to false', () => {
+      let suppressed = true;
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => suppressed });
+      fireCancelable('Space');
+      expect(callbacks.togglePause).not.toHaveBeenCalled();
+      suppressed = false;
+      fireCancelable('Space');
+      fireCancelable('KeyB');
+      expect(callbacks.togglePause).toHaveBeenCalledOnce();
+      expect(callbacks.togglePanel).toHaveBeenCalledWith('blast');
+      suppressed = true;
+      fireCancelable('Space');
+      expect(callbacks.togglePause).toHaveBeenCalledOnce();
+      sut.dispose();
+    });
+
+    it('is evaluated per keydown, not once at construction', () => {
+      const isSuppressed = vi.fn(() => false);
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed });
+      fireCancelable('Digit1');
+      fireCancelable('Digit2');
+      expect(isSuppressed.mock.calls.length).toBeGreaterThanOrEqual(2);
+      sut.dispose();
+    });
+
+    it('nested overlays: hiding only one keeps keys suppressed', () => {
+      let menuVisible = true;
+      let settingsVisible = true;
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => menuVisible || settingsVisible });
+      fireCancelable('Space');
+      settingsVisible = false;
+      fireCancelable('Space');
+      expect(callbacks.togglePause).not.toHaveBeenCalled();
+      menuVisible = false;
+      fireCancelable('Space');
+      expect(callbacks.togglePause).toHaveBeenCalledOnce();
+      sut.dispose();
+    });
+
+    it('omitted options keep existing behaviour', () => {
+      const sut = new KeyboardShortcuts(callbacks);
+      const e = fireCancelable('Space');
+      expect(callbacks.togglePause).toHaveBeenCalledOnce();
+      expect(e.defaultPrevented).toBe(true);
+      sut.dispose();
+    });
+
+    it('options object without isSuppressed keeps existing behaviour', () => {
+      const sut = new KeyboardShortcuts(callbacks, {});
+      fireCancelable('KeyB');
+      expect(callbacks.togglePanel).toHaveBeenCalledWith('blast');
+      sut.dispose();
+    });
+
+    it('setEnabled(false) suppresses everything including Escape even when not suppressed', () => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => false });
+      sut.setEnabled(false);
+      fireCancelable('Escape');
+      fireCancelable('Space');
+      expect(callbacks.onEscape).not.toHaveBeenCalled();
+      expect(callbacks.togglePause).not.toHaveBeenCalled();
+      sut.dispose();
+    });
+
+    it('setEnabled(false) suppresses Escape while also suppressed', () => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => true });
+      sut.setEnabled(false);
+      fireCancelable('Escape');
+      expect(callbacks.onEscape).not.toHaveBeenCalled();
+      sut.dispose();
+    });
+
+    it('input guard unchanged: typing in an input fires nothing when not suppressed', () => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => false });
+      const input = document.createElement('input');
+      fireCancelable('Space', input);
+      fireCancelable('KeyB', input);
+      expect(allCallbacksSilent()).toBe(true);
+      sut.dispose();
+    });
+
+    it('input guard unchanged: textarea and select also ignored', () => {
+      const sut = new KeyboardShortcuts(callbacks, { isSuppressed: () => false });
+      fireCancelable('KeyC', document.createElement('textarea'));
+      fireCancelable('KeyC', document.createElement('select'));
+      expect(callbacks.togglePanel).not.toHaveBeenCalled();
+      sut.dispose();
+    });
   });
 
 });
