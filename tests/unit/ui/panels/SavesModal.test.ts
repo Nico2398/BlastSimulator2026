@@ -1116,4 +1116,69 @@ describe('SavesModal', () => {
       });
     });
   });
+
+  describe('handleEscape (#1327)', () => {
+    it('hides a shown modal and returns true', () => {
+      const { modal } = mount();
+      modal.setBackend(makeBackend());
+      modal.show();
+      expect(modal.handleEscape()).toBe(true);
+      expect(modal.visible).toBe(false);
+      modal.dispose();
+    });
+
+    it('returns false when the modal is already hidden', () => {
+      const { modal } = mount();
+      modal.setBackend(makeBackend());
+      expect(modal.handleEscape()).toBe(false);
+      expect(modal.visible).toBe(false);
+      modal.dispose();
+    });
+
+    it('returns false on a second Esc after the first closed it', () => {
+      const { modal } = mount();
+      modal.setBackend(makeBackend());
+      modal.show();
+      expect(modal.handleEscape()).toBe(true);
+      expect(modal.handleEscape()).toBe(false);
+      modal.dispose();
+    });
+
+    it('sets the root display to none', () => {
+      const { modal } = mount();
+      modal.setBackend(makeBackend());
+      modal.show();
+      modal.handleEscape();
+      expect(modal.root.style.display).toBe('none');
+      modal.dispose();
+    });
+
+    it('clears a persistent error status when closing', async () => {
+      const { modal } = mount();
+      modal.setBackend(makeBackend());
+      modal.setOnLoad(() => null);
+      modal.show();
+      await flush();
+      // Missing slot: loadFromSlot reports a persistent error and keeps the modal open.
+      expect(await modal.loadFromSlot('slot_1')).toBe(false);
+      const statusEl = (modal as unknown as { statusEl: HTMLElement }).statusEl;
+      expect(statusEl.textContent).toBe(t('saveload.not_found'));
+      expect(modal.handleEscape()).toBe(true);
+      expect(statusEl.textContent).toBe('');
+      modal.dispose();
+    });
+
+    it('works after a failed load re-shows the hidden modal', async () => {
+      const { modal } = mount();
+      modal.setBackend(makeBackend());
+      modal.setOnLoad(() => null);
+      // Hidden (e.g. after Continue), then a failed load re-shows it with an error.
+      expect(modal.visible).toBe(false);
+      expect(await modal.loadFromSlot('slot_1')).toBe(false);
+      expect(modal.visible).toBe(true);
+      expect(modal.handleEscape()).toBe(true);
+      expect(modal.visible).toBe(false);
+      modal.dispose();
+    });
+  });
 });

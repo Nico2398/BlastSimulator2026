@@ -264,6 +264,10 @@ export class UIManager {
 
   showConfirm(config: ConfirmModalConfig): void { this.confirmModal.show(config); }
   get confirmOpen(): boolean { return this.confirmModal.visible; }
+  /** True while an event modal is on screen. */
+  get eventModalVisible(): boolean {
+    return this.eventModal.visible;
+  }
 
   /** Return-to-main-menu, requested from Settings' own confirm-gated button. */
   setQuitHandler(cb: () => void): void {
