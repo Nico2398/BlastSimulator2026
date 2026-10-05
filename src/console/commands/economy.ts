@@ -187,16 +187,16 @@ export function contractCommand(
       const id = contract.id;
       const cappedAmount = Math.min(amount, contract.quantityKg - contract.deliveredKg);
       if (cappedAmount <= 0) {
-        return { success: false, output: `Contract #${id} already fulfilled or has no outstanding quantity.` };
+        return { success: false, output: t('economy.contract.deliver_fulfilled', { id }) };
       }
       const consumption = consumeStoredOre(state.logistics, state.collectedOre, contract.materialId, cappedAmount);
       if (!consumption.success) {
-        return { success: false, output: consumption.error ?? `Not enough ${contract.materialId || 'material'} in storage to deliver.` };
+        return { success: false, output: consumption.error ?? t('economy.contract.deliver_insufficient', { material: contract.materialId || 'material' }) };
       }
       const deliverKg = Math.min(consumption.consumedKg, cappedAmount);
       const result = deliverMaterials(state.contracts, id, deliverKg, state.tickCount);
       if (result.payment === 0 && !result.completed) {
-        return { success: false, output: `Contract #${id} not found or already completed.` };
+        return { success: false, output: t('economy.contract.deliver_not_found', { id }) };
       }
       state.cash += result.payment;
       addIncome(state.finances, result.payment, 'contracts', `Contract #${id} delivery`, state.tickCount);

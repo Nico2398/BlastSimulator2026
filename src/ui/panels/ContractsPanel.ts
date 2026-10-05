@@ -20,7 +20,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
+import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection, flashStatus } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
@@ -110,8 +110,7 @@ export class ContractsPanel extends PanelBase {
 
 
   private setStatus(msg: string): void {
-    this.statusEl.textContent = msg;
-    setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
+    flashStatus(this.statusEl, msg);
   }
 
   private render(state: GameState): void {
@@ -235,8 +234,9 @@ export class ContractsPanel extends PanelBase {
       el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' } }),
     );
 
-    const amountInput = el('input', { className: 'bs-input bs-contract-amount', attrs: { type: 'number', min: '0.1', step: '0.1', value: String(maxDeliverable > 0 ? maxDeliverable : 0.1) } }) as HTMLInputElement;
-    amountInput.max = String(maxDeliverable > 0 ? maxDeliverable : 0.1);
+    const amountValue = maxDeliverable > 0 ? maxDeliverable : 0.1;
+    const amountInput = el('input', { className: 'bs-input bs-contract-amount', attrs: { type: 'number', min: '0.1', step: '0.1', value: String(amountValue) } }) as HTMLInputElement;
+    amountInput.max = String(amountValue);
     amountInput.disabled = maxDeliverable <= 0;
     amountInput.style.cssText = 'flex:1;height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)';
 
