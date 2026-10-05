@@ -110,7 +110,7 @@ describe('the default site policy is in force without any set_policy call (#1379
       const hired = employeeCommand(ctx, ['hire'], { role: 'driller' });
       if (!hired.success) throw new Error(`Setup: hire failed — ${hired.output}`);
     }
-    state.buildings.unlockedTiers.living_quarters = Math.max(state.buildings.unlockedTiers.living_quarters, 1);
+    state.buildings.unlockedTiers.living_quarters = state.buildings.unlockedTiers.living_quarters ?? 1;
     const placed = placeBuilding(state.buildings, 'living_quarters', 2, 6, 100, 100, 1);
     if (!placed.success) throw new Error('Setup: living_quarters placement failed');
     return ctx;

@@ -17,7 +17,6 @@ import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
   NEED_REST_DURATIONS,
   WORK_DURATION_TICKS,
-  SHIFT_SLEEP_DURATION_TICKS,
   SHIFT_DURATIONS_TICKS,
   MAX_NEED_GAUGE,
   NEED_REST_NO_BUILDING_CAP,

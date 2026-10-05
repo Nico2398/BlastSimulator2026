@@ -295,7 +295,7 @@ describe('tick command — resting employees drain at the resting tier (rate 0),
     // Simulate mid-rest: claimed by a rest action, timer running.
     emp.activeActionId = 999;
     emp.restTicksRemaining = 10;
-    emp.restNeedKey = null; // not owned by tickGeneralRestCompletion or processShiftCycle
+    emp.restNeedKey = null; // keyless rest: processShiftCycle's completeRestTick owns the countdown (#1379)
     emp.fatigue = 100;
 
     const result = tickCommand(ctx, ['1'], {});
@@ -303,8 +303,9 @@ describe('tick command — resting employees drain at the resting tier (rate 0),
     expect(result.success).toBe(true);
     // resting tier: fatigue does not drain at all (0/tick — not 0.5 idle, not 1 traveling, not 2 working)
     expect(emp.fatigue).toBe(100);
-    // Rest state itself is untouched by the needs-drain step.
-    expect(emp.restTicksRemaining).toBe(10);
+    // The needs-drain step leaves the rest state alone; the only change is the
+    // shift cycle's own one-tick countdown, which always runs since #1379.
+    expect(emp.restTicksRemaining).toBe(9);
     expect(emp.activeActionId).toBe(999);
   });
 });
@@ -429,6 +430,10 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     emp.destinationX = null;
     emp.destinationZ = null;
     emp.fatigue = 24; // just below the 25 warning threshold
+    // The always-on default policy (#1379) would force its own rest at fatigue
+    // <= 60; neutralize it so only the need-driven rest under test fires.
+    state.sitePolicy.shiftMode = 'continuous';
+    state.sitePolicy.fatigueRestThreshold = 0;
 
     // The employee is routed toward the living_quarters on the very first
     // tick, but (issue #437) the rest timer must not start until they have
@@ -710,6 +715,10 @@ describe('#680 acceptance — a policy-protected, housed crew never revolts acro
     // no rest destination and no policy-driven forced-rest thresholds.
     expect(state.buildings.buildings.some(b => b.type === 'living_quarters')).toBe(false);
     expect(state.sitePolicy.revision).toBe(0);
+    // The default policy is always in force (#1379); "no policy" now means a
+    // policy that never forces rest.
+    state.sitePolicy.shiftMode = 'continuous';
+    state.sitePolicy.fatigueRestThreshold = 0;
 
     let revoltFired = false;
     ctx.emitter.on('revolt:triggered', () => { revoltFired = true; });

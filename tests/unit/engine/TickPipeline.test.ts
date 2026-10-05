@@ -65,6 +65,10 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
     const state = createGame({ seed: SEED });
     const emitter = new EventEmitter();
     const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED), 0, 0);
+    // Default policy is always in force (#1379); neutralize shift rest so the
+    // completed task is not followed by a forced rest claim.
+    state.sitePolicy.shiftMode = 'continuous';
+    state.sitePolicy.fatigueRestThreshold = 0;
     // Master level — shortest possible task duration — makes "not this tick"
     // the strongest possible claim: even the fastest task cannot finish on
     // its own dispatch tick.
@@ -98,6 +102,10 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
     const state = createGame({ seed: SEED });
     const emitter = new EventEmitter();
     const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED), 0, 0);
+    // Default policy is always in force (#1379); neutralize shift rest so the
+    // completed task is not followed by a forced rest claim.
+    state.sitePolicy.shiftMode = 'continuous';
+    state.sitePolicy.fatigueRestThreshold = 0;
     assignSkill(state.employees, employee.id, 'blasting', 5);
     // Target is 1 tile away — AGENT_WALK_SPEED (2 cells/tick) covers it in a
     // single movement step, so if movement (8g) and the arrival gate (8h)
@@ -175,6 +183,10 @@ describe('runTick — TickReport reflects what happened', () => {
     const state = createGame({ seed: SEED });
     const emitter = new EventEmitter();
     const { employee } = hireEmployee(state.employees, 'blaster', new Random(SEED), 0, 0);
+    // Default policy is always in force (#1379); neutralize shift rest so the
+    // completed task is not followed by a forced rest claim.
+    state.sitePolicy.shiftMode = 'continuous';
+    state.sitePolicy.fatigueRestThreshold = 0;
     assignSkill(state.employees, employee.id, 'blasting', 5);
     state.pendingActions.push({
       id: 1, type: 'general_work', requiredSkill: 'blasting', requiredVehicleRole: null,
