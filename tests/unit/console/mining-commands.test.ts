@@ -26,6 +26,10 @@ import { tickCommand } from '../../../src/console/commands/events.js';
 import { formatTaskCompletion } from '../../../src/console/commands/tickTaskCompletion.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import * as DamageModule from '../../../src/core/entities/Damage.js';
+import { destroyVehicle } from '../../../src/core/entities/Vehicle.js';
+import { board } from '../../../src/core/engine/Mount.js';
+import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
@@ -1013,6 +1017,41 @@ describe('surveyCommand', () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain('seismic');
     expect(result.output).toContain('aerial');
+  });
+});
+
+describe('blastCommand — riders of a vehicle destroyed by flying rock (#1389)', () => {
+  it('leaves no rider mounted on a vehicle removed by processProjections, before any tick', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const state = ctx.state!;
+    const vehicle = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
+    const rider = state.employees.employees.find(e => {
+      if (e.locomotion.kind !== 'on_foot') return false;
+      e.x = vehicle.x;
+      e.z = vehicle.z;
+      return board(state, vehicle.id, e.id).success;
+    })!;
+    expect(rider.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+
+    // Flying rock destroys the vehicle inside processProjections, after the
+    // cleared-column pass has already run.
+    vi.spyOn(DamageModule, 'processProjections').mockImplementation(() => {
+      destroyVehicle(state.vehicles, vehicle.id);
+      return [];
+    });
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(true);
+    expect(state.vehicles.vehicles.some(v => v.id === vehicle.id)).toBe(false);
+    expect(rider.locomotion.kind).toBe('on_foot');
+    expectNoWorldInvariantViolations(state);
   });
 });
 

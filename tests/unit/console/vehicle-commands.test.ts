@@ -9,6 +9,9 @@ import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Veh
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { runTick } from '../../../src/core/engine/TickPipeline.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 
 // ── Test context factory ──
@@ -608,3 +611,49 @@ describe('vehicle buy — spawn position on a site grown into negative territory
   });
 });
 
+
+describe('scrapping or removing a mounted vehicle (#1389)', () => {
+  function staffedMountedVehicle() {
+    const ctx = makeGameContext({ seed: 42, staffed: true });
+    vehicleCommand(ctx, ['reposition', '2', '12', '12'], {});
+    tickCommand(ctx, ['6'], {});
+    const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === 2)!;
+    const occupantId = vehicle.occupantIds[0]!;
+    const occupant = ctx.state!.employees.employees.find(e => e.id === occupantId)!;
+    return { ctx, vehicle, occupant };
+  }
+
+  it('scrap puts the occupant on foot immediately, uninjured, morale unchanged, no invariant violation', () => {
+    const { ctx, occupant } = staffedMountedVehicle();
+    expect(occupant.locomotion).toEqual({ kind: 'mounted', vehicleId: 2 });
+    const morale = occupant.morale;
+
+    const result = vehicleCommand(ctx, ['scrap', '2'], {});
+
+    expect(result.success).toBe(true);
+    expect(occupant.locomotion).toEqual({ kind: 'on_foot' });
+    expect(occupant.injured).toBe(false);
+    expect(occupant.morale).toBe(morale);
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('stays invariant-clean and on foot after three more ticks', () => {
+    const { ctx, occupant } = staffedMountedVehicle();
+
+    vehicleCommand(ctx, ['scrap', '2'], {});
+    tickCommand(ctx, ['3'], {});
+
+    expect(occupant.locomotion.kind).not.toBe('mounted');
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('a vehicle spliced out directly is released by the next tick', () => {
+    const { ctx, vehicle, occupant } = staffedMountedVehicle();
+    ctx.state!.vehicles.vehicles = ctx.state!.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+
+    runTick(ctx.state!, ctx.grid, new Random(ctx.state!.seed + ctx.state!.tickCount), ctx.emitter, { checkInvariants: false });
+
+    expect(occupant.locomotion.kind).toBe('on_foot');
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+});
