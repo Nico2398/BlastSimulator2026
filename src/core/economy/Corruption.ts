@@ -106,6 +106,18 @@ export function isMafiaUnlocked(state: CorruptionState): boolean {
   return state.mafiaUnlocked;
 }
 
+/**
+ * Shift corruption level by delta (floored at 0); latches mafiaUnlocked at threshold.
+ * Non-finite delta is a no-op. Returns whether this call unlocked the mafia.
+ */
+export function applyCorruptionDelta(
+  _state: CorruptionState,
+  _delta: number,
+): { mafiaJustUnlocked: boolean } {
+  // TODO: implement
+  return { mafiaJustUnlocked: false };
+}
+
 /** Get corruption success probability for display/debugging. */
 export function getSuccessRate(state: CorruptionState): number {
   return Math.max(0.1, BASE_SUCCESS_RATE - state.attempts.length * HISTORY_PENALTY);
