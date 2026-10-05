@@ -18,6 +18,9 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import {
   hireEmployee,
   assignSkill,
+  giveRaise,
+  calculateQualificationBonus,
+  BASE_SALARIES,
   isOccupyingHost,
 } from '../../../src/core/entities/Employee.js';
 import type { Employee, SkillCategory } from '../../../src/core/entities/Employee.js';
@@ -580,5 +583,37 @@ describe('availableTrainingOffers', () => {
   it('a driving_center offers all three licences from one building', () => {
     const offers = availableTrainingOffers([makeBuilding({ type: 'driving_center' })]);
     expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.truck']);
+  });
+});
+
+// ── Raises survive enrolment-driven course completion (#1383) ───────────────
+
+describe('tickTraining keeps accumulated raises (#1383)', () => {
+  it('a promotion course completion keeps the raise', () => {
+    const { state, school } = setupSchool('blasting_academy');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    giveRaise(state.employees, employee.id, 250);
+
+    const result = enrolInTraining(state, employee.id, school, 'blasting');
+    expectSuccess(result);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    expect(employee.raises).toBe(250);
+    expect(employee.salary).toBe(BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + 250);
+  });
+
+  it('a new level-1 skill completion keeps the raise', () => {
+    const { state, school } = setupSchool('driving_center');
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2);
+    giveRaise(state.employees, employee.id, 250);
+
+    const result = enrolInTraining(state, employee.id, school, 'driving.excavator');
+    expectSuccess(result);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    expect(employee.qualifications.some(q => q.category === 'driving.excavator')).toBe(true);
+    expect(employee.salary).toBe(BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + 250);
   });
 });

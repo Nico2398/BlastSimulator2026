@@ -3,8 +3,10 @@
 
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
-import { SCORE_DECAY_RATE } from '../config/balance.js';
+import { SCORE_DECAY_RATE, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
+import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
+import type { Employee, EmployeeRole } from '../entities/Employee.js';
 import { getStorageCapacity } from '../entities/Building.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 
@@ -488,6 +490,32 @@ function backfillRaisedUnqualified(obj: Record<string, unknown>): void {
   if (events && !Array.isArray(events['raisedUnqualifiedActionIds'])) events['raisedUnqualifiedActionIds'] = [];
 }
 
+/**
+ * #1383: backfill `raises = max(0, salary - base - qualification bonus)` on every employee lacking a
+ * finite `raises`. Idempotent; mutates `obj` in place.
+ */
+export function backfillRaises(obj: Record<string, unknown>): void {
+  const es = obj['employees'] as { employees?: unknown } | undefined;
+  if (!es || !Array.isArray(es.employees)) return;
+  for (const raw of es.employees) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const e = raw as { raises?: unknown; salary?: unknown; role?: unknown; qualifications?: unknown };
+    if (typeof e.raises === 'number' && Number.isFinite(e.raises)) continue;
+    const salary = typeof e.salary === 'number' && Number.isFinite(e.salary) ? e.salary : 0;
+    const knownRole = typeof e.role === 'string' && Object.hasOwn(BASE_SALARIES, e.role);
+    const base = knownRole ? BASE_SALARIES[e.role as EmployeeRole] : 0;
+    const quals = (Array.isArray(e.qualifications) ? e.qualifications : []).filter(
+      (q): q is Employee['qualifications'][number] =>
+        typeof q === 'object' && q !== null && Object.hasOwn(QUALIFICATION_SALARY_BONUS, (q as { proficiencyLevel?: unknown }).proficiencyLevel as PropertyKey),
+    );
+    const bonus = calculateQualificationBonus({ qualifications: quals });
+    const raises = Math.max(0, salary - base - bonus);
+    e.raises = Number.isFinite(raises) ? raises : 0;
+    // Keep card parts (base + skills + raises) summing to the stored total.
+    if (knownRole) e.salary = base + bonus + (e.raises as number);
+  }
+}
+
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
 function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
   const current = obj['nextHoleId'];
@@ -789,6 +817,7 @@ export function deserialize(json: string): GameState {
   // current-version saves that lack a valid counter.
   migrateV28ToV29(obj);
   backfillRaisedUnqualified(obj);
+  backfillRaises(obj);
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The

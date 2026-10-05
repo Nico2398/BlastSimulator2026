@@ -4,10 +4,10 @@ import * as path from 'path';
 import { createGame, SAVE_VERSION } from '../../../src/core/state/GameState.js';
 import { createBuildingState, placeBuilding, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { enterBuilding } from '../../../src/core/engine/Mount.js';
-import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
+import { serialize, deserialize, backfillRaises } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, BASE_SALARIES, calculateQualificationBonus } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { updateScores } from '../../../src/core/scores/ScoreManager.js';
 import { SCORE_DECAY_RATE } from '../../../src/core/config/balance.js';
@@ -1971,5 +1971,100 @@ describe('deserialize — storage capacity is re-derived from warehouses (#1369)
     state.logistics.storageCapacityKg = 0;
     const restored = deserialize(serialize(state));
     expect(restored.logistics.storageCapacityKg).toBe(expected);
+  });
+});
+
+describe('backfillRaises (#1383)', () => {
+  const emp = (extra: Record<string, unknown>) => ({
+    id: 1, role: 'driller', salary: 0,
+    qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }],
+    ...extra,
+  });
+  const wrap = (employees: Record<string, unknown>[]) => ({ employees: { employees } });
+  const first = (o: ReturnType<typeof wrap>) => o.employees.employees[0]!;
+  const floor = () => BASE_SALARIES['driller'] + calculateQualificationBonus({
+    qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }] as never,
+  });
+
+  it('old save with salary above base + bonus gets raises = difference', () => {
+    const o = wrap([emp({ salary: floor() + 300 })]);
+    backfillRaises(o as unknown as Record<string, unknown>);
+    expect(first(o)['raises']).toBe(300);
+  });
+
+  it('salary equal to base + bonus gets raises = 0', () => {
+    const o = wrap([emp({ salary: floor() })]);
+    backfillRaises(o as unknown as Record<string, unknown>);
+    expect(first(o)['raises']).toBe(0);
+  });
+
+  it('salary below base + bonus clamps raises at 0', () => {
+    const o = wrap([emp({ salary: floor() - 10 })]);
+    backfillRaises(o as unknown as Record<string, unknown>);
+    expect(first(o)['raises']).toBe(0);
+  });
+
+  it('is idempotent and keeps an existing finite raises', () => {
+    const o = wrap([emp({ salary: floor() + 300 }), emp({ id: 2, salary: floor() + 999, raises: 40 })]);
+    backfillRaises(o as unknown as Record<string, unknown>);
+    backfillRaises(o as unknown as Record<string, unknown>);
+    expect(first(o)['raises']).toBe(300);
+    expect(o.employees.employees[1]!['raises']).toBe(40);
+  });
+
+  it('resyncs salary to base + bonus + raises when backfilling', () => {
+    const o = wrap([emp({ salary: floor() + 300 }), emp({ id: 2, salary: floor() - 10 })]);
+    backfillRaises(o as unknown as Record<string, unknown>);
+    expect(first(o)['salary']).toBe(floor() + 300);
+    expect(o.employees.employees[1]!['salary']).toBe(floor());
+  });
+
+  it('non-finite salary yields raises 0, never NaN', () => {
+    for (const salary of [NaN, Infinity, null, 'x']) {
+      const o = wrap([emp({ salary })]);
+      backfillRaises(o as unknown as Record<string, unknown>);
+      expect(first(o)['raises']).toBe(0);
+    }
+  });
+
+  it('tolerates null, non-object and malformed qualification entries', () => {
+    const o = wrap([
+      emp({ salary: BASE_SALARIES['driller'] + 100, qualifications: [null, 7, { proficiencyLevel: NaN }, { proficiencyLevel: 99 }] }),
+      emp({ id: 2, salary: BASE_SALARIES['driller'] + 100, qualifications: null }),
+    ]);
+    expect(() => backfillRaises(o as unknown as Record<string, unknown>)).not.toThrow();
+    expect(first(o)['raises']).toBe(100);
+    expect(o.employees.employees[1]!['raises']).toBe(100);
+  });
+
+  it('skips null / non-object employee entries and unknown or prototype roles', () => {
+    const o = { employees: { employees: [null, 5, emp({ role: 'constructor', salary: 500 }), emp({ id: 3, role: 'nope', salary: 500 })] } };
+    expect(() => backfillRaises(o as unknown as Record<string, unknown>)).not.toThrow();
+    const list = o.employees.employees as unknown as Record<string, unknown>[];
+    expect(Number.isFinite(list[2]!['raises'])).toBe(true);
+    expect(list[2]!['salary']).toBe(500);
+    expect(list[3]!['salary']).toBe(500);
+  });
+
+  it('real deserialize of a legacy save lacking raises runs the backfill', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42));
+    const base = employee.salary;
+    const parsed = JSON.parse(serialize(state)) as { employees: { employees: Record<string, unknown>[] } };
+    const raw = parsed.employees.employees.find(e => e['id'] === employee.id)!;
+    delete raw['raises'];
+    raw['salary'] = base + 400;
+    const loaded = deserialize(JSON.stringify(parsed));
+    const e = loaded.employees.employees.find(x => x.id === employee.id)!;
+    expect(e.raises).toBe(400);
+    expect(e.salary).toBe(base + 400);
+  });
+
+  it('round-trips raises through serialize/deserialize', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42));
+    employee.raises = 250;
+    const loaded = deserialize(serialize(state));
+    expect(loaded.employees.employees.find(e => e.id === employee.id)!.raises).toBe(250);
   });
 });

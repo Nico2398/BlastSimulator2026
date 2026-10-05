@@ -18,10 +18,12 @@ import {
 } from '../../../src/ui/crewDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import type { Employee } from '../../../src/core/entities/Employee.js';
+import type { Employee, EmployeeState } from '../../../src/core/entities/Employee.js';
+import { giveRaise, calculateSalary } from '../../../src/core/entities/Employee.js';
+import { gainXp } from '../../../src/core/entities/EmployeeGainXp.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../../../src/core/config/balance.js';
+import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -276,5 +278,60 @@ describe('pay i18n keys keep placeholder parity (#1373)', () => {
   it('pay_total still reads per hour in both locales', () => {
     expect(en['ui.crew.pay_total']).toContain('/h');
     expect(fr['ui.crew.pay_total']).toContain('/h');
+  });
+});
+
+describe('makePaySection raises line (#1383)', () => {
+  const perHour = (amount: number): string => String(Math.round((amount / PAY_CYCLE_TICKS) * 10) / 10);
+  const pay = (e: Employee): string => makePaySection(e, () => {}).textContent ?? '';
+  const withParts = (raises?: number): Employee => {
+    const bonus = QUALIFICATION_SALARY_BONUS[2];
+    const base = BASE_SALARIES['driller'];
+    return makeEmployee({
+      role: 'driller',
+      qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }],
+      ...(raises === undefined ? {} : { raises }),
+      salary: base + bonus + (raises ?? 0),
+    });
+  };
+
+  it('shows base, skills, raises and total when raises is 250', () => {
+    const e = withParts(250);
+    const text = pay(e);
+    expect(text).toContain(`Base $${perHour(BASE_SALARIES['driller'])}/h`);
+    expect(text).toContain(`+ skills $${perHour(QUALIFICATION_SALARY_BONUS[2])}/h`);
+    expect(text).toContain(`+ raises $${perHour(250)}/h`);
+    expect(text).toContain(`$${perHour(e.salary)}/h`);
+  });
+
+  it('displayed parts sum to the total after a real giveRaise and a level-up', () => {
+    const es = { employees: [makeEmployee({
+      role: 'driller',
+      qualifications: [{ category: 'blasting', proficiencyLevel: 1, xp: 0 }],
+    })] } as unknown as EmployeeState;
+    const e = es.employees[0]!;
+    e.salary = calculateSalary(e);
+    expect(giveRaise(es, e.id, 250)).toBe(true);
+    expect(gainXp(es, e.id, 'blasting', XP_THRESHOLDS[2])?.leveledUp).toBe(true);
+    expect(e.raises).toBe(250);
+
+    const spans = Array.from(makePaySection(e, () => {}).querySelectorAll('span')).map(s => s.textContent ?? '');
+    const num = (prefix: RegExp): number => {
+      const m = spans.map(s => prefix.exec(s)).find(Boolean);
+      expect(m).toBeTruthy();
+      return parseFloat(m![1]!);
+    };
+    const base = num(/^Base \$([\d.]+)\/h$/);
+    const skills = num(/^\+ skills \$([\d.]+)\/h$/);
+    const raises = num(/^\+ raises \$([\d.]+)\/h$/);
+    const total = num(/^\$([\d.]+)\/h$/);
+    expect(skills).toBeGreaterThan(0);
+    expect(raises).toBeGreaterThan(0);
+    // each figure is rounded to 0.1, so allow 3 roundings of slack
+    expect(Math.abs(base + skills + raises - total)).toBeLessThanOrEqual(0.15 + 1e-9);
+  });
+
+  it('shows $0 raises when raises is absent', () => {
+    expect(pay(withParts(undefined))).toContain('+ raises $0/h');
   });
 });

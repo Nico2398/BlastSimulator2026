@@ -294,7 +294,7 @@ export function tickTraining(
       existing.proficiencyLevel = level;
       existing.xp = Math.max(existing.xp, XP_THRESHOLDS[level]);
     }
-    // A better-qualified employee demands more pay.
+    // A better-qualified employee demands more pay; calculateSalary keeps earned raises.
     emp.salary = calculateSalary(emp);
 
     completed.push({ employeeId: emp.id, employeeName: emp.name, skill, level, isNew });
