@@ -579,6 +579,16 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(message).toContain(t('skill.blasting'));
     });
 
+    it('names the order, the licence and the skill for no_dual_qualified_employee (#1386), distinct from no_qualified_employee', () => {
+      const base = { id: 1, type: 'drill_hole' as const, requiredSkill: 'blasting' as const, requiredVehicleRole: 'drill_rig' as const };
+      const message = buildBlockedOrderMessage(makeAction({ ...base, blockedReason: 'no_dual_qualified_employee' }));
+      expect(message).toContain(t(ACTION_LABEL_KEY.drill_hole));
+      expect(message).toContain(t('vehicle_type.drill_rig'));
+      expect(message).toContain(t('skill.blasting'));
+      expect(message).not.toContain('notification.');
+      expect(message).not.toBe(buildBlockedOrderMessage(makeAction({ ...base, blockedReason: 'no_qualified_employee' })));
+    });
+
     it('names the order type for target_unreachable (#1231), with a translated, non-generic body distinct from the other three reasons', () => {
       // Red until the implementer adds
       // `notification.order_blocked_target_unreachable` to en.json/fr.json —
@@ -703,6 +713,24 @@ describe('blocked haul orders: warehouse gating (#1369)', () => {
     for (const a of actions) a.blockedReason = null;
     center.update(state);
     for (const a of actions) a.blockedReason = 'storage_full';
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('re-toasts once when no_qualified_employee becomes no_dual_qualified_employee (#1386)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const action: PendingAction = {
+      id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0, blockedReason: 'no_qualified_employee',
+    };
+    state.pendingActions.push(action);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+    action.blockedReason = 'no_dual_qualified_employee';
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
     center.update(state);
     expect(blockedEntries(center)).toHaveLength(2);
   });
