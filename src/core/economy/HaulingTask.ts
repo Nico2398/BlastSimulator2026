@@ -55,20 +55,20 @@ export function requestHaulFragment(
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } & RefusalKey {
-  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
+  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', { error: 'Vehicle is not a debris hauler', errorKey: 'vehicle.not_debris_hauler' });
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver', errorKey: 'mount.vehicle_no_driver' };
   if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.payload !== null) {
-    return { success: false, error: 'Vehicle is already hauling' };
+    return { success: false, error: 'Vehicle is already hauling', errorKey: 'vehicle.already_hauling' };
   }
 
   const tracked = state.logistics.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
   );
-  if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
+  if (!tracked) return { success: false, error: 'Fragment not found or not on the ground', errorKey: 'vehicle.fragment_unavailable' };
   if (isOversized(tracked.fragment.volume)) {
-    return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first' };
+    return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first', errorKey: 'vehicle.fragment_oversized' };
   }
 
   return claimAndDispatchFragmentAction(state, vehicle, 'haul_debris', fragmentId, 'haul.no_action_queued', 'haul.claim_failed');

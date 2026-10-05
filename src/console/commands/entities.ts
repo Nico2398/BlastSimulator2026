@@ -24,7 +24,7 @@ import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zo
 import { evacuateZone } from '../../core/engine/Evacuation.js';
 import { releaseOccupantsOfRemovedBuildings } from '../../core/engine/Mount.js';
 
-import { requireGame, noEmployeesMessage, placementRefusalText } from './commandUtils.js';
+import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import {
   makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity,
@@ -137,7 +137,7 @@ export function buildCommand(
         terrainReservations(state),
       );
       if (!upgradeCheck.valid) {
-        return { success: false, output: t('entities.build_upgrade_failed', { error: placementRefusalText(upgradeCheck) }) };
+        return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(upgradeCheck) }) };
       }
 
       destroyBuilding(state.buildings, id);
@@ -147,7 +147,7 @@ export function buildCommand(
         undefined, ctx.grid ?? undefined,
       );
       if (!upgradeResult.success) {
-        return { success: false, output: t('entities.build_upgrade_failed', { error: upgradeResult.error! }) };
+        return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(upgradeResult) }) };
       }
       state.cash -= totalCost;
       addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
@@ -215,7 +215,7 @@ export function buildCommand(
         moveBounds.width, moveBounds.depth, moveBounds.originX, moveBounds.originZ,
         plannedOccupants, ctx.grid ?? undefined, terrainReservations(state),
       );
-      if (!result.success) return { success: false, output: placementRefusalText(result) };
+      if (!result.success) return { success: false, output: refusalText(result) };
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
       refreshLogisticsCapacity(state);

@@ -39,7 +39,7 @@ export function findRequestVehicle(
   vehicleId: number,
 ): { success: true; vehicle: Vehicle } | ({ success: false; error: string } & RefusalKey) {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return { success: false, error: 'Vehicle not found' };
+  if (!vehicle) return { success: false, error: 'Vehicle not found', errorKey: 'vehicle.not_found', errorParams: { id: vehicleId } };
   return { success: true, vehicle };
 }
 
@@ -47,18 +47,18 @@ export function findRequestVehicle(
  * Look up `vehicleId` and confirm it is a `expectedRole` vehicle, in one step
  * — the first two checks requestBreakBoulder and requestHaulFragment both
  * run before diverging into their own role-specific conditions (driver
- * assigned, not already busy). `wrongRoleError` carries the caller's own
+ * assigned, not already busy). `wrongRole` carries the caller's own
  * wording so the two request entry points keep their distinct error messages.
  */
 export function findRequestVehicleOfRole(
   state: GameState,
   vehicleId: number,
   expectedRole: VehicleRole,
-  wrongRoleError: string,
+  wrongRole: { error: string; errorKey: string },
 ): { success: true; vehicle: Vehicle } | ({ success: false; error: string } & RefusalKey) {
   const found = findRequestVehicle(state, vehicleId);
   if (!found.success) return found;
-  if (found.vehicle.type !== expectedRole) return { success: false, error: wrongRoleError };
+  if (found.vehicle.type !== expectedRole) return { success: false, ...wrongRole };
   return found;
 }
 
@@ -147,7 +147,7 @@ export function claimAndDispatchFragmentAction(
   if (!action) return { success: false, error: t(noActionQueuedKey) };
 
   const employee = resolveVehicleDriver(vehicle, state.employees.employees);
-  if (!employee) return { success: false, error: 'Vehicle has no driver' };
+  if (!employee) return { success: false, error: 'Vehicle has no driver', errorKey: 'mount.vehicle_no_driver' };
 
   const claimed = claimPendingAction(state, action.id, employee.id);
   if (!claimed) return { success: false, error: t(claimFailedKey) };

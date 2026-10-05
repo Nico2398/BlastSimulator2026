@@ -252,7 +252,7 @@ describe('entities.ts — build upgrade to an unresearched tier', () => {
 // through buildCommand without mocking anything.
 
 describe('entities.ts — build upgrade failure (re-placement rejected by an overlap)', () => {
-  const EN = 'Upgrade failed: Space is occupied';
+  const EN = 'Upgrade failed: Space is occupied — a building or construction site covers part of that spot.';
 
   function setupBlockedUpgrade(ctx: GameContext): number {
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;

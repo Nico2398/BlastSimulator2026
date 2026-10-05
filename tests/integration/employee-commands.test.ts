@@ -884,7 +884,7 @@ describe('Console — employee fire releases the employee from the world (#1378)
     const result = employeeCommand(ctx, ['fire', '999'], {});
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Employee not found');
+    expect(result.output).toBe('Employee #999 not found.');
   });
 });
 

@@ -23,9 +23,6 @@ export function refusalText(refusal: { error?: string } & RefusalKey): string {
   return refusal.errorKey ? t(refusal.errorKey, refusal.errorParams) : refusal.error!;
 }
 
-/** @deprecated Alias of `refusalText`; callers migrate to it. */
-export const placementRefusalText = refusalText;
-
 /** Guard every command that needs a loaded game. */
 export function requireGame(ctx: GameContext): CommandResult | null {
   if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };
