@@ -20,6 +20,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "#1379: the default site policy (shift_8h, rest at fatigue <= 60) is always in force, so a staffed crew would be force-rested mid-task. This scenario is not about shift or rest policy; continuous mode with a zero threshold never forces a rest, keeping the timing this file was authored against.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "build living_quarters at:32,32",
       "description": "Ordered before any employee exists — the first idle hire below (Walt) auto-claims and builds it (#556), landing him right next to it once done, which is what makes his own later rest near-instant and keeps him out of the way of the Stan/Bob pair this file is actually about. (32,32) is flat ground at this seed — confirmed live; (10,10)/(50,50) are not.",
       "interaction": [

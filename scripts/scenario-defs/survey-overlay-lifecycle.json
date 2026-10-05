@@ -1,6 +1,6 @@
 {
   "name": "survey-overlay-lifecycle",
-  "description": "Survey confidence overlay lifecycle: fresh survey rendering \u2192 tick past stale threshold \u2192 new survey refreshes overlay \u2192 blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
+  "description": "Survey confidence overlay lifecycle: fresh survey rendering → tick past stale threshold → new survey refreshes overlay → blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
   "shots": [
     {
       "name": "overview",
@@ -50,6 +50,17 @@
         ]
       },
       "description": "#1261/#1207: this campaign start used to opt into agent occupancy explicitly; occupancy is unconditional since #1207, so the wait_until conversions below now genuinely exercise it. Latent occupancy-contention risk worth flagging: both surveyors hired above are never fired and both surveyed tile (20,20), which the drill grid below reuses as its own `start:20,20` -- three separate crew members converging on the same tile/cluster is exactly the shape of contention this batch's own other files (blast-execution-visual.json, vibration-budget.json) found genuinely stalls a charge_hole action under occupancy (see issue #1278)."
+    },
+    {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so staffed crews must not be force-rested mid-task. Continuous mode with threshold 0 never forces rest.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "time resume",
@@ -117,7 +128,7 @@
           "command": "employee assign_skill 1 skill:geology level:5"
         }
       ],
-      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step. Finding #15 class: the original command used positional args (`employee assign_skill 1 geology 5`) \u2014 assignSkillCommand requires the named form and silently rejected it ('Usage: employee assign_skill <id> skill:<category> level:1-5', never thrown), so this call and the one below failed on every run in this file's history. Fixed to the correct syntax.",
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step. Finding #15 class: the original command used positional args (`employee assign_skill 1 geology 5`) — assignSkillCommand requires the named form and silently rejected it ('Usage: employee assign_skill <id> skill:<category> level:1-5', never thrown), so this call and the one below failed on every run in this file's history. Fixed to the correct syntax.",
       "expect": {
         "equals": {
           "proficiencyTotal": 6
@@ -134,7 +145,7 @@
           "command": "employee assign_skill 2 skill:geology level:1"
         }
       ],
-      "description": "Test-only bootstrap \u2014 see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for the Finding #15 class fix.",
+      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for the Finding #15 class fix.",
       "role": "bootstrap"
     },
     {
@@ -159,7 +170,7 @@
     },
     {
       "command": "survey seismic x:20 z:20",
-      "description": "Survey 1/2, round 1. Two surveyors, so both round-1 surveys are worked in parallel (unlike Finding #16's single-employee case) \u2014 real run confirms both complete cleanly.",
+      "description": "Survey 1/2, round 1. Two surveyors, so both round-1 surveys are worked in parallel (unlike Finding #16's single-employee case) — real run confirms both complete cleanly.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -639,7 +650,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
-      "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper click precedes the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts). The (20,20)-(24,24) rectangle (4x4) computes round(4/3)+1=2 per axis, matching the declared 2x2. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles \u2014 none drilled yet, so holeCount stays 0 right after confirm.",
+      "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper click precedes the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts). The (20,20)-(24,24) rectangle (4x4) computes round(4/3)+1=2 per axis, matching the declared 2x2. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
           "type": "clickSelector",

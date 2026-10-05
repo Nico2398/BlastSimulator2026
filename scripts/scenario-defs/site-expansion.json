@@ -26,6 +26,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so staffed crews must not be force-rested mid-task. Continuous mode with threshold 0 never forces rest.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "terrain_info",
       "description": "Baseline: the site is the 32x32 square the level started as.",
       "timeout": 150,

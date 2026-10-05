@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, type Employee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle, vehicleDriverId, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
@@ -876,6 +876,32 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 
     expect(employee.pendingRestDuration).not.toBeNull();
     expect(employee.activeActionId).not.toBe(1105);
+  });
+
+  // #1379: with no living_quarters an in-place rest only restores to
+  // NEED_REST_NO_BUILDING_CAP, so a walk to a protected task (charge_hole)
+  // costing more fatigue than that gain is never reached if every threshold
+  // crossing interrupts it (entry stuck in plannedChargesByHole forever).
+  it.each<[number, boolean]>([
+    [20, false],
+    [3, true],
+  ])('#1379: mid-walk to a charge_hole, no quarters, itinerary est %s ticks at fatigue 60 rests: %s', (estTotalTicks, rests) => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const prior = pushHeldAction(state, employee.id, 1140, 'charge_hole');
+    prior.status = 'assigned';
+    employee.activeActionId = prior.id;
+    employee.fatigue = 60;
+    employee.taskTicksRemaining = null;
+    employee.isMoveStuck = true;
+    employee.itinerary = { legs: [], goal: { kind: 'work', actionId: 1140 }, workTicks: 6, estTotalTicks } as unknown as Employee['itinerary'];
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestDuration !== null).toBe(rests);
+    expect(employee.activeActionId === 1140).toBe(!rests);
   });
 
   // #1118: mirrors the legacy forceShiftRestIfNeeded's own #1118 test above —

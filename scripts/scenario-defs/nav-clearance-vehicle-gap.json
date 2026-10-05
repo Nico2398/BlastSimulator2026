@@ -22,6 +22,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "#1379: the default site policy (shift_8h, rest at fatigue <= 60) is always in force, so a staffed crew would be force-rested mid-task. This scenario is not about shift or rest policy; continuous mode with a zero threshold never forces a rest, keeping the timing this file was authored against.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "build management_office at:20,20",
       "description": "West wall of the doorway: management_office T1's 2x2 footprint covers (20,20)-(21,21). Real BuildMenu click flow — role: player, per level-ground-then-build.json's identical pattern.",
       "interaction": [

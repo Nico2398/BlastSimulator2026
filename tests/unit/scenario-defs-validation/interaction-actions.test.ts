@@ -561,29 +561,31 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
 
   // Index -> expected `command` string, read directly off the current JSON.
   const EXPECTED_COMMANDS_BY_INDEX: Record<number, string> = {
-    1: 'tutorial_start',
-    2: 'time resume',
-    3: 'employee hire role:surveyor',
+    // #1379 inserts a bootstrap 'set_policy mode:continuous fatigue:0' step at index 1
+    // (neutralises the always-on default site policy), shifting every index below by 1.
+    2: 'tutorial_start',
+    3: 'time resume',
+    4: 'employee hire role:surveyor',
     // #923 removes the standalone 'time speed 2' step that used to sit here
     // (index 4) — the speed-control lesson moved into the box-cut ramp-dig
     // wait further down, so hire-surveyor now advances straight to
     // 'survey', shifting every index below down by 1 from this test's
     // previous (#921) numbering.
-    4: 'employee assign_skill 1 skill:geology level:3',
-    5: 'survey seismic x:23 z:23',
-    6: 'wait_until field:surveyCount equals:1 max_ticks:30',
-    7: 'state',
-    8: 'employee hire role:driller',
-    9: 'employee assign_skill 2 skill:blasting level:3',
-    10: 'build living_quarters at:8,15',
+    5: 'employee assign_skill 1 skill:geology level:3',
+    6: 'survey seismic x:23 z:23',
+    7: 'wait_until field:surveyCount equals:1 max_ticks:30',
+    8: 'state',
+    9: 'employee hire role:driller',
+    10: 'employee assign_skill 2 skill:blasting level:3',
+    11: 'build living_quarters at:8,15',
     // #1014 inserts one new observe-only step here (index 11, "state" —
     // asserts the tutorial card's waiting state once the order above lands,
     // already declaring its own timeout >= 90 is not required since it has
     // no heavy render of its own; excluded from this map on purpose) between
     // the living_quarters order and its wait_until, shifting every index
     // below down by 1 from the #923 numbering.
-    14: 'build driving_center at:6,15',
-    16: 'employee train 2 skill:driving.drill_rig',
+    15: 'build driving_center at:6,15',
+    17: 'employee train 2 skill:driving.drill_rig',
     // #1205 inserts one new setup-only step here (index 17,
     // "wait_until field:trainingCount equals:1 max_ticks:300" — pauses on the
     // driller's arrival at the driving_center for a focusTile+screenshot of
@@ -591,12 +593,12 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     // own timeout >= 90 so it is excluded from this map on purpose) between
     // the train-driller enrolment and its former "tick 25" follow-up,
     // shifting every index below down by 1 from the #1014 numbering.
-    18: 'tick 25',
-    19: 'vehicle buy drill_rig',
-    20: 'employee train 1 skill:driving.excavator',
-    21: 'tick 25',
-    22: 'vehicle buy rock_digger',
-    23: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
+    19: 'tick 25',
+    20: 'vehicle buy drill_rig',
+    21: 'employee train 1 skill:driving.excavator',
+    22: 'tick 25',
+    23: 'vehicle buy rock_digger',
+    24: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
     // #923 had inserted three new steps here (time speed:8, wait_until
     // orderedRampSegmentCount, time speed:1 — indices 23-25, each already
     // declaring its own timeout >= 90) between box-cut and drill_plan. #1015
@@ -608,9 +610,9 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     // #949 retunes the tutorial's own scripted plan (spacing:3/depth:6/(20,20)
     // -> spacing:4/depth:8/(22,20); amount:5/stemming:2 -> amount:4/stemming:2.5)
     // so the shot rates good-or-better instead of catastrophic.
-    24: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
-    34: 'charge hole:* explosive:boomite amount:4 stemming:2.4',
-    38: 'sequence auto delay_step:25',
+    25: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089',
+    35: 'charge hole:* explosive:boomite amount:4 stemming:2.4',
+    39: 'sequence auto delay_step:25',
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {

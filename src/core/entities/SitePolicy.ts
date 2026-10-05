@@ -13,7 +13,10 @@ export interface SitePolicy {
   /** Per-employee threshold overrides keyed by employee ID. */
   customThresholds: Record<number, { fatigue: number }>;
   /**
-   * Bumped every time a policy is applied, whether or not any value differs.
+   * Counts explicit player applications (set_policy / the Operations panel),
+   * whether or not any value differs. Default 0. It records player edits only
+   * and never gates the engine: the default policy is in force from tick 0
+   * (#1379).
    *
    * "Has the player set a policy?" cannot be answered by comparing values:
    * applying the policy already in force changes nothing, so anything watching

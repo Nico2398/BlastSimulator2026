@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Forced shift rest (legacy and site-policy-aware)
 //
-// forceShiftRestIfNeeded is the legacy fatigue-only, fixed-duration path used
-// while no site policy has been applied; forceShiftRestIfNeededByPolicy
-// (#678) is the policy-aware variant that consults SitePolicy.shouldForceRest
-// once one has. Both are called from ShiftCycle.ts's processShiftCycle. Split
+// forceShiftRestIfNeededByPolicy (#678) consults SitePolicy.shouldForceRest and
+// is always in force (#1379), called from ShiftCycle.ts's processShiftCycle.
+// forceShiftRestIfNeeded is the superseded fatigue-only, fixed-duration path,
+// no longer called by the engine. Split
 // out of GameLoop.ts as part of #759's file-size split; re-exported there so
 // GameLoop.ts stays the single public surface for tick-orchestration callers.
 
@@ -19,7 +19,7 @@ import { isMidEvacuation } from './Evacuation.js';
 import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
-import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS } from '../config/balance.js';
+import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS, NEED_REST_NO_BUILDING_CAP, NEED_DRAIN_RATES } from '../config/balance.js';
 
 /**
  * Shared leading guard of forceShiftRestIfNeeded and
@@ -178,6 +178,22 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
 }
 
 /**
+ * True when resting in place cannot help `employee` reach the protected task
+ * (PROTECTED_MID_EXECUTION_ACTION_TYPES) it is still walking to: the trip's own
+ * fatigue cost exceeds what an in-place rest restores (it caps at
+ * NEED_REST_NO_BUILDING_CAP). Interrupting then walks nowhere — the rest ends
+ * at the same level, the walk restarts and crosses the threshold at the same
+ * point of the same route, so the action is never reached (a far charge_hole
+ * stranded in plannedChargesByHole forever, #1379). Callers pass a destination
+ * with no living_quarters (a building is weighed by restRoundTripWorthwhile).
+ */
+function isUnreachableBetweenInPlaceRests(state: GameState, employee: Employee): boolean {
+  if (employee.itinerary === null || !isMidProtectedTaskWork(state, employee)) return false;
+  const tripCost = employee.itinerary.estTotalTicks * NEED_DRAIN_RATES.fatigue.traveling;
+  return tripCost > NEED_REST_NO_BUILDING_CAP - employee.fatigue;
+}
+
+/**
  * True when `employee` is idle (activeActionId === null) but currently
  * mounted in a vehicle, and a `queued` (unclaimed) PendingAction exists
  * whose requiredVehicleRole matches that vehicle's own role.
@@ -227,8 +243,8 @@ function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
 
 /**
  * Site-policy-aware variant of forceShiftRestIfNeeded (#678) — consults
- * SitePolicy.shouldForceRest so an applied policy (state.sitePolicy.revision
- * > 0) forces rest for real, using any living_quarters tier (tier 1
+ * SitePolicy.shouldForceRest so the site policy (default or player-applied)
+ * forces rest for real, using any living_quarters tier (tier 1
  * included) or resting in place if none exists.
  *
  * Guards: skip an employee already resting (restTicksRemaining !== null),
@@ -415,6 +431,7 @@ export function forceShiftRestIfNeededByPolicy(
   // the identical ordering requirement (#1170).
   const dest = resolveRestDestination(state, emp);
   if (!dest.worthwhile) return;
+  if (dest.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
 
   // #678 follow-up: release the action this employee was actively working
   // (a drill_hole, dig_ramp_segment, or any other vehicle-gated task) back to

@@ -30,7 +30,13 @@ import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+  const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+  // The default site policy is always in force (#1379) and force-rests an
+  // employee once the shift ends or fatigue dips; these tests are about task
+  // completion, so neutralize shift rest.
+  ctx.state!.sitePolicy.shiftMode = 'continuous';
+  ctx.state!.sitePolicy.fatigueRestThreshold = 0;
+  return ctx;
 }
 
 /**

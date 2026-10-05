@@ -23,6 +23,17 @@
       "description": "#1262: agent occupancy turned on for this file; with the dense-grid dispatch fix (#1278) every downstream expectation reproduces the occupancy-off baseline unchanged."
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "#1379: the default site policy (shift_8h, threshold 60) is always in force and would force-rest the crew. This file is not about rest, so continuous mode with the lowest rest threshold (0) neutralizes it and keeps the pre-#1379 no-policy timings."
+    },
+    {
       "command": "time resume",
       "interaction": [
         {

@@ -12,6 +12,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
+import { isOnReturnTripLeg } from './Locomotion.js';
 import {
   EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries, isMidEvacuationDrive,
 } from './EvacuationHold.js';
@@ -62,9 +63,21 @@ export {
  * arrived and destinationX clears (or, for a manual vehicle-boarding walk,
  * the analogous pendingDriverVehicleId guard each site already carries
  * separately).
+ *
+ * A return trip (`Leg.returnTrip`, Locomotion.ts's relocateIdleDestinationBlocker,
+ * #1278/#1283) is NOT an evacuation walk: an idle employee shoved off a cell
+ * by an occupancy relocation walks back to it with no claim and no order
+ * behind the walk. Reading it as an evacuation froze the employee out of
+ * dispatch and every rest path for as long as the walk lasted, and in a dense
+ * crew the walk can last indefinitely (stuck, relocated again, re-queued) —
+ * its fatigue drained to 0 with nothing allowed to rest it, collapsing
+ * well-being until the level ended in a worker revolt (#1379,
+ * blast-execution-visual's cycle-4 charge drain). Dispatch and rest replace
+ * the return itinerary the moment they claim the employee.
  */
 export function isMidEvacuationWalk(employee: Employee): boolean {
-  return employee.activeActionId === null && employee.destinationX !== null;
+  return employee.activeActionId === null && employee.destinationX !== null
+    && !isOnReturnTripLeg(employee);
 }
 
 /**
