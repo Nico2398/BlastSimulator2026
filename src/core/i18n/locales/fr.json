@@ -2337,6 +2337,7 @@
   "ui.contracts.delivered_line": "{delivered} / {total} kg",
   "ui.contracts.penalty_line": "Échec = -${amount}",
   "ui.contracts.max": "Max",
+  "ui.contracts.deliver_failed": "Livraison échouée.",
   "ui.contracts.stored_note": "{kg} kg de {material} en stock",
   "ui.contracts.total": "Total",
   "ui.contracts.have_line": "En stock {kg} kg",
@@ -3597,5 +3598,10 @@
   "haul.no_action_queued": "Aucune action de transport en attente pour ce fragment",
   "haul.claim_failed": "Échec de la prise en charge de l'action de transport",
   "break.no_action_queued": "Aucune action de fragmentation en attente pour ce fragment",
-  "break.claim_failed": "Échec de la prise en charge de l'action de fragmentation"
+  "break.claim_failed": "Échec de la prise en charge de l'action de fragmentation",
+  "economy.contract.deliver_fulfilled": "Contrat #{id} déjà honoré ou sans quantité restante.",
+  "economy.contract.deliver_insufficient": "Pas assez de {material} en stock pour livrer.",
+  "economy.contract.deliver_not_found": "Contrat #{id} introuvable ou déjà terminé.",
+  "logistics.invalid_amount": "Quantité demandée invalide : {amount}.",
+  "logistics.insufficient_stock": "Pas assez de {material} en stock : {available} kg disponibles, {requested} kg demandés."
 }

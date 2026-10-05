@@ -8,7 +8,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody } from '../dom.js';
+import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, flashStatus } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -117,8 +117,7 @@ export class ShadyPanel extends PanelBase {
 
 
   setStatus(msg: string): void {
-    this.statusEl.textContent = msg;
-    setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
+    flashStatus(this.statusEl, msg);
   }
 
   refreshLocale(): void {

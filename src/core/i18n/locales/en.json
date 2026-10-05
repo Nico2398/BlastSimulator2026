@@ -2337,6 +2337,7 @@
   "ui.contracts.delivered_line": "{delivered} / {total} kg",
   "ui.contracts.penalty_line": "Fail = -${amount}",
   "ui.contracts.max": "Max",
+  "ui.contracts.deliver_failed": "Delivery failed.",
   "ui.contracts.stored_note": "{kg} kg of {material} in storage",
   "ui.contracts.total": "Total",
   "ui.contracts.have_line": "In storage {kg} kg",
@@ -3597,5 +3598,10 @@
   "haul.no_action_queued": "No haul action queued for this fragment",
   "haul.claim_failed": "Failed to claim haul action",
   "break.no_action_queued": "No break action queued for this fragment",
-  "break.claim_failed": "Failed to claim break action"
+  "break.claim_failed": "Failed to claim break action",
+  "economy.contract.deliver_fulfilled": "Contract #{id} already fulfilled or has no outstanding quantity.",
+  "economy.contract.deliver_insufficient": "Not enough {material} in storage to deliver.",
+  "economy.contract.deliver_not_found": "Contract #{id} not found or already completed.",
+  "logistics.invalid_amount": "Invalid amount requested: {amount}.",
+  "logistics.insufficient_stock": "Not enough {material} in storage: {available} kg available, {requested} kg requested."
 }

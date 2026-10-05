@@ -4,6 +4,7 @@
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
+import { t } from '../i18n/I18n.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
 
@@ -215,7 +216,7 @@ export function consumeStoredOre(
     return {
       success: false,
       consumedKg: 0,
-      error: `Invalid amount requested: ${amountKg}.`,
+      error: t('logistics.invalid_amount', { amount: amountKg }),
     };
   }
 
@@ -225,7 +226,7 @@ export function consumeStoredOre(
       return {
         success: false,
         consumedKg: 0,
-        error: `Not enough ${materialId} in storage: ${available.toFixed(1)} kg available, ${amountKg.toFixed(1)} kg requested.`,
+        error: t('logistics.insufficient_stock', { material: materialId, available: available.toFixed(1), requested: amountKg.toFixed(1) }),
       };
     }
 

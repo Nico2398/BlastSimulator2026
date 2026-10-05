@@ -28,7 +28,7 @@
 
 import { PanelBase } from './panels/PanelBase.js';
 import { t } from '../core/i18n/I18n.js';
-import { el, button, emptyState, panelRoot, panelHeader, panelBody } from './dom.js';
+import { el, button, emptyState, panelRoot, panelHeader, panelBody, flashStatus } from './dom.js';
 import { iconEl } from './icons.js';
 import { LocaleTextRegistry } from './localeText.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
@@ -200,8 +200,7 @@ export class BuildMenu extends PanelBase {
   }
 
   setStatus(msg: string): void {
-    this.statusEl.textContent = msg;
-    setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
+    flashStatus(this.statusEl, msg);
   }
 
 
