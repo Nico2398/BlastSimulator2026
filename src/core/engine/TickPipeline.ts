@@ -23,6 +23,7 @@ import type { ExpenseCategory } from '../economy/Finance.js';
 import { addExpense, addIncome } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
 import { buildTickEventContext } from './TickEventContext.js';
+import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost } from '../entities/Building.js';
@@ -267,6 +268,8 @@ export function runTick(
   // completeVehicleGatedAction, called from ArrivalEffects.ts's own
   // haul_unload/boulder_split effects (#1091) rather than from a
   // completion-pass loop in this file.
+  // Injured employees are skipped by dispatch; hand their queued work back to the pool first (#1381).
+  releaseInjuredEmployeesQueues(state);
   const dispatchResult = tickEmployees(state);
   fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
