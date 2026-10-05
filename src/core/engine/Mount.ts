@@ -158,13 +158,16 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   const guard = canReleaseDriver(state.vehicles, vehicleId);
   if (!guard.success) return { success: false, error: guard.error ?? t('mount.alight_failed') };
 
+  alightOccupant(state, vehicle, employeeId, emitter);
+  return { success: true };
+}
+
+/** Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own. */
+function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter): void {
   const employee = state.employees.employees.find(e => e.id === employeeId);
   const cell = findAlightCell(state, vehicle);
   releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
-
-  emitter?.emit('employee:alighted', { employeeId, vehicleId });
-
-  return { success: true };
+  emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
 }
 
 /**
@@ -230,16 +233,14 @@ export function releaseEmployeeFromHosts(state: GameState, employeeId: number, e
   const employee = state.employees.employees.find(e => e.id === employeeId);
   for (const vehicle of state.vehicles.vehicles) {
     if (!vehicle.occupantIds.includes(employeeId)) continue;
-    const cell = findAlightCell(state, vehicle);
-    releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
-    emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
+    alightOccupant(state, vehicle, employeeId, emitter);
   }
   for (const building of state.buildings.buildings) {
     if (!building.occupantIds.includes(employeeId)) continue;
     if (employee && isInsideBuilding(employee.locomotion)) {
       leaveBuilding(state, employeeId, emitter);
     } else {
-      building.occupantIds = building.occupantIds.filter(id => id !== employeeId);
+      releaseOccupant(building, employeeId, undefined, 0, 0);
     }
   }
   if (employee && (isMounted(employee.locomotion) || isInsideBuilding(employee.locomotion))) {

@@ -891,11 +891,6 @@ describe('Console — employee fire releases the employee from the world (#1378)
 // ── mafia removal paths share the same routine (#1378) ──────────────────────
 
 describe('Mafia — frame and accident release the target from the world (#1378)', () => {
-  let ctx: GameContext;
-
-  beforeEach(() => {
-    ctx = makeCtx();
-  });
 
   /** Try seeds until `predicate` accepts the outcome; rebuild a fresh world per attempt. */
   function runUntil<T>(attempt: (seed: number) => { ctx: GameContext; result: T; id: number }, ok: (r: T) => boolean) {
