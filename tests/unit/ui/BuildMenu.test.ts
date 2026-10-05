@@ -869,6 +869,62 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
       }));
     });
 
+    describe('over a ramp (#1390)', () => {
+      function stateWithRampAt(x: number, z: number): GameState {
+        const state = makeMockState();
+        state.builtRamps = [{ id: 1, footprint: { minX: x, maxX: x + 2, minZ: z, maxZ: z + 5 } } as any];
+        return state;
+      }
+
+      it('refuses the ghost, disables Confirm and shows the ramp reason', () => {
+        const { kit, controller, overlay, strip } = makeMockKit();
+        menu.update(stateWithRampAt(30, 20));
+        armCatalog(kit);
+        controller.simulateHover({ x: 31, z: 22 });
+        expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'point', refused: true }));
+        expect(lastStrip(strip)).toEqual(expect.objectContaining({
+          confirmEnabled: false,
+          confirmDisabledReason: t('shell.placement.refused_ramp'),
+        }));
+      });
+
+      it('leaves a footprint clear of the ramp accepted', () => {
+        const { kit, controller, overlay } = makeMockKit();
+        menu.update(stateWithRampAt(30, 20));
+        armCatalog(kit);
+        controller.simulateHover({ x: 40, z: 40 });
+        expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ refused: false }));
+      });
+
+      it('does not refuse the level-ground tool over the same ramp', () => {
+        const { kit, controller, overlay, strip } = makeMockKit();
+        menu.update(stateWithRampAt(30, 20));
+        menu.setPlacementKit(kit);
+        container.querySelector<HTMLButtonElement>('.bs-build-level-ground-btn')!.click();
+        controller.simulateSelect({ x1: 30, z1: 20, x2: 32, z2: 24 });
+        expect(lastOverlay(overlay)).toEqual(expect.objectContaining({ shape: 'rect', refused: false }));
+        expect(lastStrip(strip).confirmDisabledReason).toBeUndefined();
+      });
+
+      it('disables the placed row Upgrade button with the reason as title when the next tier reaches the ramp, and a cash-only update re-evaluates it', () => {
+        const state = stateWithRampAt(5, 7); // tier 1 office covers z 5..6; tier 2 (2x3) grows into z 7
+        state.buildings.buildings = [makeBuilding({ id: 7, type: 'management_office', tier: 1, x: 5, z: 5 })];
+        state.buildings.unlockedTiers['management_office'] = 2;
+        menu.update(state);
+        const btn = findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!;
+        expect(btn.disabled).toBe(true);
+        expect(btn.title).toBe(t('shell.placement.refused_ramp'));
+        // control: same upgrade with no ramp stays enabled
+        const clear = makeMockState();
+        clear.buildings.buildings = state.buildings.buildings;
+        clear.buildings.unlockedTiers['management_office'] = 2;
+        menu.update({ ...clear, cash: 99998 });
+        const btn2 = findPlacedRow(container, 7).querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!;
+        expect(btn2.disabled).toBe(false);
+        expect(btn2.title).toMatch(/^\$/);
+      });
+    });
+
     it('a free selection keeps Confirm enabled with no reason', () => {
       const { kit, controller, strip } = makeMockKit();
       menu.update(stateWithBuildingAt(5, 5));

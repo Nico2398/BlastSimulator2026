@@ -1642,3 +1642,9 @@ export const NEGOTIATION_EARLY_BONUS_RATE = 0.15;
 
 /** Cash fee for hiring a contractor to do an unqualified task (#1380). */
 export const UNQUALIFIED_CONTRACTOR_FEE = 25000;
+
+/** Extra cells around a ramp footprint kept clear of buildings (#1390). */
+export const RAMP_RESERVATION_MARGIN = 0;
+
+/** Cell radius around a drill hole kept clear of buildings (#1390). */
+export const HOLE_RESERVATION_RADIUS = 0;
