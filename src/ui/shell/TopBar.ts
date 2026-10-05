@@ -466,7 +466,9 @@ export class TopBar {
   }
 
   private lastScoreSig = '';
+  private lastScoreState: GameState | undefined;
   private updateScores(state: GameState): void {
+    this.lastScoreState = state;
     const scores = [
       { key: 'wellBeing', abbr: t('shell.topbar.score_well'), tipKey: 'shell.topbar.score_well_tip' },
       { key: 'safety', abbr: t('shell.topbar.score_safe'), tipKey: 'shell.topbar.score_safe_tip' },
@@ -502,6 +504,7 @@ export class TopBar {
     this.locale.refresh();
     this.weatherBtn.title = t(`hud.weather.${this.lastWeather}`);
     this.lastScoreSig = '';
+    if (this.lastScoreState) this.updateScores(this.lastScoreState);
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
   }
 
