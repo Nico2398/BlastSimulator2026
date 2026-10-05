@@ -15,13 +15,14 @@ import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
+import { createWeatherCycle } from '../../core/weather/WeatherCycle.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import type { WeatherCycleState } from '../../core/weather/WeatherCycle.js';
-import type { Random } from '../../core/math/Random.js';
+import { Random } from '../../core/math/Random.js';
 import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
 /**
@@ -76,8 +77,9 @@ export interface GameContext {
  * and `ctx.rng = new Random(seed + 1000)`. Called by new_game, sandbox start and
  * campaign start (#1459).
  */
-export function resetWeatherForNewGame(_ctx: Pick<GameContext, 'weatherCycle' | 'rng'>, _seed: number): void {
-  // TODO: implement
+export function resetWeatherForNewGame(ctx: Pick<GameContext, 'weatherCycle' | 'rng'>, seed: number): void {
+  ctx.weatherCycle = createWeatherCycle(seed);
+  ctx.rng = new Random(seed + 1000);
 }
 
 /**
@@ -465,6 +467,8 @@ export function newGameCommand(
     ...(startingCash !== undefined ? { startingCash } : {}),
     ...(flags.staffed ? { staffed: true } : {}),
   });
+  resetWeatherForNewGame(ctx, seed);
+
   const datum = defaultDatumForSize(size);
   ctx.state.world = createWorldState(size, datum, size, true);
   regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, datum, sizeZ: size, startingCrew: true });

@@ -27,7 +27,7 @@ import { AudioHooks } from './audio/AudioHooks.js';
 import { selectSaveBackend } from './persistence/selectBackend.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
+import { terrainConfigOf, ensureLandscape, resetWeatherForNewGame, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
@@ -50,8 +50,6 @@ import { PlacementController } from './ui/scene/PlacementController.js';
 import { ParamStrip } from './ui/scene/ParamStrip.js';
 import { SelectionOverlay } from './renderer/SelectionOverlay.js';
 import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRegion.js';
-import { createWeatherCycle } from './core/weather/WeatherCycle.js';
-import { Random } from './core/math/Random.js';
 import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
@@ -497,8 +495,7 @@ function onLevelStateReplaced(state: GameState): void {
   scenePicking.clearSelection();
   placementController.disarm();
   levelEndScreen.reset();
-  ctx.weatherCycle = createWeatherCycle(state.seed);
-  ctx.rng = new Random(state.seed + 1000);
+  resetWeatherForNewGame(ctx, state.seed);
   // The tutorial's steps are tuned to its own map: a swap to any other level
   // ends it (#1319), else it would block that level's end screen.
   if (tutorial.isActive && !shouldKeepTutorialRunning(state.campaign.activeLevelId)) tutorial.abandon();
