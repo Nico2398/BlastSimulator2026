@@ -2337,6 +2337,7 @@
   "ui.contracts.delivered_line": "{delivered} / {total} kg",
   "ui.contracts.penalty_line": "Fail = -${amount}",
   "ui.contracts.max": "Max",
+  "ui.contracts.deliver_failed": "Delivery failed.",
   "ui.contracts.stored_note": "{kg} kg of {material} in storage",
   "ui.contracts.total": "Total",
   "ui.contracts.have_line": "In storage {kg} kg",

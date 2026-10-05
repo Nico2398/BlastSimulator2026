@@ -50,13 +50,14 @@ const NEGOTIATE_KEY: Record<NegotiationField, { improved: string; worsened: stri
 };
 
 /** Largest deliverable amount (kg, 0.1 kg steps) that never exceeds `maxDeliverableKg`. */
-export function deliverableAmountKg(_maxDeliverableKg: number): number {
-  // TODO: implement
-  return 0;
+export function deliverableAmountKg(maxDeliverableKg: number): number {
+  if (!(maxDeliverableKg > 0)) return 0;
+  const floored = Math.floor(maxDeliverableKg * 10 + 1e-9) / 10;
+  return floored < 0.1 ? 0 : Math.min(floored, maxDeliverableKg);
 }
 
 export class ContractsPanel extends PanelBase {
-  protected statusEl?: HTMLElement;
+  private readonly statusEl: HTMLElement;
   private readonly bodyEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
   private onNavigateCb?: (panel: 'ops') => void;
@@ -75,7 +76,11 @@ export class ContractsPanel extends PanelBase {
 
     this.bodyEl = panelBody(10);
 
-    this.el.append(header, this.bodyEl);
+    this.statusEl = el('div', {
+      attrs: { class: 'bs-contract-status', style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-critical-text);min-height:14px' },
+    });
+
+    this.el.append(header, this.bodyEl, this.statusEl);
     container.appendChild(this.el);
   }
 
@@ -85,8 +90,8 @@ export class ContractsPanel extends PanelBase {
 
   update(state: GameState): void {
     const signature = JSON.stringify({
-      stored: Math.round(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
-      ore: state.collectedOre,
+      stored: Math.round(state.logistics.storedMassKg), storedTenths: deliverableAmountKg(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
+      ore: state.collectedOre, oreTenths: Object.values(state.collectedOre).map(deliverableAmountKg),
       active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}`),
       available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
@@ -104,8 +109,9 @@ export class ContractsPanel extends PanelBase {
   }
 
 
-  protected setStatus(_msg: string): void {
-    // TODO: implement
+  private setStatus(msg: string): void {
+    this.statusEl.textContent = msg;
+    setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
   }
 
   private render(state: GameState): void {
@@ -207,7 +213,7 @@ export class ContractsPanel extends PanelBase {
     const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
     const stored = this.storedOf(c.materialId, state);
     const remainingKg = Math.max(0, c.quantityKg - c.deliveredKg);
-    const maxDeliverable = Math.max(0, Math.min(remainingKg, stored));
+    const maxDeliverable = deliverableAmountKg(Math.min(remainingKg, stored));
 
     const headRow = el('div');
     headRow.style.cssText = 'display:flex;align-items:center;gap:8px';
@@ -229,22 +235,25 @@ export class ContractsPanel extends PanelBase {
       el('span', { text: t('ui.contracts.penalty_line', { amount: formatMoney(c.penaltyAmount) }), attrs: { style: 'margin-left:auto;color:var(--bsx-critical-text)' } }),
     );
 
-    const amountInput = el('input', { className: 'bs-input bs-contract-amount', attrs: { type: 'number', min: '1', step: '1', value: String(Math.max(1, Math.round(maxDeliverable))) } }) as HTMLInputElement;
-    amountInput.max = String(Math.max(1, Math.round(maxDeliverable)));
+    const amountInput = el('input', { className: 'bs-input bs-contract-amount', attrs: { type: 'number', min: '0.1', step: '0.1', value: String(maxDeliverable > 0 ? maxDeliverable : 0.1) } }) as HTMLInputElement;
+    amountInput.max = String(maxDeliverable > 0 ? maxDeliverable : 0.1);
     amountInput.disabled = maxDeliverable <= 0;
     amountInput.style.cssText = 'flex:1;height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:var(--bsx-well);color:var(--bsx-text-primary);font:600 11px/1 var(--bsx-font-mono)';
 
     const maxBtn = button('ghost', t('ui.contracts.max'), {
       dataAction: 'deliver-max',
       disabled: maxDeliverable <= 0,
-      onClick: () => { amountInput.value = String(Math.max(1, Math.round(maxDeliverable))); },
+      onClick: () => { amountInput.value = String(maxDeliverable); },
     });
     maxBtn.style.cssText = 'height:30px;padding:0 10px;font-size:10px';
 
     const deliverBtn = button('primary', t('ui.contracts.deliver'), {
       dataAction: 'deliver',
       disabled: maxDeliverable <= 0,
-      onClick: () => this.gameConsole?.(`contract deliver ${c.id} amount:${amountInput.value}`),
+      onClick: () => {
+        const result = this.gameConsole?.(`contract deliver ${c.id} amount:${amountInput.value}`);
+        this.setStatus(result?.success === false ? (result.output || t('ui.contracts.deliver_failed')) : result ? '' : t('ui.contracts.deliver_failed'));
+      },
     });
     deliverBtn.classList.add('bs-contract-deliver');
     deliverBtn.style.cssText = 'height:30px;padding:0 14px;font-size:10px';
