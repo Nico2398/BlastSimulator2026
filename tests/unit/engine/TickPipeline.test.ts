@@ -121,6 +121,7 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
 
   it('a haul-eligible employee is dispatched the same tick a fragment makes it eligible (haul dispatch runs before the employee-dispatch pass)', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     const emitter = new EventEmitter();
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
@@ -136,6 +137,7 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
     // freight_warehouse exists".
     const warehouse = placeBuilding(state.buildings, 'freight_warehouse', 10, 10, 64, 64);
     if (!warehouse.success) throw new Error(`Setup: placeBuilding failed — ${warehouse.error}`);
+    state.logistics.storageCapacityKg = 5000;
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
 
     // No haul_debris action exists yet — syncHaulDispatch must create one and

@@ -6,11 +6,11 @@
 // employee auto-claims/drives/loads/delivers them instead of hauling being
 // reachable only through the manual Fleet-panel button.
 
-import type { GameState, PendingAction, ActionType } from '../state/GameState.js';
+import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '../state/GameState.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
-import type { TrackedFragment } from './Logistics.js';
+import { storageRoomKg, type TrackedFragment } from './Logistics.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
@@ -172,8 +172,12 @@ export function isHaulOrFragmentActionClaimable(
   // turned away at the depot every tick (mirrors the same room check
   // findReachableGroundFragment/HaulingTask.ts already applies to the
   // manual Haul button's own candidate search).
-  const roomKg = state.logistics.storageCapacityKg - state.logistics.storedMassKg;
-  return tracked.fragment.mass <= roomKg;
+  return fitsStorageRoom(state, tracked);
+}
+
+/** True iff the fragment's mass fits the free storage room. Single source for the claim gate and haulBlockedReason. */
+function fitsStorageRoom(state: GameState, tracked: TrackedFragment): boolean {
+  return tracked.fragment.mass <= storageRoomKg(state.logistics);
 }
 
 /**
@@ -197,4 +201,30 @@ export function haulActionCarriesOre(
 /** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */
 export function isAutoDebrisAction(type: ActionType): boolean {
   return type === 'haul_debris' || type === 'fragment_debris';
+}
+
+const HAUL_BLOCKED_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>(['no_freight_warehouse', 'storage_full']);
+
+/** True for the blocked reasons haulBlockedReason can produce (#1369). */
+export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefined): reason is 'no_freight_warehouse' | 'storage_full' {
+  return reason != null && HAUL_BLOCKED_REASONS.has(reason);
+}
+
+/**
+ * Why a haul_debris order cannot be fulfilled now, or null: 'no_freight_warehouse'
+ * when no active warehouse provides storage (zero synced capacity),
+ * 'storage_full' when its on-ground fragment is heavier than the room left
+ * (#1369). Never set for oversized (fragment_debris) work, nor for a fragment
+ * that is gone or not on the ground.
+ */
+export function haulBlockedReason(
+  state: GameState,
+  action: PendingAction,
+  lookup?: FragmentLookup,
+): BlockedOrderReason | null {
+  if (action.type !== 'haul_debris') return null;
+  const tracked = resolveTrackedFragment(state, action, lookup);
+  if (!tracked || tracked.state !== 'on_ground') return null;
+  if (state.logistics.storageCapacityKg === 0) return 'no_freight_warehouse';
+  return fitsStorageRoom(state, tracked) ? null : 'storage_full';
 }

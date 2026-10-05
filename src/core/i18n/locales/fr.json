@@ -3120,6 +3120,8 @@
   "notification.order_blocked_no_vehicle": "{order} nécessite un(e) {role} — aucun(e) dans le parc pour l'instant.",
   "notification.order_blocked_no_driver": "{order} nécessite un(e) {role} — personne n'est autorisé(e) à en conduire un(e).",
   "notification.order_blocked_target_unreachable": "La cible de {order} est inaccessible — aucun chemin ne la relie au reste du site.",
+  "notification.order_blocked_no_warehouse": "{order} nécessite un entrepôt de fret — construisez-en un pour stocker la roche transportée.",
+  "notification.order_blocked_storage_full": "{order} ne peut pas continuer — le stockage est plein.",
   "notification.pip.blocked_orders_label": "{count} BLOQUÉ(S)",
   "notification.pip.stranded_debris_label": "{count} HORS DE PORTÉE",
   "notification.pip.stranded_debris_tip": "{count} tâche(s) de débris hors de portée - construisez une rampe ou nivelez le terrain pour les évacuer, ou laissez-les",

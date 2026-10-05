@@ -15,7 +15,7 @@ import type { GameState, PendingAction, BlockedOrderReason } from '../state/Game
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { isLicensedForRole } from './VehicleReservation.js';
-import { isAutoDebrisAction } from '../economy/HaulDispatch.js';
+import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill } from '../entities/Employee.js';
 import {
   computeClimbReachableSetFromSources,
@@ -201,6 +201,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     emp => emp.alive && !emp.injured && emp.trainingState === null,
   );
   const judgements = judgeActions(state, targets);
+  const fragmentOf = createFragmentLookup(state);
   const ghostById = new Map(state.ghostPreviews.map(g => [g.id, g]));
   let flipped = false;
 
@@ -225,7 +226,7 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     if (reason === 'no_qualified_employee' && action.requiredVehicleRole === null) {
       unqualifiedIds.add(action.id);
     }
-    action.blockedReason = reason;
+    action.blockedReason = reason ?? haulBlockedReason(state, action, fragmentOf);
   }
   if (flipped) state.ghostPreviewsRevision++;
   return unqualifiedIds;

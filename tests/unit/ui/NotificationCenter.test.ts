@@ -7,6 +7,8 @@ import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -512,5 +514,116 @@ describe('NotificationCenter (redesign P1)', () => {
       );
       expect(message).not.toBe(noVehicleMessage);
     });
+  });
+});
+
+// ── #1369: freight warehouse / storage-full blocked haul orders ────────────
+describe('blocked haul orders: warehouse gating (#1369)', () => {
+  function makeHaulAction(id: number, reason: NonNullable<PendingAction['blockedReason']>): PendingAction {
+    return {
+      id, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: id, targetZ: 0, targetY: 0, payload: { fragmentId: id }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0, blockedReason: reason,
+    };
+  }
+  const blockedEntries = (c: NotificationCenter) => c.getLog().filter(e => e.title === t('notification.title.order_blocked'));
+  const locale = (name: string) => JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), 'src/core/i18n/locales', `${name}.json`), 'utf8'),
+  ) as Record<string, unknown>;
+
+  it('buildBlockedOrderMessage returns a translated message for no_freight_warehouse', () => {
+    const msg = buildBlockedOrderMessage(makeHaulAction(1, 'no_freight_warehouse'));
+    expect(msg).not.toContain('notification.order_blocked_no_warehouse');
+    expect(msg).not.toBe(t(ACTION_LABEL_KEY.haul_debris));
+    expect(msg).toBe(t('notification.order_blocked_no_warehouse', { order: t(ACTION_LABEL_KEY.haul_debris) }));
+  });
+
+  it('buildBlockedOrderMessage returns a translated message for storage_full', () => {
+    const msg = buildBlockedOrderMessage(makeHaulAction(1, 'storage_full'));
+    expect(msg).not.toContain('notification.order_blocked_storage_full');
+    expect(msg).not.toBe(t(ACTION_LABEL_KEY.haul_debris));
+    expect(msg).toBe(t('notification.order_blocked_storage_full', { order: t(ACTION_LABEL_KEY.haul_debris) }));
+  });
+
+  it('the two reasons read differently', () => {
+    expect(buildBlockedOrderMessage(makeHaulAction(1, 'no_freight_warehouse')))
+      .not.toBe(buildBlockedOrderMessage(makeHaulAction(1, 'storage_full')));
+  });
+
+  it.each(['notification.order_blocked_no_warehouse', 'notification.order_blocked_storage_full'])(
+    'en and fr both define %s with different text', (key) => {
+      const en = locale('en')[key];
+      const fr = locale('fr')[key];
+      expect(typeof en).toBe('string');
+      expect(typeof fr).toBe('string');
+      expect(fr).not.toBe(en);
+    });
+
+  it('raises one toast for N haul actions blocked by no_freight_warehouse', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 12; i++) state.pendingActions.push(makeHaulAction(i, 'no_freight_warehouse'));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('raises one toast for N haul actions blocked by storage_full', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 12; i++) state.pendingActions.push(makeHaulAction(i, 'storage_full'));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('raises one toast per distinct haul reason when both are present', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 4; i++) state.pendingActions.push(makeHaulAction(i, 'no_freight_warehouse'));
+    for (let i = 5; i <= 8; i++) state.pendingActions.push(makeHaulAction(i, 'storage_full'));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('does not re-toast on a second update with the same reason', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 3; i++) state.pendingActions.push(makeHaulAction(i, 'no_freight_warehouse'));
+    center.update(state);
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(1);
+  });
+
+  it('re-toasts when the shared reason changes (warehouse built, then storage fills)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const actions = [1, 2, 3].map(i => makeHaulAction(i, 'no_freight_warehouse'));
+    state.pendingActions.push(...actions);
+    center.update(state);
+    for (const a of actions) a.blockedReason = 'storage_full';
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('re-toasts when the reason clears and then reappears', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const actions = [1, 2, 3].map(i => makeHaulAction(i, 'storage_full'));
+    state.pendingActions.push(...actions);
+    center.update(state);
+    for (const a of actions) a.blockedReason = null;
+    center.update(state);
+    for (const a of actions) a.blockedReason = 'storage_full';
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('toasts once for the haul reason plus once per non-haul blocked action in the same update', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 5; i++) state.pendingActions.push(makeHaulAction(i, 'storage_full'));
+    state.pendingActions.push(makeHaulAction(6, 'no_vehicle_in_fleet'));
+    state.pendingActions.push(makeHaulAction(7, 'no_licensed_driver'));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(3);
   });
 });

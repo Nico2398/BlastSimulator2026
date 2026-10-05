@@ -330,6 +330,10 @@ export const PROPAGATION_ENERGY_EPSILON = 0.01;
  *  as fully consumed rather than left behind as a negligible remainder. */
 export const FRAGMENT_SPLIT_EPSILON_KG = 1e-6;
 
+/** Storage capacity (kg) of a fresh logistics state. Zero: capacity is whatever active
+ *  Freight Warehouses provide, so before the first one is built nothing can be stored (#1369). */
+export const INITIAL_STORAGE_CAPACITY_KG = 0;
+
 /** Fraction of the energy passing through a voxel that is lost to heat and noise
  *  rather than handed to its neighbours, as
  *  `BASE + POROSITY_SCALE × porosity`.

@@ -16,6 +16,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
+import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
 
@@ -85,6 +86,8 @@ export class NotificationCenter {
   private readonly warnedContracts = new Set<number>();
   /** PendingAction ids already warned about being blocked, keyed to the reason last warned (#1061), so a re-classification to a different reason re-toasts but the same one doesn't repeat every frame. */
   private readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
+  /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
+  private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
 
   /** Push a notification: it appears as a toast now and stays in the log. */
   notify(input: NotifyInput): void {
@@ -189,6 +192,20 @@ export class NotificationCenter {
     );
     const strandedCount = queuedBlocked.filter(a => a.blockedReason === 'debris_out_of_reach').length;
     const blockedActions = queuedBlocked.filter(a => a.blockedReason !== 'debris_out_of_reach');
+    // Hundreds of haul actions share one cause: toast once per reason, not per action.
+    const haulActions = new Map<BlockedOrderReason, PendingAction>();
+    for (const a of blockedActions) {
+      const r = a.blockedReason;
+      if (isHaulBlockedReason(r) && !haulActions.has(r)) haulActions.set(r, a);
+    }
+    for (const [reason, action] of haulActions) {
+      if (this.warnedHaulReasons.has(reason)) continue;
+      this.warnedHaulReasons.add(reason);
+      this.notify({ severity: 'warn', icon: 'warn', title: t('notification.title.order_blocked'), body: buildBlockedOrderMessage(action) });
+    }
+    for (const reason of this.warnedHaulReasons) {
+      if (!haulActions.has(reason)) this.warnedHaulReasons.delete(reason);
+    }
     // A ramp's layers are judged together (#1306), so one unreachable ramp
     // would otherwise toast once per layer: warn once per ramp instead.
     const siblingActionIds = new Map<number, readonly number[]>();
@@ -198,6 +215,7 @@ export class NotificationCenter {
     }
     for (const action of blockedActions) {
       const reason = action.blockedReason as BlockedOrderReason;
+      if (isHaulBlockedReason(reason)) continue;
       if (this.warnedBlockedOrders.get(action.id) === reason) continue;
       const alreadyWarnedForRamp = (siblingActionIds.get(action.id) ?? [])
         .some(id => this.warnedBlockedOrders.get(id) === reason);
@@ -261,6 +279,10 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
         : t('notification.order_blocked_no_staff', { order });
     case 'target_unreachable':
       return t('notification.order_blocked_target_unreachable', { order });
+    case 'no_freight_warehouse':
+      return t('notification.order_blocked_no_warehouse', { order });
+    case 'storage_full':
+      return t('notification.order_blocked_storage_full', { order });
     case 'debris_out_of_reach':
       // Unreachable from update(): stranded debris is surfaced as one summary pip, not a per-order toast. Kept for exhaustiveness.
       return t('notification.pip.stranded_debris_tip', { count: 1 });

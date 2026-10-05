@@ -426,7 +426,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1361: +2 keys (mining.charge.column_exceeds_hole, ui.blast_workshop.charge.too_much_for_hole), both locales: 3597.
     // #1368: +1 key (ui.contracts.deliver_failed), both locales: 3598.
     // #1368 review fixes: +5 keys total in latest commit, both locales: 3603 (merged with origin/main).
-    expect(Object.keys(en).length).toBe(3603);
+    // #1369: +2 keys (notification.order_blocked_no_warehouse, notification.order_blocked_storage_full), both locales: 3605.
+    expect(Object.keys(en).length).toBe(3605);
   });
 });
 

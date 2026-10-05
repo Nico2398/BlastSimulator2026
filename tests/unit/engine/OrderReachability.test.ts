@@ -27,6 +27,9 @@ vi.mock('../../../src/core/nav/NavGridReachability.js', async (importOriginal) =
 import { createGame, type GameState, type PendingAction, type ActionType } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
@@ -403,5 +406,110 @@ describe('cost does not grow with the number of actors (#1306)', () => {
     fills.count = 0;
     judgeQueuedOrders(state);
     expect(fills.count).toBe(before);
+  });
+});
+
+describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
+  function fragment(id: number, mass: number): FragmentData {
+    return {
+      id, position: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z }, volume: 0.3, mass, rockId: 'cruite',
+      oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, origin: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z },
+    };
+  }
+
+  /** A haul order with a licensed driver and a hauler both reachable, so only storage can block it. */
+  function stageHaul(mass = 400): { state: GameState; id: number } {
+    const state = makeState();
+    hire(state, IN_A, [ROLE_LICENCE_REQUIRED.debris_hauler]);
+    purchaseVehicle(state.vehicles, 'debris_hauler', IN_A.x + 1, IN_A.z);
+    addBlastFragments(state.logistics, [fragment(1, mass)]);
+    const id = queue(state, 'haul_debris', IN_A_TARGET, { requiredVehicleRole: 'debris_hauler', payload: { fragmentId: 1 } });
+    return { state, id };
+  }
+  const reasonOf = (state: GameState, id: number) => state.pendingActions.find(a => a.id === id)!.blockedReason ?? null;
+  const addWarehouse = (state: GameState) => {
+    const r = placeBuilding(state.buildings, 'freight_warehouse', 20, 8, 64, 64);
+    if (!r.success) throw new Error(r.error);
+  };
+
+  it('stamps no_freight_warehouse on a haul order when no warehouse exists', () => {
+    const { state, id } = stageHaul();
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBe('no_freight_warehouse');
+  });
+
+  it('clears the reason once a warehouse is built with room', () => {
+    const { state, id } = stageHaul();
+    classifyQueuedOrders(state);
+    addWarehouse(state);
+    state.logistics.storageCapacityKg = 5000;
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBeNull();
+  });
+
+  it('stamps storage_full when a warehouse exists but the fragment exceeds the room', () => {
+    const { state, id } = stageHaul(400);
+    addWarehouse(state);
+    state.logistics.storageCapacityKg = 1000;
+    state.logistics.storedMassKg = 800;
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBe('storage_full');
+  });
+
+  it('clears storage_full when room frees up', () => {
+    const { state, id } = stageHaul(400);
+    addWarehouse(state);
+    state.logistics.storageCapacityKg = 1000;
+    state.logistics.storedMassKg = 800;
+    classifyQueuedOrders(state);
+    state.logistics.storedMassKg = 0;
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBeNull();
+  });
+
+  it('no_vehicle_in_fleet wins over the warehouse reason', () => {
+    const state = makeState();
+    hire(state, IN_A, [ROLE_LICENCE_REQUIRED.debris_hauler]);
+    addBlastFragments(state.logistics, [fragment(1, 400)]);
+    const id = queue(state, 'haul_debris', IN_A_TARGET, { requiredVehicleRole: 'debris_hauler', payload: { fragmentId: 1 } });
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBe('no_vehicle_in_fleet');
+  });
+
+  it('no_licensed_driver wins over the warehouse reason', () => {
+    const state = makeState();
+    // A driller holds no truck licence (the 'driver' role is granted one at hire).
+    hireEmployee(state.employees, 'driller', new Random(42), IN_A.x, IN_A.z);
+    purchaseVehicle(state.vehicles, 'debris_hauler', IN_A.x + 1, IN_A.z);
+    addBlastFragments(state.logistics, [fragment(1, 400)]);
+    const id = queue(state, 'haul_debris', IN_A_TARGET, { requiredVehicleRole: 'debris_hauler', payload: { fragmentId: 1 } });
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBe('no_licensed_driver');
+  });
+
+  it('classifyNewOrder stamps the warehouse reason on a fresh haul order', () => {
+    const { state, id } = stageHaul();
+    state.pendingActions.find(a => a.id === id)!.blockedReason = null;
+    classifyNewOrder(state, id);
+    expect(reasonOf(state, id)).toBe('no_freight_warehouse');
+  });
+
+  it('never stamps warehouse reasons on fragment_debris', () => {
+    const state = makeState();
+    hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_fragmenter]);
+    purchaseVehicle(state.vehicles, 'rock_fragmenter', IN_A.x + 1, IN_A.z);
+    addBlastFragments(state.logistics, [fragment(1, 400)]);
+    const id = queue(state, 'fragment_debris', IN_A_TARGET, { requiredVehicleRole: 'rock_fragmenter', payload: { fragmentId: 1 } });
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBeNull();
+  });
+
+  it('never stamps warehouse reasons on non-haul orders', () => {
+    const state = makeState();
+    hire(state, IN_A);
+    const id = queue(state, 'survey', IN_A_TARGET);
+    classifyQueuedOrders(state);
+    expect(reasonOf(state, id)).toBeNull();
   });
 });

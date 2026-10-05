@@ -221,6 +221,15 @@ on-ground fragment not already covered (an oversized fragment queues `fragment_d
 A destination targeting a depot resolves through the building-approach-cell lookup
 (`gameplay-navmesh`), never the building's raw coordinates.
 
+Storage capacity is what active Freight Warehouses provide: `INITIAL_STORAGE_CAPACITY_KG` is 0, so
+before the first warehouse nothing can be stored. `OrderReachability.ts` classifies a queued
+`haul_debris` that reachability and availability leave unblocked through `haulBlockedReason`
+(`HaulDispatch.ts`): `no_freight_warehouse` when capacity is 0, `storage_full` when its on-ground
+fragment outweighs `storageRoomKg`. Oversized `fragment_debris` is never blocked this way. Both
+reasons clear on the next classification; `NotificationCenter` toasts each once while it persists
+(not per action), and again if the reason changes. Capacity is re-derived from the warehouses
+after any building mutation and on load.
+
 ## Traffic
 
 Vehicles cannot share a cell. A driver whose next drive step is occupied waits and retries, then

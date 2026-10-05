@@ -14,7 +14,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { placeBuilding, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import {
@@ -62,6 +62,7 @@ function makeIdleHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
 
 /** A debris_hauler with a licensed driver already boarded (driverId set, occupied, mounted). */
 function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
+  state.logistics.storageCapacityKg = 5000; // fresh state has no warehouse capacity (#1369)
   const vehicle = makeIdleHauler(state, x, z);
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
@@ -76,6 +77,7 @@ function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
 function placeWarehouse(state: ReturnType<typeof createGame>, x: number, z: number) {
   const result = placeBuilding(state.buildings, 'freight_warehouse', x, z, GRID, GRID);
   if (!result.success) throw new Error(`Setup: placeBuilding failed — ${result.error}`);
+  state.logistics.storageCapacityKg = getStorageCapacity(state.buildings);
   return result.building!;
 }
 
@@ -400,6 +402,7 @@ describe('findReachableGroundFragment — precondition failures', () => {
 describe('findReachableGroundFragment — selection', () => {
   it('picks the nearest fragment when every candidate is reachable', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -425,6 +428,7 @@ describe('findReachableGroundFragment — selection', () => {
       rows[z]![x] = 'void';
     }
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeNavGridFromTypes(rows);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -437,6 +441,7 @@ describe('findReachableGroundFragment — selection', () => {
 
   it('ignores fragments that are in_transit or stored, considering only on_ground ones', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -508,6 +513,7 @@ describe('requestHaulFragment — oversized fragment rejection (#484)', () => {
 describe('findReachableGroundFragment — oversized exclusion (#484)', () => {
   it('never returns an oversized fragment even when it is nearest and reachable, picking the next reachable non-oversized one instead', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     const oversizedNear = makeFragment(1, 2, 2); // nearest by distance

@@ -412,7 +412,9 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
 
   it('a vehicle mid-haul (to_depot, cargo already picked up) keeps its reservation and cargo intact instead of dropping it (#1091: isCommittedToOwnCargo carry-over)', () => {
     const state = createGame({ seed: EVACUATION_SEED });
+    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     state.navGrid = flatWalkableGrid(40);
+    state.logistics.storageCapacityKg = 5000;
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);

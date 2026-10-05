@@ -4,6 +4,8 @@
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
 import { SCORE_DECAY_RATE } from '../config/balance.js';
+import { syncLogisticsCapacity } from '../economy/Logistics.js';
+import { getStorageCapacity } from '../entities/Building.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 
 /**
@@ -792,5 +794,8 @@ export function deserialize(json: string): GameState {
   // runs while agentOccupancy is null.
   (obj as Record<string, unknown>)['agentOccupancy'] = null;
 
-  return obj as unknown as GameState;
+  const restored = obj as unknown as GameState;
+  // Capacity is derived from the warehouses, never trusted from the save (#1369).
+  syncLogisticsCapacity(restored.logistics, getStorageCapacity(restored.buildings));
+  return restored;
 }
