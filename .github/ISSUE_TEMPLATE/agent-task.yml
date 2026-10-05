@@ -57,8 +57,12 @@ body:
       description: >
         Every area the change will edit — not the areas it only reads, calls or
         tests through. Runs whose scopes do not overlap can work at the same
-        time, so every extra scope costs parallelism. engine: src/core/engine,
-        entities, state · nav: src/core/nav, src/core/mining · economy:
+        time, so every extra scope costs parallelism. engine: tick loop and
+        persistence (TickEventContext, GameLoop, src/core/state) — clashes with
+        every core area below · tasks: task dispatch and lifecycle · movement:
+        itineraries, locomotion, mounting · crew: employees, needs, shifts ·
+        site: buildings, vehicles, zones, damage · nav: src/core/nav,
+        src/core/mining · economy:
         src/core/economy, campaign, scores · world: src/core/world, weather,
         events · ui: all of src/ui or its shared base (UIManager, PanelBase, dom,
         styles, tokens) — clashes with every UI area below · hud: shell, notify,
@@ -74,6 +78,10 @@ body:
       multiple: true
       options:
         - scope:engine
+        - scope:tasks
+        - scope:movement
+        - scope:crew
+        - scope:site
         - scope:nav
         - scope:economy
         - scope:world
