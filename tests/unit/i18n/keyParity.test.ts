@@ -438,7 +438,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1417: +16 keys (duration units, notification pips/alerts, saveload summary), both locales: 3644
     // #1397: +11 keys (localized console refusals), both locales: 3655.
     // #1397 refactor: +3 keys (vehicle.mid_haul, employees.train_already_enrolled, employees.train_injured): 3658.
-    expect(Object.keys(en).length).toBe(3658);
+    // #1386: +1 key (notification.order_blocked_no_dual_employee), both locales: 3659 (merged with #1397).
+    expect(Object.keys(en).length).toBe(3659);
   });
 });
 

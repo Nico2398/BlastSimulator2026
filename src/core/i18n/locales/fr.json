@@ -3133,6 +3133,7 @@
   "notification.order_blocked_no_staff": "{order} n'a personne pour l'exécuter — le site n'a pas encore d'employés.",
   "notification.order_blocked_no_vehicle": "{order} nécessite un(e) {role} — aucun(e) dans le parc pour l'instant.",
   "notification.order_blocked_no_driver": "{order} nécessite un(e) {role} — personne n'est autorisé(e) à en conduire un(e).",
+  "notification.order_blocked_no_dual_employee": "{order} nécessite un seul employé ayant à la fois le permis {licence} et {skill}.",
   "notification.order_blocked_target_unreachable": "La cible de {order} est inaccessible — aucun chemin ne la relie au reste du site.",
   "notification.order_blocked_no_warehouse": "{order} nécessite un entrepôt de fret — construisez-en un pour stocker la roche transportée.",
   "notification.order_blocked_storage_full": "{order} ne peut pas continuer — le stockage est plein.",

@@ -252,6 +252,70 @@ describe('classifyQueuedOrders (#1306)', () => {
     expect(state.pendingActions.find(a => a.id === id)!.blockedReason).toBe('no_vehicle_in_fleet');
   });
 
+  describe('availability reasons for a vehicle-gated drill_hole order (#1386)', () => {
+    const DRILL = { requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig' } as const;
+    const licence = ROLE_LICENCE_REQUIRED.drill_rig;
+    const reasonOf = (state: GameState, id: number) => state.pendingActions.find(a => a.id === id)!.blockedReason;
+
+    it('stamps no_dual_qualified_employee when skill and licence sit on different employees, without a modal', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting']);
+      hire(state, IN_A, [licence]);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, DRILL);
+      const { unqualifiedIds } = classifyQueuedOrders(state);
+      expect(reasonOf(state, id)).toBe('no_dual_qualified_employee');
+      expect(unqualifiedIds.has(id)).toBe(false);
+    });
+
+    it('keeps no_qualified_employee when licensed drivers exist but nobody holds the skill', () => {
+      const state = makeState();
+      hire(state, IN_A, [licence]);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, DRILL);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state, id)).toBe('no_qualified_employee');
+    });
+
+    it('keeps no_licensed_driver when a skill holder exists but nobody is licensed', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting']);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, DRILL);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state, id)).toBe('no_licensed_driver');
+    });
+
+    it('keeps no_vehicle_in_fleet when no drill_rig is owned, even with a split skill and licence', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting']);
+      hire(state, IN_A, [licence]);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, DRILL);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state, id)).toBe('no_vehicle_in_fleet');
+    });
+
+    it('is no_qualified_employee, not the dual reason, when the only skill holder is ineligible (injured)', () => {
+      const state = makeState();
+      const holder = hire(state, IN_A, ['blasting']);
+      hire(state, IN_A, [licence]);
+      holder.injured = true;
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, DRILL);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state, id)).toBe('no_qualified_employee');
+    });
+
+    it('leaves the order unblocked when one eligible employee holds both', () => {
+      const state = makeState();
+      hire(state, IN_A, ['blasting', licence]);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+      const id = queue(state, 'drill_hole', IN_A_TARGET, DRILL);
+      classifyQueuedOrders(state);
+      expect(reasonOf(state, id) ?? null).toBeNull();
+    });
+  });
+
   it('stamps target_unreachable on a stranded order whose actors exist, and clears it once reachable', () => {
     const state = makeState();
     hire(state, IN_A);
