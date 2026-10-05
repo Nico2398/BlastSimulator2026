@@ -430,7 +430,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1408: +1 key (ui.finances.category.smuggling), both locales: 3606.
     // #1380: +2 keys (unqualified-task res0_alt, res1_alt), both locales: 3608 (merged with origin/main).
     // #1422: +3 keys (ui.crew.locate, ui.fleet.locate, ui.survey.locate), both locales: 3611 (merged with #1380).
-    expect(Object.keys(en).length).toBe(3611);
+    // #1416: +4 keys (score pill tooltips), both locales: 3615
+    expect(Object.keys(en).length).toBe(3615);
   });
 });
 
