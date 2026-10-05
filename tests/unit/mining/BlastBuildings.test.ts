@@ -544,7 +544,7 @@ describe('blast command — secondary blast from a stocked warehouse (#1394)', (
     expect(sec![0]!.explosivesKg).toBe(150);
     expect(sec![0]!.radiusM).toBeGreaterThan(0);
     // Localized line key, params kg / id / casualties.
-    expect(result.output).toContain('mining.blast.secondary_blast');
+    expect(result.output).toContain('Secondary blast: 150 kg of stored explosives detonated');
   });
 
   it('adds no secondary blast when the warehouse is empty', () => {
@@ -553,7 +553,7 @@ describe('blast command — secondary blast from a stocked warehouse (#1394)', (
 
     expect(state.lastBlastReport!.destroyedBuildings.some(b => b.buildingId === wh.id)).toBe(true);
     expect(state.lastBlastReport!.secondaryBlasts ?? []).toEqual([]);
-    expect(result.output).not.toContain('mining.blast.secondary_blast');
+    expect(result.output).not.toContain('Secondary blast');
   });
 });
 
@@ -570,7 +570,8 @@ describe('build destroy — stocked explosive warehouse (#1394)', () => {
     const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
 
     expect(result.success).toBe(true);
-    expect(result.output).toContain('entities.build_destroy_lost_explosives');
+    expect(result.output).toContain('80 kg of stored explosives were lost');
+    expect(result.output).toContain('no detonation');
     expect(state.buildings.buildings.some(b => b.id === wh.id)).toBe(false);
     expect(state.damage.accidents.length).toBe(accidentsBefore);
     expect(state.lastBlastReport?.secondaryBlasts ?? []).toEqual([]);
@@ -584,7 +585,7 @@ describe('build destroy — stocked explosive warehouse (#1394)', () => {
     state.cash = 1_000_000;
     const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toContain('entities.build_destroy_lost_explosives');
+    expect(result.output).not.toContain('stored explosives were lost');
   });
 });
 
