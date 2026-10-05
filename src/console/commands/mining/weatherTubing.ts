@@ -5,13 +5,12 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, requireGameWithSub, resolveHoleId } from './shared.js';
 import {
-  createWeatherCycle,
   forceAdvance,
   setWeather,
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../../core/weather/WeatherCycle.js';
-import { Random } from '../../../core/math/Random.js';
+import { resetWeatherForNewGame } from '../world.js';
 import { buyTubing, installTubing } from '../../../core/mining/Tubing.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 
@@ -23,14 +22,12 @@ export function weatherCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  if (!ctx.weatherCycle) {
-    ctx.weatherCycle = createWeatherCycle(ctx.state!.seed);
-    ctx.rng = new Random(ctx.state!.seed + 1000);
-  }
+  if (!ctx.weatherCycle) resetWeatherForNewGame(ctx, ctx.state!.seed);
+  const weather = ctx.weatherCycle!;
 
   if (args[0] === 'advance') {
-    forceAdvance(ctx.weatherCycle, ctx.rng!);
-    return { success: true, output: `Weather: ${ctx.weatherCycle.current}` };
+    forceAdvance(weather, ctx.rng!);
+    return { success: true, output: `Weather: ${weather.current}` };
   }
 
   if (args[0] === 'set') {
@@ -41,11 +38,11 @@ export function weatherCommand(
         output: t('mining.weather.set_usage', { valid: ALL_WEATHER_STATES.join(', ') }),
       };
     }
-    setWeather(ctx.weatherCycle, target);
-    return { success: true, output: `Weather: ${ctx.weatherCycle.current}` };
+    setWeather(weather, target);
+    return { success: true, output: `Weather: ${weather.current}` };
   }
 
-  return { success: true, output: `Current weather: ${ctx.weatherCycle.current}` };
+  return { success: true, output: `Current weather: ${weather.current}` };
 }
 
 export function tubingCommand(

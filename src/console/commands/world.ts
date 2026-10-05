@@ -15,13 +15,12 @@ import { getRock } from '../../core/world/RockCatalog.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } from '../../core/world/VoxelGrid.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
-import { createWeatherCycle } from '../../core/weather/WeatherCycle.js';
+import { createWeatherCycle, type WeatherCycleState } from '../../core/weather/WeatherCycle.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
-import type { WeatherCycleState } from '../../core/weather/WeatherCycle.js';
 import { Random } from '../../core/math/Random.js';
 import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
