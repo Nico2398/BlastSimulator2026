@@ -49,7 +49,7 @@ describe('deserialize — v4→v5 migration for collectedOre (task 5.18)', () =>
       chargesByHole: {},
       sequenceDelays: {},
       savedPlans: {},
-      finances: { cash: 10000, revenue: 0, expenses: 0, transactions: [], isBankrupt: false, bankruptcyGraceTicks: 0 },
+      finances: { cash: 10000, revenue: 0, expenses: 0, transactions: [], bankruptcyGraceTicks: 0 },
       contracts: { available: [], active: [], completedHistory: [], nextId: 1, lastRefreshTick: 0 },
       logistics: { fragments: [], storageCapacityKg: 5000, storedMassKg: 0 },
       buildings: { buildings: [] },

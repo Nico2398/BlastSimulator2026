@@ -3103,7 +3103,7 @@
   "shell.placement.camera_hint": "glisser-droit oriente · Échap annule",
   "menu.subtitle": "creuser  ·  faire sauter  ·  encaisser",
   "ui.minimap.no_data": "Aucune donnée cartographique",
-  "notification.bankruptcy_triggered": "FAILLITE ! Trésorerie : ${cash}. Niveau échoué.",
+  "notification.bankruptcy_triggered": "FAILLITE ! Trésorerie : {cash}. Niveau échoué.",
   "notification.bankruptcy_warning": "Fonds au plus bas ! Faillite dans {ticksRemaining} ticks.",
   "notification.ecology_shutdown": "FERMETURE ÉCOLOGIQUE ! Le gouvernement a fermé la mine. Niveau échoué.",
   "notification.ecology_warning": "Infraction écologique ! Fermeture dans {ticksRemaining} ticks.",

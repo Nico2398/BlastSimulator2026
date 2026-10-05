@@ -22,7 +22,6 @@ export interface Transaction {
 export interface FinanceState {
   cash: number;
   transactions: Transaction[];
-  isBankrupt: boolean;
 }
 
 /** Create finance state from initial cash. */
@@ -30,7 +29,6 @@ export function createFinanceState(initialCash: number): FinanceState {
   return {
     cash: initialCash,
     transactions: [],
-    isBankrupt: false,
   };
 }
 
@@ -49,7 +47,7 @@ export function addIncome(
   state.transactions.push({ tick, amount, type: 'income', category, description });
 }
 
-/** Add expense. Deducts from balance. Triggers bankruptcy if cash < 0. */
+/** Add expense. Deducts from balance. Bankruptcy is tracked by `state.bankruptcy` (Bankruptcy.ts), not here. */
 export function addExpense(
   state: FinanceState,
   amount: number,
@@ -60,9 +58,6 @@ export function addExpense(
   if (amount <= 0) return;
   state.cash -= amount;
   state.transactions.push({ tick, amount, type: 'expense', category, description });
-  if (state.cash < 0) {
-    state.isBankrupt = true;
-  }
 }
 
 /** Get current balance. */

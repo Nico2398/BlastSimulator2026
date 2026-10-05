@@ -27,6 +27,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getFinancialReport, type CategoryTotal } from '../../core/economy/Finance.js';
 import { formatBalance, netPerTick } from '../shell/TopBar.js';
 import type { GameState } from '../../core/state/GameState.js';
+import { BANKRUPTCY_GRACE_TICKS } from '../../core/campaign/Bankruptcy.js';
 
 const RECENT_TRANSACTIONS = 15;
 
@@ -113,7 +114,7 @@ export class FinancesPanel extends PanelBase {
     if (state.bankruptcy.bankrupt) {
       children.push(this.makeBankruptcyBanner(t('campaign.bankrupt'), true));
     } else if (state.bankruptcy.ticksBelowThreshold > 0) {
-      const ticksRemaining = Math.max(0, 100 - state.bankruptcy.ticksBelowThreshold);
+      const ticksRemaining = Math.max(0, BANKRUPTCY_GRACE_TICKS - state.bankruptcy.ticksBelowThreshold);
       children.push(this.makeBankruptcyBanner(t('notification.bankruptcy_warning', { ticksRemaining }), false));
     }
 

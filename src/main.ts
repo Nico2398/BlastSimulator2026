@@ -43,6 +43,7 @@ import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { buildDemolishConfirm } from './ui/demolishConfirm.js';
 import { SelectionBar } from './ui/shell/SelectionBar.js';
+import { formatBalance } from './ui/shell/TopBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
 import { ParamStrip } from './ui/scene/ParamStrip.js';
@@ -431,7 +432,7 @@ const { runner, ctx, emitter } = createRunner();
 
 // --- Subscribe to game-over emitter events for UI notifications ---
 emitter.on('bankruptcy:triggered', ({ cash }) => {
-  uiManager.notify({ severity: 'critical', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_triggered', { cash: Math.floor(cash) }) });
+  uiManager.notify({ severity: 'critical', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_triggered', { cash: formatBalance(cash) }) });
 });
 emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
   uiManager.notify({ severity: 'warn', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_warning', { ticksRemaining }) });

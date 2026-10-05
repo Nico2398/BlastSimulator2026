@@ -712,3 +712,15 @@ describe('menu.level_locked — reworked {threshold}/{level} interpolation', () 
     expect(result).not.toMatch(/\bon\b/);
   });
 });
+
+describe('notification.bankruptcy_triggered — pre-formatted {cash} (#1376)', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: renders a negative formatted balance without "$-" or "\${"`, () => {
+      setLocale(locale);
+      const result = t('notification.bankruptcy_triggered', { cash: '-$25,832' });
+      expect(result).toContain('-$25,832');
+      expect(result).not.toContain('$-');
+      expect(result).not.toContain('${');
+    });
+  }
+});

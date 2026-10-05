@@ -59,7 +59,6 @@ function snapshot(ctx: MiningContext): Record<string, unknown> {
     cash: s.cash,
     ledgerCash: s.finances.cash,
     transactions: s.finances.transactions.length,
-    isBankrupt: s.finances.isBankrupt,
     employees: s.employees.employees.length,
     employeeNextId: s.employees.nextId,
     vehicles: s.vehicles.vehicles.length,

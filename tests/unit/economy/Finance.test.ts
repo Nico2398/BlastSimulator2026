@@ -47,12 +47,11 @@ describe('Finance system', () => {
     expect(salaryTotal?.total).toBe(200);
   });
 
-  it('balance going below 0 triggers bankruptcy flag', () => {
+  it('overdraft makes cash negative and the ledger carries no bankruptcy flag', () => {
     const state = createFinanceState(100);
-    expect(state.isBankrupt).toBe(false);
     addExpense(state, 200, 'fines', 'Massive fine', 1);
     expect(getBalance(state)).toBe(-100);
-    expect(state.isBankrupt).toBe(true);
+    expect('isBankrupt' in state).toBe(false);
   });
 
   it('financial report respects period filter', () => {
