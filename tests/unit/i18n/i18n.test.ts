@@ -707,7 +707,7 @@ describe('#1417 new notification / duration / saveload keys', () => {
       const fr = t(key);
       expect(en).not.toBe(key);
       expect(fr).not.toBe(key);
-      if (!key.startsWith('time.duration.') && key !== 'notification.pip.cash_label' && key !== 'notification.pip.contract_label') expect(fr).not.toBe(en);
+      if (!key.startsWith('time.duration.') && key !== 'notification.pip.contract_label') expect(fr).not.toBe(en);
     });
   }
 

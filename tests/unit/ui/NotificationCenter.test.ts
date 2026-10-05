@@ -7,8 +7,9 @@ import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 import { formatGameDuration } from '../../../src/ui/formatGameDuration.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { WELL_BEING_ALERT_THRESHOLD, REVOLT_TICKS } from '../../../src/core/config/balance.js';
+import { WELL_BEING_ALERT_THRESHOLD, REVOLT_TICKS, BANKRUPTCY_THRESHOLD } from '../../../src/core/config/balance.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -218,7 +219,7 @@ describe('NotificationCenter (redesign P1)', () => {
       const center = new NotificationCenter();
       const state = makeState();
       state.employees.employees.push({
-        id: 1, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
+        id: 900, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
         injured: false, alive: true, x: 0, z: 0, qualifications: [], trainingState: null,
         activeActionId: null, fatigue: 50, collapsing: true,
         interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
@@ -732,7 +733,7 @@ describe('NotificationCenter localization (#1417)', () => {
     state.scores.ecology = 10;
     state.cash = 100;
     state.employees.employees.push({
-      id: 1, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
+      id: 900, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
       injured: false, alive: true, x: 0, z: 0, qualifications: [], trainingState: null,
       activeActionId: null, fatigue: 50, collapsing: true,
       interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
@@ -757,7 +758,7 @@ describe('NotificationCenter localization (#1417)', () => {
     setLocale('fr');
     const center = new NotificationCenter();
     const pips = center.update(stressedState());
-    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'contract']) {
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
       expect(pips.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
     }
     const text = allText(pips);
@@ -771,6 +772,9 @@ describe('NotificationCenter localization (#1417)', () => {
     setLocale('fr');
     const fr = new NotificationCenter().update(state);
     expect(fr.length).toBe(en.length);
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
+      expect(en.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
+    }
     for (const e of en.filter(p => ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract'].includes(p.kind))) {
       const f = fr.find(p => p.kind === e.kind)!;
       expect(f.tip, `${e.kind} tip`).not.toBe(e.tip);
@@ -783,6 +787,7 @@ describe('NotificationCenter localization (#1417)', () => {
     state.cash = 100;
     const pip = new NotificationCenter().update(state).find(p => p.kind === 'bankruptcy')!;
     expect(pip.tip).not.toMatch(/Balance|bankruptcy/i);
+    expect(pip.tip).toContain(formatMoney(BANKRUPTCY_THRESHOLD));
     expect(pip.tip.length).toBeGreaterThan(10);
     expect(pip.tip).not.toMatch(/^notification\./);
   });

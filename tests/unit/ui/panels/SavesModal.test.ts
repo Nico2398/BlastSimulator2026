@@ -1238,15 +1238,34 @@ describe('SavesModal', () => {
       modal.dispose();
     });
 
-    it('saved slot names follow the active locale after switching back to en', async () => {
+    it('saved slot names follow the active locale after switching fr and back to en', async () => {
       const backend = makeBackend();
       await backend.save('slot_3', 'Créneau 3', '{}', 'x', null);
       const { container, modal } = mount();
       modal.setBackend(backend);
       modal.show();
       await flush();
+      setLocale('fr');
+      modal.refreshLocale();
+      await flush();
+      expect(container.textContent).toContain(t('saveload.slot_name', { n: 3 }));
+      setLocale('en');
+      modal.refreshLocale();
+      await flush();
       expect(container.textContent).toContain('Slot 3');
       expect(container.textContent).not.toContain('Créneau 3');
+      modal.dispose();
+    });
+
+    it('the quick-save summary is localized like a manual one', async () => {
+      const backend = makeBackend();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      state.cash = 12345;
+      const { modal } = mount();
+      modal.setBackend(backend);
+      modal.setGetState(() => state);
+      await modal.quickSave();
+      expect(backend.store.get('auto')!.meta.campaignSummary).toBe('$12,345 — Day 1');
       modal.dispose();
     });
   });

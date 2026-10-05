@@ -39,6 +39,18 @@ export function relativeTime(timestampMs: number): string {
   return t('ui.saves.ago_days', { n: Math.floor(hours / 24) });
 }
 
+/** Number of a manual slot id ("slot_3" -> "3"), or null for the auto slot and unknown ids. */
+function slotNumber(slotId: string): string | null {
+  return /^slot_(\d+)$/.exec(slotId)?.[1] ?? null;
+}
+
+/** Localized slot name derived from the id; `fallback` is returned for ids with no known name. */
+function slotName(slotId: string, fallback: string): string {
+  if (slotId === AUTO_SAVE_SLOT) return t('saveload.auto_name');
+  const n = slotNumber(slotId);
+  return n === null ? fallback : t('saveload.slot_name', { n });
+}
+
 type ConfirmKind = 'overwrite' | 'delete' | 'load';
 // Keys stay literal so check:i18n sees them.
 const CONFIRM_TEXT: Record<ConfirmKind, { titleKey: string; bodyKey: string; labelKey: string }> = {
@@ -261,9 +273,7 @@ export class SavesModal {
 
   /** Name derived from the slot id at render time so it follows the active locale; the stored name is only a fallback for unknown ids. */
   private slotDisplayName(slotId: string, meta: SaveMeta): string {
-    if (slotId === AUTO_SAVE_SLOT) return t('saveload.auto_name');
-    const match = /^slot_(\d+)$/.exec(slotId);
-    return match ? t('saveload.slot_name', { n: match[1]! }) : meta.name;
+    return slotName(slotId, meta.name);
   }
 
   private slotCard(slotId: string, meta: SaveMeta | null): HTMLElement {
@@ -281,7 +291,7 @@ export class SavesModal {
       // copy and no button, rather than falling into the SAVE HERE branch
       // below with a nonsense "Slot auto — empty" label.
       const label = el('span', {
-        text: isAuto ? t('ui.saves.auto_empty') : t('ui.saves.slot_empty', { n: slotId.replace('slot_', '') }),
+        text: isAuto ? t('ui.saves.auto_empty') : t('ui.saves.slot_empty', { n: slotNumber(slotId) ?? slotId }),
         attrs: { style: 'flex:1;font:400 12px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
       });
       card.append(thumb, label);
@@ -370,8 +380,7 @@ export class SavesModal {
     try {
       const data = serialize(state);
       const summary = this.summaryOf(state);
-      const slotNum = slotId.replace('slot_', '');
-      await this.backend.save(slotId, t('saveload.slot_name', { n: slotNum }), data, summary, state.campaign.activeLevelId);
+      await this.backend.save(slotId, slotName(slotId, slotId), data, summary, state.campaign.activeLevelId);
       this.setStatus(t(this.sessionOnly ? 'saveload.saved_session_only' : 'saveload.saved'));
       await this.refreshSlotList();
       this.hide();
