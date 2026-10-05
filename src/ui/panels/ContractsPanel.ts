@@ -49,7 +49,14 @@ const NEGOTIATE_KEY: Record<NegotiationField, { improved: string; worsened: stri
   penalty: { improved: 'ui.contracts.negotiate.penalty_improved', worsened: 'ui.contracts.negotiate.penalty_worsened' },
 };
 
+/** Largest deliverable amount (kg, 0.1 kg steps) that never exceeds `maxDeliverableKg`. */
+export function deliverableAmountKg(_maxDeliverableKg: number): number {
+  // TODO: implement
+  return 0;
+}
+
 export class ContractsPanel extends PanelBase {
+  private statusEl?: HTMLElement;
   private readonly bodyEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
   private onNavigateCb?: (panel: 'ops') => void;
@@ -96,6 +103,10 @@ export class ContractsPanel extends PanelBase {
     this.lastSignature = '';
   }
 
+
+  private setStatus(_msg: string): void {
+    // TODO: implement
+  }
 
   private render(state: GameState): void {
     const sections: HTMLElement[] = [
