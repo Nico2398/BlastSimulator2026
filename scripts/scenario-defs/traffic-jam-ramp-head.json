@@ -3,11 +3,12 @@
   "description": "#1208: traffic jams are detected by position at chokepoints, not by shared destination. Dig a ramp, send a crew member on foot to one tile in its body, then send four crewed vehicles to the same tile; once they stall a queue raises the traffic_jam event (trafficJamCount 1, kind ramp_head, rampId 1), and the player answers it by clicking Widen ramp in the event dialog, which orders the widening exactly once. Contract for console-api state (implementer adds): trafficJamCount, trafficJams [{kind, rampId}]. A queue of walkers alone raises the event too; that case is unit-tested (TrafficJams.test.ts), because a walker may step past a vehicle (#1263), so a crew sent after the haulers squeezes by rather than queuing.",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 staffed:true cash:100000",
+      "description": "#1413-followup: cash:100000 so a costly random event answered at the earlier no-op event steps (follow-up events are now queue-only, which shifts which random event lands) cannot leave the mine unable to afford the Widen ramp answer later.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 staffed:true cash:100000"
         }
       ],
       "role": "setup",

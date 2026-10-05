@@ -1414,14 +1414,15 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 16.377499999999984,
+          "wellBeing": 14.497499999999985,
           "safety": 50,
-          "ecology": 46.40626354005784,
+          "ecology": 52.78626354005778,
           "nuisance": 41.015658850144604
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50. ecology re-measured 46.41 -> 52.79 (union_eco_committee option 0: +8 ecology)."
       }
     },
     {
@@ -1440,14 +1441,15 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 16.377499999999984,
+          "wellBeing": 14.497499999999985,
           "safety": 50,
-          "ecology": 46.40626354005784,
+          "ecology": 52.78626354005778,
           "nuisance": 41.015658850144604
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50."
       }
     },
     {
@@ -2605,7 +2607,7 @@
           "surveyCount": 2,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "ecology": 60.77758124034693
+          "ecology": 50.197581240346715
         }
       }
     },
@@ -2682,8 +2684,8 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 60.77758124034693,
-          "nuisance": 40.30829425072332
+          "ecology": 50.197581240346715,
+          "nuisance": 36.24829425072332
         }
       }
     },
@@ -2705,8 +2707,8 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 60.77758124034693,
-          "nuisance": 40.30829425072332
+          "ecology": 50.197581240346715,
+          "nuisance": 36.24829425072332
         }
       }
     },
@@ -2728,14 +2730,15 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 60.77758124034693,
-          "nuisance": 40.30829425072332,
+          "ecology": 50.197581240346715,
+          "nuisance": 36.24829425072332,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "holeCount": 25,
           "orderedHoleCount": 0
-        }
+        },
+        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; safety re-measured 10.52 -> 0 (no safety-granting event lands; the post-death floor is not lifted)."
       }
     }
   ]

@@ -65,6 +65,8 @@ export interface EventDef {
   weightCoeff: (scores: ScoreState) => number;
   /** Prerequisite check. Returns true if event can fire. */
   canFire: (ctx: EventContext) => boolean;
+  /** When true, category timers never pick this event; it fires only when queued as a follow-up. */
+  followUpOnly?: boolean;
 }
 
 /** Context passed to prerequisite checks. */

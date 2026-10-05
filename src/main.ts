@@ -41,6 +41,7 @@ import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePickin
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
+import { buildDemolishConfirm } from './ui/demolishConfirm.js';
 import { SelectionBar } from './ui/shell/SelectionBar.js';
 import { EntityHighlight } from './renderer/EntityHighlight.js';
 import { PlacementController } from './ui/scene/PlacementController.js';
@@ -1116,10 +1117,15 @@ selectionBar.setActionHandler((action, entity) => {
       if (next !== null) reportIfFailed(t('shell.selection.widen'), window.__gameConsole(`widen_ramp id:${entity.id} width:${next}`));
       break;
     }
-    case 'demolish':
-      reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
-      scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
+    case 'demolish': {
+      const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
+      if (!placedBuilding) break;
+      uiManager.showConfirm(buildDemolishConfirm(placedBuilding, () => {
+        reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
+        scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
+      }));
       break;
+    }
   }
 });
 

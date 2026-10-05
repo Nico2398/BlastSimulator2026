@@ -552,6 +552,7 @@ export function deserialize(json: string): GameState {
   ensureField(eventsRaw, 'firedEventIds', Array.isArray, []);
   ensureField(eventsRaw, 'lastEventTick', v => typeof v === 'number', 0);
   ensureField(eventsRaw, 'actionCountSinceEvent', v => typeof v === 'number', 0);
+  ensureField(eventsRaw, 'followUpDelayTicks', v => typeof v === 'number', 0);
   ensureField(eventsRaw, 'cooldownMinIntervalTicks', v => typeof v === 'number', null);
 
   // #1083: VehicleState gained a `driverBoardingCount` lifetime counter. A

@@ -418,8 +418,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1421: worker_revolt tip key replaced by 3 cause keys (net +2): 3582.
     // #1351: +1 key (mining.tubing.install_usage), both locales: 3583.
     // #1396: +1 key (shell.placement.refused_occupied), both locales: 3584.
-    // #1357: +1 key (mining.charge.explosive_not_available), both locales: 3585.
-    expect(Object.keys(en).length).toBe(3585);
+    // #1399: +3 keys (demolish confirm title/body/loses_explosives), both locales: 3587.
+    // #1357: +1 key (mining.charge.explosive_not_available), both locales: 3588.
+    expect(Object.keys(en).length).toBe(3588);
   });
 });
 
