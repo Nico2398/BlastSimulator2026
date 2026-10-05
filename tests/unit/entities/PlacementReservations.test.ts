@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   terrainReservations,
   reservationBlocking,
-  RESERVATION_ERROR_KEY,
+  RESERVATION_REFUSAL,
   type TerrainReservation,
 } from '../../../src/core/entities/PlacementReservations.js';
 
@@ -15,10 +15,15 @@ function stateWith(over: Record<string, unknown> = {}) {
   return { builtRamps: [], plannedRamps: [], drillHoles: [], plannedDrillHoles: [], ...over } as any;
 }
 
-describe('RESERVATION_ERROR_KEY', () => {
+describe('RESERVATION_REFUSAL', () => {
   it('maps each kind to its shell.placement key', () => {
-    expect(RESERVATION_ERROR_KEY.ramp).toBe('shell.placement.refused_ramp');
-    expect(RESERVATION_ERROR_KEY.hole).toBe('shell.placement.refused_hole');
+    expect(RESERVATION_REFUSAL.ramp.errorKey).toBe('shell.placement.refused_ramp');
+    expect(RESERVATION_REFUSAL.hole.errorKey).toBe('shell.placement.refused_hole');
+  });
+
+  it('carries the English fallback beside each key', () => {
+    expect(RESERVATION_REFUSAL.ramp.error).toBe('Blocks a ramp');
+    expect(RESERVATION_REFUSAL.hole.error).toBe('Blocks a drill hole');
   });
 });
 
@@ -43,6 +48,11 @@ describe('terrainReservations (#1390)', () => {
 
   it('covers a drilled hole as a 1x1 cell', () => {
     const r = terrainReservations(stateWith({ drillHoles: [{ id: 'H1', x: 20, z: 40, depth: 8, diameter: 0.1 }] }));
+    expect(r).toEqual([hole(20, 40)]);
+  });
+
+  it('floors fractional hole coordinates to the containing cell', () => {
+    const r = terrainReservations(stateWith({ drillHoles: [{ id: 'H1', x: 20.9, z: 40.2, depth: 8, diameter: 0.1 }] }));
     expect(r).toEqual([hole(20, 40)]);
   });
 

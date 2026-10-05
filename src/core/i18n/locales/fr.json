@@ -3382,7 +3382,7 @@
   "shell.placement.outside_region": "Hors de la zone indiquée — cliquez à l’intérieur du contour bleu.",
   "shell.placement.pick_first": "Cliquez d’abord sur la zone indiquée dans la scène.",
   "shell.placement.refused_occupied": "Emplacement occupé — un bâtiment ou un chantier couvre une partie de cet endroit.",
-  "shell.placement.refused_ramp": "Bloque une rampe — l'accès à la fosse serait coupé.",
+  "shell.placement.refused_ramp": "Bloque une rampe — l’accès à la fosse serait coupé.",
   "shell.placement.refused_hole": "Bloque un trou de forage — un trou est foré ou commandé à cet endroit.",
   "shell.placement.refused_protected_ground": "Terrain protégé — un village, une rivière ou un site remarquable s’y trouve.",
   "shell.placement.refused_uneven_ground": "Pente trop forte — le terrain couvert par le bâtiment ne peut varier que de {max} niveau(x) au maximum.",

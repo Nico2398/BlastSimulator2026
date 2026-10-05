@@ -24,7 +24,7 @@ import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zo
 import { evacuateZone } from '../../core/engine/Evacuation.js';
 import { releaseOccupantsOfRemovedBuildings } from '../../core/engine/Mount.js';
 
-import { requireGame, noEmployeesMessage } from './commandUtils.js';
+import { requireGame, noEmployeesMessage, placementRefusalText } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import {
   makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity,
@@ -132,8 +132,7 @@ export function buildCommand(
         terrainReservations(state),
       );
       if (!upgradeCheck.valid) {
-        const reason = upgradeCheck.errorKey ? t(upgradeCheck.errorKey) : upgradeCheck.error!;
-        return { success: false, output: t('entities.build_upgrade_failed', { error: reason }) };
+        return { success: false, output: t('entities.build_upgrade_failed', { error: placementRefusalText(upgradeCheck) }) };
       }
 
       destroyBuilding(state.buildings, id);
@@ -211,7 +210,7 @@ export function buildCommand(
         moveBounds.width, moveBounds.depth, moveBounds.originX, moveBounds.originZ,
         plannedOccupants, ctx.grid ?? undefined, terrainReservations(state),
       );
-      if (!result.success) return { success: false, output: result.errorKey ? t(result.errorKey) : result.error! };
+      if (!result.success) return { success: false, output: placementRefusalText(result) };
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
       refreshLogisticsCapacity(state);

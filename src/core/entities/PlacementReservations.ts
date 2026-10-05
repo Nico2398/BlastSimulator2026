@@ -16,10 +16,10 @@ export interface TerrainReservation {
   maxZ: number;
 }
 
-/** Translation key for the refusal message of each reservation kind. */
-export const RESERVATION_ERROR_KEY: Record<ReservationKind, string> = {
-  ramp: 'shell.placement.refused_ramp',
-  hole: 'shell.placement.refused_hole',
+/** Refusal of each reservation kind: the translation key, and the English fallback for core callers that do not translate. */
+export const RESERVATION_REFUSAL: Record<ReservationKind, { errorKey: string; error: string }> = {
+  ramp: { errorKey: 'shell.placement.refused_ramp', error: 'Blocks a ramp' },
+  hole: { errorKey: 'shell.placement.refused_hole', error: 'Blocks a drill hole' },
 };
 
 /** Reservations from built/planned ramps and drilled/planned drill holes. Tolerates arrays missing from old saves. */

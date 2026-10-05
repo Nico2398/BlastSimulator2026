@@ -17,6 +17,11 @@ export function staffedSuffix(staffed: boolean): string {
   return staffed ? t('console.staffed_suffix') : '';
 }
 
+/** Player-facing text of a refused placement: the translated `errorKey` when core supplied one, else its plain `error`. */
+export function placementRefusalText(refusal: { error?: string; errorKey?: string }): string {
+  return refusal.errorKey ? t(refusal.errorKey) : refusal.error!;
+}
+
 /** Guard every command that needs a loaded game. */
 export function requireGame(ctx: GameContext): CommandResult | null {
   if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };

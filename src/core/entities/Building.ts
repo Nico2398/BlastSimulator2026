@@ -6,7 +6,7 @@
 
 import type { Rect } from '../world/WorldGen.js';
 import { BUILDING_DEFS } from './BuildingDefs.js';
-import { RESERVATION_ERROR_KEY, reservationBlocking, type TerrainReservation } from './PlacementReservations.js';
+import { RESERVATION_REFUSAL, reservationBlocking, type TerrainReservation } from './PlacementReservations.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
@@ -540,11 +540,7 @@ export function checkFootprintPlacement(
   if (reservations !== undefined) {
     const kind = reservationBlocking(reservations, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ });
     if (kind !== null) {
-      return {
-        valid: false,
-        error: kind === 'ramp' ? 'Blocks a ramp' : 'Blocks a drill hole',
-        errorKey: RESERVATION_ERROR_KEY[kind],
-      };
+      return { valid: false, ...RESERVATION_REFUSAL[kind] };
     }
   }
 
