@@ -68,6 +68,16 @@ export class CrewPanel extends PanelBase {
   /** UIManager wires this to its shared ConfirmModal's show() — see ConfirmModal.ts. */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
 
+  /** Wire the callback that selects an employee in the 3D scene (focuses the camera on them). */
+  setSelectEmployeeHandler(_cb: (employeeId: number) => void): void {
+    // TODO: implement
+  }
+
+  /** Locate button action: select the employee in the scene and close this panel. */
+  protected locateEmployee(_id: number): void {
+    // TODO: implement
+  }
+
 
   /**
    * Expand a specific employee's card and scroll it into view — the
