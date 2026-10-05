@@ -434,6 +434,13 @@ export function holdsRequiredSkill(
   return requiredSkill === null || employee.qualifications.some(q => q.category === requiredSkill);
 }
 
+/** True when the employee can take work now: alive, not injured, not in training. */
+export function isEligibleForWork(
+  employee: Pick<Employee, 'alive' | 'injured' | 'trainingState'>,
+): boolean {
+  return employee.alive && !employee.injured && employee.trainingState === null;
+}
+
 /**
  * The living roster — every employee still `alive`. Shared filter for any
  * aggregate/threshold computed over the roster (headcount-style stats,

@@ -20,7 +20,11 @@ import { Random } from '../../src/core/math/Random.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { setupEvents } from '../../src/core/events/index.js';
 import { clearEvents } from '../../src/core/events/EventPool.js';
-import { createRunner } from '../../src/console/createRunner.js';
+import { createRunner, runCommand, type RunnerWithContext } from '../../src/console/createRunner.js';
+import { killEmployee } from '../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
+import { UNQUALIFIED_CONTRACTOR_FEE, SURVEY_COSTS } from '../../src/core/config/balance.js';
+import { planTraining } from '../../src/core/entities/EmployeeTraining.js';
 import { parseCommand } from '../../src/console/ConsoleRunner.js';
 import { makeCampaignCtx } from './full-level/helpers.js';
 import {
@@ -755,5 +759,143 @@ describe('Event system', () => {
       expect(ctx.state!.levelEnded).toBe(false);
       expect(ctx.state!.levelEndReason).toBeNull();
     });
+  });
+});
+
+// ── #1380: every option of the "No Qualified Worker" event resolves the block ──
+//
+// Repro: hire a surveyor, queue a survey, the surveyor dies. The event used to fire every tick
+// and none of its three options did anything (Hire a Contractor only took $25,000).
+
+describe('unqualified_task_error — each option resolves the block (#1380)', () => {
+  const FOLLOW_UP_TICKS = 25;
+
+  interface Site { engine: RunnerWithContext; surveyActionId: number; cashAfterOrder: number; }
+
+  function blockedSite(opts: { school?: boolean; driver?: boolean } = {}): Site {
+    const engine = createRunner();
+    expect(runCommand(engine, 'new_game seed:42 size:32 cash:900000').success).toBe(true);
+    const state = () => engine.ctx.state!;
+    expect(runCommand(engine, 'employee hire role:surveyor').success).toBe(true);
+    const surveyor = state().employees.employees.at(-1)!;
+    if (opts.driver) expect(runCommand(engine, 'employee hire role:driver').success).toBe(true);
+    if (opts.school) {
+      expect(placeBuilding(state().buildings, 'geology_lab', 20, 20, 32, 32).success).toBe(true);
+    }
+    expect(runCommand(engine, 'survey seismic x:12 z:12').success).toBe(true);
+    const surveyActionId = state().pendingActions.find(a => a.type === 'survey')!.id;
+    killEmployee(state().employees, surveyor.id);
+    return { engine, surveyActionId, cashAfterOrder: state().cash };
+  }
+
+  const isUnqualified = (site: Site) => site.engine.ctx.state!.events.pendingEvent?.eventId === 'unqualified_task_error';
+
+  /** Tick until the event fires; returns the tick count it took. */
+  function tickToEvent(site: Site): number {
+    for (let i = 1; i <= 10; i++) {
+      runCommand(site.engine, 'tick 1');
+      if (isUnqualified(site)) return i;
+    }
+    throw new Error('unqualified_task_error never fired');
+  }
+
+  /** Tick one at a time; an unrelated random event is cleared, but the unqualified one must never come back. */
+  function expectNoRefire(site: Site, ticks = FOLLOW_UP_TICKS): void {
+    for (let i = 0; i < ticks; i++) {
+      const state = site.engine.ctx.state!;
+      if (state.events.pendingEvent && !isUnqualified(site)) state.events.pendingEvent = null;
+      runCommand(site.engine, 'tick 1');
+      expect(isUnqualified(site), `unqualified_task_error re-fired ${i + 1} ticks after the answer`).toBe(false);
+    }
+  }
+
+  it('fires once for the blocked survey and stays pending until answered', () => {
+    const site = blockedSite();
+    tickToEvent(site);
+    expect(site.engine.ctx.state!.events.pendingEvent!.unqualifiedActionIds).toContain(site.surveyActionId);
+  });
+
+  it('Cancel the Task: survey and ghost gone, fee refunded, event does not return', () => {
+    const site = blockedSite();
+    const state = site.engine.ctx.state!;
+    tickToEvent(site);
+    const cashBefore = state.cash;
+    const r = runCommand(site.engine, 'event choose 2');
+    expect(r.success).toBe(true);
+    expect(state.pendingActions.some(a => a.id === site.surveyActionId)).toBe(false);
+    expect(state.ghostPreviews.some(g => g.id === site.surveyActionId)).toBe(false);
+    expect(state.cash).toBe(cashBefore + SURVEY_COSTS.seismic);
+    expect(state.cash).toBe(site.cashAfterOrder + SURVEY_COSTS.seismic);
+    expect(r.output).not.toContain('cancel_task');
+    expectNoRefire(site);
+    expect(state.surveyResults).toHaveLength(0);
+  });
+
+  it('Hire a Contractor: $25,000 debited once, survey result recorded, event does not return', () => {
+    const site = blockedSite();
+    const state = site.engine.ctx.state!;
+    tickToEvent(site);
+    const cashBefore = state.cash;
+    const r = runCommand(site.engine, 'event choose 1');
+    expect(r.success).toBe(true);
+    expect(state.cash).toBe(cashBefore - UNQUALIFIED_CONTRACTOR_FEE);
+    expect(state.surveyResults).toHaveLength(1);
+    expect(state.pendingActions.some(a => a.id === site.surveyActionId)).toBe(false);
+    expect(r.output).not.toContain('hire_contractor');
+    expectNoRefire(site);
+    // The same work is not done twice.
+    expect(state.surveyResults).toHaveLength(1);
+  });
+
+  it('Send Someone to Training: the driver is booked on geology, fee debited once, event does not return', () => {
+    const site = blockedSite({ school: true, driver: true });
+    const state = site.engine.ctx.state!;
+    tickToEvent(site);
+    const driver = state.employees.employees.find(e => e.alive && e.role === 'driver')!;
+    const fee = planTraining(driver, 'geology', 1)!.fee;
+    const cashBefore = state.cash;
+    const r = runCommand(site.engine, 'event choose 0');
+    expect(r.success).toBe(true);
+    const booked = driver.pendingTrainingState ?? driver.trainingState;
+    expect(booked?.skill).toBe('geology');
+    expect(state.cash).toBe(cashBefore - fee);
+    expectNoRefire(site);
+    // Still enrolled or already inside: the survey is waiting for the trainee, not abandoned.
+    expect(state.pendingActions.some(a => a.id === site.surveyActionId)).toBe(true);
+    expect(state.surveyResults).toHaveLength(0);
+  });
+
+  it('Send Someone to Training with no school books nothing and the event does not return', () => {
+    const site = blockedSite({ school: false, driver: true });
+    const state = site.engine.ctx.state!;
+    tickToEvent(site);
+    const cashBefore = state.cash;
+    const r = runCommand(site.engine, 'event choose 0');
+    expect(r.success).toBe(true);
+    expect(state.cash).toBe(cashBefore);
+    expect(state.employees.employees.every(e => e.trainingState === null && (e.pendingTrainingState ?? null) === null)).toBe(true);
+    expectNoRefire(site);
+  });
+
+  it('does not fire when the only surveyor is injured, not dead', () => {
+    const site = blockedSite();
+    const state = site.engine.ctx.state!;
+    const surveyor = state.employees.employees.find(e => e.role === 'surveyor')!;
+    surveyor.alive = true;
+    surveyor.injured = true;
+    expectNoRefire(site, 10);
+    expect(state.pendingActions.find(a => a.id === site.surveyActionId)!.blockedReason).toBe('no_qualified_employee');
+  });
+
+  it('does not fire while the only surveyor is in training', () => {
+    const site = blockedSite();
+    const state = site.engine.ctx.state!;
+    const surveyor = state.employees.employees.find(e => e.role === 'surveyor')!;
+    surveyor.alive = true;
+    expect(placeBuilding(state.buildings, 'blasting_academy', 20, 20, 32, 32).success).toBe(true);
+    expect(runCommand(site.engine, `employee train ${surveyor.id} skill:blasting`).success).toBe(true);
+    expect(surveyor.pendingTrainingState ?? surveyor.trainingState).not.toBeNull();
+    expectNoRefire(site, 10);
+    expect(state.pendingActions.find(a => a.id === site.surveyActionId)?.blockedReason).toBe('no_qualified_employee');
   });
 });

@@ -17,6 +17,7 @@ import { estimateLegDistance } from './PlanItinerary.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { releaseEmployeeFromHosts } from './Mount.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
+import { releasePlannedOrderForCancelledAction, type FreedFootprint } from './CancelledOrderCleanup.js';
 
 export interface CancelActionResult {
   success: boolean;
@@ -26,6 +27,8 @@ export interface CancelActionResult {
   action?: PendingAction;
   /** Amount refunded to state.cash, 0 when the action's type charges nothing at order time. */
   refunded?: number;
+  /** Footprint a cancelled place_building order freed (blocked since order time); the caller tells the nav grid. */
+  freedFootprint?: FreedFootprint;
 }
 
 /**
@@ -89,7 +92,11 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
 
   completePendingAction(state, actionId);
 
-  return { success: true, action, refunded };
+  // The planned hole/charge/ramp segment/building site the order reserved goes
+  // with it, so every cancel path (console, events) releases it exactly once.
+  const freed = releasePlannedOrderForCancelledAction(state, action);
+
+  return freed ? { success: true, action, refunded, freedFootprint: freed } : { success: true, action, refunded };
 }
 
 /**

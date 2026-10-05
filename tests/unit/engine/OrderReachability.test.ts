@@ -513,3 +513,59 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
     expect(reasonOf(state, id)).toBeNull();
   });
 });
+
+describe('classifyQueuedOrders — a temporarily unavailable holder is not nobody (#1380)', () => {
+  /** A queued survey and the roster's only geology holder, put in `condition`. */
+  function setup(condition: (e: ReturnType<typeof hire>) => void) {
+    const state = makeState();
+    const holder = hire(state, IN_A, ['geology']);
+    const id = queue(state, 'survey', IN_A_TARGET, { requiredSkill: 'geology' });
+    condition(holder);
+    return { state, id };
+  }
+
+  it('does not report the order when the only holder is mid-course', () => {
+    const { state, id } = setup(e => { e.trainingState = { buildingId: 1, skill: 'blasting', ticksRemaining: 10, fee: 100 }; });
+    expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(false);
+  });
+
+  it('does not report the order when the only holder is walking to a course', () => {
+    const { state, id } = setup(e => { e.pendingTrainingState = { buildingId: 1, skill: 'blasting', ticksRemaining: 10, fee: 100 }; });
+    expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(false);
+  });
+
+  it('does not report the order when the only holder is injured', () => {
+    const { state, id } = setup(e => { e.injured = true; });
+    expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(false);
+  });
+
+  it('still stamps blockedReason no_qualified_employee while the holder is unavailable', () => {
+    for (const condition of [
+      (e: ReturnType<typeof hire>) => { e.injured = true; },
+      (e: ReturnType<typeof hire>) => { e.trainingState = { buildingId: 1, skill: 'blasting', ticksRemaining: 10, fee: 100 }; },
+    ]) {
+      const { state, id } = setup(condition);
+      classifyQueuedOrders(state);
+      expect(state.pendingActions.find(a => a.id === id)!.blockedReason).toBe('no_qualified_employee');
+    }
+  });
+
+  it('reports the order when the only holder is dead', () => {
+    const { state, id } = setup(e => { e.alive = false; });
+    expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(true);
+  });
+
+  it('reports the order when nobody on the roster holds the skill at all', () => {
+    const state = makeState();
+    hire(state, IN_A, ['blasting']);
+    const id = queue(state, 'survey', IN_A_TARGET, { requiredSkill: 'geology' });
+    expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(true);
+  });
+
+  it('reports the order again once the injured holder is gone for good', () => {
+    const { state, id } = setup(e => { e.injured = true; });
+    expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(false);
+    state.employees.employees[0]!.alive = false;
+    expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(true);
+  });
+});

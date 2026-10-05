@@ -66,6 +66,8 @@ export interface EventSystemState {
    * its own threshold fresh.
    */
   cooldownMinIntervalTicks: number | null;
+  /** Action ids an unqualified_task event has already been raised for (#1380). */
+  raisedUnqualifiedActionIds?: number[];
 }
 
 export interface FiredEvent {
@@ -73,6 +75,8 @@ export interface FiredEvent {
   firedAtTick: number;
   /** The jam that fired a traffic_jam event (#1208). */
   jam?: TrafficJam;
+  /** The pending actions an unqualified_task event concerns (#1380). */
+  unqualifiedActionIds?: number[];
 }
 
 /** What kind of value an EventEffect carries — decides which chip color/format the UI uses. */
@@ -106,6 +110,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     })),
     pendingEvent: null,
     jamSilencedUntil: {},
+    raisedUnqualifiedActionIds: [],
     lastOutcome: null,
     followUpQueue: [],
     followUpDelayTicks: 0,

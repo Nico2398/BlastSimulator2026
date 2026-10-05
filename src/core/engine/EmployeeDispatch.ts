@@ -8,7 +8,7 @@
 // the single public surface for tick-orchestration callers.
 
 import type { GameState } from '../state/GameState.js';
-import type { Employee } from '../entities/Employee.js';
+import { isEligibleForWork, type Employee } from '../entities/Employee.js';
 import type { EmployeeWorkState } from '../entities/EmployeeNeeds.js';
 import {
   claimActionsTargetedAtEmployee, fillIdleEmployeeFromQueueOrPool, reserveOnePoolActionAhead,
@@ -66,9 +66,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
 
   // Base eligibility: alive, not injured, not in training.
-  const eligible = state.employees.employees.filter(
-    emp => emp.alive && !emp.injured && emp.trainingState === null,
-  );
+  const eligible = state.employees.employees.filter(isEligibleForWork);
 
   // Reachability and availability classification of every queued action — see
   // OrderReachability.ts: a ghost reads red when none of the actors able to
@@ -78,7 +76,11 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // action is never added to unqualifiedIds regardless of roster headcount:
   // its real gate is vehicle/driver availability at claim time
   // (findVehicleForClaim), and flagging an unstaffed site would auto-pause it
-  // with an unresolvable unqualified_task_error every tick (#552).
+  // with an unqualified_task_error the player could not answer (#552).
+  // Only a skill no living employee holds is reported: a trainee or injured
+  // holder is merely unavailable (#1380). Each option of that event resolves the
+  // block (UnqualifiedTaskEffects.ts), and the event is raised once per blocked
+  // action (detectUnqualifiedTask), not every tick.
   const { unqualifiedIds } = classifyQueuedOrders(state);
   for (const id of unqualifiedIds) result.unqualified.push(id);
 

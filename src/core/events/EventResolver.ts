@@ -8,7 +8,8 @@ import { addIncome, addExpense } from '../economy/Finance.js';
 import type { EventConsequence } from './EventPool.js';
 import { getEventById } from './EventPool.js';
 import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.js';
-import { TRAFFIC_JAM_EFFECTS, type JamWorld } from './TrafficJamEffects.js';
+import { TRAFFIC_JAM_EFFECTS, type EventWorld, type EffectOutcome } from './TrafficJamEffects.js';
+import { UNQUALIFIED_TASK_EFFECTS } from './UnqualifiedTaskEffects.js';
 import { clearPendingEvent, queueFollowUp } from './EventSystem.js';
 
 // ── Resolution result ──
@@ -41,7 +42,7 @@ export function resolveEvent(
   optionIndex: number,
   tick: number,
   rng: Random,
-  world?: JamWorld,
+  world?: EventWorld,
 ): ResolutionResult | null {
   if (!eventSystem.pendingEvent) return null;
 
@@ -72,18 +73,16 @@ export function resolveEvent(
     tick,
   );
 
-  // A jam event carries its chokepoint: the option's effect tag names the world change to make.
-  const jam = eventSystem.pendingEvent.jam;
-  const handler = consequence.effectTag ? TRAFFIC_JAM_EFFECTS[consequence.effectTag] : undefined;
-  if (world && jam && handler) {
-    const outcome = handler(jam, world, tick);
-    result.effects.push(...outcome.effects);
-    result.cashChange += outcome.cashChange;
-    result.cashSettled += outcome.cashSettled;
-    for (const [k, d] of Object.entries(outcome.scoreChanges) as [keyof ScoreState, number][]) {
-      result.scoreChanges[k] = (result.scoreChanges[k] ?? 0) + d;
-    }
-    result.resultKey += outcome.resultKeySuffix;
+  // A jam or unqualified-task event carries what it concerns: the option's
+  // effect tag names the world change to make.
+  const { jam, unqualifiedActionIds } = eventSystem.pendingEvent;
+  const tag = consequence.effectTag;
+  if (world && jam && tag && TRAFFIC_JAM_EFFECTS[tag]) {
+    mergeOutcome(result, TRAFFIC_JAM_EFFECTS[tag]!(jam, world, tick));
+  } else if (world && unqualifiedActionIds && tag && UNQUALIFIED_TASK_EFFECTS[tag]) {
+    // The raw tag is an internal name, not something to show the player.
+    result.effects = result.effects.filter(e => e !== tag);
+    mergeOutcome(result, UNQUALIFIED_TASK_EFFECTS[tag]!(unqualifiedActionIds, world, tick));
   }
 
   // Clear the pending event; record the outcome for the UI to read directly
@@ -92,6 +91,17 @@ export function resolveEvent(
   eventSystem.lastOutcome = buildEventOutcome(result);
 
   return result;
+}
+
+/** Fold a world-effect handler's outcome into the resolution it extends. */
+function mergeOutcome(result: ResolutionResult, outcome: EffectOutcome): void {
+  result.effects.push(...outcome.effects);
+  result.cashChange += outcome.cashChange;
+  result.cashSettled += outcome.cashSettled;
+  for (const [k, d] of Object.entries(outcome.scoreChanges) as [keyof ScoreState, number][]) {
+    result.scoreChanges[k] = (result.scoreChanges[k] ?? 0) + d;
+  }
+  result.resultKey += outcome.resultKeySuffix;
 }
 
 /**

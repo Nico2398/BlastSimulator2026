@@ -428,8 +428,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1368 review fixes: +5 keys total in latest commit, both locales: 3603 (merged with origin/main).
     // #1369: +2 keys (notification.order_blocked_no_warehouse, notification.order_blocked_storage_full), both locales: 3605.
     // #1408: +1 key (ui.finances.category.smuggling), both locales: 3606.
-    // #1422: +3 keys (ui.crew.locate, ui.fleet.locate, ui.survey.locate), both locales: 3609.
-    expect(Object.keys(en).length).toBe(3609);
+    // #1380: +2 keys (unqualified-task res0_alt, res1_alt), both locales: 3608 (merged with origin/main).
+    // #1422: +3 keys (ui.crew.locate, ui.fleet.locate, ui.survey.locate), both locales: 3611 (merged with #1380).
+    expect(Object.keys(en).length).toBe(3611);
   });
 });
 

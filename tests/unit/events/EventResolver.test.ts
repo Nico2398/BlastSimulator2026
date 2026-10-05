@@ -12,6 +12,9 @@ import {
 } from '../../../src/core/events/EventPool.js';
 import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
 import { createFinanceState } from '../../../src/core/economy/Finance.js';
+import { setupEvents } from '../../../src/core/events/index.js';
+import { UNQUALIFIED_CONTRACTOR_FEE } from '../../../src/core/config/balance.js';
+import { SURVEY_FEE, setupUnqualified, totalDebit } from '../../helpers/unqualifiedWorld.js';
 
 function makeTestEvent(): EventDef {
   return {
@@ -248,5 +251,77 @@ describe('Event resolution system', () => {
 
     resolveEvent(eventSystem, finances, scores, 6, 10, rng);
     expect(scores.safety).toBe(100);
+  });
+});
+
+// ── unqualified_task_error options reach the world (#1380) ───────────────────
+
+describe('resolveEvent — unqualified_task_error', () => {
+  beforeEach(() => {
+    clearEvents();
+    setupEvents();
+  });
+
+  function pending(s: ReturnType<typeof setupUnqualified>, ids: number[] = [s.actionId]) {
+    s.state.events.pendingEvent = { eventId: 'unqualified_task_error', firedAtTick: 40, unqualifiedActionIds: ids };
+  }
+
+  const choose = (s: ReturnType<typeof setupUnqualified>, option: number) =>
+    resolveEvent(s.state.events, s.state.finances, s.state.scores, option, 40, new Random(7), s.world)!;
+
+  it('Cancel removes the blocked action and shows the refund, not the raw tag', () => {
+    const s = setupUnqualified();
+    pending(s);
+    const result = choose(s, 2);
+    expect(s.state.pendingActions.find(a => a.id === s.actionId)).toBeUndefined();
+    expect(s.state.cash + result.cashChange).toBe(s.cashAfterOrder + SURVEY_FEE);
+    expect(result.effects).not.toContain('cancel_task');
+    const cash = s.state.events.lastOutcome!.effects.find(e => e.kind === 'cash');
+    expect(cash?.delta).toBe(SURVEY_FEE);
+  });
+
+  it('Hire a Contractor completes the work for exactly the contractor fee', () => {
+    const s = setupUnqualified();
+    pending(s);
+    const result = choose(s, 1);
+    expect(totalDebit(s.cashAfterOrder, s.state, result)).toBe(UNQUALIFIED_CONTRACTOR_FEE);
+    expect(s.state.surveyResults).toHaveLength(1);
+    expect(s.state.pendingActions.find(a => a.id === s.actionId)).toBeUndefined();
+    expect(result.effects).not.toContain('hire_contractor');
+    const cash = s.state.events.lastOutcome!.effects.find(e => e.kind === 'cash');
+    expect(cash?.delta).toBe(-UNQUALIFIED_CONTRACTOR_FEE);
+  });
+
+  it('Send Someone to Training enrols the driver and keeps the plain result key', () => {
+    const s = setupUnqualified({ school: true });
+    pending(s);
+    const result = choose(s, 0);
+    const driver = s.state.employees.employees.find(e => e.id === s.driver!.id)!;
+    expect((driver.pendingTrainingState ?? driver.trainingState)?.skill).toBe('geology');
+    expect(result.resultKey).toBe('event.unqualified_task_error.res0');
+    expect(result.effects).not.toContain('train_employee');
+  });
+
+  it('Send Someone to Training with no school reports the fallback text and books nothing', () => {
+    const s = setupUnqualified({ school: false });
+    pending(s);
+    const result = choose(s, 0);
+    expect(result.resultKey).toBe('event.unqualified_task_error.res0_alt');
+    expect(s.state.cash + result.cashChange).toBe(s.cashAfterOrder);
+    expect(s.state.events.lastOutcome!.resultKey).toBe('event.unqualified_task_error.res0_alt');
+  });
+
+  it('clears the pending event', () => {
+    const s = setupUnqualified();
+    pending(s);
+    choose(s, 2);
+    expect(s.state.events.pendingEvent).toBeNull();
+  });
+
+  it('without a world, the world effects are not applied and the action is left alone', () => {
+    const s = setupUnqualified();
+    pending(s);
+    resolveEvent(s.state.events, s.state.finances, s.state.scores, 2, 40, new Random(7));
+    expect(s.state.pendingActions.some(a => a.id === s.actionId)).toBe(true);
   });
 });

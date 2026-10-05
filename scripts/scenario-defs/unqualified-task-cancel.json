@@ -1,0 +1,256 @@
+{
+  "name": "unqualified-task-cancel",
+  "description": "Hire a surveyor, queue a seismic survey, fire the surveyor: the No Qualified Worker event fires once, 'Cancel the Task' removes the survey and refunds its fee, and the event does not return (#1380).",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "worldSizeX"
+        ]
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "Hire a driver first: the roster's draw of who is unionized is deterministic, and this puts the surveyor on a non-unionized slot (id 2) so the player can fire them."
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 2
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "survey seismic x:5 z:5",
+      "description": "Ordered far from the surveyor's spawn so several ticks of travel remain before arrival -- the cancel below must land while the surveyor is still walking, not after the survey has resolved.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 5,
+          "z": 5,
+          "distance": 45,
+          "yaw": 180,
+          "pitch": 60
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0,
+          "pendingActionCount": 1
+        },
+        "note": "seismic cost (SURVEY_COSTS.seismic = $3000) already deducted at order time -- the whole point of the refund this scenario proves"
+      }
+    },
+    {
+      "command": "employee fire 2",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-employee-role=\"surveyor\"] .bs-detail-toggle",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
+        }
+      ],
+      "role": "player",
+      "description": "Fire the only surveyor through the crew panel's own dismiss control, leaving the queued survey with nobody on the roster who can perform it.",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "description": "The blocked survey raises the No Qualified Worker event.",
+      "expect": {
+        "equals": {
+          "pendingEvent": true,
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 2",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(3)"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(3)"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 3000
+        }
+      ],
+      "description": "Cancel the Task through the event dialog's own button: the queued survey goes and its $3000 order-time fee comes back.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 3000
+        },
+        "equals": {
+          "pendingActionCount": 0,
+          "pendingEvent": false,
+          "surveyCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "description": "Ten more ticks: the event does not come back for the work that was cancelled.",
+      "expect": {
+        "equals": {
+          "pendingEvent": false,
+          "pendingActionCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}

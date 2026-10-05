@@ -16,7 +16,7 @@ import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { isLicensedForRole } from './VehicleReservation.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup } from '../economy/HaulDispatch.js';
-import { holdsRequiredSkill } from '../entities/Employee.js';
+import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
 import {
   computeClimbReachableSetFromSources,
   computeClimbComponents,
@@ -197,9 +197,7 @@ function availabilityReason(
 /** Stamp blockedReason and the ghost's red flag for `targets`; returns ids needing the unqualified modal. */
 function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<number> {
   const unqualifiedIds = new Set<number>();
-  const eligible = state.employees.employees.filter(
-    emp => emp.alive && !emp.injured && emp.trainingState === null,
-  );
+  const eligible = state.employees.employees.filter(isEligibleForWork);
   const judgements = judgeActions(state, targets);
   const fragmentOf = createFragmentLookup(state);
   const ghostById = new Map(state.ghostPreviews.map(g => [g.id, g]));
@@ -223,7 +221,13 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       continue;
     }
     const reason = availabilityReason(state, eligible, action);
-    if (reason === 'no_qualified_employee' && action.requiredVehicleRole === null) {
+    // Only a skill nobody alive holds raises the modal: a trainee or injured
+    // holder is temporarily unavailable, not absent (gameplay-employee-skills rule 5).
+    if (
+      reason === 'no_qualified_employee'
+      && action.requiredVehicleRole === null
+      && !state.employees.employees.some(emp => emp.alive && holdsRequiredSkill(emp, action.requiredSkill))
+    ) {
       unqualifiedIds.add(action.id);
     }
     action.blockedReason = reason ?? haulBlockedReason(state, action, fragmentOf);

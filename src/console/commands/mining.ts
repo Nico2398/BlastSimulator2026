@@ -18,4 +18,3 @@ export type { LevelGroundActionPayload } from './mining/level.js';
 export { levelGroundCommand, cancelLevelGroundCommand } from './mining/level.js';
 export { weatherCommand, tubingCommand } from './mining/weatherTubing.js';
 export { surveyCommand } from './mining/survey.js';
-export { releasePlannedHoleForCancelledAction } from './mining/shared.js';

@@ -482,6 +482,12 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** #1380: an older save never raised an unqualified-task event. Idempotent; mutates `obj` in place. */
+function backfillRaisedUnqualified(obj: Record<string, unknown>): void {
+  const events = obj['events'] as Record<string, unknown> | undefined;
+  if (events && !Array.isArray(events['raisedUnqualifiedActionIds'])) events['raisedUnqualifiedActionIds'] = [];
+}
+
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
 function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
   const current = obj['nextHoleId'];
@@ -782,6 +788,7 @@ export function deserialize(json: string): GameState {
   // v28 -> v29: GameState.nextHoleId (#1352). Idempotent, so also guards
   // current-version saves that lack a valid counter.
   migrateV28ToV29(obj);
+  backfillRaisedUnqualified(obj);
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The

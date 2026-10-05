@@ -206,7 +206,9 @@ export function drillPlanCommand(
       const action = state.pendingActions.find(a => a.type === 'drill_hole' && a.payload['holeId'] === holeId);
       if (action) cancelAction(state, action.id);
       cancelOutstandingChargeAction(state, holeId);
-      state.plannedDrillHoles.splice(plannedIdx, 1);
+      // cancelAction releases the planned hole itself; this covers a hole with no drill action.
+      const stillPlanned = state.plannedDrillHoles.findIndex(h => h.id === holeId);
+      if (stillPlanned !== -1) state.plannedDrillHoles.splice(stillPlanned, 1);
       clearHoleCharges(state, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }

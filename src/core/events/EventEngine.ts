@@ -42,21 +42,34 @@ export function detectTrafficJam(
 }
 
 /**
- * Detects an unqualified task error: fires when at least one pending action
- * has no qualified employee on the roster.
- * Sets state.pendingEvent and returns the FiredEvent when detected.
- * Returns null if an event is already pending or no unqualified actions exist.
+ * Detects an unqualified task error: fires when a pending action nobody on the
+ * roster is qualified for has not yet been raised (#1380).
+ * `state.raisedUnqualifiedActionIds` remembers the ids already put to the
+ * player; it is pruned to the ids still blocked, so answering the event (or the
+ * work leaving the queue) never re-raises it, while a newly blocked action does.
+ * Sets state.pendingEvent (carrying every currently blocked id) and returns the
+ * FiredEvent when it fires. Returns null if an event is already pending or no
+ * unraised unqualified action exists.
  */
 export function detectUnqualifiedTask(
   unqualifiedActionIds: number[],
   state: EventSystemState,
   tickCount: number,
 ): FiredEvent | null {
+  const current = new Set(unqualifiedActionIds);
+  const raised = (state.raisedUnqualifiedActionIds ?? []).filter(id => current.has(id));
+  state.raisedUnqualifiedActionIds = raised;
+
   if (state.pendingEvent) return null;
   if (state.eventFreqMultiplier === 0) return null;
-  if (unqualifiedActionIds.length === 0) return null;
+  if (!unqualifiedActionIds.some(id => !raised.includes(id))) return null;
 
-  const event: FiredEvent = { eventId: 'unqualified_task_error', firedAtTick: tickCount };
+  state.raisedUnqualifiedActionIds = [...current];
+  const event: FiredEvent = {
+    eventId: 'unqualified_task_error',
+    firedAtTick: tickCount,
+    unqualifiedActionIds: [...current],
+  };
   state.pendingEvent = event;
   return event;
 }
