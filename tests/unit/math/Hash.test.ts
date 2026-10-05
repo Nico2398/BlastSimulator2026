@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hash32, subSeed, cellRand } from '../../../src/core/math/Hash.js';
+import { hash32, hashCombine, subSeed, cellRand } from '../../../src/core/math/Hash.js';
 
 describe('hash32', () => {
   it('is deterministic for the same input', () => {
@@ -58,5 +58,20 @@ describe('cellRand', () => {
 
   it('varies with the salt (independent placement channels at the same cell)', () => {
     expect(cellRand(1, 5, 5, 0)).not.toBe(cellRand(1, 5, 5, 1));
+  });
+});
+
+describe('hashCombine', () => {
+  it('is deterministic and an unsigned 32-bit integer', () => {
+    const h = hashCombine(42, 7);
+    expect(hashCombine(42, 7)).toBe(h);
+    expect(Number.isInteger(h)).toBe(true);
+    expect(h).toBeGreaterThanOrEqual(0);
+    expect(h).toBeLessThanOrEqual(0xffffffff);
+  });
+
+  it('differs by value and by fold order', () => {
+    expect(hashCombine(42, 8)).not.toBe(hashCombine(42, 7));
+    expect(hashCombine(hashCombine(1, 2), 3)).not.toBe(hashCombine(hashCombine(1, 3), 2));
   });
 });

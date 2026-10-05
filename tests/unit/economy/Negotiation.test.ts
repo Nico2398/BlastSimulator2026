@@ -231,12 +231,14 @@ describe('negotiationStreamSeed (#1366)', () => {
     expect(negotiationStreamSeed(42, 10, 3, 0)).toBe(a);
     expect(Number.isInteger(a)).toBe(true);
     expect(a).toBeGreaterThanOrEqual(-(2 ** 31));
-    expect(a).toBeLessThanOrEqual(2 ** 32 - 1);
+    expect(a).toBeLessThanOrEqual(2 ** 31 - 1);
   });
 
   it('differs across contract id and attempt for the same seed and tick', () => {
     const base = negotiationStreamSeed(42, 10, 3, 0);
     expect(negotiationStreamSeed(42, 10, 4, 0)).not.toBe(base);
+    expect(negotiationStreamSeed(42, 11, 3, 0)).not.toBe(base);
+    expect(negotiationStreamSeed(43, 10, 3, 0)).not.toBe(base);
     expect(negotiationStreamSeed(42, 10, 3, 1)).not.toBe(base);
   });
 });

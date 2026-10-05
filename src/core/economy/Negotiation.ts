@@ -4,6 +4,7 @@
 import type { Contract, ContractState, NegotiationChange } from './Contract.js';
 import { computeEarlyBonus } from './Contract.js';
 import { Random } from '../math/Random.js';
+import { hash32, hashCombine } from '../math/Hash.js';
 import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER } from '../config/balance.js';
 
 // ── Config ──
@@ -36,13 +37,8 @@ export function negotiationStreamSeed(
   contractId: number,
   attempt: number,
 ): number {
-  let h = Math.imul(seed | 0, 0x9e3779b1);
-  for (const v of [tick, contractId, attempt]) {
-    h = Math.imul(h ^ (v | 0), 0x85ebca6b);
-    h ^= h >>> 15;
-    h = Math.imul(h, 0xc2b2ae35);
-    h ^= h >>> 13;
-  }
+  let h = hash32(seed | 0);
+  for (const v of [tick, contractId, attempt]) h = hashCombine(h, v);
   return h | 0;
 }
 
@@ -59,10 +55,9 @@ export function negotiateContractAtTick(
   seed: number,
   tick: number,
 ): NegotiationResult | { refused: NegotiationRefusal } {
-  const contract = state.available.find(c => c.id === contractId);
-  if (!contract) return { refused: 'not_found' };
-  const rng = new Random(negotiationStreamSeed(seed, tick, contractId, contract.negotiationAttempts ?? 0));
-  return negotiateContract(state, contractId, reputation, rng) as NegotiationResult | { refused: NegotiationRefusal };
+  const attempt = state.available.find(c => c.id === contractId)?.negotiationAttempts ?? 0;
+  const rng = new Random(negotiationStreamSeed(seed, tick, contractId, attempt));
+  return negotiateContract(state, contractId, reputation, rng) ?? { refused: 'not_found' };
 }
 
 /**

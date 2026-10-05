@@ -33,6 +33,7 @@
   "economy.fragments.usage": "Usage: fragments status",
   "economy.income": "Income",
   "economy.negotiation.already_negotiated": "Contract {id} has already been negotiated; the client will not talk again.",
+  "economy.negotiation.not_found": "Contract #{id} not found.",
   "economy.negotiation.failure": "Negotiation failed.",
   "economy.negotiation.success": "Negotiation succeeded!",
   "event.lawsuit_aesthetic_pollution.desc": "Neighbor sues for aesthetic pollution. Another envelope from a law firm. Never good news.",
