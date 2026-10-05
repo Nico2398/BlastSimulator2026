@@ -7,6 +7,7 @@ import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { WELL_BEING_ALERT_THRESHOLD, REVOLT_TICKS } from '../../../src/core/config/balance.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -97,6 +98,67 @@ describe('NotificationCenter (redesign P1)', () => {
       state.scores.ecology = 45;
       const pips = center.update(state);
       expect(pips.some(p => p.kind === 'ecology')).toBe(false);
+    });
+
+    it('derives no wellbeing pip at or above the alert threshold', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.scores.wellBeing = WELL_BEING_ALERT_THRESHOLD;
+      expect(center.update(state).some(p => p.kind === 'wellbeing')).toBe(false);
+    });
+
+    it('derives a warn wellbeing pip just below the alert threshold', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.scores.wellBeing = 19.9;
+      const pips = center.update(state).filter(p => p.kind === 'wellbeing');
+      expect(pips).toHaveLength(1);
+      expect(pips[0]!.tone).toBe('warn');
+    });
+
+    it('derives a single critical wellbeing pip at zero, labelled with remaining revolt ticks that count down', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.scores.wellBeing = 0;
+      state.revolt.ticksAtZero = 40;
+      let pips = center.update(state).filter(p => p.kind === 'wellbeing');
+      expect(pips).toHaveLength(1);
+      expect(pips[0]!.tone).toBe('critical');
+      expect(pips[0]!.label).toContain(String(REVOLT_TICKS - 40));
+
+      state.revolt.ticksAtZero = 41;
+      pips = center.update(state).filter(p => p.kind === 'wellbeing');
+      expect(pips).toHaveLength(1);
+      expect(pips[0]!.label).toContain(String(REVOLT_TICKS - 41));
+    });
+
+    it('derives no exposure pip just below the warning exposure', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.mafia.exposureRisk = 0.74;
+      expect(center.update(state).some(p => p.kind === 'exposure')).toBe(false);
+    });
+
+    it('derives a warn exposure pip from 0.75 up to the arrest threshold', () => {
+      for (const risk of [0.75, 0.85]) {
+        const center = new NotificationCenter();
+        const state = makeState();
+        state.mafia.exposureRisk = risk;
+        const pips = center.update(state).filter(p => p.kind === 'exposure');
+        expect(pips).toHaveLength(1);
+        expect(pips[0]!.tone).toBe('warn');
+        expect(pips[0]!.label).toContain(String(Math.round(risk * 100)));
+      }
+    });
+
+    it('derives a critical exposure pip at or above 0.9 showing the rounded percent', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.mafia.exposureRisk = 0.93;
+      const pips = center.update(state).filter(p => p.kind === 'exposure');
+      expect(pips).toHaveLength(1);
+      expect(pips[0]!.tone).toBe('critical');
+      expect(pips[0]!.label).toContain('93');
     });
 
     it('derives a bankruptcy pip when cash is negative', () => {
