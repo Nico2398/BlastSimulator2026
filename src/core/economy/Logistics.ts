@@ -5,7 +5,7 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { scale } from '../math/Vec3.js';
-import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
 
 // ── Fragment states ──
 
@@ -28,7 +28,7 @@ export interface LogisticsState {
   storedMassKg: number;
 }
 
-export function createLogisticsState(storageCapacityKg: number = 5000): LogisticsState {
+export function createLogisticsState(storageCapacityKg: number = INITIAL_STORAGE_CAPACITY_KG): LogisticsState {
   return {
     fragments: [],
     storageCapacityKg,
@@ -352,13 +352,12 @@ export function getFragmentCounts(state: LogisticsState): FragmentCounts {
 
 /** Check if there's room to pick up more fragments. */
 export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
-  return state.storedMassKg + massKg <= state.storageCapacityKg;
+  return massKg <= storageRoomKg(state);
 }
 
 /** Free storage room in kg (capacity minus stored mass) (#1369). */
-export function storageRoomKg(_state: LogisticsState): number {
-  // TODO: implement
-  return 0;
+export function storageRoomKg(state: LogisticsState): number {
+  return state.storageCapacityKg - state.storedMassKg;
 }
 
 /** Total ore mass across all materials in `collectedOre`, in kg. */

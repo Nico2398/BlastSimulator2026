@@ -13,6 +13,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
+import { storageRoomKg } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
@@ -83,7 +84,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!isHaulEligibleVehicle(vehicle, state.vehicles)) return null;
 
-  const roomKg = state.logistics.storageCapacityKg - state.logistics.storedMassKg;
+  const roomKg = storageRoomKg(state.logistics);
 
   return findNearestReachableFragment(state, vehicleId, vehicle.x, vehicle.z, tracked => {
     // An oversized fragment can never be hauled until a Rock Fragmenter

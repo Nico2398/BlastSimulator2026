@@ -14,7 +14,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { placeBuilding, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import {
@@ -62,6 +62,7 @@ function makeIdleHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
 
 /** A debris_hauler with a licensed driver already boarded (driverId set, occupied, mounted). */
 function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
+  state.logistics.storageCapacityKg = 5000; // fresh state has no warehouse capacity (#1369)
   const vehicle = makeIdleHauler(state, x, z);
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
@@ -76,6 +77,7 @@ function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
 function placeWarehouse(state: ReturnType<typeof createGame>, x: number, z: number) {
   const result = placeBuilding(state.buildings, 'freight_warehouse', x, z, GRID, GRID);
   if (!result.success) throw new Error(`Setup: placeBuilding failed — ${result.error}`);
+  state.logistics.storageCapacityKg = getStorageCapacity(state.buildings);
   return result.building!;
 }
 

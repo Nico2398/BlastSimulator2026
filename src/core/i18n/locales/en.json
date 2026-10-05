@@ -3119,6 +3119,8 @@
   "notification.order_blocked_no_vehicle": "{order} needs a {role} — none in the fleet yet.",
   "notification.order_blocked_no_driver": "{order} needs a {role} — nobody is licensed to drive one.",
   "notification.order_blocked_target_unreachable": "{order} can't reach its target — no route connects it to the rest of the site.",
+  "notification.order_blocked_no_warehouse": "{order} needs a Freight Warehouse — build one to store hauled rock.",
+  "notification.order_blocked_storage_full": "{order} can't proceed — storage is full.",
   "notification.pip.blocked_orders_label": "{count} BLOCKED",
   "notification.pip.stranded_debris_label": "{count} OUT OF REACH",
   "notification.pip.stranded_debris_tip": "{count} debris job(s) out of reach - build a ramp or level the ground to haul them, or leave them",

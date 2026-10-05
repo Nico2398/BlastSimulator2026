@@ -137,6 +137,7 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
     // freight_warehouse exists".
     const warehouse = placeBuilding(state.buildings, 'freight_warehouse', 10, 10, 64, 64);
     if (!warehouse.success) throw new Error(`Setup: placeBuilding failed — ${warehouse.error}`);
+    state.logistics.storageCapacityKg = 5000;
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
 
     // No haul_debris action exists yet — syncHaulDispatch must create one and
