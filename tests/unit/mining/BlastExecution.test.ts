@@ -178,6 +178,46 @@ describe('executeBlast — crater', () => {
 // with, while the real wiring rewrites them to the canonical band — so
 // that test genuinely fails without this file's own call sites running.
 
+describe('executeBlast — fragment origin (#1355)', () => {
+  function blast() {
+    const grid = new VoxelGrid(40, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'boomite', 8, 2);
+    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    return executeBlast(plan, grid, [])!;
+  }
+
+  it('keeps origin where the rock sat (inside the cleared region) while position is where it landed', () => {
+    const result = blast();
+    const r = result.clearedRegion;
+    expect(result.fragments.length).toBeGreaterThan(0);
+    for (const f of result.fragments) {
+      expect(f.origin.x).toBeGreaterThanOrEqual(r.minX);
+      expect(f.origin.x).toBeLessThanOrEqual(r.maxX + 1);
+      expect(f.origin.z).toBeGreaterThanOrEqual(r.minZ);
+      expect(f.origin.z).toBeLessThanOrEqual(r.maxZ + 1);
+    }
+  });
+
+  it('origin is a separate object from position and differs from it for rock that moved', () => {
+    const result = blast();
+    for (const f of result.fragments) expect(f.origin).not.toBe(f.position);
+    const moved = result.fragments.filter(
+      f => f.origin.x !== f.position.x || f.origin.y !== f.position.y || f.origin.z !== f.position.z,
+    );
+    expect(moved.length).toBeGreaterThan(0);
+  });
+
+  it('is deterministic: a repeat of the same blast yields identical origins', () => {
+    const a = blast().fragments.map(f => f.origin);
+    const b = blast().fragments.map(f => f.origin);
+    expect(b).toEqual(a);
+  });
+});
+
 describe('executeBlast — post-carve renormalisation (#1148)', () => {
   const CRUST_HEIGHT = 10.5;
 

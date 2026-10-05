@@ -349,6 +349,7 @@ export function resolveFragmentLanding(
       const rest = piles.place(x, z, fragment.volume);
       const to = vec3(rest.x, rest.y, rest.z);
 
+      // position moves on landing; fragment.origin stays (survey lookups key on it)
       fragment.position = to;
       fragment.isProjection = arc.impactSpeed > PROJECTION_SPEED_THRESHOLD;
 
@@ -377,6 +378,7 @@ export function resolveFragmentLanding(
     const to = vec3(rest.x, rest.y, rest.z);
     const drop = Math.max(0, from.y - to.y);
 
+    // position moves on landing; fragment.origin stays (survey lookups key on it)
     fragment.position = to;
     fragment.isProjection = false;
 

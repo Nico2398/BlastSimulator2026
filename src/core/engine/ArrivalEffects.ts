@@ -218,6 +218,7 @@ export function applyBoulderSplit(state: GameState, vehicle: Vehicle, emitter?: 
       isProjection: false,
       halfExtents: scale(parentHalfExtents, factor),
       shapeSeed: rng.nextInt(0, 0x7fffffff),
+      origin: { ...tracked.fragment.origin },
     };
     state.logistics.fragments.push({ fragment: newFragment, state: 'on_ground', vehicleId: null });
     state.navGrid?.addFragmentOccupant(cellX, cellZ);

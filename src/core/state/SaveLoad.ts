@@ -586,6 +586,16 @@ export function deserialize(json: string): GameState {
   // v4 → v5: collectedOre field added
   ensureField(obj, 'collectedOre', v => typeof v === 'object' && v !== null, {});
 
+  // #1355: FragmentData gained `origin` (the floor column the rock was blasted
+  // from). No save-version bump; a save from before it has none, so the best
+  // available origin is the fragment's own position.
+  const logisticsRaw = obj['logistics'] as Record<string, unknown> | undefined;
+  if (Array.isArray(logisticsRaw?.['fragments'])) {
+    for (const f of logisticsRaw['fragments'] as Array<Record<string, unknown>>) {
+      if (f['origin'] === undefined && f['position'] !== undefined) f['origin'] = { ...(f['position'] as object) };
+    }
+  }
+
   // ghostPreviewsRevision added alongside the renderer's dirty-check gate
   // (#761) — no dedicated save-version bump, so this can't be gated behind
   // a `version < N` check: every save that predates the PR, including the

@@ -93,6 +93,7 @@ function makeProjection(overrides: Partial<FragmentData> = {}): FragmentData {
     isProjection: true,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
     shapeSeed: 1,
+    origin: { x: 15, y: 0, z: 15 },
     ...overrides,
   };
 }

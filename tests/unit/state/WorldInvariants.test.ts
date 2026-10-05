@@ -84,6 +84,7 @@ function addFragment(state: GameState, id: number, fragState: FragmentState = 'o
       isProjection: false,
       halfExtents: { x: 1, y: 1, z: 1 },
       shapeSeed: 1,
+      origin: { x: 0, y: 0, z: 0 },
     },
     state: fragState,
     vehicleId: null,

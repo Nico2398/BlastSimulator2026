@@ -25,6 +25,7 @@ function makeFragment(overrides: Partial<FragmentData> = {}): FragmentData {
     isProjection: false,
     halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
     shapeSeed: 1,
+    origin: zeroVec,
     ...overrides,
   };
 }

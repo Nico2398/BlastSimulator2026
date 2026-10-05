@@ -30,6 +30,7 @@ function makeFragment(id: number, x: number, z: number): FragmentData {
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
     shapeSeed: 1,
+    origin: { x, y: 0, z },
   };
 }
 
