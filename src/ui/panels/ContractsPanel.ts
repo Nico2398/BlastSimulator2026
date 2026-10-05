@@ -56,7 +56,7 @@ export function deliverableAmountKg(_maxDeliverableKg: number): number {
 }
 
 export class ContractsPanel extends PanelBase {
-  private statusEl?: HTMLElement;
+  protected statusEl?: HTMLElement;
   private readonly bodyEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
   private onNavigateCb?: (panel: 'ops') => void;
@@ -104,7 +104,7 @@ export class ContractsPanel extends PanelBase {
   }
 
 
-  private setStatus(_msg: string): void {
+  protected setStatus(_msg: string): void {
     // TODO: implement
   }
 
