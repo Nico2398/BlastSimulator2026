@@ -6,6 +6,7 @@
 
 import type { Rect } from '../world/WorldGen.js';
 import { BUILDING_DEFS } from './BuildingDefs.js';
+import type { TerrainReservation } from './PlacementReservations.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
@@ -240,6 +241,8 @@ export interface PlaceBuildingResult {
   success: boolean;
   building?: Building;
   error?: string;
+  /** Translation key when the refusal is a terrain reservation (#1390). */
+  errorKey?: string;
   cost?: number;
 }
 
@@ -388,6 +391,7 @@ export function moveBuilding(
   originZ: number = 0,
   plannedOccupants: ReadonlyArray<FootprintOccupant> = [],
   voxelGrid?: VoxelGrid,
+  _reservations?: ReadonlyArray<TerrainReservation>,
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
@@ -520,7 +524,8 @@ export function checkFootprintPlacement(
   originX: number,
   originZ: number,
   voxelGrid?: VoxelGrid,
-): { valid: boolean; error?: string } {
+  _reservations?: ReadonlyArray<TerrainReservation>,
+): { valid: boolean; error?: string; errorKey?: string } {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
 
