@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState } from './shared.js';
+import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
 import {
   gridCellPositions, createHolesAt, addHole, removeHole,
   computeDrillHoleDurationTicks,
@@ -49,6 +49,8 @@ function clearHoleCharges(state: GameState, holeId: string): void {
  * idle and any order-time cost is refunded — `drill_hole` carries none, but an
  * outstanding `charge_hole` refunds its `orderCost` (#1341). Charges already
  * loaded (landed) are wiped without refund: that explosive is consumed.
+ * Drilled holes' cells are re-patched in the NavGrid via
+ * `nav:occupancy_changed`, emitted after the reset (#1360).
  * Returns the total number of holes cleared (ordered + drilled).
  */
 export function clearDrillPlan(ctx: MiningContext): number {
@@ -58,7 +60,9 @@ export function clearDrillPlan(ctx: MiningContext): number {
   cancelPendingActionsOfType(state, 'charge_hole');
   cancelOutstandingDrillActions(state);
 
+  const drilled = [...state.drillHoles];
   resetPlanState(state);
+  emitHoleCellsChanged(ctx, drilled);
 
   return clearedCount;
 }
@@ -189,9 +193,11 @@ export function drillPlanCommand(
     const holeSpec = named['hole'] ?? '';
     const holeId = resolveHoleId(state, holeSpec);
 
+    const drilled = state.drillHoles.find(h => h.id === holeId);
     if (removeHole(state.drillHoles, holeId)) {
       cancelOutstandingChargeAction(state, holeId);
       clearHoleCharges(state, holeId);
+      if (drilled) emitHoleCellsChanged(ctx, [drilled]);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 

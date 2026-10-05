@@ -241,3 +241,17 @@ export function resetPlanState(state: GameState): void {
   state.plannedChargesByHole = {};
   state.sequenceDelays = {};
 }
+
+/**
+ * Emit nav:occupancy_changed for the 1x1 cell under each hole so the NavGrid
+ * cost is restored when drilled holes are removed (#1360); `drill_plan clear`
+ * reaches it through clearDrillPlan. No-op when grid is null or holes is empty.
+ */
+export function emitHoleCellsChanged(
+  ctx: GameContext,
+  holes: ReadonlyArray<{ x: number; z: number }>,
+): void {
+  for (const h of holes) {
+    emitFootprintOccupancyChanged(ctx, Math.floor(h.x), Math.floor(h.z), 1, 1);
+  }
+}
