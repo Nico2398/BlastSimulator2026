@@ -344,6 +344,10 @@ export const TRANSMISSION_LOSS_POROSITY_SCALE = 0.40;
  *  of pushing harder on the same voxel. */
 export const CHARGE_KG_PER_METRE = 2.0;
 
+/** Metres of float tolerance when testing charge column + stemming against hole
+ *  depth, so an exact fit (8 kg + 2 m in a 6 m hole) is not refused by rounding. */
+export const CHARGE_FIT_EPSILON = 1e-6;
+
 /** Ticks to drill one hole at the reference depth/diameter (#553). */
 export const DRILL_HOLE_BASE_DURATION_TICKS = 6;
 /** Reference hole depth (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */

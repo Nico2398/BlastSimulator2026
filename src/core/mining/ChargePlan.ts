@@ -2,7 +2,11 @@
 // Assigns explosives and stemming to each hole in the drill plan.
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
-import { MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG } from '../config/balance.js';
+import { t } from '../i18n/I18n.js';
+import {
+  MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
+  CHARGE_KG_PER_METRE, CHARGE_FIT_EPSILON,
+} from '../config/balance.js';
 
 export interface HoleCharge {
   explosiveId: string;
@@ -37,8 +41,20 @@ export function createCharge(
   if (stemmingM > holeDepth) {
     return { error: `Stemming ${stemmingM}m exceeds hole depth ${holeDepth}m` };
   }
+  if (!chargeFitsHole(amountKg, stemmingM, holeDepth)) {
+    return {
+      error: t('mining.charge.column_exceeds_hole', {
+        amount: amountKg,
+        column: +chargeColumnM(amountKg).toFixed(2),
+        stemming: stemmingM,
+        depth: holeDepth,
+        max: maxFittingChargeKg(holeDepth, stemmingM),
+      }),
+    };
+  }
   return { charge: { explosiveId, amountKg, stemmingM } };
 }
+
 
 /** Batch-charge all holes with the same settings. Returns errors for invalid ones. */
 export function batchCharge(
@@ -101,4 +117,25 @@ export function chargeOrderCost(explosiveId: string, amountKg: number): number {
 /** Total cash cost of every charge in a per-hole charge map. */
 export function plannedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): number {
   return Object.values(chargesByHole).reduce((sum, c) => sum + chargeOrderCost(c.explosiveId, c.amountKg), 0);
+}
+
+/** Metres of hole column that `amountKg` of explosive occupies. */
+export function chargeColumnM(amountKg: number): number {
+  return amountKg / CHARGE_KG_PER_METRE;
+}
+
+/** Raw (unrounded) heaviest charge that fits a hole of `holeDepth` under `stemmingM`; never negative. */
+export function maxChargeKgForHole(holeDepth: number, stemmingM: number): number {
+  return Math.max(0, (holeDepth - stemmingM) * CHARGE_KG_PER_METRE);
+}
+
+/** True when `amountKg` plus `stemmingM` of stemming fits a hole of `holeDepth` (within float tolerance). */
+export function chargeFitsHole(amountKg: number, stemmingM: number, holeDepth: number): boolean {
+  return chargeColumnM(amountKg) + stemmingM <= holeDepth + CHARGE_FIT_EPSILON;
+}
+
+/** Heaviest charge to show/accept for a hole: floored to 0.1 kg so the displayed maximum is itself accepted. */
+export function maxFittingChargeKg(holeDepth: number, stemmingM: number): number {
+  const kg = maxChargeKgForHole(holeDepth, stemmingM) + CHARGE_FIT_EPSILON;
+  return Math.floor(kg * 10) / 10;
 }

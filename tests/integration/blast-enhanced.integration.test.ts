@@ -226,7 +226,7 @@ describe('Blast enhanced', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
 
-    const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 25, 1);
+    const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 14, 1);
     const delays = autoVPattern(holes, 25);
     const plan = assembleBlastPlan(holes, charges, delays);
 
