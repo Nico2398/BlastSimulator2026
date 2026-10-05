@@ -290,7 +290,7 @@ describe('makePaySection raises line (#1383)', () => {
     return makeEmployee({
       role: 'driller',
       qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }],
-      raises,
+      ...(raises === undefined ? {} : { raises }),
       salary: base + bonus + (raises ?? 0),
     });
   };
