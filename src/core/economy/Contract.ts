@@ -6,6 +6,7 @@ import {
   CONTRACT_REFRESH_INTERVAL,
   CONTRACTS_PER_REFRESH,
   MAX_AVAILABLE_CONTRACTS,
+  NEGOTIATION_EARLY_BONUS_RATE,
   ORE_PRICES,
   RUBBLE_DISPOSAL_PRICE_RANGE,
 } from '../config/balance.js';
@@ -151,7 +152,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   const quantityKg = Math.round(rng.nextFloat(50, 500) / 10) * 10;
   const deadlineTicks = rng.nextInt(30, 100);
   const penaltyAmount = Math.round(quantityKg * basePricePerKg * 0.3);
-  const earlyBonus = Math.round(quantityKg * pricePerKg * 0.15);
+  const earlyBonus = computeEarlyBonus(quantityKg, pricePerKg);
 
   const id = state.nextId++;
 
@@ -164,8 +165,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
 
 /** Early-delivery bonus for a contract of the given size and price. */
 export function computeEarlyBonus(quantityKg: number, pricePerKg: number): number {
-  void quantityKg; void pricePerKg; // TODO: implement
-  return undefined as unknown as number;
+  return Math.round(quantityKg * pricePerKg * NEGOTIATION_EARLY_BONUS_RATE);
 }
 
 // ── Operations ──

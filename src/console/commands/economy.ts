@@ -12,7 +12,7 @@ import {
   type ContractSelector,
   type ContractType,
 } from '../../core/economy/Contract.js';
-import { negotiateContract } from '../../core/economy/Negotiation.js';
+import { negotiateContractAtTick } from '../../core/economy/Negotiation.js';
 import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -216,8 +216,8 @@ export function contractCommand(
       const resolved = resolveContract(state.contracts.available, args, named, usage);
       if ('success' in resolved) return resolved;
       const id = resolved.id;
-      const result = negotiateContract(state.contracts, id, 0, rng);
-      if (!result) return { success: false, output: `Contract #${id} not found.` };
+      const result = negotiateContractAtTick(state.contracts, id, 0, state.seed, state.tickCount);
+      if ('refused' in result && result.refused === 'not_found') return { success: false, output: `Contract #${id} not found.` };
       if ('refused' in result) return { success: false, output: t('economy.negotiation.already_negotiated', { id }) };
       state.contracts.lastNegotiation = { contractId: id, success: result.success, changes: result.changes };
       const lines = [

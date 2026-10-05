@@ -26,6 +26,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
+import { canNegotiate } from '../../core/economy/Negotiation.js';
 import type { Contract, ContractType, NegotiationField } from '../../core/economy/Contract.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -310,6 +311,7 @@ export class ContractsPanel extends PanelBase {
 
     const negotiateBtn = button('ghost', t('ui.contracts.negotiate'), {
       dataAction: 'negotiate',
+      ...(canNegotiate(c) ? {} : { disabled: true, title: t('ui.contracts.negotiate_used') }),
       onClick: () => this.gameConsole?.(`contract negotiate id:${c.id}`),
     });
     negotiateBtn.style.cssText = 'flex:1;height:30px;font-size:10px';
