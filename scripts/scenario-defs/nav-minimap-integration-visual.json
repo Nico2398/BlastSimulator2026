@@ -125,7 +125,7 @@
       }
     },
     {
-      "command": "build management_office at:7,8",
+      "command": "build management_office at:14,8",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -141,7 +141,7 @@
         },
         {
           "type": "pickTile",
-          "x": 7,
+          "x": 14,
           "z": 8
         },
         {

@@ -132,7 +132,7 @@
       }
     },
     {
-      "command": "build explosive_warehouse at:20,20",
+      "command": "build explosive_warehouse at:15,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -148,7 +148,7 @@
         },
         {
           "type": "pickTile",
-          "x": 20,
+          "x": 15,
           "z": 20
         },
         {
@@ -160,7 +160,7 @@
         }
       ],
       "role": "player",
-      "description": "#553: built directly on top of hole H1's now-drilled cell — placeBuilding only checks bounds/other-building occupancy, not NavGrid cell type, so a landed drill_hole cell is a legal building site.",
+      "description": "#1390: built beside hole H1 (20,20), not on it — placement refuses a footprint over a drilled or ordered hole (Blocks a drill hole), so the warehouse sits a few tiles clear of the hole and still inside blast range.",
       "expect": {
         "changedBy": {
           "cash": -20000
@@ -171,7 +171,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:24,25",
+      "command": "build freight_warehouse at:25,30",
       "interaction": [
         {
           "type": "clickSelector",
@@ -183,8 +183,8 @@
         },
         {
           "type": "pickTile",
-          "x": 24,
-          "z": 25
+          "x": 25,
+          "z": 30
         },
         {
           "type": "screenshot"
@@ -370,7 +370,7 @@
           "sequencedCount": 0,
           "buildingCount": 0
         },
-        "note": "both warehouses (200/150 max HP) sit exactly on the two charged holes and get destroyed — the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: explosive_warehouse #1, freight_warehouse #2')"
+        "note": "both warehouses (200/150 max HP) sit a few tiles from the two charged holes (#1390: placement refuses a footprint over a hole) and still get destroyed — the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: explosive_warehouse #1, freight_warehouse #2')"
       }
     },
     {
