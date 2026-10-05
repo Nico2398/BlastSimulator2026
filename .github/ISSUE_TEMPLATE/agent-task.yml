@@ -64,7 +64,7 @@ body:
         site: buildings, vehicles, zones, damage · nav: src/core/nav,
         src/core/mining · economy:
         src/core/economy, campaign, scores · world: src/core/world, weather,
-        events · ui: all of src/ui or its shared base (UIManager, PanelBase, dom,
+        events · ui: the shared UI base (UIManager, PanelBase, dom,
         styles, tokens) — clashes with every UI area below · hud: shell, notify,
         MiniMap · panels: management panels and modals · workshop: blast
         planning UI · scene: src/ui/scene, BuildMenu · tutorial: tutorial
