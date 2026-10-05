@@ -11,6 +11,8 @@ import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { setDelay, autoVPattern } from '../../../core/mining/Sequence.js';
+import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
+import { getLevel, isExplosiveAvailable, resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 
 /** Payload carried by a queued `charge_hole` PendingAction (#554). */
 export interface ChargeHoleActionPayload {
@@ -121,6 +123,8 @@ export function chargeCommand(
   const stemming = parseFloat((named['stemming'] ?? String(MIN_STEMMING_M)).replace('m', ''));
 
   if (!explosiveId) return { success: false, output: t('mining.charge.missing_explosive') };
+  const notOffered = levelExplosiveFailure(ctx.state!.campaign.activeLevelId, explosiveId);
+  if (notOffered) return notOffered;
 
   if (holeSpec === '*') {
     const holeIds = ctx.state!.drillHoles.map(h => h.id);
@@ -192,4 +196,27 @@ export function sequenceCommand(
   }
 
   return { success: false, output: t('mining.sequence.usage') };
+}
+
+/**
+ * Failure when `explosiveId` is a catalog explosive the active level does not
+ * offer. Null when allowed or when the id is not in the catalog (unknown ids
+ * keep their existing error path).
+ */
+export function levelExplosiveFailure(levelId: string | null, explosiveId: string): CommandResult | null {
+  if (!getExplosive(explosiveId)) return null;
+  if (isExplosiveAvailable(levelId, explosiveId)) return null;
+  const level = levelId ? getLevel(levelId) : undefined;
+  const nameOf = (id: string): string => {
+    const e = getExplosive(id);
+    return e ? t(e.nameKey) : id;
+  };
+  return {
+    success: false,
+    output: t('mining.charge.explosive_not_available', {
+      explosive: nameOf(explosiveId),
+      level: level ? t(level.nameKey) : (levelId ?? ''),
+      available: resolveAvailableExplosives(levelId).map(nameOf).join(', '),
+    }),
+  };
 }

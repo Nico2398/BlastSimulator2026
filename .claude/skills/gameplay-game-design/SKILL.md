@@ -126,6 +126,8 @@ Each has: energy yield, cost, water sensitivity, charge limits, rock tier requir
 Examples: Pop-Rock (starter), Big Bada Boom (mid), Dynatomics (endgame).
 Cost: costPerKg x kg is charged when the charge order is placed (finance category `explosives`) and refunded in full if the order is cancelled; firing the blast charges nothing.
 
+Level explosive lists (`availableExplosives`) are enforced in the Charge step and console `charge` (single, `hole:*`, saved-plan queue); sandbox/new_game (no known level) use the full catalog.
+
 ### Ores
 Fictional humorous names. "Treranium" (très rare, high value), common ores, exotic ores.
 

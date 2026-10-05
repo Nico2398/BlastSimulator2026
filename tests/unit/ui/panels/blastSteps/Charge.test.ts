@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ChargeStep } from '../../../../../src/ui/panels/blastSteps/Charge.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
-import { getExplosive } from '../../../../../src/core/world/ExplosiveCatalog.js';
+import { getExplosive, getAllExplosives } from '../../../../../src/core/world/ExplosiveCatalog.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
 
@@ -285,5 +285,59 @@ describe('ChargeStep', () => {
     expect(() => step.refreshLocale()).not.toThrow();
     step.update(makeState(), 'sunny');
     expect(card(step, 'boomite')).not.toBeNull();
+  });
+});
+
+describe('ChargeStep level-limited product list (#1357)', () => {
+  function cardIds(step: ChargeStep): string[] {
+    return Array.from(step.root.querySelectorAll('[data-action="select-explosive"]'))
+      .map(c => (c as HTMLElement).dataset['explosive']!);
+  }
+
+  it('shows exactly the active level explosives on dusty_hollow', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.campaign.activeLevelId = 'dusty_hollow';
+    step.update(state, 'sunny');
+    expect(cardIds(step)).toEqual(['pop_rock', 'boomite', 'krackle']);
+  });
+
+  it('shows the full catalog when activeLevelId is null', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.campaign.activeLevelId = null;
+    step.update(state, 'sunny');
+    expect(cardIds(step).length).toBe(getAllExplosives().length);
+    expect(card(step, 'dynatomics')).not.toBeNull();
+  });
+
+  it('shows the full catalog for an unknown level id', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.campaign.activeLevelId = 'sandbox_site';
+    step.update(state, 'sunny');
+    expect(cardIds(step).length).toBe(getAllExplosives().length);
+  });
+
+  it('resets a selection that falls outside the list when the level changes', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    state.campaign.activeLevelId = null;
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state, 'sunny');
+    card(step, 'dynatomics').click();
+    expect(card(step, 'dynatomics').dataset['selected']).toBe('true');
+
+    state.campaign.activeLevelId = 'dusty_hollow';
+    step.update(state, 'sunny');
+
+    expect(card(step, 'dynatomics')).toBeNull();
+    const selected = Array.from(step.root.querySelectorAll('[data-action="select-explosive"][data-selected="true"]'));
+    expect(selected).toHaveLength(1);
+    expect(['pop_rock', 'boomite', 'krackle']).toContain((selected[0] as HTMLElement).dataset['explosive']);
+
+    (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole.mock.calls[0]![0]).not.toContain('dynatomics');
   });
 });

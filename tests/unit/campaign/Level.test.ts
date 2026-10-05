@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getLevel, getAllLevels, resolveContractPriceMultiplier } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
+import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 
 describe('Level definition system (7.1)', () => {
@@ -158,5 +159,44 @@ describe('Level definition system (7.1)', () => {
     expect(level.availableExplosives).not.toContain('rumblox');
     expect(level.availableExplosives).not.toContain('obliviax');
     expect(level.availableExplosives).not.toContain('dynatomics');
+  });
+});
+
+describe('level explosive availability (#1357)', () => {
+  const fullCatalog = getAllExplosives().map(e => e.id);
+
+  it('null level id resolves to the full catalog', () => {
+    expect([...resolveAvailableExplosives(null)]).toEqual(fullCatalog);
+  });
+
+  it('dusty_hollow resolves to exactly its three explosives', () => {
+    expect([...resolveAvailableExplosives('dusty_hollow')]).toEqual(['pop_rock', 'boomite', 'krackle']);
+  });
+
+  it('tutorial_pit resolves to its own list, a strict subset of the catalog', () => {
+    const ids = [...resolveAvailableExplosives('tutorial_pit')];
+    expect(ids).toEqual(getLevel('tutorial_pit')!.availableExplosives);
+    expect(ids.length).toBeLessThan(fullCatalog.length);
+    expect(ids).not.toContain('dynatomics');
+  });
+
+  it('unknown level id (sandbox) resolves to the full catalog', () => {
+    expect([...resolveAvailableExplosives('nonexistent_mine')]).toEqual(fullCatalog);
+  });
+
+  it('isExplosiveAvailable rejects a catalog explosive outside the level list', () => {
+    expect(isExplosiveAvailable('dusty_hollow', 'dynatomics')).toBe(false);
+    expect(isExplosiveAvailable('tutorial_pit', 'krackle')).toBe(false);
+  });
+
+  it('isExplosiveAvailable accepts every explosive in the level list', () => {
+    for (const id of getLevel('dusty_hollow')!.availableExplosives) {
+      expect(isExplosiveAvailable('dusty_hollow', id)).toBe(true);
+    }
+  });
+
+  it('isExplosiveAvailable allows everything for null and unknown level ids', () => {
+    expect(isExplosiveAvailable(null, 'dynatomics')).toBe(true);
+    expect(isExplosiveAvailable('nonexistent_mine', 'dynatomics')).toBe(true);
   });
 });

@@ -30,6 +30,10 @@ import { STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
+import { chargeCommand } from '../../src/console/commands/mining.js';
+import { addHole } from '../../src/core/mining/DrillPlan.js';
+import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
+import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlanQueue.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -685,5 +689,107 @@ describe('campaign status finale line (#1320)', () => {
     const out = campaignStatusCommand(ctx, [], {}).output;
     expect(out).toContain('CAMPAIGN COMPLETE');
     expect(out).toContain(t('campaign.status_complete'));
+  });
+});
+
+// ── Charge limited to the active level's explosives (#1357) ────────────────
+
+describe('charge respects the active level availableExplosives (#1357)', () => {
+  function withHoles(ctx: GameContext, n = 2): void {
+    const st = ctx.state!;
+    for (let i = 0; i < n; i++) addHole(st, st.drillHoles, 10 + i * 4, 10, 6, 0.15);
+  }
+  function charge(ctx: GameContext, named: Record<string, string>) {
+    return chargeCommand(ctx as never, [], named);
+  }
+
+  it('dusty_hollow refuses dynatomics for a single hole with localized text, queues nothing, keeps cash', () => {
+    const ctx = makeCtx();
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    withHoles(ctx);
+    const cash = ctx.state!.cash;
+    const queued = ctx.state!.pendingActions.length;
+
+    const r = charge(ctx, { hole: 'H1', explosive: 'dynatomics', amount: '5kg', stemming: '2m' });
+
+    expect(r.success).toBe(false);
+    expect(r.output).toContain(t(getExplosive('dynatomics')!.nameKey));
+    expect(r.output).toContain(t(getLevel('dusty_hollow')!.nameKey));
+    expect(r.output).toContain(t(getExplosive('krackle')!.nameKey));
+    expect(r.output).not.toContain('mining.charge.explosive_not_available');
+    expect(ctx.state!.pendingActions.length).toBe(queued);
+    expect(Object.keys(ctx.state!.plannedChargesByHole)).toHaveLength(0);
+    expect(ctx.state!.cash).toBe(cash);
+  });
+
+  it('dusty_hollow refuses dynatomics for hole:* and queues nothing', () => {
+    const ctx = makeCtx();
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    withHoles(ctx);
+    const cash = ctx.state!.cash;
+    const queued = ctx.state!.pendingActions.length;
+
+    const r = charge(ctx, { hole: '*', explosive: 'dynatomics', amount: '5kg', stemming: '2m' });
+
+    expect(r.success).toBe(false);
+    expect(r.output).toContain(t(getLevel('dusty_hollow')!.nameKey));
+    expect(ctx.state!.pendingActions.length).toBe(queued);
+    expect(Object.keys(ctx.state!.plannedChargesByHole)).toHaveLength(0);
+    expect(ctx.state!.cash).toBe(cash);
+  });
+
+  it.each(['pop_rock', 'boomite', 'krackle'])('dusty_hollow accepts %s', (id) => {
+    const ctx = makeCtx();
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    withHoles(ctx, 1);
+    const r = charge(ctx, { hole: 'H1', explosive: id, amount: '3kg', stemming: '2m' });
+    expect(r.success).toBe(true);
+    expect(ctx.state!.plannedChargesByHole['H1']?.explosiveId).toBe(id);
+  });
+
+  it('new_game (null activeLevelId) still accepts dynatomics', () => {
+    const ctx = makeCtx();
+    expect(ctx.state!.campaign.activeLevelId).toBeNull();
+    withHoles(ctx, 1);
+    const r = charge(ctx, { hole: 'H1', explosive: 'dynatomics', amount: '3kg', stemming: '2m' });
+    expect(r.success).toBe(true);
+  });
+
+  it('an unknown explosive id keeps the existing unknown-explosive error on a campaign level', () => {
+    const ctx = makeCtx();
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    withHoles(ctx, 1);
+    const r = charge(ctx, { hole: 'H1', explosive: 'nope_ite', amount: '3kg', stemming: '2m' });
+    expect(r.success).toBe(false);
+    expect(r.output).toContain('Unknown explosive: "nope_ite"');
+  });
+
+  it('an unknown activeLevelId (sandbox) allows the full catalog', () => {
+    const ctx = makeCtx();
+    ctx.state!.campaign.activeLevelId = 'sandbox_site';
+    withHoles(ctx, 1);
+    const r = charge(ctx, { hole: 'H1', explosive: 'dynatomics', amount: '3kg', stemming: '2m' });
+    expect(r.success).toBe(true);
+  });
+
+  it('replaying a saved plan holding an unavailable explosive is refused and queues nothing', () => {
+    const ctx = makeCtx();
+    campaignStartCommand(ctx, [], { level: 'dusty_hollow' });
+    const st = ctx.state!;
+    const cash = st.cash;
+    const queued = st.pendingActions.length;
+    const saved = {
+      drillHoles: [{ id: 'H1', x: 12, z: 12, depth: 6, diameter: 0.15 }],
+      chargesByHole: { H1: { explosiveId: 'dynatomics', amountKg: 3, stemmingM: 2 } },
+      sequenceDelays: {},
+    };
+
+    const r = queueSavedBlastPlan(ctx as never, saved as never, 'plan');
+
+    expect(r.success).toBe(false);
+    expect(r.output).toContain(t(getLevel('dusty_hollow')!.nameKey));
+    expect(st.pendingActions.length).toBe(queued);
+    expect(st.plannedDrillHoles).toHaveLength(0);
+    expect(st.cash).toBe(cash);
   });
 });
