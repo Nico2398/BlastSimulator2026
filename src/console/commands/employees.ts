@@ -270,7 +270,7 @@ export function employeeCommand(
       }
 
       const result = enrolInTraining(state, id, building, skill, ctx.emitter);
-      if (!result.success) return { success: false, output: result.error! };
+      if (!result.success) return { success: false, output: refusalText(result) };
 
       state.cash -= plan.fee;
       addExpense(state.finances, plan.fee, 'salaries', `Train ${emp.name}: ${skill}`, state.tickCount);

@@ -386,9 +386,9 @@ function en(key: string, params: Record<string, string | number> = {}): string {
   return template.replace(/\{(\w+)\}/g, (_m, n: string) => (params[n] !== undefined ? String(params[n]) : `{${n}}`));
 }
 
-/** English output is either today's literal or the en.json rendering of the new key. */
-function expectEnglish(output: string, literal: string, key: string, params: Record<string, string | number> = {}): void {
-  expect([literal, en(key, params)]).toContain(output);
+/** English output is exactly the en.json rendering of `key`. */
+function expectEnglish(output: string, key: string, params: Record<string, string | number> = {}): void {
+  expect(output).toBe(en(key, params));
 }
 
 describe('refusals — new locale keys exist in both languages', () => {
@@ -422,7 +422,7 @@ describe('build <type> at: — placement refusals', () => {
     const ctx = makeCtx();
     const result = buildCommand(ctx, ['management_office'], { at: UNEVEN_AT });
     expect(result.success).toBe(false);
-    expectEnglish(result.output, 'Uneven surface', 'shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
+    expectEnglish(result.output, 'shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
   });
 
   it('uneven ground — fr prints the exact refused_uneven_ground text with {max}', () => {
@@ -441,7 +441,7 @@ describe('build <type> at: — placement refusals', () => {
     expect(check.valid).toBe(false);
     expect(check.error).toBe('Out of bounds');
     expect(check.errorKey).toBe('shell.placement.refused_out_of_bounds');
-    expectEnglish(refusalText(check), 'Out of bounds', 'shell.placement.refused_out_of_bounds');
+    expectEnglish(refusalText(check), 'shell.placement.refused_out_of_bounds');
     setLocale('fr');
     expect(refusalText(check)).toBe(fr('shell.placement.refused_out_of_bounds'));
   });
@@ -451,7 +451,7 @@ describe('build <type> at: — placement refusals', () => {
     placeTestBuilding(ctx);
     const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
     expect(result.success).toBe(false);
-    expectEnglish(result.output, 'Space is occupied', 'shell.placement.refused_occupied');
+    expectEnglish(result.output, 'shell.placement.refused_occupied');
   });
 
   it('occupied — fr prints the exact refused_occupied text', () => {
@@ -528,7 +528,7 @@ describe('build move — placement refusals', () => {
     const id = placeAt(ctx, 'management_office', 1, 4, 4);
     const enResult = buildCommand(ctx, ['move', String(id)], { to: UNEVEN_AT });
     expect(enResult.success).toBe(false);
-    expectEnglish(enResult.output, 'Uneven surface', 'shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
+    expectEnglish(enResult.output, 'shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
     setLocale('fr');
     const frResult = buildCommand(ctx, ['move', String(id)], { to: UNEVEN_AT });
     expect(frResult.success).toBe(false);
@@ -541,7 +541,7 @@ describe('build move — placement refusals', () => {
     placeAt(ctx, 'management_office', 1, 8, 8);
     const enResult = buildCommand(ctx, ['move', String(id)], { to: '8,8' });
     expect(enResult.success).toBe(false);
-    expectEnglish(enResult.output, 'Space is occupied', 'shell.placement.refused_occupied');
+    expectEnglish(enResult.output, 'shell.placement.refused_occupied');
     setLocale('fr');
     const frResult = buildCommand(ctx, ['move', String(id)], { to: '8,8' });
     expect(frResult.success).toBe(false);
@@ -589,7 +589,7 @@ describe('employee fire — refusals', () => {
     const emp = hireUnionized(ctx);
     const result = employeeCommand(ctx, ['fire', String(emp.id)], {});
     expect(result.success).toBe(false);
-    expectEnglish(result.output, 'Cannot fire unionized employee', 'employees.fire_unionized');
+    expectEnglish(result.output, 'employees.fire_unionized');
   });
 
   it('unionized — fr prints the exact fire_unionized text', () => {
@@ -605,7 +605,7 @@ describe('employee fire — refusals', () => {
     const ctx = makeCtx();
     const result = employeeCommand(ctx, ['fire', '4242'], {});
     expect(result.success).toBe(false);
-    expectEnglish(result.output, 'Employee not found', 'employees.employee_not_found', { id: 4242 });
+    expectEnglish(result.output, 'employees.employee_not_found', { id: 4242 });
   });
 
   it('nonexistent id — fr prints the exact employee_not_found text', () => {
@@ -746,7 +746,7 @@ describe('vehicle haul / break — refusals', () => {
       setLocale('fr');
       const frResult = vehicleCommand(ctx, [sub, '777'], { fragment: '1' });
       expect(frResult.success).toBe(false);
-      expect([fr('mount.vehicle_not_found'), fr('vehicle.not_found', { id: 777 })]).toContain(frResult.output);
+      expect(frResult.output).toBe(fr('vehicle.not_found', { id: 777 }));
     });
   }
 });

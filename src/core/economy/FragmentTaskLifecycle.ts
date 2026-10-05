@@ -4,7 +4,7 @@
 // position-gated vehicle tasks that target a fragment: request looks up and
 // validates the vehicle, search picks the nearest reachable candidate
 // fragment, and claimAndDispatchFragmentAction runs the claim/reserve/
-// dispatch tail once the caller's own eligibility checks pass. These four
+// dispatch tail once the caller's own eligibility checks pass. These
 // exports are those steps, shared so BoulderBreaking.ts and HaulingTask.ts
 // only carry what differs between them: eligibility rules and what happens
 // on arrival (now ArrivalEffects.ts, #1091).
@@ -25,7 +25,6 @@ import { NavGrid } from '../nav/NavGrid.js';
 import { claimPendingAction } from '../engine/TaskDispatch.js';
 import { reserveVehicle } from '../engine/VehicleReservation.js';
 import { moveTo } from '../engine/MoveTo.js';
-import { t } from '../i18n/I18n.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
 /**
@@ -41,6 +40,11 @@ export function findRequestVehicle(
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found', errorKey: 'vehicle.not_found', errorParams: { id: vehicleId } };
   return { success: true, vehicle };
+}
+
+/** Refusal for a vehicle whose driver seat is empty — shared by every fragment-task request. */
+export function vehicleNoDriver(): { success: false; error: string } & RefusalKey {
+  return { success: false, error: 'Vehicle has no driver', errorKey: 'mount.vehicle_no_driver' };
 }
 
 /**
@@ -139,18 +143,18 @@ export function claimAndDispatchFragmentAction(
   vehicle: Vehicle,
   actionType: ActionType,
   fragmentId: number,
-  noActionQueuedKey: string,
-  claimFailedKey: string,
+  noActionQueued: { error: string; errorKey: string },
+  claimFailed: { error: string; errorKey: string },
 ): { success: true } | ({ success: false; error: string } & RefusalKey) {
   const action = state.pendingActions.find(a =>
     a.type === actionType && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
-  if (!action) return { success: false, error: t(noActionQueuedKey) };
+  if (!action) return { success: false, ...noActionQueued };
 
   const employee = resolveVehicleDriver(vehicle, state.employees.employees);
-  if (!employee) return { success: false, error: 'Vehicle has no driver', errorKey: 'mount.vehicle_no_driver' };
+  if (!employee) return vehicleNoDriver();
 
   const claimed = claimPendingAction(state, action.id, employee.id);
-  if (!claimed) return { success: false, error: t(claimFailedKey) };
+  if (!claimed) return { success: false, ...claimFailed };
   reserveVehicle(state.vehicles, vehicle.id, claimed.id);
   employee.activeActionId = claimed.id;
 

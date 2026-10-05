@@ -16,7 +16,7 @@ import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { storageRoomKg } from './Logistics.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
-import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
+import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -58,7 +58,7 @@ export function requestHaulFragment(
   const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', { error: 'Vehicle is not a debris hauler', errorKey: 'vehicle.not_debris_hauler' });
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver', errorKey: 'mount.vehicle_no_driver' };
+  if (vehicleDriverId(vehicle) === null) return vehicleNoDriver();
   if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.payload !== null) {
     return { success: false, error: 'Vehicle is already hauling', errorKey: 'vehicle.already_hauling' };
   }
@@ -71,7 +71,7 @@ export function requestHaulFragment(
     return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first', errorKey: 'vehicle.fragment_oversized' };
   }
 
-  return claimAndDispatchFragmentAction(state, vehicle, 'haul_debris', fragmentId, 'haul.no_action_queued', 'haul.claim_failed');
+  return claimAndDispatchFragmentAction(state, vehicle, 'haul_debris', fragmentId, { error: 'No haul action queued for this fragment', errorKey: 'haul.no_action_queued' }, { error: 'Failed to claim haul action', errorKey: 'haul.claim_failed' });
 }
 
 /**

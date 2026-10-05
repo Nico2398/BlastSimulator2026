@@ -15,7 +15,7 @@ import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
-import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
+import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
 
 /**
  * True when `vehicle` is a rock_fragmenter with a driver assigned and no
@@ -48,7 +48,7 @@ export function requestBreakBoulder(
   const found = findRequestVehicleOfRole(state, vehicleId, 'rock_fragmenter', { error: 'Vehicle is not a rock fragmenter', errorKey: 'vehicle.not_rock_fragmenter' });
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver', errorKey: 'mount.vehicle_no_driver' };
+  if (vehicleDriverId(vehicle) === null) return vehicleNoDriver();
   if (getVehicleReservation(state.vehicles, vehicle.id) !== null) {
     return { success: false, error: 'Vehicle is already breaking a fragment', errorKey: 'vehicle.already_breaking' };
   }
@@ -59,7 +59,7 @@ export function requestBreakBoulder(
   if (!tracked) return { success: false, error: 'Fragment not found or not on the ground', errorKey: 'vehicle.fragment_unavailable' };
   if (!isOversized(tracked.fragment.volume)) return { success: false, error: 'Fragment is not oversized', errorKey: 'vehicle.fragment_not_oversized' };
 
-  return claimAndDispatchFragmentAction(state, vehicle, 'fragment_debris', fragmentId, 'break.no_action_queued', 'break.claim_failed');
+  return claimAndDispatchFragmentAction(state, vehicle, 'fragment_debris', fragmentId, { error: 'No break action queued for this fragment', errorKey: 'break.no_action_queued' }, { error: 'Failed to claim break action', errorKey: 'break.claim_failed' });
 }
 
 /**

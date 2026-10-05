@@ -1576,6 +1576,12 @@ describe('canReleaseDriver — error: vehicle not found', () => {
     const result = canReleaseDriver(vs, 9999);
     expect(result.error).toBe('Vehicle not found');
   });
+
+  it('carries the translation key and id for the console to localize', () => {
+    const result = canReleaseDriver(createVehicleState(), 9999);
+    expect(result.errorKey).toBe('vehicle.not_found');
+    expect(result.errorParams).toEqual({ id: 9999 });
+  });
 });
 
 describe('canReleaseDriver — boundary: vehicle has no driver at all', () => {

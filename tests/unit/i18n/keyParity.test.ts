@@ -437,7 +437,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1394: +3 keys (secondary blast report lines, lost-explosives demolish warning), both locales: 3628
     // #1417: +16 keys (duration units, notification pips/alerts, saveload summary), both locales: 3644
     // #1397: +11 keys (localized console refusals), both locales: 3655.
-    expect(Object.keys(en).length).toBe(3655);
+    // #1397 refactor: +3 keys (vehicle.mid_haul, employees.train_already_enrolled, employees.train_injured): 3658.
+    expect(Object.keys(en).length).toBe(3658);
   });
 });
 

@@ -132,7 +132,7 @@ export function vehicleCommand(
       if (args[2] === 'none') {
         const result = alight(state, vehicleId, ctx.emitter);
         if (!result.success) {
-          return { success: false, output: result.error };
+          return { success: false, output: refusalText(result) };
         }
         return { success: true, output: t('vehicle.driver_unassign_success', { id: vehicleId }) };
       }

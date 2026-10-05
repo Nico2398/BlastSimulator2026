@@ -17,11 +17,12 @@ import { isMounted, isInsideBuilding } from '../entities/EmployeeLocomotion.js';
 import { findBuildingExitCell, isOnBuildingRing } from '../nav/BuildingApproach.js';
 import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { isStepClimbable } from '../nav/NavGrid.js';
 import { isImpassable } from '../nav/Pathfinding.js';
 
-type MountResult = { success: true } | { success: false; error: string };
+type MountResult = { success: true } | ({ success: false; error: string } & RefusalKey);
 
 /** Anything an employee can be inside of — a vehicle or a building. */
 interface OccupancyHost {
@@ -156,7 +157,7 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   if (employeeId === null) return { success: false, error: t('mount.vehicle_no_driver') };
 
   const guard = canReleaseDriver(state.vehicles, vehicleId);
-  if (!guard.success) return { success: false, error: guard.error ?? t('mount.alight_failed') };
+  if (!guard.success) return { ...guard, success: false, error: guard.error ?? t('mount.alight_failed') };
 
   alightOccupant(state, vehicle, employeeId, emitter);
   return { success: true };
