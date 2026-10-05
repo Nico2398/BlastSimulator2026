@@ -3103,7 +3103,7 @@
   "shell.placement.camera_hint": "right-drag orbits · Esc cancels",
   "menu.subtitle": "dig  ·  blast  ·  profit",
   "ui.minimap.no_data": "No map data",
-  "notification.bankruptcy_triggered": "BANKRUPTCY! Cash: ${cash}. Level failed.",
+  "notification.bankruptcy_triggered": "BANKRUPTCY! Cash: {cash}. Level failed.",
   "notification.bankruptcy_warning": "Low funds! Bankruptcy in {ticksRemaining} ticks.",
   "notification.ecology_shutdown": "ECOLOGICAL SHUTDOWN! Government closed the mine. Level failed.",
   "notification.ecology_warning": "Ecological violation! Shutdown in {ticksRemaining} ticks.",

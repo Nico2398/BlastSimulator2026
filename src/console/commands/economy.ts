@@ -34,7 +34,7 @@ export function financesCommand(
 
   const lines = [
     `Balance: $${balance.toFixed(2)}`,
-    `Bankrupt: ${state.finances.isBankrupt ? 'YES' : 'No'}`,
+    `Bankrupt: ${state.bankruptcy.bankrupt ? 'YES' : 'No'}`,
     '',
     `Total income:   $${report.totalIncome.toFixed(2)}`,
     `Total expenses: $${report.totalExpenses.toFixed(2)}`,

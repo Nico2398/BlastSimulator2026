@@ -243,7 +243,7 @@
         "increased": [
           "safety"
         ],
-        "note": "lawsuit_wrongful_death option 0 -- Lost $200000, safety +5; drives cash sharply negative (finances.isBankrupt flips true) but the separate bankruptcy-consequence tracker (ticksBelowThreshold) hasn't crossed its grace threshold yet, so levelEnded stays false"
+        "note": "lawsuit_wrongful_death option 0 -- Lost $200000, safety +5; drives cash sharply negative (cash goes negative) but the separate bankruptcy-consequence tracker (ticksBelowThreshold) hasn't crossed its grace threshold yet, so levelEnded stays false"
       },
       "commandOutcome": "either"
     },
