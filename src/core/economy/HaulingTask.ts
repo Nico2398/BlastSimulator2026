@@ -14,6 +14,7 @@ import type { GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { storageRoomKg } from './Logistics.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
@@ -53,7 +54,7 @@ export function requestHaulFragment(
   state: GameState,
   vehicleId: number,
   fragmentId: number,
-): { success: boolean; error?: string } {
+): { success: boolean; error?: string } & RefusalKey {
   const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
   if (!found.success) return found;
   const vehicle = found.vehicle;

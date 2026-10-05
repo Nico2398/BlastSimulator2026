@@ -26,6 +26,7 @@ import { claimPendingAction } from '../engine/TaskDispatch.js';
 import { reserveVehicle } from '../engine/VehicleReservation.js';
 import { moveTo } from '../engine/MoveTo.js';
 import { t } from '../i18n/I18n.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 
 /**
  * Look up `vehicleId` for a request-phase task entry point (requestBreakBoulder,
@@ -36,7 +37,7 @@ import { t } from '../i18n/I18n.js';
 export function findRequestVehicle(
   state: GameState,
   vehicleId: number,
-): { success: true; vehicle: Vehicle } | { success: false; error: string } {
+): { success: true; vehicle: Vehicle } | ({ success: false; error: string } & RefusalKey) {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found' };
   return { success: true, vehicle };
@@ -54,7 +55,7 @@ export function findRequestVehicleOfRole(
   vehicleId: number,
   expectedRole: VehicleRole,
   wrongRoleError: string,
-): { success: true; vehicle: Vehicle } | { success: false; error: string } {
+): { success: true; vehicle: Vehicle } | ({ success: false; error: string } & RefusalKey) {
   const found = findRequestVehicle(state, vehicleId);
   if (!found.success) return found;
   if (found.vehicle.type !== expectedRole) return { success: false, error: wrongRoleError };
@@ -140,7 +141,7 @@ export function claimAndDispatchFragmentAction(
   fragmentId: number,
   noActionQueuedKey: string,
   claimFailedKey: string,
-): { success: true } | { success: false; error: string } {
+): { success: true } | ({ success: false; error: string } & RefusalKey) {
   const action = state.pendingActions.find(a =>
     a.type === actionType && a.status === 'queued' && a.payload['fragmentId'] === fragmentId);
   if (!action) return { success: false, error: t(noActionQueuedKey) };

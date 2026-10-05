@@ -10,6 +10,7 @@ import { RESERVATION_REFUSAL, reservationBlocking, type TerrainReservation } fro
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
+import type { RefusalParams } from '../i18n/Refusal.js';
 import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../config/balance.js';
 
 // ── Building types ──
@@ -243,6 +244,7 @@ export interface PlaceBuildingResult {
   error?: string;
   /** Translation key when the refusal is a terrain reservation (#1390). */
   errorKey?: string;
+  errorParams?: RefusalParams;
   cost?: number;
 }
 
@@ -342,6 +344,8 @@ export interface DemolishBuildingResult {
   /** Absolute grid cells freed by the demolition (for navmesh update). */
   freedCells: Array<{ x: number; z: number }>;
   error?: string;
+  errorKey?: string;
+  errorParams?: RefusalParams;
 }
 
 /**
@@ -531,7 +535,7 @@ export function checkFootprintPlacement(
   originZ: number,
   voxelGrid?: VoxelGrid,
   reservations?: ReadonlyArray<TerrainReservation>,
-): { valid: boolean; error?: string; errorKey?: string } {
+): { valid: boolean; error?: string; errorKey?: string; errorParams?: RefusalParams } {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
 

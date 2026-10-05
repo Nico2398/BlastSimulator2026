@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Employee system
 // Workers with roles, morale, union status, and injury tracking.
 
+import type { RefusalKey } from '../i18n/Refusal.js';
 import type { MovementTrail } from './MovementTrail.js';
 import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
@@ -382,7 +383,7 @@ export function canFireEmployee(
   state: EmployeeState,
   employeeId: number,
   opts?: { force?: boolean },
-): { success: boolean; error?: string } {
+): { success: boolean; error?: string } & RefusalKey {
   const emp = state.employees.find(e => e.id === employeeId);
   if (!emp) return { success: false, error: 'Employee not found' };
   if (!opts?.force && emp.unionized) return { success: false, error: 'Cannot fire unionized employee' };
