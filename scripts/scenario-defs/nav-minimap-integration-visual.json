@@ -140,6 +140,12 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 14,
+          "z": 8,
+          "pitch": 60
+        },
+        {
           "type": "pickTile",
           "x": 14,
           "z": 8
