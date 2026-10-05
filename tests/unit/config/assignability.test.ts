@@ -729,6 +729,27 @@ describe('running several issues at once', () => {
       }
     });
 
+    it('clashes a core area with `scope:engine` but not with another core area', () => {
+      const claim = (scope: string) => rules.scopeClaim({ labels: [`scope:${scope}`] });
+      expect(rules.claimsConflict(claim('crew'), claim('engine'))).toBe(true);
+      expect(rules.claimsConflict(claim('engine'), claim('site'))).toBe(true);
+      expect(rules.claimsConflict(claim('tasks'), claim('crew'))).toBe(false);
+      expect(rules.claimsConflict(claim('movement'), claim('nav'))).toBe(false);
+      // A UI area and a core area share no parent.
+      expect(rules.claimsConflict(claim('panels'), claim('crew'))).toBe(false);
+    });
+
+    it('calls a claim wide when it runs alone or declares a parent scope', () => {
+      const wide = (...labels: string[]) => rules.isWideClaim(rules.scopeClaim({ labels }));
+      expect(wide('scope:global')).toBe(true);
+      expect(wide('scope:pipeline')).toBe(true);
+      expect(wide('agent-task')).toBe(true);
+      expect(wide('scope:ui')).toBe(true);
+      expect(wide('scope:engine', 'scope:world')).toBe(true);
+      expect(wide('scope:panels', 'scope:crew', 'scope:world')).toBe(false);
+      expect(wide('scope:nav')).toBe(false);
+    });
+
     it('runs `scope:global` alone', () => {
       const claim = rules.scopeClaim({ labels: ['scope:global'] });
       expect(claim.exclusive).toBe(true);
@@ -765,8 +786,9 @@ describe('running several issues at once', () => {
     expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
   });
 
-  // Head-of-line: #25 waits on `ui`, and it holds `nav` too, so #30 — younger,
-  // in `nav` — may not start in front of it. #35 overlaps nothing and starts.
+  // Head-of-line for a wide claim: #25 declares the parent `ui`, waits on the
+  // live `ui` run, and holds `nav` too, so #30 — younger, in `nav` — may not
+  // start in front of it. #35 overlaps nothing and starts.
   it('lets an older waiting issue hold every scope it claims', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress', 'scope:ui'] },
@@ -775,6 +797,32 @@ describe('running several issues at once', () => {
       { number: 35, labels: ['ready', 'agent-task', 'scope:economy'] },
     ]);
     expect(numbers(await selectUpTo(api, 3))).toEqual([35]);
+  });
+
+  // Only live runs keep code apart. A narrow claim waiting on one holds
+  // nothing: on 5 Oct 2026 #1380 waited on live #1379 and its hold on `world`
+  // kept #1466, which clashed with nothing live, from starting.
+  it('lets a narrow waiting issue hold nothing, so unrelated younger work starts', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:crew', 'scope:panels'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:crew', 'scope:world'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:world'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:panels'] },
+    ]);
+    // #35 still waits: it clashes with the live run itself.
+    expect(numbers(await selectUpTo(api, 4))).toEqual([30]);
+  });
+
+  // `scope:engine` is a parent, so an engine issue waiting on a live core area
+  // holds every core area until it has run.
+  it('lets a waiting parent-scope issue hold its place', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:crew'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:engine'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:tasks'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:world'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 4))).toEqual([35]);
   });
 
   // A hold is one level deep. #25 waits on live #20 and holds `engine`; #30
@@ -929,13 +977,30 @@ describe('which scopes a live run holds', () => {
     ]);
   });
 
+  // `engine` is the parent of every simulation-core area, so a live
+  // `scope:engine` run holds all of them, and a live area holds `engine`.
+  it('holds `scope:engine` while any core area is live, and every core area while `scope:engine` is', () => {
+    const area = rules.scopeHolders([{ number: 50, labels: ['in-progress', 'scope:crew'] }]);
+    expect(area.crew).toBe(50);
+    expect(area.engine).toBe(50);
+    expect(area.tasks).toBeNull();
+    expect(area.site).toBeNull();
+    const base = rules.scopeHolders([{ number: 51, labels: ['in-progress', 'scope:engine'] }]);
+    for (const area of ['tasks', 'movement', 'crew', 'site']) expect(base[area], area).toBe(51);
+  });
+
   it('holds `scope:ui` while any UI area is live, and every UI area while `scope:ui` is', () => {
     const area = rules.scopeHolders([{ number: 40, labels: ['in-progress', 'scope:hud'] }]);
     expect(area.hud).toBe(40);
     expect(area.ui).toBe(40);
     expect(area.panels).toBeNull();
     const base = rules.scopeHolders([{ number: 41, labels: ['in-progress', 'scope:ui'] }]);
-    for (const child of Object.keys(rules.SCOPE_PARENTS)) expect(base[child], child).toBe(41);
+    const uiAreas = Object.entries(rules.SCOPE_PARENTS as Record<string, string>)
+      .filter(([, parent]) => parent === 'ui')
+      .map(([child]) => child);
+    expect(uiAreas).toHaveLength(6);
+    for (const child of uiAreas) expect(base[child], child).toBe(41);
+    expect(base.crew).toBeNull();
   });
 
   it('holds every scope while an exclusive or unscoped run is live', () => {
