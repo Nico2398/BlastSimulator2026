@@ -8,6 +8,7 @@ import {
   toggleSmuggling,
   processSmuggling,
 } from '../../../src/core/events/MafiaActions.js';
+import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
 import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../../../src/core/config/balance.js';
@@ -37,6 +38,13 @@ function addTestEmployee(state: ReturnType<typeof createEmployeeState>, unionize
   return emp;
 }
 
+/** Wrap an EmployeeState in a GameState — arrangeAccident/completeFrame take the whole state (#1378). */
+function stateOf(employees: ReturnType<typeof createEmployeeState>): GameState {
+  const state = createGame({ seed: 42 });
+  state.employees = employees;
+  return state;
+}
+
 afterEach(() => setLocale('en'));
 
 describe('Mafia gameplay mechanics', () => {
@@ -47,7 +55,7 @@ describe('Mafia gameplay mechanics', () => {
       const emp = addTestEmployee(employees);
       const corruption = createCorruptionState();
 
-      const result = arrangeAccident(mafia, employees, corruption, emp.id, new Random(seed));
+      const result = arrangeAccident(mafia, stateOf(employees), corruption, emp.id, new Random(seed));
       if (result.success) {
         expect(emp.alive).toBe(false);
         expect(result.cost).toBeGreaterThan(0);
@@ -64,7 +72,7 @@ describe('Mafia gameplay mechanics', () => {
       const emp = addTestEmployee(employees);
       const corruption = createCorruptionState();
 
-      const result = arrangeAccident(mafia, employees, corruption, emp.id, new Random(seed));
+      const result = arrangeAccident(mafia, stateOf(employees), corruption, emp.id, new Random(seed));
       if (!result.success) {
         expect(result.investigationTriggered).toBe(true);
         expect(emp.alive).toBe(true);
@@ -86,7 +94,7 @@ describe('Mafia gameplay mechanics', () => {
     expect(mafia.pendingFrames[0]!.readyTick).toBeGreaterThan(100);
 
     // Can't complete yet
-    const early = completeFrame(mafia, employees, emp.id, 100, new Random(42));
+    const early = completeFrame(mafia, stateOf(employees), emp.id, 100, new Random(42));
     expect(early.success).toBe(false);
   });
 
@@ -132,7 +140,7 @@ describe('Mafia gameplay mechanics', () => {
     const employees = createEmployeeState();
     const emp = addTestEmployee(employees);
 
-    const result = completeFrame(mafia, employees, emp.id, 100, new Random(42));
+    const result = completeFrame(mafia, stateOf(employees), emp.id, 100, new Random(42));
 
     expect(result.success).toBe(false);
     expect(result.outcomeKey).toBe('mafia.frame_no_ready');
@@ -152,7 +160,7 @@ describe('Mafia gameplay mechanics', () => {
       mafia.exposureRisk = startExposure;
       const employees = createEmployeeState();
       const emp = addTestEmployee(employees);
-      const result = arrangeAccident(mafia, employees, createCorruptionState(), emp.id, new Random(seed));
+      const result = arrangeAccident(mafia, stateOf(employees), createCorruptionState(), emp.id, new Random(seed));
       if (result.success === wantSuccess) return { mafia, result };
     }
     return expect.unreachable(`No ${wantSuccess ? 'successful' : 'failed'} accident in 50 seeds`);
@@ -181,7 +189,7 @@ describe('Mafia gameplay mechanics', () => {
   it('accident on an unknown target changes no exposure', () => {
     const mafia = createMafiaState();
     mafia.exposureRisk = 0.3;
-    const result = arrangeAccident(mafia, createEmployeeState(), createCorruptionState(), 999, new Random(1));
+    const result = arrangeAccident(mafia, stateOf(createEmployeeState()), createCorruptionState(), 999, new Random(1));
     expect(result.exposureIncrease).toBe(0);
     expect(mafia.exposureRisk).toBe(0.3);
   });
@@ -192,7 +200,7 @@ describe('Mafia gameplay mechanics', () => {
     const employees = createEmployeeState();
     const emp = addTestEmployee(employees);
     emp.alive = false;
-    const result = arrangeAccident(mafia, employees, createCorruptionState(), emp.id, new Random(1));
+    const result = arrangeAccident(mafia, stateOf(employees), createCorruptionState(), emp.id, new Random(1));
     expect(result.exposureIncrease).toBe(0);
     expect(mafia.exposureRisk).toBe(0.3);
   });
@@ -218,7 +226,7 @@ describe('Mafia gameplay mechanics', () => {
         const emp = addTestEmployee(employees);
         startFraming(mafia, employees, emp.id, 0);
         mafia.exposureRisk = start;
-        const result = completeFrame(mafia, employees, emp.id, 1_000_000, new Random(seed));
+        const result = completeFrame(mafia, stateOf(employees), emp.id, 1_000_000, new Random(seed));
         if (result.outcomeKey === 'mafia.frame_detected') {
           found = true;
           expect(mafia.exposureRisk - start).toBeCloseTo(result.exposureIncrease, 10);

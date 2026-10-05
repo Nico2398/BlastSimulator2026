@@ -8,6 +8,19 @@ import { drillPlanCommand, type MiningContext } from '../../src/console/commands
 import { killEmployee } from '../../src/core/entities/Employee.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
+import { vehicleCommand } from '../../src/console/commands/vehicle.js';
+import { surveyCommand } from '../../src/console/commands/mining.js';
+import { tickCommand } from '../../src/console/commands/events.js';
+import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
+import { moveTo } from '../../src/core/engine/MoveTo.js';
+import { vehicleDriverId, getVehicleReservation } from '../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../src/core/engine/VehicleReservation.js';
+import { addBlastFragments, pickupFragment } from '../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import { arrangeAccident, completeFrame, startFraming } from '../../src/core/events/MafiaActions.js';
+import { Random } from '../../src/core/math/Random.js';
+import type { PendingAction } from '../../src/core/state/GameState.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -655,5 +668,318 @@ describe('Console — employee hire — spawn is on the grid\'s main climb-conne
     // The island holds 4 cells; the main region holds the rest.
     expect(reachable.size).toBeGreaterThan(4);
     expect(navGrid.cellAt(employee.x, employee.z)!.surfaceY).not.toBe(summit);
+  });
+});
+
+
+// ── employee fire — full removal from the world (#1378) ─────────────────────
+
+function hireNamed(ctx: GameContext, role: string): number {
+  const before = new Set(ctx.state!.employees.employees.map(e => e.id));
+  const result = employeeCommand(ctx, ['hire'], { role });
+  if (!result.success) throw new Error(`Setup: hire failed — ${result.output}`);
+  return ctx.state!.employees.employees.find(e => !before.has(e.id))!.id;
+}
+
+function emp(ctx: GameContext, id: number) {
+  return ctx.state!.employees.employees.find(e => e.id === id);
+}
+
+function makeCargoFragment(id: number, mass = 850): FragmentData {
+  return {
+    id, position: { x: 0, y: 0, z: 0 }, volume: 0.3, mass, rockId: 'cruite',
+    oreDensities: { dirtite: 0.3 }, initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false, halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1,
+    origin: { x: 0, y: 0, z: 0 },
+  };
+}
+
+function makeQueuedAction(id: number, overrides: Partial<PendingAction> = {}): PendingAction {
+  return {
+    id, type: 'general_work', requiredSkill: null, requiredVehicleRole: null,
+    targetX: 10, targetZ: 10, targetY: 0, payload: {}, targetEmployeeId: null,
+    status: 'queued', holderId: null, queuedAtTick: 0, ...overrides,
+  };
+}
+
+/** Tick one at a time until `done`, failing loudly after `max` ticks. */
+function tickUntilDone(ctx: GameContext, done: () => boolean, max = 400): void {
+  for (let i = 0; i < max; i++) {
+    if (done()) return;
+    tickCommand(ctx, ['1'], {});
+  }
+  if (!done()) throw new Error(`condition not reached within ${max} ticks`);
+}
+
+/** Hire a licensed driver and put them aboard hauler #1 through the console path. */
+function driverAboardHauler(ctx: GameContext) {
+  vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+  const driverId = hireNamed(ctx, 'driver');
+  employeeCommand(ctx, ['assign_skill', String(driverId)], { skill: 'driving.truck', level: '1' });
+  expect(vehicleCommand(ctx, ['driver', '1', String(driverId)], {}).success).toBe(true);
+  tickCommand(ctx, ['1'], {});
+  const vehicle = ctx.state!.vehicles.vehicles[0]!;
+  expect(vehicleDriverId(vehicle)).toBe(driverId);
+  return { driverId, vehicle };
+}
+
+describe('Console — employee fire releases the employee from the world (#1378)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+  });
+
+  it('firing a driver aboard a hauler empties occupantIds, removes them from the roster, and keeps invariants', () => {
+    const { driverId, vehicle } = driverAboardHauler(ctx);
+
+    const result = employeeCommand(ctx, ['fire', String(driverId)], {});
+
+    expect(result.success).toBe(true);
+    expect(emp(ctx, driverId)).toBeUndefined();
+    expect(vehicle.occupantIds).toEqual([]);
+    expectNoWorldInvariantViolations(ctx.state!);
+    tickCommand(ctx, ['3'], {});
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('after firing the driver, another licensed employee can be assigned to the same vehicle', () => {
+    const { driverId } = driverAboardHauler(ctx);
+    const otherId = hireNamed(ctx, 'driver');
+    employeeCommand(ctx, ['assign_skill', String(otherId)], { skill: 'driving.truck', level: '1' });
+    employeeCommand(ctx, ['fire', String(driverId)], {});
+
+    const result = vehicleCommand(ctx, ['driver', '1', String(otherId)], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).not.toContain('already has a driver');
+    tickCommand(ctx, ['2'], {});
+    expect(vehicleDriverId(ctx.state!.vehicles.vehicles[0]!)).toBe(otherId);
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('firing a driver mid-haul returns the carried payload to the ground', () => {
+    const { driverId, vehicle } = driverAboardHauler(ctx);
+    ctx.state!.logistics.storageCapacityKg = 5000;
+    addBlastFragments(ctx.state!.logistics, [makeCargoFragment(1, 850)]);
+    pickupFragment(ctx.state!.logistics, 1, String(vehicle.id));
+    vehicle.payload = { fragmentId: 1, massKg: 850 };
+
+    employeeCommand(ctx, ['fire', String(driverId)], {});
+
+    expect(vehicle.payload).toBeNull();
+    const cargo = ctx.state!.logistics.fragments.find(f => f.fragment.id === 1)!;
+    expect(cargo.state).toBe('on_ground');
+    expect(vehicle.occupantIds).toEqual([]);
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('firing a surveyor mid-survey returns the action to the queue; another idle surveyor completes it', () => {
+    const first = hireNamed(ctx, 'surveyor');
+    const second = hireNamed(ctx, 'surveyor');
+    for (const id of [first, second]) {
+      employeeCommand(ctx, ['assign_skill', String(id)], { skill: 'geology', level: '3' });
+    }
+    expect(surveyCommand(ctx as any, ['seismic'], { x: '4', z: '4' }).success).toBe(true);
+    const action = ctx.state!.pendingActions.find(a => a.type === 'survey')!;
+    tickUntilDone(ctx, () => action.holderId !== null && action.status !== 'queued');
+    const holderId = action.holderId!;
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+
+    const result = employeeCommand(ctx, ['fire', String(holderId)], {});
+
+    expect(result.success).toBe(true);
+    const stored = ctx.state!.pendingActions.find(a => a.id === action.id)!;
+    expect(stored.status).toBe('queued');
+    expect(stored.holderId).toBeNull();
+    expectNoWorldInvariantViolations(ctx.state!);
+
+    tickUntilDone(ctx, () => ctx.state!.surveyResults.length === 1, 600);
+    expect(ctx.state!.surveyResults).toHaveLength(1);
+    expect(ctx.state!.pendingActions.find(a => a.id === action.id)).toBeUndefined();
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('firing a resting employee removes them from Living Quarters occupantIds and discards the rest action', () => {
+    const id = hireNamed(ctx, 'driller');
+    const e = emp(ctx, id)!;
+    const placed = placeBuilding(
+      ctx.state!.buildings, 'living_quarters', Math.round(e.x) + 3, Math.round(e.z) + 3,
+      ctx.state!.world!.sizeX, ctx.state!.world!.sizeZ, 1,
+    );
+    expect(placed.success, placed.error).toBe(true);
+    const quarters = placed.building!;
+    expect(moveTo(ctx.state!, id, { buildingId: quarters.id }).success).toBe(true);
+    ctx.state!.pendingActions.push(makeQueuedAction(900, {
+      type: 'rest', targetEmployeeId: id, holderId: id, status: 'assigned',
+    }));
+    tickUntilDone(ctx, () => e.locomotion.kind === 'inside');
+    expect(quarters.occupantIds).toEqual([id]);
+
+    const result = employeeCommand(ctx, ['fire', String(id)], {});
+
+    expect(result.success).toBe(true);
+    expect(quarters.occupantIds).toEqual([]);
+    expect(ctx.state!.pendingActions.find(a => a.id === 900)).toBeUndefined();
+    expectNoWorldInvariantViolations(ctx.state!);
+    tickCommand(ctx, ['30'], {});
+    expect(quarters.occupantIds).toEqual([]);
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('firing clears the task queue; actions targeting the fired employee stay queued, untargeted', () => {
+    const id = hireNamed(ctx, 'driller');
+    const e = emp(ctx, id)!;
+    e.taskQueue = [901, 902];
+    ctx.state!.pendingActions.push(
+      makeQueuedAction(901, { targetEmployeeId: id }),
+      makeQueuedAction(902, { targetEmployeeId: id }),
+    );
+
+    employeeCommand(ctx, ['fire', String(id)], {});
+
+    expect(e.taskQueue).toEqual([]);
+    for (const aid of [901, 902]) {
+      const a = ctx.state!.pendingActions.find(x => x.id === aid)!;
+      expect(a.status).toBe('queued');
+      expect(a.targetEmployeeId).toBeNull();
+    }
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('firing an employee holding a vehicle-gated action releases the vehicle reservation', () => {
+    vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+    const id = hireNamed(ctx, 'driller');
+    const vehicle = ctx.state!.vehicles.vehicles[0]!;
+    ctx.state!.pendingActions.push(makeQueuedAction(903, {
+      requiredVehicleRole: 'drill_rig', status: 'assigned', holderId: id,
+    }));
+    emp(ctx, id)!.activeActionId = 903;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, 903);
+
+    employeeCommand(ctx, ['fire', String(id)], {});
+
+    expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
+    expect(ctx.state!.pendingActions.find(a => a.id === 903)!.holderId).toBeNull();
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('a unionized employee is not fireable: error unchanged and no world state change', () => {
+    const { driverId, vehicle } = driverAboardHauler(ctx);
+    emp(ctx, driverId)!.unionized = true;
+    ctx.state!.pendingActions.push(makeQueuedAction(904, { status: 'assigned', holderId: driverId }));
+    emp(ctx, driverId)!.taskQueue = [905];
+    const before = JSON.stringify([ctx.state!.pendingActions, ctx.state!.vehicles, ctx.state!.employees]);
+
+    const result = employeeCommand(ctx, ['fire', String(driverId)], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Cannot fire unionized employee');
+    expect(JSON.stringify([ctx.state!.pendingActions, ctx.state!.vehicles, ctx.state!.employees])).toBe(before);
+    expect(vehicle.occupantIds).toEqual([driverId]);
+    expectNoWorldInvariantViolations(ctx.state!);
+  });
+
+  it('firing an unknown employee reports the unchanged error', () => {
+    const result = employeeCommand(ctx, ['fire', '999'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Employee not found');
+  });
+});
+
+// ── mafia removal paths share the same routine (#1378) ──────────────────────
+
+describe('Mafia — frame and accident release the target from the world (#1378)', () => {
+
+  /** Try seeds until `predicate` accepts the outcome; rebuild a fresh world per attempt. */
+  function runUntil<T>(attempt: (seed: number) => { ctx: GameContext; result: T; id: number }, ok: (r: T) => boolean) {
+    for (let seed = 0; seed < 100; seed++) {
+      const run = attempt(seed);
+      if (ok(run.result)) return run;
+    }
+    return expect.unreachable('no seed produced the wanted outcome in 100 attempts');
+  }
+
+  function accidentWorld(seed: number) {
+    const c = makeCtx();
+    const { driverId } = driverAboardHauler(c);
+    c.state!.pendingActions.push(makeQueuedAction(910, { status: 'assigned', holderId: driverId, targetEmployeeId: driverId }));
+    emp(c, driverId)!.taskQueue = [911];
+    const result = arrangeAccident(c.state!.mafia, c.state!, c.state!.corruption, driverId, new Random(seed));
+    return { ctx: c, result, id: driverId };
+  }
+
+  it('a successful accident marks the target dead, alights them, releases actions and clears the queue', () => {
+    const { ctx: c, id } = runUntil(accidentWorld, r => r.success);
+
+    const e = emp(c, id)!;
+    expect(e.alive).toBe(false);
+    expect(c.state!.vehicles.vehicles[0]!.occupantIds).toEqual([]);
+    expect(e.locomotion).toEqual({ kind: 'on_foot' });
+    const a = c.state!.pendingActions.find(x => x.id === 910)!;
+    expect(a.status).toBe('queued');
+    expect(a.holderId).toBeNull();
+    expect(a.targetEmployeeId).toBeNull();
+    expect(e.taskQueue).toEqual([]);
+    expectNoWorldInvariantViolations(c.state!);
+  });
+
+  it('a failed accident changes no world state', () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const c = makeCtx();
+      const { driverId } = driverAboardHauler(c);
+      c.state!.pendingActions.push(makeQueuedAction(912, { status: 'assigned', holderId: driverId }));
+      emp(c, driverId)!.taskQueue = [913];
+      const before = JSON.stringify([c.state!.pendingActions, c.state!.vehicles, c.state!.employees]);
+      const result = arrangeAccident(c.state!.mafia, c.state!, c.state!.corruption, driverId, new Random(seed));
+      if (result.success) continue;
+
+      expect(JSON.stringify([c.state!.pendingActions, c.state!.vehicles, c.state!.employees])).toBe(before);
+      expectNoWorldInvariantViolations(c.state!);
+      return;
+    }
+    expect.unreachable('no failed accident in 100 seeds');
+  });
+
+  function frameWorld(seed: number) {
+    const c = makeCtx();
+    const { driverId } = driverAboardHauler(c);
+    emp(c, driverId)!.unionized = true;
+    c.state!.pendingActions.push(makeQueuedAction(914, { status: 'assigned', holderId: driverId, targetEmployeeId: driverId }));
+    emp(c, driverId)!.taskQueue = [915];
+    startFraming(c.state!.mafia, c.state!.employees, driverId, 0);
+    const result = completeFrame(c.state!.mafia, c.state!, driverId, 1_000_000, new Random(seed));
+    return { ctx: c, result, id: driverId };
+  }
+
+  it('a successful frame fires even a unionized target and cleans up like firing', () => {
+    const { ctx: c, id } = runUntil(frameWorld, r => r.success);
+
+    expect(emp(c, id)).toBeUndefined();
+    expect(c.state!.vehicles.vehicles[0]!.occupantIds).toEqual([]);
+    const a = c.state!.pendingActions.find(x => x.id === 914)!;
+    expect(a.status).toBe('queued');
+    expect(a.holderId).toBeNull();
+    expect(a.targetEmployeeId).toBeNull();
+    expectNoWorldInvariantViolations(c.state!);
+  });
+
+  it('a detected frame changes no world state', () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const c = makeCtx();
+      const { driverId } = driverAboardHauler(c);
+      c.state!.pendingActions.push(makeQueuedAction(916, { status: 'assigned', holderId: driverId }));
+      startFraming(c.state!.mafia, c.state!.employees, driverId, 0);
+      const before = JSON.stringify([c.state!.pendingActions, c.state!.vehicles, c.state!.employees]);
+      const result = completeFrame(c.state!.mafia, c.state!, driverId, 1_000_000, new Random(seed));
+      if (result.success) continue;
+
+      expect(JSON.stringify([c.state!.pendingActions, c.state!.vehicles, c.state!.employees])).toBe(before);
+      expect(emp(c, driverId)).toBeDefined();
+      expectNoWorldInvariantViolations(c.state!);
+      return;
+    }
+    expect.unreachable('no detected frame in 100 seeds');
   });
 });

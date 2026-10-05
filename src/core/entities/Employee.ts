@@ -373,20 +373,32 @@ export function giveRaise(
   return true;
 }
 
-/** Fire an employee. Returns error if unionized. */
+/** Fire rule: the employee must exist and, unless `opts.force`, not be unionized. */
+export function canFireEmployee(
+  state: EmployeeState,
+  employeeId: number,
+  opts?: { force?: boolean },
+): { success: boolean; error?: string } {
+  const emp = state.employees.find(e => e.id === employeeId);
+  if (!emp) return { success: false, error: 'Employee not found' };
+  if (!opts?.force && emp.unionized) return { success: false, error: 'Cannot fire unionized employee' };
+  return { success: true };
+}
+
+/** Splice the employee out of the roster; no-op when absent. */
+export function removeFromRoster(state: EmployeeState, employeeId: number): void {
+  const idx = state.employees.findIndex(e => e.id === employeeId);
+  if (idx >= 0) state.employees.splice(idx, 1);
+}
+
+/** Roster-only fire: splices the employee out and nothing else. Gameplay callers use fireEmployeeFromWorld (TaskCancellation.ts), which also releases them from vehicles, buildings and actions (#1378). */
 export function fireEmployee(
   state: EmployeeState,
   employeeId: number,
 ): { success: boolean; error?: string } {
-  const idx = state.employees.findIndex(e => e.id === employeeId);
-  if (idx < 0) return { success: false, error: 'Employee not found' };
-
-  const emp = state.employees[idx]!;
-  if (emp.unionized) {
-    return { success: false, error: 'Cannot fire unionized employee' };
-  }
-
-  state.employees.splice(idx, 1);
+  const guard = canFireEmployee(state, employeeId);
+  if (!guard.success) return guard;
+  removeFromRoster(state, employeeId);
   return { success: true };
 }
 

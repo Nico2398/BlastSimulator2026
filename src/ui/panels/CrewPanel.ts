@@ -279,7 +279,7 @@ export class CrewPanel extends PanelBase {
   }
 
   /**
-   * fireEmployee splices the employee out permanently — there is no severance
+   * Dismissal removes the employee from the roster permanently — there is no severance
    * payment or reversal — so this always routes through the shared confirm
    * overlay rather than firing on the first click.
    */

@@ -8,12 +8,14 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import { SURVEY_COSTS, ACTION_STUCK_BACKOFF_TICKS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
-import type { Employee } from '../entities/Employee.js';
+import { canFireEmployee, removeFromRoster, type Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, isMidVehicleGatedWork, isCommittedToOwnCargo, dismountVehicleDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
 import { syncItineraryMirrors } from './MoveTo.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
+import { releaseEmployeeFromHosts } from './Mount.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 
 export interface CancelActionResult {
@@ -491,7 +493,7 @@ function actionOrderCost(action: PendingAction): number {
  * targeted at nobody: the original target is gone, and whatever qualified
  * work this was is still worth finishing.
  */
-export function releaseDeadEmployeeActions(state: GameState, employeeId: number): void {
+export function releaseDeadEmployeeActions(state: GameState, employeeId: number, emitter?: EventEmitter): void {
   // #1090: dismount any vehicle the dead employee still drives, directly —
   // releaseActionToOpenPool's own releaseVehicleReservation call below is
   // claim-only now (never dismounts), and by the time
@@ -500,7 +502,7 @@ export function releaseDeadEmployeeActions(state: GameState, employeeId: number)
   // so its vehicle-driven-by-reservedForActionId lookup would never find it
   // again — a dead employee left mounted would violate I1/I2 forever.
   const drivenVehicle = state.vehicles.vehicles.find(v => vehicleDriverId(v) === employeeId);
-  if (drivenVehicle) dismountVehicleDriver(state, drivenVehicle);
+  if (drivenVehicle) dismountVehicleDriver(state, drivenVehicle, emitter);
 
   // A snapshot, not the live array: a 'rest' action below is removed via
   // completePendingAction, which splices state.pendingActions — iterating
@@ -527,4 +529,45 @@ export function releaseDeadEmployeeActions(state: GameState, employeeId: number)
       releaseActionToOpenPool(state, action);
     }
   }
+}
+
+/**
+ * Removal routine for an employee leaving the world (fired, framed,
+ * killed in an accident), composing releaseDeadEmployeeActions and
+ * releaseEmployeeFromHosts: alights from any vehicle/building (returning a
+ * carried payload to the ground, never refused mid-haul), releases held and
+ * targeted actions to the pool, clears task/itinerary state and
+ * agentOccupancy. Idempotent; works when alive is false or the employee is
+ * no longer in the roster. (#1378)
+ */
+export function releaseEmployeeFromWorld(state: GameState, employeeId: number, emitter?: EventEmitter): void {
+  // Actions first: it dismounts a driven vehicle (clearing its reservation)
+  // before the hosts sweep below removes the occupant it looks up by.
+  releaseDeadEmployeeActions(state, employeeId, emitter);
+  releaseEmployeeFromHosts(state, employeeId, emitter);
+
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (employee) {
+    clearHolderWalkFields(employee);
+    employee.taskQueue = [];
+    employee.pendingDriverVehicleId = null;
+  }
+  state.agentOccupancy?.release({ kind: 'employee', id: employeeId });
+}
+
+/**
+ * Fire an employee: checks existence and union protection (unless
+ * opts.force), releases them from the world, then splices the roster. (#1378)
+ */
+export function fireEmployeeFromWorld(
+  state: GameState,
+  employeeId: number,
+  opts?: { force?: boolean },
+): { success: boolean; error?: string } {
+  const guard = canFireEmployee(state.employees, employeeId, opts);
+  if (!guard.success) return guard;
+
+  releaseEmployeeFromWorld(state, employeeId);
+  removeFromRoster(state.employees, employeeId);
+  return { success: true };
 }
