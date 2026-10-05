@@ -13,6 +13,8 @@ import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDispatch.js';
 import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
 import { removeHoleTubing } from '../../../core/mining/Tubing.js';
+import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
+import { checkProtectedPositions } from '../../../core/mining/BlastPlan.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -33,9 +35,9 @@ export function coveredByFootprint(
   state: GameState,
   cells: ReadonlyArray<{ id: string; x: number; z: number }>,
 ): Set<string> {
-  void state; void cells;
-  // TODO: implement
-  return new Set<string>();
+  const occupants = buildingFootprintOccupants(state);
+  if (occupants.length === 0) return new Set<string>();
+  return new Set(checkProtectedPositions(cells, occupants).map(e => e.holeId));
 }
 
 /**
@@ -150,6 +152,17 @@ export function drillPlanCommand(
       return { success: false, output: claim.output! };
     }
 
+    // Cells under a building or construction site are skipped (#1359); a grid
+    // with nothing left is refused before the existing plan is touched.
+    const covered = coveredByFootprint(ctx.state!, planned);
+    const survivors = planned
+      .filter(h => !covered.has(h.id))
+      .map((h, i) => ({ ...h, id: `H${i + 1}` }));
+    if (survivors.length === 0) {
+      return { success: false, output: t('mining.drill_plan.grid_all_blocked') };
+    }
+    counter.nextHoleId = survivors.length + 1;
+
     // A grid replaces the whole plan (#553): drop every hole (ordered or
     // already drilled) and any drill_hole action still outstanding for them
     // first, so the restart-at-H1 above never collides with an id still live
@@ -157,14 +170,16 @@ export function drillPlanCommand(
     clearDrillPlan(ctx);
     ctx.state!.nextHoleId = counter.nextHoleId;
 
-    for (const hole of planned) {
+    for (const hole of survivors) {
       dispatchDrillHoleAction(ctx, hole);
       ctx.state!.plannedDrillHoles.push(hole);
     }
 
+    const skipped = covered.size;
+    const base = `Drill plan: ${rows}×${cols} grid, ${ctx.state!.plannedDrillHoles.length} holes ordered, spacing ${spacing}m, depth ${depth}m`;
     return {
       success: true,
-      output: `Drill plan: ${rows}×${cols} grid, ${ctx.state!.plannedDrillHoles.length} holes ordered, spacing ${spacing}m, depth ${depth}m`,
+      output: skipped > 0 ? `${base}\n${t('mining.drill_plan.grid_skipped', { count: skipped })}` : base,
     };
   }
 
@@ -175,6 +190,9 @@ export function drillPlanCommand(
     const diameter = parseFloat(named['diameter'] ?? String(DRILL_HOLE_DEFAULT_DIAMETER_M));
     const claim = claimForAction(ctx, [{ x, z }], 'drill');
     if (!claim.ok) return { success: false, output: claim.output! };
+    if (coveredByFootprint(ctx.state!, [{ id: 'add', x, z }]).size > 0) {
+      return { success: false, output: t('mining.drill_plan.refused_footprint', { x, z }) };
+    }
 
     // Additive — unlike 'grid' above, does not clear the existing plan.
     const hole = addHole(ctx.state!, ctx.state!.plannedDrillHoles, x, z, depth, diameter, ctx.state!.drillHoles);
