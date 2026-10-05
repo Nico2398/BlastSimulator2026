@@ -83,7 +83,7 @@ function makeTestGrid(): VoxelGrid {
 
 // ── 1. checkProtectedPositions ─────────────────────────────────────────────────
 //
-// Validates that checkProtectedPositions(holes, buildingState) returns a
+// Validates that checkProtectedPositions(holes, buildingState.buildings) returns a
 // ValidationError { holeId, issue } for every hole whose floored (x, z)
 // falls within any building's footprint cells, and no error otherwise.
 
@@ -99,7 +99,7 @@ describe('checkProtectedPositions', () => {
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 2, 2, 5, 0.15); // exact match on footprint cell (2, 2)
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.holeId).toBe(holes[0]!.id);
@@ -115,7 +115,7 @@ describe('checkProtectedPositions', () => {
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 8, 8, 5, 0.15); // well clear of the building
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(0);
   });
@@ -129,7 +129,7 @@ describe('checkProtectedPositions', () => {
     const underBuilding = addHole(holeCounter, holes, 2, 2, 5, 0.15); // overlaps footprint cell (2, 2)
     addHole(holeCounter, holes, 10, 10, 5, 0.15);                      // no overlap
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.holeId).toBe(underBuilding.id);
@@ -145,7 +145,7 @@ describe('checkProtectedPositions', () => {
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 2.3, 2.7, 5, 0.15);
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.issue).toBe('blast.validation.protected_position');

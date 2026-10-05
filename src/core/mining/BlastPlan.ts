@@ -3,7 +3,7 @@
 
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import { isBuildingFootprintCell, type BuildingState } from '../entities/Building.js';
+import { isBuildingFootprintCell, type FootprintOccupant } from '../entities/Building.js';
 
 export interface BlastPlan {
   holes: DrillHole[];
@@ -61,14 +61,14 @@ export function assembleBlastPlan(
  * Returns a ValidationError for each hole that overlaps a building footprint.
  */
 export function checkProtectedPositions(
-  holes: DrillHole[],
-  buildingState: BuildingState,
+  holes: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z'>>,
+  occupants: ReadonlyArray<FootprintOccupant>,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
   for (const hole of holes) {
     const ax = Math.floor(hole.x);
     const az = Math.floor(hole.z);
-    for (const building of buildingState.buildings) {
+    for (const building of occupants) {
       if (isBuildingFootprintCell(building, ax, az)) {
         errors.push({ holeId: hole.id, issue: 'blast.validation.protected_position' });
         break; // one error per hole is enough

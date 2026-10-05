@@ -26,6 +26,19 @@ export interface DrillHoleActionPayload {
 }
 
 /**
+ * Ids of `cells` whose column lies under a building or construction-site
+ * footprint (#1359).
+ */
+export function coveredByFootprint(
+  state: GameState,
+  cells: ReadonlyArray<{ id: string; x: number; z: number }>,
+): Set<string> {
+  void state; void cells;
+  // TODO: implement
+  return new Set<string>();
+}
+
+/**
  * Drop every per-hole charge/sequence record for `holeId` — called when a
  * hole leaves the plan (drilled or still-ordered branch of drill_plan
  * remove) so no stale charge or delay survives under an id nothing
