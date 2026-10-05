@@ -194,11 +194,10 @@ export function drillPlanCommand(
     const holeId = resolveHoleId(state, holeSpec);
 
     const drilled = state.drillHoles.find(h => h.id === holeId);
-    const drilledCell = drilled && { x: drilled.x, z: drilled.z };
     if (removeHole(state.drillHoles, holeId)) {
       cancelOutstandingChargeAction(state, holeId);
       clearHoleCharges(state, holeId);
-      if (drilledCell) emitHoleCellsChanged(ctx, [drilledCell]);
+      if (drilled) emitHoleCellsChanged(ctx, [drilled]);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 

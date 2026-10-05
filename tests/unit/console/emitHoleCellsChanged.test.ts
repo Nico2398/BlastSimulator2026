@@ -26,9 +26,9 @@ describe('emitHoleCellsChanged (#1360)', () => {
   });
 
   it('emits nothing when grid is null', () => {
-    const emitter = new EventEmitter();
-    const regions = collect(emitter);
-    emitHoleCellsChanged({ emitter, grid: null }, [{ x: 5, z: 5 }]);
+    const ctx = setup();
+    const regions = collect(ctx.emitter);
+    emitHoleCellsChanged({ ...ctx, grid: null }, [{ x: 5, z: 5 }]);
     expect(regions).toHaveLength(0);
   });
 
