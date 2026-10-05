@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Forced shift rest (legacy and site-policy-aware)
 //
-// forceShiftRestIfNeeded is the legacy fatigue-only, fixed-duration path used
-// while no site policy has been applied; forceShiftRestIfNeededByPolicy
-// (#678) is the policy-aware variant that consults SitePolicy.shouldForceRest
-// once one has. Both are called from ShiftCycle.ts's processShiftCycle. Split
+// forceShiftRestIfNeededByPolicy (#678) consults SitePolicy.shouldForceRest and
+// is always in force (#1379), called from ShiftCycle.ts's processShiftCycle.
+// forceShiftRestIfNeeded is the superseded fatigue-only, fixed-duration path,
+// no longer called by the engine. Split
 // out of GameLoop.ts as part of #759's file-size split; re-exported there so
 // GameLoop.ts stays the single public surface for tick-orchestration callers.
 
@@ -227,8 +227,8 @@ function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
 
 /**
  * Site-policy-aware variant of forceShiftRestIfNeeded (#678) — consults
- * SitePolicy.shouldForceRest so an applied policy (state.sitePolicy.revision
- * > 0) forces rest for real, using any living_quarters tier (tier 1
+ * SitePolicy.shouldForceRest so the site policy (default or player-applied)
+ * forces rest for real, using any living_quarters tier (tier 1
  * included) or resting in place if none exists.
  *
  * Guards: skip an employee already resting (restTicksRemaining !== null),

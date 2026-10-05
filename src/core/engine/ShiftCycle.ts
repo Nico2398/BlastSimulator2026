@@ -1,8 +1,7 @@
-// BlastSimulator2026 — Shift cycle (Bunkhouse Tier 2+ / site-policy-driven)
+// BlastSimulator2026 — Shift cycle (always site-policy-driven)
 //
-// Processes the shift/rest cycle for employees: legacy fatigue-only fixed-
-// duration path when no site policy has been applied, or the policy-aware
-// path (ForceShiftRest.ts's forceShiftRestIfNeededByPolicy) once one has.
+// Processes the shift/rest cycle for employees through the policy-aware path
+// (ForceShiftRest.ts's forceShiftRestIfNeededByPolicy), always in force.
 // Split out of GameLoop.ts as part of #759's file-size split; re-exported
 // there so GameLoop.ts stays the single public surface for tick-orchestration
 // callers.
@@ -13,30 +12,28 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { completeIfOwnedRestAction } from './TaskDispatch.js';
 import { completeRestForEmployee, findPendingActionById, resolveRestBuildingId } from './RestActionHelpers.js';
-import { forceShiftRestIfNeeded, forceShiftRestIfNeededByPolicy } from './ForceShiftRest.js';
+import { forceShiftRestIfNeededByPolicy } from './ForceShiftRest.js';
 
 export interface ShiftCycleResult {
   /** Employee IDs whose rest period completed this tick. */
   restCompleted: number[];
   /** Employee IDs that transitioned from shift-working to shift-resting this tick. */
   shiftRested: number[];
-  /** Whether any employee shift logic was processed this tick. */
+  /** Whether any employee shift logic was processed this tick (always true). */
   active: boolean;
 }
 
 /**
- * Process the shift/rest cycle for employees. With no site policy ever
- * applied, this is gated on bunkhouse tier >= 2 and uses the legacy
- * fatigue-only, fixed-duration ForceShiftRest.ts's forceShiftRestIfNeeded/
- * completeRestTick path. Once a policy has been applied, it runs for every
- * alive/non-injured employee regardless of bunkhouse tier and routes
- * force-rest through the policy-aware forceShiftRestIfNeededByPolicy.
+ * Process the shift/rest cycle for employees. The site policy path is always
+ * in force (#1379): it runs for every alive/non-injured employee regardless of
+ * building tier or whether the player ever applied a policy, and routes
+ * force-rest through forceShiftRestIfNeededByPolicy. A new game's default
+ * policy (shift_8h, threshold 60) therefore protects the crew from tick 0.
  *
  * Each employee is processed in a single pass through three sequential phases:
  *   1. Complete rests — decrement restTicksRemaining, replenish fatigue on completion
  *   2. Increment ticksWorked — for active employees not currently resting
- *   3. Force shift rest — when ticksWorked reaches the work-duration threshold
- *      (legacy path), or when SitePolicy.shouldForceRest trips (policy path)
+ *   3. Force shift rest — when SitePolicy.shouldForceRest trips
  *
  * @param state - The game state (mutated in place)
  * @param firedEvents - Accumulator for events fired this tick
@@ -47,24 +44,6 @@ export function processShiftCycle(
   firedEvents: FiredEvent[],
   _emitter?: EventEmitter,
 ): ShiftCycleResult {
-  // Check for a bunkhouse (living_quarters tier >= 2)
-  const hasBunkhouse = state.buildings.buildings.some(
-    b => b.type === 'living_quarters' && b.tier >= 2 && b.active,
-  );
-
-  // #678: an applied policy (revision > 0 — see SitePolicy.ts's own doc
-  // comment on `revision` for why this, not a value comparison, is what
-  // "has the player set a policy?" means) runs shift-cycle processing
-  // regardless of bunkhouse tier — a tier-1 living_quarters, or no building
-  // at all, is a valid rest destination under a policy, not a disqualifier.
-  // With no policy ever applied, behaviour is byte-for-byte identical to
-  // before #678: gated on hasBunkhouse alone, same legacy rest path below.
-  const policyApplied = state.sitePolicy.revision > 0;
-
-  if (!policyApplied && !hasBunkhouse) {
-    return { restCompleted: [], shiftRested: [], active: false };
-  }
-
   const restCompleted: number[] = [];
   const shiftRested: number[] = [];
 
@@ -80,11 +59,7 @@ export function processShiftCycle(
     incrementWorkTick(state, emp);
 
     // Phase 3: Force shift rest when work quota is met
-    if (policyApplied) {
-      forceShiftRestIfNeededByPolicy(state, emp, firedEvents, shiftRested, _emitter);
-    } else {
-      forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested, _emitter);
-    }
+    forceShiftRestIfNeededByPolicy(state, emp, firedEvents, shiftRested, _emitter);
   }
 
   return { restCompleted, shiftRested, active: true };
@@ -92,7 +67,7 @@ export function processShiftCycle(
 
 /**
  * Decrement restTicksRemaining for an employee who is currently resting
- * under the legacy (no-policy) path.
+ * that still carries no restNeedKey (a pre-#1379 save).
  * If rest is complete (reaches ≤ 0), replenish fatigue, clear state, and record completion.
  */
 export function completeRestTick(
@@ -102,11 +77,10 @@ export function completeRestTick(
 ): void {
   if (emp.restTicksRemaining === null) return;
   // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks
-  // (Tier-1 living_quarters fatigue), or — once a site policy has
-  // been applied (#678) — by forceShiftRestIfNeededByPolicy, all carry a
-  // restNeedKey and are owned by tickGeneralRestCompletion instead — skip
-  // them here to avoid double-processing. This function only ever runs the
-  // legacy no-policy path (processShiftCycle only calls it when !policyApplied).
+  // (Tier-1 living_quarters fatigue) or by forceShiftRestIfNeededByPolicy
+  // all carry a restNeedKey and are owned by tickGeneralRestCompletion
+  // instead — skip them here to avoid double-processing. Only a keyless rest
+  // restored from a pre-#1379 save reaches the code below.
   if (emp.restNeedKey !== null) return;
 
   emp.restTicksRemaining -= 1;
