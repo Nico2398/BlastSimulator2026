@@ -18,10 +18,12 @@ import {
 } from '../../../src/ui/crewDetailSections.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import type { Employee } from '../../../src/core/entities/Employee.js';
+import type { Employee, EmployeeState } from '../../../src/core/entities/Employee.js';
+import { giveRaise, calculateSalary } from '../../../src/core/entities/Employee.js';
+import { gainXp } from '../../../src/core/entities/EmployeeGainXp.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import type { EmployeeActivity } from '../../../src/core/entities/EmployeeActivity.js';
-import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../../../src/core/config/balance.js';
+import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -302,10 +304,31 @@ describe('makePaySection raises line (#1383)', () => {
     expect(text).toContain(`$${perHour(e.salary)}/h`);
   });
 
-  it('displayed parts sum to the total', () => {
-    const e = withParts(250);
-    expect(BASE_SALARIES['driller'] + QUALIFICATION_SALARY_BONUS[2] + 250).toBe(e.salary);
-    expect(pay(e)).toContain(`+ raises $${perHour(250)}/h`);
+  it('displayed parts sum to the total after a real giveRaise and a level-up', () => {
+    const es = { employees: [makeEmployee({
+      role: 'driller',
+      qualifications: [{ category: 'blasting', proficiencyLevel: 1, xp: 0 }],
+    })] } as unknown as EmployeeState;
+    const e = es.employees[0]!;
+    e.salary = calculateSalary(e);
+    expect(giveRaise(es, e.id, 250)).toBe(true);
+    expect(gainXp(es, e.id, 'blasting', XP_THRESHOLDS[2])?.leveledUp).toBe(true);
+    expect(e.raises).toBe(250);
+
+    const spans = Array.from(makePaySection(e, () => {}).querySelectorAll('span')).map(s => s.textContent ?? '');
+    const num = (prefix: RegExp): number => {
+      const m = spans.map(s => prefix.exec(s)).find(Boolean);
+      expect(m).toBeTruthy();
+      return parseFloat(m![1]!);
+    };
+    const base = num(/^Base \$([\d.]+)\/h$/);
+    const skills = num(/^\+ skills \$([\d.]+)\/h$/);
+    const raises = num(/^\+ raises \$([\d.]+)\/h$/);
+    const total = num(/^\$([\d.]+)\/h$/);
+    expect(skills).toBeGreaterThan(0);
+    expect(raises).toBeGreaterThan(0);
+    // each figure is rounded to 0.1, so allow 3 roundings of slack
+    expect(Math.abs(base + skills + raises - total)).toBeLessThanOrEqual(0.15 + 1e-9);
   });
 
   it('shows $0 raises when raises is absent', () => {

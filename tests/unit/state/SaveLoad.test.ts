@@ -2012,6 +2012,54 @@ describe('backfillRaises (#1383)', () => {
     expect(o.employees.employees[1]!['raises']).toBe(40);
   });
 
+  it('resyncs salary to base + bonus + raises when backfilling', () => {
+    const o = wrap([emp({ salary: floor() + 300 }), emp({ id: 2, salary: floor() - 10 })]);
+    backfillRaises(o as unknown as Record<string, unknown>);
+    expect(first(o)['salary']).toBe(floor() + 300);
+    expect(o.employees.employees[1]!['salary']).toBe(floor());
+  });
+
+  it('non-finite salary yields raises 0, never NaN', () => {
+    for (const salary of [NaN, Infinity, null, 'x']) {
+      const o = wrap([emp({ salary })]);
+      backfillRaises(o as unknown as Record<string, unknown>);
+      expect(first(o)['raises']).toBe(0);
+    }
+  });
+
+  it('tolerates null, non-object and malformed qualification entries', () => {
+    const o = wrap([
+      emp({ salary: BASE_SALARIES['driller'] + 100, qualifications: [null, 7, { proficiencyLevel: NaN }, { proficiencyLevel: 99 }] }),
+      emp({ id: 2, salary: BASE_SALARIES['driller'] + 100, qualifications: null }),
+    ]);
+    expect(() => backfillRaises(o as unknown as Record<string, unknown>)).not.toThrow();
+    expect(first(o)['raises']).toBe(100);
+    expect(o.employees.employees[1]!['raises']).toBe(100);
+  });
+
+  it('skips null / non-object employee entries and unknown or prototype roles', () => {
+    const o = { employees: { employees: [null, 5, emp({ role: 'constructor', salary: 500 }), emp({ id: 3, role: 'nope', salary: 500 })] } };
+    expect(() => backfillRaises(o as unknown as Record<string, unknown>)).not.toThrow();
+    const list = o.employees.employees as unknown as Record<string, unknown>[];
+    expect(Number.isFinite(list[2]!['raises'])).toBe(true);
+    expect(list[2]!['salary']).toBe(500);
+    expect(list[3]!['salary']).toBe(500);
+  });
+
+  it('real deserialize of a legacy save lacking raises runs the backfill', () => {
+    const state = createGame({ seed: 42 });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42));
+    const base = employee.salary;
+    const parsed = JSON.parse(serialize(state)) as { employees: { employees: Record<string, unknown>[] } };
+    const raw = parsed.employees.employees.find(e => e['id'] === employee.id)!;
+    delete raw['raises'];
+    raw['salary'] = base + 400;
+    const loaded = deserialize(JSON.stringify(parsed));
+    const e = loaded.employees.employees.find(x => x.id === employee.id)!;
+    expect(e.raises).toBe(400);
+    expect(e.salary).toBe(base + 400);
+  });
+
   it('round-trips raises through serialize/deserialize', () => {
     const state = createGame({ seed: 42 });
     const { employee } = hireEmployee(state.employees, 'driller', new Random(42));

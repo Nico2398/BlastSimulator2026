@@ -3,7 +3,7 @@
 
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
-import { SCORE_DECAY_RATE } from '../config/balance.js';
+import { SCORE_DECAY_RATE, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
 import type { Employee, EmployeeRole } from '../entities/Employee.js';
@@ -498,12 +498,21 @@ export function backfillRaises(obj: Record<string, unknown>): void {
   const es = obj['employees'] as { employees?: unknown } | undefined;
   if (!es || !Array.isArray(es.employees)) return;
   for (const raw of es.employees) {
-    const e = raw as { raises?: unknown; salary?: unknown; role?: string; qualifications?: unknown } | null;
-    if (!e || (typeof e.raises === 'number' && Number.isFinite(e.raises))) continue;
-    const salary = typeof e.salary === 'number' ? e.salary : 0;
-    const base = BASE_SALARIES[e.role as EmployeeRole] ?? 0;
-    const quals = Array.isArray(e.qualifications) ? (e.qualifications as Employee['qualifications']) : [];
-    e.raises = Math.max(0, salary - base - calculateQualificationBonus({ qualifications: quals }));
+    if (typeof raw !== 'object' || raw === null) continue;
+    const e = raw as { raises?: unknown; salary?: unknown; role?: unknown; qualifications?: unknown };
+    if (typeof e.raises === 'number' && Number.isFinite(e.raises)) continue;
+    const salary = typeof e.salary === 'number' && Number.isFinite(e.salary) ? e.salary : 0;
+    const knownRole = typeof e.role === 'string' && Object.hasOwn(BASE_SALARIES, e.role);
+    const base = knownRole ? BASE_SALARIES[e.role as EmployeeRole] : 0;
+    const quals = (Array.isArray(e.qualifications) ? e.qualifications : []).filter(
+      (q): q is Employee['qualifications'][number] =>
+        typeof q === 'object' && q !== null && Object.hasOwn(QUALIFICATION_SALARY_BONUS, (q as { proficiencyLevel?: unknown }).proficiencyLevel as PropertyKey),
+    );
+    const bonus = calculateQualificationBonus({ qualifications: quals });
+    const raises = Math.max(0, salary - base - bonus);
+    e.raises = Number.isFinite(raises) ? raises : 0;
+    // Keep card parts (base + skills + raises) summing to the stored total.
+    if (knownRole) e.salary = base + bonus + (e.raises as number);
   }
 }
 
