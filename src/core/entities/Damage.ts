@@ -2,7 +2,7 @@
 // Processes fragment impacts on buildings, vehicles, and employees.
 // Kinetic energy = 0.5 * mass * velocity² (real physics).
 
-import type { FragmentData } from '../mining/BlastExecution.js';
+import type { FragmentData, SecondaryBlastEvent } from '../mining/BlastExecution.js';
 import { length } from '../math/Vec3.js';
 import type { BuildingState, Building } from './Building.js';
 import { getBuildingDef, getDefSize, destroyBuilding } from './Building.js';
@@ -78,6 +78,8 @@ export function processProjections(
   damage: DamageState,
   tick: number,
   dangerZone: ZoneBounds | null = null,
+  /** Collector: destroyed stocked explosive warehouses are pushed here for resolveSecondaryBlasts (#1394). */
+  _secondaryBlasts: SecondaryBlastEvent[] = [],
 ): AccidentRecord[] {
   const newAccidents: AccidentRecord[] = [];
   const inZone = (x: number, z: number): boolean => dangerZone === null || isInZone(x, z, dangerZone);

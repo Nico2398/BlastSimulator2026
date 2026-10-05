@@ -1648,3 +1648,18 @@ export const RAMP_RESERVATION_MARGIN = 0;
 
 /** Cell radius around a drill hole kept clear of buildings (#1390). */
 export const HOLE_RESERVATION_RADIUS = 0;
+
+/** Secondary blast radius floor in metres (#1394). */
+export const SECONDARY_BLAST_RADIUS_BASE_M = 5;
+
+/** Secondary blast radius growth per sqrt(kg) of stored explosive (#1394). */
+export const SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M = 0.5;
+
+/** Secondary blast radius cap in metres (#1394). */
+export const SECONDARY_BLAST_RADIUS_MAX_M = 40;
+
+/** Fraction of the radius within which buildings are destroyed (#1394). */
+export const SECONDARY_BLAST_BUILDING_DAMAGE_FRACTION = 0.6;
+
+/** Fraction of the radius within which people die (#1394). */
+export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;

@@ -88,16 +88,8 @@ export interface DestroyedBuildingInfo {
   z: number;
 }
 
-/**
- * Emitted when an `explosive_warehouse` with stored explosives is destroyed,
- * indicating a secondary detonation chain should be simulated.
- */
-export interface SecondaryBlastEvent {
-  buildingId: number;
-  x: number;
-  z: number;
-  explosivesKg: number;
-}
+export type { SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
+import type { SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
 
 export interface BlastRegion {
   minX: number;
@@ -169,6 +161,19 @@ export interface BlastReport {
   wetHoleIds?: string[];
   /** Ids of wet holes whose water-sensitive explosive fizzled. Optional like `wetHoleIds`. */
   fizzledHoleIds?: string[];
+  /** Secondary detonations from destroyed stocked explosive warehouses (#1394). Optional: omitted when none. */
+  secondaryBlasts?: SecondaryBlastReport[];
+}
+
+/** One secondary detonation as shown in the blast report (#1394). */
+export interface SecondaryBlastReport {
+  buildingId: number;
+  x: number;
+  z: number;
+  explosivesKg: number;
+  radiusM: number;
+  casualties: number;
+  destroyedIds: number[];
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
