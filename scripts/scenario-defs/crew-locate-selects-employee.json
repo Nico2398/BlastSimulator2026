@@ -1,0 +1,67 @@
+{
+  "name": "crew-locate-selects-employee",
+  "description": "Crew cards offer a Locate button (#1422): clicking it selects that employee in the scene (selection bar shows DETAIL), and DETAIL expands their crew row.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 staffed:true",
+      "timeout": 30,
+      "description": "Setup: a staffed site so the Crew panel has roster cards",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Click Locate on a crew card (#1422) \u2014 selects that employee in the scene, so the selection bar offers DETAIL",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-employee-id] [data-action=\"locate\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id] [data-action=\"locate\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "note": "Locate must select the employee in the scene, not merely move the camera"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Click DETAIL in the selection bar \u2014 opens the Crew panel with that employee's row expanded",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"detail\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-employee-panel [data-employee-id] .bs-employee-detail",
+        "note": "the selected employee's detail must be expanded"
+      }
+    }
+  ]
+}
