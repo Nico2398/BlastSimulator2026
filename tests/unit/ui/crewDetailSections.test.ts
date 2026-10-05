@@ -278,3 +278,37 @@ describe('pay i18n keys keep placeholder parity (#1373)', () => {
     expect(fr['ui.crew.pay_total']).toContain('/h');
   });
 });
+
+describe('makePaySection raises line (#1383)', () => {
+  const perHour = (amount: number): string => String(Math.round((amount / PAY_CYCLE_TICKS) * 10) / 10);
+  const pay = (e: Employee): string => makePaySection(e, () => {}).textContent ?? '';
+  const withParts = (raises?: number): Employee => {
+    const bonus = QUALIFICATION_SALARY_BONUS[2];
+    const base = BASE_SALARIES['driller'];
+    return makeEmployee({
+      role: 'driller',
+      qualifications: [{ category: 'blasting', proficiencyLevel: 2, xp: 0 }],
+      raises,
+      salary: base + bonus + (raises ?? 0),
+    });
+  };
+
+  it('shows base, skills, raises and total when raises is 250', () => {
+    const e = withParts(250);
+    const text = pay(e);
+    expect(text).toContain(`Base $${perHour(BASE_SALARIES['driller'])}/h`);
+    expect(text).toContain(`+ skills $${perHour(QUALIFICATION_SALARY_BONUS[2])}/h`);
+    expect(text).toContain(`+ raises $${perHour(250)}/h`);
+    expect(text).toContain(`$${perHour(e.salary)}/h`);
+  });
+
+  it('displayed parts sum to the total', () => {
+    const e = withParts(250);
+    expect(BASE_SALARIES['driller'] + QUALIFICATION_SALARY_BONUS[2] + 250).toBe(e.salary);
+    expect(pay(e)).toContain(`+ raises $${perHour(250)}/h`);
+  });
+
+  it('shows $0 raises when raises is absent', () => {
+    expect(pay(withParts(undefined))).toContain('+ raises $0/h');
+  });
+});

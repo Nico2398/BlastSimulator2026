@@ -5,6 +5,7 @@ import {
   createEmployeeState,
   hireEmployee,
   giveRaise,
+  calculateQualificationBonus,
   fireEmployee,
   killEmployee,
   processPayCycle,
@@ -1399,5 +1400,94 @@ describe('holdsRequiredSkill (#1306)', () => {
   it('is true for a held skill and false for a missing one', () => {
     expect(holdsRequiredSkill(emp, 'blasting')).toBe(true);
     expect(holdsRequiredSkill(emp, 'geology')).toBe(false);
+  });
+});
+
+// ── Raises tracked separately from base + qualification bonus (#1383) ──
+
+describe('raises field and salary (#1383)', () => {
+  const hire = (role: 'driller' | 'surveyor' = 'driller') => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, role, new Random(42));
+    return { state, emp: employee };
+  };
+
+  describe('calculateQualificationBonus', () => {
+    it('sums the bonus of a single qualification', () => {
+      expect(calculateQualificationBonus({ qualifications: [{ category: 'blasting', proficiencyLevel: 3, xp: 0 }] }))
+        .toBe(QUALIFICATION_SALARY_BONUS[3]);
+    });
+
+    it('is 0 with no qualifications', () => {
+      expect(calculateQualificationBonus({ qualifications: [] })).toBe(0);
+    });
+
+    it('sums across multiple qualifications', () => {
+      expect(calculateQualificationBonus({ qualifications: [
+        { category: 'blasting', proficiencyLevel: 1, xp: 0 },
+        { category: 'geology', proficiencyLevel: 4, xp: 0 },
+      ] })).toBe(QUALIFICATION_SALARY_BONUS[1] + QUALIFICATION_SALARY_BONUS[4]);
+    });
+  });
+
+  describe('calculateSalary with raises', () => {
+    it('adds raises on top of base + bonus', () => {
+      const { emp } = hire();
+      emp.raises = 250;
+      expect(calculateSalary(emp)).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp) + 250);
+    });
+
+    it('treats undefined raises as 0 (legacy value)', () => {
+      const { emp } = hire();
+      delete emp.raises;
+      expect(calculateSalary(emp)).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp));
+    });
+  });
+
+  describe('hireEmployee', () => {
+    it('starts with raises === 0', () => {
+      expect(hire().emp.raises).toBe(0);
+    });
+  });
+
+  describe('giveRaise', () => {
+    it('records the raise and lifts salary to base + bonus + raise', () => {
+      const { state, emp } = hire();
+      expect(giveRaise(state, emp.id, 250)).toBe(true);
+      expect(emp.raises).toBe(250);
+      expect(emp.salary).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp) + 250);
+    });
+
+    it('accumulates successive raises', () => {
+      const { state, emp } = hire();
+      giveRaise(state, emp.id, 100);
+      giveRaise(state, emp.id, 250);
+      expect(emp.raises).toBe(350);
+      expect(emp.salary).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp) + 350);
+    });
+
+    it('returns false and changes nothing for a dead employee', () => {
+      const { state, emp } = hire();
+      emp.alive = false;
+      const before = { salary: emp.salary, raises: emp.raises, morale: emp.morale };
+      expect(giveRaise(state, emp.id, 250)).toBe(false);
+      expect({ salary: emp.salary, raises: emp.raises, morale: emp.morale }).toEqual(before);
+    });
+
+    it('returns false for a missing employee', () => {
+      const { state } = hire();
+      expect(giveRaise(state, 9999, 250)).toBe(false);
+    });
+
+    it('still boosts morale, capped at 20 and 100', () => {
+      const { state, emp } = hire();
+      emp.morale = 50;
+      giveRaise(state, emp.id, 250);
+      expect(emp.morale).toBeGreaterThan(50);
+      expect(emp.morale).toBeLessThanOrEqual(70);
+      emp.morale = 99;
+      giveRaise(state, emp.id, 250);
+      expect(emp.morale).toBeLessThanOrEqual(100);
+    });
   });
 });
