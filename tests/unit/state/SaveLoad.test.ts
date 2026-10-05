@@ -354,6 +354,24 @@ describe('deserialize — event system field defaults', () => {
   });
 });
 
+describe('serialize/deserialize — raisedUnqualifiedActionIds (#1380)', () => {
+  it('round-trips the ids an unqualified_task event was already raised for', () => {
+    const state = createGame({ seed: 42 });
+    state.events.raisedUnqualifiedActionIds = [4, 9];
+    expect(deserialize(serialize(state)).events.raisedUnqualifiedActionIds).toEqual([4, 9]);
+  });
+
+  it('a save without the field loads as an empty list', () => {
+    const parsed = JSON.parse(serialize(createGame({ seed: 42 }))) as Record<string, unknown>;
+    delete (parsed['events'] as Record<string, unknown>)['raisedUnqualifiedActionIds'];
+    expect(deserialize(JSON.stringify(parsed)).events.raisedUnqualifiedActionIds).toEqual([]);
+  });
+
+  it('a fresh game starts with none raised', () => {
+    expect(createGame({ seed: 42 }).events.raisedUnqualifiedActionIds).toEqual([]);
+  });
+});
+
 // ── deserialize — Employee.restNeedKey / activeTaskSkill defaults ──────────
 // Both fields are ensured unconditionally for an employee saved before they
 // existed. Absent means "not tracked" — encoded as null on both, matching

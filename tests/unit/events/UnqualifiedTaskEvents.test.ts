@@ -81,6 +81,73 @@ describe('EventEngine — detectUnqualifiedTask (Task 3.7)', () => {
   });
 });
 
+// ── Fires once per blocked action, not every tick (#1380) ─────────────────────
+
+describe('EventEngine — detectUnqualifiedTask raises each blocked action once (#1380)', () => {
+  let eventState: EventSystemState;
+
+  beforeEach(() => {
+    eventState = createEventSystemState();
+  });
+
+  it('a fresh event state has no raised ids', () => {
+    expect(eventState.raisedUnqualifiedActionIds).toEqual([]);
+  });
+
+  it('the fired event carries the blocked action ids', () => {
+    const fired = detectUnqualifiedTask([3, 9], eventState, 10);
+    expect([...fired!.unqualifiedActionIds!].sort((a, b) => a - b)).toEqual([3, 9]);
+  });
+
+  it('does not fire a second time for the same ids on the next tick', () => {
+    expect(detectUnqualifiedTask([7], eventState, 10)).not.toBeNull();
+    eventState.pendingEvent = null; // the player answered
+    expect(detectUnqualifiedTask([7], eventState, 11)).toBeNull();
+    expect(eventState.pendingEvent).toBeNull();
+  });
+
+  it('does not fire again for the same ids however long the gap', () => {
+    detectUnqualifiedTask([7], eventState, 10);
+    eventState.pendingEvent = null;
+    for (const tick of [12, 100, 5000, 1_000_000]) {
+      expect(detectUnqualifiedTask([7], eventState, tick)).toBeNull();
+    }
+  });
+
+  it('fires for a newly queued blocked id and carries it', () => {
+    detectUnqualifiedTask([7], eventState, 10);
+    eventState.pendingEvent = null;
+    const fired = detectUnqualifiedTask([7, 8], eventState, 11);
+    expect(fired).not.toBeNull();
+    expect(fired!.unqualifiedActionIds).toContain(8);
+  });
+
+  it('forgets an id once the action is gone, so a reused id would be raised again', () => {
+    detectUnqualifiedTask([7], eventState, 10);
+    eventState.pendingEvent = null;
+    expect(detectUnqualifiedTask([], eventState, 11)).toBeNull();
+    expect(eventState.raisedUnqualifiedActionIds).toEqual([]);
+    expect(detectUnqualifiedTask([7], eventState, 12)).not.toBeNull();
+  });
+
+  it('prunes raised ids to the ids still present', () => {
+    detectUnqualifiedTask([7, 8], eventState, 10);
+    eventState.pendingEvent = null;
+    expect(detectUnqualifiedTask([8], eventState, 11)).toBeNull();
+    expect(eventState.raisedUnqualifiedActionIds).toEqual([8]);
+  });
+
+  it('a suppressed or already-pending call does not mark ids as raised', () => {
+    const muted = createEventSystemState(0);
+    detectUnqualifiedTask([7], muted, 10);
+    expect(muted.raisedUnqualifiedActionIds ?? []).toEqual([]);
+    eventState.pendingEvent = { eventId: 'traffic_jam', firedAtTick: 1 };
+    detectUnqualifiedTask([7], eventState, 10);
+    eventState.pendingEvent = null;
+    expect(detectUnqualifiedTask([7], eventState, 11)).not.toBeNull();
+  });
+});
+
 // ── unqualified_task_error EventDef registration ──────────────────────────────
 
 describe('EventPool — unqualified_task_error EventDef registration (Task 3.7)', () => {
