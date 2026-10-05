@@ -10,6 +10,7 @@ import {
   negotiateContractAtTick,
   negotiationStreamSeed,
   canNegotiate,
+  type NegotiationResult,
 } from '../../../src/core/economy/Negotiation.js';
 import { NEGOTIATION_EARLY_BONUS_RATE, NEGOTIATION_MAX_ATTEMPTS_PER_OFFER } from '../../../src/core/config/balance.js';
 
@@ -20,14 +21,19 @@ function setupContracts(seed: number) {
   return { state, rng };
 }
 
+/** Narrow a negotiateContract outcome to a performed negotiation, or null if refused/not found. */
+function performed(r: ReturnType<typeof negotiateContract>): NegotiationResult | null {
+  return r && 'success' in r ? r : null;
+}
+
 describe('Contract negotiation', () => {
   it('negotiation with fixed seed produces deterministic outcome', () => {
     const { state: s1, rng: r1 } = setupContracts(42);
     const { state: s2, rng: r2 } = setupContracts(42);
 
     const id = s1.available[0]!.id;
-    const result1 = negotiateContract(s1, id, 0, r1);
-    const result2 = negotiateContract(s2, id, 0, r2);
+    const result1 = performed(negotiateContract(s1, id, 0, r1));
+    const result2 = performed(negotiateContract(s2, id, 0, r2));
 
     expect(result1).not.toBeNull();
     expect(result2).not.toBeNull();
@@ -44,7 +50,7 @@ describe('Contract negotiation', () => {
       const origDeadline = contract.deadlineTicks;
       const origPenalty = contract.penaltyAmount;
 
-      const result = negotiateContract(state, contract.id, 50, rng); // High reputation for success
+      const result = performed(negotiateContract(state, contract.id, 50, rng)); // High reputation for success
       if (result && result.success) {
         const improved = (
           contract.pricePerKg > origPrice ||
@@ -69,7 +75,7 @@ describe('Contract negotiation', () => {
       const origDeadline = contract.deadlineTicks;
       const origPenalty = contract.penaltyAmount;
 
-      const result = negotiateContract(state, contract.id, -40, rng); // Low reputation for failure
+      const result = performed(negotiateContract(state, contract.id, -40, rng)); // Low reputation for failure
       if (result && !result.success) {
         const worsened = (
           contract.pricePerKg < origPrice ||
@@ -95,8 +101,8 @@ describe('Contract negotiation', () => {
       const { state: s2, rng: r2 } = setupContracts(seed * 100);
 
       const id = s1.available[0]!.id;
-      const r1result = negotiateContract(s1, id, 30, r1);
-      const r2result = negotiateContract(s2, id, -30, r2);
+      const r1result = performed(negotiateContract(s1, id, 30, r1));
+      const r2result = performed(negotiateContract(s2, id, -30, r2));
 
       if (r1result?.success) highRepSuccesses++;
       if (r2result?.success) lowRepSuccesses++;
