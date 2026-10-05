@@ -32,7 +32,7 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
   for (const h of fresh) {
     const c = saved.chargesByHole[h.id];
     if (!c) continue;
-    const notOffered = levelExplosiveFailure(state, c.explosiveId);
+    const notOffered = levelExplosiveFailure(state.campaign.activeLevelId, c.explosiveId);
     if (notOffered) return { success: false, output: `${h.id}: ${notOffered.output}` };
     const result = createCharge(c.explosiveId, c.amountKg, c.stemmingM, h.depth);
     if ('error' in result) return { success: false, output: result.error };

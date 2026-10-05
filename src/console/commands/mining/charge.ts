@@ -123,7 +123,7 @@ export function chargeCommand(
   const stemming = parseFloat((named['stemming'] ?? String(MIN_STEMMING_M)).replace('m', ''));
 
   if (!explosiveId) return { success: false, output: t('mining.charge.missing_explosive') };
-  const notOffered = levelExplosiveFailure(ctx.state!, explosiveId);
+  const notOffered = levelExplosiveFailure(ctx.state!.campaign.activeLevelId, explosiveId);
   if (notOffered) return notOffered;
 
   if (holeSpec === '*') {
@@ -203,9 +203,8 @@ export function sequenceCommand(
  * offer. Null when allowed or when the id is not in the catalog (unknown ids
  * keep their existing error path).
  */
-export function levelExplosiveFailure(state: GameState, explosiveId: string): CommandResult | null {
+export function levelExplosiveFailure(levelId: string | null, explosiveId: string): CommandResult | null {
   if (!getExplosive(explosiveId)) return null;
-  const levelId = state.campaign.activeLevelId;
   if (isExplosiveAvailable(levelId, explosiveId)) return null;
   const level = levelId ? getLevel(levelId) : undefined;
   const nameOf = (id: string): string => {

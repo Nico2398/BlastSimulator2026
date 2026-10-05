@@ -15,13 +15,15 @@
 // closes that; this step feeds it the panel's current product / amount /
 // stemming values and dispatches for the one hole whose row was clicked.
 //
+// Only the active level's explosives are offered (resolveAvailableExplosives);
+// the water-sensitivity badge still surfaces (that data is real and per-hole
+// derivable via wetHoles()).
+//
 // Also omitted vs. the mock: locking a product by "site rock tier" — the
 // mock's single site-wide rock tier has no real-data equivalent (rock is
 // per-voxel; holes can sit over different rock), so gating would need new
 // plumbing (grid access no panel currently has) for a comparison the design
-// doc doesn't specify how to make. Only the active level's explosives are
-// offered (resolveAvailableExplosives); the water-sensitivity badge still surfaces (that data is real and per-hole
-// derivable via wetHoles()).
+// doc doesn't specify how to make.
 
 import { t } from '../../../core/i18n/I18n.js';
 import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } from '../../dom.js';
@@ -57,7 +59,7 @@ export class ChargeStep {
 
   private gameConsole?: GameConsoleFn;
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
-  private allowedIds: readonly string[] = getAllExplosives().map(e => e.id);
+  private allowedIds: readonly string[] = resolveAvailableExplosives(null);
   private amountKg = DEFAULT_AMOUNT_KG;
   private stemmingM = DEFAULT_STEMMING_M;
   private lastSignature = '';
