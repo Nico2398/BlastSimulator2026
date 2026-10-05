@@ -6,7 +6,7 @@
 // employee auto-claims/drives/loads/delivers them instead of hauling being
 // reachable only through the manual Fleet-panel button.
 
-import type { GameState, PendingAction, ActionType } from '../state/GameState.js';
+import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '../state/GameState.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
@@ -197,4 +197,14 @@ export function haulActionCarriesOre(
 /** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */
 export function isAutoDebrisAction(type: ActionType): boolean {
   return type === 'haul_debris' || type === 'fragment_debris';
+}
+
+/** Why a haul/debris order cannot be fulfilled now (no freight warehouse, storage full), or null (#1369). */
+export function haulBlockedReason(
+  _state: GameState,
+  _action: PendingAction,
+  _lookup?: FragmentLookup,
+): BlockedOrderReason | null {
+  // TODO: implement
+  return null;
 }

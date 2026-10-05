@@ -355,6 +355,12 @@ export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
   return state.storedMassKg + massKg <= state.storageCapacityKg;
 }
 
+/** Free storage room in kg (capacity minus stored mass) (#1369). */
+export function storageRoomKg(_state: LogisticsState): number {
+  // TODO: implement
+  return 0;
+}
+
 /** Total ore mass across all materials in `collectedOre`, in kg. */
 export function totalCollectedOreKg(collectedOre: Record<string, number>): number {
   return Object.values(collectedOre).reduce((sum, kg) => sum + kg, 0);
