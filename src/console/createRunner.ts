@@ -241,10 +241,10 @@ export function createRunner(): RunnerWithContext {
   );
 
   // --- Entity commands (Phase 5) ---
-  runner.register('build', 'Place/manage buildings (list|destroy|move|<type> at:x,z)', (args, named) =>
+  runner.register('build', 'Place/manage buildings (list|destroy|upgrade|move|types|<type> at:x,z)', (args, named) =>
     buildCommand(ctx, args, named),
   );
-  runner.register('vehicle', 'Manage vehicles (list|buy|assign|move|driver|haul)', (args, named) =>
+  runner.register('vehicle', 'Manage vehicles (list|buy|reposition|driver|haul|scrap|break)', (args, named) =>
     vehicleCommand(ctx, args, named),
   );
   runner.register('employee', 'Manage employees (list|hire|raise|fire|assign_skill|dispatch|train|cancel)', (args, named) =>
