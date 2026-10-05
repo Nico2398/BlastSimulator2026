@@ -122,8 +122,6 @@ export function blastCommand(
     thisBlastAccidents.push(accident);
   }
 
-  releaseOccupantsOfRemovedVehicles(state, ctx.emitter);
-
   // Rock that was thrown lands somewhere, and whatever is standing there pays
   // for it. Fragment positions are where the rock came to rest and its speed is
   // what it was doing on impact, so this reads the blast's own outcome rather
@@ -146,6 +144,10 @@ export function blastCommand(
     syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   }
   thisBlastAccidents.push(...impacts);
+
+  // One release after both destruction paths (cleared columns above, flying
+  // rock in processProjections) so no rider stays mounted on a removed vehicle.
+  releaseOccupantsOfRemovedVehicles(state, ctx.emitter);
 
   // Every employee this blast killed (exact-hit above, or attenuated via
   // processProjections just above) may still have a PendingAction targeting

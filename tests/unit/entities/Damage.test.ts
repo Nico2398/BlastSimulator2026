@@ -232,7 +232,7 @@ describe('flying rock destroying a mounted vehicle (#1389)', () => {
 
   it('does not injure a driver whose vehicle survives the hit', () => {
     const { state, vehicle, driver } = setup();
-    vehicle.hp = vehicle.maxHp;
+    vehicle.hp = 10_000;
 
     processProjections([makeProjection(1, 10, 10, 1, 40)], state.buildings, state.vehicles, state.employees, createDamageState(), 1);
 

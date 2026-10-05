@@ -193,8 +193,8 @@ function processVehicleHit(
 
   if (v.hp <= 0) {
     // Riders of a vehicle destroyed by flying rock are injured, once only (as
-    // in processBuildingHit); the tick's releaseOccupantsOfRemovedVehicles
-    // puts them on foot and owns the occupancy write.
+    // in processBuildingHit); the caller's releaseOccupantsOfRemovedVehicles
+    // (blast command, tick) puts them on foot and owns the occupancy write.
     for (const employeeId of v.occupantIds) {
       if (employees.employees.find(e => e.id === employeeId)?.injured === false) injureEmployee(employees, employeeId);
     }
