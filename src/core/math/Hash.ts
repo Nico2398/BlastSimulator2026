@@ -17,6 +17,11 @@ export function subSeed(seed: number, label: string): number {
   return h;
 }
 
+/** Fold a numeric value into a running hash. Order-sensitive; returns an unsigned 32-bit int. */
+export function hashCombine(h: number, value: number): number {
+  return hash32(h ^ hash32(value | 0));
+}
+
 /** Seeded 2D cell hash for jittered-grid placement. Returns a float in [0, 1). */
 export function cellRand(seed: number, cx: number, cz: number, salt: number): number {
   return hash32(seed ^ Math.imul(cx, 0x9e3779b1) ^ Math.imul(cz, 0x85ebca77) ^ salt) / 4294967296;

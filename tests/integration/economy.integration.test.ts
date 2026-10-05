@@ -456,31 +456,33 @@ describe('Economy', () => {
     const originalPenalty = c.penaltyAmount;
 
     // Negotiate with very high reputation (ensures >95% success rate)
-    const result = negotiateContract(cs, c.id, 100, rng);
+    const outcome = negotiateContract(cs, c.id, 100, rng);
 
-    expect(result).not.toBeNull();
-    expect(result!.contract.id).toBe(c.id);
+    expect(outcome).not.toBeNull();
+    if (!outcome || 'refused' in outcome) throw new Error('negotiation was not performed');
+    const result = outcome;
+    expect(result.contract.id).toBe(c.id);
 
     // The negotiation always changes the contract (success improves, failure worsens)
     const changed =
-      result!.contract.pricePerKg !== originalPrice ||
-      result!.contract.deadlineTicks !== originalDeadline ||
-      result!.contract.penaltyAmount !== originalPenalty;
+      result.contract.pricePerKg !== originalPrice ||
+      result.contract.deadlineTicks !== originalDeadline ||
+      result.contract.penaltyAmount !== originalPenalty;
     expect(changed).toBe(true);
 
     // changes array should contain descriptions of what happened
-    expect(result!.changes.length).toBeGreaterThan(0);
+    expect(result.changes.length).toBeGreaterThan(0);
 
     // With reputation=100, successRate = min(0.95, max(0.05, 0.5 + 100*0.01))
     // = min(0.95, 1.5) = 0.95, so very likely to succeed
-    if (result!.success) {
+    if (result.success) {
       // On success, price should be >= original (improved)
       // Actually price improves: pricePerKg *= (1 + factor), so it increases
       // But could also have improved deadline or penalty
       const improvedSomething =
-        result!.contract.pricePerKg >= originalPrice ||
-        result!.contract.deadlineTicks >= originalDeadline ||
-        result!.contract.penaltyAmount <= originalPenalty;
+        result.contract.pricePerKg >= originalPrice ||
+        result.contract.deadlineTicks >= originalDeadline ||
+        result.contract.penaltyAmount <= originalPenalty;
       expect(improvedSomething).toBe(true);
     }
 
