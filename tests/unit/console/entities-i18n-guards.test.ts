@@ -742,7 +742,7 @@ describe('vehicle haul / break — refusals', () => {
       const ctx = makeCtx();
       const enResult = vehicleCommand(ctx, [sub, '777'], { fragment: '1' });
       expect(enResult.success).toBe(false);
-      expect(enResult.output).toBe('Vehicle not found');
+      expect(enResult.output).toBe('Vehicle #777 not found.');
       setLocale('fr');
       const frResult = vehicleCommand(ctx, [sub, '777'], { fragment: '1' });
       expect(frResult.success).toBe(false);

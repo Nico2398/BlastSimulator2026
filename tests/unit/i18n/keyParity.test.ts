@@ -436,7 +436,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1390: +2 keys (shell.placement.refused_ramp, shell.placement.refused_hole), both locales: 3625
     // #1394: +3 keys (secondary blast report lines, lost-explosives demolish warning), both locales: 3628
     // #1417: +16 keys (duration units, notification pips/alerts, saveload summary), both locales: 3644
-    expect(Object.keys(en).length).toBe(3644);
+    // #1397: +11 keys (localized console refusals), both locales: 3655.
+    expect(Object.keys(en).length).toBe(3655);
   });
 });
 
