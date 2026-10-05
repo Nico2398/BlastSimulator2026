@@ -2857,7 +2857,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 76.73555555555699,
-          "safety": 0,
+          "safety": 50,
           "ecology": 42.9899757416574,
           "nuisance": 32.47493935414351
         },
@@ -4845,8 +4845,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 36.725586550086135,
-          "nuisance": 14.3783053126797
+          "ecology": 35.675586550086194,
+          "nuisance": 13.328305312679685
         },
         "changedBy": {
           "tickCount": 0
@@ -4871,8 +4871,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 36.725586550086135,
-          "nuisance": 14.3783053126797
+          "ecology": 35.675586550086194,
+          "nuisance": 13.328305312679685
         },
         "changedBy": {
           "tickCount": 0
