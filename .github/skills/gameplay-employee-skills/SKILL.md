@@ -101,7 +101,7 @@ A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` 
 
 ## Salary Calculation
 
-Salary = base + sum of qualification level bonuses. Multi-skilled employee costs more than single-skill specialist.
+Salary = base + qualification bonus (sum of level bonuses) + raises. Raises are permanent, stored in `Employee.raises`, and survive every recompute (level-up, training, skill assignment). Legacy saves backfill `raises = max(0, salary - base - bonus)`. Multi-skilled employee costs more than single-skill specialist.
 
 ## Work & Rest Policies
 
