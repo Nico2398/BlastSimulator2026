@@ -3,9 +3,10 @@
 // Kinetic energy = 0.5 * mass * velocity² (real physics).
 
 import type { FragmentData } from '../mining/BlastExecution.js';
+import { secondaryBlastEventFor, type SecondaryBlastEvent } from './SecondaryBlast.js';
 import { length } from '../math/Vec3.js';
 import type { BuildingState, Building } from './Building.js';
-import { getBuildingDef, getDefSize, destroyBuilding } from './Building.js';
+import { buildingCenter, destroyBuilding } from './Building.js';
 import type { VehicleState, Vehicle } from './Vehicle.js';
 import { destroyVehicle } from './Vehicle.js';
 import type { EmployeeState, Employee } from './Employee.js';
@@ -78,6 +79,8 @@ export function processProjections(
   damage: DamageState,
   tick: number,
   dangerZone: ZoneBounds | null = null,
+  /** Collector: destroyed stocked explosive warehouses are pushed here for resolveSecondaryBlasts (#1394). */
+  secondaryBlasts: SecondaryBlastEvent[] = [],
 ): AccidentRecord[] {
   const newAccidents: AccidentRecord[] = [];
   const inZone = (x: number, z: number): boolean => dangerZone === null || isInZone(x, z, dangerZone);
@@ -101,7 +104,7 @@ export function processProjections(
       const dist = distanceBetween(fx, fz, cx, cz);
       const effectiveKe = keAtDistance(ke, dist);
       if (effectiveKe === null) continue;
-      const acc = processBuildingHit(b, buildings, employees, frag, effectiveKe, tick);
+      const acc = processBuildingHit(b, buildings, employees, frag, effectiveKe, tick, secondaryBlasts);
       if (acc) newAccidents.push(acc);
     }
 
@@ -155,6 +158,7 @@ function processBuildingHit(
   frag: FragmentData,
   ke: number,
   tick: number,
+  secondaryBlasts: SecondaryBlastEvent[],
 ): AccidentRecord | null {
   if (ke < BUILDING_DAMAGE_THRESHOLD) return null;
 
@@ -171,6 +175,8 @@ function processBuildingHit(
       // re-apply injureEmployee's morale penalty for one event.
       if (employees.employees.find(e => e.id === employeeId)?.injured === false) injureEmployee(employees, employeeId);
     }
+    const secondary = secondaryBlastEventFor(b);
+    if (secondary) secondaryBlasts.push(secondary);
     destroyBuilding(state, b.id);
     return { tick, type: 'building_destroyed', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
   }
@@ -213,9 +219,7 @@ function processEmployeeHit(
   damage: DamageState,
 ): AccidentRecord | null {
   if (ke >= DEATH_THRESHOLD) {
-    killEmployee(state, emp.id);
-    damage.lawsuitPending = true;
-    damage.deathCount++;
+    recordEmployeeDeath(state, damage, emp.id);
     return { tick, type: 'death', entityId: emp.id, fragmentId: frag.id, kineticEnergy: ke };
   }
   if (ke >= INJURY_THRESHOLD) {
@@ -232,6 +236,13 @@ function processEmployeeHit(
 
 // ── Helpers ──
 
+/** Kill an employee and book the consequences: a pending lawsuit and the death count. */
+export function recordEmployeeDeath(state: EmployeeState, damage: DamageState, employeeId: number): void {
+  killEmployee(state, employeeId);
+  damage.lawsuitPending = true;
+  damage.deathCount++;
+}
+
 function kineticEnergy(massKg: number, velocityMs: number): number {
   return 0.5 * massKg * velocityMs * velocityMs;
 }
@@ -240,12 +251,6 @@ function distanceBetween(x1: number, z1: number, x2: number, z2: number): number
   const dx = x1 - x2;
   const dz = z1 - z2;
   return Math.sqrt(dx * dx + dz * dz);
-}
-
-function buildingCenter(b: Building): { cx: number; cz: number } {
-  const def = getBuildingDef(b.type, b.tier);
-  const { sizeX, sizeZ } = getDefSize(def);
-  return { cx: b.x + sizeX / 2, cz: b.z + sizeZ / 2 };
 }
 
 /**

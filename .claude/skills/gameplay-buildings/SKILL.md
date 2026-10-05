@@ -122,7 +122,17 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 - Building destroyed → removed from grid immediately
 - Employees inside → put out on its ring (any removal: destruction, demolition, an upgrade's
   replace); a projection that destroys it injures them first
-- Stored contents lost; Explosive Warehouse detonation → secondary blast
+- Stored contents lost. An Explosive Warehouse destroyed by a blast or flying rock **with stock**
+  detonates (`resolveSecondaryBlasts`, `SecondaryBlast.ts`):
+  - Radius = `SECONDARY_BLAST_RADIUS_BASE_M + SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M * sqrt(kg)`, capped at
+    `SECONDARY_BLAST_RADIUS_MAX_M`, measured from the centre of the warehouse footprint.
+  - Buildings and vehicles within it take `maxHp * SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION` damage,
+    falling off linearly to 0 at the radius. Employees within `SECONDARY_BLAST_DEATH_RADIUS_FRACTION`
+    of the radius die (lawsuit pending, death count up); those further in are injured. Dead or already
+    injured employees are skipped; occupants of a destroyed building or vehicle are injured.
+  - Chain: another stocked warehouse destroyed by a detonation detonates once in turn (visited set).
+  - The blast report lists each detonation; the `blast` output carries one line per detonation.
+  - **Demolition does not detonate**: `build destroy` of a stocked warehouse only reports the lost kg.
 - Well-being, Safety, Ecology score penalties applied
 - Research Center destroyed while its enabling research task is in-flight and no other active Research Center remains → the in-flight task is cancelled and its cost refunded in full; a task still pending behind it in the queue is cancelled/refunded in turn once it reaches the head with no Research Center present. If another active Research Center still exists, the in-flight task is unaffected.
 

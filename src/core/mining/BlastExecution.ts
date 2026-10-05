@@ -88,16 +88,8 @@ export interface DestroyedBuildingInfo {
   z: number;
 }
 
-/**
- * Emitted when an `explosive_warehouse` with stored explosives is destroyed,
- * indicating a secondary detonation chain should be simulated.
- */
-export interface SecondaryBlastEvent {
-  buildingId: number;
-  x: number;
-  z: number;
-  explosivesKg: number;
-}
+export type { SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
+import { secondaryBlastEventFor, type SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
 
 export interface BlastRegion {
   minX: number;
@@ -169,10 +161,23 @@ export interface BlastReport {
   wetHoleIds?: string[];
   /** Ids of wet holes whose water-sensitive explosive fizzled. Optional like `wetHoleIds`. */
   fizzledHoleIds?: string[];
+  /** Secondary detonations from destroyed stocked explosive warehouses (#1394). Optional: omitted when none. */
+  secondaryBlasts?: SecondaryBlastReport[];
+}
+
+/** One secondary detonation as shown in the blast report (#1394). */
+export interface SecondaryBlastReport {
+  buildingId: number;
+  x: number;
+  z: number;
+  explosivesKg: number;
+  radiusM: number;
+  casualties: number;
+  destroyedIds: number[];
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [] }): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [] }, secondaryBlasts: SecondaryBlastReport[] = []): BlastReport {
   return {
     tick,
     rating: result.rating,
@@ -193,6 +198,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     ...(wetHoles.wet.length > 0
       ? { wetHoleIds: wetHoles.wet, fizzledHoleIds: wetHoles.fizzled }
       : {}),
+    ...(secondaryBlasts.length > 0 ? { secondaryBlasts } : {}),
   };
 }
 
@@ -423,14 +429,8 @@ export function executeBlast(
         z: building.z,
       });
       // Secondary blast for explosive_warehouse with stored explosives.
-      if (building.type === 'explosive_warehouse' && (building.storedExplosivesKg ?? 0) > 0) {
-        secondaryBlastEvents.push({
-          buildingId: building.id,
-          x: building.x,
-          z: building.z,
-          explosivesKg: building.storedExplosivesKg!,
-        });
-      }
+      const secondary = secondaryBlastEventFor(building);
+      if (secondary) secondaryBlastEvents.push(secondary);
       destroyBuilding(buildingState, building.id);
     }
   }
