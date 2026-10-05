@@ -132,7 +132,7 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 0
+          "surveyCount": 1
         }
       }
     },

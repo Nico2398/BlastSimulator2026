@@ -288,6 +288,7 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     targetX: centerX,
     targetZ: centerZ,
     targetY: 0,
+    // durationTicks is the base; computeActionWorkTicks scales it by geology proficiency.
     payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method] },
     targetEmployeeId: null,
   });

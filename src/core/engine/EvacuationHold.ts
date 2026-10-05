@@ -208,7 +208,7 @@ export function discardStaleRestAction(state: GameState, emp: Employee, actionId
  * interruptActiveAction — because there is no walking/task-claim state on
  * `emp` to unwind for an entry that was never promoted: interruptActiveAction's
  * extra work (interruptedActionPayload stashing, destinationX/Z clearing,
- * durationTicks preservation) all exist for the ONE action `emp` was actively
+ * resumeTicks preservation) all exist for the ONE action `emp` was actively
  * walking/working, which this never was.
  */
 export function releaseInZoneTaskQueueEntries(state: GameState, emp: Employee, zone: ZoneBounds): void {

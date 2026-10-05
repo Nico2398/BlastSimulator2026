@@ -26,6 +26,7 @@ import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
 import { backfillGhostBuildings, dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields, interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
+import { seedTaskTimerFields } from '../../../src/core/engine/ActionSelection.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
@@ -968,7 +969,7 @@ describe('interruptActiveAction (#549)', () => {
     expect(emp.activeTaskSkill).toBeNull();
   });
 
-  it('stashes the employee\'s remaining work-ticks onto the released action\'s payload.durationTicks when arrived and mid-task (progress preserved on resume)', () => {
+  it('stashes the employee\'s remaining work-ticks onto the released action\'s payload.resumeTicks (durationTicks stays the base) when arrived and mid-task (progress preserved on resume)', () => {
     addQualifiedEmployee(state, 'blasting', SEED);
     const empId = state.employees.employees[0]!.id;
     const emp = state.employees.employees.find(e => e.id === empId)!;
@@ -985,10 +986,51 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 35);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 35);
-    expect(stored.payload.durationTicks).toBe(9);
+    expect(stored.payload.resumeTicks).toBe(9);
   });
 
-  it('does not stash payload.durationTicks when the employee was still walking (taskTicksRemaining null)', () => {
+  it('a level-5 worker interrupted mid-task writes resumeTicks === remaining and leaves the base durationTicks intact (#1384)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    assignSkill(state.employees, empId, 'blasting', 5);
+    const action = makePendingAction({ id: 135, requiredSkill: 'blasting', targetX: 7, targetZ: 7, payload: { durationTicks: 40 } });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 135, empId, {
+      targetX: 7, targetZ: 7, requiredSkill: 'blasting', type: 'general_work', payload: { durationTicks: 40 },
+    }, 16);
+    simulateArrival(state, 135, empId);
+    emp.taskTicksRemaining = 6;
+
+    interruptActiveAction(state, emp, 135);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 135);
+    expect(stored.payload.resumeTicks).toBe(6);
+    expect(stored.payload.durationTicks).toBe(40);
+  });
+
+  it('a higher-level reclaimer gets the raw resumeTicks of a lower-level worker\'s interrupted task, unscaled (#1384)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    addQualifiedEmployee(state, 'blasting', SEED + 1);
+    const [a, b] = state.employees.employees as [typeof state.employees.employees[number], typeof state.employees.employees[number]];
+    assignSkill(state.employees, a.id, 'blasting', 1);
+    assignSkill(state.employees, b.id, 'blasting', 5);
+    const action = makePendingAction({ id: 136, requiredSkill: 'blasting', targetX: 7, targetZ: 7, payload: { durationTicks: 40 } });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 136, a.id, {
+      targetX: 7, targetZ: 7, requiredSkill: 'blasting', type: 'general_work', payload: { durationTicks: 40 },
+    }, 40);
+    simulateArrival(state, 136, a.id);
+    a.taskTicksRemaining = 17;
+
+    interruptActiveAction(state, a, 136);
+
+    const stored = (state as any).pendingActions.find((x: PendingAction) => x.id === 136) as PendingAction;
+    seedTaskTimerFields(state, b, stored);
+    expect(b.pendingTaskDuration).toBe(17);
+  });
+
+  it('does not stash payload.resumeTicks when the employee was still walking (taskTicksRemaining null)', () => {
     addQualifiedEmployee(state, 'blasting', SEED);
     const empId = state.employees.employees[0]!.id;
     const emp = state.employees.employees.find(e => e.id === empId)!;
@@ -1002,7 +1044,7 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 36);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 36);
-    expect(stored.payload.durationTicks).toBeUndefined();
+    expect(stored.payload.resumeTicks).toBeUndefined();
   });
 
   it('re-targets a still-walking open-pool action at the interrupted employee instead of releasing it fully open-pool (#556 livelock fix)', () => {
@@ -1245,12 +1287,12 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 41);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 41);
-    // The arrived-and-working branch (payload.durationTicks stashing) owns
+    // The arrived-and-working branch (payload.resumeTicks stashing) owns
     // this interruption instead — targetEmployeeId is untouched by either
     // branch here (it was already this employee's own id going in), so the
     // pin holds, and the remaining work is preserved for whoever resumes it.
     expect(stored.targetEmployeeId).toBe(empId);
-    expect(stored.payload.durationTicks).toBe(9);
+    expect(stored.payload.resumeTicks).toBe(9);
   });
 
   it('leaves a rest action fully open-pool (never re-targets a rest action to itself)', () => {
@@ -1273,7 +1315,7 @@ describe('interruptActiveAction (#549)', () => {
     expect(stored.targetEmployeeId).toBeNull();
   });
 
-  it('does not stash payload.durationTicks when taskTicksRemaining is exactly 0', () => {
+  it('does not stash payload.resumeTicks when taskTicksRemaining is exactly 0', () => {
     addQualifiedEmployee(state, 'blasting', SEED);
     const empId = state.employees.employees[0]!.id;
     const emp = state.employees.employees.find(e => e.id === empId)!;
@@ -1288,7 +1330,7 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 37);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 37);
-    expect(stored.payload.durationTicks).toBeUndefined();
+    expect(stored.payload.resumeTicks).toBeUndefined();
   });
 });
 

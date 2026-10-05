@@ -47,6 +47,8 @@ An action's XP award is a list, not a single slot — `computeTaskXpAwards` (`sr
 ticksRequired = baseDuration / (proficiency_multiplier * wellbeing_multiplier * event_multipliers)
 ```
 
+Fixed-duration actions (`drill_hole`, `charge_hole`, `survey`, `place_building`) carry a base `payload.durationTicks` that replaces the generic baseDuration but is scaled by the same proficiency (the action's required skill; none = level 1), need and Living Quarters multipliers (`computeActionWorkTicks`). An interrupted action stores its remaining work in `payload.resumeTicks` — already resolved, so it overrides the formula unscaled and `durationTicks` stays the base.
+
 **Wellbeing modifiers** (multiplicative):
 
 | Condition | Multiplier |
