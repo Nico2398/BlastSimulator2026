@@ -34,6 +34,7 @@ import { purchaseVehicle, getVehicleDefByTier, ROLE_LICENCE_REQUIRED } from '../
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS, ACTION_STARVATION_TICK_THRESHOLD, ACTION_STUCK_BACKOFF_TICKS } from '../../../src/core/config/balance.js';
+import { computeTaskDuration } from '../../../src/core/entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../../../src/core/entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import { computeRampSegmentDurationTicks } from '../../../src/core/mining/Ramp.js';
@@ -982,14 +983,14 @@ describe('computeActionWorkTicks (#549)', () => {
     expect(ticks).toBe(20);
   });
 
-  it('a payload.durationTicks override on a non-rest action bypasses the proficiency/need formula entirely', () => {
+  it('payload.durationTicks is a BASE duration (#1384): a level-1 geologist with no living quarters pays base / (1.0 * absent lq)', () => {
     const state = makeGame();
     const employee = addQualifiedEmployee(state, 'geology', 1);
     const action = makeWorkAction({ type: 'survey', requiredSkill: 'geology', payload: { durationTicks: 7 } });
 
     const ticks = computeActionWorkTicks(state, employee, action);
 
-    expect(ticks).toBe(7);
+    expect(ticks).toBe(Math.max(1, Math.ceil(7 / LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent)));
   });
 
   it("rest action: payload.restDuration overrides everything else, regardless of needKey", () => {
@@ -1065,6 +1066,125 @@ describe('computeActionWorkTicks (#549)', () => {
     // compute ceil(20 / 0.80) = 25.
     const expectedTicks = Math.max(1, Math.ceil(BASE_TASK_DURATION_TICKS / LIVING_QUARTERS_WELLBEING_MULTIPLIERS.t1));
     expect(ticks).toBe(expectedTicks);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// computeActionWorkTicks — fixed-duration actions scale like the rest (#1384)
+//
+// drill_hole / charge_hole / survey / place_building carry payload.durationTicks
+// as a BASE duration; the employee's proficiency in the action's own skill,
+// need multiplier and Living Quarters multiplier scale it via
+// computeTaskDuration. payload.resumeTicks (written by interruptActiveAction)
+// is remaining work, returned raw and never scaled.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('computeActionWorkTicks — fixed-duration actions apply productivity multipliers (#1384)', () => {
+  const D = 40;
+  const expected = (level: 1 | 2 | 3 | 4 | 5, needMult = 1, lqMult: number = LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent): number =>
+    computeTaskDuration(D, level, needMult, lqMult, 1);
+
+  it.each([
+    ['charge_hole', 'blasting', { holeId: 'H1', durationTicks: D }],
+    ['drill_hole', 'blasting', { holeId: 'H1', durationTicks: D }],
+    ['survey', 'geology', { durationTicks: D }],
+  ] as const)('%s: level 5 takes fewer ticks than level 1, matching computeTaskDuration', (type, skill, payload) => {
+    const state = makeGame();
+    const rookie = addQualifiedEmployee(state, skill, 1);
+    const master = addQualifiedEmployee(state, skill, 5);
+    const action = makeWorkAction({ type, requiredSkill: skill, payload: { ...payload } });
+
+    const rookieTicks = computeActionWorkTicks(state, rookie, action);
+    const masterTicks = computeActionWorkTicks(state, master, action);
+
+    expect(rookieTicks).toBe(expected(1));
+    expect(masterTicks).toBe(expected(5));
+    expect(masterTicks).toBeLessThan(rookieTicks);
+  });
+
+  it('level 5 is ceil(D * 0.40 / lq) and level 1 is ceil(D / lq) (PROFICIENCY_MULTIPLIERS 1.00 / 0.40)', () => {
+    const state = makeGame();
+    const lq = LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent;
+    const action = makeWorkAction({ type: 'charge_hole', requiredSkill: 'blasting', payload: { durationTicks: D } });
+
+    expect(computeActionWorkTicks(state, addQualifiedEmployee(state, 'blasting', 5), action)).toBe(Math.ceil((D * 0.40) / lq));
+    expect(computeActionWorkTicks(state, addQualifiedEmployee(state, 'blasting', 1), action)).toBe(Math.ceil(D / lq));
+  });
+
+  it('is keyed to the action\'s own skill: a level-5 geologist gets no discount on a blasting action', () => {
+    const state = makeGame();
+    const geologist = addQualifiedEmployee(state, 'geology', 5);
+    const action = makeWorkAction({ type: 'charge_hole', requiredSkill: 'blasting', payload: { durationTicks: D } });
+
+    expect(computeActionWorkTicks(state, geologist, action)).toBe(expected(1));
+  });
+
+  it('place_building (requiredSkill null) is unaffected by qualifications', () => {
+    const state = makeGame();
+    const master = addQualifiedEmployee(state, 'blasting', 5);
+    const rookie = addQualifiedEmployee(state, 'blasting', 1);
+    const action = makeWorkAction({ type: 'place_building', requiredSkill: null, payload: { durationTicks: D } });
+
+    expect(computeActionWorkTicks(state, master, action)).toBe(expected(1));
+    expect(computeActionWorkTicks(state, rookie, action)).toBe(expected(1));
+  });
+
+  it('a low-fatigue need multiplier lengthens a fixed-duration action', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = makeWorkAction({ type: 'charge_hole', requiredSkill: 'blasting', payload: { durationTicks: D } });
+    const fresh = computeActionWorkTicks(state, employee, action);
+
+    employee.fatigue = 10;
+    const tired = computeActionWorkTicks(state, employee, action);
+
+    expect(getNeedMultiplier(employee)).toBeLessThan(1);
+    expect(tired).toBe(expected(1, getNeedMultiplier(employee)));
+    expect(tired).toBeGreaterThan(fresh);
+  });
+
+  it('the Living Quarters multiplier applies (tier 1 building beats absent)', () => {
+    const state = makeGame();
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = makeWorkAction({ type: 'drill_hole', requiredSkill: 'blasting', payload: { durationTicks: D } });
+
+    expect(computeActionWorkTicks(state, employee, action)).toBe(expected(1, 1, LIVING_QUARTERS_WELLBEING_MULTIPLIERS.t1));
+  });
+
+  it('never returns less than 1 tick, even for a 1-tick base at level 5', () => {
+    const state = makeGame();
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+    const master = addQualifiedEmployee(state, 'blasting', 5);
+    const action = makeWorkAction({ type: 'charge_hole', requiredSkill: 'blasting', payload: { durationTicks: 1 } });
+
+    expect(computeActionWorkTicks(state, master, action)).toBe(1);
+  });
+
+  it('payload.resumeTicks is returned raw regardless of proficiency, and checked before durationTicks', () => {
+    const state = makeGame();
+    const master = addQualifiedEmployee(state, 'blasting', 5);
+    const rookie = addQualifiedEmployee(state, 'blasting', 1);
+    const action = makeWorkAction({ type: 'charge_hole', requiredSkill: 'blasting', payload: { durationTicks: D, resumeTicks: 9 } });
+
+    expect(computeActionWorkTicks(state, master, action)).toBe(9);
+    expect(computeActionWorkTicks(state, rookie, action)).toBe(9);
+  });
+
+  it('payload.resumeTicks applies without any durationTicks', () => {
+    const state = makeGame();
+    const master = addQualifiedEmployee(state, 'geology', 5);
+    const action = makeWorkAction({ type: 'survey', requiredSkill: 'geology', payload: { resumeTicks: 5 } });
+
+    expect(computeActionWorkTicks(state, master, action)).toBe(5);
+  });
+
+  it('rest actions still return restDuration raw, unaffected by proficiency', () => {
+    const state = makeGame();
+    const master = addQualifiedEmployee(state, 'blasting', 5);
+    const action = makeWorkAction({ type: 'rest', requiredSkill: null, payload: { restDuration: 15, durationTicks: D } });
+
+    expect(computeActionWorkTicks(state, master, action)).toBe(15);
   });
 });
 

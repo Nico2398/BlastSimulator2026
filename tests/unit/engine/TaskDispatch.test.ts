@@ -968,7 +968,7 @@ describe('interruptActiveAction (#549)', () => {
     expect(emp.activeTaskSkill).toBeNull();
   });
 
-  it('stashes the employee\'s remaining work-ticks onto the released action\'s payload.durationTicks when arrived and mid-task (progress preserved on resume)', () => {
+  it('stashes the employee\'s remaining work-ticks onto the released action\'s payload.resumeTicks (durationTicks stays the base) when arrived and mid-task (progress preserved on resume)', () => {
     addQualifiedEmployee(state, 'blasting', SEED);
     const empId = state.employees.employees[0]!.id;
     const emp = state.employees.employees.find(e => e.id === empId)!;
@@ -985,10 +985,30 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 35);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 35);
-    expect(stored.payload.durationTicks).toBe(9);
+    expect(stored.payload.resumeTicks).toBe(9);
   });
 
-  it('does not stash payload.durationTicks when the employee was still walking (taskTicksRemaining null)', () => {
+  it('a level-5 worker interrupted mid-task writes resumeTicks === remaining and leaves the base durationTicks intact (#1384)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    assignSkill(state.employees, empId, 'blasting', 5);
+    const action = makePendingAction({ id: 135, requiredSkill: 'blasting', targetX: 7, targetZ: 7, payload: { durationTicks: 40 } });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 135, empId, {
+      targetX: 7, targetZ: 7, requiredSkill: 'blasting', type: 'general_work', payload: { durationTicks: 40 },
+    }, 16);
+    simulateArrival(state, 135, empId);
+    emp.taskTicksRemaining = 6;
+
+    interruptActiveAction(state, emp, 135);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 135);
+    expect(stored.payload.resumeTicks).toBe(6);
+    expect(stored.payload.durationTicks).toBe(40);
+  });
+
+  it('does not stash payload.resumeTicks when the employee was still walking (taskTicksRemaining null)', () => {
     addQualifiedEmployee(state, 'blasting', SEED);
     const empId = state.employees.employees[0]!.id;
     const emp = state.employees.employees.find(e => e.id === empId)!;
@@ -1002,7 +1022,7 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 36);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 36);
-    expect(stored.payload.durationTicks).toBeUndefined();
+    expect(stored.payload.resumeTicks).toBeUndefined();
   });
 
   it('re-targets a still-walking open-pool action at the interrupted employee instead of releasing it fully open-pool (#556 livelock fix)', () => {
@@ -1250,7 +1270,7 @@ describe('interruptActiveAction (#549)', () => {
     // branch here (it was already this employee's own id going in), so the
     // pin holds, and the remaining work is preserved for whoever resumes it.
     expect(stored.targetEmployeeId).toBe(empId);
-    expect(stored.payload.durationTicks).toBe(9);
+    expect(stored.payload.resumeTicks).toBe(9);
   });
 
   it('leaves a rest action fully open-pool (never re-targets a rest action to itself)', () => {
@@ -1273,7 +1293,7 @@ describe('interruptActiveAction (#549)', () => {
     expect(stored.targetEmployeeId).toBeNull();
   });
 
-  it('does not stash payload.durationTicks when taskTicksRemaining is exactly 0', () => {
+  it('does not stash payload.resumeTicks when taskTicksRemaining is exactly 0', () => {
     addQualifiedEmployee(state, 'blasting', SEED);
     const empId = state.employees.employees[0]!.id;
     const emp = state.employees.employees.find(e => e.id === empId)!;
@@ -1288,7 +1308,7 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 37);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 37);
-    expect(stored.payload.durationTicks).toBeUndefined();
+    expect(stored.payload.resumeTicks).toBeUndefined();
   });
 });
 

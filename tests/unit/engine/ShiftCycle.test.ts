@@ -1038,7 +1038,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     expect(released.holderId).toBeNull();
     // Remaining work is preserved on the action itself so whoever reclaims
     // it resumes instead of restarting from scratch.
-    expect(released.payload['durationTicks']).toBe(4);
+    expect(released.payload['resumeTicks']).toBe(4);
     // The employee's activeActionId now points at the new rest action, not
     // the interrupted one and not null.
     expect(employee.activeActionId).not.toBe(interrupted.id);
