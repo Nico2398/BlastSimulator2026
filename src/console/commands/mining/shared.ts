@@ -14,6 +14,7 @@ import type { VillagePosition } from '../../../core/mining/BlastExecution.js';
 import { clearTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
+import { emitFootprintRegionChanged } from '../../../core/engine/BuildingTaskHelpers.js';
 import type { EventEmitter } from '../../../core/state/EventEmitter.js';
 import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 
@@ -253,7 +254,8 @@ export function emitHoleCellsChanged(
   ctx: { emitter: EventEmitter; grid: VoxelGrid | null },
   holes: ReadonlyArray<{ x: number; z: number }>,
 ): void {
-  // TODO: implement
-  void ctx;
-  void holes;
+  if (!ctx.grid) return;
+  for (const h of holes) {
+    emitFootprintRegionChanged(ctx.emitter, ctx.grid, Math.floor(h.x), Math.floor(h.z), 1, 1);
+  }
 }
