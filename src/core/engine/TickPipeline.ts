@@ -51,7 +51,7 @@ import { resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
-import { releaseOccupantsOfRemovedBuildings } from './Mount.js';
+import { releaseOccupantsOfRemovedBuildings, releaseOccupantsOfRemovedVehicles } from './Mount.js';
 
 /** One need/traffic-jam event that fired and auto-paused the tick loop. */
 export interface FiredEventReport {
@@ -338,6 +338,9 @@ export function runTick(
   // clearing, projection/seismic damage, an upgrade's replace) is put back
   // out on its ring (#1202) — none of those paths can reach the employees.
   releaseOccupantsOfRemovedBuildings(state, emitter);
+  // Same for riders of a vehicle removed this tick (blast clearing, flying
+  // rock): they end up on foot where it stood.
+  releaseOccupantsOfRemovedVehicles(state, emitter);
 
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological
   // shutdown, arrest, worker revolt).

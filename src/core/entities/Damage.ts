@@ -111,7 +111,7 @@ export function processProjections(
       const dist = distanceBetween(fx, fz, v.x, v.z);
       const effectiveKe = keAtDistance(ke, dist);
       if (effectiveKe === null) continue;
-      const acc = processVehicleHit(v, vehicles, frag, effectiveKe, tick);
+      const acc = processVehicleHit(v, vehicles, employees, frag, effectiveKe, tick);
       if (acc) newAccidents.push(acc);
     }
 
@@ -180,6 +180,7 @@ function processBuildingHit(
 function processVehicleHit(
   v: Vehicle,
   state: VehicleState,
+  employees: EmployeeState,
   frag: FragmentData,
   ke: number,
   tick: number,
@@ -191,6 +192,12 @@ function processVehicleHit(
   v.hp -= dmg;
 
   if (v.hp <= 0) {
+    // Riders of a vehicle destroyed by flying rock are injured, once only (as
+    // in processBuildingHit); the tick's releaseOccupantsOfRemovedVehicles
+    // puts them on foot and owns the occupancy write.
+    for (const employeeId of v.occupantIds) {
+      if (employees.employees.find(e => e.id === employeeId)?.injured === false) injureEmployee(employees, employeeId);
+    }
     destroyVehicle(state, v.id);
     return { tick, type: 'vehicle_destroyed', entityId: v.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
   }

@@ -333,12 +333,22 @@ export function releaseOccupantsOfRemovedBuildings(state: GameState, emitter?: E
 }
 
 /**
- * Put out everyone still mounted on a vehicle that no longer exists.
- * Returns the ids put out.
+ * Put out everyone still mounted on a vehicle that no longer exists — scrap,
+ * blast clearing or projection damage remove vehicles without reaching their
+ * occupants. They stand on foot where the vehicle was (their own x/z, which
+ * the vehicle's position mirrored). Dead employees are included so no
+ * `mounted` locomotion outlives its vehicle. Returns the ids put out.
  */
 export function releaseOccupantsOfRemovedVehicles(state: GameState, emitter?: EventEmitter): number[] {
-  // TODO: implement
-  void state;
-  void emitter;
-  return [];
+  const liveVehicleIds = new Set(state.vehicles.vehicles.map(v => v.id));
+  const released: number[] = [];
+  for (const emp of state.employees.employees) {
+    if (!isMounted(emp.locomotion)) continue;
+    const vehicleId = emp.locomotion.vehicleId;
+    if (liveVehicleIds.has(vehicleId)) continue;
+    releaseOccupant(undefined, emp.id, emp, emp.x, emp.z);
+    emitter?.emit('employee:alighted', { employeeId: emp.id, vehicleId });
+    released.push(emp.id);
+  }
+  return released;
 }
