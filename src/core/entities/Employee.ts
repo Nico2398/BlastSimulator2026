@@ -88,6 +88,8 @@ export interface Employee {
   name: string;
   role: EmployeeRole;
   salary: number;
+  /** Accumulated raises ($) on top of base + qualification bonus. Absent on legacy saves until backfilled. */
+  raises?: number;
   morale: number; // 0-100
   unionized: boolean;
   injured: boolean;
@@ -418,6 +420,13 @@ export function processPayCycle(state: EmployeeState): number {
     }
   }
   return totalSalaries;
+}
+
+/** Sum of QUALIFICATION_SALARY_BONUS over the employee's qualifications. */
+export function calculateQualificationBonus(employee: Pick<Employee, 'qualifications'>): number {
+  // TODO: implement
+  void employee;
+  return 0;
 }
 
 /** Calculate the total salary for an employee: base salary + sum of qualification bonuses. */

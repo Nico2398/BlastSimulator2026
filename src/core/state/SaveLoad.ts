@@ -488,6 +488,15 @@ function backfillRaisedUnqualified(obj: Record<string, unknown>): void {
   if (events && !Array.isArray(events['raisedUnqualifiedActionIds'])) events['raisedUnqualifiedActionIds'] = [];
 }
 
+/**
+ * #1383: backfill `raises = max(0, salary - base - qualification bonus)` on every employee lacking a
+ * finite `raises`. Idempotent; mutates `obj` in place.
+ */
+export function backfillRaises(obj: Record<string, unknown>): void {
+  // TODO: implement
+  void obj;
+}
+
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
 function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
   const current = obj['nextHoleId'];
