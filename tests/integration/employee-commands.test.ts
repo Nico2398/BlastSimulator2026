@@ -14,7 +14,8 @@ import { tickCommand } from '../../src/console/commands/events.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { moveTo } from '../../src/core/engine/MoveTo.js';
-import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation } from '../../src/core/entities/Vehicle.js';
+import { reserveVehicle } from '../../src/core/engine/VehicleReservation.js';
 import { addBlastFragments, pickupFragment } from '../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { arrangeAccident, completeFrame, startFraming } from '../../src/core/events/MafiaActions.js';
@@ -854,11 +855,11 @@ describe('Console — employee fire releases the employee from the world (#1378)
       requiredVehicleRole: 'drill_rig', status: 'assigned', holderId: id,
     }));
     emp(ctx, id)!.activeActionId = 903;
-    vehicle.reservedForActionId = 903;
+    reserveVehicle(ctx.state!.vehicles, vehicle.id, 903);
 
     employeeCommand(ctx, ['fire', String(id)], {});
 
-    expect(vehicle.reservedForActionId ?? null).toBeNull();
+    expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
     expect(ctx.state!.pendingActions.find(a => a.id === 903)!.holderId).toBeNull();
     expectNoWorldInvariantViolations(ctx.state!);
   });
