@@ -160,7 +160,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20",
-      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click lowers it to 2 before dragging, so the (20,20)-(22,22) rectangle (2x2) computes the declared 2x2 at spacing:2 (issue #479 follow-up, Finding #4). Spacing stays at 2 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it (grid 4/4 decrements it further, down to 1). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper click and drag rectangle below now match this declared shape.",
+      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click lowers it to 2 before dragging, so the (20,20)-(22,22) rectangle (2x2) computes the declared 2x2 at spacing:2 (issue #479 follow-up, Finding #4). Spacing stays at 2 afterward \u2014 it persists across grid operations within a session, so grids 2-4 below inherit it (grid 4/4 decrements it further, down to 1). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper click and drag rectangle below now match this declared shape.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1186,7 +1186,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) before Charge All, matching blast-overcharge.json's fix.",
+      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) before Charge All, matching blast-overcharge.json's fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1448,7 +1448,7 @@
           "sequencedCount": 0
         },
         "blocked": "[data-action=\"report-close\"]",
-        "note": "#950: a fired blast clears the plan back to zero — CATASTROPHIC rating with real projections confirms this grid's overcharge/understemmed premise actually holds at the UI-reachable stemming floor, not just at the command's old unreachable stemming:0. The report modal must still be closed at t=3200ms (past the old fixed 3000ms floor, per the assert above) while this real collapse is still playing, only opening once the awaitUsable step above proves it genuinely did, and closed again (this `blocked` goal) by the real CLOSE click at the end of this step's own interaction array."
+        "note": "#950: a fired blast clears the plan back to zero \u2014 CATASTROPHIC rating with real projections confirms this grid's overcharge/understemmed premise actually holds at the UI-reachable stemming floor, not just at the command's old unreachable stemming:0. The report modal must still be closed at t=3200ms (past the old fixed 3000ms floor, per the assert above) while this real collapse is still playing, only opening once the awaitUsable step above proves it genuinely did, and closed again (this `blocked` goal) by the real CLOSE click at the end of this step's own interaction array."
       }
     },
     {
@@ -2158,7 +2158,839 @@
           "employeeCount": 1
         }
       },
-      "description": "#682: first of 24 charge-only relief hires -- deliberately never assigned driving.drill_rig or any vehicle, so TaskDispatch can never route them to a drill_hole action (which requires a drill_rig). Every driller role starts with 'blasting' at Rookie (ROLE_STARTING_QUALIFICATION), which is all charge_hole requires (requiredVehicleRole: null, dispatchChargeAction/mining.ts) -- these 24 exist purely to parallelize loading the ~61 holes the 8 working drillers above landed. Direct trace (issue #682): charging that many 8kg holes with only the 8 working drillers (who by this point are also blasting-qualified and free once their own drilling plateaus, per the tick-150 steps above) took long enough under set_policy's own forced-rest interruptions that wellBeing's zero-streak still crossed REVOLT_TICKS during the charge-drain wait below. 24 more (cheap, $1000 each, no vehicle purchase) cut that phase from 300+ ticks to well under 120 -- sandbox-confirmed: charging finishes at ticksAtZero=41, comfortably under the 120-tick threshold, where 8-only and even 16-with-vehicles crews (both tried and rejected, see git history) still crossed it. Hired AFTER the drilling wait above (not before) so none of them can accidentally have driving.drill_rig assigned to them by a later step meant for a working driller, and so they add no drilling-side congestion to the already-plateaued 8x8 grid."
+      "description": "#682: first of 56 charge-only relief hires -- deliberately never assigned driving.drill_rig or any vehicle, so TaskDispatch can never route them to a drill_hole action (which requires a drill_rig). Every driller role starts with 'blasting' at Rookie (ROLE_STARTING_QUALIFICATION), which is all charge_hole requires (requiredVehicleRole: null, dispatchChargeAction/mining.ts) -- these 24 exist purely to parallelize loading the ~61 holes the 8 working drillers above landed. Direct trace (issue #682): charging that many 8kg holes with only the 8 working drillers (who by this point are also blasting-qualified and free once their own drilling plateaus, per the tick-150 steps above) took long enough under set_policy's own forced-rest interruptions that wellBeing's zero-streak still crossed REVOLT_TICKS during the charge-drain wait below. 24 more (cheap, $1000 each, no vehicle purchase) cut that phase from 300+ ticks to well under 120 -- sandbox-confirmed: charging finishes at ticksAtZero=41, comfortably under the 120-tick threshold, where 8-only and even 16-with-vehicles crews (both tried and rejected, see git history) still crossed it. Hired AFTER the drilling wait above (not before) so none of them can accidentally have driving.drill_rig assigned to them by a later step meant for a working driller, and so they add no drilling-side congestion to the already-plateaued 8x8 grid. #1379 margin fix: 32 more relief hires (56 in total, steps directly below) because under the always-on default policy the 24-relief crew left grid 4's charge tail with a thin margin -- wellbeing fell from ~40 at tick 775 to 0 at tick ~1000 (command-mode probe), and the interaction-mode run, which paces slower, reached worker_revolt at tick ~1038 with the last straggler charge still pending. With 56 relief hires the same tail holds wellbeing at 53-56 throughout (probe, ticks 800-1100): each hire shares less of the charge workload, so rest rounds interleave instead of draining the whole crew together. Nothing is loosened: the same drain waits and chargedCount checks apply, hires cost $1000 each, and the roster is still destroyed by the blast. The later `employee assign_skill` id moved 37 -> 69 to match the 32 extra hires."
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -2760,7 +3592,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #554-followup (issue #586 CI, real failure): a resolveEventIfPending alone did not fix a further 'covered by div' failure here -- root cause is a transient re-render race, not a stuck event dialog: BlastWorkshop.ts's suggestStep() auto-navigates the panel's active step reactively as background charge/drill state changes, and a bare clickSelector (single-shot, no polling) can land mid-re-render. Swapped for the same awaitUsable-then-clickSelector pattern already used everywhere else a control's usability needs polling rather than a one-shot probe -- requireUsable (interaction-driver.ts) retries the same 'covered' check every 150ms up to 6s, so a transient race clears on a later poll instead of failing the first attempt.",
+      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #554-followup (issue #586 CI, real failure): a resolveEventIfPending alone did not fix a further 'covered by div' failure here -- root cause is a transient re-render race, not a stuck event dialog: BlastWorkshop.ts's suggestStep() auto-navigates the panel's active step reactively as background charge/drill state changes, and a bare clickSelector (single-shot, no polling) can land mid-re-render. Swapped for the same awaitUsable-then-clickSelector pattern already used everywhere else a control's usability needs polling rather than a one-shot probe -- requireUsable (interaction-driver.ts) retries the same 'covered' check every 150ms up to 6s, so a transient race clears on a later poll instead of failing the first attempt.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -3406,7 +4238,7 @@
           "chargedCount": 0,
           "sequencedCount": 0
         },
-        "note": "a fired blast clears the plan back to zero. #553: shrunk from the original 64-hole grid — see this cycle's own drill_plan step for why; the PHYSICS_FRAGMENT_CAP overflow this note used to speculate about was never a hard assertion here"
+        "note": "a fired blast clears the plan back to zero. #553: shrunk from the original 64-hole grid \u2014 see this cycle's own drill_plan step for why; the PHYSICS_FRAGMENT_CAP overflow this note used to speculate about was never a hard assertion here"
       }
     },
     {
@@ -3520,12 +4352,12 @@
       }
     },
     {
-      "command": "employee assign_skill 37 skill:driving.drill_rig level:1",
+      "command": "employee assign_skill 69 skill:driving.drill_rig level:1",
       "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #947 CI-fix: employee id renumbered 36 -> 37 -- cycle 2's own extra charge-relief hire shifts every employee id from that point on by one (see that cycle's own hire step).",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 37 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 69 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"
