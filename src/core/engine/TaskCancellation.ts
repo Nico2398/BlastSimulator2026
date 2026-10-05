@@ -578,3 +578,63 @@ export function fireEmployeeFromWorld(
   removeFromRoster(state.employees, employeeId);
   return { success: true };
 }
+
+/** A queued (unstarted), non-rest action aimed at the given employee (#1381). */
+function isQueuedNonRestTargetedAt(action: PendingAction, employeeId: number): boolean {
+  return action.status === 'queued' && action.type !== 'rest' && action.targetEmployeeId === employeeId;
+}
+
+/**
+ * Return one injured, alive employee's queued (not yet started) non-rest actions
+ * to the open pool and drop them from the employee's taskQueue. The active /
+ * in-progress action is left untouched. Queued non-rest actions that targeted the
+ * employee get targetEmployeeId cleared so anyone qualified can claim them (#1381).
+ */
+export function releaseInjuredEmployeeQueue(state: GameState, employeeId: number): void {
+  const emp = state.employees.employees.find(e => e.id === employeeId);
+  if (!emp || !emp.alive || !emp.injured) return;
+
+  const kept: number[] = [];
+  for (const actionId of emp.taskQueue) {
+    const action = state.pendingActions.find(a => a.id === actionId);
+    if (!action) continue; // stale id: dropped
+    if (action.type === 'rest') {
+      kept.push(actionId); // personal; nobody else can rest for them
+      continue;
+    }
+    if (action.targetEmployeeId === employeeId) action.targetEmployeeId = null;
+    releaseActionToOpenPool(state, action);
+  }
+  emp.taskQueue = kept;
+
+  for (const action of state.pendingActions) {
+    if (isQueuedNonRestTargetedAt(action, employeeId)) action.targetEmployeeId = null;
+  }
+}
+
+/**
+ * Apply releaseInjuredEmployeeQueue to every alive, injured employee that still
+ * has something to release: a queue entry that is stale or non-rest, or a queued
+ * non-rest action targeted at them. A rest-only queue is skipped, so it costs
+ * nothing per tick. Idempotent (#1381).
+ */
+export function releaseInjuredEmployeesQueues(state: GameState): void {
+  // Built lazily, one pass over the pool, only once an injured employee exists.
+  let actionsById: Map<number, PendingAction> | null = null;
+  let targetedIds: Set<number> | null = null;
+  for (const emp of state.employees.employees) {
+    if (!emp.alive || !emp.injured) continue;
+    if (!actionsById || !targetedIds) {
+      actionsById = new Map();
+      targetedIds = new Set();
+      for (const a of state.pendingActions) {
+        actionsById.set(a.id, a);
+        const target = a.targetEmployeeId;
+        if (target !== null && isQueuedNonRestTargetedAt(a, target)) targetedIds.add(target);
+      }
+    }
+    const pool = actionsById;
+    const hasReleasable = emp.taskQueue.some(id => pool.get(id)?.type !== 'rest');
+    if (hasReleasable || targetedIds.has(emp.id)) releaseInjuredEmployeeQueue(state, emp.id);
+  }
+}

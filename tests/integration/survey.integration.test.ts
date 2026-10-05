@@ -23,7 +23,7 @@ import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { SURVEY_STALE_TICKS, SURVEY_COSTS, SURVEY_DURATION_TICKS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
-import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
+import { hireEmployee, assignSkill, injureEmployee } from '../../src/core/entities/Employee.js';
 import { executeBlast, type FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
@@ -901,5 +901,38 @@ describe('Survey system — seismic building side effects', () => {
 
     expect(findBuilding(b1.id).hp).toBe(b1HpBefore - 10);
     expect(findBuilding(b2.id).hp).toBe(b2HpBefore - 10);
+  });
+});
+
+// ── Injured surveyor's reserved queue goes back to the pool (#1381) ─────────
+
+describe('Survey system — injured surveyor releases queued surveys (#1381)', () => {
+  it('a healthy surveyor finishes all 4 surveys; none stay assigned to the injured one', () => {
+    const ctx = makeCtx();
+    const id1 = hireEmployeeByRole(ctx, 'surveyor');
+    const id2 = hireEmployeeByRole(ctx, 'surveyor');
+    for (const id of [id1, id2]) employeeCommand(ctx, ['assign_skill', String(id)], { skill: 'geology', level: '3' });
+    const state = ctx.state!;
+    const e1 = state.employees.employees.find(e => e.id === id1)!;
+
+    for (const [x, z] of [[10, 10], [12, 12], [14, 14], [16, 16]]) {
+      expect(surveyCommand(ctx as any, ['core_sample'], { x: String(x), z: String(z) }).success).toBe(true);
+    }
+    const surveys = state.pendingActions.filter(a => a.type === 'survey');
+    expect(surveys).toHaveLength(4);
+    const first = surveys[0]!;
+
+    // Surveyor #1 holds survey #1 in its reserved queue, then gets hurt.
+    first.status = 'assigned';
+    first.holderId = id1;
+    e1.taskQueue = [first.id];
+    injureEmployee(state.employees, id1);
+
+    for (let i = 0; i < 300; i++) tickCommand(ctx, ['1'], {});
+
+    expect(state.pendingActions.filter(a => a.type === 'survey')).toHaveLength(0);
+    expect(state.surveyResults).toHaveLength(4);
+    expect(state.surveyResults.every(r => r.surveyorId === id2)).toBe(true);
+    expect(e1.taskQueue).toEqual([]);
   });
 });
