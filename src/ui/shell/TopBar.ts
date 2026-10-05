@@ -466,12 +466,14 @@ export class TopBar {
   }
 
   private lastScoreSig = '';
+  private lastScoreState: GameState | undefined;
   private updateScores(state: GameState): void {
+    this.lastScoreState = state;
     const scores = [
-      { key: 'wellBeing', abbr: t('shell.topbar.score_well') },
-      { key: 'safety', abbr: t('shell.topbar.score_safe') },
-      { key: 'ecology', abbr: t('shell.topbar.score_eco') },
-      { key: 'nuisance', abbr: t('shell.topbar.score_nuis') },
+      { key: 'wellBeing', abbr: t('shell.topbar.score_well'), tipKey: 'shell.topbar.score_well_tip' },
+      { key: 'safety', abbr: t('shell.topbar.score_safe'), tipKey: 'shell.topbar.score_safe_tip' },
+      { key: 'ecology', abbr: t('shell.topbar.score_eco'), tipKey: 'shell.topbar.score_eco_tip' },
+      { key: 'nuisance', abbr: t('shell.topbar.score_nuis'), tipKey: 'shell.topbar.score_nuis_tip' },
     ] as const;
     const values = scores.map(s => Math.round((state.scores as unknown as Record<string, number>)[s.key] ?? 50));
     const sig = values.join(',');
@@ -482,6 +484,7 @@ export class TopBar {
       const value = values[i]!;
       const color = value < 30 ? 'var(--bsx-critical-text)' : value < 55 ? 'var(--bsx-amber)' : 'var(--bsx-positive)';
       const col = el('div');
+      col.title = t(s.tipKey);
       col.style.cssText = 'display:flex;flex:0 0 auto;flex-direction:column;gap:5px;width:58px;padding:6px 5px';
       const row = el('div');
       row.style.cssText = 'display:flex;align-items:baseline;justify-content:space-between';
@@ -501,6 +504,7 @@ export class TopBar {
     this.locale.refresh();
     this.weatherBtn.title = t(`hud.weather.${this.lastWeather}`);
     this.lastScoreSig = '';
+    if (this.lastScoreState) this.updateScores(this.lastScoreState);
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
   }
 
