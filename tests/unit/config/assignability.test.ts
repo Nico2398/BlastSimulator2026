@@ -786,17 +786,40 @@ describe('running several issues at once', () => {
     expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
   });
 
-  // Head-of-line for a wide claim: #25 declares the parent `ui`, waits on the
-  // live `ui` run, and holds `nav` too, so #30 — younger, in `nav` — may not
-  // start in front of it. #35 overlaps nothing and starts.
-  it('lets an older waiting issue hold every scope it claims', async () => {
+  // Head-of-line for a wide claim: #25 declares the parent `ui` and waits on
+  // the live `ui` run. It holds `ui` — so #28, younger and in a UI area, may
+  // not start in front of it — but not its ordinary `nav`, so #30 starts.
+  it('lets an older wide issue hold only its parent scopes', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress', 'scope:ui'] },
       { number: 25, labels: ['ready', 'agent-task', 'scope:ui', 'scope:nav'] },
+      { number: 28, labels: ['ready', 'agent-task', 'scope:hud'] },
       { number: 30, labels: ['ready', 'agent-task', 'scope:nav'] },
       { number: 35, labels: ['ready', 'agent-task', 'scope:economy'] },
     ]);
-    expect(numbers(await selectUpTo(api, 3))).toEqual([35]);
+    expect(numbers(await selectUpTo(api, 4))).toEqual([30, 35]);
+  });
+
+  // 5 Oct 2026: #1403 (`console`, `hud`, `engine`) waited on a live core run
+  // and held `console` and `hud` with its `engine`, so issues touching only
+  // those waited behind a run they had nothing to do with.
+  it('leaves a waiting wide issue\'s ordinary scopes free', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:tasks', 'scope:world'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:console', 'scope:hud', 'scope:engine'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:crew'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:hud'] },
+      { number: 40, labels: ['ready', 'agent-task', 'scope:console'] },
+    ]);
+    // #30 waits: `crew` sits under the held `engine`.
+    expect(numbers(await selectUpTo(api, 4))).toEqual([35, 40]);
+  });
+
+  it('holds everything for a waiting issue that runs alone, and only parents otherwise', () => {
+    const held = (...labels: string[]) => rules.heldPart(rules.scopeClaim({ labels }));
+    expect(held('scope:pipeline').exclusive).toBe(true);
+    expect(held('scope:console', 'scope:hud', 'scope:engine')).toEqual({ exclusive: false, scopes: ['engine'], why: null });
+    expect(held('scope:ui', 'scope:nav').scopes).toEqual(['ui']);
   });
 
   // Only live runs keep code apart. A narrow claim waiting on one holds
@@ -839,13 +862,14 @@ describe('running several issues at once', () => {
   });
 
   // Clashing with a waiting issue and with a running one is a clash with a
-  // running one: #30 holds `nav`, so #35 waits behind it.
+  // running one: #30 clashes with waiting #25 on `crew` and with live #20 on
+  // `world`, so it holds `ui` and #35 waits behind it.
   it('holds a place when any clash is with a running claim', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress', 'scope:world'] },
       { number: 25, labels: ['ready', 'agent-task', 'scope:world', 'scope:engine'] },
-      { number: 30, labels: ['ready', 'agent-task', 'scope:engine', 'scope:world', 'scope:nav'] },
-      { number: 35, labels: ['ready', 'agent-task', 'scope:nav'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:crew', 'scope:world', 'scope:ui'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:hud'] },
     ]);
     const result = await selectUpTo(api, 4);
     expect(result.issues).toEqual([]);

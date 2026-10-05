@@ -85,8 +85,9 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  * session; on 5 Oct, 15 of the 29 `ready` issues carried `scope:engine` and the
  * queue was back to one. Each is split into the areas below it
  * (`SCOPE_PARENTS`). The parent scope itself still exists, for a change to the
- * shared base of its areas or across several of them, and it clashes with
- * every one of them.
+ * shared base of its areas, and it clashes with every one of them. A change
+ * across several areas lists them rather than taking the parent: a parent is a
+ * wide claim and holds its place while it waits.
  *
  * Every `ready` issue declares at least one scope: it is part of the
  * Definition of Ready (`readinessVerdict` below, `agentic-issue-creation`).
@@ -104,7 +105,7 @@ const SCOPES = Object.freeze({
   nav: 'Terrain surface and pathfinding: src/core/nav, src/core/mining',
   economy: 'Money and progression: src/core/economy, campaign, scores',
   world: 'World generation and events: src/core/world, weather, events',
-  ui: 'All of src/ui, or its shared base: UIManager, PanelBase, dom, styles, tokens, icons',
+  ui: 'Shared UI base: UIManager, PanelBase, dom, styles, tokens, icons',
   hud: 'Always-on HUD: src/ui/shell, src/ui/notify, MiniMap, KeyboardShortcuts, gameConsole',
   panels: 'Management panels and modals in src/ui/panels, crew and fleet detail sections',
   workshop: 'Blast planning UI: BlastWorkshop, src/ui/panels/blastSteps, blast report, preflight',
@@ -760,6 +761,26 @@ function isWideClaim(claim) {
   return claim.scopes.some((scope) => parents.has(scope));
 }
 
+/**
+ * The part of a wide claim it holds while it waits: everything when it runs
+ * alone, otherwise only its parent scopes (which cover every area under them).
+ * Its ordinary scopes are left free, for the reason an ordinary claim holds
+ * nothing: they free up within a few passes. On 5 Oct 2026 #1403 (`console`,
+ * `hud`, `engine`) held `console` and `hud` with its `engine`, and nine issues
+ * that touched only those waited behind a run they had nothing to do with.
+ */
+function heldPart(claim) {
+  if (claim.exclusive) return claim;
+  const parents = new Set(Object.values(SCOPE_PARENTS));
+  return { exclusive: false, scopes: claim.scopes.filter((scope) => parents.has(scope)), why: null };
+}
+
+/** A claim as the assignment log names it. */
+function describeClaim(claim) {
+  if (claim.exclusive) return 'everything';
+  return claim.scopes.map((scope) => `\`${SCOPE_PREFIX}${scope}\``).join(', ');
+}
+
 /** Whether two claims may not be held at the same time. */
 function claimsConflict(a, b) {
   if (a.exclusive || b.exclusive) return true;
@@ -922,8 +943,9 @@ const WAITING_AHEAD = 'waiting ahead of it';
  * with a *wide* claim (`isWideClaim`: it runs alone, or it declares a parent
  * scope such as `ui` or `engine`) that could run but for a clash with a
  * *running* claim — a live run, or an issue assigned earlier in this pass —
- * *holds* its claim for the rest of the pass, so nothing younger that overlaps
- * it starts first. A wide claim needs many areas free at once, and with every
+ * *holds* the wide part of its claim (`heldPart`: everything when it runs
+ * alone, otherwise its parent scopes) for the rest of the pass, so nothing
+ * younger that overlaps that part starts first. A wide claim needs many areas free at once, and with every
  * slot refilled on each merge that moment never comes on its own: a
  * `scope:pipeline` issue would wait until the backlog emptied. Holding drains
  * the overlapping queue until it can run. No clock is involved: the hold lasts
@@ -1059,11 +1081,12 @@ async function selectNextAssignable(api, options = {}) {
         );
         continue;
       }
+      const held = heldPart(claim);
       log(
         `#${issue.number}: waits — ${clashReason(claim, running)}. ` +
-          'It holds its place: nothing younger that overlaps it starts first.'
+          `It holds its place on ${describeClaim(held)}: nothing younger that overlaps it there starts first.`
       );
-      holders.push({ number: issue.number, holds: WAITING_AHEAD, claim });
+      holders.push({ number: issue.number, holds: WAITING_AHEAD, claim: held });
       // A waiting issue that claims everything leaves nothing to find further on.
       if (claim.exclusive) break;
       continue;
@@ -1202,6 +1225,7 @@ module.exports = {
   blockedByFor,
   blockedChainLimit,
   claimsConflict,
+  heldPart,
   isWideClaim,
   consecutiveHaltedRuns,
   dependencyVerdict,
