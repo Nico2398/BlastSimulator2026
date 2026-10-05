@@ -665,7 +665,7 @@ function resetStuckTracking(emp: Employee): void {
  * safe to treat as inert: worst case it is relocated again (or never
  * finishes returning), exactly as if `returnAfterRelocate` had been left off.
  */
-function isOnReturnTripLeg(emp: Employee): boolean {
+export function isOnReturnTripLeg(emp: Employee): boolean {
   return emp.itinerary?.legs[0]?.returnTrip === true;
 }
 

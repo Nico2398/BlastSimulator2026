@@ -3,22 +3,22 @@
   "description": "Visual verification of blast execution and effects: explosion animation, energy propagation visualization, fragment spawning, projection flyrock, Tier A projected vs Tier B collapse physics, and PHYSICS_FRAGMENT_CAP overflow fallback",
   "steps": [
     {
-      "command": "new_game seed:42 cash:4500000",
+      "command": "new_game seed:42 cash:6500000",
       "timeout": 40,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:4500000"
+          "command": "new_game seed:42 cash:6500000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 4500000,
+          "cash": 6500000,
           "holeCount": 0
         }
       },
-      "description": " #553: cash bumped from $50,000 to $3,000,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits, and the 4th cycle restores its pre-#553 rows:8 cols:8 (64-hole) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts to stress the projectile-grouping path (#404) -- which a single driller/drill_rig takes over 1000 ticks to land door-to-door even at tight spacing:1. #1278 migration: bumped $3,000,000 -> $4,500,000 -- under agent occupancy cycle 4's 33-employee crew (8 working drillers + 24 charge-only relief) now spends real ticks waiting out/relocating around each other in this deliberately overpacked 8x8/1m-spacing grid (the fixture's whole point per #1278's own task framing), roughly 2x the pre-occupancy dispatch time for the same 64-hole drill+charge workload -- direct-traced (command mode, replaying this file's own exact command sequence): payroll alone for the wider 33-employee crew over that longer window drives cash from ~$1.7M (post cycle-3, pre cycle-4-hiring) down to a trough of roughly $380K by the time cycle 4's blast fires, where the old $3,000,000 start went bankrupt (cash < $5,000 for BANKRUPTCY_GRACE_TICKS, GameOverConditions.ts) around tick 1729, well before cycle 4 even finished charging. $4,500,000 keeps cash positive with margin through both remaining cycles; see the cycle-4 charge-drain `wait_until` step's own note for the paired tick-budget widening, and the removed wildcard-resweep steps' own note for why this is a real congestion cost, not merely a bigger bill for the same work."
+      "description": " #553: cash bumped from $50,000 to $3,000,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits, and the 4th cycle restores its pre-#553 rows:8 cols:8 (64-hole) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts to stress the projectile-grouping path (#404) -- which a single driller/drill_rig takes over 1000 ticks to land door-to-door even at tight spacing:1. #1278 migration: bumped $3,000,000 -> $4,500,000 -- under agent occupancy cycle 4's 33-employee crew (8 working drillers + 24 charge-only relief) now spends real ticks waiting out/relocating around each other in this deliberately overpacked 8x8/1m-spacing grid (the fixture's whole point per #1278's own task framing), roughly 2x the pre-occupancy dispatch time for the same 64-hole drill+charge workload -- direct-traced (command mode, replaying this file's own exact command sequence): payroll alone for the wider 33-employee crew over that longer window drives cash from ~$1.7M (post cycle-3, pre cycle-4-hiring) down to a trough of roughly $380K by the time cycle 4's blast fires, where the old $3,000,000 start went bankrupt (cash < $5,000 for BANKRUPTCY_GRACE_TICKS, GameOverConditions.ts) around tick 1729, well before cycle 4 even finished charging. $4,500,000 keeps cash positive with margin through both remaining cycles; see the cycle-4 charge-drain `wait_until` step's own note for the paired tick-budget widening, and the removed wildcard-resweep steps' own note for why this is a real congestion cost, not merely a bigger bill for the same work. #1379: bumped $4,500,000 -> $6,500,000 -- with always-on rest and the return-trip fix (an idle employee displaced by an occupancy relocation no longer reads as mid-evacuation, so it can rest instead of walking itself to fatigue 0 and collapsing well-being to a revolt) the cycle-4 charge drains finish with a healthy crew instead of ending the level, but run longer: the 65-employee payroll drove cash to -$343,000 by the final cycle with the old budget."
     },
     {
       "command": "set_policy mode:continuous fatigue:0",

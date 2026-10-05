@@ -283,6 +283,18 @@ describe('isMidEvacuationWalk (#557 review)', () => {
   it('false for a genuinely idle employee — no active action and no destination (boundary)', () => {
     expect(isMidEvacuationWalk(makeEmployee(null, null))).toBe(false);
   });
+
+  it('false for an idle employee on an occupancy return trip — no claim, so rest and dispatch may take it (#1379)', () => {
+    const employee = makeEmployee(null, 40);
+    employee.itinerary = {
+      legs: [{
+        mode: 'foot', vehicleId: null, destX: 40, destZ: 7, arrival: 'exact',
+        onArrive: { kind: 'none' }, estTicks: 10, returnTrip: true,
+      }],
+      goal: { kind: 'reposition', x: 40, z: 7 }, workTicks: 0, estTotalTicks: 10,
+    } as typeof employee.itinerary;
+    expect(isMidEvacuationWalk(employee)).toBe(false);
+  });
 });
 
 // isEvacuationHoldActive/clearResolvedEvacuationHolds/discardStaleRestAction/
