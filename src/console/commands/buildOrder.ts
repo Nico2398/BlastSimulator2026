@@ -20,9 +20,11 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
 import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../../core/config/balance.js';
+import { terrainReservations } from '../../core/entities/PlacementReservations.js';
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
 import { findBuildingApproachCell, isApproachCellStranded, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
 
+import { placementRefusalText } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
 
@@ -112,8 +114,9 @@ export function orderBuildingCommand(
   const occupants = buildingFootprintOccupants(state);
   const check = checkFootprintPlacement(
     occupants, type, x, z, tier, bounds.width, bounds.depth, bounds.originX, bounds.originZ, ctx.grid ?? undefined,
+    terrainReservations(state),
   );
-  if (!check.valid) return { success: false, output: check.error! };
+  if (!check.valid) return { success: false, output: placementRefusalText(check) };
 
   // Claim the order's own id and the finished building's id now, not when
   // the site completes: sites are built in parallel and land in whatever

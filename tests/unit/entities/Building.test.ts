@@ -24,6 +24,7 @@ import {
 } from '../../../src/core/entities/Building.js';
 import type { Building, FootprintOccupant } from '../../../src/core/entities/Building.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import type { TerrainReservation } from '../../../src/core/entities/PlacementReservations.js';
 
 describe('Building system', () => {
   it('placing a building deducts cost and adds it to state', () => {
@@ -793,5 +794,88 @@ describe('rectOverlapsOccupants (#1396)', () => {
       ...occupants,
     ];
     expect(rectOverlapsOccupants(many, { minX: 5, minZ: 4, maxX: 7, maxZ: 5 })).toBe(true);
+  });
+});
+
+// ── Terrain reservations (#1390) ─────────────────────────────────────────────
+
+describe('checkFootprintPlacement — terrain reservations (#1390)', () => {
+  const rampRes: TerrainReservation = { kind: 'ramp', minX: 5, maxX: 6, minZ: 5, maxZ: 6 };
+  const holeRes: TerrainReservation = { kind: 'hole', minX: 5, maxX: 5, minZ: 5, maxZ: 5 };
+
+  it('refuses a footprint overlapping a ramp with the ramp key and "Blocks a ramp"', () => {
+    const r = checkFootprintPlacement([], 'management_office', 4, 4, 1, 64, 64, 0, 0, undefined, [rampRes]);
+    expect(r.valid).toBe(false);
+    expect(r.errorKey).toBe('shell.placement.refused_ramp');
+    expect(r.error).toBe('Blocks a ramp');
+  });
+
+  it('refuses a footprint overlapping a hole with the hole key and "Blocks a drill hole"', () => {
+    const r = checkFootprintPlacement([], 'management_office', 4, 4, 1, 64, 64, 0, 0, undefined, [holeRes]);
+    expect(r.valid).toBe(false);
+    expect(r.errorKey).toBe('shell.placement.refused_hole');
+    expect(r.error).toBe('Blocks a drill hole');
+  });
+
+  it('accepts a footprint edge-adjacent to a reservation', () => {
+    // office is 2 wide: x 3..4 (max exclusive 5) touches reservation at x=5.
+    const r = checkFootprintPlacement([], 'management_office', 3, 5, 1, 64, 64, 0, 0, undefined, [rampRes]);
+    expect(r.valid).toBe(true);
+    expect(r.errorKey).toBeUndefined();
+  });
+
+  it('is unchanged when no reservations are passed or the list is empty', () => {
+    expect(checkFootprintPlacement([], 'management_office', 5, 5, 1, 64, 64, 0, 0).valid).toBe(true);
+    expect(checkFootprintPlacement([], 'management_office', 5, 5, 1, 64, 64, 0, 0, undefined, []).valid).toBe(true);
+  });
+
+  it('reports "Out of bounds" before a reservation', () => {
+    const res: TerrainReservation = { kind: 'ramp', minX: 63, maxX: 63, minZ: 0, maxZ: 0 };
+    const r = checkFootprintPlacement([], 'management_office', 63, 0, 1, 64, 64, 0, 0, undefined, [res]);
+    expect(r.error).toBe('Out of bounds');
+    expect(r.errorKey).toBeUndefined();
+  });
+
+  it('reports "Space is occupied" before a reservation', () => {
+    const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 4, z: 4 }];
+    const r = checkFootprintPlacement(occupants, 'management_office', 4, 4, 1, 64, 64, 0, 0, undefined, [rampRes]);
+    expect(r.error).toBe('Space is occupied');
+    expect(r.errorKey).toBeUndefined();
+  });
+
+  it('reports the reservation before "Uneven surface"', () => {
+    const vg = makeVoxelGridWithHeights(64, 64, (x, z) => (x === 5 && z === 5) ? 9 : 3);
+    const r = checkFootprintPlacement([], 'management_office', 4, 4, 1, 64, 64, 0, 0, vg, [rampRes]);
+    expect(r.error).toBe('Blocks a ramp');
+  });
+
+  it('still reports "Uneven surface" when the reservation is clear', () => {
+    const vg = makeVoxelGridWithHeights(64, 64, (x, z) => (x === 1 && z === 1) ? 9 : 3);
+    const r = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0, vg, [rampRes]);
+    expect(r.error).toBe('Uneven surface');
+  });
+});
+
+describe('moveBuilding — terrain reservations (#1390)', () => {
+  it('refuses a move onto a ramp, keeps the building in place, and carries the errorKey', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const id = state.buildings[0]!.id;
+    const res: TerrainReservation[] = [{ kind: 'ramp', minX: 20, maxX: 21, minZ: 20, maxZ: 25 }];
+    const r = moveBuilding(state, id, 20, 20, 64, 64, 0, 0, [], undefined, res);
+    expect(r.success).toBe(false);
+    expect(r.error).toBe('Blocks a ramp');
+    expect(r.errorKey).toBe('shell.placement.refused_ramp');
+    expect(state.buildings[0]!.x).toBe(0);
+    expect(state.buildings[0]!.z).toBe(0);
+  });
+
+  it('moves normally when the target is clear of reservations', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const id = state.buildings[0]!.id;
+    const res: TerrainReservation[] = [{ kind: 'hole', minX: 40, maxX: 40, minZ: 40, maxZ: 40 }];
+    const r = moveBuilding(state, id, 20, 20, 64, 64, 0, 0, [], undefined, res);
+    expect(r.success).toBe(true);
   });
 });

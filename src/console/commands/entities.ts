@@ -24,7 +24,7 @@ import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zo
 import { evacuateZone } from '../../core/engine/Evacuation.js';
 import { releaseOccupantsOfRemovedBuildings } from '../../core/engine/Mount.js';
 
-import { requireGame, noEmployeesMessage } from './commandUtils.js';
+import { requireGame, noEmployeesMessage, placementRefusalText } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import {
   makeFootprintRegion, levelBuildingFootprint, siteBounds, refreshLogisticsCapacity,
@@ -32,6 +32,7 @@ import {
 } from './buildingHelpers.js';
 import { orderBuildingCommand } from './buildOrder.js';
 import { t } from '../../core/i18n/I18n.js';
+import { terrainReservations } from '../../core/entities/PlacementReservations.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.
@@ -128,9 +129,10 @@ export function buildCommand(
       const upgradeCheck = checkFootprintPlacement(
         upgradeOccupants, upgradeType, x, z, nextTier,
         upBounds.width, upBounds.depth, upBounds.originX, upBounds.originZ, ctx.grid ?? undefined,
+        terrainReservations(state),
       );
       if (!upgradeCheck.valid) {
-        return { success: false, output: t('entities.build_upgrade_failed', { error: upgradeCheck.error! }) };
+        return { success: false, output: t('entities.build_upgrade_failed', { error: placementRefusalText(upgradeCheck) }) };
       }
 
       destroyBuilding(state.buildings, id);
@@ -206,9 +208,9 @@ export function buildCommand(
       const result = moveBuilding(
         state.buildings, id, toCoords[0]!, toCoords[1]!,
         moveBounds.width, moveBounds.depth, moveBounds.originX, moveBounds.originZ,
-        plannedOccupants, ctx.grid ?? undefined,
+        plannedOccupants, ctx.grid ?? undefined, terrainReservations(state),
       );
-      if (!result.success) return { success: false, output: result.error! };
+      if (!result.success) return { success: false, output: placementRefusalText(result) };
       state.cash -= result.cost!;
       addExpense(state.finances, result.cost!, 'construction', `Relocate building #${id}`, state.tickCount);
       refreshLogisticsCapacity(state);

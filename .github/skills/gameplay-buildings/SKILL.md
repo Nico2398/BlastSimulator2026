@@ -114,6 +114,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 3. **Protected voxels:** voxels beneath building cannot be drilled or blasted (blocked with error)
 4. **Blast destruction:** if blast reaches voxels beneath building → building destroyed instantly
 5. **No overlap:** buildings cannot overlap each other
+5b. **Reserved terrain** (#1390): a footprint may not cover a built or planned ramp corridor, nor an ordered or drilled hole (`terrainReservations`, `PlacementReservations.ts`); order, move and upgrade are refused with a localized reason. Edge-adjacent is allowed.
 6. **Ramps are not buildings** (#1298): a ramp is a dug terrain feature (`state.builtRamps`, see `gameplay-navmesh`), never in `state.buildings`. It takes the selection plumbing only (click picks it, corridor highlighted, selection bar) and offers a widen action — no demolish, no tier upgrade, no move, no occupants.
 
 ## Destruction Effects
