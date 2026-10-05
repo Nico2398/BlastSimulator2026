@@ -585,7 +585,7 @@
   "event.mafia_family_reunion.opt1": "Decline the Reunion",
   "event.mafia_family_reunion.opt2": "Offer a Buffet Only",
   "event.mafia_family_reunion.res0": "The crime family reunion takes over the canteen for a full weekend. Loud, disruptive, and non-negotiable.",
-  "event.mafia_family_reunion.res1": "The reunion is declined. The canteen stays available and safety stays intact.",
+  "event.mafia_family_reunion.res1": "The reunion is declined. The canteen stays available, but the family takes offence and safety takes a hit.",
   "event.mafia_family_reunion.res2": "A smaller buffet-only gathering satisfies the request without the full reunion.",
   "event.mafia_family_reunion.title": "Family Reunion",
   "event.mafia_fbi_mole.desc": "FBI undercover agent suspected. The family has a new 'opportunity.'",
