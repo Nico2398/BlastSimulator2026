@@ -6,6 +6,7 @@ import { modelLibrary } from './renderer/models/ModelLibrary.js';
 import { fetchModelBytes, preloadModels, yieldToEventLoop } from './renderer/models/ModelLoader.js';
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
+import { wireCrewNotifications } from './ui/notify/crewNotifications.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { shouldAutoStartTutorial, shouldKeepTutorialRunning, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
@@ -472,6 +473,8 @@ emitter.on('terrain:updated', ({ region }) => {
 emitter.on('blast:started', ({ originX, originZ }) => {
   gameRenderer.notifyBlastScatter(originX, originZ);
 });
+
+wireCrewNotifications(emitter, () => ctx.state, n => uiManager.notify(n));
 
 let lastCommandOutput = '';
 const consoleLogs: string[] = [];

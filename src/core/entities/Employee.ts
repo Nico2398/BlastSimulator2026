@@ -564,6 +564,5 @@ export {
 
 /** Number of actions an employee holds: the active one plus the queued follow-ups (#1387). */
 export function employeeQueueDepth(emp: Pick<Employee, 'activeActionId' | 'taskQueue'>): number {
-  void emp;
-  return 0; // TODO: implement
+  return (emp.activeActionId !== null ? 1 : 0) + emp.taskQueue.length;
 }

@@ -50,7 +50,8 @@ export function pictogramKindFor(activity: EmployeeActivity): PictogramKind | nu
       // rendered above them to hang a pictogram off of (#1203).
       return null;
     case 'stuck':
-      return null; // TODO: implement
+      // No pictogram fits "blocked path"; the Crew panel line and the stuck alert pip carry it.
+      return null;
   }
 }
 

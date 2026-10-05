@@ -66,7 +66,7 @@ export function describeActivity(activity: EmployeeActivity): string {
       : t('ui.crew.task_walking');
     case 'idle': return t('ui.crew.task_idle');
     case 'training': return t('ui.crew.task_training');
-    case 'stuck': return t('ui.crew.task_idle'); // TODO: implement
+    case 'stuck': return t('ui.crew.task_stuck');
   }
 }
 

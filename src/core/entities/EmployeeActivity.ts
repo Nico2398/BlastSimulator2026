@@ -63,6 +63,7 @@ export function computeEmployeeActivity(employee: Employee, vehicleState: Vehicl
   if (drivenVehicle) return { ...IDLE, kind: 'driving', vehicleId: drivenVehicle.id };
 
   if (employee.destinationX !== null || employee.destinationZ !== null) {
+    if (employee.isMoveStuck) return { ...IDLE, kind: 'stuck', actionType: employee.pendingActionType };
     return { ...IDLE, kind: 'walking', actionType: employee.pendingActionType };
   }
 
