@@ -86,7 +86,12 @@ export function buildCommand(
       // Notify NavGridSync via nav:occupancy_changed of the removed building's footprint
       const { sizeX: destroySizeX, sizeZ: destroySizeZ } = getDefSize(destroyDef);
       emitFootprintOccupancyChanged(ctx, toDestroy.x, toDestroy.z, destroySizeX, destroySizeZ);
-      return { success: true, output: t('entities.build_destroy_success', { id, cost: demolishCost }) };
+      const lostKg = toDestroy.type === 'explosive_warehouse' ? (toDestroy.storedExplosivesKg ?? 0) : 0;
+      const destroyOutput = t('entities.build_destroy_success', { id, cost: demolishCost });
+      return {
+        success: true,
+        output: lostKg > 0 ? `${destroyOutput}\n${t('entities.build_destroy_lost_explosives', { kg: lostKg })}` : destroyOutput,
+      };
     }
     case 'upgrade': {
       const id = parseInt(args[1] ?? '', 10);

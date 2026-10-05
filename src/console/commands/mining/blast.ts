@@ -4,10 +4,14 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleValidBlastPlan, wetHoleIdSet, levelVillagePositions } from './shared.js';
-import { executeBlast, buildBlastReport, maxVillageVibration } from '../../../core/mining/BlastExecution.js';
+import { executeBlast, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
+import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
+import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
+import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
+import { releaseOccupantsOfRemovedBuildings } from '../../../core/engine/Mount.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { killEmployee } from '../../../core/entities/Employee.js';
 import { releaseOccupantsOfRemovedVehicles } from '../../../core/engine/Mount.js';
@@ -131,6 +135,7 @@ export function blastCommand(
   // clearly outside it must not take a hit just because a stray fragment
   // happened to come down nearby (#557 audit).
   const dangerZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
+  const projectionSecondaryEvents: SecondaryBlastEvent[] = [];
   const impacts = processProjections(
     result.fragments,
     state.buildings,
@@ -139,11 +144,45 @@ export function blastCommand(
     state.damage,
     state.tickCount,
     dangerZone,
+    projectionSecondaryEvents,
   );
   if (impacts.length > 0) {
     syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   }
   thisBlastAccidents.push(...impacts);
+
+  // Stocked explosive warehouses destroyed by the blast or by flying rock
+  // detonate in turn (#1394). resolveSecondaryBlasts records its accidents on
+  // state.damage itself; they are added to this blast's own list here.
+  const destroyedFootprints = new Map<number, { x: number; z: number; sizeX: number; sizeZ: number }>();
+  if (result.secondaryBlastEvents.length + projectionSecondaryEvents.length > 0) {
+    for (const b of state.buildings.buildings) {
+      destroyedFootprints.set(b.id, { x: b.x, z: b.z, ...getDefSize(getBuildingDef(b.type, b.tier)) });
+    }
+  }
+  const secondaryOutcomes = resolveSecondaryBlasts(
+    [...result.secondaryBlastEvents, ...projectionSecondaryEvents],
+    state.buildings, state.vehicles, state.employees, state.damage, state.tickCount,
+  );
+  const secondaryReports: SecondaryBlastReport[] = [];
+  for (const outcome of secondaryOutcomes) {
+    thisBlastAccidents.push(...outcome.accidents);
+    const destroyed = outcome.accidents.filter(a => a.type === 'building_destroyed');
+    for (const a of destroyed) recordBuildingDestruction(state.scores, a.entityLabel === 'explosive_warehouse');
+    secondaryReports.push({
+      buildingId: outcome.event.buildingId,
+      x: outcome.event.x,
+      z: outcome.event.z,
+      explosivesKg: outcome.event.explosivesKg,
+      radiusM: outcome.radiusM,
+      casualties: outcome.accidents.filter(a => a.type === 'injury' || a.type === 'death').length,
+      destroyedIds: destroyed.map(a => a.entityId),
+    });
+  }
+  if (secondaryOutcomes.length > 0) {
+    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
+  }
 
   // One release after both destruction paths (cleared columns above, flying
   // rock in processProjections) so no rider stays mounted on a removed vehicle.
@@ -182,7 +221,7 @@ export function blastCommand(
   const wetReport = classifyWetChargedHoles(plan.charges, wetHoleIds);
   state.lastBlastReport = buildBlastReport(
     result, state.tickCount, spent, thisBlastAccidents,
-    wetReport,
+    wetReport, secondaryReports,
   );
 
   // Clear drill plan after blast (holes are consumed)
@@ -204,6 +243,16 @@ export function blastCommand(
   // double-remesh for what carves zero further voxels.
   if (result.clearedVoxels > 0) {
     ctx.emitter.emit('nav:occupancy_changed', { region: regionForColumns(result.clearedRegion, ctx.grid!) });
+  }
+
+  // Every footprint a detonation cleared is free ground for navigation, as
+  // `build destroy` reports it.
+  for (const outcome of secondaryOutcomes) {
+    for (const a of outcome.accidents) {
+      if (a.type !== 'building_destroyed') continue;
+      const gone = destroyedFootprints.get(a.entityId);
+      if (gone) emitFootprintOccupancyChanged(ctx, gone.x, gone.z, gone.sizeX, gone.sizeZ);
+    }
   }
 
   return {
@@ -232,6 +281,7 @@ export function blastCommand(
       ...(result.destroyedBuildings.length > 0
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
+      ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties })),
     ].join('\n'),
   };
 }

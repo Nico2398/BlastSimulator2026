@@ -79,7 +79,7 @@ export function processProjections(
   tick: number,
   dangerZone: ZoneBounds | null = null,
   /** Collector: destroyed stocked explosive warehouses are pushed here for resolveSecondaryBlasts (#1394). */
-  _secondaryBlasts: SecondaryBlastEvent[] = [],
+  secondaryBlasts: SecondaryBlastEvent[] = [],
 ): AccidentRecord[] {
   const newAccidents: AccidentRecord[] = [];
   const inZone = (x: number, z: number): boolean => dangerZone === null || isInZone(x, z, dangerZone);
@@ -103,7 +103,7 @@ export function processProjections(
       const dist = distanceBetween(fx, fz, cx, cz);
       const effectiveKe = keAtDistance(ke, dist);
       if (effectiveKe === null) continue;
-      const acc = processBuildingHit(b, buildings, employees, frag, effectiveKe, tick);
+      const acc = processBuildingHit(b, buildings, employees, frag, effectiveKe, tick, secondaryBlasts);
       if (acc) newAccidents.push(acc);
     }
 
@@ -157,6 +157,7 @@ function processBuildingHit(
   frag: FragmentData,
   ke: number,
   tick: number,
+  secondaryBlasts: SecondaryBlastEvent[],
 ): AccidentRecord | null {
   if (ke < BUILDING_DAMAGE_THRESHOLD) return null;
 
@@ -172,6 +173,9 @@ function processBuildingHit(
       // Same once-only rule as processEmployeeHit: a second injury would
       // re-apply injureEmployee's morale penalty for one event.
       if (employees.employees.find(e => e.id === employeeId)?.injured === false) injureEmployee(employees, employeeId);
+    }
+    if (b.type === 'explosive_warehouse' && (b.storedExplosivesKg ?? 0) > 0) {
+      secondaryBlasts.push({ buildingId: b.id, x: b.x, z: b.z, explosivesKg: b.storedExplosivesKg! });
     }
     destroyBuilding(state, b.id);
     return { tick, type: 'building_destroyed', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
@@ -238,13 +242,13 @@ function kineticEnergy(massKg: number, velocityMs: number): number {
   return 0.5 * massKg * velocityMs * velocityMs;
 }
 
-function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {
+export function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {
   const dx = x1 - x2;
   const dz = z1 - z2;
   return Math.sqrt(dx * dx + dz * dz);
 }
 
-function buildingCenter(b: Building): { cx: number; cz: number } {
+export function buildingCenter(b: Building): { cx: number; cz: number } {
   const def = getBuildingDef(b.type, b.tier);
   const { sizeX, sizeZ } = getDefSize(def);
   return { cx: b.x + sizeX / 2, cz: b.z + sizeZ / 2 };

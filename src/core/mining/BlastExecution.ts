@@ -177,7 +177,7 @@ export interface SecondaryBlastReport {
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [] }): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [] }, secondaryBlasts: SecondaryBlastReport[] = []): BlastReport {
   return {
     tick,
     rating: result.rating,
@@ -198,6 +198,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     ...(wetHoles.wet.length > 0
       ? { wetHoleIds: wetHoles.wet, fizzledHoleIds: wetHoles.fizzled }
       : {}),
+    ...(secondaryBlasts.length > 0 ? { secondaryBlasts } : {}),
   };
 }
 
