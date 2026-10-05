@@ -16,7 +16,7 @@
 // ContractsPanel.ts already established for #bs-contract-panel in P5.
 
 import { PanelBase } from './PanelBase.js';
-import { makeLocateButton, LOCATE_CAMERA_DISTANCE } from '../locateButton.js';
+import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -273,7 +273,7 @@ export class FleetPanel extends PanelBase {
       title: t('ui.fleet.locate'),
       onClick: () => {
         const live = this.lastState?.vehicles.vehicles.find(x => x.id === v.id);
-        if (live) window.__cameraFocus?.(live.x, live.z, LOCATE_CAMERA_DISTANCE);
+        if (live) focusCameraOn(live.x, live.z);
       },
     });
     head.append(iconChip, nameCol, this.tag(makeStatusChip(v, state.vehicles, this.occupantOf(v, state)), 'bs-fleet-status'), locateBtn);

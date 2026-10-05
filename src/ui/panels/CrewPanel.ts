@@ -16,7 +16,7 @@
 // established for #bs-contract-panel in P5.
 
 import { PanelBase } from './PanelBase.js';
-import { makeLocateButton, LOCATE_CAMERA_DISTANCE } from '../locateButton.js';
+import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -74,10 +74,10 @@ export class CrewPanel extends PanelBase {
   setSelectEmployeeHandler(cb: (employeeId: number) => void): void { this.onSelectEmployeeCb = cb; }
 
   /** Locate button action: focus the camera on the live employee and select them. Never touches card expansion. */
-  protected locateEmployee(id: number): void {
+  private locateEmployee(id: number): void {
     const live = this.lastState?.employees.employees.find(x => x.id === id);
     if (!live) return;
-    window.__cameraFocus?.(live.x, live.z, LOCATE_CAMERA_DISTANCE);
+    focusCameraOn(live.x, live.z);
     this.onSelectEmployeeCb?.(id);
   }
 

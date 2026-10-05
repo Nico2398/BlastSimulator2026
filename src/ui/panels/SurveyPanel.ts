@@ -12,7 +12,7 @@
 // for their own root ids in P6.
 
 import { PanelBase } from './PanelBase.js';
-import { makeLocateButton, LOCATE_CAMERA_DISTANCE } from '../locateButton.js';
+import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, paintToggleButton, panelRoot, panelHeader, panelHeaderButton, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -364,7 +364,7 @@ export class SurveyPanel extends PanelBase {
     head.appendChild(makeLocateButton({
       title: t('ui.survey.locate'),
       size: 24,
-      onClick: () => window.__cameraFocus?.(survey.centerX, survey.centerZ, LOCATE_CAMERA_DISTANCE),
+      onClick: () => focusCameraOn(survey.centerX, survey.centerZ),
     }));
 
     const rows: HTMLElement[] = [head];

@@ -4,6 +4,11 @@ import { iconEl } from './icons.js';
 /** Camera distance used when a Locate button focuses the scene camera on an entity. */
 export const LOCATE_CAMERA_DISTANCE = 15;
 
+/** Focus the scene camera on a world position via the `window.__cameraFocus` bridge (absent headless). */
+export function focusCameraOn(x: number, z: number): void {
+  window.__cameraFocus?.(x, z, LOCATE_CAMERA_DISTANCE);
+}
+
 interface LocateButtonOptions {
   title: string;
   size?: number;
