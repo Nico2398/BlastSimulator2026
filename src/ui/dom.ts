@@ -313,3 +313,9 @@ export function panelBody(gap: number, className?: string): HTMLElement {
   body.style.cssText = `flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:${gap}px`;
   return body;
 }
+
+/** Show `msg` in a transient status line; clears after 3 s unless replaced meanwhile. */
+export function flashStatus(statusEl: HTMLElement, msg: string): void {
+  statusEl.textContent = msg;
+  setTimeout(() => { if (statusEl.textContent === msg) statusEl.textContent = ''; }, 3000);
+}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { ContractsPanel } from '../../../../src/ui/panels/ContractsPanel.js';
+import { ContractsPanel, deliverableAmountKg } from '../../../../src/ui/panels/ContractsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -458,5 +458,124 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
     panel.update(state);
     expect(panel.root.querySelector<HTMLButtonElement>('[data-contract-id="3"] [data-action="negotiate"]')!.disabled).toBe(true);
     expect(panel.root.querySelector<HTMLButtonElement>('[data-contract-id="4"] [data-action="negotiate"]')!.disabled).toBe(false);
+  });
+});
+
+// ── #1368: deliver amount floors to 0.1 kg, never exceeds stock; failures surface ──
+
+describe('deliverableAmountKg (#1368)', () => {
+  it.each([
+    [99.6, 99.6],
+    [0.3, 0.3],
+    [1.1, 1.1],
+    [0.04, 0],
+    [1234.567, 1234.5],
+    [0, 0],
+    [40, 40],
+  ])('floors %s kg to %s', (input, expected) => {
+    expect(deliverableAmountKg(input)).toBeCloseTo(expected, 10);
+  });
+
+  it('never exceeds its input', () => {
+    for (const v of [99.6, 0.3, 1.1, 0.04, 1234.567, 99.99, 7.77, 0.1 + 0.2, 55.55]) {
+      expect(deliverableAmountKg(v)).toBeLessThanOrEqual(v + 1e-9);
+    }
+  });
+
+  it('returns 0 for non-positive or non-finite input', () => {
+    expect(deliverableAmountKg(-5)).toBe(0);
+    expect(deliverableAmountKg(NaN)).toBe(0);
+  });
+});
+
+describe('ContractsPanel deliver amount (#1368)', () => {
+  function setup(stock: number, contract: Partial<Contract> = {}, rubble = false) {
+    const ctx = makePanel();
+    const state = makeState();
+    if (rubble) state.logistics.storedMassKg = stock;
+    else state.collectedOre['dirtite'] = stock;
+    state.contracts.active.push(makeContract({ id: 5, quantityKg: 100, deliveredKg: 0, ...contract }));
+    ctx.panel.show();
+    ctx.panel.update(state);
+    const input = () => ctx.panel.root.querySelector<HTMLInputElement>('.bs-contract-amount')!;
+    const deliver = () => ctx.panel.root.querySelector<HTMLButtonElement>('.bs-contract-deliver')!;
+    const max = () => ctx.panel.root.querySelector<HTMLButtonElement>('[data-action="deliver-max"]')!;
+    return { ...ctx, state, input, deliver, max };
+  }
+
+  it('pre-fills 99.6 for 99.6 kg stock instead of rounding up to 100', () => {
+    const { input } = setup(99.6);
+    expect(Number(input().value)).toBeCloseTo(99.6, 10);
+  });
+
+  it('MAX sets 99.6 after the player edits the field', () => {
+    const { input, max } = setup(99.6);
+    input().value = '3';
+    max().click();
+    expect(Number(input().value)).toBeCloseTo(99.6, 10);
+  });
+
+  it('Deliver calls the console with amount:99.6', () => {
+    const { deliver, gameConsole } = setup(99.6);
+    deliver().click();
+    expect(gameConsole).toHaveBeenCalledWith('contract deliver 5 amount:99.6');
+  });
+
+  it('input max attribute does not exceed stock', () => {
+    const { input } = setup(99.6);
+    expect(Number(input().max)).toBeLessThanOrEqual(99.6 + 1e-9);
+  });
+
+  it('limits to remaining when remaining < stock (40.5 of 99.6)', () => {
+    const { input, deliver, gameConsole } = setup(99.6, { quantityKg: 40.5 });
+    expect(Number(input().value)).toBeCloseTo(40.5, 10);
+    deliver().click();
+    expect(gameConsole).toHaveBeenCalledWith('contract deliver 5 amount:40.5');
+  });
+
+  it('disables input, MAX and Deliver when floored amount is 0 (stock 0.04)', () => {
+    const { input, deliver, max } = setup(0.04);
+    expect(input().disabled).toBe(true);
+    expect(deliver().disabled).toBe(true);
+    expect(max().disabled).toBe(true);
+  });
+
+  it('rubble contract floors against storedMassKg', () => {
+    const { input, deliver, gameConsole } = setup(99.6, { type: 'rubble_disposal', materialId: '' }, true);
+    expect(Number(input().value)).toBeCloseTo(99.6, 10);
+    deliver().click();
+    expect(gameConsole).toHaveBeenCalledWith('contract deliver 5 amount:99.6');
+  });
+
+  it('rubble contract with 0.04 kg stored is disabled', () => {
+    const { deliver } = setup(0.04, { type: 'rubble_disposal', materialId: '' }, true);
+    expect(deliver().disabled).toBe(true);
+  });
+
+  it('shows the console output in the panel when Deliver fails', () => {
+    const { panel, deliver, gameConsole } = setup(99.6);
+    gameConsole.mockReturnValue({ success: false, output: 'Not enough ore in storage (#1368)' });
+    deliver().click();
+    expect(panel.root.textContent).toContain('Not enough ore in storage (#1368)');
+  });
+
+  it('failure status survives a re-render', () => {
+    const { panel, state, deliver, gameConsole } = setup(99.6);
+    gameConsole.mockReturnValue({ success: false, output: 'Refused: reason-xyz' });
+    deliver().click();
+    panel.update(state);
+    state.collectedOre['dirtite'] = 98.6;
+    panel.update(state);
+    expect(panel.root.textContent).toContain('Refused: reason-xyz');
+  });
+
+  it('a successful Deliver clears the earlier failure message', () => {
+    const { panel, deliver, gameConsole } = setup(99.6);
+    gameConsole.mockReturnValue({ success: false, output: 'Refused: reason-xyz' });
+    deliver().click();
+    expect(panel.root.textContent).toContain('Refused: reason-xyz');
+    gameConsole.mockReturnValue({ success: true, output: 'Delivered fine' });
+    deliver().click();
+    expect(panel.root.textContent).not.toContain('Refused: reason-xyz');
   });
 });

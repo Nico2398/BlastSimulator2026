@@ -692,6 +692,29 @@ describe('Economy', () => {
     expect(completed!.completed).toBe(true);
   });
 
+  // ── #1368: fractional-kg deliveries match what the panel now offers ──────
+  it('contract deliver amount:99.6 succeeds with 99.6 kg in stock', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+    pushStoredFragment(ctx, 1, 99.6, 0.04, { [c.materialId]: 1.0 });
+    ctx.state!.collectedOre[c.materialId] = 99.6;
+
+    const result = contractCommand(ctx, ['deliver', String(c.id)], { amount: '99.6' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)!.deliveredKg).toBeCloseTo(99.6, 6);
+  });
+
+  it('contract deliver amount:100 is refused with "Not enough" when only 99.6 kg is in stock', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+    pushStoredFragment(ctx, 1, 99.6, 0.04, { [c.materialId]: 1.0 });
+    ctx.state!.collectedOre[c.materialId] = 99.6;
+
+    const result = contractCommand(ctx, ['deliver', String(c.id)], { amount: '100' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Not enough');
+  });
+
   // ── 14. Full round trip: blast -> reachable-fragment haul -> store -> ─────
   //         contract deliver (#466 — playtest could not reach this because no
   //         UI control could ever issue `vehicle haul`, and naive
