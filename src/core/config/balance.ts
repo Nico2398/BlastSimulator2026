@@ -113,6 +113,10 @@ export const ECOLOGICAL_WARNING_TICKS = 50;
 
 /** Corruption exposure threshold (0–1) for criminal arrest. */
 export const ARREST_EXPOSURE_THRESHOLD = 0.9;
+/** Exposure (0–1) at which the one-shot arrest warning fires. */
+export const ARREST_WARNING_EXPOSURE = 0.75;
+/** Well-being score at or below which the player is alerted. */
+export const WELL_BEING_ALERT_THRESHOLD = 20;
 
 /** Exposure added by arranging an accident (applies on success and failure). */
 export const ACCIDENT_EXPOSURE = 0.1;

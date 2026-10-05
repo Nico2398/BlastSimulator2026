@@ -67,7 +67,7 @@ const MAX_LOG = 100;
 /** Auto-dismiss delay, matching the design's toast motion spec. */
 const TOAST_LIFETIME_MS = 6500;
 
-export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders' | 'traffic' | 'debris';
+export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders' | 'traffic' | 'debris' | 'wellbeing' | 'exposure';
 
 export interface AlertPip {
   readonly kind: AlertKind;

@@ -28,6 +28,13 @@ export function createRevoltState(): RevoltState {
   return { ticksAtZero: 0, warningFired: false, revolted: false };
 }
 
+/** Ticks left before the revolt triggers. */
+export function revoltTicksRemaining(revolt: RevoltState): number {
+  void revolt;
+  // TODO: implement
+  return 0;
+}
+
 // ── Tick update ──
 
 /**
