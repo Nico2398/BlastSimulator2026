@@ -341,7 +341,7 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:H5 explosive:boomite amount:7 stemming:3",
+      "command": "charge hole:H5 explosive:boomite amount:7 stemming:2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -355,7 +355,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 3
+          "value": 2
         },
         {
           "type": "assert",
@@ -367,7 +367,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "3.0 m"
+          "expectedValue": "2.0 m"
         },
         {
           "type": "clickSelector",
@@ -410,6 +410,82 @@
           "chargedCount": 9,
           "orderedChargeCount": 0
         }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "#1361 overflow state. Holes are 6 m deep and stemming is 2.0 m, so a column of amount/2 m fits only up to 8 kg. Select Krackle (10 kg max, so the stepper can go past the limit; boomite caps at 8 kg and never overflows), step the amount to 9 kg: 4.5 m column + 2 m stemming > 6 m. The Charge step must show the reason line 'Shallowest hole is 6 m. At this stemming at most 8 kg fits.' and disable Charge All. The stepper keeps the 9 kg the player asked for.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 9
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"] + div",
+          "property": "textContent",
+          "expectedValue": "Shallowest hole is 6 m. At this stemming at most 8 kg fits.",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]",
+          "property": "disabled",
+          "expectedValue": true
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "9 kg + 2 m stemming overflows the 6 m shallowest hole: Charge All is disabled and the reason line is shown (#1361)"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "#1361 recovery: step the amount back down to 8 kg (4 m column + 2 m stemming = 6 m, exactly fits). The reason line must disappear and Charge All must be usable again.",
+      "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 8
+        },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"] + div",
+          "property": "textContent",
+          "expectedValue": "",
+          "timeoutMs": 10000
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]",
+          "property": "disabled",
+          "expectedValue": false
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "8 kg fits the 6 m hole at 2 m stemming: Charge All re-enabled (#1361)"
       }
     }
   ],

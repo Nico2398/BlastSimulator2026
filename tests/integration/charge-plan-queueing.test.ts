@@ -348,18 +348,18 @@ function explosivesTotal(state: { finances: Parameters<typeof getFinancialReport
 }
 
 describe('charge order cash cost (#1341)', () => {
-  it('charge hole:* amount:20kg of a $200/kg explosive on 6 holes lowers cash by exactly $24,000 and books an explosives expense', () => {
+  it('charge hole:* amount:12kg of a $200/kg explosive on 6 holes lowers cash by exactly $14,400 and books an explosives expense', () => {
     const { run, state } = setupDrilled(2, 3);
     expect(state.drillHoles).toHaveLength(6);
     const cashBefore = state.cash;
 
-    const result = run('charge hole:* explosive:dynatomics amount:20kg stemming:2');
+    const result = run('charge hole:* explosive:dynatomics amount:12kg stemming:2');
 
     expect(result.success).toBe(true);
-    expect(state.cash).toBe(cashBefore - 24_000);
+    expect(state.cash).toBe(cashBefore - 14_400);
     expect(state.finances.cash).toBe(state.cash);
     const report = getFinancialReport(state.finances, state.tickCount);
-    expect(report.expensesByCategory).toContainEqual({ category: 'explosives', total: 24_000 });
+    expect(report.expensesByCategory).toContainEqual({ category: 'explosives', total: 14_400 });
   });
 
   it('a single charge hole:H1 charges once at order time and nothing more when the charge lands', () => {
@@ -537,5 +537,100 @@ describe('charge order funds check with a zero-or-negative net cost (#1341)', ()
     expect(r.success).toBe(false);
     expect(r.output).toContain('Insufficient funds');
     expect(state.cash).toBe(-100);
+  });
+});
+
+// ── charge column must fit the hole (#1361) ──
+
+describe('charge column overflow is refused at order time (#1361)', () => {
+  function setupSixMetreHole() {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    drillAndLand(run, state, 'rows:1 cols:2 spacing:5 depth:6 start:14,14');
+    expect(state.drillHoles).toHaveLength(2);
+    expect(state.drillHoles.every(h => h.depth === 6)).toBe(true);
+    return { run, state };
+  }
+
+  it('boomite 8 kg + 3 m stemming on a 6 m hole fails, names the 6 kg maximum, spends nothing and orders nothing', () => {
+    const { run, state } = setupSixMetreHole();
+    const holeId = state.drillHoles[0]!.id;
+    const cashBefore = state.cash;
+
+    const result = run(`charge hole:${holeId} explosive:boomite amount:8 stemming:3`);
+
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/Maximum that fits: 6/); // (6 - 3) * 2 = 6 kg fits
+    expect(state.cash).toBe(cashBefore);
+    expect(state.plannedChargesByHole[holeId]).toBeUndefined();
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+  });
+
+  it('a krackle 10 kg + 2 m stemming order on a 6 m hole is refused with the 8 kg maximum in the message and nothing is spent', () => {
+    const { run, state } = setupSixMetreHole();
+    const holeId = state.drillHoles[0]!.id;
+    const cashBefore = state.cash;
+
+    const result = run(`charge hole:${holeId} explosive:krackle amount:10 stemming:2`);
+
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/\b8(\.0)?\b/);
+    expect(state.cash).toBe(cashBefore);
+    expect(state.plannedChargesByHole[holeId]).toBeUndefined();
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+  });
+
+  it('the exact boundary (boomite 8 kg + 2 m stemming on a 6 m hole) is accepted', () => {
+    const { run, state } = setupSixMetreHole();
+    const holeId = state.drillHoles[0]!.id;
+
+    expect(run(`charge hole:${holeId} explosive:boomite amount:8 stemming:2`).success).toBe(true);
+    expect(state.plannedChargesByHole[holeId]).toEqual({ explosiveId: 'boomite', amountKg: 8, stemmingM: 2 });
+  });
+
+  it('charge hole:* fails when any hole is too shallow, ordering and spending nothing for the others', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    drillAndLand(run, state, 'rows:1 cols:2 spacing:5 depth:8 start:12,12');
+    expect(state.drillHoles).toHaveLength(2);
+    state.drillHoles[1]!.depth = 4; // shallow hole: 5 kg (2.5 m) + 2 m stemming overflows it
+    expect(state.drillHoles.map(h => h.depth).sort()).toEqual([4, 8]);
+    const cashBefore = state.cash;
+
+    const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
+
+    expect(result.success).toBe(false);
+    expect(state.cash).toBe(cashBefore);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+  });
+
+  it('blast_plan load refuses a saved charge whose column overflows its hole, queuing and spending nothing', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    drillAndLand(run, state, 'rows:1 cols:1 spacing:5 depth:4 start:14,14');
+    expect(run('charge hole:* explosive:boomite amount:3 stemming:2').success).toBe(true);
+    tickUntil(run, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
+    expect(run('blast_plan save').success).toBe(true);
+
+    // Tamper: 5 kg (2.5 m) + 2 m stemming no longer fits the 4 m hole.
+    const saved = state.savedPlans['default']!;
+    for (const c of Object.values(saved.chargesByHole)) c.amountKg = 5;
+    state.drillHoles.length = 0;
+    for (const k of Object.keys(state.chargesByHole)) delete state.chargesByHole[k];
+    const cashBefore = state.cash;
+
+    const result = run('blast_plan load');
+
+    expect(result.success).toBe(false);
+    expect(state.cash).toBe(cashBefore);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole' || a.type === 'drill_hole')).toHaveLength(0);
   });
 });

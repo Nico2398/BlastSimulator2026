@@ -188,7 +188,7 @@ describe('Blast balance — the pipeline stays coherent', () => {
     // The one failure the other channels cannot see: a fragment whose resting
     // place has nothing under it. It reads as a floating boulder on screen and
     // as a perfectly ordinary blast in every number the report carries.
-    for (const shot of [{ kg: 8 }, { kg: 8, stemming: 0.5 }, { kg: 20, stemming: 0.5, explosive: 'dynatomics' }]) {
+    for (const shot of [{ kg: 8 }, { kg: 8, stemming: 0.5 }, { kg: 15, stemming: 0.5, explosive: 'dynatomics' }]) {
       const { result, grid } = fireOnto(shot);
       const pile = summariseMuckPile(result.fragments, grid);
 
