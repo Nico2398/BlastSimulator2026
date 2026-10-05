@@ -38,6 +38,7 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.crew.skill_xp', // "{xp} / {next} XP" — XP is a cognate, embedded in a format string
   'ui.fleet.load_kg', // "{kg} / {cap} kg"
   'ui.survey.duration_ticks', // "{ticks}t"
+  'notification.pip.contract_label', // "#{id} · {duration}" — format-only
   'ui.survey.radius_cells', // "r {radius}" — radius/rayon both start with r, not a coincidence worth two abbreviations
 
   // ── Language picker endonyms ──

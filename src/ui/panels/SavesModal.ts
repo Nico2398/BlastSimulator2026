@@ -9,13 +9,14 @@
 // the shared .bs-confirm-overlay tier most modals share.
 
 import { t } from '../../core/i18n/I18n.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
 import { el, button } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import type { SaveBackend, SaveMeta } from '../../core/state/SaveBackend.js';
-import { SAVE_SLOT_COUNT, AUTO_SAVE_INTERVAL_TICKS } from '../../core/config/balance.js';
+import { SAVE_SLOT_COUNT, AUTO_SAVE_INTERVAL_TICKS, TICKS_PER_DAY } from '../../core/config/balance.js';
 import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { getLevel } from '../../core/campaign/Level.js';
 import type { SaveBackendKind } from '../../persistence/selectBackend.js';
@@ -215,7 +216,7 @@ export class SavesModal {
     if (!state || hasLevelEnded(state)) return;
     try {
       const data = serialize(state);
-      const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;
+      const summary = this.summaryOf(state);
       await this.backend.save(AUTO_SAVE_SLOT, t('saveload.auto_name'), data, summary, state.campaign.activeLevelId);
       if (this.autoSaveFailing) {
         this.autoSaveFailing = false;
@@ -258,6 +259,13 @@ export class SavesModal {
     }
   }
 
+  /** Name derived from the slot id at render time so it follows the active locale; the stored name is only a fallback for unknown ids. */
+  private slotDisplayName(slotId: string, meta: SaveMeta): string {
+    if (slotId === AUTO_SAVE_SLOT) return t('saveload.auto_name');
+    const match = /^slot_(\d+)$/.exec(slotId);
+    return match ? t('saveload.slot_name', { n: match[1]! }) : meta.name;
+  }
+
   private slotCard(slotId: string, meta: SaveMeta | null): HTMLElement {
     const isAuto = slotId === AUTO_SAVE_SLOT;
 
@@ -296,7 +304,7 @@ export class SavesModal {
     const thumb = el('div', { attrs: { style: THUMB_STYLE } });
 
     const nameRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:7px' } });
-    nameRow.appendChild(el('span', { text: meta.name, attrs: { style: 'font:600 12px/1 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }));
+    nameRow.appendChild(el('span', { text: this.slotDisplayName(slotId, meta), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }));
     if (isAuto) {
       const chip = el('span', {
         text: t('ui.saves.auto_chip'),
@@ -344,6 +352,10 @@ export class SavesModal {
     }
   }
 
+  private summaryOf(state: GameState): string {
+    return t('saveload.summary', { cash: formatMoney(state.cash), day: Math.floor(state.tickCount / TICKS_PER_DAY) + 1 });
+  }
+
   /** Overwrite button on a filled manual slot: no game means nothing to confirm. */
   private requestOverwrite(slotId: string): void {
     if (!this.getState?.()) { this.setStatus(t('saveload.no_game'), 'error'); return; }
@@ -357,7 +369,7 @@ export class SavesModal {
     this.writing = true;
     try {
       const data = serialize(state);
-      const summary = `$${state.cash.toLocaleString('en-US')} — Day ${Math.floor(state.tickCount / 24) + 1}`;
+      const summary = this.summaryOf(state);
       const slotNum = slotId.replace('slot_', '');
       await this.backend.save(slotId, t('saveload.slot_name', { n: slotNum }), data, summary, state.campaign.activeLevelId);
       this.setStatus(t(this.sessionOnly ? 'saveload.saved_session_only' : 'saveload.saved'));

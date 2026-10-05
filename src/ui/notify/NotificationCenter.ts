@@ -16,6 +16,8 @@ import { ARREST_EXPOSURE_THRESHOLD, ARREST_WARNING_EXPOSURE } from '../../core/c
 import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
 import { WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
+import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
@@ -135,18 +137,18 @@ export class NotificationCenter {
     const pips: AlertPip[] = [];
 
     if (state.events.pendingEvent) {
-      pips.push({ kind: 'event', icon: 'warn', label: 'EVENT', tone: 'critical', tip: 'An event is waiting — the clock is held' });
+      pips.push({ kind: 'event', icon: 'warn', label: t('notification.pip.event_label'), tone: 'critical', tip: t('notification.pip.event_tip') });
     }
     if (state.scores.ecology < 20) {
-      pips.push({ kind: 'ecology', icon: 'crit', label: `ECO ${Math.round(state.scores.ecology)}`, tone: 'critical', tip: `Ecology critical (${Math.round(state.scores.ecology)}) — shutdown proceedings begin once it hits zero` });
+      pips.push({ kind: 'ecology', icon: 'crit', label: t('notification.pip.ecology_label', { value: Math.round(state.scores.ecology) }), tone: 'critical', tip: t('notification.pip.ecology_tip', { value: Math.round(state.scores.ecology) }) });
     }
     const wellBeing = state.scores.wellBeing;
     if (wellBeing < WELL_BEING_ALERT_THRESHOLD) {
       if (wellBeing > 0) {
         pips.push({ kind: 'wellbeing', icon: 'warn', label: t('notification.pip.wellbeing_label', { value: Math.round(wellBeing) }), tone: 'warn', tip: t('notification.pip.wellbeing_tip') });
       } else if (!state.revolt.revolted) {
-        const ticks = revoltTicksRemaining(state.revolt);
-        pips.push({ kind: 'wellbeing', icon: 'crit', label: t('notification.pip.revolt_label', { ticks }), tone: 'critical', tip: t('notification.pip.revolt_tip', { ticks }) });
+        const duration = formatGameDuration(revoltTicksRemaining(state.revolt));
+        pips.push({ kind: 'wellbeing', icon: 'crit', label: t('notification.pip.revolt_label', { duration }), tone: 'critical', tip: t('notification.pip.revolt_tip', { duration }) });
       }
     }
     const exposure = state.mafia.exposureRisk;
@@ -158,17 +160,17 @@ export class NotificationCenter {
     // below BANKRUPTCY_THRESHOLD, not merely once it goes negative — firing this pip only
     // at cash < 0 left the player with no warning for most of that countdown.
     if (state.cash < BANKRUPTCY_THRESHOLD) {
-      pips.push({ kind: 'bankruptcy', icon: 'crit', label: 'CASH', tone: 'critical', tip: `Balance is below $${BANKRUPTCY_THRESHOLD.toLocaleString('en-US')} — bankruptcy proceedings may follow` });
+      pips.push({ kind: 'bankruptcy', icon: 'crit', label: t('notification.pip.cash_label'), tone: 'critical', tip: t('notification.pip.cash_tip', { threshold: formatMoney(BANKRUPTCY_THRESHOLD) }) });
     }
     const collapsedCount = state.employees.employees.filter(e => e.alive && e.collapsing).length;
     if (collapsedCount > 0) {
-      pips.push({ kind: 'crew', icon: 'collapse', label: String(collapsedCount), tone: 'critical', tip: `${collapsedCount} employee(s) collapsed` });
+      pips.push({ kind: 'crew', icon: 'collapse', label: String(collapsedCount), tone: 'critical', tip: t('notification.pip.crew_collapsed_tip', { count: collapsedCount }) });
     }
     const stuckCount = state.vehicles.vehicles.filter(
       v => resolveVehicleDriver(v, state.employees.employees)?.isMoveStuck === true,
     ).length;
     if (stuckCount > 0) {
-      pips.push({ kind: 'fleet', icon: 'vehicle', label: String(stuckCount), tone: 'warn', tip: `${stuckCount} vehicle(s) stuck` });
+      pips.push({ kind: 'fleet', icon: 'vehicle', label: String(stuckCount), tone: 'warn', tip: t('notification.pip.fleet_stuck_tip', { count: stuckCount }) });
     }
     const jams = findTrafficJams(state.builtRamps, state.employees.employees);
     if (jams.length > 0) {
@@ -181,14 +183,15 @@ export class NotificationCenter {
     });
     if (urgentContract) {
       const remaining = urgentContract.acceptedAtTick + urgentContract.deadlineTicks - state.tickCount;
-      pips.push({ kind: 'contract', icon: 'clock', label: `#${urgentContract.id} · ${remaining}h`, tone: 'warn', tip: `Contract #${urgentContract.id} expires in ${remaining}h` });
+      const duration = formatGameDuration(remaining);
+      pips.push({ kind: 'contract', icon: 'clock', label: t('notification.pip.contract_label', { id: urgentContract.id, duration }), tone: 'warn', tip: t('notification.pip.contract_tip', { id: urgentContract.id, duration }) });
       if (!this.warnedContracts.has(urgentContract.id)) {
         this.warnedContracts.add(urgentContract.id);
         this.notify({
           severity: 'warn',
           icon: 'clock',
-          title: `Contract #${urgentContract.id} is expiring soon`,
-          body: `${remaining}h left — penalty $${urgentContract.penaltyAmount.toLocaleString('en-US')} if it lapses.`,
+          title: t('notification.contract_expiring_title', { id: urgentContract.id }),
+          body: t('notification.contract_expiring_body', { duration, penalty: formatMoney(urgentContract.penaltyAmount) }),
         });
       }
     }
