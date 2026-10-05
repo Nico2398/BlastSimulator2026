@@ -585,14 +585,49 @@ export function fireEmployeeFromWorld(
  * in-progress action is left untouched. Queued non-rest actions that targeted the
  * employee get targetEmployeeId cleared so anyone qualified can claim them (#1381).
  */
-export function releaseInjuredEmployeeQueue(_state: GameState, _employeeId: number): void {
-  // TODO: implement
+export function releaseInjuredEmployeeQueue(state: GameState, employeeId: number): void {
+  const emp = state.employees.employees.find(e => e.id === employeeId);
+  if (!emp || !emp.alive || !emp.injured) return;
+
+  const kept: number[] = [];
+  for (const actionId of emp.taskQueue) {
+    const action = state.pendingActions.find(a => a.id === actionId);
+    if (!action) continue; // stale id: dropped
+    if (action.type === 'rest') {
+      kept.push(actionId); // personal; nobody else can rest for them
+      continue;
+    }
+    if (action.targetEmployeeId === employeeId) action.targetEmployeeId = null;
+    releaseActionToOpenPool(state, action);
+  }
+  emp.taskQueue = kept;
+
+  for (const action of state.pendingActions) {
+    if (action.status === 'queued' && action.type !== 'rest' && action.targetEmployeeId === employeeId) {
+      action.targetEmployeeId = null;
+    }
+  }
 }
 
 /**
  * Apply releaseInjuredEmployeeQueue to every alive, injured employee that still
  * holds queued work. Idempotent (#1381).
  */
-export function releaseInjuredEmployeesQueues(_state: GameState): void {
-  // TODO: implement
+export function releaseInjuredEmployeesQueues(state: GameState): void {
+  let targetedScanned = false;
+  let targetedIds: Set<number> | null = null;
+  for (const emp of state.employees.employees) {
+    if (!emp.alive || !emp.injured) continue;
+    if (!targetedScanned) {
+      // One pass over the pool, only once an injured employee exists.
+      targetedScanned = true;
+      targetedIds = new Set();
+      for (const a of state.pendingActions) {
+        if (a.status === 'queued' && a.type !== 'rest' && a.targetEmployeeId !== null) targetedIds.add(a.targetEmployeeId);
+      }
+    }
+    if (emp.taskQueue.length > 0 || targetedIds!.has(emp.id)) {
+      releaseInjuredEmployeeQueue(state, emp.id);
+    }
+  }
 }
