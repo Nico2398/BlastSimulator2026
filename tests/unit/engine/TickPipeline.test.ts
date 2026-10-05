@@ -121,6 +121,7 @@ describe('runTick — step ordering (dev-architecture: no behaviour change from 
 
   it('a haul-eligible employee is dispatched the same tick a fragment makes it eligible (haul dispatch runs before the employee-dispatch pass)', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     const emitter = new EventEmitter();
     const rng = new Random(SEED);
     const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);

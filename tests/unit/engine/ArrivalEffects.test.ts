@@ -108,6 +108,7 @@ function reserveFragmentAction(
 describe('applyHaulLoad', () => {
   it('moves an on-ground fragment onto vehicle.payload, frees its nav-grid occupancy, and returns true', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
     const fragment = makeFragment(1, 5, 5, 0.3, 850);
@@ -296,6 +297,7 @@ describe('applyBoulderSplit', () => {
 describe('applyArrivalEffect', () => {
   it('dispatches "haul_load" to applyHaulLoad', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 0.3, 900)]);
     reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, { x: 5, z: 5 });

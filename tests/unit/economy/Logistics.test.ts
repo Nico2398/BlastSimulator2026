@@ -15,6 +15,9 @@ import {
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
+/** Explicit capacity: a fresh logistics state holds 0 kg until a freight warehouse exists (#1369). */
+const TEST_STORAGE_KG = 5000;
+
 /** Minimal all-walkable NavGrid fixture, mirroring NavGrid.test.ts's own hand-built grids. */
 function makeTestNavGrid(width: number, height: number): NavGrid {
   const cells: NavCell[][] = [];
@@ -78,7 +81,7 @@ function putInStorage(state: LogisticsState, fragment: FragmentData): void {
 
 describe('Fragment logistics', () => {
   it('after blast, fragments are in on_ground state', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1), makeFragment(2), makeFragment(3)]);
 
     const counts = getFragmentCounts(state);
@@ -88,7 +91,7 @@ describe('Fragment logistics', () => {
   });
 
   it('pickupFragment moves fragment to in_transit', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1)]);
 
     const ok = pickupFragment(state, 1, 'truck-01');
@@ -100,7 +103,7 @@ describe('Fragment logistics', () => {
   });
 
   it('delivering fragment to depot moves it to stored', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 50)]);
     pickupFragment(state, 1, 'truck-01');
     deliverToDepot(state, 1);
@@ -111,7 +114,7 @@ describe('Fragment logistics', () => {
   });
 
   it('selling fragment against contract credits income and reduces quantity', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 200)]);
     pickupFragment(state, 1, 'truck-01');
     deliverToDepot(state, 1);
@@ -127,7 +130,7 @@ describe('Fragment logistics', () => {
   });
 
   it('deliverToDepot without collectedOre works as before', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
     pickupFragment(state, 1, 'truck-01');
     const result = deliverToDepot(state, 1);
@@ -137,7 +140,7 @@ describe('Fragment logistics', () => {
   });
 
   it('deliverToDepot with collectedOre accumulates ore mass correctly', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
     pickupFragment(state, 1, 'truck-01');
     const collectedOre: Record<string, number> = {};
@@ -147,7 +150,7 @@ describe('Fragment logistics', () => {
   });
 
   it('deliverToDepot accumulates multiple fragments into collectedOre', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 200)]);
     pickupFragment(state, 1, 'truck-01');
     pickupFragment(state, 2, 'truck-01');
@@ -159,7 +162,7 @@ describe('Fragment logistics', () => {
   });
 
   it('deliverToDepot adds to existing ore type in collectedOre', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
     pickupFragment(state, 1, 'truck-01');
     const collectedOre: Record<string, number> = { existingOre: 50 };
@@ -170,7 +173,7 @@ describe('Fragment logistics', () => {
   });
 
   it('deliverToDepot returns false for missing fragment even with collectedOre', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
     pickupFragment(state, 1, 'truck-01');
     const collectedOre: Record<string, number> = {};
@@ -202,7 +205,7 @@ describe('Fragment logistics', () => {
 
 describe('consumeStoredOre', () => {
   it('happy path: consumes a stored fragment covering the requested ore amount', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.04 × density 1.0 × 2500 kg/m³ = 100kg of oreA
     const frag1 = makeStoredFragment(1, 500, 0.04, { oreA: 1.0 });
     // A second, untouched fragment worth another 100kg of oreA.
@@ -224,7 +227,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('boundary: requesting exactly the available amount succeeds and empties storage', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.04 × density 1.0 × 2500 = 100kg of oreB
     const frag = makeStoredFragment(1, 500, 0.04, { oreB: 1.0 });
     putInStorage(state, frag);
@@ -240,7 +243,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rejects a request exceeding available stock, leaving state untouched', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 500, 0.04, { oreC: 1.0 }); // 100kg oreC
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreC: 100 };
@@ -260,7 +263,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rejects a request for an ore type not present in collectedOre at all', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 500, 0.04, { oreD: 1.0 });
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
@@ -274,7 +277,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('ore: a request within FRAGMENT_SPLIT_EPSILON_KG of a fragment\'s full ore contribution fully removes it instead of leaving a near-zero sliver', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.16 × density 1.0 × 2500 = 400kg of oreK.
     const oldest = makeStoredFragment(1, 800, 0.16, { oreK: 1.0 });
     // volume 0.12 × density 1.0 × 2500 = 300kg of oreK.
@@ -304,7 +307,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('ore: a request spanning two fragments fully consumes the oldest and partially splits the next', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.16 × density 1.0 × 2500 = 400kg of oreL.
     const oldest = makeStoredFragment(1, 800, 0.16, { oreL: 1.0 });
     // volume 0.12 × density 1.0 × 2500 = 300kg of oreL.
@@ -332,7 +335,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble (materialId "") prefers barren fragments, leaving ore-bearing stock and collectedOre untouched when barren stock alone covers the request', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // One ore-bearing fragment, one barren fragment — a rubble contract pays
     // cents per kg where an ore_sale pays dollars, so disposal reaches for
     // genuinely worthless waste before it ever touches ore-bearing rock
@@ -362,7 +365,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble (materialId "") reaches into ore-bearing fragments once barren stock runs out, splitting them and decrementing collectedOre for the ore it removes', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const oreFrag = makeStoredFragment(1, 500, 0.04, { oreE: 1.0 }); // 500kg mass, 100kg oreE
     const barrenFrag = makeStoredFragment(2, 300, 0.02, {}); // 300kg mass, no ore
     putInStorage(state, oreFrag);
@@ -389,7 +392,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble: two sequential small deliveries against a single oversized fragment both succeed via partial splits (issue #973 regression)', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // Mirrors the actual reported bug shape: a single large stored fragment,
     // then a 100kg delivery followed by a 40kg delivery one step later.
     const frag = makeStoredFragment(1, 795.75, 0.3183, {}); // barren — disposal reaches for waste first
@@ -417,7 +420,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble: a request within FRAGMENT_SPLIT_EPSILON_KG of a fragment\'s full mass fully removes it instead of leaving a near-zero sliver', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const oldest = makeStoredFragment(1, 400, 0.16, {});
     const newer = makeStoredFragment(2, 300, 0.12, {});
     putInStorage(state, oldest);
@@ -445,7 +448,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble: a request spanning two fragments fully consumes the oldest and partially splits the next', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const oldest = makeStoredFragment(1, 400, 0.16, {});
     const newer = makeStoredFragment(2, 300, 0.12, {});
     putInStorage(state, oldest);
@@ -469,7 +472,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble: a partial split of an ore-bearing fragment decrements collectedOre by the ore that physically left storage', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // The only stored fragment carries real ore, so disposal has no barren
     // stock to prefer and must split this one.
     const frag = makeStoredFragment(1, 500, 0.04, { oreX: 1.0 }); // 100kg oreX
@@ -490,7 +493,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble boundary: requesting exactly the stored mass succeeds and empties storage', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 400, 0.03, {});
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
@@ -504,7 +507,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rubble insufficient stock fails without touching storedMassKg', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 200, 0.02, {});
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
@@ -518,7 +521,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rejects a non-finite amount (NaN), leaving state and collectedOre untouched', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 500, 0.04, { oreH: 1.0 }); // 100kg oreH
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreH: 100 };
@@ -537,7 +540,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('rejects a non-finite amount (Infinity), leaving state and collectedOre untouched', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 500, 0.04, { oreI: 1.0 }); // 100kg oreI
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreI: 100 };
@@ -556,7 +559,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('multi-ore fragment: consuming one ore type also decrements every other ore the removed fragment touched', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.06 × 0.5 density × 2500 = 75kg for each of oreF and oreG.
     const frag = makeStoredFragment(1, 700, 0.06, { oreF: 0.5, oreG: 0.5 });
     putInStorage(state, frag);
@@ -575,7 +578,7 @@ describe('consumeStoredOre', () => {
   });
 
   it('multi-ore fragment: a request smaller than the fragment\'s ore content partially splits it, decrementing every ore key proportionally', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.06 × 0.5 density × 2500 = 75kg for each of oreF and oreG.
     const frag = makeStoredFragment(1, 700, 0.06, { oreF: 0.5, oreG: 0.5 });
     putInStorage(state, frag);
@@ -608,7 +611,7 @@ describe('consumeStoredOre', () => {
 
 describe('splitStoredFragmentMass', () => {
   it('removes the requested mass from a stored fragment, returning its own mass/volume/oreDensities and leaving the remainder stored', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 1000, 0.4, { oreJ: 0.6 });
     putInStorage(state, frag);
 
@@ -628,7 +631,7 @@ describe('splitStoredFragmentMass', () => {
   });
 
   it('scales the remaining fragment\'s halfExtents down by cbrt(1 - fraction removed)', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // makeStoredFragment fixes halfExtents at {x:0.5, y:0.5, z:0.5}.
     const frag = makeStoredFragment(1, 1000, 0.4, {});
     putInStorage(state, frag);
@@ -643,7 +646,7 @@ describe('splitStoredFragmentMass', () => {
   });
 
   it('returns null when the fragment id does not exist in storage', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 500, 0.2, {});
     putInStorage(state, frag);
 
@@ -654,7 +657,7 @@ describe('splitStoredFragmentMass', () => {
   });
 
   it('returns null when the fragment exists but is not in the stored state (e.g. on_ground)', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 500)]); // on_ground, never picked up
 
     const removed = splitStoredFragmentMass(state, 1, 100);
@@ -664,7 +667,7 @@ describe('splitStoredFragmentMass', () => {
   });
 
   it('returns null when massToRemoveKg equals the fragment\'s full mass (use sellFragment to remove it whole)', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 500, 0.2, {});
     putInStorage(state, frag);
 
@@ -676,7 +679,7 @@ describe('splitStoredFragmentMass', () => {
   });
 
   it('returns null when massToRemoveKg is zero or negative', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const frag = makeStoredFragment(1, 500, 0.2, {});
     putInStorage(state, frag);
 
@@ -694,7 +697,7 @@ describe('splitStoredFragmentMass', () => {
 
 describe('returnFragmentToGround', () => {
   it('flips an in_transit fragment back to on_ground, clearing its vehicle association', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
     pickupFragment(state, 1, 'truck-01');
     const before = state.fragments.find(f => f.fragment.id === 1)!;
@@ -710,7 +713,7 @@ describe('returnFragmentToGround', () => {
   });
 
   it('returns false and mutates nothing when the fragment is already on_ground (no matching in_transit fragment)', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]); // never picked up
 
     const ok = returnFragmentToGround(state, 1);
@@ -722,7 +725,7 @@ describe('returnFragmentToGround', () => {
   });
 
   it('returns false and mutates nothing for a nonexistent fragment id', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
     pickupFragment(state, 1, 'truck-01');
 
@@ -735,7 +738,7 @@ describe('returnFragmentToGround', () => {
   });
 
   it('when a navGrid is provided, re-registers the fragment as a nav-grid occupant at its recorded position', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     const navGrid = makeTestNavGrid(5, 5);
     addBlastFragments(state, [makeFragment(1, 100)], navGrid); // registers occupancy at (0,0)
     expect(navGrid.cellAt(0, 0)!.fragmentOccupancy).toBe(1);
@@ -750,7 +753,7 @@ describe('returnFragmentToGround', () => {
   });
 
   it('succeeds without throwing when navGrid is omitted', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
     pickupFragment(state, 1, 'truck-01');
 
@@ -762,7 +765,7 @@ describe('returnFragmentToGround', () => {
   });
 
   it('when dropPosition is provided, relocates the fragment there instead of leaving it at its stale pre-pickup position (#974)', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     // Fragment's ORIGINAL recorded position (where the blast placed it).
     addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
     pickupFragment(state, 1, 'truck-01');
@@ -779,7 +782,7 @@ describe('returnFragmentToGround', () => {
   });
 
   it('when dropPosition is omitted, the fragment reverts to its own already-recorded position', () => {
-    const state = createLogisticsState();
+    const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
     pickupFragment(state, 1, 'truck-01');
 

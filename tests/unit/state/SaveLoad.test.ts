@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createGame, SAVE_VERSION } from '../../../src/core/state/GameState.js';
-import { createBuildingState, placeBuilding } from '../../../src/core/entities/Building.js';
+import { createBuildingState, placeBuilding, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { enterBuilding } from '../../../src/core/engine/Mount.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
@@ -1932,5 +1932,26 @@ describe('negotiationAttempts persistence (#1366)', () => {
     const first = negotiateContract(restored.contracts, offer.id, 0, new Random(1));
     expect(first && 'refused' in first).toBe(false);
     expect(negotiateContract(restored.contracts, offer.id, 0, new Random(1))).toEqual({ refused: 'already_negotiated' });
+  });
+});
+
+describe('deserialize — storage capacity is re-derived from warehouses (#1369)', () => {
+  it('a stale 5000 kg capacity with no freight warehouse loads as 0', () => {
+    const state = createGame({ seed: 42 });
+    const parsed = JSON.parse(serialize(state)) as Record<string, any>;
+    parsed['logistics'].storageCapacityKg = 5000;
+    const restored = deserialize(JSON.stringify(parsed));
+    expect(restored.logistics.storageCapacityKg).toBe(0);
+  });
+
+  it('a stale 0 capacity with a freight warehouse loads as the warehouse capacity', () => {
+    const state = createGame({ seed: 42 });
+    const placed = placeBuilding(state.buildings, 'freight_warehouse', 20, 20, 64, 64);
+    expect(placed.success).toBe(true);
+    const expected = getStorageCapacity(state.buildings);
+    expect(expected).toBeGreaterThan(0);
+    state.logistics.storageCapacityKg = 0;
+    const restored = deserialize(serialize(state));
+    expect(restored.logistics.storageCapacityKg).toBe(expected);
   });
 });

@@ -400,6 +400,7 @@ describe('findReachableGroundFragment — precondition failures', () => {
 describe('findReachableGroundFragment — selection', () => {
   it('picks the nearest fragment when every candidate is reachable', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -425,6 +426,7 @@ describe('findReachableGroundFragment — selection', () => {
       rows[z]![x] = 'void';
     }
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeNavGridFromTypes(rows);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -437,6 +439,7 @@ describe('findReachableGroundFragment — selection', () => {
 
   it('ignores fragments that are in_transit or stored, considering only on_ground ones', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -508,6 +511,7 @@ describe('requestHaulFragment — oversized fragment rejection (#484)', () => {
 describe('findReachableGroundFragment — oversized exclusion (#484)', () => {
   it('never returns an oversized fragment even when it is nearest and reachable, picking the next reachable non-oversized one instead', () => {
     const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     const oversizedNear = makeFragment(1, 2, 2); // nearest by distance
