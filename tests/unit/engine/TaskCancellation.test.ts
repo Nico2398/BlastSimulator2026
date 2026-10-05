@@ -11,10 +11,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
-import { releaseDeadEmployeeActions, cancelAction, interruptActiveAction } from '../../../src/core/engine/TaskCancellation.js';
+import { releaseDeadEmployeeActions, cancelAction, interruptActiveAction, releaseEmployeeFromWorld, fireEmployeeFromWorld } from '../../../src/core/engine/TaskCancellation.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { purchaseVehicle, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
-import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
+import { createEmployeeState, hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
+import { board } from '../../../src/core/engine/Mount.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import * as PlanItineraryModule from '../../../src/core/engine/PlanItinerary.js';
@@ -521,5 +525,272 @@ describe('interruptActiveAction — stuck-abandon backoff stamp (#1130)', () => 
     interruptActiveAction(state, emp, action.id, { forceOpenPool: true });
 
     expect(state.pendingActions.find(a => a.id === action.id)!.stuckBackoffUntilTick).toBe(2000 + ACTION_STUCK_BACKOFF_TICKS);
+  });
+});
+
+// ── releaseEmployeeFromWorld / fireEmployeeFromWorld (#1378) ────────────────
+
+function makeCargoFragment(id: number, mass = 850): FragmentData {
+  return {
+    id,
+    position: { x: 0, y: 0, z: 0 },
+    volume: 0.3,
+    mass,
+    rockId: 'cruite',
+    oreDensities: { dirtite: 0.3 },
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
+    origin: { x: 0, y: 0, z: 0 },
+  };
+}
+
+describe('releaseEmployeeFromWorld (#1378)', () => {
+  function setup() {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    state.navGrid = makeFlatGrid(20, 20);
+    return state;
+  }
+  function hire(state: ReturnType<typeof createGame>, role: 'driver' | 'driller' = 'driller', x = 5, z = 5) {
+    return hireEmployee(state.employees, role, new Random(SEED), x, z).employee;
+  }
+
+  it('alights a driver from the vehicle: occupantIds empty, locomotion on_foot', () => {
+    const state = setup();
+    const driver = hire(state, 'driver');
+    assignSkill(state.employees, driver.id, 'driving.truck', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    expect(board(state, vehicle.id, driver.id).success).toBe(true);
+
+    releaseEmployeeFromWorld(state, driver.id);
+
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(driver.locomotion).toEqual({ kind: 'on_foot' });
+  });
+
+  it('returns the payload a driven hauler carries to the ground', () => {
+    const state = setup();
+    state.logistics.storageCapacityKg = 5000;
+    addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
+    const driver = hire(state, 'driver');
+    assignSkill(state.employees, driver.id, 'driving.truck', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    expect(board(state, vehicle.id, driver.id).success).toBe(true);
+    pickupFragment(state.logistics, 1, String(vehicle.id));
+    vehicle.payload = { fragmentId: 1, massKg: 850 };
+
+    releaseEmployeeFromWorld(state, driver.id);
+
+    expect(vehicle.payload).toBeNull();
+    expect(vehicle.occupantIds).toEqual([]);
+    const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
+    expect(cargo.state).toBe('on_ground');
+    expect(cargo.vehicleId).toBeNull();
+  });
+
+  it('removes a passenger from occupantIds and leaves the driver aboard', () => {
+    const state = setup();
+    const driver = hire(state, 'driver');
+    const passenger = hire(state, 'driller');
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.occupantIds = [driver.id, passenger.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    passenger.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+
+    releaseEmployeeFromWorld(state, passenger.id);
+
+    expect(vehicle.occupantIds).toEqual([driver.id]);
+    expect(passenger.locomotion).toEqual({ kind: 'on_foot' });
+    expect(driver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+  });
+
+  it('removes a building occupant from the building and puts them on foot', () => {
+    const state = setup();
+    const building = placeBuilding(state.buildings, 'driving_center', 8, 8, 20, 20).building!;
+    const emp = hire(state, 'driller', 7, 7);
+    building.occupantIds = [emp.id];
+    emp.locomotion = { kind: 'inside', buildingId: building.id };
+
+    releaseEmployeeFromWorld(state, emp.id);
+
+    expect(building.occupantIds).toEqual([]);
+    expect(emp.locomotion).toEqual({ kind: 'on_foot' });
+  });
+
+  it('returns a held action to the pool: queued, holder cleared, ghost unclaimed', () => {
+    const state = setup();
+    const emp = hire(state);
+    const action = makeAction({ id: 10, status: 'in_progress', holderId: emp.id });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 10, type: 'general_work', targetX: 0, targetZ: 0, targetY: 0, claimed: true });
+    emp.activeActionId = action.id;
+    emp.taskTicksRemaining = 5;
+
+    releaseEmployeeFromWorld(state, emp.id);
+
+    const stored = state.pendingActions.find(a => a.id === 10)!;
+    expect(stored.status).toBe('queued');
+    expect(stored.holderId).toBeNull();
+    expect(state.ghostPreviews.find(g => g.id === 10)!.claimed).toBe(false);
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.taskTicksRemaining).toBeNull();
+  });
+
+  it('clears targetEmployeeId on a queued action targeting the employee, leaving it queued', () => {
+    const state = setup();
+    const emp = hire(state);
+    state.pendingActions.push(makeAction({ id: 11, targetEmployeeId: emp.id }));
+
+    releaseEmployeeFromWorld(state, emp.id);
+
+    const stored = state.pendingActions.find(a => a.id === 11)!;
+    expect(stored.status).toBe('queued');
+    expect(stored.targetEmployeeId).toBeNull();
+  });
+
+  it('releases the vehicle reservation of a held vehicle-gated action', () => {
+    const state = setup();
+    const emp = hire(state);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    state.pendingActions.push(makeAction({ id: 12, status: 'assigned', holderId: emp.id, requiredVehicleRole: 'drill_rig' }));
+    emp.activeActionId = 12;
+    reserveVehicle(state.vehicles, vehicle.id, 12);
+
+    releaseEmployeeFromWorld(state, emp.id);
+
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
+  });
+
+  it('drops the task queue and itinerary', () => {
+    const state = setup();
+    const emp = hire(state);
+    emp.taskQueue = [21, 22];
+    emp.pendingTaskDuration = 4;
+
+    releaseEmployeeFromWorld(state, emp.id);
+
+    expect(emp.taskQueue).toEqual([]);
+    expect(emp.itinerary).toBeNull();
+    expect(emp.pendingTaskDuration).toBeNull();
+  });
+
+  it('works for a dead employee (alive false) and for one no longer in the roster', () => {
+    const state = setup();
+    const driver = hire(state, 'driver');
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    driver.alive = false;
+    state.pendingActions.push(makeAction({ id: 30, status: 'assigned', holderId: driver.id }));
+
+    releaseEmployeeFromWorld(state, driver.id);
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(state.pendingActions.find(a => a.id === 30)!.status).toBe('queued');
+
+    // Gone from the roster: held action and targeted action still released.
+    state.pendingActions.push(makeAction({ id: 31, status: 'assigned', holderId: 777, targetEmployeeId: 777 }));
+    releaseEmployeeFromWorld(state, 777);
+    const stored = state.pendingActions.find(a => a.id === 31)!;
+    expect(stored.status).toBe('queued');
+    expect(stored.holderId).toBeNull();
+    expect(stored.targetEmployeeId).toBeNull();
+  });
+
+  it('is idempotent: a second call changes nothing and does not throw', () => {
+    const state = setup();
+    const driver = hire(state, 'driver');
+    assignSkill(state.employees, driver.id, 'driving.truck', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    board(state, vehicle.id, driver.id);
+    state.pendingActions.push(makeAction({ id: 40, status: 'assigned', holderId: driver.id }));
+    driver.taskQueue = [41];
+
+    releaseEmployeeFromWorld(state, driver.id);
+    const snapshot = JSON.stringify([state.pendingActions, state.vehicles, state.employees]);
+    expect(() => releaseEmployeeFromWorld(state, driver.id)).not.toThrow();
+
+    expect(JSON.stringify([state.pendingActions, state.vehicles, state.employees])).toBe(snapshot);
+  });
+
+  it('does nothing to the world when the employee holds, rides and targets nothing', () => {
+    const state = setup();
+    const emp = hire(state);
+    const other = hire(state, 'driller', 9, 9);
+    const untouched = makeAction({ id: 50, status: 'assigned', holderId: other.id, targetEmployeeId: other.id });
+    state.pendingActions.push(untouched);
+    const before = JSON.stringify([state.pendingActions, state.vehicles, state.buildings, other]);
+
+    releaseEmployeeFromWorld(state, emp.id);
+
+    expect(JSON.stringify([state.pendingActions, state.vehicles, state.buildings, other])).toBe(before);
+    expect(emp.locomotion).toEqual({ kind: 'on_foot' });
+  });
+});
+
+describe('fireEmployeeFromWorld (#1378)', () => {
+  function setup() {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    state.navGrid = makeFlatGrid(20, 20);
+    return state;
+  }
+
+  it('removes the employee from the roster and releases them from the world', () => {
+    const state = setup();
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 5, 5);
+    assignSkill(state.employees, employee.id, 'driving.truck', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    board(state, vehicle.id, employee.id);
+    state.pendingActions.push(makeAction({ id: 60, status: 'assigned', holderId: employee.id }));
+    employee.activeActionId = 60;
+
+    const result = fireEmployeeFromWorld(state, employee.id);
+
+    expect(result.success).toBe(true);
+    expect(state.employees.employees.find(e => e.id === employee.id)).toBeUndefined();
+    expect(vehicle.occupantIds).toEqual([]);
+    expect(state.pendingActions.find(a => a.id === 60)!.status).toBe('queued');
+  });
+
+  it('fails for an unknown employee with the existing error and changes nothing', () => {
+    const state = setup();
+    state.pendingActions.push(makeAction({ id: 61, status: 'assigned', holderId: 999 }));
+
+    const result = fireEmployeeFromWorld(state, 999);
+
+    expect(result).toEqual({ success: false, error: 'Employee not found' });
+    expect(state.pendingActions.find(a => a.id === 61)!.status).toBe('assigned');
+  });
+
+  it('refuses a unionized employee: error unchanged, roster and held action untouched', () => {
+    const state = setup();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 5, 5);
+    employee.unionized = true;
+    state.pendingActions.push(makeAction({ id: 62, status: 'assigned', holderId: employee.id }));
+    employee.activeActionId = 62;
+    employee.taskQueue = [63];
+
+    const result = fireEmployeeFromWorld(state, employee.id);
+
+    expect(result).toEqual({ success: false, error: 'Cannot fire unionized employee' });
+    expect(state.employees.employees).toContain(employee);
+    expect(state.pendingActions.find(a => a.id === 62)!.holderId).toBe(employee.id);
+    expect(employee.activeActionId).toBe(62);
+    expect(employee.taskQueue).toEqual([63]);
+  });
+
+  it('force: true fires a unionized employee and releases them', () => {
+    const state = setup();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 5, 5);
+    employee.unionized = true;
+    state.pendingActions.push(makeAction({ id: 64, status: 'assigned', holderId: employee.id }));
+
+    const result = fireEmployeeFromWorld(state, employee.id, { force: true });
+
+    expect(result.success).toBe(true);
+    expect(state.employees.employees.find(e => e.id === employee.id)).toBeUndefined();
+    expect(state.pendingActions.find(a => a.id === 64)!.holderId).toBeNull();
   });
 });
