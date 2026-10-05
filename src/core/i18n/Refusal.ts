@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Locale-free refusal description carried by core results
 
 /** Interpolation values for a translation key. */
-export type RefusalParams = Record<string, string | number>;
+type RefusalParams = Record<string, string | number>;
 
 /**
  * Optional translation hint a core refusal carries beside its English `error`.
