@@ -511,6 +511,11 @@ export class UIManager {
     this.crewPanel.expandEmployee(id);
   }
 
+  /** Wire the scene-selection callback used by the Crew panel's Locate button. */
+  setSelectEmployeeHandler(cb: (employeeId: number) => void): void {
+    this.crewPanel.setSelectEmployeeHandler(cb);
+  }
+
   /** Close whichever panel is open (no-op when none). */
   closeActivePanel(): void { this.hideAllPanels(); }
 

@@ -104,7 +104,7 @@ describe('CrewPanel', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeEmployee({ id: 1, unionized: true, injured: true })]));
     const row = panel.root.querySelector('[data-employee-id="1"]')!;
-    expect(row.querySelectorAll('[title]').length).toBe(2);
+    expect(row.querySelectorAll('[title]:not([data-action="locate"])').length).toBe(2);
   });
 
   it('shows a driving tag when a vehicle lists the employee as its driver', () => {

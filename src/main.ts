@@ -1026,6 +1026,10 @@ uiManager.setSelectVehicleHandler((vehicleId) => {
   scenePicking.select({ kind: 'vehicle', id: vehicleId, point: new THREE.Vector3(), distance: 0 });
 });
 
+uiManager.setSelectEmployeeHandler((employeeId) => {
+  scenePicking.select({ kind: 'employee', id: employeeId, point: new THREE.Vector3(), distance: 0 });
+});
+
 // --- Scene picking wiring (redesign P2) ---
 scenePicking.setHoverChangeHandler((hover) => {
   if (ctx.state) hoverTag.update(hover, ctx.state);

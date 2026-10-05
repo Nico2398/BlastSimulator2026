@@ -329,6 +329,47 @@ describe('UIManager — showEmployeeDetail (scene selection DETAIL/TRAIN, P2)', 
   });
 });
 
+describe('UIManager — Crew panel Locate forwarding (#1422)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('setSelectEmployeeHandler(cb) forwards to the Crew panel so a Locate click invokes cb with the employee id', () => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+    const cb = vi.fn();
+    uiManager.setSelectEmployeeHandler(cb);
+    uiManager.showPanel('employees');
+
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.employees.employees = [{
+      id: 2, name: 'Walt', role: 'driller', salary: 1000, morale: 60, unionized: false, injured: false,
+      alive: true, x: 3, z: 3, qualifications: [], trainingState: null, activeActionId: null, fatigue: 100,
+      collapsing: false, interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
+      restNeedKey: null, taskTicksRemaining: null, activeTaskSkill: null, destinationX: null,
+      destinationZ: null, moveConsecutiveFailures: 0, isMoveStuck: false, pendingRestDuration: null,
+      pendingRestNeedKey: null, pendingTaskDuration: null, pendingActionType: null,
+      pendingActionPayload: null, pendingDriverVehicleId: null, taskQueue: [],
+      locomotion: { kind: 'on_foot' }, itinerary: null, vehicleWaitingTicks: 0,
+    }];
+    state.employees.nextId = 3;
+    uiManager.update(state);
+
+    (container.querySelector('#bs-employee-panel [data-employee-id="2"] [data-action="locate"]') as HTMLElement).click();
+    expect(cb).toHaveBeenCalledWith(2);
+  });
+});
+
 // ── Survey confidence overlay toggle wiring (#496) ──────────────────────────
 describe('UIManager — survey overlay toggle wiring (#496)', () => {
   let container: HTMLDivElement;
