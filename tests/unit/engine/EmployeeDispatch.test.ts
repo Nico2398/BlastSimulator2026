@@ -1137,8 +1137,44 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
 
     tickEmployees(state);
 
-    const reasons: unknown[] = ['no_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver'];
+    const reasons: unknown[] = ['no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver'];
     expect(reasons).not.toContain(state.pendingActions.find(a => a.id === 1)!.blockedReason);
+  });
+
+  it('flags no_dual_qualified_employee (no modal) when the skill and the licence sit on different employees, then clears once one employee holds both (#1386)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    // driller starts with 'blasting' (ROLE_STARTING_QUALIFICATION), no drill_rig licence.
+    const { employee: driller } = hireEmployee(state.employees, 'driller', rng);
+    const { employee: driver } = hireEmployee(state.employees, 'driver', rng);
+    assignSkill(state.employees, driver.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    for (const id of [1, 2]) {
+      state.pendingActions.push({
+        id, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+        targetX: id, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+        status: 'queued', holderId: null, queuedAtTick: 0,
+      });
+    }
+
+    const result = tickEmployees(state);
+
+    for (const id of [1, 2]) {
+      const stored = state.pendingActions.find(a => a.id === id)!;
+      expect(stored.blockedReason).toBe('no_dual_qualified_employee');
+      expect(stored.status).toBe('queued');
+      expect(result.unqualified).not.toContain(id);
+    }
+
+    // The driller now also holds the licence.
+    assignSkill(state.employees, driller.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    tickEmployees(state);
+
+    const reasons: unknown[] = ['no_qualified_employee', 'no_dual_qualified_employee', 'no_vehicle_in_fleet', 'no_licensed_driver'];
+    for (const id of [1, 2]) {
+      expect(reasons).not.toContain(state.pendingActions.find(a => a.id === id)?.blockedReason);
+    }
   });
 
   it('regression: result.unqualified still reports an action nobody on the roster is qualified for, unchanged by the new blocked channel (mirrors pre-#1061 coverage)', () => {
