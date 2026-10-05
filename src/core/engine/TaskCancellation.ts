@@ -579,6 +579,11 @@ export function fireEmployeeFromWorld(
   return { success: true };
 }
 
+/** A queued (unstarted), non-rest action aimed at the given employee (#1381). */
+function isQueuedNonRestTargetedAt(action: PendingAction, employeeId: number): boolean {
+  return action.status === 'queued' && action.type !== 'rest' && action.targetEmployeeId === employeeId;
+}
+
 /**
  * Return one injured, alive employee's queued (not yet started) non-rest actions
  * to the open pool and drop them from the employee's taskQueue. The active /
@@ -603,31 +608,33 @@ export function releaseInjuredEmployeeQueue(state: GameState, employeeId: number
   emp.taskQueue = kept;
 
   for (const action of state.pendingActions) {
-    if (action.status === 'queued' && action.type !== 'rest' && action.targetEmployeeId === employeeId) {
-      action.targetEmployeeId = null;
-    }
+    if (isQueuedNonRestTargetedAt(action, employeeId)) action.targetEmployeeId = null;
   }
 }
 
 /**
  * Apply releaseInjuredEmployeeQueue to every alive, injured employee that still
- * holds queued work. Idempotent (#1381).
+ * has something to release: a queue entry that is stale or non-rest, or a queued
+ * non-rest action targeted at them. A rest-only queue is skipped, so it costs
+ * nothing per tick. Idempotent (#1381).
  */
 export function releaseInjuredEmployeesQueues(state: GameState): void {
-  let targetedScanned = false;
+  // Built lazily, one pass over the pool, only once an injured employee exists.
+  let actionsById: Map<number, PendingAction> | null = null;
   let targetedIds: Set<number> | null = null;
   for (const emp of state.employees.employees) {
     if (!emp.alive || !emp.injured) continue;
-    if (!targetedScanned) {
-      // One pass over the pool, only once an injured employee exists.
-      targetedScanned = true;
+    if (!actionsById || !targetedIds) {
+      actionsById = new Map();
       targetedIds = new Set();
       for (const a of state.pendingActions) {
-        if (a.status === 'queued' && a.type !== 'rest' && a.targetEmployeeId !== null) targetedIds.add(a.targetEmployeeId);
+        actionsById.set(a.id, a);
+        const target = a.targetEmployeeId;
+        if (target !== null && isQueuedNonRestTargetedAt(a, target)) targetedIds.add(target);
       }
     }
-    if (emp.taskQueue.length > 0 || targetedIds!.has(emp.id)) {
-      releaseInjuredEmployeeQueue(state, emp.id);
-    }
+    const pool = actionsById;
+    const hasReleasable = emp.taskQueue.some(id => pool.get(id)?.type !== 'rest');
+    if (hasReleasable || targetedIds.has(emp.id)) releaseInjuredEmployeeQueue(state, emp.id);
   }
 }

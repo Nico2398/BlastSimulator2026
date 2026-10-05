@@ -903,6 +903,17 @@ describe('releaseInjuredEmployeeQueue (#1381)', () => {
     expect(state.pendingActions.find(x => x.id === 6)!.targetEmployeeId).toBeNull();
   });
 
+  it('clears targetEmployeeId on a queued, unheld non-rest action targeted at the injured employee', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 9, status: 'queued', holderId: null, targetEmployeeId: emp.id }));
+    emp.injured = true;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    expect(state.pendingActions.find(x => x.id === 9)!.targetEmployeeId).toBeNull();
+  });
+
   it('leaves a rest queue entry alone', () => {
     const { state, hire } = setup();
     const emp = hire();
@@ -997,6 +1008,32 @@ describe('releaseInjuredEmployeesQueues sweep (#1381)', () => {
     releaseInjuredEmployeesQueues(state);
 
     expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(a.taskQueue).toEqual([1]);
+  });
+
+  it('releases a targeted queued action for an injured employee with an empty taskQueue', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    state.pendingActions.push(makeAction({ id: 1, status: 'queued', holderId: null, targetEmployeeId: a.id }));
+    a.taskQueue = [];
+    a.injured = true;
+
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions[0]!.targetEmployeeId).toBeNull();
+  });
+
+  it('leaves a rest-only queue untouched', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    state.pendingActions.push(makeAction({ id: 1, type: 'rest', status: 'assigned', holderId: a.id, targetEmployeeId: a.id }));
+    a.taskQueue = [1];
+    a.injured = true;
+
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(state.pendingActions[0]!.holderId).toBe(a.id);
     expect(a.taskQueue).toEqual([1]);
   });
 
