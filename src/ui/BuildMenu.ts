@@ -34,6 +34,7 @@ import { LocaleTextRegistry } from './localeText.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Rect } from '../core/world/WorldGen.js';
+import { RESERVATION_ERROR_KEY, reservationBlocking, terrainReservations } from '../core/entities/PlacementReservations.js';
 import { buildingFootprintOccupants } from '../core/nav/NavGridSync.js';
 import {
   getAllBuildingTypes,
@@ -287,6 +288,13 @@ export class BuildMenu extends PanelBase {
     return rectOverlapsOccupants(occupants, rect) ? t('shell.placement.refused_occupied') : null;
   }
 
+  /** Why `rect` (min inclusive, max exclusive) covers a ramp corridor or a drill hole (#1390); null when clear. */
+  private reservationRefusal(rect: Rect): string | null {
+    if (!this.lastState) return null;
+    const kind = reservationBlocking(terrainReservations(this.lastState), rect);
+    return kind === null ? null : t(RESERVATION_ERROR_KEY[kind]);
+  }
+
   /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
   private armLevelGroundTool(): void {
     const kit = this.placementKit;
@@ -425,7 +433,8 @@ export class BuildMenu extends PanelBase {
       let rectReason: string | null = null;
       if (at) {
         const { sizeX, sizeZ } = getDefSize(def);
-        rectReason = this.rectRefusal({ minX: at.x, minZ: at.z, maxX: at.x + sizeX, maxZ: at.z + sizeZ }, movingId);
+        const rect = { minX: at.x, minZ: at.z, maxX: at.x + sizeX, maxZ: at.z + sizeZ };
+        rectReason = this.rectRefusal(rect, movingId) ?? this.reservationRefusal(rect);
       }
       const hover = hoverRefusal(controller, rectReason);
       overlay.update(at ? { shape: 'point', x: at.x, z: at.z, footprintCells: def.footprint, refused: hover.refused } : null);
@@ -553,6 +562,12 @@ export class BuildMenu extends PanelBase {
    * rows per affordability, mirroring `refreshCatalogButtons`. Does not
    * rebuild the list — only toggles `disabled` on existing DOM buttons.
    */
+  /** Reservation refusal for `b`'s next-tier footprint (#1390), or null. */
+  private upgradeRefusal(b: Building, nextTier: BuildingTier): string | null {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, nextTier));
+    return this.reservationRefusal({ minX: b.x, minZ: b.z, maxX: b.x + sizeX, maxZ: b.z + sizeZ });
+  }
+
   private refreshPlacedButtons(cash: number): void {
     const buildings = this.lastState?.buildings.buildings ?? [];
     for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
@@ -570,7 +585,9 @@ export class BuildMenu extends PanelBase {
       const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
       if (upgradeBtn) {
         const nextTier = b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
-        upgradeBtn.disabled = nextTier === null || cash < getUpgradeCost(b, nextTier);
+        const blocked = nextTier === null ? null : this.upgradeRefusal(b, nextTier);
+        upgradeBtn.disabled = nextTier === null || cash < getUpgradeCost(b, nextTier) || blocked !== null;
+        if (nextTier !== null) upgradeBtn.title = blocked ?? `$${getUpgradeCost(b, nextTier)}`;
       }
     }
   }
@@ -639,8 +656,9 @@ export class BuildMenu extends PanelBase {
     upgradeBtn.disabled = nextTier === null;
     if (nextTier !== null) {
       const upgradeCost = getUpgradeCost(b, nextTier);
-      upgradeBtn.title = `$${upgradeCost}`;
-      upgradeBtn.disabled = this.lastCash < upgradeCost;
+      const blocked = this.upgradeRefusal(b, nextTier);
+      upgradeBtn.title = blocked ?? `$${upgradeCost}`;
+      upgradeBtn.disabled = this.lastCash < upgradeCost || blocked !== null;
     }
     upgradeBtn.addEventListener('click', () => {
       if (nextTier !== null && nextLocked) {

@@ -6,7 +6,7 @@
 
 import type { Rect } from '../world/WorldGen.js';
 import { BUILDING_DEFS } from './BuildingDefs.js';
-import type { TerrainReservation } from './PlacementReservations.js';
+import { RESERVATION_ERROR_KEY, reservationBlocking, type TerrainReservation } from './PlacementReservations.js';
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
@@ -391,7 +391,7 @@ export function moveBuilding(
   originZ: number = 0,
   plannedOccupants: ReadonlyArray<FootprintOccupant> = [],
   voxelGrid?: VoxelGrid,
-  _reservations?: ReadonlyArray<TerrainReservation>,
+  reservations?: ReadonlyArray<TerrainReservation>,
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
@@ -402,10 +402,10 @@ export function moveBuilding(
   ];
   const check = checkFootprintPlacement(
     occupants,
-    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
+    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid, reservations,
   );
   if (!check.valid) {
-    return { success: false, error: check.error! };
+    return { success: false, error: check.error!, ...(check.errorKey !== undefined && { errorKey: check.errorKey }) };
   }
 
   building.x = newX;
@@ -524,7 +524,7 @@ export function checkFootprintPlacement(
   originX: number,
   originZ: number,
   voxelGrid?: VoxelGrid,
-  _reservations?: ReadonlyArray<TerrainReservation>,
+  reservations?: ReadonlyArray<TerrainReservation>,
 ): { valid: boolean; error?: string; errorKey?: string } {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
@@ -535,6 +535,17 @@ export function checkFootprintPlacement(
 
   if (rectOverlapsOccupants(occupants, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ })) {
     return { valid: false, error: 'Space is occupied' };
+  }
+
+  if (reservations !== undefined) {
+    const kind = reservationBlocking(reservations, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ });
+    if (kind !== null) {
+      return {
+        valid: false,
+        error: kind === 'ramp' ? 'Blocks a ramp' : 'Blocks a drill hole',
+        errorKey: RESERVATION_ERROR_KEY[kind],
+      };
+    }
   }
 
   if (voxelGrid !== undefined) {
