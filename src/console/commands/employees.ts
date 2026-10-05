@@ -1,12 +1,12 @@
 // BlastSimulator2026 — Console commands for employees
 // Roster, hiring, pay, skills, and training.
 
+import { fireEmployeeFromWorld } from '../../core/engine/TaskCancellation.js';
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   hireEmployee,
   giveRaise,
-  fireEmployee,
   assignSkill,
   HIRING_COSTS,
   type EmployeeRole,
@@ -127,7 +127,7 @@ export function employeeCommand(
     case 'fire': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       if (isNaN(id)) return { success: false, output: t('employees.fire_usage') };
-      const result = fireEmployee(state.employees, id);
+      const result = fireEmployeeFromWorld(state, id);
       if (!result.success) return { success: false, output: result.error! };
       return { success: true, output: t('employees.fire_success', { id }) };
     }

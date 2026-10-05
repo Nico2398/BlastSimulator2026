@@ -15,6 +15,7 @@ import { syncItineraryMirrors } from './MoveTo.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { releaseEmployeeFromHosts } from './Mount.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 
 export interface CancelActionResult {
@@ -532,13 +533,26 @@ export function releaseDeadEmployeeActions(state: GameState, employeeId: number)
 
 /**
  * Single removal routine for an employee leaving the world (fired, framed,
- * killed in an accident): alights from any vehicle/building, releases held
- * and targeted actions to the pool, clears task/itinerary state and
+ * killed in an accident): alights from any vehicle/building (returning a
+ * carried payload to the ground, never refused mid-haul), releases held and
+ * targeted actions to the pool, clears task/itinerary state and
  * agentOccupancy. Idempotent; works when alive is false or the employee is
  * no longer in the roster. (#1378)
  */
-export function releaseEmployeeFromWorld(_state: GameState, _employeeId: number, _emitter?: EventEmitter): void {
-  // TODO: implement
+export function releaseEmployeeFromWorld(state: GameState, employeeId: number, emitter?: EventEmitter): void {
+  const drivenVehicle = state.vehicles.vehicles.find(v => vehicleDriverId(v) === employeeId);
+  if (drivenVehicle) dismountVehicleDriver(state, drivenVehicle, emitter);
+  releaseEmployeeFromHosts(state, employeeId, emitter);
+
+  releaseDeadEmployeeActions(state, employeeId);
+
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (employee) {
+    clearHolderWalkFields(employee);
+    employee.taskQueue = [];
+    employee.pendingDriverVehicleId = null;
+  }
+  state.agentOccupancy?.release({ kind: 'employee', id: employeeId });
 }
 
 /**
@@ -546,10 +560,16 @@ export function releaseEmployeeFromWorld(_state: GameState, _employeeId: number,
  * opts.force), releases them from the world, then splices the roster. (#1378)
  */
 export function fireEmployeeFromWorld(
-  _state: GameState,
-  _employeeId: number,
-  _opts?: { force?: boolean },
+  state: GameState,
+  employeeId: number,
+  opts?: { force?: boolean },
 ): { success: boolean; error?: string } {
-  // TODO: implement
-  return undefined as unknown as { success: boolean; error?: string };
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  if (!employee) return { success: false, error: 'Employee not found' };
+  if (!opts?.force && employee.unionized) return { success: false, error: 'Cannot fire unionized employee' };
+
+  releaseEmployeeFromWorld(state, employeeId);
+  const idx = state.employees.employees.findIndex(e => e.id === employeeId);
+  if (idx >= 0) state.employees.employees.splice(idx, 1);
+  return { success: true };
 }

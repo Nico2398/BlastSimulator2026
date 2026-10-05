@@ -373,7 +373,7 @@ export function giveRaise(
   return true;
 }
 
-/** Fire an employee. Returns error if unionized. */
+/** Roster-only fire: splices the employee out and nothing else. Gameplay callers use fireEmployeeFromWorld (TaskCancellation.ts), which also releases them from vehicles, buildings and actions (#1378). */
 export function fireEmployee(
   state: EmployeeState,
   employeeId: number,

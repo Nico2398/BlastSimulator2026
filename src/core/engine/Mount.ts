@@ -219,6 +219,34 @@ export function alightIfMounted(state: GameState, emp: Employee, emitter?: Event
   }
 }
 
+/**
+ * Take `employeeId` out of whatever vehicle or building lists them as an
+ * occupant, working from the hosts' side so it also covers an employee who is
+ * dead or no longer in the roster (#1378). A driver is released like `alight`
+ * does, but without its mid-haul refusal: the caller returns any carried
+ * payload to the ground first. Idempotent; a no-op when nothing hosts them.
+ */
+export function releaseEmployeeFromHosts(state: GameState, employeeId: number, emitter?: EventEmitter): void {
+  const employee = state.employees.employees.find(e => e.id === employeeId);
+  for (const vehicle of state.vehicles.vehicles) {
+    if (!vehicle.occupantIds.includes(employeeId)) continue;
+    const cell = findAlightCell(state, vehicle);
+    releaseOccupant(vehicle, employeeId, employee, cell.x, cell.z);
+    emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
+  }
+  for (const building of state.buildings.buildings) {
+    if (!building.occupantIds.includes(employeeId)) continue;
+    if (employee && isInsideBuilding(employee.locomotion)) {
+      leaveBuilding(state, employeeId, emitter);
+    } else {
+      building.occupantIds = building.occupantIds.filter(id => id !== employeeId);
+    }
+  }
+  if (employee && (isMounted(employee.locomotion) || isInsideBuilding(employee.locomotion))) {
+    employee.locomotion = { kind: 'on_foot' };
+  }
+}
+
 // ── Building case (#1202) ──
 
 /**
