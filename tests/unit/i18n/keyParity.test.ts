@@ -432,8 +432,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1422: +3 keys (ui.crew.locate, ui.fleet.locate, ui.survey.locate), both locales: 3611 (merged with #1380).
     // #1416: +4 keys (score pill tooltips), both locales: 3615
     // #1383: +1 key (ui.crew.pay_raises), both locales: 3616
-    // #1390: +2 keys (shell.placement.refused_ramp, shell.placement.refused_hole), both locales: 3618
-    expect(Object.keys(en).length).toBe(3618);
+    // #1415: +7 keys (arrest warning, wellbeing/exposure pips): 3623
+    // #1390: +2 keys (shell.placement.refused_ramp, shell.placement.refused_hole), both locales: 3625
+    expect(Object.keys(en).length).toBe(3625);
   });
 });
 

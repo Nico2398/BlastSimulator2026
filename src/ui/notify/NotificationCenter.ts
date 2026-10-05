@@ -12,6 +12,9 @@
 import type { IconName } from '../icons.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
+import { ARREST_EXPOSURE_THRESHOLD, ARREST_WARNING_EXPOSURE } from '../../core/campaign/CriminalArrest.js';
+import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
+import { WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
@@ -67,7 +70,7 @@ const MAX_LOG = 100;
 /** Auto-dismiss delay, matching the design's toast motion spec. */
 const TOAST_LIFETIME_MS = 6500;
 
-export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders' | 'traffic' | 'debris';
+export type AlertKind = 'event' | 'ecology' | 'bankruptcy' | 'contract' | 'crew' | 'fleet' | 'orders' | 'traffic' | 'debris' | 'wellbeing' | 'exposure';
 
 export interface AlertPip {
   readonly kind: AlertKind;
@@ -136,6 +139,20 @@ export class NotificationCenter {
     }
     if (state.scores.ecology < 20) {
       pips.push({ kind: 'ecology', icon: 'crit', label: `ECO ${Math.round(state.scores.ecology)}`, tone: 'critical', tip: `Ecology critical (${Math.round(state.scores.ecology)}) — shutdown proceedings begin once it hits zero` });
+    }
+    const wellBeing = state.scores.wellBeing;
+    if (wellBeing < WELL_BEING_ALERT_THRESHOLD) {
+      if (wellBeing > 0) {
+        pips.push({ kind: 'wellbeing', icon: 'warn', label: t('notification.pip.wellbeing_label', { value: Math.round(wellBeing) }), tone: 'warn', tip: t('notification.pip.wellbeing_tip') });
+      } else if (!state.revolt.revolted) {
+        const ticks = revoltTicksRemaining(state.revolt);
+        pips.push({ kind: 'wellbeing', icon: 'crit', label: t('notification.pip.revolt_label', { ticks }), tone: 'critical', tip: t('notification.pip.revolt_tip', { ticks }) });
+      }
+    }
+    const exposure = state.mafia.exposureRisk;
+    if (exposure >= ARREST_WARNING_EXPOSURE) {
+      const percent = Math.round(exposure * 100);
+      pips.push({ kind: 'exposure', icon: 'gavel', label: t('notification.pip.exposure_label', { percent }), tone: exposure >= ARREST_EXPOSURE_THRESHOLD ? 'critical' : 'warn', tip: t('notification.pip.exposure_tip', { percent }) });
     }
     // Real bankruptcy grace-tick countdown (Bankruptcy.ts) starts the moment cash drops
     // below BANKRUPTCY_THRESHOLD, not merely once it goes negative — firing this pip only

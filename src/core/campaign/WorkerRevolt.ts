@@ -28,6 +28,11 @@ export function createRevoltState(): RevoltState {
   return { ticksAtZero: 0, warningFired: false, revolted: false };
 }
 
+/** Ticks left before the revolt triggers. */
+export function revoltTicksRemaining(revolt: RevoltState): number {
+  return Math.max(0, REVOLT_TICKS - revolt.ticksAtZero);
+}
+
 // ── Tick update ──
 
 /**
@@ -47,7 +52,7 @@ export function updateRevolt(
     if (!revolt.warningFired && revolt.ticksAtZero >= REVOLT_WARNING_TICKS) {
       revolt.warningFired = true;
       emitter.emit('revolt:warning', {
-        ticksRemaining: REVOLT_TICKS - revolt.ticksAtZero,
+        ticksRemaining: revoltTicksRemaining(revolt),
       });
     }
 

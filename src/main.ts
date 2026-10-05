@@ -446,6 +446,9 @@ emitter.on('ecology:warning', ({ ticksRemaining }) => {
 emitter.on('arrest:triggered', () => {
   uiManager.notify({ severity: 'critical', icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_triggered') });
 });
+emitter.on('arrest:warning', ({ exposure }) => {
+  uiManager.notify({ severity: 'warn', icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_warning', { percent: Math.round(exposure * 100) }) });
+});
 emitter.on('revolt:triggered', () => {
   uiManager.notify({ severity: 'critical', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_triggered') });
 });
