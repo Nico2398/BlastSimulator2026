@@ -585,7 +585,7 @@
   "event.mafia_family_reunion.opt1": "Refuser la Réunion",
   "event.mafia_family_reunion.opt2": "Se Limiter à un Buffet",
   "event.mafia_family_reunion.res0": "La réunion de famille du crime organisé envahit la cantine tout un week-end. Bruyant, perturbant, et non négociable.",
-  "event.mafia_family_reunion.res1": "La réunion est déclinée. La cantine reste disponible et la sécurité reste intacte.",
+  "event.mafia_family_reunion.res1": "La réunion est déclinée. La cantine reste disponible, mais la famille prend ombrage de l'affront et la sécurité en pâtit.",
   "event.mafia_family_reunion.res2": "Un rassemblement plus modeste, autour d'un simple buffet, satisfait la demande sans la réunion complète.",
   "event.mafia_family_reunion.title": "Réunion de Famille",
   "event.mafia_fbi_mole.desc": "Un agent infiltré du FBI est soupçonné. La famille a une nouvelle 'opportunité'.",
