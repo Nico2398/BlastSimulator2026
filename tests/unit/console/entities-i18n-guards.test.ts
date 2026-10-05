@@ -23,10 +23,25 @@ import { setLocale } from '../../../src/core/i18n/I18n.js';
 import {
   placeBuilding,
   getBuildingDef,
+  checkFootprintPlacement,
   type BuildingType,
   type BuildingTier,
 } from '../../../src/core/entities/Building.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { refusalText } from '../../../src/console/commands/commandUtils.js';
+import { employeeCommand } from '../../../src/console/commands/employees.js';
+import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
+import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
+import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../../../src/core/config/balance.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
+import { Random } from '../../../src/core/math/Random.js';
+import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
 
 function makeCtx(cash = 1_000_000): GameContext {
   return makeGameContext({ mineType: 'desert', seed: 1, size: 32, cash });
@@ -345,4 +360,393 @@ describe('entities.ts — zone clear success message (fresh game, 0 vehicles/emp
     expect(result.success).toBe(true);
     expect(result.output).not.toBe(EN);
   });
+});
+
+// ── Refusals (#1397): core refusals reach the console in the active locale ──
+//
+// Core results keep their English `error` and add `errorKey`/`errorParams`;
+// the console translates. Each fr assertion pins the exact interpolated
+// fr.json value, looked up by key so the test fails until the key exists.
+
+type Locale = Record<string, string>;
+const EN = enLocale as Locale;
+const FR = frLocale as Locale;
+
+/** Interpolated fr.json text for `key`; throws when the key is missing from fr.json. */
+function fr(key: string, params: Record<string, string | number> = {}): string {
+  const template = FR[key];
+  if (template === undefined) throw new Error(`fr.json lacks key ${key}`);
+  return template.replace(/\{(\w+)\}/g, (_m, n: string) => (params[n] !== undefined ? String(params[n]) : `{${n}}`));
+}
+
+/** Interpolated en.json text for `key`; throws when the key is missing from en.json. */
+function en(key: string, params: Record<string, string | number> = {}): string {
+  const template = EN[key];
+  if (template === undefined) throw new Error(`en.json lacks key ${key}`);
+  return template.replace(/\{(\w+)\}/g, (_m, n: string) => (params[n] !== undefined ? String(params[n]) : `{${n}}`));
+}
+
+/** English output is either today's literal or the en.json rendering of the new key. */
+function expectEnglish(output: string, literal: string, key: string, params: Record<string, string | number> = {}): void {
+  expect([literal, en(key, params)]).toContain(output);
+}
+
+describe('refusals — new locale keys exist in both languages', () => {
+  const keys = [
+    'shell.placement.refused_out_of_bounds',
+    'entities.build_not_researched',
+    'entities.build_no_approach',
+    'employees.fire_unionized',
+    'vehicle.not_debris_hauler',
+    'vehicle.not_rock_fragmenter',
+    'vehicle.already_hauling',
+    'vehicle.already_breaking',
+    'vehicle.fragment_unavailable',
+    'vehicle.fragment_oversized',
+    'vehicle.fragment_not_oversized',
+  ];
+  for (const key of keys) {
+    it(`${key} is defined in en.json and fr.json, and differs between them`, () => {
+      expect(EN[key]).toBeTruthy();
+      expect(FR[key]).toBeTruthy();
+      expect(FR[key]).not.toBe(EN[key]);
+    });
+  }
+});
+
+/** Top-left cell whose T1 management_office footprint spans too much height (seed 1, size 32, desert). */
+const UNEVEN_AT = '0,20';
+
+describe('build <type> at: — placement refusals', () => {
+  it('uneven ground — en keeps the English text', () => {
+    const ctx = makeCtx();
+    const result = buildCommand(ctx, ['management_office'], { at: UNEVEN_AT });
+    expect(result.success).toBe(false);
+    expectEnglish(result.output, 'Uneven surface', 'shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
+  });
+
+  it('uneven ground — fr prints the exact refused_uneven_ground text with {max}', () => {
+    const ctx = makeCtx();
+    setLocale('fr');
+    const result = buildCommand(ctx, ['management_office'], { at: UNEVEN_AT });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD }));
+  });
+
+  // The site grid grows to claim any off-site cell a build targets, so the
+  // console never reaches the out-of-bounds rule; the core result carries the
+  // key and the console translates it (refusalText).
+  it('out of bounds — core keeps the English error and carries the key; refusalText translates it', () => {
+    const check = checkFootprintPlacement([], 'management_office', -5, -5, 1, 32, 32, 0, 0);
+    expect(check.valid).toBe(false);
+    expect(check.error).toBe('Out of bounds');
+    expect(check.errorKey).toBe('shell.placement.refused_out_of_bounds');
+    expectEnglish(refusalText(check), 'Out of bounds', 'shell.placement.refused_out_of_bounds');
+    setLocale('fr');
+    expect(refusalText(check)).toBe(fr('shell.placement.refused_out_of_bounds'));
+  });
+
+  it('occupied — en keeps the English text', () => {
+    const ctx = makeCtx();
+    placeTestBuilding(ctx);
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(result.success).toBe(false);
+    expectEnglish(result.output, 'Space is occupied', 'shell.placement.refused_occupied');
+  });
+
+  it('occupied — fr prints the exact refused_occupied text', () => {
+    const ctx = makeCtx();
+    placeTestBuilding(ctx);
+    setLocale('fr');
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('shell.placement.refused_occupied'));
+  });
+});
+
+describe('build <type> at: — order refusals', () => {
+  it('unresearched tier — en keeps the English literal', () => {
+    const ctx = makeCtx();
+    const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Tier 2 management_office is not researched — research required before placement.');
+  });
+
+  it('unresearched tier — fr prints the exact build_not_researched text', () => {
+    const ctx = makeCtx();
+    setLocale('fr');
+    const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('entities.build_not_researched', { tier: 2, type: 'management_office' }));
+  });
+
+  it('insufficient funds — en keeps the English literal', () => {
+    const ctx = makeCtx(0);
+    const cost = getBuildingDef('management_office', 1).constructionCost;
+    const result = buildCommand(ctx, ['management_office'], { at: '4,4' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(0)}`);
+  });
+
+  it('insufficient funds — fr prints the exact console.insufficient_funds text', () => {
+    const ctx = makeCtx(0);
+    const cost = getBuildingDef('management_office', 1).constructionCost;
+    setLocale('fr');
+    const result = buildCommand(ctx, ['management_office'], { at: '4,4' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('console.insufficient_funds', { need: formatMoney(cost), have: formatMoney(0) }));
+  });
+
+  /** Three offices seal the (0,0) pocket's approach ring (see navgrid-patching.test.ts). */
+  function sealPocket(ctx: GameContext): void {
+    for (const at of ['2,0', '0,2', '2,2']) {
+      expect(buildCommand(ctx, ['management_office'], { at }).success).toBe(true);
+    }
+  }
+
+  it('no reachable approach — en keeps the English text', () => {
+    const ctx = makeCtx();
+    sealPocket(ctx);
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('No reachable approach to this site — surroundings are fully blocked');
+  });
+
+  it('no reachable approach — fr prints the exact build_no_approach text', () => {
+    const ctx = makeCtx();
+    sealPocket(ctx);
+    setLocale('fr');
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('entities.build_no_approach'));
+  });
+});
+
+describe('build move — placement refusals', () => {
+  it('uneven destination — en keeps the English text, fr prints refused_uneven_ground', () => {
+    const ctx = makeCtx();
+    const id = placeAt(ctx, 'management_office', 1, 4, 4);
+    const enResult = buildCommand(ctx, ['move', String(id)], { to: UNEVEN_AT });
+    expect(enResult.success).toBe(false);
+    expectEnglish(enResult.output, 'Uneven surface', 'shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD });
+    setLocale('fr');
+    const frResult = buildCommand(ctx, ['move', String(id)], { to: UNEVEN_AT });
+    expect(frResult.success).toBe(false);
+    expect(frResult.output).toBe(fr('shell.placement.refused_uneven_ground', { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD }));
+  });
+
+  it('occupied destination — en keeps the English text, fr prints refused_occupied', () => {
+    const ctx = makeCtx();
+    const id = placeAt(ctx, 'management_office', 1, 4, 4);
+    placeAt(ctx, 'management_office', 1, 8, 8);
+    const enResult = buildCommand(ctx, ['move', String(id)], { to: '8,8' });
+    expect(enResult.success).toBe(false);
+    expectEnglish(enResult.output, 'Space is occupied', 'shell.placement.refused_occupied');
+    setLocale('fr');
+    const frResult = buildCommand(ctx, ['move', String(id)], { to: '8,8' });
+    expect(frResult.success).toBe(false);
+    expect(frResult.output).toBe(fr('shell.placement.refused_occupied'));
+  });
+});
+
+describe('build upgrade — blocked upgrade wraps the translated inner refusal', () => {
+  function setupBlockedUpgrade(ctx: GameContext): number {
+    ctx.state!.buildings.unlockedTiers['management_office'] = 3;
+    const id = placeAt(ctx, 'management_office', 1, 0, 0);
+    placeAt(ctx, 'management_office', 1, 0, 2);
+    return id;
+  }
+
+  it('fr output is build_upgrade_failed around the fr refused_occupied text', () => {
+    const ctx = makeCtx();
+    const id = setupBlockedUpgrade(ctx);
+    setLocale('fr');
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('entities.build_upgrade_failed', { error: fr('shell.placement.refused_occupied') }));
+    expect(result.output).not.toContain('Space is occupied');
+  });
+
+  it('en output still names the occupied space', () => {
+    const ctx = makeCtx();
+    const id = setupBlockedUpgrade(ctx);
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/^Upgrade failed: /);
+    expect(result.output).toContain('Space is occupied');
+  });
+});
+
+describe('employee fire — refusals', () => {
+  function hireUnionized(ctx: GameContext) {
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    employee.unionized = true;
+    return employee;
+  }
+
+  it('unionized — en keeps the English text', () => {
+    const ctx = makeCtx();
+    const emp = hireUnionized(ctx);
+    const result = employeeCommand(ctx, ['fire', String(emp.id)], {});
+    expect(result.success).toBe(false);
+    expectEnglish(result.output, 'Cannot fire unionized employee', 'employees.fire_unionized');
+  });
+
+  it('unionized — fr prints the exact fire_unionized text', () => {
+    const ctx = makeCtx();
+    const emp = hireUnionized(ctx);
+    setLocale('fr');
+    const result = employeeCommand(ctx, ['fire', String(emp.id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('employees.fire_unionized'));
+  });
+
+  it('nonexistent id — en keeps the English text', () => {
+    const ctx = makeCtx();
+    const result = employeeCommand(ctx, ['fire', '4242'], {});
+    expect(result.success).toBe(false);
+    expectEnglish(result.output, 'Employee not found', 'employees.employee_not_found', { id: 4242 });
+  });
+
+  it('nonexistent id — fr prints the exact employee_not_found text', () => {
+    const ctx = makeCtx();
+    setLocale('fr');
+    const result = employeeCommand(ctx, ['fire', '4242'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(fr('employees.employee_not_found', { id: 4242 }));
+  });
+});
+
+describe('vehicle haul / break — refusals', () => {
+  function makeFragment(id: number, x: number, z: number, volume: number): FragmentData {
+    return {
+      id, position: { x, y: 0, z }, volume, mass: 1000, rockId: 'cruite', oreDensities: {},
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false, halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+      shapeSeed: id, origin: { x, y: 0, z },
+    };
+  }
+
+  function buy(ctx: GameContext, role: 'debris_hauler' | 'rock_fragmenter') {
+    return purchaseVehicle(ctx.state!.vehicles, role, 5, 5).vehicle;
+  }
+
+  function mountDriver(ctx: GameContext, vehicle: { id: number; x: number; z: number; occupantIds: number[] }) {
+    const { employee } = hireEmployee(ctx.state!.employees, 'driver', new Random(1));
+    employee.x = vehicle.x;
+    employee.z = vehicle.z;
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    vehicle.occupantIds = [employee.id];
+  }
+
+  /** Staffed vehicle of `role` plus a ground fragment of `volume`; returns ids. */
+  function setup(ctx: GameContext, role: 'debris_hauler' | 'rock_fragmenter', volume: number) {
+    const vehicle = buy(ctx, role);
+    mountDriver(ctx, vehicle);
+    placeAt(ctx, 'freight_warehouse', 1, 0, 0);
+    addBlastFragments(ctx.state!.logistics, [makeFragment(1, vehicle.x, vehicle.z, volume)]);
+    syncHaulDispatch(ctx.state!);
+    return { vehicleId: vehicle.id, fragmentId: 1 };
+  }
+
+  const SMALL = OVERSIZED_FRAGMENT_THRESHOLD - 0.1;
+  const BIG = OVERSIZED_FRAGMENT_THRESHOLD + 0.5;
+
+  const cases: Array<{
+    name: string;
+    sub: 'haul' | 'break';
+    en: string;
+    expectedFr: () => string;
+    prepare: (ctx: GameContext) => { vehicleId: number; fragmentId: number };
+  }> = [
+    {
+      name: 'haul — no driver', sub: 'haul', en: 'Vehicle has no driver',
+      expectedFr: () => fr('mount.vehicle_no_driver'),
+      prepare: (ctx) => ({ vehicleId: buy(ctx, 'debris_hauler').id, fragmentId: 1 }),
+    },
+    {
+      name: 'break — no driver', sub: 'break', en: 'Vehicle has no driver',
+      expectedFr: () => fr('mount.vehicle_no_driver'),
+      prepare: (ctx) => ({ vehicleId: buy(ctx, 'rock_fragmenter').id, fragmentId: 1 }),
+    },
+    {
+      name: 'haul — wrong role', sub: 'haul', en: 'Vehicle is not a debris hauler',
+      expectedFr: () => fr('vehicle.not_debris_hauler'),
+      prepare: (ctx) => ({ vehicleId: buy(ctx, 'rock_fragmenter').id, fragmentId: 1 }),
+    },
+    {
+      name: 'break — wrong role', sub: 'break', en: 'Vehicle is not a rock fragmenter',
+      expectedFr: () => fr('vehicle.not_rock_fragmenter'),
+      prepare: (ctx) => ({ vehicleId: buy(ctx, 'debris_hauler').id, fragmentId: 1 }),
+    },
+    {
+      name: 'haul — already hauling', sub: 'haul', en: 'Vehicle is already hauling',
+      expectedFr: () => fr('vehicle.already_hauling'),
+      prepare: (ctx) => {
+        const ids = setup(ctx, 'debris_hauler', SMALL);
+        expect(vehicleCommand(ctx, ['haul', String(ids.vehicleId)], { fragment: '1' }).success).toBe(true);
+        return ids;
+      },
+    },
+    {
+      name: 'break — already breaking', sub: 'break', en: 'Vehicle is already breaking a fragment',
+      expectedFr: () => fr('vehicle.already_breaking'),
+      prepare: (ctx) => {
+        const ids = setup(ctx, 'rock_fragmenter', BIG);
+        expect(vehicleCommand(ctx, ['break', String(ids.vehicleId)], { fragment: '1' }).success).toBe(true);
+        return ids;
+      },
+    },
+    {
+      name: 'haul — fragment unavailable', sub: 'haul', en: 'Fragment not found or not on the ground',
+      expectedFr: () => fr('vehicle.fragment_unavailable'),
+      prepare: (ctx) => ({ ...setup(ctx, 'debris_hauler', SMALL), fragmentId: 999 }),
+    },
+    {
+      name: 'break — fragment unavailable', sub: 'break', en: 'Fragment not found or not on the ground',
+      expectedFr: () => fr('vehicle.fragment_unavailable'),
+      prepare: (ctx) => ({ ...setup(ctx, 'rock_fragmenter', BIG), fragmentId: 999 }),
+    },
+    {
+      name: 'haul — fragment oversized', sub: 'haul', en: 'Fragment is oversized and needs a Rock Fragmenter first',
+      expectedFr: () => fr('vehicle.fragment_oversized'),
+      prepare: (ctx) => setup(ctx, 'debris_hauler', BIG),
+    },
+    {
+      name: 'break — fragment not oversized', sub: 'break', en: 'Fragment is not oversized',
+      expectedFr: () => fr('vehicle.fragment_not_oversized'),
+      prepare: (ctx) => setup(ctx, 'rock_fragmenter', SMALL),
+    },
+  ];
+
+  for (const c of cases) {
+    it(`${c.name} — en keeps the English literal`, () => {
+      const ctx = makeCtx();
+      const { vehicleId, fragmentId } = c.prepare(ctx);
+      const result = vehicleCommand(ctx, [c.sub, String(vehicleId)], { fragment: String(fragmentId) });
+      expect(result.success).toBe(false);
+      expect(result.output).toBe(c.en);
+    });
+
+    it(`${c.name} — fr prints the exact fr.json text`, () => {
+      const ctx = makeCtx();
+      const { vehicleId, fragmentId } = c.prepare(ctx);
+      setLocale('fr');
+      const result = vehicleCommand(ctx, [c.sub, String(vehicleId)], { fragment: String(fragmentId) });
+      expect(result.success).toBe(false);
+      expect(result.output).toBe(c.expectedFr());
+    });
+  }
+
+  for (const sub of ['haul', 'break'] as const) {
+    it(`${sub} — unknown vehicle id: en English, fr translated`, () => {
+      const ctx = makeCtx();
+      const enResult = vehicleCommand(ctx, [sub, '777'], { fragment: '1' });
+      expect(enResult.success).toBe(false);
+      expect(enResult.output).toBe('Vehicle not found');
+      setLocale('fr');
+      const frResult = vehicleCommand(ctx, [sub, '777'], { fragment: '1' });
+      expect(frResult.success).toBe(false);
+      expect([fr('mount.vehicle_not_found'), fr('vehicle.not_found', { id: 777 })]).toContain(frResult.output);
+    });
+  }
 });
