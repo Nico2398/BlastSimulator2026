@@ -3133,6 +3133,7 @@
   "notification.order_blocked_no_staff": "{order} has no one to do it — the site has no employees yet.",
   "notification.order_blocked_no_vehicle": "{order} needs a {role} — none in the fleet yet.",
   "notification.order_blocked_no_driver": "{order} needs a {role} — nobody is licensed to drive one.",
+  "notification.order_blocked_no_dual_employee": "{order} needs one employee with both the {licence} licence and {skill}.",
   "notification.order_blocked_target_unreachable": "{order} can't reach its target — no route connects it to the rest of the site.",
   "notification.order_blocked_no_warehouse": "{order} needs a Freight Warehouse — build one to store hauled rock.",
   "notification.order_blocked_storage_full": "{order} can't proceed — storage is full.",

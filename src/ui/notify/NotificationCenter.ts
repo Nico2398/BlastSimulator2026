@@ -298,8 +298,11 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
         ? t('notification.order_blocked_no_employee', { order, skill: t(`skill.${action.requiredSkill}`) })
         : t('notification.order_blocked_no_staff', { order });
     case 'no_dual_qualified_employee':
-      // TODO: implement message naming the licence and skill (#1386)
-      return order;
+      return t('notification.order_blocked_no_dual_employee', {
+        order,
+        licence: t(`vehicle_type.${action.requiredVehicleRole}`),
+        skill: t(`skill.${action.requiredSkill}`),
+      });
     case 'target_unreachable':
       return t('notification.order_blocked_target_unreachable', { order });
     case 'no_freight_warehouse':

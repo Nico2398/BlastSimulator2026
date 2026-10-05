@@ -176,6 +176,8 @@ export function judgeQueuedOrders(state: GameState): Map<number, OrderReachabili
 /**
  * Warning reason for an action nobody can currently work, independent of
  * geography: no vehicle / licence / skill among the employees able to work now.
+ * A vehicle order where licensed and skilled employees both exist but nobody
+ * holds both reports `no_dual_qualified_employee`.
  */
 function availabilityReason(
   state: GameState,
@@ -189,7 +191,10 @@ function availabilityReason(
     if (!state.vehicles.vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';
     const licensed = eligible.filter(emp => isLicensedForRole(emp, role));
     if (licensed.length === 0) return 'no_licensed_driver';
-    return holdsSkill(licensed) ? null : 'no_qualified_employee';
+    if (holdsSkill(licensed)) return null;
+    return action.requiredSkill !== null && holdsSkill(eligible)
+      ? 'no_dual_qualified_employee'
+      : 'no_qualified_employee';
   }
   return holdsSkill(eligible) ? null : 'no_qualified_employee';
 }
