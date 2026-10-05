@@ -30,12 +30,12 @@ import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } 
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
-import { chargeOrderCost, chargeColumnM, maxChargeKgForHole, floorToTenthKg } from '../../../core/mining/ChargePlan.js';
+import { chargeOrderCost, chargeFitsHole, maxFittingChargeKg } from '../../../core/mining/ChargePlan.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { TUBING_COST } from '../../../core/mining/Tubing.js';
-import { MIN_STEMMING_M, CHARGE_FIT_EPSILON } from '../../../core/config/balance.js';
+import { MIN_STEMMING_M } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
@@ -239,13 +239,13 @@ export class ChargeStep {
   // Charge All. The stepper is left alone so the player sees what they asked for.
   private updateFitLine(shallowest: number | null): void {
     const overflows = shallowest !== null
-      && chargeColumnM(this.amountKg) + this.stemmingM > shallowest + CHARGE_FIT_EPSILON;
+      && !chargeFitsHole(this.amountKg, this.stemmingM, shallowest);
     this.chargeAllBtn.disabled = overflows;
     if (!overflows || shallowest === null) {
       this.fitLineEl.replaceChildren();
       return;
     }
-    const max = floorToTenthKg(maxChargeKgForHole(shallowest, this.stemmingM) + CHARGE_FIT_EPSILON);
+    const max = maxFittingChargeKg(shallowest, this.stemmingM);
     this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.too_much_for_hole', { depth: shallowest, max })));
   }
 

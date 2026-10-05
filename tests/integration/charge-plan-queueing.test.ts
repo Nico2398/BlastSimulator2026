@@ -562,7 +562,7 @@ describe('charge column overflow is refused at order time (#1361)', () => {
     const result = run(`charge hole:${holeId} explosive:boomite amount:8 stemming:3`);
 
     expect(result.success).toBe(false);
-    expect(result.output).toMatch(/\b6(\.0)?\b/); // (6 - 3) * 2 = 6 kg fits
+    expect(result.output).toMatch(/Maximum that fits: 6/); // (6 - 3) * 2 = 6 kg fits
     expect(state.cash).toBe(cashBefore);
     expect(state.plannedChargesByHole[holeId]).toBeUndefined();
     expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);

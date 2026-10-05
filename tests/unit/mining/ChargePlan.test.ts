@@ -206,11 +206,14 @@ describe('maxChargeKgForHole (#1361)', () => {
 });
 
 describe('createCharge — column must fit the hole (#1361)', () => {
-  it('createCharge(boomite, 12, 2, 6) is refused and the message mentions 8', () => {
-    const result = createCharge('boomite', 12, 2, 6);
+  it('createCharge(rumblox, 12, 2, 6) is refused by the column rule and the message mentions 8', () => {
+    const result = createCharge('rumblox', 12, 2, 6);
     expect('error' in result).toBe(true);
     expect('charge' in result).toBe(false);
-    if ('error' in result) expect(result.error).toContain('8');
+    if ('error' in result) {
+      expect(result.error).not.toContain('out of range');
+      expect(result.error).toContain('8');
+    }
   });
 
   it('refuses rumblox 12 kg + 2 m stemming in a 6 m hole (in range, column overflows) and names the 8 kg maximum', () => {

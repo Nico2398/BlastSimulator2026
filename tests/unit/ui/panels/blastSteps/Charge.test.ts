@@ -357,7 +357,7 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
 
     expect(chargeAll(step).disabled).toBe(true);
     // max for the 4 m hole under 2 m stemming = (4 - 2) * 2 = 4 kg
-    expect(reasonText(step)).toMatch(/\b4(\.0)?\b/);
+    expect(reasonText(step)).toMatch(/at most 4 kg/);
   });
 
   it('shows no overflow reason and leaves Charge All enabled when the charge fits every hole', () => {
