@@ -586,7 +586,7 @@ describe('forced rest under an applied SitePolicy — driven through the console
     expect(minWellBeing).toBeGreaterThan(0);
   });
 
-  it('WITHOUT a policy applied, the same run reaches collapse territory (opt-in contrast case)', () => {
+  it('WITHOUT forced-rest protection (continuous, threshold 0), the same run reaches collapse territory (contrast case)', () => {
     const ctx = makeCtx();
     const state = ctx.state!;
     state.cash = 1_000_000;
@@ -595,8 +595,11 @@ describe('forced rest under an applied SitePolicy — driven through the console
     const build = buildCommand(ctx, ['living_quarters'], { at: '2,6', tier: '1' });
     expect(build.success).toBe(true);
 
-    // No set_policy call — revision stays 0, the opt-in gate stays closed.
-    expect(state.sitePolicy.revision).toBe(0);
+    // #1379: the default policy is always in force, so the unprotected crew is
+    // modelled by directly disabling both forced-rest triggers (continuous
+    // mode, fatigue threshold 0), not by leaving the revision at 0.
+    state.sitePolicy.shiftMode = 'continuous';
+    state.sitePolicy.fatigueRestThreshold = 0;
 
     let sawCollapse = false;
     let minFatigue = 100;
