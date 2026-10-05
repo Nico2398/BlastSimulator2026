@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
-import { releaseDeadEmployeeActions, cancelAction, interruptActiveAction, releaseEmployeeFromWorld, fireEmployeeFromWorld } from '../../../src/core/engine/TaskCancellation.js';
+import { releaseDeadEmployeeActions, releaseInjuredEmployeeQueue, releaseInjuredEmployeesQueues, cancelAction, interruptActiveAction, releaseEmployeeFromWorld, fireEmployeeFromWorld } from '../../../src/core/engine/TaskCancellation.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { purchaseVehicle, getVehicleReservation } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
@@ -792,5 +792,263 @@ describe('fireEmployeeFromWorld (#1378)', () => {
     expect(result.success).toBe(true);
     expect(state.employees.employees.find(e => e.id === employee.id)).toBeUndefined();
     expect(state.pendingActions.find(a => a.id === 64)!.holderId).toBeNull();
+  });
+});
+
+describe('releaseInjuredEmployeeQueue (#1381)', () => {
+  function setup() {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const hire = () => hireEmployee(state.employees, 'driller', new Random(SEED)).employee;
+    return { state, hire };
+  }
+
+  it('releases a queued, assigned action to the pool: queued, no holder, empty taskQueue', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 1, status: 'assigned', holderId: emp.id }));
+    emp.taskQueue = [1];
+    emp.injured = true;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    const a = state.pendingActions.find(x => x.id === 1)!;
+    expect(a.status).toBe('queued');
+    expect(a.holderId).toBeNull();
+    expect(emp.taskQueue).toEqual([]);
+  });
+
+  it('leaves activeActionId and the in-progress action untouched', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(
+      makeAction({ id: 1, status: 'in_progress', holderId: emp.id }),
+      makeAction({ id: 2, status: 'assigned', holderId: emp.id }),
+    );
+    emp.activeActionId = 1;
+    emp.taskTicksRemaining = 5;
+    emp.taskQueue = [2];
+    emp.injured = true;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    const active = state.pendingActions.find(x => x.id === 1)!;
+    expect(active.status).toBe('in_progress');
+    expect(active.holderId).toBe(emp.id);
+    expect(emp.activeActionId).toBe(1);
+    expect(emp.taskTicksRemaining).toBe(5);
+    expect(state.pendingActions.find(x => x.id === 2)!.status).toBe('queued');
+    expect(emp.taskQueue).toEqual([]);
+  });
+
+  it('drops the vehicle reservation of a released vehicle-gated action', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 3, status: 'assigned', holderId: emp.id, requiredVehicleRole: 'drill_rig' }));
+    emp.taskQueue = [3];
+    emp.injured = true;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    reserveVehicle(state.vehicles, vehicle.id, 3);
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
+    expect(state.pendingActions.find(x => x.id === 3)!.status).toBe('queued');
+  });
+
+  it('keeps the reservation of a haul committed to its own cargo (existing release behaviour)', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({
+      id: 4, type: 'haul_debris', status: 'assigned', holderId: emp.id,
+      requiredVehicleRole: 'debris_hauler', payload: { fragmentId: 9 },
+    }));
+    emp.taskQueue = [4];
+    emp.injured = true;
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    reserveVehicle(state.vehicles, vehicle.id, 4);
+    vehicle.payload = { fragmentId: 9, massKg: 100 };
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(4);
+    expect(vehicle.payload).not.toBeNull();
+    expect(state.pendingActions.find(x => x.id === 4)!.status).toBe('queued');
+  });
+
+  it('unclaims the ghost preview and bumps ghostPreviewsRevision', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 5, status: 'assigned', holderId: emp.id }));
+    state.ghostPreviews.push({ id: 5, type: 'general_work', targetX: 0, targetZ: 0, targetY: 0, claimed: true });
+    emp.taskQueue = [5];
+    emp.injured = true;
+    const before = state.ghostPreviewsRevision;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    expect(state.ghostPreviews.find(g => g.id === 5)!.claimed).toBe(false);
+    expect(state.ghostPreviewsRevision).toBeGreaterThan(before);
+  });
+
+  it('clears targetEmployeeId on a queued action targeted at the injured employee', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 6, status: 'assigned', holderId: emp.id, targetEmployeeId: emp.id }));
+    emp.taskQueue = [6];
+    emp.injured = true;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    expect(state.pendingActions.find(x => x.id === 6)!.targetEmployeeId).toBeNull();
+  });
+
+  it('clears targetEmployeeId on a queued, unheld non-rest action targeted at the injured employee', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 9, status: 'queued', holderId: null, targetEmployeeId: emp.id }));
+    emp.injured = true;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    expect(state.pendingActions.find(x => x.id === 9)!.targetEmployeeId).toBeNull();
+  });
+
+  it('leaves a rest queue entry alone', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 7, type: 'rest', status: 'assigned', holderId: emp.id, targetEmployeeId: emp.id }));
+    emp.taskQueue = [7];
+    emp.injured = true;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    const rest = state.pendingActions.find(x => x.id === 7)!;
+    expect(rest.status).toBe('assigned');
+    expect(rest.holderId).toBe(emp.id);
+    expect(emp.taskQueue).toEqual([7]);
+  });
+
+  it('drops a queue id with no matching action without throwing', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    emp.taskQueue = [404];
+    emp.injured = true;
+
+    expect(() => releaseInjuredEmployeeQueue(state, emp.id)).not.toThrow();
+    expect(emp.taskQueue).toEqual([]);
+  });
+
+  it('is idempotent', () => {
+    const { state, hire } = setup();
+    const emp = hire();
+    state.pendingActions.push(makeAction({ id: 8, status: 'assigned', holderId: emp.id }));
+    state.ghostPreviews.push({ id: 8, type: 'general_work', targetX: 0, targetZ: 0, targetY: 0, claimed: true });
+    emp.taskQueue = [8];
+    emp.injured = true;
+
+    releaseInjuredEmployeeQueue(state, emp.id);
+    const rev = state.ghostPreviewsRevision;
+    releaseInjuredEmployeeQueue(state, emp.id);
+
+    expect(state.ghostPreviewsRevision).toBe(rev);
+    expect(state.pendingActions.find(x => x.id === 8)!.status).toBe('queued');
+    expect(emp.taskQueue).toEqual([]);
+  });
+});
+
+describe('releaseInjuredEmployeesQueues sweep (#1381)', () => {
+  function setup() {
+    const state = createGame({ seed: SEED });
+    state.employees = createEmployeeState();
+    const rng = new Random(SEED);
+    const hire = () => hireEmployee(state.employees, 'driller', rng).employee;
+    return { state, hire };
+  }
+
+  it('releases the queues of several injured employees', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    const b = hire();
+    state.pendingActions.push(
+      makeAction({ id: 1, status: 'assigned', holderId: a.id }),
+      makeAction({ id: 2, status: 'assigned', holderId: b.id }),
+    );
+    a.taskQueue = [1]; b.taskQueue = [2];
+    a.injured = true; b.injured = true;
+
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions.every(x => x.status === 'queued' && x.holderId === null)).toBe(true);
+    expect(a.taskQueue).toEqual([]);
+    expect(b.taskQueue).toEqual([]);
+  });
+
+  it('does not sweep a healed employee', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    state.pendingActions.push(makeAction({ id: 1, status: 'assigned', holderId: a.id }));
+    a.taskQueue = [1];
+    a.injured = false;
+
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(a.taskQueue).toEqual([1]);
+  });
+
+  it('does not sweep a dead employee', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    state.pendingActions.push(makeAction({ id: 1, status: 'assigned', holderId: a.id }));
+    a.taskQueue = [1];
+    a.injured = true;
+    a.alive = false;
+
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(a.taskQueue).toEqual([1]);
+  });
+
+  it('releases a targeted queued action for an injured employee with an empty taskQueue', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    state.pendingActions.push(makeAction({ id: 1, status: 'queued', holderId: null, targetEmployeeId: a.id }));
+    a.taskQueue = [];
+    a.injured = true;
+
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions[0]!.targetEmployeeId).toBeNull();
+  });
+
+  it('leaves a rest-only queue untouched', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    state.pendingActions.push(makeAction({ id: 1, type: 'rest', status: 'assigned', holderId: a.id, targetEmployeeId: a.id }));
+    a.taskQueue = [1];
+    a.injured = true;
+
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(state.pendingActions[0]!.holderId).toBe(a.id);
+    expect(a.taskQueue).toEqual([1]);
+  });
+
+  it('is idempotent across repeated sweeps', () => {
+    const { state, hire } = setup();
+    const a = hire();
+    state.pendingActions.push(makeAction({ id: 1, status: 'assigned', holderId: a.id }));
+    a.taskQueue = [1];
+    a.injured = true;
+
+    releaseInjuredEmployeesQueues(state);
+    releaseInjuredEmployeesQueues(state);
+
+    expect(state.pendingActions[0]!.status).toBe('queued');
+    expect(state.pendingActions[0]!.holderId).toBeNull();
+    expect(a.taskQueue).toEqual([]);
   });
 });

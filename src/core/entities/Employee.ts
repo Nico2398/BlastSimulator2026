@@ -479,7 +479,11 @@ export function getEffectiveness(employee: Employee): number {
   return 0.5 + (employee.morale / 100) * 0.7;
 }
 
-/** Injure an employee. */
+/**
+ * Injure an employee. Queued work is not released here (entities/ cannot import
+ * engine); the tick sweep releaseInjuredEmployeesQueues (TaskCancellation.ts,
+ * TickPipeline step 8d) returns it to the open pool (#1381).
+ */
 export function injureEmployee(state: EmployeeState, employeeId: number): boolean {
   const emp = state.employees.find(e => e.id === employeeId);
   if (!emp || !emp.alive) return false;
