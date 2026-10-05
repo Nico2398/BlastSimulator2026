@@ -24,6 +24,7 @@ export interface DrillHoleActionPayload {
   z: number;
   depth: number;
   diameter: number;
+  /** Base ticks; scaled by the worker's proficiency at claim time. */
   durationTicks: number;
 }
 

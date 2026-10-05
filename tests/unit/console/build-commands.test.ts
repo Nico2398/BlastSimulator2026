@@ -1,12 +1,14 @@
 // BlastSimulator2026 — build command unit tests (CH1.7)
 // Tests tier placement, upgrade, and demolish-with-cost behaviour.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { createRunner } from '../../../src/console/createRunner.js';
+import { setLocale } from '../../../src/core/i18n/I18n.js';
 
 function makeCtx(): MiningContext {
   // Staffed (#556): confirming a placement only queues a construction site —
@@ -261,5 +263,136 @@ describe('build command — demolish with cost', () => {
     const result = buildCommand(ctx, ['destroy', '9999'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('not found');
+  });
+});
+
+// ── build — ramp and drill-hole reservations (#1390) ──────────────────────
+
+describe('build command — terrain reservations (#1390)', () => {
+  afterEach(() => setLocale('en'));
+
+  function setup() {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('new_game seed:42 staffed:true').success).toBe(true);
+    ctx.state!.cash += 1_000_000;
+    ctx.state!.buildings.unlockedTiers.management_office = 3;
+    return { runner, ctx, state: ctx.state! };
+  }
+
+  function snapshot(state: ReturnType<typeof setup>['state']) {
+    return {
+      cash: state.cash,
+      planned: state.plannedBuildings.length,
+      actions: state.pendingActions.length,
+      buildings: state.buildings.buildings.length,
+    };
+  }
+
+  function tickUntilBuilt(runner: ReturnType<typeof setup>['runner'], state: ReturnType<typeof setup>['state']): void {
+    for (let i = 0; i < 300 && state.plannedBuildings.length > 0; i++) {
+      for (const e of state.employees.employees) e.fatigue = 100;
+      runner.run('tick 1');
+    }
+  }
+
+  it('refuses a building ordered over a planned ramp footprint', () => {
+    const { runner, state } = setup();
+    expect(runner.run('build_ramp start:30,20 end:30,40 depth:8').success).toBe(true);
+    const before = snapshot(state);
+    const r = runner.run('build vehicle_depot at:28,19');
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).toContain('blocks a ramp');
+    expect(snapshot(state)).toEqual(before);
+  });
+
+  it('refuses management_office at 40,14 on a planned ramp', () => {
+    const { runner, state } = setup();
+    expect(runner.run('build_ramp start:40,8 end:40,28 depth:8').success).toBe(true);
+    const fp = state.plannedRamps[0]!.footprint;
+    expect(fp.minX).toBeLessThanOrEqual(40);
+    expect(fp.maxX).toBeGreaterThanOrEqual(40);
+    expect(fp.minZ).toBeLessThanOrEqual(14);
+    expect(fp.maxZ).toBeGreaterThanOrEqual(14);
+    const before = snapshot(state);
+    const r = runner.run('build management_office at:40,14');
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).toContain('blocks a ramp');
+    expect(snapshot(state)).toEqual(before);
+  });
+
+  it('refuses an order that lands on a built ramp', () => {
+    const { runner, state } = setup();
+    state.builtRamps.push({
+      id: 1, def: {} as any, width: 3, footprint: { minX: 10, maxX: 12, minZ: 10, maxZ: 20 },
+    } as any);
+    const before = snapshot(state);
+    const r = runner.run('build management_office at:11,15');
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).toContain('blocks a ramp');
+    expect(snapshot(state)).toEqual(before);
+  });
+
+  it('refuses a building ordered on an ordered drill hole', () => {
+    const { runner, state } = setup();
+    expect(runner.run('drill_plan add x:20 z:40 depth:6').success).toBe(true);
+    expect(state.plannedDrillHoles.length).toBe(1);
+    const before = snapshot(state);
+    const r = runner.run('build management_office at:20,40');
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).toContain('blocks a drill hole');
+    expect(snapshot(state)).toEqual(before);
+  });
+
+  it('accepts an order clear of the ramp and holes', () => {
+    const { runner, state } = setup();
+    expect(runner.run('build_ramp start:30,20 end:30,40 depth:8').success).toBe(true);
+    const r = runner.run('build management_office at:10,10');
+    expect(r.success).toBe(true);
+    expect(state.plannedBuildings.length).toBe(1);
+  });
+
+  it('localizes the refusal in French and not as the English text', () => {
+    const { runner } = setup();
+    runner.run('build_ramp start:30,20 end:30,40 depth:8');
+    setLocale('fr');
+    const r = runner.run('build vehicle_depot at:28,19');
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).not.toContain('blocks a ramp');
+    expect(r.output).not.toContain('shell.placement.refused_ramp');
+  });
+
+  it('refuses build move onto a ramp and leaves the building where it was', () => {
+    const { runner, state } = setup();
+    expect(runner.run('build management_office at:10,10').success).toBe(true);
+    tickUntilBuilt(runner, state);
+    const b = state.buildings.buildings[0]!;
+    expect(runner.run('build_ramp start:30,20 end:30,40 depth:8').success).toBe(true);
+    const cash = state.cash;
+    const r = runner.run(`build move ${b.id} to:30,25`);
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).toContain('blocks a ramp');
+    expect(state.buildings.buildings[0]!.x).toBe(10);
+    expect(state.buildings.buildings[0]!.z).toBe(10);
+    expect(state.cash).toBe(cash);
+  });
+
+  it('refuses build upgrade when the larger tier hits a ramp, keeping the old building', () => {
+    const { runner, state } = setup();
+    expect(runner.run('build management_office at:10,10').success).toBe(true);
+    tickUntilBuilt(runner, state);
+    const b = state.buildings.buildings[0]!;
+    // Column x+2 and row z+2 are outside T1 (2x2) but inside T2 whichever way it extends.
+    state.builtRamps.push(
+      { id: 1, def: {} as any, width: 3, footprint: { minX: b.x + 2, maxX: b.x + 2, minZ: b.z, maxZ: b.z + 2 } } as any,
+      { id: 2, def: {} as any, width: 3, footprint: { minX: b.x, maxX: b.x + 2, minZ: b.z + 2, maxZ: b.z + 2 } } as any,
+    );
+    const cash = state.cash;
+    const r = runner.run(`build upgrade ${b.id}`);
+    expect(r.success).toBe(false);
+    expect(r.output.toLowerCase()).toContain('blocks a ramp');
+    expect(state.buildings.buildings).toHaveLength(1);
+    expect(state.buildings.buildings[0]!.id).toBe(b.id);
+    expect(state.buildings.buildings[0]!.tier).toBe(1);
+    expect(state.cash).toBe(cash);
   });
 });

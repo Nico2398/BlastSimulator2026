@@ -73,10 +73,14 @@ function resolveEmployeeProductivityInputs(
  * Single source of truth for both the cost estimate/resolution below and the
  * claim-time seeding of pendingTaskDuration/pendingRestDuration in EmployeeDispatchSteps.ts.
  *
- * A survey's own durationTicks (SURVEY_DURATION_TICKS[method], set by
- * runSurvey) and a rest action's own restDuration override the generic
- * proficiency-scaled duration — both already appear directly in the action's
- * payload rather than being derived here.
+ * An action carrying a base `payload.durationTicks` (drill_hole, charge_hole,
+ * survey, place_building) replaces BASE_TASK_DURATION_TICKS as the base but is
+ * still scaled by proficiency, need and Living Quarters multipliers. A numeric
+ * `payload.resumeTicks` (written by interruptActiveAction) is already-resolved
+ * remaining work and is returned unscaled. `dig_ramp_segment` and
+ * `level_ground` bypass resumeTicks: their live grid count (cells/columns
+ * still pending) is their resume mechanism. A rest action's own restDuration
+ * overrides everything and is likewise raw.
  *
  * `grid`, when provided, lets the `dig_ramp_segment` branch read the live
  * voxel count instead of the stale one captured in the action's payload at
@@ -86,7 +90,7 @@ function resolveEmployeeProductivityInputs(
 export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction, grid?: VoxelGrid): number {
   if (action.type === 'rest') {
     if (typeof action.payload['restDuration'] === 'number') {
-      return action.payload['restDuration'] as number;
+      return action.payload['restDuration'];
     }
     const needKey = resolveRestNeedKey(action.payload);
     return needKey !== null ? NEED_REST_DURATIONS[needKey] : BASE_TASK_DURATION_TICKS;
@@ -119,12 +123,17 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier, level, needMult, lqMult);
   }
 
-  if (typeof action.payload['durationTicks'] === 'number') {
-    return action.payload['durationTicks'] as number;
+  // Already-resolved remaining work from an interrupted action
+  // (interruptActiveAction) — returned raw, never rescaled.
+  if (typeof action.payload['resumeTicks'] === 'number') {
+    return action.payload['resumeTicks'];
   }
 
+  const baseTicks = typeof action.payload['durationTicks'] === 'number'
+    ? action.payload['durationTicks']
+    : BASE_TASK_DURATION_TICKS;
   const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
-  return computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
+  return computeTaskDuration(baseTicks, level, needMult, lqMult, 1);
 }
 
 /**

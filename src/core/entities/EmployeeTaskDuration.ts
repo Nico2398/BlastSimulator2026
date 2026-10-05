@@ -17,6 +17,9 @@ import { PROFICIENCY_MULTIPLIERS } from '../config/balance.js';
  * - lqMultiplier: productivity factor from living quarters tier (0.85–1.10), e.g. 1.0 for no bonus
  * - eventMultiplier: combined event productivity factor (e.g. 1.20 for union happy hour)
  * - Result is always at least 1 tick
+ * - baseDuration is BASE_TASK_DURATION_TICKS or an action's own base
+ *   payload.durationTicks (drill/charge/survey/build); a resumeTicks override
+ *   bypasses this function entirely (ActionSelection.computeActionWorkTicks)
  * - baseDuration must be a positive number (need not be an integer; the
  *   result is ceiled to the next whole tick)
  */

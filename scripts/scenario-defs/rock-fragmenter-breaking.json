@@ -670,7 +670,10 @@
           "buildingCount": 2,
           "orderedBuildingCount": 0
         },
-        "note": "#953 moved the file's 'storedMassKg must have grown' proof here since command mode still had a haul outstanding when this wait opened; #1091-followup: the itinerary rebuild's new dispatch-cost ordering (#1090) delays which employee grabs the starved building task, so buildingCount now reaches 2 well before the first delivery lands (sandbox-confirmed: storedMassKg is still 0 right after this wait resolves). The proof moved back to the tick-40 step below, where it actually happens now."
+        "note": "#1384: fixed-duration actions (place_building) now scale by proficiency/fatigue, so the warehouses stand at tick ~246 and the first delivery (0 -> 1575 kg) lands while this wait runs; the 'storedMassKg must have grown' proof sits here again. Earlier history: #953 had it here, #1091-followup moved it to the tick-40 step; the later tick-40 step now only adds cash drain, the second delivery (1575 -> 3937.5 kg) lands in the tick-30 step before it.",
+        "increased": [
+          "storedMassKg"
+        ]
       }
     },
     {
@@ -726,10 +729,7 @@
         "decreased": [
           "cash"
         ],
-        "increased": [
-          "storedMassKg"
-        ],
-        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check — storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. #1091-followup: the 'increased' proof moved back here from the wait_until step above — the itinerary rebuild's dispatch-cost reordering (#1090) now has buildingCount reach 2 well before the first haul lands (sandbox-confirmed storedMassKg still 0 there), and this tick-40 step is where the delivery is sandbox-confirmed to land (0 -> 3871.875 kg in one traced run). Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs — increased is the cross-mode-robust proof."
+        "note": "#1384: cash drain only. The storedMassKg growth proof moved to the wait_until step above, since the deliveries now land before this step (no growth left in these 40 ticks)."
       }
     },
     {

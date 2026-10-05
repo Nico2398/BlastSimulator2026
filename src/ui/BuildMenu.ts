@@ -34,6 +34,7 @@ import { LocaleTextRegistry } from './localeText.js';
 import type { ClaimRefusalReason } from '../core/world/PlayableArea.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { Rect } from '../core/world/WorldGen.js';
+import { RESERVATION_REFUSAL, reservationBlocking, terrainReservations, type TerrainReservation } from '../core/entities/PlacementReservations.js';
 import { buildingFootprintOccupants } from '../core/nav/NavGridSync.js';
 import {
   getAllBuildingTypes,
@@ -287,6 +288,35 @@ export class BuildMenu extends PanelBase {
     return rectOverlapsOccupants(occupants, rect) ? t('shell.placement.refused_occupied') : null;
   }
 
+  /** Why `rect` (min inclusive, max exclusive) covers a ramp corridor or a drill hole (#1390); null when clear. */
+  private reservationRefusal(rect: Rect, reservations: ReadonlyArray<TerrainReservation>): string | null {
+    const kind = reservationBlocking(reservations, rect);
+    return kind === null ? null : t(RESERVATION_REFUSAL[kind].errorKey);
+  }
+
+  /** Current ramp and drill-hole reservations; computed once per refresh or hover, not per building. */
+  private currentReservations(): TerrainReservation[] {
+    return this.lastState ? terrainReservations(this.lastState) : [];
+  }
+
+  /** Reservation refusal for `b`'s next-tier footprint (#1390), or null. */
+  private upgradeRefusal(b: Building, nextTier: BuildingTier, reservations: ReadonlyArray<TerrainReservation>): string | null {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, nextTier));
+    return this.reservationRefusal({ minX: b.x, minZ: b.z, maxX: b.x + sizeX, maxZ: b.z + sizeZ }, reservations);
+  }
+
+  /** Disabled state and tooltip of `b`'s Upgrade button: the refusal reason when blocked, else the cost. */
+  private applyUpgradeState(
+    btn: HTMLButtonElement, b: Building, cash: number, reservations: ReadonlyArray<TerrainReservation>,
+  ): void {
+    if (b.tier >= 3) { btn.disabled = true; return; }
+    const nextTier = (b.tier + 1) as BuildingTier;
+    const cost = getUpgradeCost(b, nextTier);
+    const blocked = this.upgradeRefusal(b, nextTier, reservations);
+    btn.title = blocked ?? `$${cost}`;
+    btn.disabled = cash < cost || blocked !== null;
+  }
+
   /** A rectangle drag, like Drill.ts's grid tool — the whole dragged area is the order, no extra parameters to tune. */
   private armLevelGroundTool(): void {
     const kit = this.placementKit;
@@ -424,8 +454,10 @@ export class BuildMenu extends PanelBase {
       const at = sel ? { x: sel.x1, z: sel.z1 } : controller.hoveredTile;
       let rectReason: string | null = null;
       if (at) {
+        const reservations = this.currentReservations();
         const { sizeX, sizeZ } = getDefSize(def);
-        rectReason = this.rectRefusal({ minX: at.x, minZ: at.z, maxX: at.x + sizeX, maxZ: at.z + sizeZ }, movingId);
+        const rect = { minX: at.x, minZ: at.z, maxX: at.x + sizeX, maxZ: at.z + sizeZ };
+        rectReason = this.rectRefusal(rect, movingId) ?? this.reservationRefusal(rect, reservations);
       }
       const hover = hoverRefusal(controller, rectReason);
       overlay.update(at ? { shape: 'point', x: at.x, z: at.z, footprintCells: def.footprint, refused: hover.refused } : null);
@@ -555,6 +587,7 @@ export class BuildMenu extends PanelBase {
    */
   private refreshPlacedButtons(cash: number): void {
     const buildings = this.lastState?.buildings.buildings ?? [];
+    const reservations = this.currentReservations();
     for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
       const idStr = row.dataset['buildingId'];
       if (!idStr) continue;
@@ -569,8 +602,7 @@ export class BuildMenu extends PanelBase {
 
       const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
       if (upgradeBtn) {
-        const nextTier = b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
-        upgradeBtn.disabled = nextTier === null || cash < getUpgradeCost(b, nextTier);
+        this.applyUpgradeState(upgradeBtn, b, cash, reservations);
       }
     }
   }
@@ -597,10 +629,11 @@ export class BuildMenu extends PanelBase {
       this.placedEl.replaceChildren(emptyState(t('ui.build.none_placed')));
       return;
     }
-    this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b)));
+    const reservations = this.currentReservations();
+    this.placedEl.replaceChildren(...buildings.map((b) => this.makePlacedRow(b, reservations)));
   }
 
-  private makePlacedRow(b: Building): HTMLElement {
+  private makePlacedRow(b: Building, reservations: ReadonlyArray<TerrainReservation>): HTMLElement {
     const def = getBuildingDef(b.type, b.tier);
     const row = document.createElement('div');
     row.className = 'bs-build-placed-row';
@@ -636,12 +669,7 @@ export class BuildMenu extends PanelBase {
     upgradeBtn.className = 'bsx-btn bsx-btn-primary bs-build-upgrade-btn';
     upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
     upgradeBtn.textContent = t('ui.build.upgrade');
-    upgradeBtn.disabled = nextTier === null;
-    if (nextTier !== null) {
-      const upgradeCost = getUpgradeCost(b, nextTier);
-      upgradeBtn.title = `$${upgradeCost}`;
-      upgradeBtn.disabled = this.lastCash < upgradeCost;
-    }
+    this.applyUpgradeState(upgradeBtn, b, this.lastCash, reservations);
     upgradeBtn.addEventListener('click', () => {
       if (nextTier !== null && nextLocked) {
         this.setStatus(t('ui.build.research_required', { tier: nextTier }));

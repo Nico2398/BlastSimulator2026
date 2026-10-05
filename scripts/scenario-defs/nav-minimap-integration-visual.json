@@ -125,7 +125,7 @@
       }
     },
     {
-      "command": "build management_office at:7,8",
+      "command": "build management_office at:14,8",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -140,8 +140,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 14,
+          "z": 8,
+          "pitch": 60
+        },
+        {
           "type": "pickTile",
-          "x": 7,
+          "x": 14,
           "z": 8
         },
         {

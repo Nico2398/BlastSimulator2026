@@ -160,7 +160,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20",
-      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click lowers it to 2 before dragging, so the (20,20)-(22,22) rectangle (2x2) computes the declared 2x2 at spacing:2 (issue #479 follow-up, Finding #4). Spacing stays at 2 afterward \u2014 it persists across grid operations within a session, so grids 2-4 below inherit it (grid 4/4 decrements it further, down to 1). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper click and drag rectangle below now match this declared shape.",
+      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click lowers it to 2 before dragging, so the (20,20)-(22,22) rectangle (2x2) computes the declared 2x2 at spacing:2 (issue #479 follow-up, Finding #4). Spacing stays at 2 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it (grid 4/4 decrements it further, down to 1). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper click and drag rectangle below now match this declared shape.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1186,7 +1186,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) before Charge All, matching blast-overcharge.json's fix.",
+      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) before Charge All, matching blast-overcharge.json's fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1448,7 +1448,7 @@
           "sequencedCount": 0
         },
         "blocked": "[data-action=\"report-close\"]",
-        "note": "#950: a fired blast clears the plan back to zero \u2014 CATASTROPHIC rating with real projections confirms this grid's overcharge/understemmed premise actually holds at the UI-reachable stemming floor, not just at the command's old unreachable stemming:0. The report modal must still be closed at t=3200ms (past the old fixed 3000ms floor, per the assert above) while this real collapse is still playing, only opening once the awaitUsable step above proves it genuinely did, and closed again (this `blocked` goal) by the real CLOSE click at the end of this step's own interaction array."
+        "note": "#950: a fired blast clears the plan back to zero — CATASTROPHIC rating with real projections confirms this grid's overcharge/understemmed premise actually holds at the UI-reachable stemming floor, not just at the command's old unreachable stemming:0. The report modal must still be closed at t=3200ms (past the old fixed 3000ms floor, per the assert above) while this real collapse is still playing, only opening once the awaitUsable step above proves it genuinely did, and closed again (this `blocked` goal) by the real CLOSE click at the end of this step's own interaction array."
       }
     },
     {
@@ -3592,7 +3592,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #554-followup (issue #586 CI, real failure): a resolveEventIfPending alone did not fix a further 'covered by div' failure here -- root cause is a transient re-render race, not a stuck event dialog: BlastWorkshop.ts's suggestStep() auto-navigates the panel's active step reactively as background charge/drill state changes, and a bare clickSelector (single-shot, no polling) can land mid-re-render. Swapped for the same awaitUsable-then-clickSelector pattern already used everywhere else a control's usability needs polling rather than a one-shot probe -- requireUsable (interaction-driver.ts) retries the same 'covered' check every 150ms up to 6s, so a transient race clears on a later poll instead of failing the first attempt.",
+      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #554-followup (issue #586 CI, real failure): a resolveEventIfPending alone did not fix a further 'covered by div' failure here -- root cause is a transient re-render race, not a stuck event dialog: BlastWorkshop.ts's suggestStep() auto-navigates the panel's active step reactively as background charge/drill state changes, and a bare clickSelector (single-shot, no polling) can land mid-re-render. Swapped for the same awaitUsable-then-clickSelector pattern already used everywhere else a control's usability needs polling rather than a one-shot probe -- requireUsable (interaction-driver.ts) retries the same 'covered' check every 150ms up to 6s, so a transient race clears on a later poll instead of failing the first attempt.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -4130,15 +4130,15 @@
       "commandOutcome": "either"
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:800",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:2000",
       "timeout": 125,
-      "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some. #682 fix (real interaction-mode finding, live-diagnosed, not the reported overlay theory): `increased:[chargedCount]` dropped again -- it was only ever verified against command-mode runs, and does not hold in interaction mode on this seed. Live state dumps prove the 8 straggler clicks themselves are NOT blocked (orderedChargeCount genuinely climbs 0->7 across steps 130-137, one real order per click, so the buttons are clickable and reachable) -- interaction mode's real click-driven drilling pace simply saturates the grid (holeCount:62, chargedCount:62, orderedChargeCount:0) during step 129's own wait, before any straggler exists to charge, so every one of the 8 straggler clicks is a legitimate redundant re-order of an already-charged hole (harmless, matching this step's own `commandOutcome: either` reasoning) and chargedCount has nothing left to increase to. Command mode's own 53->61 trace is real and unaffected -- this is a genuine cross-mode pacing divergence (interaction mode's real click dispatch finishes the grid faster than command mode's bulk `tick`), not a bug in either mode, so the one shared `expect` block can only assert what holds in both: the drain itself completing. #1278 migration: widened 400 -> 800 -- under agent occupancy this same 34-hole drain (direct-traced, command mode) now takes 616 ticks, not the old budget's sub-400, because the tightly packed 33-employee/8x8/1m-spacing crew now pays real occupancy wait/relocate/reroute cost around each other instead of the old free pass-through; 800 gives margin over the measured value.",
+      "description": "#1384: widened 800 -> 2000 -- fixed-duration charge/drill actions now scale with proficiency/fatigue, so this drain measured 864 ticks (command mode) where 800 used to suffice. #682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some. #682 fix (real interaction-mode finding, live-diagnosed, not the reported overlay theory): `increased:[chargedCount]` dropped again -- it was only ever verified against command-mode runs, and does not hold in interaction mode on this seed. Live state dumps prove the 8 straggler clicks themselves are NOT blocked (orderedChargeCount genuinely climbs 0->7 across steps 130-137, one real order per click, so the buttons are clickable and reachable) -- interaction mode's real click-driven drilling pace simply saturates the grid (holeCount:62, chargedCount:62, orderedChargeCount:0) during step 129's own wait, before any straggler exists to charge, so every one of the 8 straggler clicks is a legitimate redundant re-order of an already-charged hole (harmless, matching this step's own `commandOutcome: either` reasoning) and chargedCount has nothing left to increase to. Command mode's own 53->61 trace is real and unaffected -- this is a genuine cross-mode pacing divergence (interaction mode's real click dispatch finishes the grid faster than command mode's bulk `tick`), not a bug in either mode, so the one shared `expect` block can only assert what holds in both: the drain itself completing. #1278 migration: widened 400 -> 800 -- under agent occupancy this same 34-hole drain (direct-traced, command mode) now takes 616 ticks, not the old budget's sub-400, because the tightly packed 33-employee/8x8/1m-spacing crew now pays real occupancy wait/relocate/reroute cost around each other instead of the old free pass-through; 800 gives margin over the measured value.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 800,
+          "maxTicks": 2000,
           "timeoutMs": 120000
         }
       ],
@@ -4150,30 +4150,34 @@
       }
     },
     {
-      "command": "charge hole:H8 explosive:boomite amount:8 stemming:0.5",
-      "description": "#947 CI-fix: final straggler retry -- H8 is drilled late (direct trace: holeCount only reaches 64, H8 included, during the wait_until directly above; every earlier straggler attempt at H8, including the one further up this file, ran while it still read 'Hole \\\"H8\\\" has not been drilled yet.'), so nothing charges it before now. `commandOutcome: either` and a real click-selector guard the case where a different run's own dispatch order drills (and charges) H8 earlier, making this retry a harmless no-op.",
+      "command": "charge hole:H17 explosive:boomite amount:8 stemming:0.5",
+      "description": "#1384: H17 is a straggler under the scaled action durations (blast reports 'H17: Missing charge' otherwise); same either-outcome reasoning as the H8 retry above. Interaction mode clicks the first row that is neither charged nor ordered (data-charged/data-ordered=false, a shape selector, not a baked hole id -- the #654 lint refuses those), which is H17 in a run where it is the lone straggler; clickIfPresent because a run where it already landed has nothing left to click.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
         },
         {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
           "type": "clickIfPresent",
-          "selector": "#bs-blast-panel [data-hole=\"H8\"] [data-action=\"charge-hole\"]"
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
         }
       ],
       "role": "player",
       "commandOutcome": "either"
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:250",
-      "description": "#947 CI-fix: drains H8's own final straggler retry above. #1283 CI-fix: widened 100 -> 250 -- the occupancy-crossing fix landed in this same issue (Locomotion.ts's busy-employee crossing fallback, scoped to a direct path rather than a full avoid-everyone-but-one search, #1283's own dense-grid follow-up) shifts this scenario's overall tick trajectory slightly; direct-traced (interaction mode, real click replay) this exact drain now completes at loop-tick 175 where it used to fit inside the old 100-tick budget, so 250 gives margin over the measured value, matching this file's own #1278 precedent for the identical reason one step above.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1384: drains the H17 straggler order above. The old H8 retry/drain pair was removed: with the widened drain wait before it, H8 is already drilled and charged, and re-ordering a charged hole (no already-loaded guard, mining.ts) only queued a redundant charge that stalled.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
-          "maxTicks": 250,
-          "timeoutMs": 30000
+          "maxTicks": 600,
+          "timeoutMs": 60000
         }
       ],
       "role": "setup",
@@ -4181,7 +4185,125 @@
         "equals": {
           "orderedChargeCount": 0
         }
-      }
+      },
+      "timeout": 90
+    },
+    {
+      "command": "tick 1",
+      "description": "#1384: further straggler sweep (interaction mode only; command mode has already reached orderedChargeCount:0/chargedCount:64 above, so this is a 1-tick no-op there). Under scaled action durations the set of holes still uncharged when the first drain returns depends on real-browser pacing, so the single click above can leave a second or third straggler and the FIRE button stays disabled (validateBlastPlan: missing charge). Each sweep orders the first row that is neither charged nor ordered; the drain wait that follows lets the panel re-render from real state before the next sweep picks its row, so two sweeps never double-order one hole. clickIfPresent: nothing to click once every hole is charged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1384: drains the straggler sweep directly above (immediate when nothing was ordered); waiting on the order queue, not a fixed pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      },
+      "timeout": 90
+    },
+    {
+      "command": "tick 1",
+      "description": "#1384: further straggler sweep (interaction mode only; command mode has already reached orderedChargeCount:0/chargedCount:64 above, so this is a 1-tick no-op there). Under scaled action durations the set of holes still uncharged when the first drain returns depends on real-browser pacing, so the single click above can leave a second or third straggler and the FIRE button stays disabled (validateBlastPlan: missing charge). Each sweep orders the first row that is neither charged nor ordered; the drain wait that follows lets the panel re-render from real state before the next sweep picks its row, so two sweeps never double-order one hole. clickIfPresent: nothing to click once every hole is charged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1384: drains the straggler sweep directly above (immediate when nothing was ordered); waiting on the order queue, not a fixed pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      },
+      "timeout": 90
+    },
+    {
+      "command": "tick 1",
+      "description": "#1384: further straggler sweep (interaction mode only; command mode has already reached orderedChargeCount:0/chargedCount:64 above, so this is a 1-tick no-op there). Under scaled action durations the set of holes still uncharged when the first drain returns depends on real-browser pacing, so the single click above can leave a second or third straggler and the FIRE button stays disabled (validateBlastPlan: missing charge). Each sweep orders the first row that is neither charged nor ordered; the drain wait that follows lets the panel re-render from real state before the next sweep picks its row, so two sweeps never double-order one hole. clickIfPresent: nothing to click once every hole is charged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1384: drains the straggler sweep directly above (immediate when nothing was ordered); waiting on the order queue, not a fixed pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      },
+      "timeout": 90
     },
     {
       "command": "sequence auto delay_step:25",
@@ -4238,7 +4360,7 @@
           "chargedCount": 0,
           "sequencedCount": 0
         },
-        "note": "a fired blast clears the plan back to zero. #553: shrunk from the original 64-hole grid \u2014 see this cycle's own drill_plan step for why; the PHYSICS_FRAGMENT_CAP overflow this note used to speculate about was never a hard assertion here"
+        "note": "a fired blast clears the plan back to zero. #553: shrunk from the original 64-hole grid — see this cycle's own drill_plan step for why; the PHYSICS_FRAGMENT_CAP overflow this note used to speculate about was never a hard assertion here"
       }
     },
     {

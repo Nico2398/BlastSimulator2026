@@ -110,7 +110,7 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  *  - targetEmployeeId is left exactly as it was for a targeted action (stays
  *    reserved for its target) or for an open-pool action already arrived at
  *    its target (stays open-pool — work-in-progress is preserved via
- *    payload.durationTicks below instead, and any qualified employee can
+ *    payload.resumeTicks below instead, and any qualified employee can
  *    finish it from here). An open-pool action interrupted while still
  *    walking there is the one exception: it gets re-targeted at `employee`
  *    instead of releasing to the open pool — see this function's own doc
@@ -135,9 +135,9 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  * physically arrived and was counting down (`taskTicksRemaining` set — as
  * opposed to still walking there, which hasn't consumed any of the task's own
  * duration yet), the remaining tick count is written onto the action's own
- * `payload.durationTicks` — the same override `computeActionWorkTicks`
- * (ActionSelection.ts) already honors for a survey's method-specific
- * duration — so whichever employee reclaims this action later (the same one
+ * `payload.resumeTicks` — the unscaled override `computeActionWorkTicks`
+ * (ActionSelection.ts) honors ahead of the base `durationTicks`, which stays
+ * untouched — so whichever employee reclaims this action later (the same one
  * post-rest, or, since an open-pool action's `targetEmployeeId` stays
  * whatever it was, potentially a different one) resumes it instead of
  * restarting its full work duration from scratch. Without this, a single
@@ -253,7 +253,7 @@ export function interruptActiveAction(
       employee.interruptedActionPayload = action.payload;
 
       if (employee.taskTicksRemaining !== null && employee.taskTicksRemaining > 0) {
-        action.payload = { ...action.payload, durationTicks: employee.taskTicksRemaining };
+        action.payload = { ...action.payload, resumeTicks: employee.taskTicksRemaining };
       } else if (
         action.type !== 'rest'
         && employee.taskTicksRemaining === null

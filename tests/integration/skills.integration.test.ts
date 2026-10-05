@@ -25,6 +25,8 @@ import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuratio
 import { Random } from '../../src/core/math/Random.js';
 import { SURVEY_DURATION_TICKS, XP_THRESHOLDS } from '../../src/core/config/balance.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
+import { createRunner } from '../../src/console/createRunner.js';
+import { tickUntil } from './helpers.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -752,5 +754,48 @@ describe('Vehicle-gated dispatch grants driving licence XP tick-by-tick (#622)',
     tickCommand(ctx, ['1'], {});
     expect(qual().proficiencyLevel).toBe(2);
     expect(qual().xp).toBeGreaterThanOrEqual(XP_THRESHOLDS[2]);
+  });
+});
+
+// ── Fixed-duration actions honour proficiency (#1384) ────────────────────────
+//
+// charge_hole carries a BASE payload.durationTicks; the charging employee's
+// blasting proficiency scales it. Two identical holes, charged by an
+// all-level-1 and an all-level-5 blaster crew, must not take the same time.
+
+describe('charge_hole duration scales with blasting proficiency (#1384)', () => {
+  /** Ticks from ordering the charge until the hole's charge lands. */
+  function ticksToCharge(blastingLevel: 1 | 5): number {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    state.sitePolicy.shiftMode = 'continuous';
+    state.sitePolicy.fatigueRestThreshold = 0;
+    for (const emp of state.employees.employees) {
+      const q = emp.qualifications.find(x => x.category === 'blasting');
+      if (q) q.proficiencyLevel = blastingLevel;
+    }
+
+    expect(run('drill_plan grid rows:1 cols:1 spacing:5 depth:8 start:14,14').success).toBe(true);
+    tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
+    expect(state.drillHoles).toHaveLength(1);
+    const holeId = state.drillHoles[0]!.id;
+
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+    let ticks = 0;
+    while (state.chargesByHole[holeId] === undefined && ticks < 800) {
+      run('tick 1');
+      ticks++;
+    }
+    expect(state.chargesByHole[holeId]).toBeDefined();
+    return ticks;
+  }
+
+  it('a level-5 blaster charges the same hole in fewer ticks than a level-1 blaster', () => {
+    const rookieTicks = ticksToCharge(1);
+    const masterTicks = ticksToCharge(5);
+
+    expect(masterTicks).toBeLessThan(rookieTicks);
   });
 });

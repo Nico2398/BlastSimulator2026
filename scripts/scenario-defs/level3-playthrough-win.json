@@ -769,7 +769,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         }
       }
     },
@@ -790,7 +790,7 @@
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
-          "surveyCount": 1
+          "surveyCount": 2
         }
       },
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #1262-followup: surveyCount re-derived 2 -> 1, same one-tick occupancy shift as the tick step above.",
@@ -1435,7 +1435,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 99,
+          "tickCount": 107,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1712,7 +1712,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 795778,
+          "cash": 788684,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1932,7 +1932,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1957,7 +1957,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1979,7 +1979,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2001,7 +2001,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2027,7 +2027,7 @@
           "tickCount": 6
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2053,7 +2053,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2076,7 +2076,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2106,7 +2106,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2128,7 +2128,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2154,7 +2154,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2176,7 +2176,7 @@
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2222,9 +2222,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 550,
+          "tickCount": 538,
           "cash": 2300000,
-          "deathCount": 6,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,

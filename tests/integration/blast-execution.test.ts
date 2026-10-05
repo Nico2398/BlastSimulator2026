@@ -282,7 +282,7 @@ describe('Blast execution — #1346', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    expect(run('drill_plan grid rows:3 cols:4 spacing:3 depth:8 start:12,12').success).toBe(true);
+    expect(run('drill_plan grid rows:4 cols:6 spacing:3 depth:8 start:12,12').success).toBe(true);
     const state = ctx.state!;
     for (let i = 0; i < 2000 && state.drillHoles.length < 3; i++) run('tick 1');
     expect(state.drillHoles.length).toBeGreaterThanOrEqual(3);
@@ -293,6 +293,7 @@ describe('Blast execution — #1346', () => {
     for (let i = 0; i < 3000; i++) {
       for (const h of state.drillHoles) {
         if (ordered.has(h.id)) continue;
+        state.cash = Math.max(state.cash, 100000); // slower scaled drilling accrues wages; keep charge orders affordable
         expect(run(`charge hole:${h.id} explosive:boomite amount:8 stemming:2`).success).toBe(true);
         ordered.add(h.id);
       }
@@ -339,7 +340,7 @@ describe('Blast execution — #1346', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    expect(run('drill_plan grid rows:3 cols:4 spacing:3 depth:8 start:12,12').success).toBe(true);
+    expect(run('drill_plan grid rows:4 cols:6 spacing:3 depth:8 start:12,12').success).toBe(true);
     const state = ctx.state!;
     for (let i = 0; i < 2000 && state.drillHoles.length < 2; i++) run('tick 1');
     expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
@@ -359,7 +360,7 @@ describe('Blast execution — #1346', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
-    expect(run('drill_plan grid rows:3 cols:4 spacing:3 depth:8 start:12,12').success).toBe(true);
+    expect(run('drill_plan grid rows:4 cols:6 spacing:3 depth:8 start:12,12').success).toBe(true);
     const state = ctx.state!;
     for (let i = 0; i < 2000 && state.drillHoles.length < 1; i++) run('tick 1');
     expect(state.drillHoles.length).toBeGreaterThan(0);

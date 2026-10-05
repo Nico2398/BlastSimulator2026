@@ -246,6 +246,10 @@ export class BlastReportModal {
       const fg = style.critical ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
       notes.push(this.makeNoteCard(style.icon, bgPrefix, fg, accidentText(a, state)));
     }
+    for (const sb of report.secondaryBlasts ?? []) {
+      notes.push(this.makeNoteCard('build', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
+        t('ui.blast_workshop.report.secondary_blast', { kg: sb.explosivesKg, id: sb.buildingId, casualties: sb.casualties })));
+    }
     if (report.oversizedFragments > 0) {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
         t('ui.blast_workshop.report.oversized_hint', { count: report.oversizedFragments, vehicle: t('vehicle_type.rock_fragmenter') })));
