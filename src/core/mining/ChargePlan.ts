@@ -102,3 +102,16 @@ export function chargeOrderCost(explosiveId: string, amountKg: number): number {
 export function plannedChargesCost(chargesByHole: Readonly<Record<string, HoleCharge>>): number {
   return Object.values(chargesByHole).reduce((sum, c) => sum + chargeOrderCost(c.explosiveId, c.amountKg), 0);
 }
+
+/** Metres of hole column that `amountKg` of explosive occupies. */
+export function chargeColumnM(amountKg: number): number {
+  void amountKg;
+  return undefined as unknown as number; // TODO: implement
+}
+
+/** Raw (unrounded) heaviest charge that fits a hole of `holeDepth` under `stemmingM`; never negative. */
+export function maxChargeKgForHole(holeDepth: number, stemmingM: number): number {
+  void holeDepth;
+  void stemmingM;
+  return undefined as unknown as number; // TODO: implement
+}
