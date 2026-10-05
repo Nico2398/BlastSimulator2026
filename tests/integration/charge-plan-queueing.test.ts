@@ -595,8 +595,9 @@ describe('charge column overflow is refused at order time (#1361)', () => {
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
     const state = ctx.state!;
-    drillAndLand(run, state, 'rows:1 cols:1 spacing:5 depth:8 start:12,12');
-    drillAndLand(run, state, 'rows:1 cols:1 spacing:5 depth:4 start:20,20');
+    drillAndLand(run, state, 'rows:1 cols:2 spacing:5 depth:8 start:12,12');
+    expect(state.drillHoles).toHaveLength(2);
+    state.drillHoles[1]!.depth = 4; // shallow hole: 5 kg (2.5 m) + 2 m stemming overflows it
     expect(state.drillHoles.map(h => h.depth).sort()).toEqual([4, 8]);
     const cashBefore = state.cash;
 
