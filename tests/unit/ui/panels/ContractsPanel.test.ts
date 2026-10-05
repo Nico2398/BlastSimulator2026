@@ -425,4 +425,38 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
       expect(wrapper.textContent).toContain(emptyKey);
     }
   });
+
+  it('disables the negotiate button only on offers already negotiated (#1366)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(
+      makeContract({ id: 1, negotiationAttempts: 1 }),
+      makeContract({ id: 2 }),
+    );
+    panel.show();
+    panel.update(state);
+
+    const btn = (id: number) => panel.root.querySelector<HTMLButtonElement>(
+      `[data-contract-id="${id}"] [data-action="negotiate"]`,
+    );
+    expect(btn(1)).not.toBeNull();
+    expect(btn(1)!.disabled).toBe(true);
+    expect(btn(1)!.title).toBe(t('ui.contracts.negotiate_used'));
+    expect(btn(2)!.disabled).toBe(false);
+  });
+
+  it('disables a card negotiate button after the offer has been negotiated (#1366)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const c = makeContract({ id: 3 });
+    state.contracts.available.push(c, makeContract({ id: 4 }));
+    panel.show();
+    panel.update(state);
+    expect(panel.root.querySelector<HTMLButtonElement>('[data-contract-id="3"] [data-action="negotiate"]')!.disabled).toBe(false);
+
+    c.negotiationAttempts = 1;
+    panel.update(state);
+    expect(panel.root.querySelector<HTMLButtonElement>('[data-contract-id="3"] [data-action="negotiate"]')!.disabled).toBe(true);
+    expect(panel.root.querySelector<HTMLButtonElement>('[data-contract-id="4"] [data-action="negotiate"]')!.disabled).toBe(false);
+  });
 });

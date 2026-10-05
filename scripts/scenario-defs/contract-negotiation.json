@@ -1,6 +1,6 @@
 {
   "name": "contract-negotiation",
-  "description": "Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes -- the file's original version never called `contract negotiate` at all, only accept/deliver; rewritten to exercise the actual negotiation mechanic (issue #479 follow-up).",
+  "description": "Negotiate a contract once and observe the outcome, then prove a second negotiation on the same offer is refused (one attempt per offer, #1366), then accept and attempt delivery. The file's original version never called `contract negotiate` at all; rewritten to exercise the actual negotiation mechanic (issue #479 follow-up).",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow",
@@ -39,7 +39,7 @@
     },
     {
       "command": "contract negotiate type:supply material:dirtite",
-      "description": "First negotiation attempt (round 1). No state field exists for a contract's own terms (price/deadline/penalty) -- there is nothing to negotiate over but the contracts a fresh dusty_hollow start already offers, so the target is fixed at the supply/dirtite offer throughout this file (confirmed id 1 in a fresh dusty_hollow start, issue #635) rather than reading it back from `contract list`'s text output, which expect can't do.",
+      "description": "Negotiation attempt on the supply/dirtite offer (the only attempt it gets, #1366). The target is fixed at the supply/dirtite offer throughout this file rather than read back from `contract list`'s text output, which expect can't do.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -59,12 +59,12 @@
         "changedBy": {
           "cash": 0
         },
-        "note": "negotiating costs nothing and moves no count -- the only real effect is on the contract's own terms, which no state field exposes. Confirmed via direct trace (seed:42, dusty_hollow): this first attempt genuinely FAILS (deadline worsened by 11%)."
+        "note": "negotiating costs nothing and moves no count -- the only real effect is on the contract's own terms, which no state field exposes. The outcome (success or failure) depends on the per-attempt RNG stream and is not pinned here."
       }
     },
     {
       "command": "tick 5",
-      "description": "A tick between negotiation attempts, not just a pause -- contract negotiate's RNG is freshly seeded from state.seed + state.tickCount each call (economy.ts), so two negotiate calls at the same tick roll identically. This is what lets round 2 below land a genuinely different outcome.",
+      "description": "A tick passes between the first attempt and the refused retry, so the refusal below cannot be explained by an identical same-tick roll.",
       "interaction": [
         {
           "type": "command",
@@ -80,20 +80,22 @@
     },
     {
       "command": "contract negotiate type:supply material:dirtite",
-      "description": "Second negotiation attempt (round 2) on the same still-available contract -- this is the file's own premise made real: repeated negotiation produces both outcomes.",
+      "description": "Second negotiation on the same offer is refused (one attempt per offer, #1366): the console answers `already negotiated`, and the card's negotiate button is disabled in the panel.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
+          "type": "command",
+          "command": "contract negotiate type:supply material:dirtite"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "changedBy": {
           "cash": 0
         },
-        "note": "confirmed via direct trace: this second attempt genuinely SUCCEEDS (deadline improved by 8%) -- opposite of round 1, proving the file's own claim (\"observe both improved and worsened pricing outcomes\") for real rather than asserting it never happened."
-      }
+        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"negotiate\"]",
+        "note": "the refused retry leaves the contract's terms and cash untouched; the negotiate button on that card is disabled with the 'Already negotiated' tooltip."
+      },
+      "commandOutcome": "refused"
     },
     {
       "command": "contract accept type:supply material:dirtite",

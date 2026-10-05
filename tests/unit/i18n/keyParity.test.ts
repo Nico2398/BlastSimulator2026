@@ -421,7 +421,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1399: +3 keys (demolish confirm title/body/loses_explosives), both locales: 3587.
     // #1357: +1 key (mining.charge.explosive_not_available), both locales: 3588.
     // #1359: +4 keys (mining.drill_plan.refused_footprint, mining.drill_plan.grid_skipped, mining.drill_plan.grid_all_blocked, ui.blast_workshop.drill.grid_skipped_preview), both locales: 3592.
-    expect(Object.keys(en).length).toBe(3592);
+    // #1366: +2 keys (economy.negotiation.already_negotiated, ui.contracts.negotiate_used), both locales: 3594.
+    // #1366 refactor: +1 key (economy.negotiation.not_found), both locales: 3595.
+    expect(Object.keys(en).length).toBe(3595);
   });
 });
 

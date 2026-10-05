@@ -26,6 +26,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
+import { canNegotiate } from '../../core/economy/Negotiation.js';
 import type { Contract, ContractType, NegotiationField } from '../../core/economy/Contract.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -80,7 +81,7 @@ export class ContractsPanel extends PanelBase {
       stored: Math.round(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
       ore: state.collectedOre,
       active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}`),
-      available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}`),
+      available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
       tick: state.tickCount,
@@ -310,6 +311,7 @@ export class ContractsPanel extends PanelBase {
 
     const negotiateBtn = button('ghost', t('ui.contracts.negotiate'), {
       dataAction: 'negotiate',
+      ...(canNegotiate(c) ? {} : { disabled: true, title: t('ui.contracts.negotiate_used') }),
       onClick: () => this.gameConsole?.(`contract negotiate id:${c.id}`),
     });
     negotiateBtn.style.cssText = 'flex:1;height:30px;font-size:10px';

@@ -1903,3 +1903,34 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
     expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
   });
 });
+
+describe('negotiationAttempts persistence (#1366)', () => {
+  function stateWithOffer() {
+    const state = createGame({ seed: 3, mineType: 'desert' });
+    state.contracts.available.push({
+      id: 77, type: 'ore_sale', materialId: 'dirtite', description: 'x',
+      quantityKg: 100, deliveredKg: 0, pricePerKg: 3, deadlineTicks: 50, acceptedAtTick: 0,
+      penaltyAmount: 90, earlyBonus: 45, completed: false, expired: false,
+    });
+    return state;
+  }
+
+  it('round trip keeps negotiationAttempts', () => {
+    const state = stateWithOffer();
+    state.contracts.available[0]!.negotiationAttempts = 1;
+    const restored = deserialize(serialize(state));
+    expect(restored.contracts.available[0]!.negotiationAttempts).toBe(1);
+  });
+
+  it('an old save without the field is negotiable once', async () => {
+    const { canNegotiate, negotiateContract } = await import('../../../src/core/economy/Negotiation.js');
+    const parsed = JSON.parse(serialize(stateWithOffer()));
+    delete parsed.contracts.available[0].negotiationAttempts;
+    const restored = deserialize(JSON.stringify(parsed));
+    const offer = restored.contracts.available[0]!;
+    expect(canNegotiate(offer)).toBe(true);
+    const first = negotiateContract(restored.contracts, offer.id, 0, new Random(1));
+    expect(first && 'refused' in first).toBe(false);
+    expect(negotiateContract(restored.contracts, offer.id, 0, new Random(1))).toEqual({ refused: 'already_negotiated' });
+  });
+});

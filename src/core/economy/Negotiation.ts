@@ -2,7 +2,10 @@
 // Probabilistic negotiation that can improve or worsen contract terms.
 
 import type { Contract, ContractState, NegotiationChange } from './Contract.js';
+import { computeEarlyBonus } from './Contract.js';
 import { Random } from '../math/Random.js';
+import { hash32, hashCombine } from '../math/Hash.js';
+import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER } from '../config/balance.js';
 
 // ── Config ──
 
@@ -25,6 +28,38 @@ export interface NegotiationResult {
   contract: Contract;
 }
 
+export type NegotiationRefusal = 'not_found' | 'already_negotiated';
+
+/** Seed of the RNG stream for one negotiation attempt on one offer. */
+export function negotiationStreamSeed(
+  seed: number,
+  tick: number,
+  contractId: number,
+  attempt: number,
+): number {
+  let h = hash32(seed | 0);
+  for (const v of [tick, contractId, attempt]) h = hashCombine(h, v);
+  return h | 0;
+}
+
+/** Whether the offer still has negotiation attempts left. */
+export function canNegotiate(contract: Contract): boolean {
+  return (contract.negotiationAttempts ?? 0) < NEGOTIATION_MAX_ATTEMPTS_PER_OFFER;
+}
+
+/** Negotiate using a per-attempt RNG stream derived from seed, tick, id and attempt. */
+export function negotiateContractAtTick(
+  state: ContractState,
+  contractId: number,
+  reputation: number,
+  seed: number,
+  tick: number,
+): NegotiationResult | { refused: NegotiationRefusal } {
+  const attempt = state.available.find(c => c.id === contractId)?.negotiationAttempts ?? 0;
+  const rng = new Random(negotiationStreamSeed(seed, tick, contractId, attempt));
+  return negotiateContract(state, contractId, reputation, rng) ?? { refused: 'not_found' };
+}
+
 /**
  * Negotiate a contract in the available list.
  * Success probability = BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR.
@@ -36,9 +71,12 @@ export function negotiateContract(
   contractId: number,
   reputation: number,
   rng: Random,
-): NegotiationResult | null {
+): NegotiationResult | { refused: 'already_negotiated' } | null {
   const contract = state.available.find(c => c.id === contractId);
   if (!contract) return null;
+  const attempts = contract.negotiationAttempts ?? 0;
+  if (attempts >= NEGOTIATION_MAX_ATTEMPTS_PER_OFFER) return { refused: 'already_negotiated' };
+  contract.negotiationAttempts = attempts + 1;
 
   const successRate = Math.min(0.95, Math.max(0.05, BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR));
   const isSuccess = rng.chance(successRate);
@@ -90,6 +128,9 @@ export function negotiateContract(
     }
   }
 
+  if (changes.some(c => c.field === 'price')) {
+    contract.earlyBonus = computeEarlyBonus(contract.quantityKg, contract.pricePerKg);
+  }
   return { success: isSuccess, changes, contract };
 }
 
