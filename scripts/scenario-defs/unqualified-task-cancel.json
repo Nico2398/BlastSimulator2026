@@ -155,7 +155,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle",
+          "selector": "#bs-employee-panel [data-employee-role=\"surveyor\"] .bs-detail-toggle",
           "timeoutMs": 2000
         },
         {

@@ -103,7 +103,8 @@ export function cancelRampCommand(ctx: MiningContext, rampId: number): { success
   if (!ramp) return { success: false, output: `Ramp #${rampId} not found` };
 
   let refunded = 0;
-  for (const segment of ramp.segments) {
+  // Snapshot: cancelAction releases the planned segment from ramp.segments.
+  for (const segment of [...ramp.segments]) {
     if (segment.done) continue;
     const result = cancelAction(state, segment.actionId);
     if (result.success) refunded += result.refunded ?? 0;

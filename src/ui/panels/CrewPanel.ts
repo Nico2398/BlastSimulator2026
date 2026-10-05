@@ -205,7 +205,7 @@ export class CrewPanel extends PanelBase {
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {
     const expanded = e.id === this.expandedId;
-    const row = el('div', { attrs: { 'data-employee-id': String(e.id) } });
+    const row = el('div', { attrs: { 'data-employee-id': String(e.id), 'data-employee-role': e.role } });
     // flex-shrink:0 — overflow:hidden (for the rounded corners) drops this
     // row's automatic min-height from content-based to 0, which without this
     // lets bodyEl's flex layout compress an expanded row to fit instead of

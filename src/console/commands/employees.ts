@@ -22,11 +22,11 @@ import {
 } from '../../core/entities/EmployeeTraining.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
-import { releasePlannedHoleForCancelledAction } from './mining.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { t } from '../../core/i18n/I18n.js';
+import { emitFootprintOccupancyChanged } from './buildingHelpers.js';
 
 const VALID_SKILL_CATEGORIES: SkillCategory[] = [
   'driving.truck', 'driving.excavator', 'driving.drill_rig',
@@ -298,10 +298,10 @@ export function employeeCommand(
           : t('employees.cancel_action_not_found', { id });
         return { success: false, output: message };
       }
-      // A cancelled drill_hole/charge_hole order still has a ghost in
-      // plannedDrillHoles/plannedChargesByHole — cancelAction only removes
-      // the generic PendingAction record (#554 code review).
-      releasePlannedHoleForCancelledAction(ctx, result.action!);
+      // cancelAction already released the planned entry; a freed building
+      // footprint still has to reach the nav grid.
+      const freed = result.freedFootprint;
+      if (freed) emitFootprintOccupancyChanged(ctx, freed.x, freed.z, freed.sizeX, freed.sizeZ);
       const refundSuffix = result.refunded && result.refunded > 0
         ? t('employees.cancel_refund_suffix', { amount: formatMoney(result.refunded) })
         : '';

@@ -11,7 +11,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import { getDefSize, getBuildingDef } from '../entities/Building.js';
 
 /** Footprint a cancelled building order freed; the caller tells the nav grid. */
-interface FreedFootprint {
+export interface FreedFootprint {
   x: number;
   z: number;
   sizeX: number;

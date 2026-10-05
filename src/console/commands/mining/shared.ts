@@ -3,7 +3,6 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState, PendingAction } from '../../../core/state/GameState.js';
 import { cancelAction } from '../../../core/engine/TaskDispatch.js';
-import { releasePlannedOrderForCancelledAction } from '../../../core/engine/CancelledOrderCleanup.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../../core/mining/BlastPlan.js';
 import type { BlastPlan, ValidationError } from '../../../core/mining/BlastPlan.js';
@@ -71,16 +70,6 @@ export function findOutstandingChargeAction(state: GameState, holeId: string): P
 export function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
   const action = findOutstandingChargeAction(state, holeId);
   if (action) cancelAction(state, action.id);
-}
-
-/**
- * Console face of releasePlannedOrderForCancelledAction (core, CancelledOrderCleanup.ts):
- * releases the planned order a cancelled action reserved, then tells the nav
- * grid when a cancelled building order freed its footprint.
- */
-export function releasePlannedHoleForCancelledAction(ctx: GameContext, action: PendingAction): void {
-  const freed = releasePlannedOrderForCancelledAction(ctx.state!, action);
-  if (freed) emitFootprintOccupancyChanged(ctx, freed.x, freed.z, freed.sizeX, freed.sizeZ);
 }
 
 /**

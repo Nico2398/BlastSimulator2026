@@ -8,7 +8,6 @@ import type { SkillCategory } from '../entities/Employee.js';
 import { createEmployeeState, hireEmployee } from '../entities/Employee.js';
 import { availableTrainingOffers, enrolInTraining, planTraining } from '../entities/EmployeeTraining.js';
 import { cancelAction } from '../engine/TaskDispatch.js';
-import { releasePlannedOrderForCancelledAction } from '../engine/CancelledOrderCleanup.js';
 import { applyTaskCompletion } from '../engine/TaskCompletionEffects.js';
 import { completePendingAction } from '../engine/TaskLifecycleCore.js';
 import { emitFootprintRegionChanged } from '../engine/BuildingTaskHelpers.js';
@@ -52,7 +51,7 @@ const cancelTask: UnqualifiedEffectHandler = (ids, world) => {
   for (const action of pendingActionsOf(world, ids)) {
     const result = cancelAction(state, action.id);
     if (!result.success) continue;
-    const freed = releasePlannedOrderForCancelledAction(state, action);
+    const freed = result.freedFootprint;
     if (freed && grid && emitter) {
       emitFootprintRegionChanged(emitter, grid, freed.x, freed.z, freed.sizeX, freed.sizeZ);
     }
