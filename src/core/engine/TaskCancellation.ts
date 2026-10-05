@@ -578,3 +578,21 @@ export function fireEmployeeFromWorld(
   removeFromRoster(state.employees, employeeId);
   return { success: true };
 }
+
+/**
+ * Return one injured, alive employee's queued (not yet started) non-rest actions
+ * to the open pool and drop them from the employee's taskQueue. The active /
+ * in-progress action is left untouched. Queued non-rest actions that targeted the
+ * employee get targetEmployeeId cleared so anyone qualified can claim them (#1381).
+ */
+export function releaseInjuredEmployeeQueue(_state: GameState, _employeeId: number): void {
+  // TODO: implement
+}
+
+/**
+ * Apply releaseInjuredEmployeeQueue to every alive, injured employee that still
+ * holds queued work. Idempotent (#1381).
+ */
+export function releaseInjuredEmployeesQueues(_state: GameState): void {
+  // TODO: implement
+}

@@ -8,7 +8,7 @@ import { holdsRequiredSkill, type Employee } from '../entities/Employee.js';
 export type { PendingAction };
 
 export { clearActiveTaskFields, completePendingAction, completeIfOwnedRestAction } from './TaskLifecycleCore.js';
-export { cancelAction, interruptActiveAction, releaseDeadEmployeeActions } from './TaskCancellation.js';
+export { cancelAction, interruptActiveAction, releaseDeadEmployeeActions, releaseInjuredEmployeeQueue, releaseInjuredEmployeesQueues } from './TaskCancellation.js';
 export type { CancelActionResult } from './TaskCancellation.js';
 
 /**
