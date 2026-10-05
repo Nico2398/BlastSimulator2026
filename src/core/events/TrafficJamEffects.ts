@@ -15,12 +15,12 @@ import {
 } from '../config/balance.js';
 
 /** What a jam effect handler may touch. */
-export interface JamWorld {
+export interface EventWorld {
   state: GameState;
   grid: VoxelGrid | null;
 }
 
-interface JamEffectOutcome {
+export interface EffectOutcome {
   effects: string[];
   /** Cash for the caller to apply to the flat cash field. */
   cashChange: number;
@@ -32,11 +32,11 @@ interface JamEffectOutcome {
   resultKeySuffix: '' | '_alt';
 }
 
-type JamEffectHandler = (jam: TrafficJam, world: JamWorld, tick: number) => JamEffectOutcome;
+type JamEffectHandler = (jam: TrafficJam, world: EventWorld, tick: number) => EffectOutcome;
 
 const UNCHANGED = { cashChange: 0, cashSettled: 0, scoreChanges: {} } as const;
 
-function silence(world: JamWorld, jam: TrafficJam, tick: number, ticks: number): void {
+function silence(world: EventWorld, jam: TrafficJam, tick: number, ticks: number): void {
   world.state.events.jamSilencedUntil[jam.key] = tick + ticks;
 }
 
@@ -59,7 +59,7 @@ const rerouteVehicles: JamEffectHandler = (jam, world, tick) => {
  */
 const widenRamp: JamEffectHandler = (jam, world, tick) => {
   const { state, grid } = world;
-  const failed = (): JamEffectOutcome => {
+  const failed = (): EffectOutcome => {
     silence(world, jam, tick, TRAFFIC_JAM_REROUTE_SILENCE_TICKS);
     return { ...UNCHANGED, effects: [], resultKeySuffix: '_alt' };
   };

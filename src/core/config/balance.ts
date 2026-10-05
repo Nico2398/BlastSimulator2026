@@ -1635,3 +1635,6 @@ export const NEGOTIATION_MAX_ATTEMPTS_PER_OFFER = 1;
 
 /** Early-delivery bonus as a fraction of quantity x price (#1366). */
 export const NEGOTIATION_EARLY_BONUS_RATE = 0.15;
+
+/** Cash fee for hiring a contractor to do an unqualified task (#1380). */
+export const UNQUALIFIED_CONTRACTOR_FEE = 25000;
