@@ -14,6 +14,7 @@ import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCor
 import { syncItineraryMirrors } from './MoveTo.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
 import { estimateLegDistance } from './PlanItinerary.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 
 export interface CancelActionResult {
@@ -527,4 +528,28 @@ export function releaseDeadEmployeeActions(state: GameState, employeeId: number)
       releaseActionToOpenPool(state, action);
     }
   }
+}
+
+/**
+ * Single removal routine for an employee leaving the world (fired, framed,
+ * killed in an accident): alights from any vehicle/building, releases held
+ * and targeted actions to the pool, clears task/itinerary state and
+ * agentOccupancy. Idempotent; works when alive is false or the employee is
+ * no longer in the roster. (#1378)
+ */
+export function releaseEmployeeFromWorld(_state: GameState, _employeeId: number, _emitter?: EventEmitter): void {
+  // TODO: implement
+}
+
+/**
+ * Fire an employee: checks existence and union protection (unless
+ * opts.force), releases them from the world, then splices the roster. (#1378)
+ */
+export function fireEmployeeFromWorld(
+  _state: GameState,
+  _employeeId: number,
+  _opts?: { force?: boolean },
+): { success: boolean; error?: string } {
+  // TODO: implement
+  return undefined as unknown as { success: boolean; error?: string };
 }

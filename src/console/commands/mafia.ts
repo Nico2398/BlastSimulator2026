@@ -60,7 +60,7 @@ export function mafiaCommand(
           }),
         };
       }
-      const result = arrangeAccident(state.mafia, state.employees, state.corruption, empId, rng);
+      const result = arrangeAccident(state.mafia, state, state.corruption, empId, rng);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Arranged accident', state.tickCount);
       return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
@@ -75,7 +75,7 @@ export function mafiaCommand(
         f => f.employeeId === empId && state.tickCount >= f.readyTick,
       );
       if (pending) {
-        const result = completeFrame(state.mafia, state.employees, empId, state.tickCount, rng);
+        const result = completeFrame(state.mafia, state, empId, state.tickCount, rng);
         return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
       }
 

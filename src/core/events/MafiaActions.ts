@@ -4,6 +4,7 @@
 
 import type { Random } from '../math/Random.js';
 import type { CorruptionState } from '../economy/Corruption.js';
+import type { GameState } from '../state/GameState.js';
 import type { EmployeeState } from '../entities/Employee.js';
 import { killEmployee } from '../entities/Employee.js';
 import {
@@ -72,11 +73,12 @@ function applyExposure(mafia: MafiaState, nominal: number): number {
  */
 export function arrangeAccident(
   mafia: MafiaState,
-  employees: EmployeeState,
+  state: GameState,
   _corruption: CorruptionState,
   targetId: number,
   rng: Random,
 ): MafiaActionResult {
+  const employees = state.employees;
   const emp = employees.employees.find(e => e.id === targetId);
   if (!emp || !emp.alive) {
     return { success: false, cost: 0, exposureIncrease: 0,
@@ -140,7 +142,7 @@ export function startFraming(
  */
 export function completeFrame(
   mafia: MafiaState,
-  employees: EmployeeState,
+  state: GameState,
   targetId: number,
   currentTick: number,
   rng: Random,
@@ -154,6 +156,7 @@ export function completeFrame(
   }
 
   mafia.pendingFrames.splice(frameIdx, 1);
+  const employees = state.employees;
 
   if (rng.chance(FRAME_SUCCESS_RATE)) {
     const idx = employees.employees.findIndex(e => e.id === targetId);
