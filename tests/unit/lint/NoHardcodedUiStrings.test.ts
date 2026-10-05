@@ -205,6 +205,39 @@ function scanElOptionLiterals(relPath: string, source: string): Violation[] {
   return violations;
 }
 
+/**
+ * Alert literals (#1417): NotificationCenter pips/toasts and SavesModal's slot
+ * summary build `{ tip, label, title, body }` objects and a `summary` template
+ * outside any `el()`/`.notify(` call the other scans look at. Flags quoted or
+ * template literals for those fields that still hold an English word after
+ * `${...}` segments are stripped. Bare-number templates (`${n}`, `#${id}`) pass.
+ */
+function scanAlertLiterals(relPath: string, source: string): Violation[] {
+  const violations: Violation[] = [];
+  const lines = source.split('\n');
+  const fieldPattern = /\b(?:tip|label|title|body)\s*:\s*(['"`])((?:(?!\1).)*)\1/g;
+  const summaryPattern = /\bsummary\s*=\s*`((?:(?!`).)*)`/;
+
+  lines.forEach((lineText, idx) => {
+    fieldPattern.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = fieldPattern.exec(lineText))) {
+      const literal = (m[2] ?? '').replace(/\$\{[^}]*\}/g, '');
+      if (looksLikeEnglishText(literal)) {
+        violations.push({ file: relPath, line: idx + 1, snippet: lineText.trim() });
+      }
+    }
+    const s = summaryPattern.exec(lineText);
+    if (s) {
+      const literal = (s[1] ?? '').replace(/\$\{[^}]*\}/g, '');
+      if (looksLikeEnglishText(literal)) {
+        violations.push({ file: relPath, line: idx + 1, snippet: lineText.trim() });
+      }
+    }
+  });
+  return violations;
+}
+
 function filterAllowlisted(violations: Violation[]): Violation[] {
   return violations.filter((v) => !HARDCODED_STRING_ALLOWLIST.includes(`${v.file}:${v.line}`));
 }
@@ -280,5 +313,31 @@ describe('src/main.ts — no hardcoded notification strings (issue #457)', () =>
     const source = readFileSync(join(ROOT, relPath), 'utf8');
     const allCalls = (source.match(/uiManager\.notify\(/g) ?? []).length;
     expect(allCalls).toBeGreaterThanOrEqual(7);
+  });
+});
+
+describe('NotificationCenter.ts and SavesModal.ts — alert literals go through t() (issue #1417)', () => {
+  const files = ['src/ui/notify/NotificationCenter.ts', 'src/ui/panels/SavesModal.ts'];
+
+  it('no tip/label/title/body literal or summary template holds hardcoded English', () => {
+    const violations: Violation[] = [];
+    for (const relPath of files) {
+      violations.push(...scanAlertLiterals(relPath, readFileSync(join(ROOT, relPath), 'utf8')));
+    }
+    const remaining = filterAllowlisted(violations);
+    expect(
+      remaining,
+      `${remaining.length} hardcoded alert string(s):\n${formatViolations(remaining)}`,
+    ).toEqual([]);
+  });
+
+  it('sanity: both files are scanned and the scanner detects a known-bad literal', () => {
+    for (const relPath of files) {
+      expect(readFileSync(join(ROOT, relPath), 'utf8').length).toBeGreaterThan(100);
+    }
+    expect(scanAlertLiterals('x.ts', "pips.push({ tip: 'An event is waiting' });")).toHaveLength(1);
+    expect(scanAlertLiterals('x.ts', 'const summary = `$${a} — Day ${b}`;')).toHaveLength(1);
+    expect(scanAlertLiterals('x.ts', "pips.push({ label: `#${id}`, tip: t('k') });")).toHaveLength(0);
+    expect(scanAlertLiterals('x.ts', 'const summary = `${a}${b}`;')).toHaveLength(0);
   });
 });

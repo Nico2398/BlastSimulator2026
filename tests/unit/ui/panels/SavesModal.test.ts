@@ -1181,4 +1181,73 @@ describe('SavesModal', () => {
       modal.dispose();
     });
   });
+
+  describe('localization (#1417)', () => {
+    it('in fr, the manual save summary is French ("Jour"), not "Day"', async () => {
+      setLocale('fr');
+      const backend = makeBackend();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      state.cash = 12345;
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      modal.setGetState(() => state);
+      modal.show();
+      await flush();
+      const btn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === t('ui.saves.save_here'));
+      btn!.click();
+      await flush();
+      const summary = backend.store.get('slot_1')!.meta.campaignSummary;
+      expect(summary).toContain('Jour 1');
+      expect(summary).not.toContain('Day');
+      expect(summary).toContain('$');
+      modal.dispose();
+    });
+
+    it('in en, the manual save summary keeps the "$12,345 — Day 1" shape', async () => {
+      const backend = makeBackend();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      state.cash = 12345;
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      modal.setGetState(() => state);
+      modal.show();
+      await flush();
+      const btn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === t('ui.saves.save_here'));
+      btn!.click();
+      await flush();
+      expect(backend.store.get('slot_1')!.meta.campaignSummary).toBe('$12,345 — Day 1');
+      modal.dispose();
+    });
+
+    it('slot names are derived from the slot id at render time, so an English-saved slot shows French in fr', async () => {
+      const backend = makeBackend();
+      await backend.save('slot_2', 'Slot 2', '{}', 'x', null);
+      await backend.save('auto', 'Auto-Save', '{}', 'x', null);
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      modal.show();
+      await flush();
+      setLocale('fr');
+      modal.refreshLocale();
+      await flush();
+      const text = container.textContent ?? '';
+      expect(text).toContain(t('saveload.slot_name', { n: 2 }));
+      expect(text).not.toContain('Slot 2');
+      expect(text).toContain(t('saveload.auto_name'));
+      expect(text).not.toContain('Auto-Save');
+      modal.dispose();
+    });
+
+    it('saved slot names follow the active locale after switching back to en', async () => {
+      const backend = makeBackend();
+      await backend.save('slot_3', 'Créneau 3', '{}', 'x', null);
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      modal.show();
+      await flush();
+      expect(container.textContent).toContain('Slot 3');
+      expect(container.textContent).not.toContain('Créneau 3');
+      modal.dispose();
+    });
+  });
 });
