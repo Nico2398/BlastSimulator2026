@@ -131,6 +131,7 @@ export class UIManager {
     this.operationsPanel.setCloseHandler(() => this.hideAllPanels());
     this.buildMenu = new BuildMenu(leftCol);
     this.buildMenu.setCloseHandler(() => this.hideAllPanels());
+    this.buildMenu.setConfirmHandler(config => this.confirmModal.show(config));
     this.fleetPanel = new FleetPanel(leftCol);
     this.fleetPanel.setCloseHandler(() => this.hideAllPanels());
     // FleetPanel's no-driver warning cross-links to Crew ('crew' is its own
