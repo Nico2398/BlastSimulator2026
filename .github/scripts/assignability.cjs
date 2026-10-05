@@ -748,6 +748,18 @@ function scopesOverlap(a, b) {
   return a === b || SCOPE_PARENTS[a] === b || SCOPE_PARENTS[b] === a;
 }
 
+/**
+ * Whether a claim is wide enough to hold its place while it waits: it runs
+ * alone, or it declares a scope other scopes sit inside (`ui`, `engine`).
+ * Such a claim needs many areas free at once, which a busy queue never
+ * leaves on its own — see "Its place in line" in `selectNextAssignable`.
+ */
+function isWideClaim(claim) {
+  if (claim.exclusive) return true;
+  const parents = new Set(Object.values(SCOPE_PARENTS));
+  return claim.scopes.some((scope) => parents.has(scope));
+}
+
 /** Whether two claims may not be held at the same time. */
 function claimsConflict(a, b) {
   if (a.exclusive || b.exclusive) return true;
@@ -905,18 +917,28 @@ const WAITING_AHEAD = 'waiting ahead of it';
  * scopes — the Definition of Ready refuses one that does not — and
  * `scope:global` or `scope:pipeline` claims the whole repository.
  *
- * **Its place in line.** An older issue that could run but for a clash with a
+ * **Its place in line — wide claims only.** Live runs are what keep two runs
+ * off the same code; nothing below changes that. On top of it, an older issue
+ * with a *wide* claim (`isWideClaim`: it runs alone, or it declares a parent
+ * scope such as `ui` or `engine`) that could run but for a clash with a
  * *running* claim — a live run, or an issue assigned earlier in this pass —
  * *holds* its claim for the rest of the pass, so nothing younger that overlaps
- * it starts first. Without that, a steady stream of small issues in one scope
- * could keep an older one in the same scope waiting forever. No clock is
- * involved: the hold lasts exactly as long as the clash does, and an older issue
- * that runs alone holds everything, so the queue drains until it can run. Only an issue that is otherwise assignable holds a place — one waiting
- * on a dependency does not, or a paused issue would hold the very scope its own
- * blocker needs.
+ * it starts first. A wide claim needs many areas free at once, and with every
+ * slot refilled on each merge that moment never comes on its own: a
+ * `scope:pipeline` issue would wait until the backlog emptied. Holding drains
+ * the overlapping queue until it can run. No clock is involved: the hold lasts
+ * exactly as long as the clash does. Only an issue that is otherwise assignable
+ * holds a place — one waiting on a dependency does not, or a paused issue would
+ * hold the very scope its own blocker needs.
  *
- * A hold is one level deep. An issue that waits only on another *waiting*
- * issue's hold waits, but holds nothing itself. Transitive holds chained
+ * An ordinary claim — one or a few areas, no parent — waits without holding.
+ * Its scopes free up often enough that it starts within a few passes, and its
+ * hold was what kept unrelated work idle: on 5 Oct 2026 #1380 (`engine`,
+ * `world`) waited on live #1379 and held `world`, so #1466, which touched only
+ * `world` and clashed with nothing live, could not start.
+ *
+ * A hold is also one level deep. A wide issue that waits only on another
+ * *waiting* issue's hold waits, but holds nothing itself. Transitive holds chained
  * through overlapping multi-scope issues: on 4 Oct 2026 live #1320 (ui,
  * economy) made #1341 (console, engine, economy) wait, whose hold made #1343
  * (nav, engine, world) wait, whose hold covered the last free scopes — one
@@ -1027,6 +1049,13 @@ async function selectNextAssignable(api, options = {}) {
         log(
           `#${issue.number}: waits — ${clashReason(claim, clashes[0])}. ` +
             'It waits behind a waiting issue, not a running one, so it holds no place of its own.'
+        );
+        continue;
+      }
+      if (!isWideClaim(claim)) {
+        log(
+          `#${issue.number}: waits — ${clashReason(claim, running)}. ` +
+            'Its claim is narrow, so it holds no place: younger work that clashes with nothing live may start.'
         );
         continue;
       }
@@ -1173,6 +1202,7 @@ module.exports = {
   blockedByFor,
   blockedChainLimit,
   claimsConflict,
+  isWideClaim,
   consecutiveHaltedRuns,
   dependencyVerdict,
   graphVerdict,

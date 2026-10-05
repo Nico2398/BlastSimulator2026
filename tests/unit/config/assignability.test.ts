@@ -739,6 +739,17 @@ describe('running several issues at once', () => {
       expect(rules.claimsConflict(claim('panels'), claim('crew'))).toBe(false);
     });
 
+    it('calls a claim wide when it runs alone or declares a parent scope', () => {
+      const wide = (...labels: string[]) => rules.isWideClaim(rules.scopeClaim({ labels }));
+      expect(wide('scope:global')).toBe(true);
+      expect(wide('scope:pipeline')).toBe(true);
+      expect(wide('agent-task')).toBe(true);
+      expect(wide('scope:ui')).toBe(true);
+      expect(wide('scope:engine', 'scope:world')).toBe(true);
+      expect(wide('scope:panels', 'scope:crew', 'scope:world')).toBe(false);
+      expect(wide('scope:nav')).toBe(false);
+    });
+
     it('runs `scope:global` alone', () => {
       const claim = rules.scopeClaim({ labels: ['scope:global'] });
       expect(claim.exclusive).toBe(true);
@@ -775,8 +786,9 @@ describe('running several issues at once', () => {
     expect(numbers(await selectUpTo(api, 2))).toEqual([30]);
   });
 
-  // Head-of-line: #25 waits on `ui`, and it holds `nav` too, so #30 — younger,
-  // in `nav` — may not start in front of it. #35 overlaps nothing and starts.
+  // Head-of-line for a wide claim: #25 declares the parent `ui`, waits on the
+  // live `ui` run, and holds `nav` too, so #30 — younger, in `nav` — may not
+  // start in front of it. #35 overlaps nothing and starts.
   it('lets an older waiting issue hold every scope it claims', async () => {
     const api = fakeApi([
       { number: 20, labels: ['in-progress', 'scope:ui'] },
@@ -785,6 +797,32 @@ describe('running several issues at once', () => {
       { number: 35, labels: ['ready', 'agent-task', 'scope:economy'] },
     ]);
     expect(numbers(await selectUpTo(api, 3))).toEqual([35]);
+  });
+
+  // Only live runs keep code apart. A narrow claim waiting on one holds
+  // nothing: on 5 Oct 2026 #1380 waited on live #1379 and its hold on `world`
+  // kept #1466, which clashed with nothing live, from starting.
+  it('lets a narrow waiting issue hold nothing, so unrelated younger work starts', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:crew', 'scope:panels'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:crew', 'scope:world'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:world'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:panels'] },
+    ]);
+    // #35 still waits: it clashes with the live run itself.
+    expect(numbers(await selectUpTo(api, 4))).toEqual([30]);
+  });
+
+  // `scope:engine` is a parent, so an engine issue waiting on a live core area
+  // holds every core area until it has run.
+  it('lets a waiting parent-scope issue hold its place', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['in-progress', 'scope:crew'] },
+      { number: 25, labels: ['ready', 'agent-task', 'scope:engine'] },
+      { number: 30, labels: ['ready', 'agent-task', 'scope:tasks'] },
+      { number: 35, labels: ['ready', 'agent-task', 'scope:world'] },
+    ]);
+    expect(numbers(await selectUpTo(api, 4))).toEqual([35]);
   });
 
   // A hold is one level deep. #25 waits on live #20 and holds `engine`; #30
