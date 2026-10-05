@@ -16,6 +16,7 @@
 // established for #bs-contract-panel in P5.
 
 import { PanelBase } from './PanelBase.js';
+import { makeLocateButton, LOCATE_CAMERA_DISTANCE } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -42,6 +43,7 @@ export class CrewPanel extends PanelBase {
   private expandedId: number | null = null;
   private lastSignature = '';
   private lastState: GameState | null = null;
+  private onSelectEmployeeCb?: (employeeId: number) => void;
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -69,13 +71,14 @@ export class CrewPanel extends PanelBase {
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
 
   /** Wire the callback that selects an employee in the 3D scene (focuses the camera on them). */
-  setSelectEmployeeHandler(_cb: (employeeId: number) => void): void {
-    // TODO: implement
-  }
+  setSelectEmployeeHandler(cb: (employeeId: number) => void): void { this.onSelectEmployeeCb = cb; }
 
-  /** Locate button action: select the employee in the scene and close this panel. */
-  protected locateEmployee(_id: number): void {
-    // TODO: implement
+  /** Locate button action: focus the camera on the live employee and select them. Never touches card expansion. */
+  protected locateEmployee(id: number): void {
+    const live = this.lastState?.employees.employees.find(x => x.id === id);
+    if (!live) return;
+    window.__cameraFocus?.(live.x, live.z, LOCATE_CAMERA_DISTANCE);
+    this.onSelectEmployeeCb?.(id);
   }
 
 
@@ -225,7 +228,7 @@ export class CrewPanel extends PanelBase {
       expanded ? 'rgba(255,176,46,.4)' : e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
     };background:${expanded ? 'rgba(255,176,46,.07)' : 'var(--bsx-card)'}`;
 
-    const toggle = el('button', { className: 'bs-detail-toggle', attrs: { style: 'width:100%;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;cursor:pointer;text-align:left' } });
+    const toggle = el('button', { className: 'bs-detail-toggle', attrs: { style: 'flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;cursor:pointer;text-align:left' } });
     toggle.addEventListener('click', () => {
       this.expandedId = expanded ? null : e.id;
       this.lastSignature = '';
@@ -253,7 +256,14 @@ export class CrewPanel extends PanelBase {
     const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: [nameLine, roleLine] });
 
     toggle.append(avatar, col, this.makeStatusTags(e, state), iconEl('chev', 12, 0.4));
-    row.appendChild(toggle);
+    const locateBtn = makeLocateButton({
+      title: t('ui.crew.locate'),
+      onClick: () => this.locateEmployee(e.id),
+    });
+    locateBtn.addEventListener('click', ev => ev.stopPropagation());
+    locateBtn.style.marginRight = '11px';
+    const header = el('div', { attrs: { style: 'display:flex;align-items:center' }, children: [toggle, locateBtn] });
+    row.appendChild(header);
 
     if (expanded) {
       const detail = el('div', { className: 'bs-crew-detail bs-employee-detail', attrs: { style: 'padding:0 11px 12px;display:flex;flex-direction:column;gap:11px' } });

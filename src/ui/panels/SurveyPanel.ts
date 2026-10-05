@@ -12,6 +12,7 @@
 // for their own root ids in P6.
 
 import { PanelBase } from './PanelBase.js';
+import { makeLocateButton, LOCATE_CAMERA_DISTANCE } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, paintToggleButton, panelRoot, panelHeader, panelHeaderButton, panelBody } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -360,9 +361,11 @@ export class SurveyPanel extends PanelBase {
         attrs: { style: `margin-left:auto;font-size:10px;color:${stale ? 'var(--bsx-critical-text)' : 'var(--bsx-text-muted)'}` },
       }),
     );
-    const locateBtn = el('button', { attrs: { style: 'width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer' }, children: [iconEl('locate', 11)] });
-    locateBtn.addEventListener('click', () => window.__cameraFocus?.(survey.centerX, survey.centerZ, 15));
-    head.appendChild(locateBtn);
+    head.appendChild(makeLocateButton({
+      title: t('ui.survey.locate'),
+      size: 24,
+      onClick: () => window.__cameraFocus?.(survey.centerX, survey.centerZ, LOCATE_CAMERA_DISTANCE),
+    }));
 
     const rows: HTMLElement[] = [head];
 
