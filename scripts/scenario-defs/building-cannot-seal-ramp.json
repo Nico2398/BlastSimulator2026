@@ -149,14 +149,14 @@
       }
     },
     {
-      "command": "build vehicle_depot at:10,10",
+      "command": "build vehicle_depot at:50,30",
       "description": "Pick a tile clear of the ramp in the same armed tool: Confirm becomes usable and the order goes through.",
       "timeout": 60,
       "interaction": [
         {
           "type": "pickTile",
-          "x": 10,
-          "z": 10
+          "x": 50,
+          "z": 30
         },
         {
           "type": "awaitUsable",
