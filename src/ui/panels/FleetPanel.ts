@@ -124,7 +124,7 @@ export class FleetPanel extends PanelBase {
    * (swaps the driver row for the no-driver row), and who is eligible to
    * drive (changes the no-driver row's licence warning). HP, load, status,
    * and the traffic banner all drift on their own — refreshDynamic patches
-   * those in place so an in-progress board-walk or Haul/Scrap click survives.
+   * (or adds/removes, for the banner) those in place so an in-progress board-walk or Haul/Scrap click survives.
    */
   private computeSignature(state: GameState): string {
     // reservedForActionId is part of the signature too (#1092): it decides
@@ -144,9 +144,7 @@ export class FleetPanel extends PanelBase {
   }
 
   private refreshDynamic(state: GameState): void {
-    const banner = this.makeTrafficBanner(state);
-    if (banner) this.bodyEl.querySelector('.bs-fleet-traffic')?.replaceWith(this.tag(banner, 'bs-fleet-traffic'));
-    else this.bodyEl.querySelector('.bs-fleet-traffic')?.remove();
+    this.syncTrafficBanner(state);
 
     for (const v of state.vehicles.vehicles) {
       const row = this.bodyEl.querySelector<HTMLElement>(`[data-vehicle-id="${v.id}"]`);
@@ -157,6 +155,15 @@ export class FleetPanel extends PanelBase {
       const existingLoad = row.querySelector('.bs-fleet-load');
       if (load && existingLoad) existingLoad.replaceWith(this.tag(load, 'bs-fleet-load'));
     }
+  }
+
+  /** Add, update or remove the jam banner in place; render() puts it first in the body (#1395). */
+  private syncTrafficBanner(state: GameState): void {
+    const banner = this.makeTrafficBanner(state);
+    const existing = this.bodyEl.querySelector('.bs-fleet-traffic');
+    if (!banner) existing?.remove();
+    else if (existing) existing.replaceWith(this.tag(banner, 'bs-fleet-traffic'));
+    else this.bodyEl.prepend(this.tag(banner, 'bs-fleet-traffic'));
   }
 
   /** The employee in `v`'s driver seat, for the occupant-derived status line (#1092) — undefined when nobody is aboard. */
