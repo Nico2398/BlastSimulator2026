@@ -1,0 +1,202 @@
+{
+  "name": "building-cannot-seal-ramp",
+  "description": "#1390: a building cannot be ordered over a planned ramp corridor. The placement tool refuses the ghost before Confirm (blocked, nothing ordered, cash unchanged), the console refuses the same orders, and a placement clear of the ramp still goes through. Every click is a real player step.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "description": "Staffed opening so the crew can dig and build.",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "build_ramp start:30,20 end:30,40 depth:8",
+      "description": "Order a ramp corridor (footprint x29-31, z20-39) through the real ramp tool: depth stepper, drag, Confirm.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "focusTile",
+          "x": 30,
+          "z": 30,
+          "distance": 40,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 30,
+          "z1": 20,
+          "x2": 30,
+          "z2": 40
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "build vehicle_depot at:28,19",
+      "description": "Arm the vehicle depot from the catalog and pick a tile whose footprint overlaps the planned ramp. Ghost is refused before any click: Confirm is unreachable and no building is ordered (#1390). Screenshot shows the red ghost with the blocks-a-ramp reason.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 28,
+          "z": 19,
+          "distance": 30,
+          "pitch": 80
+        },
+        {
+          "type": "pickTile",
+          "x": 28,
+          "z": 19
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "guard",
+      "commandOutcome": "refused",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "orderedBuildingCount": 0
+        },
+        "blocked": "#bs-tile-select-confirm",
+        "note": "#1390 -- footprint over a ramp corridor leaves Confirm disabled."
+      }
+    },
+    {
+      "command": "build vehicle_depot at:30,30",
+      "description": "Same still-armed tool, pick a tile in the middle of the ramp corridor: still refused, Confirm still blocked, nothing ordered.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "focusTile",
+          "x": 30,
+          "z": 30,
+          "distance": 30,
+          "pitch": 80
+        },
+        {
+          "type": "pickTile",
+          "x": 30,
+          "z": 30
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "guard",
+      "commandOutcome": "refused",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "orderedBuildingCount": 0
+        },
+        "blocked": "#bs-tile-select-confirm",
+        "note": "#1390 -- the ramp interior is refused as well as its edge."
+      }
+    },
+    {
+      "command": "build vehicle_depot at:10,10",
+      "description": "Pick a tile clear of the ramp in the same armed tool: Confirm becomes usable and the order goes through.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 10
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 1
+        },
+        "note": "#1390 -- a placement clear of the ramp still succeeds."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "ramp-area",
+      "yaw": 0,
+      "pitch": 60
+    }
+  ]
+}
