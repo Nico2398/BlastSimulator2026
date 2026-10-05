@@ -14,7 +14,7 @@ import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDi
 import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
 import { removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
-import { checkProtectedPositions } from '../../../core/mining/BlastPlan.js';
+import { coveredByFootprint } from '../../../core/mining/BlastPlan.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -25,19 +25,6 @@ export interface DrillHoleActionPayload {
   depth: number;
   diameter: number;
   durationTicks: number;
-}
-
-/**
- * Ids of `cells` whose column lies under a building or construction-site
- * footprint (#1359).
- */
-export function coveredByFootprint(
-  state: GameState,
-  cells: ReadonlyArray<{ id: string; x: number; z: number }>,
-): Set<string> {
-  const occupants = buildingFootprintOccupants(state);
-  if (occupants.length === 0) return new Set<string>();
-  return new Set(checkProtectedPositions(cells, occupants).map(e => e.holeId));
 }
 
 /**
@@ -154,7 +141,7 @@ export function drillPlanCommand(
 
     // Cells under a building or construction site are skipped (#1359); a grid
     // with nothing left is refused before the existing plan is touched.
-    const covered = coveredByFootprint(ctx.state!, planned);
+    const covered = coveredByFootprint(planned, buildingFootprintOccupants(ctx.state!));
     const survivors = planned
       .filter(h => !covered.has(h.id))
       .map((h, i) => ({ ...h, id: `H${i + 1}` }));
@@ -190,7 +177,7 @@ export function drillPlanCommand(
     const diameter = parseFloat(named['diameter'] ?? String(DRILL_HOLE_DEFAULT_DIAMETER_M));
     const claim = claimForAction(ctx, [{ x, z }], 'drill');
     if (!claim.ok) return { success: false, output: claim.output! };
-    if (coveredByFootprint(ctx.state!, [{ id: 'add', x, z }]).size > 0) {
+    if (coveredByFootprint([{ id: 'add', x, z }], buildingFootprintOccupants(ctx.state!)).size > 0) {
       return { success: false, output: t('mining.drill_plan.refused_footprint', { x, z }) };
     }
 

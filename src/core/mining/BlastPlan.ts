@@ -77,3 +77,15 @@ export function checkProtectedPositions(
   }
   return errors;
 }
+
+/**
+ * Ids of `cells` whose column lies under a building or construction-site
+ * footprint (#1359). Takes the occupant list so callers choose the source.
+ */
+export function coveredByFootprint(
+  cells: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z'>>,
+  occupants: ReadonlyArray<FootprintOccupant>,
+): Set<string> {
+  if (occupants.length === 0) return new Set<string>();
+  return new Set(checkProtectedPositions(cells, occupants).map(e => e.holeId));
+}
