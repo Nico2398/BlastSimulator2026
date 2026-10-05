@@ -124,7 +124,8 @@ export class FleetPanel extends PanelBase {
    * (swaps the driver row for the no-driver row), and who is eligible to
    * drive (changes the no-driver row's licence warning). HP, load, status,
    * and the traffic banner all drift on their own — refreshDynamic patches
-   * (or adds/removes, for the banner) those in place so an in-progress board-walk or Haul/Scrap click survives.
+   * (or adds/removes, for the banner) those in place so an in-progress
+   * board-walk or Haul/Scrap click survives.
    */
   private computeSignature(state: GameState): string {
     // reservedForActionId is part of the signature too (#1092): it decides
