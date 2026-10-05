@@ -30,7 +30,10 @@ export function createArrestState(): ArrestState {
 
 /**
  * Call each tick. Returns true if arrest was just triggered.
- * Emits 'arrest:triggered' on game over.
+ * Emits 'arrest:triggered' on game over. Below the arrest threshold, emits
+ * 'arrest:warning' once when exposure reaches ARREST_WARNING_EXPOSURE; the
+ * latch re-arms when exposure falls back under it. A jump straight past the
+ * arrest threshold arrests without a warning.
  */
 export function updateArrest(
   state: GameState,
@@ -43,6 +46,14 @@ export function updateArrest(
     arrest.arrested = true;
     emitter.emit('arrest:triggered', { exposure: state.mafia.exposureRisk });
     return true;
+  }
+
+  const exposure = state.mafia.exposureRisk;
+  if (exposure < ARREST_WARNING_EXPOSURE) {
+    arrest.warningFired = false;
+  } else if (!arrest.warningFired) {
+    arrest.warningFired = true;
+    emitter.emit('arrest:warning', { exposure });
   }
 
   return false;

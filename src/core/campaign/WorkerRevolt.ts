@@ -30,9 +30,7 @@ export function createRevoltState(): RevoltState {
 
 /** Ticks left before the revolt triggers. */
 export function revoltTicksRemaining(revolt: RevoltState): number {
-  void revolt;
-  // TODO: implement
-  return 0;
+  return Math.max(0, REVOLT_TICKS - revolt.ticksAtZero);
 }
 
 // ── Tick update ──
