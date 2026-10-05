@@ -1343,6 +1343,26 @@
       "role": "observe"
     },
     {
+      "command": "wait_until field:activeContractCount equals:0 max_ticks:150",
+      "timeout": 120,
+      "description": "#1379: the three contracts accepted at the same tick all lapse by their own deadline (30-100 ticks, ContractGen.ts), but how far the clock has run past acceptance by now differs between command and interaction mode (the browser's clicks take their own tick budget), so under the always-on site policy the interaction run reached the final check with two still active. Waits on the lapse itself instead of assuming the clock got there -- the clock-independent form of the check below, which keeps asserting activeContractCount 0.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "activeContractCount",
+          "equals": 0,
+          "maxTicks": 150,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "activeContractCount": 0
+        }
+      }
+    },
+    {
       "command": "tick 5",
       "interaction": [
         {

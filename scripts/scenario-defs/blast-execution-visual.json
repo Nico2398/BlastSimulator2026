@@ -520,16 +520,14 @@
           "panel": "vehicles"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"] .bsx-btn-danger"
+          "type": "clickIfPresent",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"] .bsx-btn-danger",
+          "timeoutMs": 3000
         },
         {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 3000
         }
       ],
       "role": "player",

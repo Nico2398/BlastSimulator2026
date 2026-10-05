@@ -1579,10 +1579,15 @@
       "command": "event choose 0",
       "interaction": [
         {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 10000
+        },
+        {
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "No event pending at this checkpoint post-fix (sandbox-confirmed) -- kept as a no-op resolveEventIfPending for structural consistency with every other event choose 0 step in this file. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): tickCount corrected 331 -> 333 (following the `tick 20` step's own note above), wellBeing 4.460833333333321 -> 4.299166666666655 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest at this exact tick. safety, ecology, deathCount, and employeeCount reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
+      "description": "No event pending at this checkpoint post-fix (sandbox-confirmed) -- kept as a no-op resolveEventIfPending for structural consistency with every other event choose 0 step in this file. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): tickCount corrected 331 -> 333 (following the `tick 20` step's own note above), wellBeing 4.460833333333321 -> 4.299166666666655 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest at this exact tick. safety, ecology, deathCount, and employeeCount reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1379: the hollow guard blast above leaves its BAD report modal open in the browser, and UIManager defers the event dialog while that report is up -- so a pending event (the trajectory shifted with the always-on policy) has no reachable choice button. A player closes the report first; clickIfPresent because the report may already be closed.",
       "role": "player",
       "expect": {
         "equals": {
