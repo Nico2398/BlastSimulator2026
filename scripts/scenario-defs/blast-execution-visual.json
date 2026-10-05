@@ -4151,10 +4151,18 @@
     },
     {
       "command": "charge hole:H17 explosive:boomite amount:8 stemming:0.5",
-      "description": "#1384: H17 is a straggler under the scaled action durations (blast reports 'H17: Missing charge' otherwise); same either-outcome reasoning as the H8 retry above. Interaction mode has no per-hole click here (a baked data-hole selector is refused by the #654 lint); it only resolves events.",
+      "description": "#1384: H17 is a straggler under the scaled action durations (blast reports 'H17: Missing charge' otherwise); same either-outcome reasoning as the H8 retry above. Interaction mode clicks the first row that is neither charged nor ordered (data-charged/data-ordered=false, a shape selector, not a baked hole id -- the #654 lint refuses those), which is H17 in a run where it is the lone straggler; clickIfPresent because a run where it already landed has nothing left to click.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
         }
       ],
       "role": "player",
