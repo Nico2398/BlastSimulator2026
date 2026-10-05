@@ -32,6 +32,7 @@ import {
   REVOLT_TICKS,
   SCORE_DECAY_RATE,
   TRAFFIC_JAM_MIN_TICKS,
+  FOLLOWUP_DELAY_TICKS,
 } from '../../src/core/config/balance.js';
 import type { BuiltRamp } from '../../src/core/state/GameState.js';
 import { rampFootprint } from '../../src/core/mining/RampWidening.js';
@@ -265,19 +266,22 @@ describe('Event system', () => {
 
   it('tickEventSystem processes follow-up queue before timers', () => {
     const eventState = createEventSystemState();
-    eventState.followUpQueue.push('union_coffee_uprising');
+    queueFollowUp(eventState, 'union_strike_aftermath');
 
     // pendingEvent should be null initially
     expect(eventState.pendingEvent).toBeNull();
 
     const evCtx = makeEventCtx();
-    const result = tickEventSystem(eventState, evCtx, new Random(42));
+    let result = null;
+    for (let i = 0; i < FOLLOWUP_DELAY_TICKS && !result; i++) {
+      result = tickEventSystem(eventState, evCtx, new Random(42));
+    }
 
     // Should pick up the follow-up event
     expect(result).not.toBeNull();
-    expect(result!.eventId).toBe('union_coffee_uprising');
+    expect(result!.eventId).toBe('union_strike_aftermath');
     expect(eventState.pendingEvent).not.toBeNull();
-    expect(eventState.pendingEvent!.eventId).toBe('union_coffee_uprising');
+    expect(eventState.pendingEvent!.eventId).toBe('union_strike_aftermath');
   });
 
   // ── 5. detectTrafficJam (#1208: chokepoint / position based) ──────────────
@@ -419,16 +423,16 @@ describe('Event system', () => {
 
   it('followUpQueue drains when tickEventSystem processes them', () => {
     const eventState = createEventSystemState();
-    queueFollowUp(eventState, 'union_coffee_uprising');
-    queueFollowUp(eventState, 'union_overtime_revolt');
+    queueFollowUp(eventState, 'union_strike_aftermath');
+    queueFollowUp(eventState, 'politics_mayor_wins');
     expect(eventState.followUpQueue).toHaveLength(2);
 
     const evCtx = makeEventCtx();
-    tickEventSystem(eventState, evCtx, new Random(42));
+    for (let i = 0; i < FOLLOWUP_DELAY_TICKS; i++) tickEventSystem(eventState, evCtx, new Random(42));
 
     // First follow-up should have been consumed; second stays in queue
     expect(eventState.followUpQueue).toHaveLength(1);
-    expect(eventState.followUpQueue[0]).toBe('union_overtime_revolt');
+    expect(eventState.followUpQueue[0]).toBe('politics_mayor_wins');
   });
 
   // ── 9. time command shows speed and pause state ────────────────────────────

@@ -9,7 +9,7 @@ import {
   selectEvent,
   incrementActionCount,
 } from '../../../src/core/events/EventSystem.js';
-import { MIN_EVENT_INTERVAL_ACTIONS } from '../../../src/core/config/balance.js';
+import { MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS } from '../../../src/core/config/balance.js';
 import {
   registerEvents,
   clearEvents,
@@ -165,18 +165,20 @@ describe('Event system engine', () => {
   });
 
   it('follow-up events are also deduplicated', () => {
-    registerEvents([makeEvent('followup_ev', 'union')]);
+    registerEvents([{ ...makeEvent('followup_ev', 'union'), followUpOnly: true }]);
     const state = createEventSystemState();
 
     // Queue the follow-up twice
     queueFollowUp(state, 'followup_ev');
     queueFollowUp(state, 'followup_ev');
 
+    state.followUpDelayTicks = 1;
     const first = tickEventSystem(state, makeCtx(), new Random(42));
     expect(first?.eventId).toBe('followup_ev');
     clearPendingEvent(state);
 
     // Second attempt should be skipped (already fired)
+    state.followUpDelayTicks = 1;
     const second = tickEventSystem(state, makeCtx(), new Random(42));
     expect(second).toBeNull();
   });
@@ -357,27 +359,29 @@ describe('Event system engine', () => {
   });
 
   it('actionCountSinceEvent resets to 0 after follow-up event fires', () => {
-    registerEvents([makeEvent('followup_ev', 'union')]);
+    registerEvents([{ ...makeEvent('followup_ev', 'union'), followUpOnly: true }]);
     const state = createEventSystemState();
     state.actionCountSinceEvent = 5;
     queueFollowUp(state, 'followup_ev');
 
     const ctx = makeCtx({ tickCount: 200 });
-    const fired = tickEventSystem(state, ctx, new Random(42));
+    let fired = null;
+    for (let i = 0; i < FOLLOWUP_DELAY_TICKS && !fired; i++) fired = tickEventSystem(state, ctx, new Random(42));
     expect(fired).not.toBeNull();
     expect(fired!.eventId).toBe('followup_ev');
     expect(state.actionCountSinceEvent).toBe(0);
   });
 
   it('follow-up queue events bypass cooldown check', () => {
-    registerEvents([makeEvent('followup_ev', 'union')]);
+    registerEvents([{ ...makeEvent('followup_ev', 'union'), followUpOnly: true }]);
     const state = createEventSystemState();
     state.lastEventTick = 190;
     state.actionCountSinceEvent = 0;
     queueFollowUp(state, 'followup_ev');
 
     const ctx = makeCtx({ tickCount: 200 });
-    const fired = tickEventSystem(state, ctx, new Random(42));
+    let fired = null;
+    for (let i = 0; i < FOLLOWUP_DELAY_TICKS && !fired; i++) fired = tickEventSystem(state, ctx, new Random(42));
     expect(fired).not.toBeNull();
     expect(fired!.eventId).toBe('followup_ev');
   });
