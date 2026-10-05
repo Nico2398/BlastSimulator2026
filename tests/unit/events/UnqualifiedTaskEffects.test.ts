@@ -83,7 +83,7 @@ describe('hire_contractor with nothing completable', () => {
   it('returns the fee once with the _alt text and keeps the action queued', () => {
     const s = setupUnqualified();
     // A survey needs the voxel grid; without one the contractor cannot do it.
-    const gridless = { state: s.state };
+    const gridless = { state: s.state, grid: null };
     const ledgerBefore = s.state.finances.cash;
     const outcome = UNQUALIFIED_TASK_EFFECTS['hire_contractor']!([s.actionId], gridless, TICK);
     expect(outcome.resultKeySuffix).toBe('_alt');
