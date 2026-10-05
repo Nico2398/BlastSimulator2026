@@ -861,7 +861,8 @@ describe('unqualified_task_error — each option resolves the block (#1380)', ()
     expect(state.cash).toBe(cashBefore - fee);
     expectNoRefire(site);
     // Still enrolled or already inside: the survey is waiting for the trainee, not abandoned.
-    expect(state.pendingActions.some(a => a.id === site.surveyActionId) || state.surveyResults.length > 0).toBe(true);
+    expect(state.pendingActions.some(a => a.id === site.surveyActionId)).toBe(true);
+    expect(state.surveyResults).toHaveLength(0);
   });
 
   it('Send Someone to Training with no school books nothing and the event does not return', () => {
@@ -895,6 +896,6 @@ describe('unqualified_task_error — each option resolves the block (#1380)', ()
     expect(runCommand(site.engine, `employee train ${surveyor.id} skill:blasting`).success).toBe(true);
     expect(surveyor.pendingTrainingState ?? surveyor.trainingState).not.toBeNull();
     expectNoRefire(site, 10);
-    expect(state.pendingActions.find(a => a.id === site.surveyActionId)?.blockedReason ?? null).not.toBeNull();
+    expect(state.pendingActions.find(a => a.id === site.surveyActionId)?.blockedReason).toBe('no_qualified_employee');
   });
 });

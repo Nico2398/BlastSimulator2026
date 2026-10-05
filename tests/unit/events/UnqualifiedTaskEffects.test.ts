@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { UNQUALIFIED_TASK_EFFECTS } from '../../../src/core/events/UnqualifiedTaskEffects.js';
+import { UNQUALIFIED_CONTRACTOR_FEE } from '../../../src/core/config/balance.js';
 import { planTraining } from '../../../src/core/entities/EmployeeTraining.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -78,6 +79,47 @@ describe('hire_contractor', () => {
   });
 });
 
+describe('hire_contractor with nothing completable', () => {
+  it('returns the fee once with the _alt text and keeps the action queued', () => {
+    const s = setupUnqualified();
+    // A survey needs the voxel grid; without one the contractor cannot do it.
+    const gridless = { state: s.state };
+    const ledgerBefore = s.state.finances.cash;
+    const outcome = UNQUALIFIED_TASK_EFFECTS['hire_contractor']!([s.actionId], gridless, TICK);
+    expect(outcome.resultKeySuffix).toBe('_alt');
+    expect(outcome.cashChange).toBe(UNQUALIFIED_CONTRACTOR_FEE);
+    expect(outcome.cashSettled).toBe(0);
+    // The ledger gets the refund exactly once; state.cash is left for the caller to apply cashChange.
+    expect(s.state.finances.cash).toBe(ledgerBefore + UNQUALIFIED_CONTRACTOR_FEE);
+    expect(s.state.cash).toBe(s.cashAfterOrder);
+    expect(s.state.surveyResults).toHaveLength(0);
+    expect(s.state.pendingActions.some(a => a.id === s.actionId)).toBe(true);
+  });
+
+  it('refunds when the id is no longer queued', () => {
+    const s = setupUnqualified();
+    const outcome = UNQUALIFIED_TASK_EFFECTS['hire_contractor']!([s.actionId + 99], s.world, TICK);
+    expect(outcome.resultKeySuffix).toBe('_alt');
+    expect(outcome.cashChange).toBe(UNQUALIFIED_CONTRACTOR_FEE);
+  });
+});
+
+describe('hire_contractor on a drill order', () => {
+  it('lands the planned hole and removes the action', () => {
+    const s = setupUnqualified();
+    const action = s.state.pendingActions.find(a => a.id === s.actionId)!;
+    action.type = 'drill_hole';
+    action.requiredSkill = null;
+    action.payload = { holeId: 'h1' };
+    s.state.plannedDrillHoles.push({ id: 'h1', x: 12, z: 12, depth: 5, diameter: 0.2 } as never);
+    const outcome = UNQUALIFIED_TASK_EFFECTS['hire_contractor']!([s.actionId], s.world, TICK);
+    expect(outcome.resultKeySuffix).toBe('');
+    expect(s.state.plannedDrillHoles).toHaveLength(0);
+    expect(s.state.drillHoles.map(h => h.id)).toEqual(['h1']);
+    expect(s.state.pendingActions.some(a => a.id === s.actionId)).toBe(false);
+  });
+});
+
 describe('train_employee', () => {
   it('enrols the eligible employee on the missing skill and debits the fee once', () => {
     const s = setupUnqualified({ school: true });
@@ -131,8 +173,8 @@ describe('train_employee', () => {
 });
 
 describe('unqualified_task_error fallback text (#1380)', () => {
-  it('has an _alt result key for the training option in both locales', () => {
-    const key = 'event.unqualified_task_error.res0_alt';
+  it.each(['res0_alt', 'res1_alt'])('has an %s result key in both locales', suffix => {
+    const key = `event.unqualified_task_error.${suffix}`;
     expect((enLocale as Record<string, string>)[key]).toEqual(expect.any(String));
     expect((frLocale as Record<string, string>)[key]).toEqual(expect.any(String));
     expect((enLocale as Record<string, string>)[key]).not.toBe((frLocale as Record<string, string>)[key]);

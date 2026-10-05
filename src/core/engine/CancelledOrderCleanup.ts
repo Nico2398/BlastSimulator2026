@@ -1,11 +1,10 @@
 // BlastSimulator2026 — planned-order cleanup for a cancelled action (#1380)
 //
-// cancelAction (TaskCancellation.ts) is deliberately ignorant of mining- and
-// building-specific state, so it can cancel any action type. The planned-pool
-// entry an order reserved (planned hole, charge, ramp segment, building site)
-// is bookkeeping owned here and has to be released whenever an order is
-// cancelled — from the console's `employee cancel` and from the unqualified-task
-// event's Cancel option alike (#554, #555, #556).
+// The planned-pool entry an order reserved (planned hole, charge, ramp segment,
+// building site) is bookkeeping owned here and has to be released whenever an
+// order is cancelled. cancelAction (TaskCancellation.ts) calls this itself, so
+// every caller — the console's `employee cancel` and the unqualified-task
+// event's Cancel option alike — gets the release (#554, #555, #556, #1380).
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import { getDefSize, getBuildingDef } from '../entities/Building.js';

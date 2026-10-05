@@ -119,7 +119,7 @@ describe('EventEngine — detectUnqualifiedTask raises each blocked action once 
     eventState.pendingEvent = null;
     const fired = detectUnqualifiedTask([7, 8], eventState, 11);
     expect(fired).not.toBeNull();
-    expect(fired!.unqualifiedActionIds).toContain(8);
+    expect(fired!.unqualifiedActionIds).toEqual([7, 8]);
   });
 
   it('forgets an id once the action is gone, so a reused id would be raised again', () => {

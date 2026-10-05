@@ -5,7 +5,7 @@
 
 import type { ActionType, PendingAction } from '../state/GameState.js';
 import type { SkillCategory } from '../entities/Employee.js';
-import { createEmployeeState, hireEmployee } from '../entities/Employee.js';
+import { createEmployeeState, hireEmployee, isEligibleForWork } from '../entities/Employee.js';
 import { availableTrainingOffers, enrolInTraining, planTraining } from '../entities/EmployeeTraining.js';
 import { cancelAction } from '../engine/TaskDispatch.js';
 import { applyTaskCompletion } from '../engine/TaskCompletionEffects.js';
@@ -115,7 +115,7 @@ const trainEmployee: UnqualifiedEffectHandler = (ids, world, tick) => {
   if (!offer) return alt();
 
   const candidates = state.employees.employees
-    .filter(e => e.alive && !e.injured && e.trainingState === null && !e.pendingTrainingState)
+    .filter(e => isEligibleForWork(e) && !e.pendingTrainingState)
     .sort((a, b) => a.id - b.id);
   for (const emp of candidates) {
     const plan = planTraining(emp, skill, offer.building.tier);

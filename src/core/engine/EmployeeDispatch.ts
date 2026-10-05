@@ -8,7 +8,7 @@
 // the single public surface for tick-orchestration callers.
 
 import type { GameState } from '../state/GameState.js';
-import type { Employee } from '../entities/Employee.js';
+import { isEligibleForWork, type Employee } from '../entities/Employee.js';
 import type { EmployeeWorkState } from '../entities/EmployeeNeeds.js';
 import {
   claimActionsTargetedAtEmployee, fillIdleEmployeeFromQueueOrPool, reserveOnePoolActionAhead,
@@ -66,9 +66,7 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
 
   // Base eligibility: alive, not injured, not in training.
-  const eligible = state.employees.employees.filter(
-    emp => emp.alive && !emp.injured && emp.trainingState === null,
-  );
+  const eligible = state.employees.employees.filter(isEligibleForWork);
 
   // Reachability and availability classification of every queued action — see
   // OrderReachability.ts: a ghost reads red when none of the actors able to
