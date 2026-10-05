@@ -833,14 +833,14 @@ describe('checkFootprintPlacement — terrain reservations (#1390)', () => {
     const res: TerrainReservation = { kind: 'ramp', minX: 63, maxX: 63, minZ: 0, maxZ: 0 };
     const r = checkFootprintPlacement([], 'management_office', 63, 0, 1, 64, 64, 0, 0, undefined, [res]);
     expect(r.error).toBe('Out of bounds');
-    expect(r.errorKey).toBeUndefined();
+    expect(r.errorKey).toBe('shell.placement.refused_out_of_bounds');
   });
 
   it('reports "Space is occupied" before a reservation', () => {
     const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 4, z: 4 }];
     const r = checkFootprintPlacement(occupants, 'management_office', 4, 4, 1, 64, 64, 0, 0, undefined, [rampRes]);
     expect(r.error).toBe('Space is occupied');
-    expect(r.errorKey).toBeUndefined();
+    expect(r.errorKey).toBe('shell.placement.refused_occupied');
   });
 
   it('reports the reservation before "Uneven surface"', () => {

@@ -13,7 +13,7 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { alightIfMounted, leaveBuilding } from '../engine/Mount.js';
 import { moveTo } from '../engine/MoveTo.js';
-import { t } from '../i18n/I18n.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 import {
   TRAINING_BUILDING_SKILLS,
   TRAINING_BASE_TICKS,
@@ -136,7 +136,7 @@ export function planTraining(
 
 export type EnrolInTrainingResult =
   | { success: true; fee: number; plan: TrainingPlan }
-  | { success: false; error: string };
+  | ({ success: false; error: string } & RefusalKey);
 
 /**
  * Begin training an employee at a building.
@@ -182,20 +182,32 @@ export function enrolInTraining(
   emitter?: EventEmitter,
 ): EnrolInTrainingResult {
   const employee = state.employees.employees.find(e => e.id === employeeId);
-  if (!employee || !employee.alive) return { success: false, error: 'Employee not found or not alive' };
-  if (isEnrolledInTraining(employee)) return { success: false, error: 'Employee already in training' };
-  if (employee.injured) return { success: false, error: 'Injured employees cannot train' };
+  if (!employee || !employee.alive) return { success: false, error: 'Employee not found or not alive', errorKey: 'employees.employee_not_found', errorParams: { id: employeeId } };
+  if (isEnrolledInTraining(employee)) return { success: false, error: 'Employee already in training', errorKey: 'employees.train_already_enrolled', errorParams: { name: employee.name } };
+  if (employee.injured) return { success: false, error: 'Injured employees cannot train', errorKey: 'employees.train_injured', errorParams: { name: employee.name } };
   if (!trainableSkills(building.type).includes(skill)) {
-    return { success: false, error: `${building.type} does not teach ${skill}` };
+    return {
+      success: false,
+      error: `${building.type} does not teach ${skill}`,
+      errorKey: 'employees.train_building_no_teach',
+      errorParams: { buildingId: building.id, skill },
+    };
   }
 
   const plan = planTraining(employee, skill, building.tier);
-  if (!plan) return { success: false, error: `Already at the highest proficiency in ${skill}` };
+  if (!plan) return {
+    success: false,
+    error: `Already at the highest proficiency in ${skill}`,
+    errorKey: 'employees.train_already_master',
+    errorParams: { name: employee.name, skill },
+  };
 
   if (isSchoolFull(state, building)) {
     return {
       success: false,
-      error: t('employees.train_school_full', { buildingType: building.type, buildingId: building.id, skill }),
+      error: `${building.type} #${building.id} is full — no seats free to train ${skill}`,
+      errorKey: 'employees.train_school_full',
+      errorParams: { buildingType: building.type, buildingId: building.id, skill },
     };
   }
 

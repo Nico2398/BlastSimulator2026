@@ -23,7 +23,7 @@ import {
 import { addExpense } from '../../core/economy/Finance.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
 import { Random } from '../../core/math/Random.js';
-import { requireGame, noEmployeesMessage } from './commandUtils.js';
+import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { t } from '../../core/i18n/I18n.js';
 import { emitFootprintOccupancyChanged } from './buildingHelpers.js';
@@ -128,7 +128,7 @@ export function employeeCommand(
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       if (isNaN(id)) return { success: false, output: t('employees.fire_usage') };
       const result = fireEmployeeFromWorld(state, id);
-      if (!result.success) return { success: false, output: result.error! };
+      if (!result.success) return { success: false, output: refusalText(result) };
       return { success: true, output: t('employees.fire_success', { id }) };
     }
     case 'assign_skill': {
@@ -270,7 +270,7 @@ export function employeeCommand(
       }
 
       const result = enrolInTraining(state, id, building, skill, ctx.emitter);
-      if (!result.success) return { success: false, output: result.error! };
+      if (!result.success) return { success: false, output: refusalText(result) };
 
       state.cash -= plan.fee;
       addExpense(state.finances, plan.fee, 'salaries', `Train ${emp.name}: ${skill}`, state.tickCount);

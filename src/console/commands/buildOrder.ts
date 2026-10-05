@@ -24,7 +24,8 @@ import { terrainReservations } from '../../core/entities/PlacementReservations.j
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
 import { findBuildingApproachCell, isApproachCellStranded, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
 
-import { placementRefusalText } from './commandUtils.js';
+import { refusalText } from './commandUtils.js';
+import { t } from '../../core/i18n/I18n.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
 
@@ -91,14 +92,17 @@ export function orderBuildingCommand(
   // research gate, then funds — both ahead of claimForAction/the footprint
   // check because those mutate (claim off-site land, reserve the site).
   if (isPlacementBlockedByResearch(state.buildings, type, tier)) {
-    return { success: false, output: `Tier ${tier} ${type} is not researched — research required before placement.` };
+    return { success: false, output: t('entities.build_not_researched', { tier, type }) };
   }
 
   const def = getBuildingDef(type, tier);
   if (state.cash < def.constructionCost) {
     return {
       success: false,
-      output: `Insufficient funds: need $${formatMoney(def.constructionCost)}, have $${formatMoney(state.cash)}`,
+      output: t('console.insufficient_funds', {
+        need: formatMoney(def.constructionCost),
+        have: formatMoney(state.cash),
+      }),
     };
   }
 
@@ -116,7 +120,7 @@ export function orderBuildingCommand(
     occupants, type, x, z, tier, bounds.width, bounds.depth, bounds.originX, bounds.originZ, ctx.grid ?? undefined,
     terrainReservations(state),
   );
-  if (!check.valid) return { success: false, output: placementRefusalText(check) };
+  if (!check.valid) return { success: false, output: refusalText(check) };
 
   // Claim the order's own id and the finished building's id now, not when
   // the site completes: sites are built in parallel and land in whatever
@@ -152,7 +156,7 @@ export function orderBuildingCommand(
   if (state.navGrid && !isOnBuildingRing({ x, z }, def, approach.x, approach.z)) {
     state.plannedBuildings.pop();
     emitFootprintOccupancyChanged(ctx, x, z, footprintX, footprintZ);
-    return { success: false, output: 'No reachable approach to this site — surroundings are fully blocked' };
+    return { success: false, output: t('entities.build_no_approach') };
   }
 
   state.cash -= def.constructionCost;

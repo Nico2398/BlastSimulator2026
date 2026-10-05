@@ -760,7 +760,7 @@ describe('fireEmployeeFromWorld (#1378)', () => {
 
     const result = fireEmployeeFromWorld(state, 999);
 
-    expect(result).toEqual({ success: false, error: 'Employee not found' });
+    expect(result).toMatchObject({ success: false, error: 'Employee not found' });
     expect(state.pendingActions.find(a => a.id === 61)!.status).toBe('assigned');
   });
 
@@ -774,7 +774,7 @@ describe('fireEmployeeFromWorld (#1378)', () => {
 
     const result = fireEmployeeFromWorld(state, employee.id);
 
-    expect(result).toEqual({ success: false, error: 'Cannot fire unionized employee' });
+    expect(result).toMatchObject({ success: false, error: 'Cannot fire unionized employee' });
     expect(state.employees.employees).toContain(employee);
     expect(state.pendingActions.find(a => a.id === 62)!.holderId).toBe(employee.id);
     expect(employee.activeActionId).toBe(62);

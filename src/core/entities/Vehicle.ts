@@ -10,6 +10,7 @@ import {
   NAV_CLEARANCE_VEHICLE_CELLS,
 } from '../config/balance.js';
 import type { Employee } from './Employee.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 
 export { ROLE_LICENCE_REQUIRED, canAssignDriver } from './VehicleDriverAssignment.js';
 
@@ -331,10 +332,10 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
 export function canReleaseDriver(
   vehicleState: VehicleState,
   vehicleId: number,
-): { success: boolean; error?: string } {
+): { success: boolean; error?: string } & RefusalKey {
   const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
-  if (!vehicle) return { success: false, error: 'Vehicle not found' };
-  if (vehicle.payload !== null) return { success: false, error: 'Vehicle is mid-haul' };
+  if (!vehicle) return { success: false, error: 'Vehicle not found', errorKey: 'vehicle.not_found', errorParams: { id: vehicleId } };
+  if (vehicle.payload !== null) return { success: false, error: 'Vehicle is mid-haul', errorKey: 'vehicle.mid_haul', errorParams: { id: vehicleId } };
 
   return { success: true };
 }

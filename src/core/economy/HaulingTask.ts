@@ -14,8 +14,9 @@ import type { GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
 import { storageRoomKg } from './Logistics.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
-import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction } from './FragmentTaskLifecycle.js';
+import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
 import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -53,24 +54,24 @@ export function requestHaulFragment(
   state: GameState,
   vehicleId: number,
   fragmentId: number,
-): { success: boolean; error?: string } {
-  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
+): { success: boolean; error?: string } & RefusalKey {
+  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', { error: 'Vehicle is not a debris hauler', errorKey: 'vehicle.not_debris_hauler' });
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicleDriverId(vehicle) === null) return { success: false, error: 'Vehicle has no driver' };
+  if (vehicleDriverId(vehicle) === null) return vehicleNoDriver();
   if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.payload !== null) {
-    return { success: false, error: 'Vehicle is already hauling' };
+    return { success: false, error: 'Vehicle is already hauling', errorKey: 'vehicle.already_hauling' };
   }
 
   const tracked = state.logistics.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
   );
-  if (!tracked) return { success: false, error: 'Fragment not found or not on the ground' };
+  if (!tracked) return { success: false, error: 'Fragment not found or not on the ground', errorKey: 'vehicle.fragment_unavailable' };
   if (isOversized(tracked.fragment.volume)) {
-    return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first' };
+    return { success: false, error: 'Fragment is oversized and needs a Rock Fragmenter first', errorKey: 'vehicle.fragment_oversized' };
   }
 
-  return claimAndDispatchFragmentAction(state, vehicle, 'haul_debris', fragmentId, 'haul.no_action_queued', 'haul.claim_failed');
+  return claimAndDispatchFragmentAction(state, vehicle, 'haul_debris', fragmentId, { error: 'No haul action queued for this fragment', errorKey: 'haul.no_action_queued' }, { error: 'Failed to claim haul action', errorKey: 'haul.claim_failed' });
 }
 
 /**

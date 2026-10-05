@@ -218,6 +218,10 @@ describe('enrolInTraining — validation', () => {
     const result = enrolInTraining(state, 1, makeBuilding({ type: 'geology_lab' }), 'driving.excavator');
     expectFailure(result);
     expect(result.error).toContain('does not teach');
+    if (!result.success) {
+      expect(result.errorKey).toBe('employees.train_building_no_teach');
+      expect(result.errorParams).toEqual({ buildingId: 1, skill: 'driving.excavator' });
+    }
     expect(state.employees.employees[0]!.trainingState).toBeNull();
     expect(state.employees.employees[0]!.pendingTrainingState).toBeNull();
   });

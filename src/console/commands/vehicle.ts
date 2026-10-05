@@ -26,7 +26,7 @@ import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
 import { addExpense, addIncome } from '../../core/economy/Finance.js';
 import { SPAWN_RING_SIZE, SPAWN_TILE_SPACING } from '../../core/config/balance.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
-import { requireGame } from './commandUtils.js';
+import { requireGame, refusalText } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
 // ── tier arg parsing ──
@@ -132,7 +132,7 @@ export function vehicleCommand(
       if (args[2] === 'none') {
         const result = alight(state, vehicleId, ctx.emitter);
         if (!result.success) {
-          return { success: false, output: result.error };
+          return { success: false, output: refusalText(result) };
         }
         return { success: true, output: t('vehicle.driver_unassign_success', { id: vehicleId }) };
       }
@@ -171,7 +171,7 @@ export function vehicleCommand(
       // ArrivalGate.tickArrivalGate/tickHaulingProgress each tick (#437).
       const result = requestHaulFragment(state, vehicleId, fragmentId);
       if (!result.success) {
-        return { success: false, output: result.error! };
+        return { success: false, output: refusalText(result) };
       }
       return { success: true, output: t('vehicle.haul_success', { id: vehicleId, fragmentId }) };
     }
@@ -198,7 +198,7 @@ export function vehicleCommand(
       // tickBreakProgress each tick (#484).
       const result = requestBreakBoulder(state, vehicleId, fragmentId);
       if (!result.success) {
-        return { success: false, output: result.error! };
+        return { success: false, output: refusalText(result) };
       }
       return { success: true, output: t('vehicle.break_success', { id: vehicleId, fragmentId }) };
     }

@@ -18,6 +18,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { releaseEmployeeFromHosts } from './Mount.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { releasePlannedOrderForCancelledAction, type FreedFootprint } from './CancelledOrderCleanup.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 
 export interface CancelActionResult {
   success: boolean;
@@ -570,7 +571,7 @@ export function fireEmployeeFromWorld(
   state: GameState,
   employeeId: number,
   opts?: { force?: boolean },
-): { success: boolean; error?: string } {
+): { success: boolean; error?: string } & RefusalKey {
   const guard = canFireEmployee(state.employees, employeeId, opts);
   if (!guard.success) return guard;
 

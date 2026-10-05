@@ -10,6 +10,7 @@ import { RESERVATION_REFUSAL, reservationBlocking, type TerrainReservation } fro
 import { isTierUnlocked } from './BuildingResearch.js';
 import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
+import type { RefusalKey } from '../i18n/Refusal.js';
 import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD } from '../config/balance.js';
 
 // ── Building types ──
@@ -237,12 +238,22 @@ export function createBuildingState(): BuildingState {
 
 // ── Operations ──
 
-export interface PlaceBuildingResult {
+/** The translation hint of a refusal, spread into a result only when present. */
+function refusalKeyOf(refusal: RefusalKey): RefusalKey {
+  return {
+    ...(refusal.errorKey !== undefined && { errorKey: refusal.errorKey }),
+    ...(refusal.errorParams !== undefined && { errorParams: refusal.errorParams }),
+  };
+}
+
+function buildingNotFound(id: number): { error: string } & RefusalKey {
+  return { error: 'Building not found', errorKey: 'entities.building_not_found', errorParams: { id } };
+}
+
+export interface PlaceBuildingResult extends RefusalKey {
   success: boolean;
   building?: Building;
   error?: string;
-  /** Translation key when the refusal is a terrain reservation (#1390). */
-  errorKey?: string;
   cost?: number;
 }
 
@@ -286,7 +297,12 @@ export function placeBuilding(
   const def = getBuildingDef(type, tier);
 
   if (isPlacementBlockedByResearch(state, type, tier)) {
-    return { success: false, error: `Tier ${tier} ${type} is not researched — research required before placement.` };
+    return {
+      success: false,
+      error: `Tier ${tier} ${type} is not researched — research required before placement.`,
+      errorKey: 'entities.build_not_researched',
+      errorParams: { tier, type },
+    };
   }
 
   const check = checkFootprintPlacement(
@@ -294,7 +310,7 @@ export function placeBuilding(
     type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid,
   );
   if (!check.valid) {
-    return { success: false, error: check.error! };
+    return { success: false, error: check.error!, ...refusalKeyOf(check) };
   }
 
   const building: Building = {
@@ -337,7 +353,7 @@ export function destroyBuilding(state: BuildingState, buildingId: number): boole
   return true;
 }
 
-export interface DemolishBuildingResult {
+export interface DemolishBuildingResult extends RefusalKey {
   success: boolean;
   /** Absolute grid cells freed by the demolition (for navmesh update). */
   freedCells: Array<{ x: number; z: number }>;
@@ -350,7 +366,7 @@ export interface DemolishBuildingResult {
  */
 export function demolishBuilding(state: BuildingState, buildingId: number): DemolishBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
-  if (!building) return { success: false, freedCells: [], error: 'Building not found' };
+  if (!building) return { success: false, freedCells: [], ...buildingNotFound(buildingId) };
 
   const def = getBuildingDef(building.type, building.tier);
   const freedCells = def.footprint.map(([dx, dz]) => ({ x: building.x + dx, z: building.z + dz }));
@@ -400,7 +416,7 @@ export function moveBuilding(
   reservations?: ReadonlyArray<TerrainReservation>,
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
-  if (!building) return { success: false, error: 'Building not found' };
+  if (!building) return { success: false, ...buildingNotFound(buildingId) };
 
   const occupants: FootprintOccupant[] = [
     ...state.buildings.filter(b => b.id !== buildingId).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
@@ -411,7 +427,7 @@ export function moveBuilding(
     building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ, voxelGrid, reservations,
   );
   if (!check.valid) {
-    return { success: false, error: check.error!, ...(check.errorKey !== undefined && { errorKey: check.errorKey }) };
+    return { success: false, error: check.error!, ...refusalKeyOf(check) };
   }
 
   building.x = newX;
@@ -531,16 +547,16 @@ export function checkFootprintPlacement(
   originZ: number,
   voxelGrid?: VoxelGrid,
   reservations?: ReadonlyArray<TerrainReservation>,
-): { valid: boolean; error?: string; errorKey?: string } {
+): { valid: boolean; error?: string } & RefusalKey {
   const def = getBuildingDef(type, tier);
   const { sizeX, sizeZ } = getDefSize(def);
 
   if (x < originX || z < originZ || x + sizeX > originX + gridSizeX || z + sizeZ > originZ + gridSizeZ) {
-    return { valid: false, error: 'Out of bounds' };
+    return { valid: false, error: 'Out of bounds', errorKey: 'shell.placement.refused_out_of_bounds' };
   }
 
   if (rectOverlapsOccupants(occupants, { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ })) {
-    return { valid: false, error: 'Space is occupied' };
+    return { valid: false, error: 'Space is occupied', errorKey: 'shell.placement.refused_occupied' };
   }
 
   if (reservations !== undefined) {
@@ -553,7 +569,12 @@ export function checkFootprintPlacement(
   if (voxelGrid !== undefined) {
     const buildable = isFootprintBuildable(def.footprint, x, z, (cx, cz) => getSurfaceY(voxelGrid, cx, cz));
     if (!buildable) {
-      return { valid: false, error: 'Uneven surface' };
+      return {
+        valid: false,
+        error: 'Uneven surface',
+        errorKey: 'shell.placement.refused_uneven_ground',
+        errorParams: { max: BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD },
+      };
     }
   }
 

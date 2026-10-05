@@ -2,6 +2,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import type { RefusalKey } from '../../core/i18n/Refusal.js';
 import { t } from '../../core/i18n/I18n.js';
 import { resolveContractPriceMultiplier } from '../../core/campaign/Level.js';
 
@@ -17,9 +18,9 @@ export function staffedSuffix(staffed: boolean): string {
   return staffed ? t('console.staffed_suffix') : '';
 }
 
-/** Player-facing text of a refused placement: the translated `errorKey` when core supplied one, else its plain `error`. */
-export function placementRefusalText(refusal: { error?: string; errorKey?: string }): string {
-  return refusal.errorKey ? t(refusal.errorKey) : refusal.error!;
+/** Player-facing text of a core refusal: `errorKey` translated with `errorParams` when core supplied a key, else its plain English `error`. */
+export function refusalText(refusal: { error?: string } & RefusalKey): string {
+  return refusal.errorKey ? t(refusal.errorKey, refusal.errorParams) : refusal.error!;
 }
 
 /** Guard every command that needs a loaded game. */
