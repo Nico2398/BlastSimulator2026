@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { FinancesPanel } from '../../../../src/ui/panels/FinancesPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
+import { BANKRUPTCY_GRACE_TICKS } from '../../../../src/core/campaign/Bankruptcy.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
 function makeState(): GameState {
@@ -249,5 +250,46 @@ describe('FinancesPanel — scroll-bounded ledger section (#958)', () => {
     for (const bodyEl of [emptyBodyEl, fullBodyEl]) {
       expect(bodyEl.style.overflowY).toBe('auto');
     }
+  });
+
+  describe('bankruptcy countdown (#1376)', () => {
+    function textFor(ticksBelowThreshold: number, bankrupt = false): string {
+      const { panel } = makePanel();
+      panel.show();
+      const s = makeState();
+      s.bankruptcy.ticksBelowThreshold = ticksBelowThreshold;
+      s.bankruptcy.bankrupt = bankrupt;
+      panel.update(s);
+      return panel.root.textContent ?? '';
+    }
+
+    it('counts down from BANKRUPTCY_GRACE_TICKS', () => {
+      const remaining = BANKRUPTCY_GRACE_TICKS - 40;
+      expect(textFor(40)).toContain(`Bankruptcy in ${remaining} ticks`);
+    });
+
+    it('shows the full grace period after one tick below threshold', () => {
+      expect(textFor(1)).toContain(`Bankruptcy in ${BANKRUPTCY_GRACE_TICKS - 1} ticks`);
+    });
+
+    it('shows 0 when the streak equals the grace period', () => {
+      expect(textFor(BANKRUPTCY_GRACE_TICKS)).toContain('Bankruptcy in 0 ticks');
+    });
+
+    it('clamps at 0 when the streak exceeds the grace period', () => {
+      const text = textFor(BANKRUPTCY_GRACE_TICKS + 25);
+      expect(text).toContain('Bankruptcy in 0 ticks');
+      expect(text).not.toContain('-');
+    });
+
+    it('shows no countdown when not below threshold', () => {
+      expect(textFor(0)).not.toContain('Bankruptcy in');
+    });
+
+    it('still shows the seized banner when bankrupt', () => {
+      const text = textFor(40, true);
+      expect(text).toContain(t('campaign.bankrupt'));
+      expect(text).not.toContain('Bankruptcy in');
+    });
   });
 });
