@@ -2,10 +2,11 @@
 // Processes fragment impacts on buildings, vehicles, and employees.
 // Kinetic energy = 0.5 * mass * velocity² (real physics).
 
-import type { FragmentData, SecondaryBlastEvent } from '../mining/BlastExecution.js';
+import type { FragmentData } from '../mining/BlastExecution.js';
+import { secondaryBlastEventFor, type SecondaryBlastEvent } from './SecondaryBlast.js';
 import { length } from '../math/Vec3.js';
 import type { BuildingState, Building } from './Building.js';
-import { getBuildingDef, getDefSize, destroyBuilding } from './Building.js';
+import { buildingCenter, destroyBuilding } from './Building.js';
 import type { VehicleState, Vehicle } from './Vehicle.js';
 import { destroyVehicle } from './Vehicle.js';
 import type { EmployeeState, Employee } from './Employee.js';
@@ -174,9 +175,8 @@ function processBuildingHit(
       // re-apply injureEmployee's morale penalty for one event.
       if (employees.employees.find(e => e.id === employeeId)?.injured === false) injureEmployee(employees, employeeId);
     }
-    if (b.type === 'explosive_warehouse' && (b.storedExplosivesKg ?? 0) > 0) {
-      secondaryBlasts.push({ buildingId: b.id, x: b.x, z: b.z, explosivesKg: b.storedExplosivesKg! });
-    }
+    const secondary = secondaryBlastEventFor(b);
+    if (secondary) secondaryBlasts.push(secondary);
     destroyBuilding(state, b.id);
     return { tick, type: 'building_destroyed', entityId: b.id, fragmentId: frag.id, kineticEnergy: ke, entityLabel };
   }
@@ -219,9 +219,7 @@ function processEmployeeHit(
   damage: DamageState,
 ): AccidentRecord | null {
   if (ke >= DEATH_THRESHOLD) {
-    killEmployee(state, emp.id);
-    damage.lawsuitPending = true;
-    damage.deathCount++;
+    recordEmployeeDeath(state, damage, emp.id);
     return { tick, type: 'death', entityId: emp.id, fragmentId: frag.id, kineticEnergy: ke };
   }
   if (ke >= INJURY_THRESHOLD) {
@@ -238,20 +236,21 @@ function processEmployeeHit(
 
 // ── Helpers ──
 
+/** Kill an employee and book the consequences: a pending lawsuit and the death count. */
+export function recordEmployeeDeath(state: EmployeeState, damage: DamageState, employeeId: number): void {
+  killEmployee(state, employeeId);
+  damage.lawsuitPending = true;
+  damage.deathCount++;
+}
+
 function kineticEnergy(massKg: number, velocityMs: number): number {
   return 0.5 * massKg * velocityMs * velocityMs;
 }
 
-export function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {
+function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {
   const dx = x1 - x2;
   const dz = z1 - z2;
   return Math.sqrt(dx * dx + dz * dz);
-}
-
-export function buildingCenter(b: Building): { cx: number; cz: number } {
-  const def = getBuildingDef(b.type, b.tier);
-  const { sizeX, sizeZ } = getDefSize(def);
-  return { cx: b.x + sizeX / 2, cz: b.z + sizeZ / 2 };
 }
 
 /**

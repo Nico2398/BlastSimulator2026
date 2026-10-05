@@ -324,6 +324,12 @@ export function placeBuilding(
 }
 
 /** Destroy a building by ID. */
+/** Centre of a building's footprint in world coordinates. */
+export function buildingCenter(b: Building): { cx: number; cz: number } {
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, b.tier));
+  return { cx: b.x + sizeX / 2, cz: b.z + sizeZ / 2 };
+}
+
 export function destroyBuilding(state: BuildingState, buildingId: number): boolean {
   const idx = state.buildings.findIndex(b => b.id === buildingId);
   if (idx < 0) return false;

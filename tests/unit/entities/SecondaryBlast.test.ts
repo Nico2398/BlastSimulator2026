@@ -8,7 +8,7 @@ import {
   type SecondaryBlastEvent,
 } from '../../../src/core/entities/SecondaryBlast.js';
 import { createDamageState } from '../../../src/core/entities/Damage.js';
-import { createBuildingState, placeBuilding } from '../../../src/core/entities/Building.js';
+import { createBuildingState, placeBuilding, buildingCenter, getBuildingDef } from '../../../src/core/entities/Building.js';
 import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -17,6 +17,7 @@ import {
   SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M,
   SECONDARY_BLAST_RADIUS_MAX_M,
   SECONDARY_BLAST_DEATH_RADIUS_FRACTION,
+  SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION,
 } from '../../../src/core/config/balance.js';
 
 const GRID = 128;
@@ -123,14 +124,50 @@ describe('resolveSecondaryBlasts', () => {
     expect(w.damage.accidents).toEqual([]);
   });
 
-  it('damages a building inside the radius', () => {
+  it('damages a building by maxHp * fraction * (1 - d/r), measured from its centre', () => {
     const w = makeWorld();
     placeBuilding(w.buildings, 'living_quarters', 62, 60, GRID, GRID);
     const b = w.buildings.buildings[0]!;
+    const maxHp = getBuildingDef(b.type, b.tier).maxHp;
     const hp0 = b.hp;
-    resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
-    const after = w.buildings.buildings.find(x => x.id === b.id);
-    expect(after === undefined || after.hp < hp0).toBe(true);
+    const radius = secondaryBlastRadiusM(100);
+    const { cx, cz } = buildingCenter(b);
+    const d = Math.hypot(cx - 60, cz - 60);
+    const out = resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
+
+    const expected = maxHp * SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION * (1 - d / radius);
+    expect(w.buildings.buildings.some(x => x.id === b.id)).toBe(true);
+    expect(hp0 - b.hp).toBeCloseTo(expected, 6);
+    const rec = w.damage.accidents.find(a => a.type === 'building_damage' && a.entityId === b.id);
+    expect(rec).toBeDefined();
+    expect(rec!.entityLabel).toBe(b.type);
+    expect(out[0]!.accidents).toContainEqual(rec);
+  });
+
+  it('a full-HP building survives one detonation even at the epicentre', () => {
+    const w = makeWorld();
+    placeBuilding(w.buildings, 'living_quarters', 60, 60, GRID, GRID);
+    const b = w.buildings.buildings[0]!;
+    resolveSecondaryBlasts([event(100, b.x, b.z)], w.buildings, w.vehicles, w.employees, w.damage, 7);
+    expect(w.buildings.buildings.some(x => x.id === b.id)).toBe(true);
+    expect(b.hp).toBeGreaterThan(0);
+  });
+
+  it('injures occupants of a destroyed building and records the destruction', () => {
+    const w = makeWorld();
+    placeBuilding(w.buildings, 'living_quarters', 62, 60, GRID, GRID);
+    const b = w.buildings.buildings[0]!;
+    b.hp = 1;
+    // Far outside the blast radius so only the building-collapse path can injure them.
+    const emp = hireEmployee(w.employees, 'driller', w.rng, 120, 120).employee;
+    b.occupantIds.push(emp.id);
+    const out = resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
+
+    expect(w.buildings.buildings.some(x => x.id === b.id)).toBe(false);
+    expect(emp.injured).toBe(true);
+    expect(emp.alive).toBe(true);
+    expect(out[0]!.accidents.some(a => a.type === 'building_destroyed' && a.entityId === b.id && a.entityLabel === 'living_quarters')).toBe(true);
+    expect(out[0]!.accidents.some(a => a.type === 'injury' && a.entityId === emp.id)).toBe(true);
   });
 
   it('damages or destroys a vehicle inside the radius', () => {
@@ -160,6 +197,18 @@ describe('resolveSecondaryBlasts', () => {
     const out = resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
     expect(emp.morale).toBe(morale0);
     expect(out[0]!.accidents.filter(a => a.entityId === emp.id)).toEqual([]);
+  });
+
+  it('kills an already injured employee inside the death radius', () => {
+    const w = makeWorld();
+    const radius = secondaryBlastRadiusM(100);
+    const emp = hireEmployee(w.employees, 'driller', w.rng, 60 + radius * SECONDARY_BLAST_DEATH_RADIUS_FRACTION * 0.5, 60).employee;
+    emp.injured = true;
+    const out = resolveSecondaryBlasts([event(100)], w.buildings, w.vehicles, w.employees, w.damage, 7);
+    expect(emp.alive).toBe(false);
+    expect(w.damage.deathCount).toBe(1);
+    expect(w.damage.lawsuitPending).toBe(true);
+    expect(out[0]!.accidents.some(a => a.type === 'death' && a.entityId === emp.id)).toBe(true);
   });
 
   it('chains a stocked warehouse the blast destroys, exactly once', () => {

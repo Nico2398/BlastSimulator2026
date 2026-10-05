@@ -89,7 +89,7 @@ export interface DestroyedBuildingInfo {
 }
 
 export type { SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
-import type { SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
+import { secondaryBlastEventFor, type SecondaryBlastEvent } from '../entities/SecondaryBlast.js';
 
 export interface BlastRegion {
   minX: number;
@@ -429,14 +429,8 @@ export function executeBlast(
         z: building.z,
       });
       // Secondary blast for explosive_warehouse with stored explosives.
-      if (building.type === 'explosive_warehouse' && (building.storedExplosivesKg ?? 0) > 0) {
-        secondaryBlastEvents.push({
-          buildingId: building.id,
-          x: building.x,
-          z: building.z,
-          explosivesKg: building.storedExplosivesKg!,
-        });
-      }
+      const secondary = secondaryBlastEventFor(building);
+      if (secondary) secondaryBlastEvents.push(secondary);
       destroyBuilding(buildingState, building.id);
     }
   }

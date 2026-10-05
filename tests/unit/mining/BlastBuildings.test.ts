@@ -14,6 +14,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   createBuildingState,
   placeBuilding,
+  buildingCenter,
 } from '../../../src/core/entities/Building.js';
 
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -273,6 +274,7 @@ describe('executeBlast — secondary blast events', () => {
     const buildingState = createBuildingState();
     const placed = placeBuilding(buildingState, 'explosive_warehouse', 5, 5, 20, 20);
     const buildingId = placed.building!.id;
+    const { cx, cz } = buildingCenter(placed.building!);
 
     // storedExplosivesKg triggers a secondary blast event when the building is destroyed.
     (buildingState.buildings[0] as any).storedExplosivesKg = 200;
@@ -289,8 +291,8 @@ describe('executeBlast — secondary blast events', () => {
     expect(events).toHaveLength(1);
     expect(events[0].buildingId).toBe(buildingId);
     expect(events[0].explosivesKg).toBe(200);
-    expect(events[0].x).toBe(5);
-    expect(events[0].z).toBe(5);
+        expect(events[0].x).toBe(cx);
+    expect(events[0].z).toBe(cz);
   });
 
   it('emits no secondaryBlastEvent when storedExplosivesKg is 0', () => {
@@ -448,8 +450,9 @@ describe('processProjections — secondary blast collector (#1394)', () => {
     expect(collector).toHaveLength(1);
     expect(collector[0]!.buildingId).toBe(wh.id);
     expect(collector[0]!.explosivesKg).toBe(120);
-    expect(collector[0]!.x).toBeCloseTo(wh.x, 6);
-    expect(collector[0]!.z).toBeCloseTo(wh.z, 6);
+    const { cx, cz } = buildingCenter(wh);
+    expect(collector[0]!.x).toBeCloseTo(cx, 6);
+    expect(collector[0]!.z).toBeCloseTo(cz, 6);
   });
 
   it('pushes nothing when the destroyed warehouse holds 0 kg', () => {

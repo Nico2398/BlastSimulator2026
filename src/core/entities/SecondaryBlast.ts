@@ -1,15 +1,15 @@
 // BlastSimulator2026 — Secondary blasts
 // A destroyed explosive warehouse holding stock detonates, hurting what is near it.
 
-import { buildingCenter, distanceBetween, type AccidentRecord, type DamageState } from './Damage.js';
-import { destroyBuilding, getBuildingDef, type BuildingState } from './Building.js';
+import { recordEmployeeDeath, type AccidentRecord, type DamageState } from './Damage.js';
+import { buildingCenter, destroyBuilding, getBuildingDef, type Building, type BuildingState } from './Building.js';
 import { destroyVehicle, getVehicleDefByTier, type VehicleState } from './Vehicle.js';
-import { injureEmployee, killEmployee, type EmployeeState } from './Employee.js';
+import { injureEmployee, type EmployeeState } from './Employee.js';
 import {
   SECONDARY_BLAST_RADIUS_BASE_M,
   SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M,
   SECONDARY_BLAST_RADIUS_MAX_M,
-  SECONDARY_BLAST_BUILDING_DAMAGE_FRACTION,
+  SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION,
   SECONDARY_BLAST_DEATH_RADIUS_FRACTION,
 } from '../config/balance.js';
 
@@ -19,6 +19,17 @@ export interface SecondaryBlastEvent {
   x: number;
   z: number;
   explosivesKg: number;
+}
+
+/** Event for a building whose destruction detonates stored explosives, else null. Centred on its footprint. */
+export function secondaryBlastEventFor(b: Building): SecondaryBlastEvent | null {
+  if (b.type !== 'explosive_warehouse' || (b.storedExplosivesKg ?? 0) <= 0) return null;
+  const { cx, cz } = buildingCenter(b);
+  return { buildingId: b.id, x: cx, z: cz, explosivesKg: b.storedExplosivesKg! };
+}
+
+function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {
+  return Math.hypot(x1 - x2, z1 - z2);
 }
 
 interface SecondaryBlastOutcome {
@@ -77,16 +88,16 @@ export function resolveSecondaryBlasts(
       const dist = distanceBetween(event.x, event.z, cx, cz);
       if (dist > radiusM) continue;
       const maxHp = getBuildingDef(b.type, b.tier).maxHp;
-      b.hp -= maxHp * SECONDARY_BLAST_BUILDING_DAMAGE_FRACTION * (1 - dist / radiusM);
+      b.hp -= maxHp * SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION * (1 - dist / radiusM);
       if (b.hp > 0) {
         record('building_damage', b.id, b.type);
         continue;
       }
       for (const employeeId of b.occupantIds) injureOnce(employeeId);
+      const follow = secondaryBlastEventFor(b);
       destroyBuilding(buildings, b.id);
       record('building_destroyed', b.id, b.type);
-      if (b.type === 'explosive_warehouse' && (b.storedExplosivesKg ?? 0) > 0) {
-        const follow = { buildingId: b.id, x: b.x, z: b.z, explosivesKg: b.storedExplosivesKg! };
+      if (follow) {
         chained.push(follow);
         worklist.push(follow);
       }
@@ -96,7 +107,7 @@ export function resolveSecondaryBlasts(
       const dist = distanceBetween(event.x, event.z, v.x, v.z);
       if (dist > radiusM) continue;
       const maxHp = getVehicleDefByTier(v.type, v.tier).maxHp;
-      v.hp -= maxHp * SECONDARY_BLAST_BUILDING_DAMAGE_FRACTION * (1 - dist / radiusM);
+      v.hp -= maxHp * SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION * (1 - dist / radiusM);
       if (v.hp > 0) {
         record('vehicle_damage', v.id, v.type);
         continue;
@@ -107,13 +118,11 @@ export function resolveSecondaryBlasts(
     }
 
     for (const emp of employees.employees) {
-      if (!emp.alive || emp.injured) continue;
+      if (!emp.alive) continue;
       const dist = distanceBetween(event.x, event.z, emp.x, emp.z);
       if (dist > radiusM) continue;
       if (dist <= radiusM * SECONDARY_BLAST_DEATH_RADIUS_FRACTION) {
-        killEmployee(employees, emp.id);
-        damage.lawsuitPending = true;
-        damage.deathCount++;
+        recordEmployeeDeath(employees, damage, emp.id);
         record('death', emp.id);
       } else {
         injureOnce(emp.id);

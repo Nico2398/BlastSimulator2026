@@ -1658,8 +1658,8 @@ export const SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M = 0.5;
 /** Secondary blast radius cap in metres (#1394). */
 export const SECONDARY_BLAST_RADIUS_MAX_M = 40;
 
-/** Fraction of the radius within which buildings are destroyed (#1394). */
-export const SECONDARY_BLAST_BUILDING_DAMAGE_FRACTION = 0.6;
+/** Fraction of max HP a building or vehicle loses at the epicentre, falling off linearly to 0 at the radius (#1394). */
+export const SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION = 0.6;
 
 /** Fraction of the radius within which people die (#1394). */
 export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;
