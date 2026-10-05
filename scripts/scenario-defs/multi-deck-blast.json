@@ -83,7 +83,7 @@
       }
     },
     {
-      "command": "charge hole:H1 explosive:boomite amount:6 stemming:6",
+      "command": "charge hole:H1 explosive:boomite amount:4 stemming:4",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -92,24 +92,24 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
+          "value": 4
         },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 6
+          "value": 4
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "6 kg"
+          "expectedValue": "4 kg"
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "6.0 m"
+          "expectedValue": "4.0 m"
         },
         {
           "type": "clickSelector",
@@ -155,29 +155,29 @@
       }
     },
     {
-      "command": "charge hole:H2 explosive:boomite amount:5 stemming:5",
+      "command": "charge hole:H2 explosive:boomite amount:4 stemming:3",
       "interaction": [
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
+          "value": 4
         },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 5
+          "value": 3
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "5 kg"
+          "expectedValue": "4 kg"
         },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "5.0 m"
+          "expectedValue": "3.0 m"
         },
         {
           "type": "clickSelector",

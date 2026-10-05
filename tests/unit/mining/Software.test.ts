@@ -200,7 +200,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('previewHoleDetails reflects wet holes: coarser fragments or no projection', () => {
-    const { grid, plan } = planWith('big_bada_boom', 12, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
+    const { grid, plan } = planWith('big_bada_boom', 8, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
     const dry = previewHoleDetails(plan, grid, 3);
     const wet = previewHoleDetails(plan, grid, 3, allWet(plan));
     const changed = plan.holes.some(h => {
@@ -216,7 +216,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('only the wet holes are weakened in previewHoleDetails', () => {
-    const { grid, plan } = planWith('big_bada_boom', 12, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
+    const { grid, plan } = planWith('big_bada_boom', 8, 1.8); // heavy charge: collar voxel is energised, so wet is measurable
     const dry = previewHoleDetails(plan, grid, 2);
     const first = plan.holes[0]!.id;
     const wet = previewHoleDetails(plan, grid, 2, new Set([first]));

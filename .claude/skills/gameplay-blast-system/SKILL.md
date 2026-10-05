@@ -46,6 +46,7 @@ per-voxel objects or string keys, which a blast revisits far too often to afford
   (`CHARGE_KG_PER_METRE`) from the bottom of the hole. Stemming does *not* shorten it; poor stemming
   is priced into `stemmingEfficiency` instead. Clamped to the world floor so an over-deep hole
   cannot lose part of its charge.
+- **Hole fit.** Charge column (`amountKg / CHARGE_KG_PER_METRE`) plus stemming must fit the hole depth; `createCharge` refuses an overflow (`mining.charge.column_exceeds_hole`, quoting the max kg that fits, `maxChargeKgForHole`). The Charge step shows the same limit and disables Charge All; the stepper is never clamped.
 - **Absorption threshold** = rock mix weighted by `energyAbsorption`, × `fractureModifier`, ×
   `confinementFactor(distToAir)`. **Rock near a free face breaks for a fraction of the energy**
   (`UNCONFINED_THRESHOLD_FACTOR`, ramping to full over `CONFINEMENT_FULL_DEPTH`) — this is why bench

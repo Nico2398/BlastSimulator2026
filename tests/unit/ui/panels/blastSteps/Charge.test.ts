@@ -341,3 +341,51 @@ describe('ChargeStep level-limited product list (#1357)', () => {
     expect(gameConsole.mock.calls[0]![0]).not.toContain('dynatomics');
   });
 });
+
+
+describe('ChargeStep — column overflow guard (#1361)', () => {
+  const reasonText = (step: ChargeStep): string =>
+    Array.from(step.root.querySelectorAll('.bsx-reason')).map(e => e.textContent ?? '').join(' | ');
+  const chargeAll = (step: ChargeStep) => step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
+
+  it('shows a reason line with the max kg and disables Charge All when amount + stemming overflow the shallowest hole', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15); // shallowest: default 5 kg (2.5 m) + 2 m > 4 m
+    step.update(state, 'sunny');
+
+    expect(chargeAll(step).disabled).toBe(true);
+    // max for the 4 m hole under 2 m stemming = (4 - 2) * 2 = 4 kg
+    expect(reasonText(step)).toMatch(/at most 4 kg/);
+  });
+
+  it('shows no overflow reason and leaves Charge All enabled when the charge fits every hole', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 13, 10, 6, 0.15);
+    step.update(state, 'sunny');
+
+    expect(chargeAll(step).disabled).toBe(false);
+    expect(step.root.querySelectorAll('.bsx-reason')).toHaveLength(0);
+  });
+
+  it('shows no overflow reason when there are no holes', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+
+    expect(step.root.querySelectorAll('.bsx-reason')).toHaveLength(0);
+  });
+
+  it('a disabled Charge All dispatches no command when clicked', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15);
+    step.update(state, 'sunny');
+
+    chargeAll(step).click();
+
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+});

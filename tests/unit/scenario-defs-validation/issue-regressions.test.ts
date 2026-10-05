@@ -101,7 +101,7 @@ describe('The 3 known un-converted player steps are converted to real UI interac
 describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole button with clickIfPresent (#694)', () => {
   const TARGETS = [
     {
-      command: 'charge hole:H1 explosive:boomite amount:8 stemming:3',
+      command: 'charge hole:H1 explosive:boomite amount:8 stemming:2',
       selector: '#bs-blast-panel [data-hole="H1"] [data-action="charge-hole"]',
     },
     {
