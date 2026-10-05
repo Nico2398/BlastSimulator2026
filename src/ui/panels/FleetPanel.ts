@@ -16,6 +16,7 @@
 // ContractsPanel.ts already established for #bs-contract-panel in P5.
 
 import { PanelBase } from './PanelBase.js';
+import { makeLocateButton, focusCameraOn } from '../locateButton.js';
 import { t } from '../../core/i18n/I18n.js';
 import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -268,8 +269,13 @@ export class FleetPanel extends PanelBase {
       ] }),
       el('span', { text: t(`vehicle_type.${v.type}`), attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
     );
-    const locateBtn = el('button', { attrs: { style: 'width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer' }, children: [iconEl('locate', 12)] });
-    locateBtn.addEventListener('click', () => window.__cameraFocus?.(v.x, v.z, 15));
+    const locateBtn = makeLocateButton({
+      title: t('ui.fleet.locate'),
+      onClick: () => {
+        const live = this.lastState?.vehicles.vehicles.find(x => x.id === v.id);
+        if (live) focusCameraOn(live.x, live.z);
+      },
+    });
     head.append(iconChip, nameCol, this.tag(makeStatusChip(v, state.vehicles, this.occupantOf(v, state)), 'bs-fleet-status'), locateBtn);
 
     const rows: HTMLElement[] = [head, this.tag(makeHpGauge(v), 'bs-fleet-hp')];
