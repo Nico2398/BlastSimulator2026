@@ -52,7 +52,7 @@ export function updateRevolt(
     if (!revolt.warningFired && revolt.ticksAtZero >= REVOLT_WARNING_TICKS) {
       revolt.warningFired = true;
       emitter.emit('revolt:warning', {
-        ticksRemaining: REVOLT_TICKS - revolt.ticksAtZero,
+        ticksRemaining: revoltTicksRemaining(revolt),
       });
     }
 

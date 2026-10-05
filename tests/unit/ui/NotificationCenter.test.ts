@@ -132,6 +132,32 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(pips[0]!.label).toContain(String(REVOLT_TICKS - 41));
     });
 
+    it('derives no wellbeing pip once the crew has already revolted', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.scores.wellBeing = 0;
+      state.revolt.revolted = true;
+      expect(center.update(state).some(p => p.kind === 'wellbeing')).toBe(false);
+    });
+
+    it('labels the warn wellbeing pip with the rounded value', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.scores.wellBeing = 12.6;
+      const pips = center.update(state).filter(p => p.kind === 'wellbeing');
+      expect(pips).toHaveLength(1);
+      expect(pips[0]!.label).toContain('13');
+    });
+
+    it('derives a critical exposure pip at exactly the arrest threshold of 0.9', () => {
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.mafia.exposureRisk = 0.9;
+      const pips = center.update(state).filter(p => p.kind === 'exposure');
+      expect(pips).toHaveLength(1);
+      expect(pips[0]!.tone).toBe('critical');
+    });
+
     it('derives no exposure pip just below the warning exposure', () => {
       const center = new NotificationCenter();
       const state = makeState();
