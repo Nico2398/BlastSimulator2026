@@ -136,6 +136,7 @@ Fictional humorous names. "Treranium" (très rare, high value), common ores, exo
 Procedural cycle: sunny → cloudy → rain → heavy rain → storm → heat wave → cold snap.
 Rain fills drill holes. Water-sensitive explosives fail without tubing. Porous rock = faster water infiltration.
 Tubing is purchasable per-hole waterproofing.
+Every game start (browser level swap, console `new_game`, sandbox start, campaign start) reseeds weather via `createWeatherCycle(seed)` and `Random(seed + 1000)`; console commands use `resetWeatherForNewGame` (`src/console/commands/world.ts`), and a refused start leaves weather untouched.
 Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing a hole or firing the blast drops its tubing record with no refund; unused inventory persists.
 
 ## Safety & Projection Profiles

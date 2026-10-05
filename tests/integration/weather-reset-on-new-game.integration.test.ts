@@ -67,7 +67,7 @@ describe('weather reset on game start (#1459)', () => {
     const { runner, ctx } = createRunner();
     runner.run('new_game seed:42');
     runner.run('weather set heavy_rain');
-    const res = runner.run('campaign start level:grumpstone_ridge');
+    const res = runner.run('campaign start level:tutorial_pit');
     expect(res.success).toBe(true);
     expect(ctx.weatherCycle).toEqual(createWeatherCycle(ctx.state!.seed));
   });
