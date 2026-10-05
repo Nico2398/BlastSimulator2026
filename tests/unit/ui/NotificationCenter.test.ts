@@ -519,7 +519,7 @@ describe('NotificationCenter (redesign P1)', () => {
 
 // ── #1369: freight warehouse / storage-full blocked haul orders ────────────
 describe('blocked haul orders: warehouse gating (#1369)', () => {
-  function makeHaulAction(id: number, reason: PendingAction['blockedReason']): PendingAction {
+  function makeHaulAction(id: number, reason: NonNullable<PendingAction['blockedReason']>): PendingAction {
     return {
       id, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
       targetX: id, targetZ: 0, targetY: 0, payload: { fragmentId: id }, targetEmployeeId: null,
@@ -602,5 +602,28 @@ describe('blocked haul orders: warehouse gating (#1369)', () => {
     for (const a of actions) a.blockedReason = 'storage_full';
     center.update(state);
     expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('re-toasts when the reason clears and then reappears', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    const actions = [1, 2, 3].map(i => makeHaulAction(i, 'storage_full'));
+    state.pendingActions.push(...actions);
+    center.update(state);
+    for (const a of actions) a.blockedReason = null;
+    center.update(state);
+    for (const a of actions) a.blockedReason = 'storage_full';
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(2);
+  });
+
+  it('toasts once for the haul reason plus once per non-haul blocked action in the same update', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 5; i++) state.pendingActions.push(makeHaulAction(i, 'storage_full'));
+    state.pendingActions.push(makeHaulAction(6, 'no_vehicle_in_fleet'));
+    state.pendingActions.push(makeHaulAction(7, 'no_licensed_driver'));
+    center.update(state);
+    expect(blockedEntries(center)).toHaveLength(3);
   });
 });

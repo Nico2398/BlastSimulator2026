@@ -16,6 +16,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
+import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
 
@@ -194,8 +195,8 @@ export class NotificationCenter {
     // Hundreds of haul actions share one cause: toast once per reason, not per action.
     const haulActions = new Map<BlockedOrderReason, PendingAction>();
     for (const a of blockedActions) {
-      const r = a.blockedReason as BlockedOrderReason;
-      if (HAUL_REASONS.has(r) && !haulActions.has(r)) haulActions.set(r, a);
+      const r = a.blockedReason;
+      if (isHaulBlockedReason(r) && !haulActions.has(r)) haulActions.set(r, a);
     }
     for (const [reason, action] of haulActions) {
       if (this.warnedHaulReasons.has(reason)) continue;
@@ -213,8 +214,8 @@ export class NotificationCenter {
       for (const id of ids) siblingActionIds.set(id, ids);
     }
     for (const action of blockedActions) {
-      if (HAUL_REASONS.has(action.blockedReason as BlockedOrderReason)) continue;
       const reason = action.blockedReason as BlockedOrderReason;
+      if (isHaulBlockedReason(reason)) continue;
       if (this.warnedBlockedOrders.get(action.id) === reason) continue;
       const alreadyWarnedForRamp = (siblingActionIds.get(action.id) ?? [])
         .some(id => this.warnedBlockedOrders.get(id) === reason);
@@ -263,8 +264,6 @@ export class NotificationCenter {
     }
   }
 }
-
-const HAUL_REASONS: ReadonlySet<BlockedOrderReason> = new Set(['no_freight_warehouse', 'storage_full']);
 
 /** Builds the notification body naming the blocked order and its missing requirement (#1061). */
 export function buildBlockedOrderMessage(action: PendingAction): string {

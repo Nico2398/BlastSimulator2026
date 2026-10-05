@@ -20,9 +20,8 @@ import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
 import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup } from '../../../src/core/economy/HaulDispatch.js';
-import { pickupFragment, storageRoomKg, createLogisticsState } from '../../../src/core/economy/Logistics.js';
-import { placeBuilding, getStorageCapacity } from '../../../src/core/entities/Building.js';
-import { INITIAL_STORAGE_CAPACITY_KG } from '../../../src/core/config/balance.js';
+import { pickupFragment } from '../../../src/core/economy/Logistics.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 
 const SEED = 42;
 
@@ -653,47 +652,11 @@ function addWarehouse(state: ReturnType<typeof createGame>): void {
   if (!result.success) throw new Error(`Setup: placeBuilding failed — ${result.error}`);
 }
 
-describe('initial storage capacity (#1369)', () => {
-  it('INITIAL_STORAGE_CAPACITY_KG is 0', () => {
-    expect(INITIAL_STORAGE_CAPACITY_KG).toBe(0);
-  });
-
-  it('createLogisticsState() defaults to zero capacity', () => {
-    expect(createLogisticsState().storageCapacityKg).toBe(0);
-  });
-
-  it('createLogisticsState(n) honours an explicit capacity', () => {
-    expect(createLogisticsState(750).storageCapacityKg).toBe(750);
-  });
-
-  it('createGame starts with zero logistics capacity', () => {
-    expect(createGame({ seed: SEED }).logistics.storageCapacityKg).toBe(0);
-  });
-});
-
-describe('storageRoomKg (#1369)', () => {
-  it('is capacity minus stored mass', () => {
-    const s = createLogisticsState(1000);
-    s.storedMassKg = 300;
-    expect(storageRoomKg(s)).toBe(700);
-  });
-
-  it('is zero for a fresh default state', () => {
-    expect(storageRoomKg(createLogisticsState())).toBe(0);
-  });
-
-  it('is zero when exactly full', () => {
-    const s = createLogisticsState(500);
-    s.storedMassKg = 500;
-    expect(storageRoomKg(s)).toBe(0);
-  });
-});
-
 describe('haulBlockedReason (#1369)', () => {
   it('is no_freight_warehouse for a haul_debris action with no active freight_warehouse', () => {
     const state = createGame({ seed: SEED });
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 100)]);
-    expect(getStorageCapacity(state.buildings)).toBe(0);
+    expect(state.logistics.storageCapacityKg).toBe(0);
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBe('no_freight_warehouse');
   });
 
@@ -757,6 +720,16 @@ describe('haulBlockedReason (#1369)', () => {
     addWarehouse(state);
     state.logistics.storageCapacityKg = 10;
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 99 } }))).toBeNull();
+  });
+
+  it('is null for a missing fragment or one not on the ground even with no warehouse', () => {
+    const state = createGame({ seed: SEED });
+    state.logistics.storageCapacityKg = 1000;
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 400)]);
+    pickupFragment(state.logistics, 1, 'v1');
+    state.logistics.storageCapacityKg = 0;
+    expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBeNull();
+    expect(haulBlockedReason(state, makeHaulAction({ id: 2, payload: { fragmentId: 99 } }))).toBeNull();
   });
 
   it('is null for a fragment that is no longer on_ground, however little room is left', () => {

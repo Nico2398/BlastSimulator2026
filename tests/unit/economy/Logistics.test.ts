@@ -10,9 +10,11 @@ import {
   consumeStoredOre,
   splitStoredFragmentMass,
   returnFragmentToGround,
+  storageRoomKg,
   type LogisticsState,
 } from '../../../src/core/economy/Logistics.js';
-import { FRAGMENT_SPLIT_EPSILON_KG } from '../../../src/core/config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../../../src/core/config/balance.js';
+import { createGame } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
 /** Explicit capacity: a fresh logistics state holds 0 kg until a freight warehouse exists (#1369). */
@@ -791,5 +793,42 @@ describe('returnFragmentToGround', () => {
     expect(ok).toBe(true);
     const tracked = state.fragments.find(f => f.fragment.id === 1)!;
     expect(tracked.fragment.position).toEqual({ x: 0, y: 0, z: 0 });
+  });
+});
+
+// ── #1369: initial capacity and free room ──
+describe('initial storage capacity (#1369)', () => {
+  it('INITIAL_STORAGE_CAPACITY_KG is 0', () => {
+    expect(INITIAL_STORAGE_CAPACITY_KG).toBe(0);
+  });
+
+  it('createLogisticsState() defaults to zero capacity', () => {
+    expect(createLogisticsState().storageCapacityKg).toBe(0);
+  });
+
+  it('createLogisticsState(n) honours an explicit capacity', () => {
+    expect(createLogisticsState(750).storageCapacityKg).toBe(750);
+  });
+
+  it('createGame starts with zero logistics capacity', () => {
+    expect(createGame({ seed: 42 }).logistics.storageCapacityKg).toBe(0);
+  });
+});
+
+describe('storageRoomKg (#1369)', () => {
+  it('is capacity minus stored mass', () => {
+    const s = createLogisticsState(1000);
+    s.storedMassKg = 300;
+    expect(storageRoomKg(s)).toBe(700);
+  });
+
+  it('is zero for a fresh default state', () => {
+    expect(storageRoomKg(createLogisticsState())).toBe(0);
+  });
+
+  it('is zero when exactly full', () => {
+    const s = createLogisticsState(500);
+    s.storedMassKg = 500;
+    expect(storageRoomKg(s)).toBe(0);
   });
 });
