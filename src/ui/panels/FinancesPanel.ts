@@ -20,6 +20,7 @@
 
 import { PanelBase } from './PanelBase.js';
 import { t } from '../../core/i18n/I18n.js';
+import { formatGameDuration } from '../formatGameDuration.js';
 import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
@@ -115,7 +116,7 @@ export class FinancesPanel extends PanelBase {
       children.push(this.makeBankruptcyBanner(t('campaign.bankrupt'), true));
     } else if (state.bankruptcy.ticksBelowThreshold > 0) {
       const ticksRemaining = Math.max(0, BANKRUPTCY_GRACE_TICKS - state.bankruptcy.ticksBelowThreshold);
-      children.push(this.makeBankruptcyBanner(t('notification.bankruptcy_warning', { ticksRemaining }), false));
+      children.push(this.makeBankruptcyBanner(t('notification.bankruptcy_warning', { duration: formatGameDuration(ticksRemaining) }), false));
     }
 
     return card(children);

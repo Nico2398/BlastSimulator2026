@@ -37,6 +37,7 @@ import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/
 import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
+import { formatGameDuration } from './ui/formatGameDuration.js';
 import { ScenePicking, pickScene, type EntityPick } from './ui/scene/ScenePicking.js';
 import type { GameState } from './core/state/GameState.js';
 import { resolveScreenPointForTile, type ProjectToNDC, type RaycastForTile, type ScreenTileResolution } from './renderer/ScreenTileResolution.js';
@@ -435,13 +436,13 @@ emitter.on('bankruptcy:triggered', ({ cash }) => {
   uiManager.notify({ severity: 'critical', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_triggered', { cash: formatBalance(cash) }) });
 });
 emitter.on('bankruptcy:warning', ({ ticksRemaining }) => {
-  uiManager.notify({ severity: 'warn', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_warning', { ticksRemaining }) });
+  uiManager.notify({ severity: 'warn', title: t('notification.title.bankruptcy'), body: t('notification.bankruptcy_warning', { duration: formatGameDuration(ticksRemaining) }) });
 });
 emitter.on('ecology:shutdown', () => {
   uiManager.notify({ severity: 'critical', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_shutdown') });
 });
 emitter.on('ecology:warning', ({ ticksRemaining }) => {
-  uiManager.notify({ severity: 'warn', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_warning', { ticksRemaining }) });
+  uiManager.notify({ severity: 'warn', icon: 'rock', title: t('notification.title.ecology'), body: t('notification.ecology_warning', { duration: formatGameDuration(ticksRemaining) }) });
 });
 emitter.on('arrest:triggered', () => {
   uiManager.notify({ severity: 'critical', icon: 'gavel', title: t('notification.title.arrest'), body: t('notification.arrest_triggered') });
@@ -453,7 +454,7 @@ emitter.on('revolt:triggered', () => {
   uiManager.notify({ severity: 'critical', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_triggered') });
 });
 emitter.on('revolt:warning', ({ ticksRemaining }) => {
-  uiManager.notify({ severity: 'warn', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_warning', { ticksRemaining }) });
+  uiManager.notify({ severity: 'warn', icon: 'union', title: t('notification.title.revolt'), body: t('notification.revolt_warning', { duration: formatGameDuration(ticksRemaining) }) });
 });
 // Terrain mesh rebuild is event-driven, not command-name-matched: every voxel
 // mutator (generation, blast, drill, ramp) emits this after mutating the grid

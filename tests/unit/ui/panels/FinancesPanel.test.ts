@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { FinancesPanel } from '../../../../src/ui/panels/FinancesPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
+import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../../../src/core/campaign/Bankruptcy.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -280,20 +281,20 @@ describe('FinancesPanel — scroll-bounded ledger section (#958)', () => {
 
     it('counts down from BANKRUPTCY_GRACE_TICKS', () => {
       const remaining = BANKRUPTCY_GRACE_TICKS - 40;
-      expect(textFor(40)).toContain(`Bankruptcy in ${remaining} ticks`);
+      expect(textFor(40)).toContain(`Bankruptcy in ${formatGameDuration(remaining)}`);
     });
 
     it('shows the full grace period after one tick below threshold', () => {
-      expect(textFor(1)).toContain(`Bankruptcy in ${BANKRUPTCY_GRACE_TICKS - 1} ticks`);
+      expect(textFor(1)).toContain(`Bankruptcy in ${formatGameDuration(BANKRUPTCY_GRACE_TICKS - 1)}`);
     });
 
     it('shows 0 when the streak equals the grace period', () => {
-      expect(textFor(BANKRUPTCY_GRACE_TICKS)).toContain('Bankruptcy in 0 ticks');
+      expect(textFor(BANKRUPTCY_GRACE_TICKS)).toContain(`Bankruptcy in ${formatGameDuration(0)}`);
     });
 
     it('clamps at 0 when the streak exceeds the grace period', () => {
       const text = textFor(BANKRUPTCY_GRACE_TICKS + 25);
-      expect(text).toContain('Bankruptcy in 0 ticks');
+      expect(text).toContain(`Bankruptcy in ${formatGameDuration(0)}`);
       expect(text).not.toContain('-');
     });
 

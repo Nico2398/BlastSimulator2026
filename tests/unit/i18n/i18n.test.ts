@@ -675,17 +675,63 @@ describe('notification.* keys — en and fr translations differ', () => {
   }
 });
 
-describe('notification.bankruptcy_warning / ecology_warning / revolt_warning — {ticksRemaining} interpolation', () => {
+describe('notification.bankruptcy_warning / ecology_warning / revolt_warning — {duration} interpolation', () => {
   for (const locale of LOCALES) {
-    it(`locale ${locale}: warning notifications interpolate {ticksRemaining}`, () => {
+    it(`locale ${locale}: warning notifications interpolate {duration}`, () => {
       setLocale(locale);
       for (const key of ['notification.bankruptcy_warning', 'notification.ecology_warning', 'notification.revolt_warning']) {
-        const result = t(key, { ticksRemaining: 42 });
+        const result = t(key, { duration: '2d 22h' });
         expect(result, `key "${key}" must resolve`).not.toBe(key);
-        expect(result, `"${result}" must contain the ticksRemaining value`).toContain('42');
+        expect(result, `"${result}" must contain the duration value`).toContain('2d 22h');
       }
     });
   }
+});
+
+describe('#1417 new notification / duration / saveload keys', () => {
+  const NEW_KEYS = [
+    'time.duration.hours', 'time.duration.days', 'time.duration.days_hours',
+    'notification.pip.event_label', 'notification.pip.event_tip',
+    'notification.pip.ecology_label', 'notification.pip.ecology_tip',
+    'notification.pip.cash_label', 'notification.pip.cash_tip',
+    'notification.pip.crew_collapsed_tip', 'notification.pip.fleet_stuck_tip',
+    'notification.pip.contract_label', 'notification.pip.contract_tip',
+    'notification.contract_expiring_title', 'notification.contract_expiring_body',
+    'saveload.summary',
+  ];
+  for (const key of NEW_KEYS) {
+    it(`${key} resolves in en and fr and differs between them (unless a unit)`, () => {
+      setLocale('en');
+      const en = t(key);
+      setLocale('fr');
+      const fr = t(key);
+      expect(en).not.toBe(key);
+      expect(fr).not.toBe(key);
+      if (!key.startsWith('time.duration.') && key !== 'notification.pip.contract_label') expect(fr).not.toBe(en);
+    });
+  }
+
+  it('revolt pip label and tip take {duration}', () => {
+    for (const locale of LOCALES) {
+      setLocale(locale);
+      expect(t('notification.pip.revolt_label', { duration: '3d 8h' })).toContain('3d 8h');
+      expect(t('notification.pip.revolt_tip', { duration: '3d 8h' })).toContain('3d 8h');
+    }
+  });
+
+  it('bankruptcy warning reads as hours/days, not ticks, in both locales', () => {
+    setLocale('en');
+    expect(t('notification.bankruptcy_warning', { duration: '2d 22h' })).toContain('Bankruptcy in 2d 22h.');
+    setLocale('fr');
+    expect(t('notification.bankruptcy_warning', { duration: '2 j 22 h' })).toContain('Faillite dans 2 j 22 h.');
+  });
+
+  it('saveload.summary interpolates cash and day', () => {
+    setLocale('en');
+    expect(t('saveload.summary', { cash: '1,000', day: 3 })).toBe('$1,000 — Day 3');
+    setLocale('fr');
+    expect(t('saveload.summary', { cash: '1 000', day: 3 })).toBe('1 000 $ — Jour 3');
+  });
 });
 
 // ── menu.level_locked reworked with {threshold}/{level} params ─────────────

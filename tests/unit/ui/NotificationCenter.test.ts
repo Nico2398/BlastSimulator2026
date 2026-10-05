@@ -4,10 +4,12 @@ import { NotificationCenter, buildBlockedOrderMessage } from '../../../src/ui/no
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction, PlannedRamp } from '../../../src/core/state/GameState.js';
 import { ACTION_LABEL_KEY } from '../../../src/ui/crewDetailSections.js';
-import { t } from '../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../src/core/i18n/I18n.js';
+import { formatGameDuration } from '../../../src/ui/formatGameDuration.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { WELL_BEING_ALERT_THRESHOLD, REVOLT_TICKS } from '../../../src/core/config/balance.js';
+import { WELL_BEING_ALERT_THRESHOLD, REVOLT_TICKS, BANKRUPTCY_THRESHOLD } from '../../../src/core/config/balance.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -116,7 +118,7 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(pips[0]!.tone).toBe('warn');
     });
 
-    it('derives a single critical wellbeing pip at zero, labelled with remaining revolt ticks that count down', () => {
+    it('derives a single critical wellbeing pip at zero, labelled with the remaining revolt time in days/hours that counts down', () => {
       const center = new NotificationCenter();
       const state = makeState();
       state.scores.wellBeing = 0;
@@ -124,12 +126,12 @@ describe('NotificationCenter (redesign P1)', () => {
       let pips = center.update(state).filter(p => p.kind === 'wellbeing');
       expect(pips).toHaveLength(1);
       expect(pips[0]!.tone).toBe('critical');
-      expect(pips[0]!.label).toContain(String(REVOLT_TICKS - 40));
+      expect(pips[0]!.label).toContain(formatGameDuration(REVOLT_TICKS - 40));
 
       state.revolt.ticksAtZero = 41;
       pips = center.update(state).filter(p => p.kind === 'wellbeing');
       expect(pips).toHaveLength(1);
-      expect(pips[0]!.label).toContain(String(REVOLT_TICKS - 41));
+      expect(pips[0]!.label).toContain(formatGameDuration(REVOLT_TICKS - 41));
     });
 
     it('derives no wellbeing pip once the crew has already revolted', () => {
@@ -217,7 +219,7 @@ describe('NotificationCenter (redesign P1)', () => {
       const center = new NotificationCenter();
       const state = makeState();
       state.employees.employees.push({
-        id: 1, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
+        id: 900, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
         injured: false, alive: true, x: 0, z: 0, qualifications: [], trainingState: null,
         activeActionId: null, fatigue: 50, collapsing: true,
         interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
@@ -713,5 +715,131 @@ describe('blocked haul orders: warehouse gating (#1369)', () => {
     state.pendingActions.push(makeHaulAction(7, 'no_licensed_driver'));
     center.update(state);
     expect(blockedEntries(center)).toHaveLength(3);
+  });
+});
+
+describe('NotificationCenter localization (#1417)', () => {
+  afterEach(() => { setLocale('en'); });
+
+  const ENGLISH_LEAKS = [/Balance/, /expires/, /collapsed/, /\bleft\b/, /\bstuck\b/, /critical/i, /waiting/, /Contract #/, /penalty/, /proceedings/];
+
+  function allText(items: readonly { label: string; tip: string }[]): string {
+    return items.map(p => `${p.label} | ${p.tip}`).join('\n');
+  }
+
+  function stressedState() {
+    const state = makeState();
+    state.events.pendingEvent = { eventId: 'test', firedAtTick: 1 };
+    state.scores.ecology = 10;
+    state.cash = 100;
+    state.employees.employees.push({
+      id: 900, name: 'X', role: 'driller', salary: 100, morale: 50, unionized: false,
+      injured: false, alive: true, x: 0, z: 0, qualifications: [], trainingState: null,
+      activeActionId: null, fatigue: 50, collapsing: true,
+      interruptedActionPayload: null, ticksWorked: 0, restTicksRemaining: null,
+      taskTicksRemaining: null, activeSkillCategory: null,
+    } as never);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 0, 0);
+    employee.isMoveStuck = true;
+    state.vehicles.vehicles.push({
+      id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
+      occupantIds: [employee.id],
+    } as never);
+    state.contracts.active.push({
+      id: 7, type: 'ore_sale', materialId: 'grumpite', description: 'test',
+      quantityKg: 100, deliveredKg: 0, pricePerKg: 1, deadlineTicks: 5,
+      acceptedAtTick: 0, penaltyAmount: 500, earlyBonus: 0, completed: false, expired: false,
+    });
+    state.tickCount = 2;
+    return state;
+  }
+
+  it('pip tooltips are French in fr: no English fragments leak', () => {
+    setLocale('fr');
+    const center = new NotificationCenter();
+    const pips = center.update(stressedState());
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
+      expect(pips.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
+    }
+    const text = allText(pips);
+    for (const leak of ENGLISH_LEAKS) expect(text).not.toMatch(leak);
+  });
+
+  it('pip tooltips differ between en and fr for every derived pip kind', () => {
+    const state = stressedState();
+    setLocale('en');
+    const en = new NotificationCenter().update(state);
+    setLocale('fr');
+    const fr = new NotificationCenter().update(state);
+    expect(fr.length).toBe(en.length);
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
+      expect(en.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
+    }
+    for (const e of en.filter(p => ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract'].includes(p.kind))) {
+      const f = fr.find(p => p.kind === e.kind)!;
+      expect(f.tip, `${e.kind} tip`).not.toBe(e.tip);
+    }
+  });
+
+  it('the low-cash pip tooltip in fr names the threshold and is not the English sentence', () => {
+    setLocale('fr');
+    const state = makeState();
+    state.cash = 100;
+    const pip = new NotificationCenter().update(state).find(p => p.kind === 'bankruptcy')!;
+    expect(pip.tip).not.toMatch(/Balance|bankruptcy/i);
+    expect(pip.tip).toContain(formatMoney(BANKRUPTCY_THRESHOLD));
+    expect(pip.tip.length).toBeGreaterThan(10);
+    expect(pip.tip).not.toMatch(/^notification\./);
+  });
+
+  it('pip tooltips never surface raw i18n keys', () => {
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      const pips = new NotificationCenter().update(stressedState());
+      for (const p of pips) {
+        expect(p.label).not.toMatch(/notification\./);
+        expect(p.tip).not.toMatch(/notification\./);
+      }
+    }
+  });
+
+  it('the contract-expiry toast is French in fr', () => {
+    setLocale('fr');
+    const center = new NotificationCenter();
+    center.update(stressedState());
+    const entry = center.getLog().find(e => e.title.includes('#7'));
+    expect(entry).toBeDefined();
+    expect(entry!.title).not.toMatch(/Contract|expiring/);
+    expect(entry!.body).not.toMatch(/left|penalty|lapses/);
+    expect(entry!.body).toContain('500');
+  });
+
+  it('the contract-expiry toast in en reads from the notification.contract_expiring_* keys', () => {
+    setLocale('en');
+    const center = new NotificationCenter();
+    center.update(stressedState());
+    const entry = center.getLog().find(e => e.title.includes('#7'))!;
+    expect(entry.title).toContain('#7');
+    expect(entry.title).not.toBe('notification.contract_expiring_title');
+    expect(entry.body).not.toBe('notification.contract_expiring_body');
+    expect(t('notification.contract_expiring_title', { id: 7 })).not.toBe('notification.contract_expiring_title');
+  });
+
+  it('the revolt pip label speaks in days and hours, not raw ticks', () => {
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      const state = makeState();
+      state.scores.wellBeing = 0;
+      state.revolt.ticksAtZero = 40; // 80 ticks left = 3 days 8 hours
+      const pip = new NotificationCenter().update(state).find(p => p.kind === 'wellbeing')!;
+      expect(pip.label).toContain(formatGameDuration(80));
+      expect(pip.tip).toContain(formatGameDuration(80));
+    }
+    setLocale('en');
+    const state = makeState();
+    state.scores.wellBeing = 0;
+    state.revolt.ticksAtZero = 40;
+    const pip = new NotificationCenter().update(state).find(p => p.kind === 'wellbeing')!;
+    expect(pip.label).toContain('3d 8h');
   });
 });
