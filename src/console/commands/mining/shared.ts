@@ -14,6 +14,8 @@ import type { VillagePosition } from '../../../core/mining/BlastExecution.js';
 import { clearTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
+import type { EventEmitter } from '../../../core/state/EventEmitter.js';
+import type { VoxelGrid } from '../../../core/world/VoxelGrid.js';
 
 export function requireGame(ctx: MiningContext): string | null {
   if (!ctx.state || !ctx.grid) return t('console.no_game_loaded');
@@ -240,4 +242,18 @@ export function resetPlanState(state: GameState): void {
   state.chargesByHole = {};
   state.plannedChargesByHole = {};
   state.sequenceDelays = {};
+}
+
+/**
+ * Emit nav:occupancy_changed for the 1x1 cell under each hole so the NavGrid
+ * cost is restored/refreshed when drilled holes are cleared, removed or
+ * replaced (#1360). No-op when grid is null or holes is empty.
+ */
+export function emitHoleCellsChanged(
+  ctx: { emitter: EventEmitter; grid: VoxelGrid | null },
+  holes: ReadonlyArray<{ x: number; z: number }>,
+): void {
+  // TODO: implement
+  void ctx;
+  void holes;
 }
