@@ -3,6 +3,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import type { TrafficJam } from './TrafficJams.js';
 import { respreadLegDestination } from '../engine/Locomotion.js';
 import { nextRampWidth, orderRampWiden, rampFootprint } from '../mining/RampWidening.js';
@@ -18,6 +19,8 @@ import {
 export interface EventWorld {
   state: GameState;
   grid: VoxelGrid | null;
+  /** Receives world-change events an effect causes; absent in headless unit use (#1380). */
+  emitter?: EventEmitter;
 }
 
 export interface EffectOutcome {

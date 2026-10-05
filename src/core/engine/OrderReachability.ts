@@ -223,7 +223,13 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       continue;
     }
     const reason = availabilityReason(state, eligible, action);
-    if (reason === 'no_qualified_employee' && action.requiredVehicleRole === null) {
+    // Only a skill nobody alive holds raises the modal: a trainee or injured
+    // holder is temporarily unavailable, not absent (gameplay-employee-skills rule 5).
+    if (
+      reason === 'no_qualified_employee'
+      && action.requiredVehicleRole === null
+      && !state.employees.employees.some(emp => emp.alive && holdsRequiredSkill(emp, action.requiredSkill))
+    ) {
       unqualifiedIds.add(action.id);
     }
     action.blockedReason = reason ?? haulBlockedReason(state, action, fragmentOf);

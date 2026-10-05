@@ -2,6 +2,7 @@
 // Fires when a pending action has no qualified employee on the roster.
 
 import { ev } from './EventBuilder.js';
+import { UNQUALIFIED_CONTRACTOR_FEE } from '../config/balance.js';
 import type { EventDef } from './EventPool.js';
 
 export const UNQUALIFIED_TASK_EVENTS: EventDef[] = [
@@ -10,7 +11,7 @@ export const UNQUALIFIED_TASK_EVENTS: EventDef[] = [
     weight: () => 1,
     options: [
       { effectTag: 'train_employee' },
-      { cashDelta: -25000, effectTag: 'hire_contractor' },
+      { cashDelta: -UNQUALIFIED_CONTRACTOR_FEE, effectTag: 'hire_contractor' },
       { effectTag: 'cancel_task' },
     ],
   }),

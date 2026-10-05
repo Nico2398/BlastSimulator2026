@@ -78,7 +78,11 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   // action is never added to unqualifiedIds regardless of roster headcount:
   // its real gate is vehicle/driver availability at claim time
   // (findVehicleForClaim), and flagging an unstaffed site would auto-pause it
-  // with an unresolvable unqualified_task_error every tick (#552).
+  // with an unqualified_task_error the player could not answer (#552).
+  // Only a skill no living employee holds is reported: a trainee or injured
+  // holder is merely unavailable (#1380). Each option of that event resolves the
+  // block (UnqualifiedTaskEffects.ts), and the event is raised once per blocked
+  // action (detectUnqualifiedTask), not every tick.
   const { unqualifiedIds } = classifyQueuedOrders(state);
   for (const id of unqualifiedIds) result.unqualified.push(id);
 

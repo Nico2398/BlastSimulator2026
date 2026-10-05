@@ -110,6 +110,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     })),
     pendingEvent: null,
     jamSilencedUntil: {},
+    raisedUnqualifiedActionIds: [],
     lastOutcome: null,
     followUpQueue: [],
     followUpDelayTicks: 0,
