@@ -4189,6 +4189,123 @@
       "timeout": 90
     },
     {
+      "command": "tick 1",
+      "description": "#1384: further straggler sweep (interaction mode only; command mode has already reached orderedChargeCount:0/chargedCount:64 above, so this is a 1-tick no-op there). Under scaled action durations the set of holes still uncharged when the first drain returns depends on real-browser pacing, so the single click above can leave a second or third straggler and the FIRE button stays disabled (validateBlastPlan: missing charge). Each sweep orders the first row that is neither charged nor ordered; the drain wait that follows lets the panel re-render from real state before the next sweep picks its row, so two sweeps never double-order one hole. clickIfPresent: nothing to click once every hole is charged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1384: drains the straggler sweep directly above (immediate when nothing was ordered); waiting on the order queue, not a fixed pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      },
+      "timeout": 90
+    },
+    {
+      "command": "tick 1",
+      "description": "#1384: further straggler sweep (interaction mode only; command mode has already reached orderedChargeCount:0/chargedCount:64 above, so this is a 1-tick no-op there). Under scaled action durations the set of holes still uncharged when the first drain returns depends on real-browser pacing, so the single click above can leave a second or third straggler and the FIRE button stays disabled (validateBlastPlan: missing charge). Each sweep orders the first row that is neither charged nor ordered; the drain wait that follows lets the panel re-render from real state before the next sweep picks its row, so two sweeps never double-order one hole. clickIfPresent: nothing to click once every hole is charged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1384: drains the straggler sweep directly above (immediate when nothing was ordered); waiting on the order queue, not a fixed pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      },
+      "timeout": 90
+    },
+    {
+      "command": "tick 1",
+      "description": "#1384: further straggler sweep (interaction mode only; command mode has already reached orderedChargeCount:0/chargedCount:64 above, so this is a 1-tick no-op there). Under scaled action durations the set of holes still uncharged when the first drain returns depends on real-browser pacing, so the single click above can leave a second or third straggler and the FIRE button stays disabled (validateBlastPlan: missing charge). Each sweep orders the first row that is neither charged nor ordered; the drain wait that follows lets the panel re-render from real state before the next sweep picks its row, so two sweeps never double-order one hole. clickIfPresent: nothing to click once every hole is charged.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole][data-charged=\"false\"][data-ordered=\"false\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1384: drains the straggler sweep directly above (immediate when nothing was ordered); waiting on the order queue, not a fixed pad.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      },
+      "timeout": 90
+    },
+    {
       "command": "sequence auto delay_step:25",
       "description": "#1278 migration: the three wildcard `charge hole:*` resweeps that used to sit here (#953/#1201/#1252, each pairing a wholesale re-order with its own drain wait) are removed -- direct-traced (command mode, replaying this file's own exact command sequence under agent occupancy): the named 34-hole straggler list plus its widened drain wait (see that step's own note) already reaches chargedCount:64/orderedChargeCount:0 on its own, before any of the three resweeps would fire. Removing them isn't just tidying: `charge hole:*` re-dispatches a charge_hole action for every ALREADY-charged hole too (no already-loaded guard, mining.ts) -- with 33 employees congesting this same 8x8/1m-spacing grid under real occupancy wait/relocate behavior, a wholesale re-order of 64 holes (most already done) cost roughly 1200 further ticks and ~$2.3M more payroll across the three resweeps in a direct A/B trace, which is what pushed cycle 4 into a real `worker_revolt` (and, before the cash bump on this file's own `new_game` step, bankruptcy) that the named-list-only trajectory never reaches. Left in place: the named per-hole list and its own H8 retry immediately above, which the same trace confirms are still genuinely needed (a real, if smaller, per-hole straggler set persists under occupancy) -- per issue #1278's own task framing, only proven-unnecessary insurance comes out; the rest stays.",
       "interaction": [
