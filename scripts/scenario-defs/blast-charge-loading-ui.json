@@ -341,7 +341,7 @@
       "role": "setup"
     },
     {
-      "command": "charge hole:H5 explosive:boomite amount:7 stemming:3",
+      "command": "charge hole:H5 explosive:boomite amount:7 stemming:2",
       "interaction": [
         {
           "type": "clickSelector",
@@ -355,7 +355,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 3
+          "value": 2
         },
         {
           "type": "assert",
@@ -367,7 +367,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "3.0 m"
+          "expectedValue": "2.0 m"
         },
         {
           "type": "clickSelector",

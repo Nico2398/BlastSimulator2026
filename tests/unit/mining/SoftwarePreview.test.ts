@@ -138,7 +138,7 @@ describe('SoftwarePreview — getBlastBBox', () => {
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
-    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 5, 2);
+    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 4, 2);
     const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
 
     const ctx = computeHoleContext(plan, grid);
