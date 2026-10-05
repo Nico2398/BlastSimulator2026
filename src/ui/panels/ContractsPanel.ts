@@ -81,7 +81,7 @@ export class ContractsPanel extends PanelBase {
       stored: Math.round(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
       ore: state.collectedOre,
       active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}`),
-      available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}`),
+      available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
       tick: state.tickCount,
