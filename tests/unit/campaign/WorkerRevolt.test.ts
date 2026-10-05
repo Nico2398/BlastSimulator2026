@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createRevoltState,
+  revoltTicksRemaining,
   updateRevolt,
   REVOLT_TICKS,
   REVOLT_WARNING_TICKS,
@@ -92,5 +93,26 @@ describe('Worker revolt system (7.7)', () => {
       updateRevolt(state, revolt, emitter);
     }
     expect(warnHandler).toHaveBeenCalledOnce();
+  });
+});
+
+describe('revoltTicksRemaining', () => {
+  it('returns the full REVOLT_TICKS at zero ticks', () => {
+    expect(revoltTicksRemaining(createRevoltState())).toBe(REVOLT_TICKS);
+    expect(REVOLT_TICKS).toBe(120);
+  });
+
+  it('subtracts ticksAtZero', () => {
+    const r = createRevoltState();
+    r.ticksAtZero = 40;
+    expect(revoltTicksRemaining(r)).toBe(REVOLT_TICKS - 40);
+  });
+
+  it('clamps at 0 at and beyond REVOLT_TICKS', () => {
+    const r = createRevoltState();
+    r.ticksAtZero = REVOLT_TICKS;
+    expect(revoltTicksRemaining(r)).toBe(0);
+    r.ticksAtZero = REVOLT_TICKS + 50;
+    expect(revoltTicksRemaining(r)).toBe(0);
   });
 });
