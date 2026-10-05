@@ -19,7 +19,7 @@ import { isMidEvacuation } from './Evacuation.js';
 import { isEnrolledInTraining } from '../entities/EmployeeTraining.js';
 import { shouldForceRest } from '../entities/SitePolicy.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
-import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS } from '../config/balance.js';
+import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS, NEED_SOFT_THRESHOLDS, NEED_REST_NO_BUILDING_CAP, NEED_DRAIN_RATES } from '../config/balance.js';
 
 /**
  * Shared leading guard of forceShiftRestIfNeeded and
@@ -175,6 +175,22 @@ function isMidProtectedTaskWork(state: GameState, employee: Employee): boolean {
   if (employee.activeActionId === null) return false;
   const action = state.pendingActions.find(a => a.id === employee.activeActionId);
   return action !== undefined && PROTECTED_MID_EXECUTION_ACTION_TYPES.has(action.type);
+}
+
+/**
+ * True when resting in place cannot help `employee` reach the protected task
+ * (PROTECTED_MID_EXECUTION_ACTION_TYPES) it is still walking to: the trip's own
+ * fatigue cost exceeds what an in-place rest restores (it caps at
+ * NEED_REST_NO_BUILDING_CAP). Interrupting then walks nowhere — the rest ends
+ * at the same level, the walk restarts and crosses the threshold at the same
+ * point of the same route, so the action is never reached (a far charge_hole
+ * stranded in plannedChargesByHole forever, #1379). Callers pass a destination
+ * with no living_quarters (a building is weighed by restRoundTripWorthwhile).
+ */
+function isUnreachableBetweenInPlaceRests(state: GameState, employee: Employee): boolean {
+  if (employee.itinerary === null || !isMidProtectedTaskWork(state, employee)) return false;
+  const tripCost = employee.itinerary.estTotalTicks * NEED_DRAIN_RATES.fatigue.traveling;
+  return tripCost > NEED_REST_NO_BUILDING_CAP - employee.fatigue;
 }
 
 /**
@@ -415,6 +431,7 @@ export function forceShiftRestIfNeededByPolicy(
   // the identical ordering requirement (#1170).
   const dest = resolveRestDestination(state, emp);
   if (!dest.worthwhile) return;
+  if (dest.buildingId === undefined && isUnreachableBetweenInPlaceRests(state, emp)) return;
 
   // #678 follow-up: release the action this employee was actively working
   // (a drill_hole, dig_ramp_segment, or any other vehicle-gated task) back to
