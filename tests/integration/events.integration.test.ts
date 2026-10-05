@@ -37,6 +37,7 @@ import {
   SCORE_DECAY_RATE,
   TRAFFIC_JAM_MIN_TICKS,
   FOLLOWUP_DELAY_TICKS,
+  MAFIA_UNLOCK_THRESHOLD,
 } from '../../src/core/config/balance.js';
 import type { BuiltRamp } from '../../src/core/state/GameState.js';
 import { rampFootprint } from '../../src/core/mining/RampWidening.js';
@@ -213,6 +214,53 @@ describe('Event system', () => {
     expect(result.success).toBe(true);
     expect(ctx.state!.cash).toBe(cashBefore - 8000);
     expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
+  });
+
+  // ── 3b-ii. event choose routes corruptionDelta through applyCorruptionDelta (#1406) ──
+
+  it('event choose with a positive corruptionDelta reaching the threshold unlocks mafia', () => {
+    // union_profit_sharing option 1: corruptionDelta +5, no cash cost.
+    ctx.state!.events.pendingEvent = { eventId: 'union_profit_sharing', firedAtTick: ctx.state!.tickCount };
+    expect(ctx.state!.corruption.mafiaUnlocked).toBe(false);
+
+    const result = eventCommand(ctx, ['choose', '1'], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.corruption.level).toBeGreaterThanOrEqual(MAFIA_UNLOCK_THRESHOLD);
+    expect(ctx.state!.corruption.mafiaUnlocked).toBe(true);
+  });
+
+  it('event choose with an option carrying no corruptionDelta leaves corruption untouched', () => {
+    // union_profit_sharing option 0 has no corruptionDelta.
+    ctx.state!.events.pendingEvent = { eventId: 'union_profit_sharing', firedAtTick: ctx.state!.tickCount };
+
+    eventCommand(ctx, ['choose', '0'], {});
+
+    expect(ctx.state!.corruption.level).toBe(0);
+    expect(ctx.state!.corruption.mafiaUnlocked).toBe(false);
+  });
+
+  it('event choose with a clean-up option (corruptionDelta -25) at low level leaves level at 0', () => {
+    // politics_whistleblower option 2 (full_reform): corruptionDelta -25.
+    ctx.state!.corruption.level = 2;
+    ctx.state!.events.pendingEvent = { eventId: 'politics_whistleblower', firedAtTick: ctx.state!.tickCount };
+
+    const result = eventCommand(ctx, ['choose', '2'], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.corruption.level).toBe(0);
+  });
+
+  it('mafiaUnlocked stays latched after a later clean-up choose', () => {
+    ctx.state!.events.pendingEvent = { eventId: 'union_profit_sharing', firedAtTick: ctx.state!.tickCount };
+    eventCommand(ctx, ['choose', '1'], {});
+    expect(ctx.state!.corruption.mafiaUnlocked).toBe(true);
+
+    ctx.state!.events.pendingEvent = { eventId: 'politics_whistleblower', firedAtTick: ctx.state!.tickCount };
+    eventCommand(ctx, ['choose', '2'], {});
+
+    expect(ctx.state!.corruption.level).toBe(0);
+    expect(ctx.state!.corruption.mafiaUnlocked).toBe(true);
   });
 
   // ── 3c. event dismiss clears lastOutcome (P8) ──────────────────────────────
