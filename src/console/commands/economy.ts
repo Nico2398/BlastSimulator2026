@@ -218,6 +218,7 @@ export function contractCommand(
       const id = resolved.id;
       const result = negotiateContract(state.contracts, id, 0, rng);
       if (!result) return { success: false, output: `Contract #${id} not found.` };
+      if ('refused' in result) return { success: false, output: t('economy.negotiation.already_negotiated', { id }) };
       state.contracts.lastNegotiation = { contractId: id, success: result.success, changes: result.changes };
       const lines = [
         result.success ? 'Negotiation SUCCEEDED!' : 'Negotiation FAILED.',

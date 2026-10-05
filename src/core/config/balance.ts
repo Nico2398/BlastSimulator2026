@@ -1621,3 +1621,9 @@ export const BLAST_PROJECTION_NUISANCE_PER_PROJECTION = 0.5;
 
 /** Ticks over which vibration score effects are applied (#1343). */
 export const SCORE_VIBRATION_WINDOW_TICKS = 10;
+
+/** Negotiation attempts allowed per contract offer (#1366). */
+export const NEGOTIATION_MAX_ATTEMPTS_PER_OFFER = 1;
+
+/** Early-delivery bonus as a fraction of quantity x price (#1366). */
+export const NEGOTIATION_EARLY_BONUS_RATE = 0.15;

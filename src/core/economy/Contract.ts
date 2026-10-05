@@ -39,6 +39,8 @@ export interface Contract {
   completed: boolean;
   /** Whether the contract has expired (deadline passed). */
   expired: boolean;
+  /** Negotiation attempts already made on this offer. Absent means none. */
+  negotiationAttempts?: number;
 }
 
 // ── Negotiation outcome (types live here, not in Negotiation.ts, so
@@ -158,6 +160,12 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
     pricePerKg, deadlineTicks, acceptedAtTick: 0, penaltyAmount, earlyBonus,
     completed: false, expired: false,
   };
+}
+
+/** Early-delivery bonus for a contract of the given size and price. */
+export function computeEarlyBonus(quantityKg: number, pricePerKg: number): number {
+  void quantityKg; void pricePerKg; // TODO: implement
+  return undefined as unknown as number;
 }
 
 // ── Operations ──

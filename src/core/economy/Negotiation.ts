@@ -25,6 +25,37 @@ export interface NegotiationResult {
   contract: Contract;
 }
 
+export type NegotiationRefusal = 'not_found' | 'already_negotiated';
+
+/** Seed of the RNG stream for one negotiation attempt on one offer. */
+export function negotiationStreamSeed(
+  seed: number,
+  tick: number,
+  contractId: number,
+  attempt: number,
+): number {
+  void seed; void tick; void contractId; void attempt; // TODO: implement
+  return undefined as unknown as number;
+}
+
+/** Whether the offer still has negotiation attempts left. */
+export function canNegotiate(contract: Contract): boolean {
+  void contract; // TODO: implement
+  return undefined as unknown as boolean;
+}
+
+/** Negotiate using a per-attempt RNG stream derived from seed, tick, id and attempt. */
+export function negotiateContractAtTick(
+  state: ContractState,
+  contractId: number,
+  reputation: number,
+  seed: number,
+  tick: number,
+): NegotiationResult | { refused: NegotiationRefusal } {
+  void state; void contractId; void reputation; void seed; void tick; // TODO: implement
+  return undefined as unknown as NegotiationResult;
+}
+
 /**
  * Negotiate a contract in the available list.
  * Success probability = BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR.
@@ -36,7 +67,7 @@ export function negotiateContract(
   contractId: number,
   reputation: number,
   rng: Random,
-): NegotiationResult | null {
+): NegotiationResult | { refused: 'already_negotiated' } | null {
   const contract = state.available.find(c => c.id === contractId);
   if (!contract) return null;
 
