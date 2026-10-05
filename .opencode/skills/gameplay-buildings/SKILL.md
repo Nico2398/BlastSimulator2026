@@ -125,8 +125,8 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 - Stored contents lost. An Explosive Warehouse destroyed by a blast or flying rock **with stock**
   detonates (`resolveSecondaryBlasts`, `SecondaryBlast.ts`):
   - Radius = `SECONDARY_BLAST_RADIUS_BASE_M + SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M * sqrt(kg)`, capped at
-    `SECONDARY_BLAST_RADIUS_MAX_M`, measured from the warehouse.
-  - Buildings and vehicles within it take `maxHp * SECONDARY_BLAST_BUILDING_DAMAGE_FRACTION` damage,
+    `SECONDARY_BLAST_RADIUS_MAX_M`, measured from the centre of the warehouse footprint.
+  - Buildings and vehicles within it take `maxHp * SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION` damage,
     falling off linearly to 0 at the radius. Employees within `SECONDARY_BLAST_DEATH_RADIUS_FRACTION`
     of the radius die (lawsuit pending, death count up); those further in are injured. Dead or already
     injured employees are skipped; occupants of a destroyed building or vehicle are injured.
