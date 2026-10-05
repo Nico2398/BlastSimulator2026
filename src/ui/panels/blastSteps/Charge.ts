@@ -30,12 +30,12 @@ import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } 
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
-import { chargeOrderCost } from '../../../core/mining/ChargePlan.js';
+import { chargeOrderCost, chargeColumnM, maxChargeKgForHole, floorToTenthKg } from '../../../core/mining/ChargePlan.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { TUBING_COST } from '../../../core/mining/Tubing.js';
-import { MIN_STEMMING_M } from '../../../core/config/balance.js';
+import { MIN_STEMMING_M, CHARGE_FIT_EPSILON } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
@@ -54,6 +54,7 @@ export class ChargeStep {
   private readonly stemmingValueEl: HTMLElement;
   private readonly chargeAllBtn: HTMLButtonElement;
   private readonly chargeLineEl: HTMLElement;
+  private readonly fitLineEl: HTMLElement;
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
 
@@ -116,13 +117,14 @@ export class ChargeStep {
     this.chargeAllBtn.append(chargeAllLabelEl, this.chargeLineEl);
     this.chargeAllBtn.addEventListener('click', () => this.chargeAll());
 
+    this.fitLineEl = el('div');
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId));
 
     const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
     this.tubingCardEl = el('div');
 
     this.el.append(
-      productHeader, this.productListEl, stepperRow, this.chargeAllBtn,
+      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl,
       this.holeList.root, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -141,6 +143,7 @@ export class ChargeStep {
   update(state: GameState, weather: WeatherState | undefined): void {
     const wet = weather ? wetHoles(state, weather) : [];
     const holes = state.drillHoles;
+    const shallowest = holes.length > 0 ? Math.min(...holes.map(h => h.depth)) : null;
 
     this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
     if (!this.allowedIds.includes(this.selectedExplosiveId) && this.allowedIds[0] !== undefined) {
@@ -157,6 +160,7 @@ export class ChargeStep {
       holes: holes.map(h => h.id),
       charges: holes.map(h => holeChargeSignature(state.chargesByHole[h.id])),
       planned: holes.map(h => holeChargeSignature(state.plannedChargesByHole[h.id])),
+      shallowest,
       wet, tub: state.tubingState.inventory,
     });
     if (signature === this.lastSignature) return;
@@ -164,6 +168,7 @@ export class ChargeStep {
 
     this.renderProductList(wet.length > 0);
     this.updateChargeLine(holes.length);
+    this.updateFitLine(shallowest);
     this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole);
     this.renderTubingCard(wet, state.tubingState.inventory);
   }
@@ -228,6 +233,20 @@ export class ChargeStep {
     this.chargeLineEl.textContent = t('ui.blast_workshop.charge.charge_line', {
       count: holeCount, amount: this.amountKg, name, cost: `$${formatMoney(cost)}`,
     });
+  }
+
+  // Charge column + stemming overflowing the shallowest hole: say why and block
+  // Charge All. The stepper is left alone so the player sees what they asked for.
+  private updateFitLine(shallowest: number | null): void {
+    const overflows = shallowest !== null
+      && chargeColumnM(this.amountKg) + this.stemmingM > shallowest + CHARGE_FIT_EPSILON;
+    this.chargeAllBtn.disabled = overflows;
+    if (!overflows || shallowest === null) {
+      this.fitLineEl.replaceChildren();
+      return;
+    }
+    const max = floorToTenthKg(maxChargeKgForHole(shallowest, this.stemmingM) + CHARGE_FIT_EPSILON);
+    this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.too_much_for_hole', { depth: shallowest, max })));
   }
 
   private renderTubingCard(wetIds: string[], inventory: number): void {
