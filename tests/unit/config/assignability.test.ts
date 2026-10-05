@@ -729,6 +729,16 @@ describe('running several issues at once', () => {
       }
     });
 
+    it('clashes a core area with `scope:engine` but not with another core area', () => {
+      const claim = (scope: string) => rules.scopeClaim({ labels: [`scope:${scope}`] });
+      expect(rules.claimsConflict(claim('crew'), claim('engine'))).toBe(true);
+      expect(rules.claimsConflict(claim('engine'), claim('site'))).toBe(true);
+      expect(rules.claimsConflict(claim('tasks'), claim('crew'))).toBe(false);
+      expect(rules.claimsConflict(claim('movement'), claim('nav'))).toBe(false);
+      // A UI area and a core area share no parent.
+      expect(rules.claimsConflict(claim('panels'), claim('crew'))).toBe(false);
+    });
+
     it('runs `scope:global` alone', () => {
       const claim = rules.scopeClaim({ labels: ['scope:global'] });
       expect(claim.exclusive).toBe(true);
@@ -929,13 +939,30 @@ describe('which scopes a live run holds', () => {
     ]);
   });
 
+  // `engine` is the parent of every simulation-core area, so a live
+  // `scope:engine` run holds all of them, and a live area holds `engine`.
+  it('holds `scope:engine` while any core area is live, and every core area while `scope:engine` is', () => {
+    const area = rules.scopeHolders([{ number: 50, labels: ['in-progress', 'scope:crew'] }]);
+    expect(area.crew).toBe(50);
+    expect(area.engine).toBe(50);
+    expect(area.tasks).toBeNull();
+    expect(area.site).toBeNull();
+    const base = rules.scopeHolders([{ number: 51, labels: ['in-progress', 'scope:engine'] }]);
+    for (const area of ['tasks', 'movement', 'crew', 'site']) expect(base[area], area).toBe(51);
+  });
+
   it('holds `scope:ui` while any UI area is live, and every UI area while `scope:ui` is', () => {
     const area = rules.scopeHolders([{ number: 40, labels: ['in-progress', 'scope:hud'] }]);
     expect(area.hud).toBe(40);
     expect(area.ui).toBe(40);
     expect(area.panels).toBeNull();
     const base = rules.scopeHolders([{ number: 41, labels: ['in-progress', 'scope:ui'] }]);
-    for (const child of Object.keys(rules.SCOPE_PARENTS)) expect(base[child], child).toBe(41);
+    const uiAreas = Object.entries(rules.SCOPE_PARENTS as Record<string, string>)
+      .filter(([, parent]) => parent === 'ui')
+      .map(([child]) => child);
+    expect(uiAreas).toHaveLength(6);
+    for (const child of uiAreas) expect(base[child], child).toBe(41);
+    expect(base.crew).toBeNull();
   });
 
   it('holds every scope while an exclusive or unscoped run is live', () => {

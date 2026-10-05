@@ -75,15 +75,17 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  *
  * Coarse on purpose, with one exception. A finer grid invites mislabelling, and
  * a wrong label costs a conflict round. Files every area touches — `balance.ts`,
- * the locale files, `main.ts`, `GameState.ts` — belong to no scope; the gate is
+ * the locale files, `main.ts`, `GameState.ts`, `TickPipeline.ts` — belong to no scope; the gate is
  * what handles them. A change that genuinely spans many areas says so with
  * `scope:global`, which runs alone.
  *
- * The exception is `src/ui`. On 4 Oct 2026 more than half of the 65 `ready`
- * issues carried `scope:ui`, so one live UI run kept every other UI issue
- * waiting and `AGENTIC_MAX_PARALLEL_RUNS=4` ran one session. `ui` is split into
- * the areas below it (`SCOPE_PARENTS`); `scope:ui` itself still exists, for a
- * change to the shared UI base or across several UI areas, and it clashes with
+ * The exceptions are `src/ui` and the simulation core. On 4 Oct 2026 more than
+ * half of the 65 `ready` issues carried `scope:ui`, so one live UI run kept
+ * every other UI issue waiting and `AGENTIC_MAX_PARALLEL_RUNS=4` ran one
+ * session; on 5 Oct, 15 of the 29 `ready` issues carried `scope:engine` and the
+ * queue was back to one. Each is split into the areas below it
+ * (`SCOPE_PARENTS`). The parent scope itself still exists, for a change to the
+ * shared base of its areas or across several of them, and it clashes with
  * every one of them.
  *
  * Every `ready` issue declares at least one scope: it is part of the
@@ -94,8 +96,12 @@ const DEFAULT_MAX_PARALLEL_RUNS = 1;
  */
 const SCOPE_PREFIX = 'scope:';
 const SCOPES = Object.freeze({
-  engine: 'Simulation core: src/core/engine, entities, state',
-  nav: 'Terrain surface and movement: src/core/nav, src/core/mining',
+  engine: 'Tick loop and persistence: TickEventContext, GameLoop, GameOverConditions, src/core/state',
+  tasks: 'Task dispatch and lifecycle: Task*, ActionSelection, EmployeeDispatch*, Arrival*, Evacuation*',
+  movement: 'Journeys: Itinerary, PlanItinerary, Locomotion, Mount, MoveTo, EntityMovementTick',
+  crew: 'Employees, needs and shifts: entities/Employee*, SitePolicy, Need*, Rest*, ShiftCycle',
+  site: 'Site property: entities/Building*, Zone, Vehicle*, Damage',
+  nav: 'Terrain surface and pathfinding: src/core/nav, src/core/mining',
   economy: 'Money and progression: src/core/economy, campaign, scores',
   world: 'World generation and events: src/core/world, weather, events',
   ui: 'All of src/ui, or its shared base: UIManager, PanelBase, dom, styles, tokens, icons',
@@ -126,9 +132,14 @@ const EXCLUSIVE_SCOPES = new Set(['pipeline', 'global']);
  * Scopes that sit inside a wider one. A scope clashes with its parent as well
  * as with itself, so `scope:ui` — the shared base every UI area builds on —
  * never runs beside `scope:panels`, while `scope:panels` runs beside
- * `scope:tutorial`.
+ * `scope:tutorial`; likewise `scope:engine` never runs beside `scope:crew`,
+ * while `scope:crew` runs beside `scope:site`.
  */
 const SCOPE_PARENTS = Object.freeze({
+  tasks: 'engine',
+  movement: 'engine',
+  crew: 'engine',
+  site: 'engine',
   hud: 'ui',
   panels: 'ui',
   workshop: 'ui',

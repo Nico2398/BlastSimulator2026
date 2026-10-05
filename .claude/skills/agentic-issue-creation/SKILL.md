@@ -108,7 +108,11 @@ Part of the Definition of Ready. With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the q
 
 | Label | Covers |
 |-------|--------|
-| `scope:engine` | `src/core/engine`, `src/core/entities`, `src/core/state` |
+| `scope:engine` | The tick loop and persistence: `TickEventContext`, `GameLoop`, `GameOverConditions`, `src/core/state` — clashes with every core area below |
+| `scope:tasks` | Task dispatch and lifecycle in `src/core/engine`: `Task*`, `ActionSelection`, `EmployeeDispatch*`, `BuildingTaskHelpers`, `OrderReachability`, `VehicleReservation`, `Arrival*`, `Evacuation*` |
+| `scope:movement` | Journeys in `src/core/engine`: `Itinerary`, `PlanItinerary`, `Locomotion`, `Mount`, `MoveTo`, `EntityMovementTick`; `entities/EmployeeLocomotion`, `MovementTrail` |
+| `scope:crew` | Employees, needs and shifts: `entities/Employee*` (not `EmployeeLocomotion`), `SitePolicy`; `engine/Need*`, `Rest*`, `ForceShiftRest`, `ShiftCycle` |
+| `scope:site` | Site property: `entities/Building*`, `Zone`, `Vehicle*`, `Damage` |
 | `scope:nav` | `src/core/nav`, `src/core/mining` |
 | `scope:economy` | `src/core/economy`, `src/core/campaign`, `src/core/scores` |
 | `scope:world` | `src/core/world`, `src/core/weather`, `src/core/events` |
@@ -129,8 +133,8 @@ Part of the Definition of Ready. With `AGENTIC_MAX_PARALLEL_RUNS` above 1, the q
 
 - **Edited, not touched.** An area the change only imports from, calls into, reads state from, or that the bug was observed through adds no scope. A UI bug whose fix is in `src/core/economy` is `scope:economy` alone — the panel that showed the wrong number is not edited.
 - **Tests follow their code.** `tests/unit/...` and `tests/integration/...` take the scope of the code they test, and add none of their own. A new scenario definition under `scripts/scenario-defs` is `scope:scenarios` only when the scenario *runners* change or the scenario is the deliverable; a scenario that proves a fix rides the fix's scope.
-- **Shared files need no scope.** `balance.ts`, the locale files, `main.ts`, `GameState.ts` — name the feature's scope and let the merge gate handle the overlap.
-- **The narrowest UI area wins.** Pick `scope:hud`, `scope:panels`, `scope:workshop`, `scope:scene`, `scope:tutorial` or `scope:screens`. `scope:ui` is for an edit to the shared UI base, or a change spread across three or more UI areas — it blocks every UI area at once.
+- **Shared files need no scope.** `balance.ts`, the locale files, `main.ts`, `GameState.ts`, `TickPipeline.ts` — hubs every area adds a line to. Name the feature's scope and let the merge gate handle the overlap. A change that reworks one of them rather than adding to it takes `scope:engine`.
+- **The narrowest area wins.** In `src/ui`, pick `scope:hud`, `scope:panels`, `scope:workshop`, `scope:scene`, `scope:tutorial` or `scope:screens`; `scope:ui` is for an edit to the shared UI base, or a change spread across three or more UI areas. In the simulation core, pick `scope:tasks`, `scope:movement`, `scope:crew` or `scope:site`; `scope:engine` is for the tick loop and persistence, or a change spread across three or more core areas. A parent scope blocks every area under it at once.
 - **`scope:global` is for cross-cutting changes only** — a refactor or rename across most of the tree. It runs alone, so a change that edits four named areas lists those four rather than reaching for it.
 
 **Every extra scope costs the whole queue, not just this issue.** An issue that cannot start because one of its scopes is in flight *holds* all of its other scopes for the rest of the pass, so nothing younger overlapping it starts first (`agentic-autonomous-pipeline`). A spurious `scope:engine` on a UI issue therefore keeps every engine issue waiting too. A scope too narrow costs one conflict round when the run strays outside it — the merge gate catches it; a scope too wide silently costs a parallel slot for as long as the issue waits. When unsure whether the diff will reach an area, leave it out.
