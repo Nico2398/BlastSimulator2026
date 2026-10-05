@@ -1,8 +1,11 @@
 // BlastSimulator2026 — Follow-up events
 // Events triggered as consequences of other events' decision options.
 
-import { ev } from './EventBuilder.js';
+import { ev as buildEvent } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+
+/** Every event here fires only when a parent queues it — never from a category timer (#1413). */
+const ev: typeof buildEvent = (id, category, opts) => buildEvent(id, category, { ...opts, followUpOnly: true });
 
 export const FOLLOWUP_EVENTS: EventDef[] = [
   // Follow-up to union_strike_threat (option 2: call their bluff → full strike)
