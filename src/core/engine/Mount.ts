@@ -331,3 +331,14 @@ export function releaseOccupantsOfRemovedBuildings(state: GameState, emitter?: E
   }
   return released;
 }
+
+/**
+ * Put out everyone still mounted on a vehicle that no longer exists.
+ * Returns the ids put out.
+ */
+export function releaseOccupantsOfRemovedVehicles(state: GameState, emitter?: EventEmitter): number[] {
+  // TODO: implement
+  void state;
+  void emitter;
+  return [];
+}
