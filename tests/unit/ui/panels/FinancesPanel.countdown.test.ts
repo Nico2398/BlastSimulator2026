@@ -9,6 +9,7 @@ vi.mock('../../../../src/core/campaign/Bankruptcy.js', async (importOriginal) =>
 }));
 
 import { FinancesPanel } from '../../../../src/ui/panels/FinancesPanel.js';
+import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 
 function textFor(ticks: number): string {
@@ -24,12 +25,12 @@ function textFor(ticks: number): string {
 
 describe('FinancesPanel countdown uses BANKRUPTCY_GRACE_TICKS', () => {
   it('40 ticks below with grace 60 shows 20', () => {
-    expect(textFor(40)).toContain('Bankruptcy in 20 ticks');
+    expect(textFor(40)).toContain(`Bankruptcy in ${formatGameDuration(20)}`);
   });
   it('grace-length streak shows 0', () => {
-    expect(textFor(60)).toContain('Bankruptcy in 0 ticks');
+    expect(textFor(60)).toContain(`Bankruptcy in ${formatGameDuration(0)}`);
   });
   it('clamps at 0 beyond grace', () => {
-    expect(textFor(75)).toContain('Bankruptcy in 0 ticks');
+    expect(textFor(75)).toContain(`Bankruptcy in ${formatGameDuration(0)}`);
   });
 });

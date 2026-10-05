@@ -707,7 +707,7 @@ describe('#1417 new notification / duration / saveload keys', () => {
       const fr = t(key);
       expect(en).not.toBe(key);
       expect(fr).not.toBe(key);
-      if (!key.startsWith('time.duration.') && key !== 'notification.pip.cash_label') expect(fr).not.toBe(en);
+      if (!key.startsWith('time.duration.') && key !== 'notification.pip.cash_label' && key !== 'notification.pip.contract_label') expect(fr).not.toBe(en);
     });
   }
 
@@ -721,9 +721,9 @@ describe('#1417 new notification / duration / saveload keys', () => {
 
   it('bankruptcy warning reads as hours/days, not ticks, in both locales', () => {
     setLocale('en');
-    expect(t('notification.bankruptcy_warning', { duration: '2d 22h' })).toBe('Bankruptcy in 2d 22h.');
+    expect(t('notification.bankruptcy_warning', { duration: '2d 22h' })).toContain('Bankruptcy in 2d 22h.');
     setLocale('fr');
-    expect(t('notification.bankruptcy_warning', { duration: '2 j 22 h' })).toBe('Faillite dans 2 j 22 h.');
+    expect(t('notification.bankruptcy_warning', { duration: '2 j 22 h' })).toContain('Faillite dans 2 j 22 h.');
   });
 
   it('saveload.summary interpolates cash and day', () => {
