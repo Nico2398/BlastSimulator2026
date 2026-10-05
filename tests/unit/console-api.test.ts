@@ -170,7 +170,7 @@ describe('console-api', () => {
 
     it('reports weather as null while ctx.weatherCycle does not exist', () => {
       runner.runner.run('new_game mine_type:desert seed:42');
-      (runner.ctx as MiningContext).weatherCycle = undefined;
+      delete (runner.ctx as MiningContext).weatherCycle;
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.weather).toBeNull();
