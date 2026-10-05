@@ -9,8 +9,8 @@ describe('locate i18n keys (#1422)', () => {
     const f = (fr as Record<string, string>)['ui.crew.locate'];
     expect(typeof e).toBe('string');
     expect(typeof f).toBe('string');
-    expect(e.length).toBeGreaterThan(0);
-    expect(f.length).toBeGreaterThan(0);
+    expect((e ?? '').length).toBeGreaterThan(0);
+    expect((f ?? '').length).toBeGreaterThan(0);
     expect(e).not.toBe(f);
   });
 });
