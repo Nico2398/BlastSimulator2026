@@ -773,8 +773,10 @@ describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () =
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
     const state = ctx.state!;
+    const navGrid = state.navGrid;
+    if (!navGrid) throw new Error('new_game produced no navGrid');
     const cell = (x: number, z: number) => {
-      const c = state.navGrid.cellAt(x, z)!;
+      const c = navGrid.cellAt(x, z)!;
       return { type: c.type, moveCost: c.moveCost };
     };
     const occupancyEvents: unknown[] = [];
@@ -784,7 +786,7 @@ describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () =
       tickUntil(run, () => state.drillHoles.length >= count, 800);
       expect(state.drillHoles.length).toBeGreaterThanOrEqual(count);
     };
-    return { run, state, cell, occupancyEvents, drill };
+    return { run, state, navGrid, cell, occupancyEvents, drill };
   }
 
   it('drill_plan clear restores a drilled hole cell to its pre-hole type and moveCost 1', () => {
@@ -873,9 +875,9 @@ describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () =
   });
 
   it('findPath across former hole cells costs the same as baseline after clear', () => {
-    const { run, state, drill } = setup();
+    const { run, navGrid, drill } = setup();
     const req = { agentId: 0, fromX: 10, fromZ: 15, toX: 20, toZ: 15, avoidVehicles: false };
-    const baseline = findPath(state.navGrid, req);
+    const baseline = findPath(navGrid, req);
     expect(baseline.found).toBe(true);
 
     drill('x:14 z:15', 1);
@@ -883,7 +885,7 @@ describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () =
     drill('x:16 z:15', 3);
     expect(run('drill_plan clear').success).toBe(true);
 
-    const after = findPath(state.navGrid, req);
+    const after = findPath(navGrid, req);
     expect(after.found).toBe(true);
     expect(after.totalCost).toBeCloseTo(baseline.totalCost, 6);
   });
