@@ -5,6 +5,9 @@ import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { setLocale } from '../../../src/core/i18n/I18n.js';
+import en from '../../../src/core/i18n/locales/en.json';
+import fr from '../../../src/core/i18n/locales/fr.json';
 
 function makeWeatherCycle(current: WeatherCycleState['current']): WeatherCycleState {
   const cycle = createWeatherCycle(1);
@@ -379,5 +382,122 @@ describe('TopBar (redesign P1)', () => {
     const scoresEl = container.querySelector('#bs-hud-scores');
     expect(scoresEl?.children.length).toBe(4);
     topBar.dispose();
+  });
+
+  describe('score pill tooltips (#1416)', () => {
+    const ECO_EN = 'Ecology — dust, water contamination, waste… — reaching 0 ends the level';
+
+    function mount() {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const topBar = new TopBar(container);
+      const center = new NotificationCenter();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      topBar.update(state, undefined, undefined, center);
+      const titles = () =>
+        Array.from(container.querySelector('#bs-hud-scores')!.children).map(c => c.getAttribute('title') ?? '');
+      return { topBar, center, state, titles };
+    }
+
+    it('every pill has a non-empty title in en', () => {
+      setLocale('en');
+      const { topBar, titles } = mount();
+      const t = titles();
+      expect(t).toHaveLength(4);
+      for (const title of t) expect(title.length).toBeGreaterThan(0);
+      topBar.dispose();
+    });
+
+    it('every pill has a non-empty title in fr, different from en', () => {
+      setLocale('en');
+      const a = mount();
+      const enTitles = a.titles();
+      a.topBar.dispose();
+      setLocale('fr');
+      try {
+        const b = mount();
+        const frTitles = b.titles();
+        expect(frTitles).toHaveLength(4);
+        frTitles.forEach((title, i) => {
+          expect(title.length).toBeGreaterThan(0);
+          expect(title).not.toBe(enTitles[i]);
+        });
+        b.topBar.dispose();
+      } finally {
+        setLocale('en');
+      }
+    });
+
+    it('en ECO title is exact', () => {
+      setLocale('en');
+      const { topBar, titles } = mount();
+      expect(titles()[2]).toBe(ECO_EN);
+      topBar.dispose();
+    });
+
+    it('only WELL and ECO mention the level-ending threshold (en)', () => {
+      setLocale('en');
+      const { topBar, titles } = mount();
+      const [well, safe, eco, nuis] = titles();
+      expect(well).toContain('reaching 0 ends the level');
+      expect(eco).toContain('reaching 0 ends the level');
+      expect(safe).not.toContain('reaching 0 ends the level');
+      expect(nuis).not.toContain('reaching 0 ends the level');
+      topBar.dispose();
+    });
+
+    it('only WELL and ECO mention the level-ending threshold (fr)', () => {
+      setLocale('fr');
+      try {
+        const { topBar, titles } = mount();
+        const [well, safe, eco, nuis] = titles();
+        expect(well).toContain('met fin au niveau');
+        expect(eco).toContain('met fin au niveau');
+        expect(safe).not.toContain('met fin au niveau');
+        expect(nuis).not.toContain('met fin au niveau');
+        topBar.dispose();
+      } finally {
+        setLocale('en');
+      }
+    });
+
+    it('refreshLocale() switches titles to fr without a score change', () => {
+      setLocale('en');
+      const { topBar, titles } = mount();
+      const enTitles = titles();
+      setLocale('fr');
+      try {
+        topBar.refreshLocale();
+        const frTitles = titles();
+        frTitles.forEach((title, i) => {
+          expect(title.length).toBeGreaterThan(0);
+          expect(title).not.toBe(enTitles[i]);
+        });
+        expect(frTitles[2]).toContain('met fin au niveau');
+      } finally {
+        setLocale('en');
+      }
+      topBar.dispose();
+    });
+
+    it('titles persist after a score change', () => {
+      setLocale('en');
+      const { topBar, center, state, titles } = mount();
+      const before = titles();
+      state.scores.safety = 33;
+      state.scores.ecology = 12;
+      topBar.update(state, undefined, undefined, center);
+      expect(titles()).toEqual(before);
+      expect(titles()[2]).toBe(ECO_EN);
+      topBar.dispose();
+    });
+
+    it('en.json and fr.json define all four score tooltip keys', () => {
+      const keys = ['score_well_tip', 'score_safe_tip', 'score_eco_tip', 'score_nuis_tip'].map(k => `shell.topbar.${k}`);
+      for (const k of keys) {
+        expect((en as Record<string, string>)[k], `en ${k}`).toBeTruthy();
+        expect((fr as Record<string, string>)[k], `fr ${k}`).toBeTruthy();
+      }
+    });
   });
 });
