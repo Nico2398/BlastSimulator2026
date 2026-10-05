@@ -156,6 +156,7 @@ describe('FleetPanel', () => {
       const vehicles = ids.map(id => makeVehicle({ id, occupantIds: [100 + id] }));
       const drivers = ids.map(id => makeEmployee({
         id: 100 + id,
+        x: 8, z: 8, // jam coordinates derive from the stuck employees' own positions
         vehicleWaitingTicks: waiting,
         itinerary: {
           legs: [{ mode: 'drive', vehicleId: id, destX: 8, destZ: 8, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
