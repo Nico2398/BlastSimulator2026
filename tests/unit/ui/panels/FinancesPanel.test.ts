@@ -81,6 +81,21 @@ describe('FinancesPanel', () => {
     expect(text).toContain('$200');
   });
 
+  it('renders a localized smuggling income line (#1408)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.finances.transactions.push(
+      { tick: 5, type: 'income', amount: 8000, category: 'smuggling', description: 'Smuggling' },
+    );
+    panel.show();
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain(t('ui.finances.category.smuggling'));
+    expect(text).toContain('Smuggling');
+    expect(text).toContain('$8,000');
+    expect(text).not.toContain('ui.finances.category.smuggling');
+  });
+
   it('renders the ledger most-recent-first with category and day, not raw description', () => {
     const { panel } = makePanel();
     const state = makeState();

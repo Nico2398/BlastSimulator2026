@@ -183,7 +183,7 @@ export function runTick(
   const smugResult = processSmuggling(state.mafia, rng);
   if (smugResult.income > 0) {
     state.cash += smugResult.income;
-    addIncome(state.finances, smugResult.income, 'contracts', 'Smuggling', state.tickCount);
+    addIncome(state.finances, smugResult.income, 'smuggling', 'Smuggling', state.tickCount);
   }
 
   // 6. Mafia exposure check
