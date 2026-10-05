@@ -4,7 +4,7 @@ import { iconEl } from './icons.js';
 /** Camera distance used when a Locate button focuses the scene camera on an entity. */
 export const LOCATE_CAMERA_DISTANCE = 15;
 
-export interface LocateButtonOptions {
+interface LocateButtonOptions {
   title: string;
   size?: number;
   onClick: () => void;
@@ -19,9 +19,22 @@ export function makeLocateButton(opts: LocateButtonOptions): HTMLButtonElement {
       'data-action': 'locate',
       title: opts.title,
       'aria-label': opts.title,
-      style: `width:${size}px;height:${size}px;flex:0 0 ${size}px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer`,
     },
     children: [iconEl('locate', Math.round(size / 2) - 1)],
+  });
+  // Set per property: some DOM parsers drop a whole cssText string when one value (var()) is unparseable.
+  Object.assign(btn.style, {
+    width: `${size}px`,
+    height: `${size}px`,
+    flex: `0 0 ${size}px`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid var(--bsx-hairline-strong)',
+    borderRadius: '4px',
+    background: 'transparent',
+    color: 'var(--bsx-text-muted)',
+    cursor: 'pointer',
   });
   btn.addEventListener('click', opts.onClick);
   return btn;
