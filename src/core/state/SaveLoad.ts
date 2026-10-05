@@ -5,6 +5,8 @@ import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
 import { SCORE_DECAY_RATE } from '../config/balance.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
+import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
+import type { Employee, EmployeeRole } from '../entities/Employee.js';
 import { getStorageCapacity } from '../entities/Building.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 
@@ -493,8 +495,16 @@ function backfillRaisedUnqualified(obj: Record<string, unknown>): void {
  * finite `raises`. Idempotent; mutates `obj` in place.
  */
 export function backfillRaises(obj: Record<string, unknown>): void {
-  // TODO: implement
-  void obj;
+  const es = obj['employees'] as { employees?: unknown } | undefined;
+  if (!es || !Array.isArray(es.employees)) return;
+  for (const raw of es.employees) {
+    const e = raw as { raises?: unknown; salary?: unknown; role?: string; qualifications?: unknown } | null;
+    if (!e || (typeof e.raises === 'number' && Number.isFinite(e.raises))) continue;
+    const salary = typeof e.salary === 'number' ? e.salary : 0;
+    const base = BASE_SALARIES[e.role as EmployeeRole] ?? 0;
+    const quals = Array.isArray(e.qualifications) ? (e.qualifications as Employee['qualifications']) : [];
+    e.raises = Math.max(0, salary - base - calculateQualificationBonus({ qualifications: quals }));
+  }
 }
 
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
@@ -798,6 +808,7 @@ export function deserialize(json: string): GameState {
   // current-version saves that lack a valid counter.
   migrateV28ToV29(obj);
   backfillRaisedUnqualified(obj);
+  backfillRaises(obj);
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The

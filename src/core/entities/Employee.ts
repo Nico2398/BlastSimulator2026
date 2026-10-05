@@ -302,6 +302,7 @@ export function hireEmployee(
     name: generateName(rng),
     role,
     salary: BASE_SALARIES[role],
+    raises: 0,
     morale: 60, // Neutral-positive starting morale
     unionized: rng.chance(0.3), // 30% chance of being unionized
     injured: false,
@@ -368,7 +369,8 @@ export function giveRaise(
   const emp = state.employees.find(e => e.id === employeeId);
   if (!emp || !emp.alive) return false;
 
-  emp.salary += amount;
+  emp.raises = (emp.raises ?? 0) + amount;
+  emp.salary = calculateSalary(emp);
   // Morale boost proportional to raise relative to current salary
   const moraleBoost = Math.min(20, Math.round((amount / emp.salary) * 50));
   emp.morale = Math.min(100, emp.morale + moraleBoost);
@@ -424,15 +426,12 @@ export function processPayCycle(state: EmployeeState): number {
 
 /** Sum of QUALIFICATION_SALARY_BONUS over the employee's qualifications. */
 export function calculateQualificationBonus(employee: Pick<Employee, 'qualifications'>): number {
-  // TODO: implement
-  void employee;
-  return 0;
+  return employee.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
 }
 
-/** Calculate the total salary for an employee: base salary + sum of qualification bonuses. */
+/** Total salary: base salary + qualification bonus + permanent raises (`employee.raises`). */
 export function calculateSalary(employee: Employee): number {
-  return BASE_SALARIES[employee.role] +
-    employee.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
+  return BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + (employee.raises ?? 0);
 }
 
 /** True when `requiredSkill` is null (no requirement) or the employee holds a qualification in it. */
