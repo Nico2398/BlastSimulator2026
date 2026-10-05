@@ -15,6 +15,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
+import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { tickUntil } from './helpers.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { t } from '../../src/core/i18n/I18n.js';
@@ -763,5 +764,135 @@ describe('drill_plan — refuses holes under a building or construction site (#1
     expect(r.success).toBe(true);
     expect(state.plannedDrillHoles).toHaveLength(4);
     expect(r.output).not.toMatch(/skipped/i);
+  });
+});
+
+describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () => {
+  function setup() {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    const cell = (x: number, z: number) => {
+      const c = state.navGrid.cellAt(x, z)!;
+      return { type: c.type, moveCost: c.moveCost };
+    };
+    const occupancyEvents: unknown[] = [];
+    ctx.emitter.on('nav:occupancy_changed', e => { occupancyEvents.push(e); });
+    const drill = (cmdArgs: string, count: number) => {
+      expect(run(`drill_plan add ${cmdArgs} depth:8`).success).toBe(true);
+      tickUntil(run, () => state.drillHoles.length >= count, 800);
+      expect(state.drillHoles.length).toBeGreaterThanOrEqual(count);
+    };
+    return { run, state, cell, occupancyEvents, drill };
+  }
+
+  it('drill_plan clear restores a drilled hole cell to its pre-hole type and moveCost 1', () => {
+    const { run, state, cell, drill } = setup();
+    const before = cell(15, 15);
+    expect(before.type).not.toBe('drill_hole');
+    drill('x:15 z:15', 1);
+    expect(cell(15, 15)).toEqual({ type: 'drill_hole', moveCost: 5 });
+
+    expect(run('drill_plan clear').success).toBe(true);
+    expect(state.drillHoles).toHaveLength(0);
+    expect(cell(15, 15).type).not.toBe('drill_hole');
+    expect(cell(15, 15)).toEqual(before);
+    expect(cell(15, 15).moveCost).toBe(1);
+  });
+
+  it('drill_plan remove on a drilled hole restores its cell', () => {
+    const { run, state, cell, drill } = setup();
+    const before = cell(15, 15);
+    drill('x:15 z:15', 1);
+    const id = state.drillHoles[0]!.id;
+    expect(cell(15, 15).type).toBe('drill_hole');
+
+    expect(run(`drill_plan remove hole:${id}`).success).toBe(true);
+    expect(cell(15, 15)).toEqual(before);
+    expect(cell(15, 15).moveCost).toBe(1);
+  });
+
+  it('drill_plan grid at a different origin restores the old drilled cells', () => {
+    const { run, state, cell, drill } = setup();
+    const before = cell(15, 15);
+    drill('x:15 z:15', 1);
+    expect(cell(15, 15).type).toBe('drill_hole');
+
+    expect(run('drill_plan grid rows:1 cols:2 spacing:4 depth:8 start:22,22').success).toBe(true);
+    expect(state.drillHoles).toHaveLength(0);
+    expect(cell(15, 15)).toEqual(before);
+    expect(cell(15, 15).type).not.toBe('drill_hole');
+  });
+
+  it('clearing or removing planned-only (undrilled) holes emits no nav:occupancy_changed and leaves cells unchanged', () => {
+    const { run, state, cell, occupancyEvents } = setup();
+    const before = cell(15, 15);
+    expect(run('drill_plan add x:15 z:15 depth:8').success).toBe(true);
+    expect(run('drill_plan add x:18 z:18 depth:8').success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(2);
+    expect(state.drillHoles).toHaveLength(0);
+    occupancyEvents.length = 0;
+
+    expect(run(`drill_plan remove hole:${state.plannedDrillHoles[0]!.id}`).success).toBe(true);
+    expect(occupancyEvents).toHaveLength(0);
+    expect(run('drill_plan clear').success).toBe(true);
+    expect(occupancyEvents).toHaveLength(0);
+    expect(cell(15, 15)).toEqual(before);
+  });
+
+  it('emits one 1x1 nav:occupancy_changed per drilled hole on clear', () => {
+    const { run, state, occupancyEvents, drill } = setup();
+    drill('x:15 z:15', 1);
+    drill('x:19 z:19', 2);
+    expect(state.drillHoles).toHaveLength(2);
+    occupancyEvents.length = 0;
+
+    expect(run('drill_plan clear').success).toBe(true);
+    expect(occupancyEvents).toHaveLength(2);
+    for (const e of occupancyEvents as Array<{ region: { minX: number; maxX: number; minZ: number; maxZ: number } }>) {
+      expect(e.region.minX).toBe(e.region.maxX);
+      expect(e.region.minZ).toBe(e.region.maxZ);
+    }
+  });
+
+  it('two drilled holes sharing a floored cell: removing one keeps drill_hole, removing the second restores', () => {
+    const { run, state, cell, drill } = setup();
+    const before = cell(15, 15);
+    drill('x:15.2 z:15.2', 1);
+    drill('x:15.7 z:15.7', 2);
+    expect(state.drillHoles).toHaveLength(2);
+    expect(cell(15, 15).type).toBe('drill_hole');
+
+    expect(run(`drill_plan remove hole:${state.drillHoles[0]!.id}`).success).toBe(true);
+    expect(state.drillHoles).toHaveLength(1);
+    expect(cell(15, 15)).toEqual({ type: 'drill_hole', moveCost: 5 });
+
+    expect(run(`drill_plan remove hole:${state.drillHoles[0]!.id}`).success).toBe(true);
+    expect(cell(15, 15)).toEqual(before);
+  });
+
+  it('findPath across former hole cells costs the same as baseline after clear', () => {
+    const { run, state, drill } = setup();
+    const req = { agentId: 0, fromX: 10, fromZ: 15, toX: 20, toZ: 15, avoidVehicles: false };
+    const baseline = findPath(state.navGrid, req);
+    expect(baseline.found).toBe(true);
+
+    drill('x:14 z:15', 1);
+    drill('x:15 z:15', 2);
+    drill('x:16 z:15', 3);
+    expect(run('drill_plan clear').success).toBe(true);
+
+    const after = findPath(state.navGrid, req);
+    expect(after.found).toBe(true);
+    expect(after.totalCost).toBeCloseTo(baseline.totalCost, 6);
+  });
+
+  it('clear with an empty plan emits nothing and reports 0 holes', () => {
+    const { run, occupancyEvents } = setup();
+    const result = run('drill_plan clear');
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('Cleared drill plan (0 holes)');
+    expect(occupancyEvents).toHaveLength(0);
   });
 });
