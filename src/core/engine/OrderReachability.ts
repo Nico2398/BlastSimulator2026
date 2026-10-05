@@ -192,9 +192,7 @@ function availabilityReason(
     const licensed = eligible.filter(emp => isLicensedForRole(emp, role));
     if (licensed.length === 0) return 'no_licensed_driver';
     if (holdsSkill(licensed)) return null;
-    return action.requiredSkill !== null && holdsSkill(eligible)
-      ? 'no_dual_qualified_employee'
-      : 'no_qualified_employee';
+    return holdsSkill(eligible) ? 'no_dual_qualified_employee' : 'no_qualified_employee';
   }
   return holdsSkill(eligible) ? null : 'no_qualified_employee';
 }
