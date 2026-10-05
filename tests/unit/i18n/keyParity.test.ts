@@ -424,7 +424,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1366: +2 keys (economy.negotiation.already_negotiated, ui.contracts.negotiate_used), both locales: 3594.
     // #1366 refactor: +1 key (economy.negotiation.not_found), both locales: 3595.
     // #1368: +1 key (ui.contracts.deliver_failed), both locales: 3596.
-    expect(Object.keys(en).length).toBe(3596);
+    // #1368 review fixes: +5 keys total in latest commit, both locales: 3601.
+    expect(Object.keys(en).length).toBe(3601);
   });
 });
 
