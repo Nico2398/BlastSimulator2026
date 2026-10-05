@@ -77,7 +77,9 @@ function resolveEmployeeProductivityInputs(
  * survey, place_building) replaces BASE_TASK_DURATION_TICKS as the base but is
  * still scaled by proficiency, need and Living Quarters multipliers. A numeric
  * `payload.resumeTicks` (written by interruptActiveAction) is already-resolved
- * remaining work and is returned unscaled. A rest action's own restDuration
+ * remaining work and is returned unscaled. `dig_ramp_segment` and
+ * `level_ground` bypass resumeTicks: their live grid count (cells/columns
+ * still pending) is their resume mechanism. A rest action's own restDuration
  * overrides everything and is likewise raw.
  *
  * `grid`, when provided, lets the `dig_ramp_segment` branch read the live
@@ -88,7 +90,7 @@ function resolveEmployeeProductivityInputs(
 export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction, grid?: VoxelGrid): number {
   if (action.type === 'rest') {
     if (typeof action.payload['restDuration'] === 'number') {
-      return action.payload['restDuration'] as number;
+      return action.payload['restDuration'];
     }
     const needKey = resolveRestNeedKey(action.payload);
     return needKey !== null ? NEED_REST_DURATIONS[needKey] : BASE_TASK_DURATION_TICKS;
@@ -124,11 +126,11 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
   // Already-resolved remaining work from an interrupted action
   // (interruptActiveAction) — returned raw, never rescaled.
   if (typeof action.payload['resumeTicks'] === 'number') {
-    return action.payload['resumeTicks'] as number;
+    return action.payload['resumeTicks'];
   }
 
   const baseTicks = typeof action.payload['durationTicks'] === 'number'
-    ? action.payload['durationTicks'] as number
+    ? action.payload['durationTicks']
     : BASE_TASK_DURATION_TICKS;
   const { level, needMult, lqMult } = resolveEmployeeProductivityInputs(state, employee, action);
   return computeTaskDuration(baseTicks, level, needMult, lqMult, 1);

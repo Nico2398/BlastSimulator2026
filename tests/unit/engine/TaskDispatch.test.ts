@@ -26,6 +26,7 @@ import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
 import { backfillGhostBuildings, dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields, interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
+import { seedTaskTimerFields } from '../../../src/core/engine/ActionSelection.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 
@@ -1006,6 +1007,27 @@ describe('interruptActiveAction (#549)', () => {
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 135);
     expect(stored.payload.resumeTicks).toBe(6);
     expect(stored.payload.durationTicks).toBe(40);
+  });
+
+  it('a higher-level reclaimer gets the raw resumeTicks of a lower-level worker\'s interrupted task, unscaled (#1384)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    addQualifiedEmployee(state, 'blasting', SEED + 1);
+    const [a, b] = state.employees.employees as [typeof state.employees.employees[number], typeof state.employees.employees[number]];
+    assignSkill(state.employees, a.id, 'blasting', 1);
+    assignSkill(state.employees, b.id, 'blasting', 5);
+    const action = makePendingAction({ id: 136, requiredSkill: 'blasting', targetX: 7, targetZ: 7, payload: { durationTicks: 40 } });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 136, a.id, {
+      targetX: 7, targetZ: 7, requiredSkill: 'blasting', type: 'general_work', payload: { durationTicks: 40 },
+    }, 40);
+    simulateArrival(state, 136, a.id);
+    a.taskTicksRemaining = 17;
+
+    interruptActiveAction(state, a, 136);
+
+    const stored = (state as any).pendingActions.find((x: PendingAction) => x.id === 136) as PendingAction;
+    seedTaskTimerFields(state, b, stored);
+    expect(b.pendingTaskDuration).toBe(17);
   });
 
   it('does not stash payload.resumeTicks when the employee was still walking (taskTicksRemaining null)', () => {
