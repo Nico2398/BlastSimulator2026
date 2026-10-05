@@ -3,7 +3,7 @@
 
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
-import { isBuildingFootprintCell, type BuildingState } from '../entities/Building.js';
+import { isBuildingFootprintCell, type FootprintOccupant } from '../entities/Building.js';
 
 export interface BlastPlan {
   holes: DrillHole[];
@@ -61,14 +61,14 @@ export function assembleBlastPlan(
  * Returns a ValidationError for each hole that overlaps a building footprint.
  */
 export function checkProtectedPositions(
-  holes: DrillHole[],
-  buildingState: BuildingState,
+  holes: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z'>>,
+  occupants: ReadonlyArray<FootprintOccupant>,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
   for (const hole of holes) {
     const ax = Math.floor(hole.x);
     const az = Math.floor(hole.z);
-    for (const building of buildingState.buildings) {
+    for (const building of occupants) {
       if (isBuildingFootprintCell(building, ax, az)) {
         errors.push({ holeId: hole.id, issue: 'blast.validation.protected_position' });
         break; // one error per hole is enough
@@ -76,4 +76,28 @@ export function checkProtectedPositions(
     }
   }
   return errors;
+}
+
+/**
+ * Ids of `cells` whose column lies under a building or construction-site
+ * footprint (#1359). Takes the occupant list so callers choose the source.
+ */
+export function coveredByFootprint(
+  cells: ReadonlyArray<Pick<DrillHole, 'id' | 'x' | 'z'>>,
+  occupants: ReadonlyArray<FootprintOccupant>,
+): Set<string> {
+  if (occupants.length === 0) return new Set<string>();
+  return new Set(checkProtectedPositions(cells, occupants).map(e => e.holeId));
+}
+
+/**
+ * Split candidate cells into those clear of every footprint and the count of
+ * those under one (#1359). Order of the clear cells is preserved.
+ */
+export function partitionByFootprint<T extends { x: number; z: number }>(
+  cells: ReadonlyArray<T>,
+  occupants: ReadonlyArray<FootprintOccupant>,
+): { clear: T[]; skipped: number } {
+  const covered = coveredByFootprint(cells.map((c, i) => ({ id: String(i), x: c.x, z: c.z })), occupants);
+  return { clear: cells.filter((_, i) => !covered.has(String(i))), skipped: covered.size };
 }

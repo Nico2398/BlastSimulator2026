@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { validateBlastPlan, assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
+import { validateBlastPlan, assembleBlastPlan, coveredByFootprint } from '../../../src/core/mining/BlastPlan.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
@@ -56,5 +56,18 @@ describe('BlastPlan', () => {
     expect(chargeError).toBeDefined();
     expect(chargeError!.issue).toBe('blast.validation.charge_loading');
     expect(chargeError!.issue).not.toBe('blast.validation.missing_charge');
+  });
+});
+
+describe('coveredByFootprint', () => {
+  const cells = [{ id: 'a', x: 0.5, z: 0.5 }, { id: 'b', x: 50, z: 50 }];
+
+  it('returns an empty set when there are no occupants', () => {
+    expect(coveredByFootprint(cells, []).size).toBe(0);
+  });
+
+  it('returns only ids of cells under an occupant footprint', () => {
+    const covered = coveredByFootprint(cells, [{ type: 'management_office', tier: 1, x: 0, z: 0 }]);
+    expect([...covered]).toEqual(['a']);
   });
 });

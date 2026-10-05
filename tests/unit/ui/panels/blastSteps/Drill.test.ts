@@ -336,3 +336,174 @@ describe('DrillStep — scroll-bounded hole list (#958)', () => {
     expect(wrapper.contains(saveBtn)).toBe(false);
   });
 });
+
+// ── Footprint awareness (#1359) ──────────────────────────────────────────────
+
+/** State with a planned living_quarters whose footprint includes tile (10, 10). */
+function makeStateWithFootprint() {
+  const state = makeState();
+  state.plannedBuildings.push({
+    id: 1, buildingId: 1, type: 'living_quarters', tier: 1, x: 10, z: 10,
+  } as unknown as (typeof state.plannedBuildings)[number]);
+  return state;
+}
+
+function lastStripArg(strip: { show: ReturnType<typeof vi.fn> }) {
+  return strip.show.mock.calls.at(-1)![0] as {
+    result: string; confirmEnabled: boolean; confirmDisabledReason?: string;
+  };
+}
+
+describe('DrillStep — footprint awareness (#1359)', () => {
+  it('add-hole on a covered tile disables confirm and gives the footprint reason', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeStateWithFootprint(), 'sunny');
+
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+    const arg = lastStripArg(strip);
+    expect(arg.confirmEnabled).toBe(false);
+    expect(arg.confirmDisabledReason).toContain('Cannot drill at (10, 10)');
+  });
+
+  it('add-hole on a clear tile keeps confirm enabled with no reason', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeStateWithFootprint(), 'sunny');
+
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 200, z1: 200, x2: 200, z2: 200 });
+
+    const arg = lastStripArg(strip);
+    expect(arg.confirmEnabled).toBe(true);
+    expect(arg.confirmDisabledReason).toBeUndefined();
+  });
+
+  it('add-hole before any state update treats the tile as clear', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+    expect(lastStripArg(strip).confirmEnabled).toBe(true);
+  });
+
+  it('grid preview shows the skipped count when some cells are under a footprint', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeStateWithFootprint(), 'sunny');
+
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 40, z2: 40 });
+
+    const arg = lastStripArg(strip);
+    expect(arg.result).toMatch(/under buildings \(skipped\)/);
+    expect(arg.confirmEnabled).toBe(true);
+  });
+
+  it('grid preview omits the skipped note when no cell is covered', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeStateWithFootprint(), 'sunny');
+
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 200, z1: 200, x2: 209, z2: 209 });
+
+    expect(lastStripArg(strip).result).not.toContain('skipped');
+  });
+
+  it('grid with every cell covered disables confirm and explains why', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeStateWithFootprint(), 'sunny');
+
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 10, z2: 10 });
+
+    const arg = lastStripArg(strip);
+    expect(arg.confirmEnabled).toBe(false);
+    expect(arg.confirmDisabledReason).toContain('Every cell of that grid');
+  });
+
+  it('oversize grid skips the footprint preview instead of enumerating cells', () => {
+    const { step } = makeStep();
+    const { kit, controller, strip } = makeMockKit();
+    step.setPlacementKit(kit);
+    step.update(makeStateWithFootprint(), 'sunny');
+
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    // 101 x 101 cells at 3 m spacing > MAX_DRILL_GRID_HOLES (10 000).
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 310, z2: 310 });
+
+    const arg = lastStripArg(strip);
+    expect(arg.result).not.toContain('skipped');
+    expect(arg.confirmEnabled).toBe(true);
+  });
+});
+
+describe('DrillStep — drill notice after confirm (#1359)', () => {
+  const notice = (step: DrillStep) => step.root.querySelector('[data-role="drill-notice"]') as HTMLElement;
+
+  it('shows the console output after a successful confirm', () => {
+    const { step, gameConsole } = makeStep();
+    gameConsole.mockReturnValue({ success: true, output: 'Ordered 8 holes (2 skipped).' });
+    const { kit, controller } = makeMockKit();
+    step.setPlacementKit(kit);
+
+    (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 19, z2: 13 });
+    controller.simulateConfirm();
+
+    expect(notice(step).textContent).toBe('Ordered 8 holes (2 skipped).');
+    expect(notice(step).style.display).toBe('block');
+    expect(notice(step).style.color).toBe('var(--bsx-text-muted)');
+  });
+
+  it('shows a refusal in the danger colour', () => {
+    const { step, gameConsole } = makeStep();
+    gameConsole.mockReturnValue({ success: false, output: 'Cannot drill at (25, 30).' });
+    const { kit, controller } = makeMockKit();
+    step.setPlacementKit(kit);
+
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 25, z1: 30, x2: 25, z2: 30 });
+    controller.simulateConfirm();
+
+    expect(notice(step).textContent).toBe('Cannot drill at (25, 30).');
+    expect(notice(step).style.display).toBe('block');
+    expect(notice(step).style.color).not.toBe('var(--bsx-text-muted)');
+  });
+
+  it('hides the notice when the command prints nothing', () => {
+    const { step } = makeStep();
+    const { kit, controller } = makeMockKit();
+    step.setPlacementKit(kit);
+
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 25, z1: 30, x2: 25, z2: 30 });
+    controller.simulateConfirm();
+
+    expect(notice(step).style.display).toBe('none');
+  });
+
+  it('tolerates a missing game console (no notice, no throw)', () => {
+    const container = document.createElement('div');
+    const step = new DrillStep(container);
+    const { kit, controller } = makeMockKit();
+    step.setPlacementKit(kit);
+
+    (step.root.querySelector('[data-action="add-hole-tool"]') as HTMLButtonElement).click();
+    controller.simulateSelect({ x1: 25, z1: 30, x2: 25, z2: 30 });
+    expect(() => controller.simulateConfirm()).not.toThrow();
+    expect(notice(step).style.display).toBe('none');
+  });
+});

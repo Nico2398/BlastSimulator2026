@@ -83,12 +83,24 @@ function makeTestGrid(): VoxelGrid {
 
 // ── 1. checkProtectedPositions ─────────────────────────────────────────────────
 //
-// Validates that checkProtectedPositions(holes, buildingState) returns a
+// Validates that checkProtectedPositions(holes, buildingState.buildings) returns a
 // ValidationError { holeId, issue } for every hole whose floored (x, z)
 // falls within any building's footprint cells, and no error otherwise.
 
 describe('checkProtectedPositions', () => {
   beforeEach(() => { holeCounter.nextHoleId = 1; });
+
+  it('flags a hole under a planned building (construction site occupant, #1359)', () => {
+    // living_quarters tier 1 is 3x3: planned at (10, 10) covers x,z 10..12.
+    const planned = [{ type: 'living_quarters' as const, tier: 1 as const, x: 10, z: 10 }];
+    const holes: DrillHole[] = [];
+    const under = addHole(holeCounter, holes, 12.6, 11.2, 5, 0.15); // floors to (12, 11)
+    addHole(holeCounter, holes, 13, 10, 5, 0.15);                   // just outside
+
+    const errors: ValidationError[] = checkProtectedPositions(holes, planned);
+
+    expect(errors).toEqual([{ holeId: under.id, issue: 'blast.validation.protected_position' }]);
+  });
 
   it('returns a ValidationError when a hole sits on a building footprint cell', () => {
     // explosive_warehouse tier-1 footprint: rect(2,2) → covers cells
@@ -99,7 +111,7 @@ describe('checkProtectedPositions', () => {
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 2, 2, 5, 0.15); // exact match on footprint cell (2, 2)
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.holeId).toBe(holes[0]!.id);
@@ -115,7 +127,7 @@ describe('checkProtectedPositions', () => {
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 8, 8, 5, 0.15); // well clear of the building
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(0);
   });
@@ -129,7 +141,7 @@ describe('checkProtectedPositions', () => {
     const underBuilding = addHole(holeCounter, holes, 2, 2, 5, 0.15); // overlaps footprint cell (2, 2)
     addHole(holeCounter, holes, 10, 10, 5, 0.15);                      // no overlap
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.holeId).toBe(underBuilding.id);
@@ -145,7 +157,7 @@ describe('checkProtectedPositions', () => {
     const holes: DrillHole[] = [];
     addHole(holeCounter, holes, 2.3, 2.7, 5, 0.15);
 
-    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
+    const errors: ValidationError[] = checkProtectedPositions(holes, buildingState.buildings);
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.issue).toBe('blast.validation.protected_position');

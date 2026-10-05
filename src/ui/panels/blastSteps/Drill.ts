@@ -12,13 +12,16 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import { gridCellPositions } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
-import { placementRefusalReason, type PlacementKit } from '../../scene/PlacementKit.js';
+import { hoverRefusal, type PlacementKit } from '../../scene/PlacementKit.js';
+import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
+import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import {
-  DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, DRILL_GRID_DEFAULT_DEPTH_M,
+  DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
 } from '../../../core/config/balance.js';
 
 
@@ -37,6 +40,8 @@ export class DrillStep {
   private readonly clearRowEl: HTMLElement;
   private readonly clearBtn: HTMLButtonElement;
   private readonly savedPlans: SavedPlansList;
+  private readonly commandNoticeEl: HTMLElement;
+  private lastState: GameState | null = null;
 
   private gameConsole?: GameConsoleFn;
   private placementKit: PlacementKit | null = null;
@@ -121,7 +126,12 @@ export class DrillStep {
       name => this.gameConsole?.(`blast_plan load name:${name}`),
     );
 
-    this.el.append(gridBtn, toolRow, this.clearRowEl, statStrip, holesHeader, this.holeListEl, this.savedPlans.root);
+    this.commandNoticeEl = el('div');
+    this.commandNoticeEl.style.cssText = 'display:none;font:500 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-muted);white-space:pre-line';
+    this.commandNoticeEl.setAttribute('role', 'status');
+    this.commandNoticeEl.dataset['role'] = 'drill-notice';
+
+    this.el.append(gridBtn, toolRow, this.commandNoticeEl, this.clearRowEl, statStrip, holesHeader, this.holeListEl, this.savedPlans.root);
     container.appendChild(this.el);
   }
 
@@ -131,6 +141,7 @@ export class DrillStep {
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
   update(state: GameState, weather: WeatherState | undefined): void {
+    this.lastState = state;
     const holes = state.drillHoles;
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;
@@ -216,25 +227,8 @@ export class DrillStep {
   }
 
   private makeHoleRow(hole: DrillHole, state: GameState, wet: Set<string>): HTMLElement {
-    const row = el('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border:1px solid var(--bsx-hairline);border-radius:4px;background:var(--bsx-card)';
-
-    const tag = el('span', { text: hole.id, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-ore);width:24px' } });
-    const at = el('span', { text: `(${hole.x}, ${hole.z})`, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-muted)' } });
-    const depth = el('span', { text: `${hole.depth.toFixed(1)} m`, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-muted)' } });
-
     const status = this.holeStatus(hole, state, wet);
-    const statusChip = chip(status.label, status.tone);
-    statusChip.style.marginLeft = 'auto';
-
-    const deleteBtn = el('button');
-    deleteBtn.style.cssText = 'width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--bsx-text-micro);cursor:pointer;padding:0';
-    deleteBtn.dataset['action'] = 'remove-hole';
-    deleteBtn.appendChild(iconEl('x', 10));
-    deleteBtn.addEventListener('click', () => this.gameConsole?.(`drill_plan remove hole:${hole.id}`));
-
-    row.append(tag, at, depth, statusChip, deleteBtn);
-    return row;
+    return this.buildHoleRow(hole, chip(status.label, status.tone), '');
   }
 
   /**
@@ -245,14 +239,16 @@ export class DrillStep {
    * button (which cancels its queued `drill_hole` action).
    */
   private makeOrderedHoleRow(hole: PlannedHole): HTMLElement {
+    return this.buildHoleRow(hole, chip(t('ui.blast_workshop.drill.status_ordered'), 'neutral'), ';opacity:.7');
+  }
+
+  private buildHoleRow(hole: Pick<DrillHole, 'id' | 'x' | 'z' | 'depth'>, statusChip: HTMLElement, extraStyle: string): HTMLElement {
     const row = el('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border:1px solid var(--bsx-hairline);border-radius:4px;background:var(--bsx-card);opacity:.7';
+    row.style.cssText = `display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border:1px solid var(--bsx-hairline);border-radius:4px;background:var(--bsx-card)${extraStyle}`;
 
     const tag = el('span', { text: hole.id, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-ore);width:24px' } });
     const at = el('span', { text: `(${hole.x}, ${hole.z})`, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-muted)' } });
     const depth = el('span', { text: `${hole.depth.toFixed(1)} m`, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-muted)' } });
-
-    const statusChip = chip(t('ui.blast_workshop.drill.status_ordered'), 'neutral');
     statusChip.style.marginLeft = 'auto';
 
     const deleteBtn = el('button');
@@ -271,14 +267,74 @@ export class DrillStep {
     return { label: t('ui.blast_workshop.drill.status_dry'), tone: 'neutral' };
   }
 
-  private armGridTool(): void {
+  /** Run a console command and show its output, so a refusal is never silent. */
+  private runAndNotify(cmd: string): void {
+    const res = this.gameConsole?.(cmd);
+    this.commandNoticeEl.textContent = res?.output ?? '';
+    this.commandNoticeEl.style.display = res?.output ? 'block' : 'none';
+    this.commandNoticeEl.style.color = res && !res.success ? 'var(--bsx-danger, #ff5b4c)' : 'var(--bsx-text-muted)';
+  }
+
+  /** Cells of the grid the selection would generate that lie under a footprint; bounded by MAX_DRILL_GRID_HOLES. */
+  private coveredGridCount(sel: { x1: number; z1: number }, rows: number, cols: number): number {
+    if (!this.lastState || rows * cols > MAX_DRILL_GRID_HOLES) return 0;
+    const cells = gridCellPositions({ x: sel.x1, z: sel.z1 }, rows, cols, this.gridSpacing);
+    return partitionByFootprint(cells, buildingFootprintOccupants(this.lastState)).skipped;
+  }
+
+  private coveredCount(cells: { id: string; x: number; z: number }[]): number {
+    return this.lastState ? coveredByFootprint(cells, buildingFootprintOccupants(this.lastState)).size : 0;
+  }
+
+  /** Strip field stepping a clamped grid setting; re-renders the strip on change. */
+  private stepField(
+    key: 'spacing' | 'depth', label: string, prop: 'gridSpacing' | 'gridDepth',
+    min: number, max: number, refresh: () => void,
+  ) {
+    const step = (delta: number, bound: (a: number, b: number) => number, limit: number) => () => {
+      this[prop] = bound(limit, this[prop] + delta); this.lastSignature = ''; refresh();
+    };
+    return {
+      key, label, value: this[prop], format: (v: number) => `${v} m`,
+      onDec: step(-1, Math.max, min), onInc: step(1, Math.min, max),
+    };
+  }
+
+  /** Confirm handler tail shared by both tools: notify, reset signature, flash. */
+  private afterConfirm(overlay: PlacementKit['overlay'], cmd: string, onRan?: () => void): void {
+    this.runAndNotify(cmd);
+    onRan?.();
+    this.lastSignature = '';
+    overlay.flashConfirm();
+  }
+
+  /**
+   * Shared arm/cancel/refresh wiring of both placement tools: `render` draws the
+   * overlay + strip for a live selection (the idle case is handled here),
+   * `onConfirm` runs the player's confirmed selection.
+   */
+  private armTool(
+    shape: 'rect' | 'point',
+    render: (kit: PlacementKit, refresh: () => void) => void,
+    onConfirm: (sel: { x1: number; z1: number; x2: number; z2: number }, overlay: PlacementKit['overlay']) => void,
+  ): void {
     const kit = this.placementKit;
     if (!kit) return;
     const { controller, overlay, strip } = kit;
     if (controller.isArmed) { controller.cancel(); return; }
-
     const refresh = (): void => {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+      render(kit, refresh);
+    };
+    controller.setConfirmHandler(sel => onConfirm(sel, overlay));
+    controller.setChangeHandler(refresh);
+    controller.arm({ shape });
+    refresh();
+  }
+
+  private armGridTool(): void {
+    this.armTool('rect', (kit, refresh) => {
+      const { controller, overlay, strip } = kit;
       const sel = controller.selection;
       const region = controller.activeRegion;
       overlay.update(sel ? {
@@ -289,66 +345,58 @@ export class DrillStep {
 
       const cols = sel ? Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1) : 0;
       const rows = sel ? Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1) : 0;
+      const coveredCount = sel ? this.coveredGridCount(sel, rows, cols) : 0;
+      const allCovered = sel !== null && rows * cols > 0 && coveredCount >= rows * cols;
+      const refusal = hoverRefusal(controller, allCovered ? t('mining.drill_plan.grid_all_blocked') : null);
       strip.show({
         icon: 'grid',
         title: t('ui.blast_workshop.drill.grid_tool'),
         subtitle: sel ? `${cols} × ${rows}` : '',
         fields: [
-          { key: 'spacing', label: t('ui.blast_workshop.drill.spacing'), value: this.gridSpacing, format: v => `${v} m`, onDec: () => { this.gridSpacing = Math.max(1, this.gridSpacing - 1); this.lastSignature = ''; refresh(); }, onInc: () => { this.gridSpacing = Math.min(20, this.gridSpacing + 1); this.lastSignature = ''; refresh(); } },
-          { key: 'depth', label: t('ui.blast_workshop.drill.depth'), value: this.gridDepth, format: v => `${v} m`, onDec: () => { this.gridDepth = Math.max(1, this.gridDepth - 1); this.lastSignature = ''; refresh(); }, onInc: () => { this.gridDepth = Math.min(40, this.gridDepth + 1); this.lastSignature = ''; refresh(); } },
+          this.stepField('spacing', t('ui.blast_workshop.drill.spacing'), 'gridSpacing', 1, 20, refresh),
+          this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', 1, 40, refresh),
         ],
-        result: sel ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}` : '—',
-        confirmEnabled: controller.canConfirm,
-        confirmDisabledReason: placementRefusalReason(controller),
+        result: sel
+          ? `${cols} × ${rows} ${t('ui.blast_workshop.drill.holes_section')}${coveredCount > 0 ? ` — ${t('ui.blast_workshop.drill.grid_skipped_preview', { count: coveredCount })}` : ''}`
+          : '—',
+        confirmEnabled: controller.canConfirm && !allCovered,
+        confirmDisabledReason: refusal.reason,
         instruction: t('ui.blast_workshop.drill.grid_tool_hint'),
       });
-    };
-
-    controller.setConfirmHandler((sel) => {
+    }, (sel, overlay) => {
       const cols = Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1);
       const rows = Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1);
-      this.gameConsole?.(`drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`);
-      this.lastGridPattern = { rows, cols };
-      this.lastSignature = '';
-      overlay.flashConfirm();
+      this.afterConfirm(
+        overlay,
+        `drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`,
+        () => { this.lastGridPattern = { rows, cols }; },
+      );
     });
-    controller.setChangeHandler(refresh);
-    controller.arm({ shape: 'rect' });
-    refresh();
   }
 
   private armAddHoleTool(): void {
-    const kit = this.placementKit;
-    if (!kit) return;
-    const { controller, overlay, strip } = kit;
-    if (controller.isArmed) { controller.cancel(); return; }
-
-    const refresh = (): void => {
-      if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
+    this.armTool('point', (kit, refresh) => {
+      const { controller, overlay, strip } = kit;
       const sel = controller.selection;
-      overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1 } : null);
+      const covered = sel ? this.coveredCount([{ id: 'add', x: sel.x1, z: sel.z1 }]) > 0 : false;
+      const footprintReason = covered && sel ? t('mining.drill_plan.refused_footprint', { x: Math.floor(sel.x1), z: Math.floor(sel.z1) }) : null;
+      const refusal = hoverRefusal(controller, footprintReason);
+      overlay.update(sel ? { shape: 'point', x: sel.x1, z: sel.z1, refused: refusal.refused } : null);
 
       strip.show({
         icon: 'hole',
         title: t('ui.blast_workshop.drill.add_hole'),
         subtitle: sel ? `(${sel.x1}, ${sel.z1})` : '',
         fields: [
-          { key: 'depth', label: t('ui.blast_workshop.drill.depth'), value: this.gridDepth, format: v => `${v} m`, onDec: () => { this.gridDepth = Math.max(1, this.gridDepth - 1); this.lastSignature = ''; refresh(); }, onInc: () => { this.gridDepth = Math.min(40, this.gridDepth + 1); this.lastSignature = ''; refresh(); } },
+          this.stepField('depth', t('ui.blast_workshop.drill.depth'), 'gridDepth', 1, 40, refresh),
         ],
         result: sel ? '1' : '—',
-        confirmEnabled: controller.canConfirm,
-        confirmDisabledReason: placementRefusalReason(controller),
+        confirmEnabled: controller.canConfirm && !covered,
+        confirmDisabledReason: refusal.reason,
         instruction: t('ui.blast_workshop.drill.add_hole_hint'),
       });
-    };
-
-    controller.setConfirmHandler((sel) => {
-      this.gameConsole?.(`drill_plan add x:${sel.x1} z:${sel.z1} depth:${this.gridDepth} diameter:${this.gridDiameter}`);
-      this.lastSignature = '';
-      overlay.flashConfirm();
+    }, (sel, overlay) => {
+      this.afterConfirm(overlay, `drill_plan add x:${sel.x1} z:${sel.z1} depth:${this.gridDepth} diameter:${this.gridDiameter}`);
     });
-    controller.setChangeHandler(refresh);
-    controller.arm({ shape: 'point' });
-    refresh();
   }
 }
