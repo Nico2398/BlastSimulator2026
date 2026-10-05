@@ -338,8 +338,35 @@
       }
     },
     {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        },
+        "note": "still recovered, no new collapse — Stan is kept continuously dispatched (working-rate drain) rather than idling, same as Walt, and stays above the collapse threshold through this batch"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "employee hire role:driller",
-      "description": "#928 follow-up: moved here from right before the build order below (was directly ahead of the old `tick 50` step) -- a third hire, brought on purely to build the quarters ordered below (#556). Neither Walter nor Stan can: this file works both of them to exhaustion on purpose, and an employee deep in the collapse cycle never claims a construction site. Under the single-gauge fatigue model Walter's own natural idle-then-proactive-rest cycle (no explicit dispatch keeps him busy, unlike Stan) leaves him genuinely idle for a long stretch after the `tick 200` step above -- ordering the build there let dispatch's idle-employee scan (which always favours the lowest employee id first, EmployeeDispatchSteps.ts) hand the construction site to Walter instead of this fresh hire, running him down into a second, unintended collapse that landed on top of Stan's own designed one below (sandbox-confirmed: collapsedCount read 2, not 1, at that checkpoint). Hiring and ordering here instead lands while Walter is confirmed genuinely busy (mid-rest, restTicksRemaining still counting down from the `tick 200` step's own recovery, per that step's own note) rather than idle, so this fresh hire is the only eligible candidate again, restoring the file's own premise.",
+      "description": "#1384: hire+order moved to just after the `tick 50` block (was before it). Fixed-duration actions (place_building) now scale by proficiency/fatigue/Living Quarters, so the quarters stand at a different tick; ordered earlier, the standing building shifted Stan's task boundary to tick 215, where an auto-rest was claimed before his fatigue reached 0 and the collapse beat never fired. Ordered here, Stan's final push again runs continuously into the collapse (re-derived live). #928 follow-up: moved here from right before the build order below (was directly ahead of the old `tick 50` step) -- a third hire, brought on purely to build the quarters ordered below (#556). Neither Walter nor Stan can: this file works both of them to exhaustion on purpose, and an employee deep in the collapse cycle never claims a construction site. Under the single-gauge fatigue model Walter's own natural idle-then-proactive-rest cycle (no explicit dispatch keeps him busy, unlike Stan) leaves him genuinely idle for a long stretch after the `tick 200` step above -- ordering the build there let dispatch's idle-employee scan (which always favours the lowest employee id first, EmployeeDispatchSteps.ts) hand the construction site to Walter instead of this fresh hire, running him down into a second, unintended collapse that landed on top of Stan's own designed one below (sandbox-confirmed: collapsedCount read 2, not 1, at that checkpoint). Hiring and ordering here instead lands while Walter is confirmed genuinely busy (mid-rest, restTicksRemaining still counting down from the `tick 200` step's own recovery, per that step's own note) rather than idle, so this fresh hire is the only eligible candidate again, restoring the file's own premise.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -403,33 +430,6 @@
         },
         "note": "Ordering only queues a construction site (#556). The fresh hire above builds it across the collapse push below and the closing wait; the standing building is asserted there, not here."
       }
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "collapsedCount": 0
-        },
-        "note": "still recovered, no new collapse — Stan is kept continuously dispatched (working-rate drain) rather than idling, same as Walt, and stays above the collapse threshold through this batch"
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "employee list",

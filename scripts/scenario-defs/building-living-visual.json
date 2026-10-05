@@ -49,7 +49,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -70,7 +72,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2
         }
@@ -91,7 +95,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 3
         }
@@ -281,7 +287,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "orderedBuildingCount": 1,
           "buildingCount": 2
@@ -329,7 +337,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -378,7 +388,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "orderedBuildingCount": 1,
           "buildingCount": 3
@@ -438,7 +450,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#928: widened from tick 5 -- by this point in the file the legacy shift-cycle (hasBunkhouse: a tier-2+ living_quarters is already standing) is active, and #928's single-gauge fatigue model means less proactive need-interruption keeps an employee's ticksWorked accumulating uninterrupted, so one of the three employees is already mid forced-shift-rest (WORK_DURATION_TICKS=6) right as this step starts -- fatigue correctly holds flat while resting (NEED_DRAIN_RATES.fatigue.resting=0, unchanged, #680) rather than draining, so a 5-tick window can catch it between 'still resting' and 'just replenished above its own pre-rest value', making minFatigue non-monotonic for a few ticks. #1062 (NEED_HARD_THRESHOLDS.fatigue: 5 -> 0) changed which of these two competing employees this step's own tick budget catches mid-recovery: Walt genuinely collapses (fatigue reaches the new floor of 0, COLLAPSING) a little earlier in the file's own long unmanaged build-and-idle stretch than the old floor allowed, and his own collapse-rest is still completing (against a real living_quarters now, unlike collapse-recovery.json's no-building case) right as THIS step starts (minFatigue=0 going in) — its recovery, not Stan's own continued drain, dominates the step, so minFatigue nets UPWARD this time (0 -> 50.5, re-derived live) rather than the old downward net the comment above still describes for the shift-cycle-only case. #1252 (#1200): net direction flips back to DOWNWARD (58.6 -> 46.6, re-derived live) -- #1200 dispatches every `build living_quarters`/`build research_center` order's own builder at the footprint's approach-ring cell instead of the raw origin, from order time, and that retargeting lengthens the tier-2 living_quarters build's own wait_until (direct-traced: buildingCount reaches 3 after 114 ticks here, not the pre-#1200 45), which pushes Walt's own first collapse and its 24-tick construction task into exact collision with each other -- his construction reaches its last tick (taskTicksRemaining 1) the same tick his fatigue reaches the new floor (0) and COLLAPSING wins the race, discarding the nearly-finished task onto Stan to redo and delaying Walt's own rest-completion (confirmed via direct trace, `runCommand`-replayed through this exact command sequence: Walt's collapse-rest now finishes and his fatigue starts climbing again only around tick 404-413, well after this step's own tick 348-368 window closes) rather than completing inside it as before. Neither employee is stuck -- both reach and use a living_quarters normally, just later -- so this step's own tick-20 window now catches both of them mid-drain with no recovery in flight: Walt (the file's own low-fatigue employee) falls 58.6 -> 46.6, Stan falls 97.0 -> 85.0, both by the same 12 over the window (plain drain, no rest to offset it), so minFatigue nets DOWNWARD now.",
+      "description": "#1384: fixed-duration actions (build, research) now scale by proficiency/fatigue/Living Quarters, so builds finish at different ticks and the fatigue trajectory shifted. At this step minFatigue starts at 23.9 (Stan, drained) and a rest/collapse-recovery in flight completes inside the 20-tick window, so minFatigue nets UPWARD (23.9 -> 74.5, re-derived live) rather than the earlier downward net. Direction is the claim: someone recovering in a living_quarters raises the minimum.",
       "interaction": [
         {
           "type": "command",
@@ -447,8 +459,10 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["minFatigue"],
-        "note": "#1252 (#1200): minFatigue now starts this step at 58.6 (Walt), not 0 -- his collapse-rest has not started yet at this point in the file (see this step's own #1252 description) -- and both employees are plainly draining for the whole window with nobody recovering, so this step nets DOWNWARD (58.6 -> 46.6) rather than the pre-#1200 upward net driven by Walt's rest completing inside this exact window."
+        "note": "#1384: minFatigue rises (23.9 -> 74.5) because the lowest-fatigue employee is mid-rest in a living_quarters during this window.",
+        "increased": [
+          "minFatigue"
+        ]
       }
     },
     {

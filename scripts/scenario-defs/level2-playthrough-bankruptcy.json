@@ -964,7 +964,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7121
+          "cash": -7103
         }
       },
       "description": "#1151: re-baselined against a measured run -- cash -7127 -> -7109. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so wages and the safety/score curves accrue over a slightly different trajectory. Re-measured rather than loosened, so each stays an exact check. #1252 (#1200): cash re-measured -7109 -> -7121. #1200 retargets the management_office builder (employee #1) at the footprint's approach-ring cell (19,5) instead of the raw order origin (20,5), from order time -- one tile closer to employee #1's own spawn, so the construction (claimed at tick 0) completes one tick sooner than before (direct-traced: activeActionId clears at tick 39 here, tick 40-41 on main pre-#1200). That frees employee #1 for reassignment one tick earlier, which lands a small, one-time -$12 shift in this window's own cash total (direct-traced against a git-worktree run of this same command sequence on main, pre-#1200: cash -21141 identical through tick 39, then -27966/-27991/... here vs -27960/-27979/... there, a bounded -$6 then -$12 gap that never grows past -$12 for the rest of the file) -- not a growing divergence, a single early reassignment's own incidental cost."
@@ -1125,7 +1125,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 66.2000000000001,
+          "safety": 64.8500000000001,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -1196,7 +1196,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -70266,
+          "cash": -70248,
           "tickCount": 100,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1318,7 +1318,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 77.45000000000017,
+          "safety": 76.10000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1508,7 +1508,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 77.45000000000017,
+          "safety": 76.10000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1648,7 +1648,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 77.45000000000017,
+          "safety": 76.10000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1673,7 +1673,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 77.45000000000017,
+          "safety": 76.10000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1698,7 +1698,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 77.45000000000017,
+          "safety": 76.10000000000016,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,

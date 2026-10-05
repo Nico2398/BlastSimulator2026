@@ -816,7 +816,7 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 10,
+          "deathCount": 9,
           "levelEnded": false,
           "bankrupt": false
         }
@@ -850,8 +850,8 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 619,
-          "deathCount": 10,
+          "tickCount": 708,
+          "deathCount": 9,
           "wellBeing": 0,
           "holeCount": 0,
           "employeeCount": 12,
@@ -874,10 +874,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -905,7 +905,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -926,10 +926,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -957,7 +957,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -978,10 +978,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1009,7 +1009,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1030,10 +1030,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1061,7 +1061,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1082,10 +1082,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1113,7 +1113,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1134,10 +1134,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1165,7 +1165,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1186,10 +1186,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1217,7 +1217,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1238,10 +1238,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1269,7 +1269,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1290,10 +1290,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1321,7 +1321,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1342,10 +1342,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1373,7 +1373,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1394,10 +1394,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1425,7 +1425,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1446,10 +1446,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1477,7 +1477,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1498,10 +1498,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1529,7 +1529,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1550,10 +1550,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1581,7 +1581,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1602,10 +1602,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1633,7 +1633,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1654,10 +1654,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1685,7 +1685,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1706,10 +1706,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1737,7 +1737,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1758,10 +1758,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1789,7 +1789,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1810,10 +1810,10 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
-          "deathCount": 10
+          "deathCount": 9
         }
       },
       "description": "#1313: the mine is frozen after the revolt -- a tick advances neither cash nor the clock."
@@ -1841,7 +1841,7 @@
       "expect": {
         "equals": {
           "wellBeing": 0,
-          "tickCount": 619,
+          "tickCount": 708,
           "levelEndReason": "worker_revolt"
         },
         "note": "wellBeing sits on its floor; the revolt is the end."
@@ -1859,7 +1859,7 @@
       "expect": {
         "equals": {
           "employeeCount": 12,
-          "deathCount": 10
+          "deathCount": 9
         }
       }
     },
@@ -1878,8 +1878,8 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 619,
-          "deathCount": 10,
+          "tickCount": 708,
+          "deathCount": 9,
           "wellBeing": 0,
           "employeeCount": 12
         }
@@ -1897,7 +1897,7 @@
       "expect": {
         "equals": {
           "bankrupt": false,
-          "tickCount": 619
+          "tickCount": 708
         }
       }
     },
@@ -1912,7 +1912,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 619,
+          "tickCount": 708,
           "employeeCount": 12
         }
       }
@@ -1932,8 +1932,8 @@
           "levelEndReason": "worker_revolt",
           "revolted": true,
           "bankrupt": false,
-          "tickCount": 619,
-          "deathCount": 10,
+          "tickCount": 708,
+          "deathCount": 9,
           "wellBeing": 0,
           "employeeCount": 12
         },

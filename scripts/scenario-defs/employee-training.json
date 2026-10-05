@@ -525,73 +525,16 @@
       }
     },
     {
-      "command": "tick 40",
-      "description": "#553: drain the ordered plan in bounded chunks rather than one huge tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:800",
+      "timeout": 125,
+      "description": "#1384: drilling time now scales with proficiency/fatigue/Living Quarters, so the old fixed 4x tick 40 pads no longer land the holes at a fixed tick. Wait on the condition instead.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 40"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 40",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 40"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 40",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 40"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 40",
-      "description": "#553: sandbox-measured landing for this exact sequence (seed 42): all 4 holes down by the end of this 4th 40-tick chunk.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 40"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
