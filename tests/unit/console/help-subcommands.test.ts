@@ -18,7 +18,7 @@ function helpLine(name: string): string {
 function groupTokens(text: string): string[] {
   const m = /\(([^)]*)\)/.exec(text);
   expect(m, `parenthesised group in: ${text}`).not.toBeNull();
-  return (m as RegExpExecArray)[1]
+  return ((m as RegExpExecArray)[1] ?? '')
     .split('|')
     .map((s) => s.trim())
     .filter((s) => /^[a-z_]+$/.test(s));
