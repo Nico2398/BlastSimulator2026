@@ -29,6 +29,17 @@
       "role": "setup"
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "#1379: the default site policy (shift_8h, rest at fatigue <= 60) is always in force, so a staffed crew would be force-rested mid-task. This scenario is not about shift or rest policy; continuous mode with a zero threshold never forces a rest, keeping the timing this file was authored against.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "employee hire role:surveyor",
       "description": "Surveyor #1 -- spawns near world centre (16,16) with no per-hire offset (first hire of this role).",
       "interaction": [

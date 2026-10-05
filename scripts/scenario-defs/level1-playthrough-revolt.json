@@ -19,6 +19,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "setup",
+      "description": "#1379: the default site policy (shift_8h, threshold 60) is always in force, so a staffed crew is force-rested and cared for by default. This file is about the revolt that neglect causes, so neglect is now explicit: continuous mode with the lowest rest threshold (0) never forces rest, leaving wellBeing to drain exactly as the pre-#1379 no-policy baseline did."
+    },
+    {
       "command": "vehicle driver 1 1",
       "interaction": [
         {

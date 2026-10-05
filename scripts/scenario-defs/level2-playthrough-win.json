@@ -24,6 +24,17 @@
       "description": "#553: staffed:true added -- cash:150000 sits on this new_game, not on the campaign start below, because that command fails outright (grumpstone_ridge is tier-2, locked on a fresh campaign, Finding #59), so it never replaces this state and a cash: on it would be discarded with the rest of the command. staffed:true hires and equips its own free crew before any assertion here: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster, #3-5 drivers, vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter -- free, not deducted from cash, which is why employeeCount is already 5 here instead of 0. All four vehicles come unmanned (driverId: null); vehicle driver 1 1 immediately below crews the free rig with the free driller, since drill_hole is now a queued, vehicle-gated action and nothing drills without a driver aboard. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs, same as before -- but see the pattern-1 drill-wait step further down for what that budget can no longer survive once drilling takes hundreds of ticks instead of zero."
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "setup",
+      "description": "#1379: the default site policy (shift_8h, threshold 60) is always in force and would force-rest the crew. This file is not about rest, so continuous mode with the lowest rest threshold (0) neutralizes it and keeps the pre-#1379 no-policy timings."
+    },
+    {
       "command": "vehicle driver 1 1",
       "interaction": [
         {

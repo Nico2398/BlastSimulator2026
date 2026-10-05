@@ -377,12 +377,16 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 40",
-      "description": "#928: widened from `tick 6` -- see this cycle's own two extra tick-10/event pairs above for why. #1204: widened again, 16 -> 40 -- completeRestForEmployee (RestActionHelpers.ts) now caps a rest taken too far from any living_quarters at NEED_REST_NO_BUILDING_CAP instead of unconditionally full-restoring via a distance-blind findNearestLivingQuarters lookup that ignored needRestSearchRadius entirely (the fix's own doc comment: 'not re-derived from the employee's current position'). This grid's living_quarters at (8,58) sits ~40 cells from the (20,20) drill site, past the 20-cell search radius, so the driller's fatigue-driven rests here now land in the degraded, capped branch and recur more often -- direct-traced (command mode): chargedCount reaches 4 by tick 224 (60 ticks after this step starts), not by the old tick 16 budget's tick 213; widened to 40 for margin.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1379: the default site policy is always in force (rest at fatigue <= 60), so the crew's rests interleave with charging and the fixed tick pad no longer reliably covers it. Waits on the charge queue draining; the chargedCount check below still proves every hole got its charge.",
+      "timeout": 95,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 40"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
@@ -509,7 +513,7 @@
     },
     {
       "command": "vehicle scrap 1",
-      "description": "#1204: this cycle's own drill_rig #1 used to end every run destroyed by the blast above -- parked at the (20,20) drill site the whole time, since the driller never had reason to leave before finishing all 4 charges. Widening the tick step above (#1204's own rest-cap fix, see that step's comment) now gives the driller's own fatigue an extra proactive rest round-trip that completes -- alighting the vehicle at the living_quarters ring, done for good once no more same-role work is claimable (hasClaimableSameRoleFollowUp) -- before the blast ever fires, so the truck survives it and sits idle at (11,57) instead. Every later cycle's own `vehicle buy` step asserts vehicleCount resets to exactly 1, so it is scrapped explicitly here rather than left to rely on the blast destroying it by coincidence. Scoped by [data-vtype=\"drill_rig\"] (this cycle's only vehicle, and its only drill_rig) rather than a runtime-assigned [data-vehicle-id], matching the shape-selector convention `.claude/rules/scenario-defs.md`/#654 established over a baked id.",
+      "description": "#1204: this cycle's own drill_rig #1 used to end every run destroyed by the blast above -- parked at the (20,20) drill site the whole time, since the driller never had reason to leave before finishing all 4 charges. Widening the tick step above (#1204's own rest-cap fix, see that step's comment) now gives the driller's own fatigue an extra proactive rest round-trip that completes -- alighting the vehicle at the living_quarters ring, done for good once no more same-role work is claimable (hasClaimableSameRoleFollowUp) -- before the blast ever fires, so the truck survives it and sits idle at (11,57) instead. Every later cycle's own `vehicle buy` step asserts vehicleCount resets to exactly 1, so it is scrapped explicitly here rather than left to rely on the blast destroying it by coincidence. Scoped by [data-vtype=\"drill_rig\"] (this cycle's only vehicle, and its only drill_rig) rather than a runtime-assigned [data-vehicle-id], matching the shape-selector convention `.claude/rules/scenario-defs.md`/#654 established over a baked id. #1379: with the default policy always in force the driller's rest round-trip timing varies, so the truck may instead already be destroyed by the blast above (parked at the drill site); scrapping it is then a refused no-op, hence commandOutcome either. Later cycles buy their own rigs either way.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -528,7 +532,8 @@
           "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "inspect 20,20,0",
@@ -1327,11 +1332,16 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 10",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:600",
+      "description": "#1379: the default site policy is always in force (rest at fatigue <= 60), so the crew's rests interleave with charging and the fixed tick pad no longer reliably covers it. Waits on the charge queue draining; the chargedCount check below still proves every hole got its charge.",
+      "timeout": 95,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
@@ -1491,7 +1501,7 @@
     },
     {
       "command": "set_policy mode:shift_8h",
-      "description": "#682: arms forceShiftRestIfNeededByPolicy (#678) -- state.sitePolicy.revision is 0 (unapplied) until this runs, and shift_8h/60/60/20 are already SITE_POLICY_DEFAULT_THRESHOLDS (balance.ts), so this step changes nothing about the thresholds themselves, only whether they're enforced. Scoped to start here (not from new_game) so cycles 1-3 above are unaffected -- direct trace (issue #682) confirmed grid 4/5's own crew-hire/vehicle counts and cash deltas are unaffected by whether policy is applied before or after grid 3, since it only forces rest for employees who are actually working, and cycles 1-3's own crews are long gone by this point. Necessary but not sufficient on its own for grid 4's revolt -- see the charge-relief hires further down this file's own note for the other half of the fix.",
+      "description": "#682/#1379: explicitly applies the shift_8h policy (bumps state.sitePolicy.revision). Since #1379 the default policy (shift_8h, threshold 60) is always in force from tick 0, so this step no longer arms anything; shift_8h/60/60/20 are already SITE_POLICY_DEFAULT_THRESHOLDS (balance.ts) and it changes no threshold. Scoped to start here (not from new_game) so cycles 1-3 above are unaffected -- direct trace (issue #682) confirmed grid 4/5's own crew-hire/vehicle counts and cash deltas are unaffected by whether policy is applied before or after grid 3, since it only forces rest for employees who are actually working, and cycles 1-3's own crews are long gone by this point. Necessary but not sufficient on its own for grid 4's revolt -- see the charge-relief hires further down this file's own note for the other half of the fix.",
       "interaction": [
         {
           "type": "ensurePanel",

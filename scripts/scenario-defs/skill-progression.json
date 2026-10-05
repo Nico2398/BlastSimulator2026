@@ -35,6 +35,11 @@
       "description": "Starts with extra cash ($200,000) so the five living quarters and the 700-tick run stay solvent."
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so staffed crews must not be force-rested mid-task. Continuous mode with threshold 0 never forces rest.",
+      "role": "setup"
+    },
+    {
       "command": "time resume",
       "interaction": [
         {
@@ -692,7 +697,7 @@
         }
       ],
       "role": "setup",
-      "description": "A single `tick 700` step silently under-runs: a random event can fire mid-batch and the tick command stops advancing right there (`Advanced N of 700 requested ticks`) rather than queuing the remainder, and `tick` itself refuses to advance at all while an event is pending. Chunked into 14\u00d7 (tick 50, event choose 0) instead, the same pattern already used everywhere else in this file's sibling scenarios, so no requested ticks are silently dropped waiting on an unresolved dialog."
+      "description": "A single `tick 700` step silently under-runs: a random event can fire mid-batch and the tick command stops advancing right there (`Advanced N of 700 requested ticks`) rather than queuing the remainder, and `tick` itself refuses to advance at all while an event is pending. Chunked into 14× (tick 50, event choose 0) instead, the same pattern already used everywhere else in this file's sibling scenarios, so no requested ticks are silently dropped waiting on an unresolved dialog."
     },
     {
       "command": "event choose 0",

@@ -21,6 +21,17 @@
       }
     },
     {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "#1379: the default site policy (shift_8h, rest at fatigue <= 60) is always in force, so a staffed crew would be force-rested mid-task. This scenario is not about shift or rest policy; continuous mode with a zero threshold never forces a rest, keeping the timing this file was authored against.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {
@@ -322,11 +333,16 @@
       }
     },
     {
-      "command": "tick 50",
+      "command": "wait_until field:researchQueueLength equals:0 max_ticks:600",
+      "description": "#1379: waits on the tier-3 research task actually finishing instead of a fixed 50-tick pad; the research worker's pace now depends on the always-on default policy's rest cycles, so the pad no longer reliably covered it.",
+      "timeout": 95,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "researchQueueLength",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup"
