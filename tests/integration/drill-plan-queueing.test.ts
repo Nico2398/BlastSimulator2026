@@ -17,6 +17,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { tickUntil } from './helpers.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
+import { t } from '../../src/core/i18n/I18n.js';
 
 describe('drill_plan grid — queues drill_hole actions instead of writing holes instantly (#553)', () => {
   afterEach(() => {
@@ -602,5 +603,164 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(state.plannedChargesByHole[holeId]).toBeUndefined();
     expect(state.pendingActions.some(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId)).toBe(false);
     expect(state.cash).toBeCloseTo(cashAfterLoad + cost, 5);
+  });
+});
+
+// ── drill holes under a building or construction site are refused (#1359) ──
+//
+// living_quarters tier 1 is a 3x3 footprint, so `build living_quarters at:30,30`
+// covers cells x 30..32, z 30..32. A hole there would be unblastable
+// (protected_position) and stick ORDERED forever, so the order is refused.
+
+function footprintGame() {
+  const { runner, ctx } = createRunner();
+  const run = (cmd: string) => runner.run(cmd);
+  expect(run('new_game seed:42 staffed:true').success).toBe(true);
+  return { run, state: ctx.state! };
+}
+
+/** Orders living_quarters at 30,30 and leaves it a construction site (no ticks). */
+function orderSite(run: (c: string) => { success: boolean }, state: { plannedBuildings: unknown[] }) {
+  expect(run('build living_quarters at:30,30').success).toBe(true);
+  expect(state.plannedBuildings.length).toBeGreaterThan(0);
+}
+
+/** Ticks until the site is finished. */
+function finishBuilding(run: (c: string) => { success: boolean }, state: { plannedBuildings: unknown[]; buildings: { buildings: unknown[] } }) {
+  tickUntil(run, () => state.plannedBuildings.length === 0, 1500);
+  expect(state.plannedBuildings).toHaveLength(0);
+  expect(state.buildings.buildings.length).toBeGreaterThan(0);
+}
+
+describe('drill_plan — refuses holes under a building or construction site (#1359)', () => {
+  it('1. add on a finished building is refused with the localized reason, plan and actions untouched', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+    finishBuilding(run, state);
+    const plannedBefore = [...state.plannedDrillHoles];
+    const actionsBefore = [...state.pendingActions];
+
+    const r = run('drill_plan add x:31 z:31 depth:8');
+    expect(r.success).toBe(false);
+    expect(r.output).toBe(t('mining.drill_plan.refused_footprint', { x: 31, z: 31 }));
+    expect(state.plannedDrillHoles).toEqual(plannedBefore);
+    expect(state.pendingActions).toEqual(actionsBefore);
+  });
+
+  it('2. add on a construction site (plannedBuildings only, no ticks) is refused', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+    expect(state.buildings.buildings).toHaveLength(0);
+    const actionsBefore = state.pendingActions.length;
+
+    const r = run('drill_plan add x:31 z:31 depth:8');
+    expect(r.success).toBe(false);
+    expect(r.output).toBe(t('mining.drill_plan.refused_footprint', { x: 31, z: 31 }));
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(actionsBefore);
+  });
+
+  it('3. the far edge cell inside the footprint is refused; the cell just outside is accepted', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+
+    expect(run('drill_plan add x:30 z:30 depth:8').success).toBe(false);
+    expect(run('drill_plan add x:32 z:32 depth:8').success).toBe(false);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+
+    expect(run('drill_plan add x:33 z:30 depth:8').success).toBe(true);
+    expect(run('drill_plan add x:29 z:30 depth:8').success).toBe(true);
+    expect(run('drill_plan add x:30 z:33 depth:8').success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(3);
+  });
+
+  it('4. fractional coordinates inside a footprint cell (31.7) are refused', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+
+    const r = run('drill_plan add x:31.7 z:30.2 depth:8');
+    expect(r.success).toBe(false);
+    expect(r.output).toBe(t('mining.drill_plan.refused_footprint', { x: 31.7, z: 30.2 }));
+    expect(state.plannedDrillHoles).toHaveLength(0);
+
+    // 32.9 still floors to 32 (inside); 33.1 floors to 33 (outside).
+    expect(run('drill_plan add x:32.9 z:31 depth:8').success).toBe(false);
+    expect(run('drill_plan add x:33.1 z:31 depth:8').success).toBe(true);
+  });
+
+  it('5. grid partially overlapping: states skipped count, holes and actions agree, ids H1..Hn contiguous', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+
+    // 4x4 grid spacing 1 from 29,29 -> x,z 29..32; cells with x,z in 30..32 (9) are covered, 7 remain.
+    const r = run('drill_plan grid rows:4 cols:4 spacing:1 depth:8 start:29,29');
+    expect(r.success).toBe(true);
+    expect(r.output).toContain(t('mining.drill_plan.grid_skipped', { count: 9 }));
+
+    const holes = state.plannedDrillHoles;
+    expect(holes).toHaveLength(7);
+    const actions = state.pendingActions.filter(a => a.type === 'drill_hole');
+    expect(actions).toHaveLength(7);
+    expect(holes.map(h => h.id)).toEqual(Array.from({ length: 7 }, (_, i) => `H${i + 1}`));
+    expect(new Set(actions.map(a => a.payload['holeId']))).toEqual(new Set(holes.map(h => h.id)));
+    for (const h of holes) {
+      const inside = h.x >= 30 && h.x <= 32 && h.z >= 30 && h.z <= 32;
+      expect(inside).toBe(false);
+    }
+  });
+
+  it('6. grid fully under a building is refused; existing plan and actions are preserved', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+    expect(run('drill_plan add x:10 z:10 depth:8').success).toBe(true);
+    const plannedBefore = [...state.plannedDrillHoles];
+    const actionsBefore = [...state.pendingActions];
+
+    const r = run('drill_plan grid rows:2 cols:2 spacing:1 depth:8 start:30,30');
+    expect(r.success).toBe(false);
+    expect(r.output).toBe(t('mining.drill_plan.grid_all_blocked'));
+    expect(state.plannedDrillHoles).toEqual(plannedBefore);
+    expect(state.pendingActions).toEqual(actionsBefore);
+  });
+
+  it('7. a refused add does not consume a hole id: the next accepted hole is H1', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+
+    expect(run('drill_plan add x:31 z:31 depth:8').success).toBe(false);
+    expect(run('drill_plan add x:5 z:5 depth:8').success).toBe(true);
+    expect(state.plannedDrillHoles.map(h => h.id)).toEqual(['H1']);
+    expect(state.nextHoleId).toBe(2);
+  });
+
+  it('8. a grid beside a finished building drills fully: no hole is stuck ORDERED after 150 ticks, and blast reports no protected position', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+    finishBuilding(run, state);
+
+    const r = run('drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:29,29');
+    expect(r.success).toBe(true);
+    const ordered = state.plannedDrillHoles.length;
+    expect(ordered).toBeGreaterThan(0);
+    expect(ordered).toBeLessThan(9);
+
+    tickUntil(run, () => state.plannedDrillHoles.length === 0, 150);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.drillHoles).toHaveLength(ordered);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+
+    const blast = run('blast');
+    expect(blast.output).not.toContain(t('blast.validation.protected_position'));
+  });
+
+  it('9. a grid entirely clear of buildings reports no skipped cells', () => {
+    const { run, state } = footprintGame();
+    orderSite(run, state);
+
+    const r = run('drill_plan grid rows:2 cols:2 spacing:3 depth:8 start:5,5');
+    expect(r.success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(4);
+    expect(r.output).not.toContain(t('mining.drill_plan.grid_skipped', { count: 0 }));
   });
 });

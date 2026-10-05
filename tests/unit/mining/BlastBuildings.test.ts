@@ -90,6 +90,18 @@ function makeTestGrid(): VoxelGrid {
 describe('checkProtectedPositions', () => {
   beforeEach(() => { holeCounter.nextHoleId = 1; });
 
+  it('flags a hole under a planned building (construction site occupant, #1359)', () => {
+    // living_quarters tier 1 is 3x3: planned at (10, 10) covers x,z 10..12.
+    const planned = [{ type: 'living_quarters' as const, tier: 1 as const, x: 10, z: 10 }];
+    const holes: DrillHole[] = [];
+    const under = addHole(holeCounter, holes, 12.6, 11.2, 5, 0.15); // floors to (12, 11)
+    addHole(holeCounter, holes, 13, 10, 5, 0.15);                   // just outside
+
+    const errors: ValidationError[] = checkProtectedPositions(holes, planned);
+
+    expect(errors).toEqual([{ holeId: under.id, issue: 'blast.validation.protected_position' }]);
+  });
+
   it('returns a ValidationError when a hole sits on a building footprint cell', () => {
     // explosive_warehouse tier-1 footprint: rect(2,2) → covers cells
     // (2,2), (3,2), (2,3), (3,3) when placed at origin (2, 2).
