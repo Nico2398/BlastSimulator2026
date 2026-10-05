@@ -1265,7 +1265,7 @@ describe('interruptActiveAction (#549)', () => {
     interruptActiveAction(state, emp, 41);
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 41);
-    // The arrived-and-working branch (payload.durationTicks stashing) owns
+    // The arrived-and-working branch (payload.resumeTicks stashing) owns
     // this interruption instead — targetEmployeeId is untouched by either
     // branch here (it was already this employee's own id going in), so the
     // pin holds, and the remaining work is preserved for whoever resumes it.

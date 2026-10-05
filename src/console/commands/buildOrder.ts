@@ -31,6 +31,7 @@ export interface PlaceBuildingActionPayload {
   buildingOrderId: number;
   cost: number;
   footprint: ReadonlyArray<readonly [number, number]>;
+  /** Base ticks; scaled by the worker's proficiency at claim time. */
   durationTicks: number;
 }
 

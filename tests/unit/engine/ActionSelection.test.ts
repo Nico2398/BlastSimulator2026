@@ -993,6 +993,18 @@ describe('computeActionWorkTicks (#549)', () => {
     expect(ticks).toBe(Math.max(1, Math.ceil(7 / LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent)));
   });
 
+  it('a payload.durationTicks base is scaled by proficiency like the generic base (>=1, ceiled)', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'geology', 5);
+    const action = makeWorkAction({ type: 'survey', requiredSkill: 'geology', payload: { durationTicks: 20 } });
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBeLessThan(20);
+    expect(ticks).toBeGreaterThanOrEqual(1);
+    expect(Number.isInteger(ticks)).toBe(true);
+  });
+
   it("rest action: payload.restDuration overrides everything else, regardless of needKey", () => {
     const state = makeGame();
     const employee = addQualifiedEmployee(state, 'blasting', 1);

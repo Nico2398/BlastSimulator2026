@@ -20,6 +20,7 @@ export interface ChargeHoleActionPayload {
   explosiveId: string;
   amountKg: number;
   stemmingM: number;
+  /** Base ticks; scaled by the worker's proficiency at claim time. */
   durationTicks: number;
   /** Cash charged at order time (costPerKg x kg); refunded on cancel (#1341). */
   orderCost: number;
