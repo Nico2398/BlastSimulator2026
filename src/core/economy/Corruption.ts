@@ -76,17 +76,8 @@ export function attemptCorruption(
 
   state.attempts.push({ tick, target, cost, success });
 
-  if (success) {
-    state.level++;
-  } else {
-    // Failed corruption increases level too (you tried, you're corrupt)
-    state.level++;
-  }
-
-  const mafiaJustUnlocked = !state.mafiaUnlocked && state.level >= MAFIA_THRESHOLD;
-  if (mafiaJustUnlocked) {
-    state.mafiaUnlocked = true;
-  }
+  // Failed attempts raise the level too (you tried, you're corrupt).
+  const { mafiaJustUnlocked } = applyCorruptionDelta(state, 1);
 
   return {
     success,
@@ -104,6 +95,21 @@ export function getCorruptionLevel(state: CorruptionState): number {
 /** Check if mafia events are unlocked. */
 export function isMafiaUnlocked(state: CorruptionState): boolean {
   return state.mafiaUnlocked;
+}
+
+/**
+ * Shift corruption level by delta (floored at 0); latches mafiaUnlocked at threshold.
+ * Non-finite delta is a no-op. Returns whether this call unlocked the mafia.
+ */
+export function applyCorruptionDelta(
+  state: CorruptionState,
+  delta: number,
+): { mafiaJustUnlocked: boolean } {
+  if (!Number.isFinite(delta)) return { mafiaJustUnlocked: false };
+  state.level = Math.max(0, state.level + delta);
+  const mafiaJustUnlocked = !state.mafiaUnlocked && state.level >= MAFIA_THRESHOLD;
+  if (mafiaJustUnlocked) state.mafiaUnlocked = true;
+  return { mafiaJustUnlocked };
 }
 
 /** Get corruption success probability for display/debugging. */
