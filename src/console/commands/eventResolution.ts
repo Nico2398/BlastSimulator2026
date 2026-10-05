@@ -9,6 +9,7 @@ import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
 import { clearLastOutcome } from '../../core/events/EventSystem.js';
+import { applyCorruptionDelta } from '../../core/economy/Corruption.js';
 import { requireGame } from './commandUtils.js';
 
 /**
@@ -72,7 +73,7 @@ export function eventCommand(
         lines.push(`  • ${e}`);
       }
       if (result.corruptionChange !== 0) {
-        state.corruption.level += result.corruptionChange;
+        applyCorruptionDelta(state.corruption, result.corruptionChange);
       }
       // Resume the game after resolving the event (tick pauses on event)
       state.isPaused = false;
