@@ -177,3 +177,46 @@ describe('findDrivenVehicle', () => {
     expect(findDrivenVehicle(6, vehicles)).toBeNull();
   });
 });
+
+describe('computeEmployeeActivity — stuck (#1387)', () => {
+  it('reports stuck for a stuck walker with a destination', () => {
+    const emp = makeEmployee({ isMoveStuck: true, destinationX: 5, destinationZ: 5 });
+    expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('stuck');
+  });
+
+  it('reports stuck when only one destination coordinate is set', () => {
+    const emp = makeEmployee({ isMoveStuck: true, destinationX: 5, destinationZ: null });
+    expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('stuck');
+  });
+
+  it('keeps a non-stuck walker walking', () => {
+    const emp = makeEmployee({ isMoveStuck: false, destinationX: 5, destinationZ: 5 });
+    expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('walking');
+  });
+
+  it('reports idle for a stuck employee with no destination', () => {
+    const emp = makeEmployee({ isMoveStuck: true });
+    expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('idle');
+  });
+
+  it('keeps a stuck driver driving', () => {
+    const emp = makeEmployee({ isMoveStuck: true, destinationX: 5, destinationZ: 5 });
+    const veh = makeVehicle({ occupantIds: [emp.id] });
+    expect(computeEmployeeActivity(emp, makeVehicleState([veh])).kind).toBe('driving');
+  });
+
+  it('keeps a stuck driver on a reserved vehicle driving_to_task', () => {
+    const emp = makeEmployee({ isMoveStuck: true, destinationX: 5, destinationZ: 5 });
+    const veh = makeVehicle({ occupantIds: [emp.id] });
+    const vs = makeVehicleState([veh]);
+    vs.reservations = [{ vehicleId: veh.id, actionId: 1 } as never];
+    const kind = computeEmployeeActivity(emp, vs).kind;
+    expect(['driving', 'driving_to_task']).toContain(kind);
+    expect(kind).not.toBe('stuck');
+  });
+
+  it('keeps a stuck employee mid-task working', () => {
+    const emp = makeEmployee({ isMoveStuck: true, destinationX: 5, destinationZ: 5, taskTicksRemaining: 4 });
+    expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('working');
+  });
+});

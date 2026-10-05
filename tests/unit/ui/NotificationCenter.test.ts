@@ -230,6 +230,54 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(crewPip?.label).toBe('1');
     });
 
+    describe('stuck pip counts on-foot employees (#1387)', () => {
+      function stuckWalker(state: ReturnType<typeof makeState>, seed: number) {
+        const { employee } = hireEmployee(state.employees, 'driller', new Random(seed), 0, 0);
+        employee.isMoveStuck = true;
+        return employee;
+      }
+
+      it('counts a stuck on-foot employee', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        stuckWalker(state, 1);
+        const pip = center.update(state).find(p => p.label === '1' && p.tone === 'warn');
+        expect(pip).toBeDefined();
+        expect(pip!.tip).toBe(t('notification.pip.crew_stuck_tip', { count: 1 }));
+      });
+
+      it('counts walkers and drivers together without double counting the driver', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        const walker = stuckWalker(state, 1);
+        const driver = stuckWalker(state, 2);
+        state.vehicles.vehicles.push({
+          id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
+          payload: null, occupantIds: [driver.id],
+        });
+        expect(walker.id).not.toBe(driver.id);
+        const pip = center.update(state).find(p => p.tone === 'warn' && p.tip === t('notification.pip.crew_stuck_tip', { count: 2 }));
+        expect(pip).toBeDefined();
+        expect(pip!.label).toBe('2');
+      });
+
+      it('does not count a dead stuck employee', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        const e = stuckWalker(state, 1);
+        e.alive = false;
+        const tip1 = t('notification.pip.crew_stuck_tip', { count: 1 });
+        expect(center.update(state).some(p => p.tip === tip1)).toBe(false);
+      });
+
+      it('does not count a non-stuck employee', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        hireEmployee(state.employees, 'driller', new Random(1), 0, 0);
+        expect(center.update(state)).toHaveLength(0);
+      });
+    });
+
     it('derives a fleet pip counting stuck vehicles', () => {
       // #1138: isMoveStuck lives on the driving Employee now, not the
       // vehicle — a stuck vehicle is one whose occupant (occupantIds[0])

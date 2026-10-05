@@ -11,7 +11,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { findStarvedActionForEmployee } from '../../../src/core/engine/ActionSelection.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, employeeQueueDepth } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
@@ -21,6 +21,7 @@ import {
   NEED_SOFT_THRESHOLDS,
   NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   ACTION_STARVATION_TICK_THRESHOLD,
+  MAX_EMPLOYEE_TASK_QUEUE_DEPTH,
 } from '../../../src/core/config/balance.js';
 
 describe('autoInsertNeedTasks (7.7)', () => {
@@ -403,7 +404,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
   });
 
   // ── Test 14 ─────────────────────────────────────────────────────────────────
-  it('adds need_warning to firedEvents when rest action already queued', () => {
+  it('rest already queued: skipped with reason but no need_warning firedEvent (#1387)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
@@ -430,15 +431,15 @@ describe('autoInsertNeedTasks (7.7)', () => {
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
 
     const firedEvents: FiredEvent[] = [];
-    autoInsertNeedTasks(state, firedEvents);
+    const result = autoInsertNeedTasks(state, firedEvents);
 
-    expect(firedEvents).toHaveLength(1);
-    expect(firedEvents[0]!.eventId).toBe('need_warning');
-    expect(firedEvents[0]!.firedAtTick).toBe(state.tickCount);
+    expect(firedEvents).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]!.reason).toBe('rest_action_already_queued');
   });
 
   // ── Test 15 ─────────────────────────────────────────────────────────────────
-  it('emits employee:need_warning via emitter when insertion skipped', () => {
+  it('does not emit employee:need_warning when a rest is already queued (#1387)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
@@ -470,7 +471,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
 
     autoInsertNeedTasks(state, firedEvents, mockEmitter);
 
-    expect(events).toContain('employee:need_warning');
+    expect(events).not.toContain('employee:need_warning');
   });
 
   // ── Test 16 ─────────────────────────────────────────────────────────────────
@@ -706,5 +707,80 @@ describe('autoInsertNeedTasks (7.7)', () => {
     const starved = findStarvedActionForEmployee(state, employee);
     expect(starved).not.toBeNull();
     expect(starved!.action.id).toBe(restAction!.id);
+  });
+
+  // ── #1387: need warning only when the queue is full ─────────────────────────
+  describe('need_warning throttling (#1387)', () => {
+    function setup(opts: { full: boolean }) {
+      const state = createGame({ seed: SEED });
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED));
+      employee.x = 0;
+      employee.z = 0;
+      employee.fatigue = 20;
+      if (opts.full) {
+        employee.activeActionId = 1000;
+        employee.taskQueue = Array.from({ length: MAX_EMPLOYEE_TASK_QUEUE_DEPTH - 1 }, (_, i) => 2000 + i);
+      }
+      placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+      const events: Array<{ event: string; payload: unknown }> = [];
+      const emitter = { emit: (event: string, payload: unknown) => { events.push({ event, payload }); } } as unknown as EventEmitter;
+      const warnings = () => events.filter(e => e.event === 'employee:need_warning');
+      return { state, employee, emitter, events, warnings };
+    }
+
+    it('employeeQueueDepth counts the active action plus queued follow-ups', () => {
+      expect(employeeQueueDepth({ activeActionId: null, taskQueue: [] })).toBe(0);
+      expect(employeeQueueDepth({ activeActionId: 5, taskQueue: [] })).toBe(1);
+      expect(employeeQueueDepth({ activeActionId: null, taskQueue: [1, 2] })).toBe(2);
+      expect(employeeQueueDepth({ activeActionId: 5, taskQueue: [1, 2] })).toBe(3);
+    });
+
+    it('full queue and no rest queued: need_warning emitted exactly once across many ticks', () => {
+      const { state, employee, emitter, warnings } = setup({ full: true });
+      expect(employeeQueueDepth(employee)).toBeGreaterThanOrEqual(MAX_EMPLOYEE_TASK_QUEUE_DEPTH);
+      const firedEvents: FiredEvent[] = [];
+      for (let i = 0; i < 6; i++) {
+        state.tickCount++;
+        autoInsertNeedTasks(state, firedEvents, emitter);
+        // drop the inserted rest so the next tick again sees "no rest queued"
+        state.pendingActions = state.pendingActions.filter(a => a.type !== 'rest');
+      }
+      expect(warnings()).toHaveLength(1);
+      expect(firedEvents.filter(e => e.eventId === 'need_warning')).toHaveLength(1);
+      expect(warnings()[0]!.payload).toEqual({ employeeId: employee.id, needKey: 'fatigue' });
+      expect(employee.needWarningLatched).toBe(true);
+    });
+
+    it('full queue: the rest action is still inserted', () => {
+      const { state, employee, emitter } = setup({ full: true });
+      const result = autoInsertNeedTasks(state, [], emitter);
+      expect(result.inserted).toHaveLength(1);
+      expect(state.pendingActions.some(a => a.type === 'rest' && a.targetEmployeeId === employee.id)).toBe(true);
+    });
+
+    it('re-arms after the gauge recovers, warning again on the next dip', () => {
+      const { state, employee, emitter, warnings } = setup({ full: true });
+      autoInsertNeedTasks(state, [], emitter);
+      expect(warnings()).toHaveLength(1);
+      state.pendingActions = state.pendingActions.filter(a => a.type !== 'rest');
+
+      employee.fatigue = 90; // recovered
+      autoInsertNeedTasks(state, [], emitter);
+      expect(employee.needWarningLatched).toBe(false);
+
+      employee.fatigue = 20; // dips again
+      autoInsertNeedTasks(state, [], emitter);
+      expect(warnings()).toHaveLength(2);
+    });
+
+    it('non-full queue: no need_warning, rest inserted', () => {
+      const { state, employee, emitter, events } = setup({ full: false });
+      employee.activeActionId = 42; // depth 1 < max
+      const firedEvents: FiredEvent[] = [];
+      const result = autoInsertNeedTasks(state, firedEvents, emitter);
+      expect(result.inserted).toHaveLength(1);
+      expect(events.filter(e => e.event === 'employee:need_warning')).toHaveLength(0);
+      expect(firedEvents).toHaveLength(0);
+    });
   });
 });

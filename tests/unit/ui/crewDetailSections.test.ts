@@ -27,6 +27,7 @@ import { MORALE_THRESHOLDS, PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, XP_THRE
 import { BASE_SALARIES } from '../../../src/core/entities/Employee.js';
 import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import { t } from '../../../src/core/i18n/I18n.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
@@ -126,6 +127,13 @@ describe('moraleColor', () => {
 });
 
 describe('describeActivity', () => {
+  it('labels a stuck employee with the stuck text, not walking (#1387)', () => {
+    const text = describeActivity(activity({ kind: 'stuck' }));
+    expect(text).toBe(t('ui.crew.task_stuck'));
+    expect(text).not.toBe(t('ui.crew.task_walking'));
+    expect(text).not.toBe(t('ui.crew.task_idle'));
+  });
+
   it('labels a collapsed employee', () => {
     expect(describeActivity(activity({ kind: 'collapsed' }))).toBe('Collapsed');
   });
