@@ -29,7 +29,7 @@ describe('runTick smuggling income category (#1408)', () => {
 
   it('books smuggling income under the smuggling category', () => {
     const { state } = tickUntilIncome(42, 8000);
-    const report = getFinancialReport(state.finances);
+    const report = getFinancialReport(state.finances, state.tickCount);
     const entry = report.incomeByCategory.find(c => c.category === 'smuggling');
     expect(entry).toBeDefined();
     expect(entry!.total).toBeGreaterThan(0);
@@ -37,7 +37,7 @@ describe('runTick smuggling income category (#1408)', () => {
 
   it('does not credit smuggling income to contracts', () => {
     const { state } = tickUntilIncome(42, 8000);
-    const report = getFinancialReport(state.finances);
+    const report = getFinancialReport(state.finances, state.tickCount);
     expect(report.incomeByCategory.find(c => c.category === 'contracts')).toBeUndefined();
   });
 
