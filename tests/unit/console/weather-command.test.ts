@@ -69,6 +69,7 @@ describe('weatherCommand', () => {
 
     it('lazily initializes the weather cycle on first use', () => {
       const ctx = makeCtx();
+      delete ctx.weatherCycle; // new_game seeds it (#1459); this covers a ctx that never started a game
       expect(ctx.weatherCycle).toBeUndefined();
       weatherCommand(ctx, ['set', 'cloudy'], {});
       expect(ctx.weatherCycle).toBeDefined();

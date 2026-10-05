@@ -205,17 +205,6 @@
         "note": "a fired blast clears the plan back to zero"
       },
       "description": "Fire; report modal opens with wet-hole note card (screenshot taken before closing). The 1500ms wait only lets the modal entrance animation finish; nothing queryable."
-    },
-    {
-      "command": "weather set sunny",
-      "description": "Restore clear weather. The batch runner shares one engine across scenarios and new_game does not reset the weather cycle in command mode, so a leftover heavy_rain would wet holes in every later scenario. Bootstrap: weather has no UI control.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "weather set sunny"
-        }
-      ],
-      "role": "bootstrap"
     }
   ]
 }
