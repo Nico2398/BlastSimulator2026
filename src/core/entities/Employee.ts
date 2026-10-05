@@ -243,6 +243,8 @@ export interface Employee {
    * at enqueue time. Empty when the employee has no queued follow-up work.
    */
   taskQueue: number[];
+  /** True while a need warning has fired and not yet cleared; throttles repeat toasts (#1387). */
+  needWarningLatched?: boolean;
   /**
    * Whether the employee is on foot or mounted in a vehicle. Must agree with
    * the mounted vehicle's `occupantIds` in both directions — see the
@@ -348,6 +350,7 @@ export function hireEmployee(
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
     taskQueue: [],
+    needWarningLatched: false,
     locomotion: { kind: 'on_foot' },
     itinerary: null,
     vehicleWaitingTicks: 0,
@@ -558,3 +561,9 @@ export {
   planTraining, startTraining, enrolInTraining, tickTraining,
   isEnrolledInTraining, isSchoolFull,
 } from './EmployeeTraining.js';
+
+/** Number of actions an employee holds: the active one plus the queued follow-ups (#1387). */
+export function employeeQueueDepth(emp: Pick<Employee, 'activeActionId' | 'taskQueue'>): number {
+  void emp;
+  return 0; // TODO: implement
+}

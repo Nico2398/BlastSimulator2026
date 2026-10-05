@@ -1663,3 +1663,6 @@ export const SECONDARY_BLAST_STRUCTURE_DAMAGE_FRACTION = 0.6;
 
 /** Fraction of the radius within which people die (#1394). */
 export const SECONDARY_BLAST_DEATH_RADIUS_FRACTION = 0.5;
+
+/** Minimum ticks between two crew toasts of the same kind for the same employee (#1387). */
+export const CREW_TOAST_COOLDOWN_TICKS = 30;
