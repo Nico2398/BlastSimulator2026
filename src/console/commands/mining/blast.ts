@@ -10,6 +10,7 @@ import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { killEmployee } from '../../../core/entities/Employee.js';
+import { releaseOccupantsOfRemovedVehicles } from '../../../core/engine/Mount.js';
 import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
@@ -143,6 +144,10 @@ export function blastCommand(
     syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   }
   thisBlastAccidents.push(...impacts);
+
+  // One release after both destruction paths (cleared columns above, flying
+  // rock in processProjections) so no rider stays mounted on a removed vehicle.
+  releaseOccupantsOfRemovedVehicles(state, ctx.emitter);
 
   // Every employee this blast killed (exact-hit above, or attenuated via
   // processProjections just above) may still have a PendingAction targeting

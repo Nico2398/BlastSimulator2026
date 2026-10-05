@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   board, alight, enterBuilding, leaveBuilding, releaseOccupantsOfRemovedBuildings,
+  releaseOccupantsOfRemovedVehicles,
 } from '../../../src/core/engine/Mount.js';
 import { placeBuilding, destroyBuilding, getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
@@ -582,5 +583,65 @@ describe('board — the vehicle case of the same model', () => {
     expect(board(state, vehicle.id, employee.id).success).toBe(false);
     expect(vehicle.occupantIds).toEqual([]);
     expect(employee.locomotion).toEqual({ kind: 'inside', buildingId: school.id });
+  });
+});
+
+describe('releaseOccupantsOfRemovedVehicles (#1389)', () => {
+  function mountedOn(state: ReturnType<typeof createGame>, vehicleId: number, x = 7, z = 9) {
+    const employee = hireTruckDriver(state, x, z);
+    employee.locomotion = { kind: 'mounted', vehicleId };
+    return employee;
+  }
+
+  it('puts an occupant of a vanished vehicle on foot at its own position with no journey', () => {
+    const state = createGame({ seed: SEED });
+    const employee = mountedOn(state, 999);
+    employee.itinerary = { goal: { kind: 'reposition', x: 3, z: 3 } } as never;
+    employee.destinationX = 3;
+    employee.destinationZ = 3;
+    employee.pendingDriverVehicleId = 999;
+
+    const released = releaseOccupantsOfRemovedVehicles(state);
+
+    expect(released).toEqual([employee.id]);
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+    expect({ x: employee.x, z: employee.z }).toEqual({ x: 7, z: 9 });
+    expect(employee.itinerary).toBeNull();
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+    expect(employee.pendingDriverVehicleId).toBeNull();
+  });
+
+  it('emits employee:alighted for each released employee', () => {
+    const state = createGame({ seed: SEED });
+    const employee = mountedOn(state, 999);
+    const emitter = new EventEmitter();
+    const seen: Array<{ employeeId: number; vehicleId: number }> = [];
+    emitter.on('employee:alighted', e => seen.push(e));
+
+    releaseOccupantsOfRemovedVehicles(state, emitter);
+
+    expect(seen).toEqual([{ employeeId: employee.id, vehicleId: 999 }]);
+  });
+
+  it('includes dead employees', () => {
+    const state = createGame({ seed: SEED });
+    const employee = mountedOn(state, 999);
+    employee.alive = false;
+
+    expect(releaseOccupantsOfRemovedVehicles(state)).toEqual([employee.id]);
+    expect(employee.locomotion).toEqual({ kind: 'on_foot' });
+  });
+
+  it('is a no-op returning [] when every host vehicle still exists', () => {
+    const state = createGame({ seed: SEED });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    const driver = hireTruckDriver(state);
+    expect(board(state, vehicle.id, driver.id).success).toBe(true);
+    const onFoot = hireTruckDriver(state, 5, 5);
+
+    expect(releaseOccupantsOfRemovedVehicles(state)).toEqual([]);
+    expect(driver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+    expect(onFoot.locomotion).toEqual({ kind: 'on_foot' });
   });
 });

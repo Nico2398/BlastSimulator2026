@@ -18,7 +18,7 @@ import {
 } from '../../core/entities/Vehicle.js';
 import { findAvailableDriverForReposition } from '../../core/entities/VehicleDriverAssignment.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
-import { alight } from '../../core/engine/Mount.js';
+import { alight, releaseOccupantsOfRemovedVehicles } from '../../core/engine/Mount.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { moveTo } from '../../core/engine/MoveTo.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
@@ -182,6 +182,7 @@ export function vehicleCommand(
       if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
       const residualValue = computeScrapResidualValue(vehicle.type, vehicle.tier, vehicle.hp);
       destroyVehicle(state.vehicles, id);
+      releaseOccupantsOfRemovedVehicles(state, ctx.emitter);
       state.cash += residualValue;
       addIncome(state.finances, residualValue, 'refund', `Scrap ${vehicle.type} #${id}`, state.tickCount);
       return { success: true, output: t('vehicle.scrap_success', { id, value: residualValue }) };

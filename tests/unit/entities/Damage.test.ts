@@ -8,7 +8,12 @@ import {
   createBuildingState,
   placeBuilding,
 } from '../../../src/core/entities/Building.js';
-import { createVehicleState } from '../../../src/core/entities/Vehicle.js';
+import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { createGame } from '../../../src/core/state/GameState.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { releaseOccupantsOfRemovedVehicles } from '../../../src/core/engine/Mount.js';
+import { expectNoWorldInvariantViolations } from '../../helpers/worldInvariants.js';
 import {
   createEmployeeState,
   type Employee,
@@ -198,5 +203,51 @@ describe('Damage and casualty system', () => {
 
     expect(accidents.length).toBeGreaterThan(0);
     expect(accidents.some(a => a.type === 'building_damage' || a.type === 'building_destroyed')).toBe(true);
+  });
+});
+
+describe('flying rock destroying a mounted vehicle (#1389)', () => {
+  /** Driver mounted on a hauler at (10,10); driver's own x/z kept far away so only the vehicle path can injure them. */
+  function setup() {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 10, 10);
+    vehicle.hp = 1;
+    const driver = hireEmployee(state.employees, 'driver', new Random(42), 60, 60).employee;
+    vehicle.occupantIds = [driver.id];
+    driver.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    return { state, vehicle, driver };
+  }
+
+  it('injures the occupant exactly once even when two fragments hit', () => {
+    const { state, vehicle, driver } = setup();
+    const moraleBefore = driver.morale;
+    const projections = [makeProjection(1, 10, 10, 10, 15), makeProjection(2, 10.5, 10, 10, 15)];
+
+    processProjections(projections, state.buildings, state.vehicles, state.employees, createDamageState(), 1);
+
+    expect(state.vehicles.vehicles.find(v => v.id === vehicle.id)).toBeUndefined();
+    expect(driver.injured).toBe(true);
+    expect(driver.morale).toBe(moraleBefore - 20);
+  });
+
+  it('does not injure a driver whose vehicle survives the hit', () => {
+    const { state, vehicle, driver } = setup();
+    vehicle.hp = 10_000;
+
+    processProjections([makeProjection(1, 10, 10, 1, 40)], state.buildings, state.vehicles, state.employees, createDamageState(), 1);
+
+    expect(driver.injured).toBe(false);
+  });
+
+  it('release afterwards puts the injured occupant on foot with no I1 violation', () => {
+    const { state, driver } = setup();
+
+    processProjections([makeProjection(1, 10, 10, 10, 15)], state.buildings, state.vehicles, state.employees, createDamageState(), 1);
+    const released = releaseOccupantsOfRemovedVehicles(state);
+
+    expect(released).toEqual([driver.id]);
+    expect(driver.locomotion).toEqual({ kind: 'on_foot' });
+    expect(driver.injured).toBe(true);
+    expectNoWorldInvariantViolations(state);
   });
 });

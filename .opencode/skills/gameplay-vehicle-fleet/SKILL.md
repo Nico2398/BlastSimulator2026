@@ -201,6 +201,7 @@ Two behaviours follow and are never special-cased:
 | Enter | The employee stands on the building's ring (the cells just outside its footprint), on foot, and the building is under its people capacity. Sets `locomotion` to `inside`, appends to the building's `occupantIds`, emits `employee:entered_building`. The employee's `x`/`z` stays on the ring cell they entered from; they hold no ground cell, get no character mesh, no minimap dot and cannot be picked, but stay in the Crew panel. A full building refuses them: the itinerary ends there and they stay on foot on the ring. |
 | Leave | Clears `locomotion`, removes from `occupantIds`, places the employee on the free ring cell nearest the one they entered from (`findBuildingExitCell`), emits `employee:left_building`. |
 | Building removed | A building destroyed, demolished or replaced by an upgrade with people inside puts them out on its ring — `releaseOccupantsOfRemovedBuildings`, once per tick and after a console demolition. A projection that destroys it injures them first. |
+| Vehicle removed | A vehicle scrapped, blast-destroyed or destroyed by flying rock with riders puts them on foot where it stood — `releaseOccupantsOfRemovedVehicles`, once per tick and after a console scrap or blast clearing; dead riders included. A projection that destroys it injures them first (once only); scrap does not. |
 
 The employee stays mounted while working — a digger digs from the cab. Alighting happens only when
 a plan needs them on foot, or when an interruption replans them.

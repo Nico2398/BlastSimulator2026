@@ -22,6 +22,7 @@ export interface GameEventMap {
   'bankruptcy:warning': { cash: number; ticksRemaining: number };
   'bankruptcy:triggered': { cash: number };
   'arrest:triggered': { exposure: number };
+  'arrest:warning': { exposure: number };
   'ecology:warning': { ticksRemaining: number };
   'ecology:shutdown': Record<string, never>;
   'revolt:warning': { ticksRemaining: number };
