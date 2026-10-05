@@ -18,6 +18,8 @@ import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { tickUntil } from './helpers.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { t } from '../../src/core/i18n/I18n.js';
+import { checkProtectedPositions } from '../../src/core/mining/BlastPlan.js';
+import { buildingFootprintOccupants } from '../../src/core/nav/NavGridSync.js';
 
 describe('drill_plan grid — queues drill_hole actions instead of writing holes instantly (#553)', () => {
   afterEach(() => {
@@ -750,8 +752,7 @@ describe('drill_plan — refuses holes under a building or construction site (#1
     expect(state.drillHoles).toHaveLength(ordered);
     expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
 
-    const blast = run('blast');
-    expect(blast.output).not.toContain(t('blast.validation.protected_position'));
+    expect(checkProtectedPositions(state.drillHoles, buildingFootprintOccupants(state))).toEqual([]);
   });
 
   it('9. a grid entirely clear of buildings reports no skipped cells', () => {
@@ -761,6 +762,6 @@ describe('drill_plan — refuses holes under a building or construction site (#1
     const r = run('drill_plan grid rows:2 cols:2 spacing:3 depth:8 start:5,5');
     expect(r.success).toBe(true);
     expect(state.plannedDrillHoles).toHaveLength(4);
-    expect(r.output).not.toContain(t('mining.drill_plan.grid_skipped', { count: 0 }));
+    expect(r.output).not.toMatch(/skipped/i);
   });
 });

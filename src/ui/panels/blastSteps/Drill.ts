@@ -12,11 +12,12 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import { gridCellPositions } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoleIdsFor } from '../../../core/mining/WetHoles.js';
 import { hoverRefusal, type PlacementKit } from '../../scene/PlacementKit.js';
-import { coveredByFootprint } from '../../../core/mining/BlastPlan.js';
+import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import {
@@ -277,13 +278,8 @@ export class DrillStep {
   /** Cells of the grid the selection would generate that lie under a footprint; bounded by MAX_DRILL_GRID_HOLES. */
   private coveredGridCount(sel: { x1: number; z1: number }, rows: number, cols: number): number {
     if (!this.lastState || rows * cols > MAX_DRILL_GRID_HOLES) return 0;
-    const cells: { id: string; x: number; z: number }[] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        cells.push({ id: `${r},${c}`, x: sel.x1 + c * this.gridSpacing, z: sel.z1 + r * this.gridSpacing });
-      }
-    }
-    return this.coveredCount(cells);
+    const cells = gridCellPositions({ x: sel.x1, z: sel.z1 }, rows, cols, this.gridSpacing);
+    return partitionByFootprint(cells, buildingFootprintOccupants(this.lastState)).skipped;
   }
 
   private coveredCount(cells: { id: string; x: number; z: number }[]): number {

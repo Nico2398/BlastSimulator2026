@@ -35,6 +35,32 @@ interface HoleIdCounter {
   nextHoleId: number;
 }
 
+/** Surface positions of a rows × cols grid pattern, row-major from `origin`. */
+export function gridCellPositions(
+  origin: { x: number; z: number },
+  rows: number,
+  cols: number,
+  spacing: number,
+): { x: number; z: number }[] {
+  const cells: { x: number; z: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      cells.push({ x: origin.x + c * spacing, z: origin.z + r * spacing });
+    }
+  }
+  return cells;
+}
+
+/** Create one hole per position, taking consecutive ids from `counter`. */
+export function createHolesAt(
+  counter: HoleIdCounter,
+  cells: ReadonlyArray<{ x: number; z: number }>,
+  depth: number,
+  diameter: number,
+): PlannedHole[] {
+  return cells.map(cell => ({ id: `H${counter.nextHoleId++}`, x: cell.x, z: cell.z, depth, diameter }));
+}
+
 /** Create a grid drill pattern. */
 export function createGridPlan(
   counter: HoleIdCounter,
@@ -45,19 +71,7 @@ export function createGridPlan(
   depth: number,
   diameter: number,
 ): PlannedHole[] {
-  const holes: DrillHole[] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      holes.push({
-        id: `H${counter.nextHoleId++}`,
-        x: origin.x + c * spacing,
-        z: origin.z + r * spacing,
-        depth,
-        diameter,
-      });
-    }
-  }
-  return holes;
+  return createHolesAt(counter, gridCellPositions(origin, rows, cols, spacing), depth, diameter);
 }
 
 /** Add a single hole to an existing plan. */

@@ -89,3 +89,15 @@ export function coveredByFootprint(
   if (occupants.length === 0) return new Set<string>();
   return new Set(checkProtectedPositions(cells, occupants).map(e => e.holeId));
 }
+
+/**
+ * Split candidate cells into those clear of every footprint and the count of
+ * those under one (#1359). Order of the clear cells is preserved.
+ */
+export function partitionByFootprint<T extends { x: number; z: number }>(
+  cells: ReadonlyArray<T>,
+  occupants: ReadonlyArray<FootprintOccupant>,
+): { clear: T[]; skipped: number } {
+  const covered = coveredByFootprint(cells.map((c, i) => ({ id: String(i), x: c.x, z: c.z })), occupants);
+  return { clear: cells.filter((_, i) => !covered.has(String(i))), skipped: covered.size };
+}

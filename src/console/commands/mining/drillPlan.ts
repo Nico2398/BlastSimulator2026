@@ -6,7 +6,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState } from './shared.js';
 import {
-  createGridPlan, addHole, removeHole,
+  gridCellPositions, createHolesAt, addHole, removeHole,
   computeDrillHoleDurationTicks,
 } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
@@ -14,7 +14,7 @@ import { dispatchPendingAction, cancelAction } from '../../../core/engine/TaskDi
 import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../core/config/balance.js';
 import { removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
-import { coveredByFootprint } from '../../../core/mining/BlastPlan.js';
+import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -124,37 +124,29 @@ export function drillPlanCommand(
       };
     }
 
-    // Local counter: state is only touched once the claim succeeds.
-    const counter = { nextHoleId: 1 };
-    const planned = createGridPlan(
-      counter,
-      { x: origin[0] ?? 0, z: origin[1] ?? 0 },
-      rows, cols, spacing, depth, diameter,
-    );
+    const cells = gridCellPositions({ x: origin[0] ?? 0, z: origin[1] ?? 0 }, rows, cols, spacing);
 
     // Claim before committing the plan: a grid reaching ground the site
     // cannot have is refused whole, rather than landing half on the map.
-    const claim = claimForAction(ctx, planned.map(h => ({ x: h.x, z: h.z })), 'drill');
+    const claim = claimForAction(ctx, cells, 'drill');
     if (!claim.ok) {
       return { success: false, output: claim.output! };
     }
 
     // Cells under a building or construction site are skipped (#1359); a grid
     // with nothing left is refused before the existing plan is touched.
-    const covered = coveredByFootprint(planned, buildingFootprintOccupants(ctx.state!));
-    const survivors = planned
-      .filter(h => !covered.has(h.id))
-      .map((h, i) => ({ ...h, id: `H${i + 1}` }));
-    if (survivors.length === 0) {
+    const { clear, skipped } = partitionByFootprint(cells, buildingFootprintOccupants(ctx.state!));
+    if (clear.length === 0) {
       return { success: false, output: t('mining.drill_plan.grid_all_blocked') };
     }
-    counter.nextHoleId = survivors.length + 1;
 
     // A grid replaces the whole plan (#553): drop every hole (ordered or
     // already drilled) and any drill_hole action still outstanding for them
-    // first, so the restart-at-H1 above never collides with an id still live
+    // first, so the restart-at-H1 below never collides with an id still live
     // in pendingActions/plannedDrillHoles.
     clearDrillPlan(ctx);
+    const counter = { nextHoleId: 1 };
+    const survivors = createHolesAt(counter, clear, depth, diameter);
     ctx.state!.nextHoleId = counter.nextHoleId;
 
     for (const hole of survivors) {
@@ -162,7 +154,6 @@ export function drillPlanCommand(
       ctx.state!.plannedDrillHoles.push(hole);
     }
 
-    const skipped = covered.size;
     const base = `Drill plan: ${rows}×${cols} grid, ${ctx.state!.plannedDrillHoles.length} holes ordered, spacing ${spacing}m, depth ${depth}m`;
     return {
       success: true,
