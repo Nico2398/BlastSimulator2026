@@ -38,6 +38,13 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // work — see that scenario's own `employee cancel` step for the full
   // trace).
   'employee cancel',
+  // #1379: the default site policy (shift_8h, rest at fatigue 60) is in force
+  // from tick 0, so every scenario that is not about shifts or rest opens by
+  // neutralising it with this one exact policy (continuous mode, threshold 0
+  // never forces rest). Exact-string on purpose: a policy a scenario is
+  // actually about is set by clicking the Ops panel's policy controls
+  // (`player` role), never through this entry.
+  'set_policy mode:continuous fatigue:0',
   'weather set',
   'weather',
   'event fire',

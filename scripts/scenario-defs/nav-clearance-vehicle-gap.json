@@ -30,7 +30,7 @@
           "command": "set_policy mode:continuous fatigue:0"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
     },
     {
       "command": "build management_office at:20,20",

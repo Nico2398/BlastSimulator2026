@@ -28,7 +28,7 @@
           "command": "set_policy mode:continuous fatigue:0"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
     },
     {
       "command": "build living_quarters at:32,32",

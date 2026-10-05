@@ -30,7 +30,7 @@
           "command": "set_policy mode:continuous fatigue:0"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
     },
     {
       "command": "vehicle driver 1 1",

@@ -21,7 +21,13 @@
     },
     {
       "command": "set_policy mode:continuous fatigue:0",
-      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap",
       "description": "#1379: the default site policy (shift_8h, fatigue threshold 60) is always in force, so a staffed crew is force-rested on the shift clock or once fatigue reaches 60. This file is not about shift or rest policy, so continuous mode with the lowest threshold neutralizes it and the file keeps testing what it was written for."
     },
     {

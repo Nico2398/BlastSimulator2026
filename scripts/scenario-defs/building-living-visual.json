@@ -29,7 +29,7 @@
           "command": "set_policy mode:continuous fatigue:0"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
     },
     {
       "command": "employee hire role:driller",

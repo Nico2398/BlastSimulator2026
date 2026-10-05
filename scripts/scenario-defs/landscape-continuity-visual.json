@@ -156,7 +156,7 @@
           "command": "set_policy mode:continuous fatigue:0"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
     },
     {
       "command": "terrain_info",
