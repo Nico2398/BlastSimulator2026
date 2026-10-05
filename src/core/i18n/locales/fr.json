@@ -2510,6 +2510,7 @@
   "ui.crew.pay": "SALAIRE",
   "ui.crew.pay_base": "Base {amount} $/h",
   "ui.crew.pay_bonus": "+ compétences {amount} $/h",
+  "ui.crew.pay_raises": "+ augmentations {amount} $/h",
   "ui.crew.pay_total": "{amount} $/h",
   "ui.crew.give_raise": "Augmenter",
   "ui.crew.raise_amount": "+{amount} $/h",

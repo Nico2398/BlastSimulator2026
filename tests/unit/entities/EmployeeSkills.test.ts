@@ -24,6 +24,10 @@ import {
   // ── New exports (CH1.4 — not yet implemented in Employee.ts) ────────────────
   assignSkill,
   calculateSalary,
+  calculateQualificationBonus,
+  giveRaise,
+  gainXp,
+  BASE_SALARIES,
   startTraining,
   tickTraining,
 } from '../../../src/core/entities/Employee.js';
@@ -463,4 +467,68 @@ describe('training end-to-end — all SkillCategory values (four building types)
       expect(ts).toBeNull();
     });
   }
+});
+
+// ── Raises survive level-ups and course completion (#1383) ───────────────────
+
+describe('raises survive skill progression (#1383)', () => {
+  it('a raise survives a gainXp level-up', () => {
+    const { state, empId } = makeStateWithOne();
+    const emp = state.employees.find(e => e.id === empId)!;
+    giveRaise(state, empId, 250);
+    const before = emp.salary;
+
+    const result = gainXp(state, empId, 'blasting', XP_THRESHOLDS[2]);
+
+    expect(result!.leveledUp).toBe(true);
+    expect(emp.salary).toBeGreaterThan(before);
+    expect(emp.salary).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp) + 250);
+    expect(emp.raises).toBe(250);
+  });
+
+  it('a raise survives a multi-level jump', () => {
+    const { state, empId } = makeStateWithOne();
+    const emp = state.employees.find(e => e.id === empId)!;
+    giveRaise(state, empId, 250);
+
+    gainXp(state, empId, 'blasting', XP_THRESHOLDS[4]);
+
+    expect(emp.qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(4);
+    expect(emp.salary).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp) + 250);
+  });
+
+  it('gainXp without a level-up leaves the salary untouched', () => {
+    const { state, empId } = makeStateWithOne();
+    const emp = state.employees.find(e => e.id === empId)!;
+    giveRaise(state, empId, 250);
+    const before = emp.salary;
+
+    gainXp(state, empId, 'blasting', 1);
+
+    expect(emp.salary).toBe(before);
+  });
+
+  it('a raise survives training completion on an existing skill', () => {
+    const { state, empId, buildingId } = makeGameStateWithOne();
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    giveRaise(state.employees, empId, 250);
+
+    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
+    tickTraining(state);
+
+    expect(emp.salary).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp) + 250);
+    expect(emp.raises).toBe(250);
+  });
+
+  it('a raise survives training completion of a new level-1 skill', () => {
+    const { state, empId, buildingId } = makeGameStateWithOne();
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    giveRaise(state.employees, empId, 250);
+
+    startTraining(state.employees, empId, buildingId, 'geology' as SkillCategory, 1, 100);
+    tickTraining(state);
+
+    expect(emp.qualifications.some(q => q.category === 'geology')).toBe(true);
+    expect(emp.salary).toBe(BASE_SALARIES[emp.role] + calculateQualificationBonus(emp) + 250);
+  });
 });
