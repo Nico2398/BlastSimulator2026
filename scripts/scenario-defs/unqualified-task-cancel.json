@@ -199,7 +199,17 @@
       "command": "event choose 2",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(3)"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(3)"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 3000
         }
       ],
       "description": "Cancel the Task through the event dialog's own button: the queued survey goes and its $3000 order-time fee comes back.",
