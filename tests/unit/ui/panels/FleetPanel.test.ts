@@ -151,6 +151,85 @@ describe('FleetPanel', () => {
     expect(banner!.textContent).toContain('3 people and vehicles');
   });
 
+  describe('jam banner on refresh (#1395)', () => {
+    function jamFixture(ids: number[], waiting: number) {
+      const vehicles = ids.map(id => makeVehicle({ id, occupantIds: [100 + id] }));
+      const drivers = ids.map(id => makeEmployee({
+        id: 100 + id,
+        x: 8, z: 8, // jam coordinates derive from the stuck employees' own positions
+        vehicleWaitingTicks: waiting,
+        itinerary: {
+          legs: [{ mode: 'drive', vehicleId: id, destX: 8, destZ: 8, arrival: 'exact', onArrive: { kind: 'none' }, estTicks: 5 }],
+          goal: { kind: 'reposition', x: 8, z: 8 },
+          workTicks: 0,
+          estTotalTicks: 5,
+        },
+      }));
+      return { vehicles, drivers };
+    }
+    // Same vehicles/drivers every call; only the ids in jamIds carry waits.
+    const stateFor = (ids: number[], waiting: number, jamIds: number[] = ids): GameState => {
+      const { vehicles, drivers } = jamFixture(ids, 0);
+      const jam = jamFixture(jamIds, waiting).drivers;
+      return makeState(vehicles, drivers.map(d => jam.find(j => j.id === d.id) ?? d));
+    };
+
+    it('banner appears on a refresh with an unchanged signature', () => {
+      const { panel } = makePanel();
+      panel.update(stateFor([1, 2, 3], 0));
+      expect(panel.root.querySelector('.bs-fleet-traffic')).toBeNull();
+      panel.update(stateFor([1, 2, 3], 15));
+      expect(panel.root.querySelector('.bs-fleet-traffic')).not.toBeNull();
+    });
+
+    it('new banner is the first child of the body with count and coordinates', () => {
+      const { panel } = makePanel();
+      panel.update(stateFor([1, 2, 3], 0));
+      panel.update(stateFor([1, 2, 3], 15));
+      const banner = panel.root.querySelector('.bs-fleet-traffic')!;
+      expect(banner.parentElement!.firstElementChild).toBe(banner);
+      expect(banner.textContent).toMatch(/^3 people and vehicles are stuck near \(\d+, \d+\)/);
+      expect(banner.textContent).toContain(t('ui.fleet.traffic_advisory', { count: 3, x: 8, z: 8 }));
+    });
+
+    it('banner is removed when waits reset with an unchanged signature', () => {
+      const { panel } = makePanel();
+      panel.update(stateFor([1, 2, 3], 15));
+      expect(panel.root.querySelector('.bs-fleet-traffic')).not.toBeNull();
+      panel.update(stateFor([1, 2, 3], 0));
+      expect(panel.root.querySelector('.bs-fleet-traffic')).toBeNull();
+    });
+
+    it('jam count change updates banner text and keeps one banner', () => {
+      const { panel } = makePanel();
+      panel.update(stateFor([1, 2, 3, 4], 15, [1, 2, 3]));
+      expect(panel.root.querySelector('.bs-fleet-traffic')!.textContent).toContain('3 people and vehicles');
+      panel.update(stateFor([1, 2, 3, 4], 15, [1, 2, 3, 4]));
+      expect(panel.root.querySelectorAll('.bs-fleet-traffic').length).toBe(1);
+      expect(panel.root.querySelector('.bs-fleet-traffic')!.textContent).toContain('4 people and vehicles');
+    });
+
+    it('vehicle cards keep DOM identity across jam appear and disappear', () => {
+      const { panel } = makePanel();
+      panel.update(stateFor([1, 2, 3], 0));
+      const before = [1, 2, 3].map(id => panel.root.querySelector(`[data-vehicle-id="${id}"]`));
+      expect(before.every(el => el !== null)).toBe(true);
+      panel.update(stateFor([1, 2, 3], 15));
+      expect(panel.root.querySelector('.bs-fleet-traffic')).not.toBeNull();
+      [1, 2, 3].forEach((id, i) => expect(panel.root.querySelector(`[data-vehicle-id="${id}"]`)).toBe(before[i]));
+      panel.update(stateFor([1, 2, 3], 0));
+      expect(panel.root.querySelector('.bs-fleet-traffic')).toBeNull();
+      [1, 2, 3].forEach((id, i) => expect(panel.root.querySelector(`[data-vehicle-id="${id}"]`)).toBe(before[i]));
+    });
+
+    it('repeated updates during a persisting jam leave one banner', () => {
+      const { panel } = makePanel();
+      panel.update(stateFor([1, 2, 3], 0));
+      for (let i = 0; i < 4; i++) panel.update(stateFor([1, 2, 3], 15 + i));
+      expect(panel.root.querySelectorAll('.bs-fleet-traffic').length).toBe(1);
+    });
+  });
+
   it('status chip reports a real stuck duration', () => {
     const { panel } = makePanel();
     const vehicle = makeVehicle({ occupantIds: [6] });
