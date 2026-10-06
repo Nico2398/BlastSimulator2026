@@ -9,7 +9,7 @@ import type { Vehicle, VehicleState } from './Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import type { ActionType } from '../state/GameState.js';
 
-export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'training' | 'idle';
+export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'training' | 'stuck' | 'idle';
 
 export interface EmployeeActivity {
   kind: EmployeeActivityKind;
@@ -63,6 +63,7 @@ export function computeEmployeeActivity(employee: Employee, vehicleState: Vehicl
   if (drivenVehicle) return { ...IDLE, kind: 'driving', vehicleId: drivenVehicle.id };
 
   if (employee.destinationX !== null || employee.destinationZ !== null) {
+    if (employee.isMoveStuck) return { ...IDLE, kind: 'stuck', actionType: employee.pendingActionType };
     return { ...IDLE, kind: 'walking', actionType: employee.pendingActionType };
   }
 

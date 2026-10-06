@@ -20,7 +20,6 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
-import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 import { isHaulBlockedReason } from '../../core/economy/HaulDispatch.js';
 
 export type Severity = 'info' | 'positive' | 'warn' | 'critical';
@@ -166,11 +165,9 @@ export class NotificationCenter {
     if (collapsedCount > 0) {
       pips.push({ kind: 'crew', icon: 'collapse', label: String(collapsedCount), tone: 'critical', tip: t('notification.pip.crew_collapsed_tip', { count: collapsedCount }) });
     }
-    const stuckCount = state.vehicles.vehicles.filter(
-      v => resolveVehicleDriver(v, state.employees.employees)?.isMoveStuck === true,
-    ).length;
+    const stuckCount = state.employees.employees.filter(e => e.alive && e.isMoveStuck).length;
     if (stuckCount > 0) {
-      pips.push({ kind: 'fleet', icon: 'vehicle', label: String(stuckCount), tone: 'warn', tip: t('notification.pip.fleet_stuck_tip', { count: stuckCount }) });
+      pips.push({ kind: 'crew', icon: 'crew', label: String(stuckCount), tone: 'warn', tip: t('notification.pip.crew_stuck_tip', { count: stuckCount }) });
     }
     const jams = findTrafficJams(state.builtRamps, state.employees.employees);
     if (jams.length > 0) {

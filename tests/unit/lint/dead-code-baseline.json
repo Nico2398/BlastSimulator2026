@@ -195,7 +195,6 @@
     "src/ui/localeText.ts:LocaleParams",
     "src/ui/notify/NotificationCenter.ts:AlertKind",
     "src/ui/notify/NotificationCenter.ts:LogEntry",
-    "src/ui/notify/NotificationCenter.ts:Severity",
     "src/ui/panels/BlastWorkshop.ts:StepId",
     "src/ui/panels/SavesModal.ts:GetStateCallback",
     "src/ui/panels/SavesModal.ts:OnLoadCallback",

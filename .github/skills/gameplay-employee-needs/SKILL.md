@@ -100,7 +100,7 @@ Auto-insert a rest task at the soft threshold — don't wait for the hard thresh
 |-------|------------------|----------------------|
 | `fatigue` | 25 (`NEED_SOFT_THRESHOLDS.fatigue`) | Insert `rest(living_quarters)` after current task if not already queued |
 
-Queue full → skip auto-insert + emit `need_warning` event for player.
+`need_warning` (toast to the player, #1387) fires only when the queue is full (`employeeQueueDepth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH`) and no rest is queued yet, once per episode (`Employee.needWarningLatched`, cleared when no gauge is below threshold). The rest is still inserted. A rest already queued is skipped (`rest_action_already_queued`) with no warning.
 
 **Soft-threshold contract:** hitting it never interrupts — the employee finishes the action already in progress. The queued rest then wins priority over any other action once the employee next goes idle, or when actions are claimed in the same dispatch batch (`EmployeeDispatchSteps.ts`).
 

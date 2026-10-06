@@ -10,11 +10,12 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { NeedKey } from '../entities/Employee.js';
+import { employeeQueueDepth } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { createRestPendingAction, findNearestBuildingOfType, resolveBuildingApproach, isMidClaimedTaskExecution } from './RestActionHelpers.js';
 import { isMidEvacuation } from './Evacuation.js';
-import { NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER } from '../config/balance.js';
+import { NEED_SOFT_THRESHOLDS, NEED_REST_DURATIONS, NEED_REST_BUILDING_TYPES, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 
 export interface NeedInsertionResult {
   /** Employee/need pairs that had a rest PendingAction inserted. */
@@ -141,7 +142,10 @@ export function autoInsertNeedTasks(
     }
 
     // If no gauges are below threshold, skip entirely
-    if (triggeredGauges.length === 0) continue;
+    if (triggeredGauges.length === 0) {
+      emp.needWarningLatched = false;
+      continue;
+    }
 
     // Check if employee already has a rest PendingAction queued
     const hasRestAction = state.pendingActions.some(
@@ -152,10 +156,17 @@ export function autoInsertNeedTasks(
       // Record all triggered gauges as skipped
       for (const gauge of triggeredGauges) {
         result.skipped.push({ employeeId: emp.id, needKey: gauge, reason: 'rest_action_already_queued' });
+      }
+      continue;
+    }
+
+    // Queue full with no rest queued: warn once per episode (#1387); the rest is still inserted below.
+    if (employeeQueueDepth(emp) >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH && emp.needWarningLatched !== true) {
+      emp.needWarningLatched = true;
+      for (const gauge of triggeredGauges) {
         _firedEvents?.push({ eventId: 'need_warning', firedAtTick: state.tickCount });
         _emitter?.emit('employee:need_warning', { employeeId: emp.id, needKey: gauge });
       }
-      continue;
     }
 
     // Use the first triggered gauge as the primary one (array is non-empty due to check above)

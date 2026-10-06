@@ -10,7 +10,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
-import { holdsRequiredSkill } from '../entities/Employee.js';
+import { holdsRequiredSkill, employeeQueueDepth } from '../entities/Employee.js';
 import {
   selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
   isRampSegmentClaimable, isChargeHoleClaimable, findStarvedActionForEmployee, canReleaseStrandedOnFootAction,
@@ -72,7 +72,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
     });
 
   for (const action of targeted) {
-    const depth = (employee.activeActionId !== null ? 1 : 0) + employee.taskQueue.length;
+    const depth = employeeQueueDepth(employee);
     if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) break;
 
     const vehicleCheck = findVehicleForClaim(state, action, employee);
@@ -415,7 +415,7 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
   const activeAction = state.pendingActions.find(a => a.id === employee.activeActionId);
   if (activeAction === undefined || activeAction.type === 'rest') return;
 
-  const depth = 1 + employee.taskQueue.length;
+  const depth = employeeQueueDepth(employee);
   if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) return;
 
   // #1000: while busy on a vehicle-gated action, never reserve ahead an

@@ -87,6 +87,11 @@ describe('pictogramKindFor', () => {
     expect(pictogramKindFor(makeActivity('working', null))).toBeNull();
   });
 
+  it('returns null for kind "stuck" — the Crew panel line and stuck alert pip carry it (#1387)', () => {
+    expect(pictogramKindFor(makeActivity('stuck'))).toBeNull();
+    expect(pictogramKindFor(makeActivity('stuck', 'rest'))).toBeNull();
+  });
+
   it('returns null for kind "training" — an employee mid-course is hidden inside the school, nothing to hang a pictogram off of (#1203)', () => {
     expect(pictogramKindFor(makeActivity('training'))).toBeNull();
   });

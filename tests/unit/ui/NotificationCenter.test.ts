@@ -230,10 +230,56 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(crewPip?.label).toBe('1');
     });
 
-    it('derives a fleet pip counting stuck vehicles', () => {
-      // #1138: isMoveStuck lives on the driving Employee now, not the
-      // vehicle — a stuck vehicle is one whose occupant (occupantIds[0])
-      // reads isMoveStuck: true.
+    describe('stuck pip counts on-foot employees (#1387)', () => {
+      function stuckWalker(state: ReturnType<typeof makeState>, seed: number) {
+        const { employee } = hireEmployee(state.employees, 'driller', new Random(seed), 0, 0);
+        employee.isMoveStuck = true;
+        return employee;
+      }
+
+      it('counts a stuck on-foot employee', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        stuckWalker(state, 1);
+        const pip = center.update(state).find(p => p.label === '1' && p.tone === 'warn');
+        expect(pip).toBeDefined();
+        expect(pip!.tip).toBe(t('notification.pip.crew_stuck_tip', { count: 1 }));
+      });
+
+      it('counts walkers and drivers together without double counting the driver', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        const walker = stuckWalker(state, 1);
+        const driver = stuckWalker(state, 2);
+        state.vehicles.vehicles.push({
+          id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
+          payload: null, occupantIds: [driver.id],
+        });
+        expect(walker.id).not.toBe(driver.id);
+        const pip = center.update(state).find(p => p.tone === 'warn' && p.tip === t('notification.pip.crew_stuck_tip', { count: 2 }));
+        expect(pip).toBeDefined();
+        expect(pip!.label).toBe('2');
+      });
+
+      it('does not count a dead stuck employee', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        const e = stuckWalker(state, 1);
+        e.alive = false;
+        const tip1 = t('notification.pip.crew_stuck_tip', { count: 1 });
+        expect(center.update(state).some(p => p.tip === tip1)).toBe(false);
+      });
+
+      it('does not count a non-stuck employee', () => {
+        const center = new NotificationCenter();
+        const state = makeState();
+        hireEmployee(state.employees, 'driller', new Random(1), 0, 0);
+        expect(center.update(state)).toHaveLength(0);
+      });
+    });
+
+    it('derives a crew pip counting stuck employees, drivers included', () => {
+      // #1138: isMoveStuck lives on the driving Employee, not the vehicle.
       const center = new NotificationCenter();
       const state = makeState();
       const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 0, 0);
@@ -243,7 +289,9 @@ describe('NotificationCenter (redesign P1)', () => {
         payload: null, occupantIds: [employee.id],
       });
       const pips = center.update(state);
-      expect(pips.find(p => p.kind === 'fleet')?.label).toBe('1');
+      const pip = pips.find(p => p.tip === t('notification.pip.crew_stuck_tip', { count: 1 }));
+      expect(pip?.kind).toBe('crew');
+      expect(pip?.label).toBe('1');
     });
 
     it('derives a contract pip and fires exactly one expiry toast per contract', () => {
@@ -786,7 +834,7 @@ describe('NotificationCenter localization (#1417)', () => {
     setLocale('fr');
     const center = new NotificationCenter();
     const pips = center.update(stressedState());
-    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'contract']) {
       expect(pips.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
     }
     const text = allText(pips);
@@ -800,13 +848,14 @@ describe('NotificationCenter localization (#1417)', () => {
     setLocale('fr');
     const fr = new NotificationCenter().update(state);
     expect(fr.length).toBe(en.length);
-    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'contract']) {
       expect(en.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
     }
-    for (const e of en.filter(p => ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract'].includes(p.kind))) {
+    for (const e of en.filter(p => ['event', 'ecology', 'bankruptcy', 'crew', 'contract'].includes(p.kind))) {
       const f = fr.find(p => p.kind === e.kind)!;
       expect(f.tip, `${e.kind} tip`).not.toBe(e.tip);
     }
+    expect(fr.some(p => p.tip === t('notification.pip.crew_stuck_tip', { count: 1 })), 'stuck pip in fr').toBe(true);
   });
 
   it('the low-cash pip tooltip in fr names the threshold and is not the English sentence', () => {

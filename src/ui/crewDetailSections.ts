@@ -66,6 +66,7 @@ export function describeActivity(activity: EmployeeActivity): string {
       : t('ui.crew.task_walking');
     case 'idle': return t('ui.crew.task_idle');
     case 'training': return t('ui.crew.task_training');
+    case 'stuck': return t('ui.crew.task_stuck');
   }
 }
 
@@ -103,6 +104,8 @@ export function makeHiredLocationStrip(e: Employee, state: GameState): HTMLEleme
   let location: string;
   if (activity.kind === 'driving' || activity.kind === 'driving_to_task') {
     location = t('ui.crew.location_aboard', { vehicle: `#${activity.vehicleId}` });
+  } else if (activity.kind === 'stuck') {
+    location = t('ui.crew.location_stuck', { x: e.x, z: e.z });
   } else if (e.destinationX !== null || e.destinationZ !== null) {
     location = t('ui.crew.location_walking', { x: e.destinationX ?? e.x, z: e.destinationZ ?? e.z });
   } else {
