@@ -103,6 +103,8 @@ describe('refreshOrderReachability steady-state cache benchmark (#1427)', () => 
     const samples: number[] = [];
     for (let i = 0; i < 5; i++) {
       const state = makeState(200, 50, BIG);
+      // Staging dispatches orders, which already warms the per-state cache; drop it.
+      state.navGrid!.bumpRevision();
       const t0 = performance.now();
       refreshOrderReachability(state);
       samples.push(performance.now() - t0);
