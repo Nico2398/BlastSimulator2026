@@ -12,7 +12,8 @@ import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js'
 /** Commands a `role: 'setup'` step may carry in this scenario: time control only. */
 const TIME_CONTROL_COMMANDS = ['tutorial_start', 'time resume', 'wait_until', 'tick'];
 
-const steps: ScenarioStepDef[] = loadScenarioDef('tutorial-interactive', SCENARIO_DIR).steps;
+/** Scenarios that must play the real tutorial: #1338 interactive, #1517 steps-visual. */
+const SCENARIOS = ['tutorial-interactive', 'tutorial-steps-visual'] as const;
 
 const isTimeControl = (command: string): boolean =>
   TIME_CONTROL_COMMANDS.some((c) => command === c || command.startsWith(`${c} `));
@@ -25,12 +26,19 @@ function commandsOf(step: ScenarioStepDef): string[] {
   return [step.command, ...inner];
 }
 
-describe('tutorial-interactive.json plays honestly (#1338)', () => {
+describe.each(SCENARIOS)('%s.json plays honestly (#1338, #1517)', (scenarioName) => {
+  const steps: ScenarioStepDef[] = loadScenarioDef(scenarioName, SCENARIO_DIR).steps;
+
   it('opens with campaign start level:tutorial_pit and no cash: override', () => {
     const first = steps[0]!;
     expect(first.command).toMatch(/^campaign start level:tutorial_pit(\s|$)/);
     for (const c of commandsOf(first)) expect(c).not.toMatch(/\bcash:/);
     expect(first.expect?.equals ?? {}).not.toHaveProperty('cash');
+  });
+
+  it('carries no cash: token in any command or interaction command', () => {
+    const offenders = steps.flatMap(commandsOf).filter((c) => /\bcash:/.test(c));
+    expect(offenders).toEqual([]);
   });
 
   it('has exactly one campaign start', () => {
