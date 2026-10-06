@@ -945,7 +945,6 @@ describe('reachability cache (#1427)', () => {
       // Driver boards: the vehicle is usable wherever it is, and sits in B.
       vehicle.occupantIds = [driver.id];
       driver.x = IN_B.x; driver.z = IN_B.z;
-      driver.mountedVehicleId = vehicle.id;
       const v = verdicts(state);
       expect(fills.count).toBeGreaterThan(0);
       expect(v[id]).toBe('unreachable'); // target is in A, vehicle and driver are in B
