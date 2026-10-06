@@ -2615,6 +2615,7 @@
   "ui.level_end.replay": "REPLAY FOR THREE STARS",
   "ui.level_end.continue": "CONTINUE TO {level}",
   "ui.level_end.back_to_portfolio": "BACK TO PORTFOLIO",
+  "ui.level_end.back_to_sandbox": "BACK TO SANDBOX SETUP",
   "ui.level_end.retry": "RETRY {level}",
   "ui.level_end.stat.final_balance": "FINAL BALANCE",
   "ui.level_end.stat.salaries_paid": "SALARIES PAID",

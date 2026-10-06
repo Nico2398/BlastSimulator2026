@@ -2615,6 +2615,7 @@
   "ui.level_end.replay": "REJOUER POUR TROIS ÉTOILES",
   "ui.level_end.continue": "CONTINUER VERS {level}",
   "ui.level_end.back_to_portfolio": "RETOUR AU PORTEFEUILLE",
+  "ui.level_end.back_to_sandbox": "RETOUR À LA CONFIGURATION DU BAC À SABLE",
   "ui.level_end.retry": "RÉESSAYER {level}",
   "ui.level_end.stat.final_balance": "SOLDE FINAL",
   "ui.level_end.stat.salaries_paid": "SALAIRES VERSÉS",

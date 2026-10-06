@@ -64,6 +64,8 @@ export class LevelEndScreen {
   private onReplay?: (levelId: string) => void;
   private onContinue?: (nextLevelId: string) => void;
   private onBackToPortfolio?: () => void;
+  private onRetrySandbox?: () => void;
+  private onBackToSandbox?: () => void;
 
   /** True once rendered for the current terminal-reason transition — reset the instant levelEndReason clears. */
   private rendered = false;
@@ -145,13 +147,18 @@ export class LevelEndScreen {
 
     this.defeatBackBtn = button('ghost', t('ui.level_end.back_to_portfolio'), {
       dataAction: 'back-to-portfolio',
-      onClick: () => this.onBackToPortfolio?.(),
+      onClick: () => {
+        if (this.isSandbox(this.lastState)) this.onBackToSandbox?.();
+        else this.onBackToPortfolio?.();
+      },
     });
     this.defeatBackBtn.style.flex = '1';
-    this.locale.bindText(this.defeatBackBtn, 'ui.level_end.back_to_portfolio');
+    // Label is set per defeat in renderDefeatContent (sandbox vs campaign), so no bindText here.
 
     this.defeatRetryBtn = button('primary', '', { dataAction: 'retry', onClick: () => {
-      if (this.lastState?.campaign.activeLevelId) this.onReplay?.(this.lastState.campaign.activeLevelId);
+      const id = this.lastState?.campaign.activeLevelId;
+      if (id) this.onReplay?.(id);
+      else this.onRetrySandbox?.();
     } });
     this.defeatRetryBtn.style.flex = '1.4';
 
@@ -172,6 +179,8 @@ export class LevelEndScreen {
   setOnReplay(cb: (levelId: string) => void): void { this.onReplay = cb; }
   setOnContinue(cb: (nextLevelId: string) => void): void { this.onContinue = cb; }
   setOnBackToPortfolio(cb: () => void): void { this.onBackToPortfolio = cb; }
+  setOnRetrySandbox(cb: () => void): void { this.onRetrySandbox = cb; }
+  setOnBackToSandbox(cb: () => void): void { this.onBackToSandbox = cb; }
 
   refreshLocale(): void {
     this.locale.refresh();
@@ -241,6 +250,11 @@ export class LevelEndScreen {
     this.defeatTipTextEl.textContent = '';
     this.defeatStatGridEl.replaceChildren();
     this.defeatRetryBtn.textContent = '';
+  }
+
+  /** Sandbox runs have no active campaign level — endless free play. */
+  private isSandbox(state: GameState | null): boolean {
+    return !state?.campaign.activeLevelId;
   }
 
   private nextLevelId(state: GameState): string | null {
@@ -364,11 +378,17 @@ export class LevelEndScreen {
     this.defeatStatGridEl.replaceChildren(statGrid(this.defeatStats(reason, state), 4));
 
     const activeId = state.campaign.activeLevelId;
-    const level = activeId ? getLevel(activeId) : undefined;
+    const sandbox = this.isSandbox(state);
+    let levelName = '';
+    if (sandbox) {
+      levelName = t('sandbox.level.name');
+    } else {
+      const level = activeId ? getLevel(activeId) : undefined;
+      if (level) levelName = t(level.nameKey);
+    }
     this.defeatRetryBtn.textContent = '';
-    this.defeatRetryBtn.appendChild(el('span', {
-      text: t('ui.level_end.retry', { level: level ? t(level.nameKey) : '' }),
-    }));
+    this.defeatRetryBtn.appendChild(el('span', { text: t('ui.level_end.retry', { level: levelName }) }));
+    this.defeatBackBtn.textContent = t(sandbox ? 'ui.level_end.back_to_sandbox' : 'ui.level_end.back_to_portfolio');
   }
 
   private defeatTipKey(reason: DefeatReason, state: GameState): string {

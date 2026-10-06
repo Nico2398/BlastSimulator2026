@@ -10,7 +10,8 @@ import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
 import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES } from '../../src/core/campaign/Sandbox.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { BANKRUPTCY_GRACE_TICKS, DEFAULT_GRID_SIZE, SANDBOX_DATUM, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { addIncome } from '../../src/core/economy/Finance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
@@ -301,5 +302,38 @@ describe('sandbox mode vs the campaign profile (#1312)', () => {
     runner.run('sandbox start biome:desert_badlands difficulty:easy seed:5');
     ctx.state!.campaign.levels['grumpstone_ridge']!.unlocked = true;
     expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
+  });
+});
+
+describe('sandbox is endless free play (#1321)', () => {
+  it('never wins on profit: net profit far above the old $100k target ends nothing', () => {
+    const { runner, ctx } = createRunner();
+    runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5');
+    addIncome(ctx.state!.finances, 500000, 'sales', 'test windfall', ctx.state!.tickCount);
+    runner.run('tick 3');
+    expect(ctx.state!.levelEndReason).toBeNull();
+    expect(ctx.state!.levelEnded).toBe(false);
+  });
+
+  it('bankruptcy still ends a sandbox run', () => {
+    const { runner, ctx } = createRunner();
+    runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5');
+    ctx.state!.cash = 0;
+    ctx.state!.bankruptcy.ticksBelowThreshold = BANKRUPTCY_GRACE_TICKS - 1;
+    runner.run('tick 1');
+    expect(ctx.state!.levelEndReason).toBe('bankruptcy');
+    expect(ctx.state!.levelEnded).toBe(true);
+  });
+
+  it('running sandbox start twice with identical args restarts the same configuration', () => {
+    const { runner, ctx } = createRunner();
+    const args = 'sandbox start biome:green_foothills difficulty:hard seed:2024';
+    runner.run(args);
+    const first = { seed: ctx.state!.seed, cash: ctx.state!.cash, solid: solidCount(ctx.grid!) };
+    runner.run('tick 5');
+    runner.run(args);
+    expect({ seed: ctx.state!.seed, cash: ctx.state!.cash, solid: solidCount(ctx.grid!) }).toEqual(first);
+    expect(ctx.state!.tickCount).toBe(0);
+    expect(ctx.state!.levelEndReason).toBeNull();
   });
 });
