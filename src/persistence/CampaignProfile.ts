@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Campaign profile: campaign progress kept outside GameState (#1312)
 // Pure data + merge helpers. Storage lives in CampaignProfileStore.ts.
 
-import { createCampaignState, isCampaignComplete, unlockNextLevel, type CampaignState } from '../core/campaign/Campaign.js';
+import { createCampaignState, isCampaignComplete, recordStars, unlockNextLevel, type CampaignState } from '../core/campaign/Campaign.js';
 import { getAllLevels } from '../core/campaign/Level.js';
 
 export interface CampaignProfile {
@@ -53,6 +53,7 @@ export function mergeCampaignIntoProfile(
       entry.completed = entry.completed || inc.completed === true;
       entry.cumulativeProfit = Math.max(entry.cumulativeProfit, finiteOr(inc.cumulativeProfit, 0));
       entry.bestSessionProfit = Math.max(entry.bestSessionProfit, finiteOr(inc.bestSessionProfit, 0));
+      if (inc.bestStars) recordBestStars(profile, id, inc.bestStars);
     }
     target.campaignComplete = target.campaignComplete || incoming.campaignComplete === true;
   }
@@ -63,10 +64,14 @@ export function mergeCampaignIntoProfile(
   }
 }
 
-/** Raise a level's best stars (never lowers). */
+/**
+ * Raise a level's best stars (never lowers). Mirrored onto the campaign's own
+ * level entry, which the world map and level end screen read (#1311).
+ */
 export function recordBestStars(profile: CampaignProfile, levelId: string, stars: number): void {
   if (!Object.hasOwn(profile.campaign.levels, levelId)) return;
   profile.bestStars[levelId] = Math.max((Object.hasOwn(profile.bestStars, levelId) ? profile.bestStars[levelId]! : 0), clampStars(stars)) as Stars;
+  recordStars(profile.campaign, levelId, profile.bestStars[levelId]!);
 }
 
 /** Reset the profile to a fresh state, in place (object identity preserved). */

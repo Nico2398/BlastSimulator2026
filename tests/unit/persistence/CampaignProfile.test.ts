@@ -122,6 +122,22 @@ describe('mergeCampaignIntoProfile', () => {
 });
 
 describe('recordBestStars', () => {
+  it('mirrors stars onto the profile campaign level the world map reads (#1311)', () => {
+    const p = createCampaignProfile();
+    recordBestStars(p, 'dusty_hollow', 2);
+    expect(p.campaign.levels['dusty_hollow']!.bestStars).toBe(2);
+    expect(parseCampaignProfile(JSON.parse(JSON.stringify(p))).campaign.levels['dusty_hollow']!.bestStars).toBe(2);
+  });
+
+  it('merges stars held on an incoming campaign level', () => {
+    const p = createCampaignProfile();
+    const incoming = completedIncoming();
+    incoming.levels['dusty_hollow']!.bestStars = 3;
+    mergeCampaignIntoProfile(p, incoming);
+    expect(p.bestStars['dusty_hollow']).toBe(3);
+    expect(p.campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+  });
+
   it('raises stars', () => {
     const p = createCampaignProfile();
     recordBestStars(p, 'dusty_hollow', 2);
