@@ -20,6 +20,7 @@ import { ShadyPanel } from './panels/ShadyPanel.js';
 import { SettingsPanel } from './panels/SettingsPanel.js';
 import { MiniMap } from './MiniMap.js';
 import { TopBar } from './shell/TopBar.js';
+import { LeftColumn } from './shell/LeftColumn.js';
 import { ToolRail } from './shell/ToolRail.js';
 import { Toasts } from './shell/Toasts.js';
 import { ActivityLog } from './shell/ActivityLog.js';
@@ -58,6 +59,7 @@ export class UIManager {
   private readonly shadyPanel: ShadyPanel;
   private readonly settingsPanel: SettingsPanel;
   private readonly miniMap: MiniMap;
+  private readonly leftColumn: LeftColumn;
 
   private activePanel: PanelName | null = null;
   private onLanguageChange?: (lang: string) => void;
@@ -75,25 +77,16 @@ export class UIManager {
 
     // Left column — panels (temporary adapter, per the implementation plan:
     // panel bodies migrate to the new dock chrome surface-by-surface in
-    // P4-P9; P1 only replaces the shell around them).
-    const leftCol = document.createElement('div');
-    leftCol.id = 'bs-left-col';
-    // max-height, not height: when the column's content overflows, max-height
-    // clamps its used height to a definite value, which is what each panel's
-    // own `max-height:100%` (BuildMenu.ts and its 8 siblings) resolves
-    // against — so the panels are bounded and their bodies scroll without
-    // this needing to be a fixed height. Verified against
-    // crew-panel-short-viewport.json: reverting this line alone keeps that
-    // scenario green, while reverting CrewPanel's roster-row `flex-shrink:0`
-    // fails it.
-    leftCol.style.cssText = 'position:fixed;top:70px;left:8px;z-index:100;display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 80px);overflow-y:auto;pointer-events:none';
+    // P4-P9; P1 only replaces the shell around them). Self-registers its
+    // bounds so the selection bar can keep clear of it (#1423).
+    this.leftColumn = new LeftColumn(container);
+    const leftCol = this.leftColumn.el;
 
     // Right column — minimap
     const rightCol = document.createElement('div');
     rightCol.id = 'bs-right-col';
     rightCol.style.cssText = 'position:fixed;top:70px;right:8px;z-index:100';
 
-    container.appendChild(leftCol);
     container.appendChild(rightCol);
 
     // Shell — each of these self-registers its on-screen bounds with
@@ -532,6 +525,7 @@ export class UIManager {
 
   dispose(): void {
     this.topBar.dispose();
+    this.leftColumn.dispose();
     this.toolRail.dispose();
     this.toasts.dispose();
     this.activityLog.dispose();

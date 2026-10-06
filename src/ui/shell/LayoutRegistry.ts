@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Shell layout registry (#956)
 //
-// Screen-edge UI regions (TopBar, ToolRail, Toasts, SelectionBar,
+// Screen-edge UI regions (TopBar, ToolRail, LeftColumn, Toasts, SelectionBar,
 // ActivityLog, MiniMap) declare their on-screen bounds here so a test can prove no
 // two 'hud'-layer regions overlap at a matrix of viewport sizes, and that
 // none falls outside the viewport. Populated by each shell region on
