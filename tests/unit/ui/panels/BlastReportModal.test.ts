@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../../src/ui/panels/BlastReportModal.js';
+import { t } from '../../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -571,7 +572,7 @@ describe('BlastReportModal', () => {
 
       openReport(modal, state, setNow);
 
-      expect(modal.root.textContent).toContain('Oz Trill was killed by a projection');
+      expect(modal.root.textContent).toContain('Oz Trill was killed by flying rock');
       expect(modal.root.querySelector('bs-icon[name="skull"]')).not.toBeNull();
     });
 
@@ -583,7 +584,7 @@ describe('BlastReportModal', () => {
 
       openReport(modal, state, setNow);
 
-      expect(modal.root.textContent).toContain('Dorian Kask was injured by a projection');
+      expect(modal.root.textContent).toContain('Dorian Kask was injured by flying rock');
       expect(modal.root.querySelector('bs-icon[name="injured"]')).not.toBeNull();
     });
 
@@ -596,7 +597,7 @@ describe('BlastReportModal', () => {
 
       openReport(modal, state, setNow);
 
-      expect(modal.root.textContent).toContain('Debris Hauler was destroyed by a projection');
+      expect(modal.root.textContent).toContain('Debris Hauler was destroyed by flying rock');
       expect(modal.root.querySelector('bs-icon[name="vehicle"]')).not.toBeNull();
     });
 
@@ -609,7 +610,7 @@ describe('BlastReportModal', () => {
 
       openReport(modal, state, setNow);
 
-      expect(modal.root.textContent).toContain('Rock Fragmenter took projection damage');
+      expect(modal.root.textContent).toContain('Rock Fragmenter took flying rock damage');
     });
 
     it('falls back to a generic worker label when the accident\'s employee can\'t be found', () => {
@@ -619,7 +620,7 @@ describe('BlastReportModal', () => {
 
       openReport(modal, state, setNow);
 
-      expect(modal.root.textContent).toContain('A worker was injured by a projection');
+      expect(modal.root.textContent).toContain('A worker was injured by flying rock');
     });
 
     it('does not render a note-card for a building accident — destroyedBuildings has its own dedicated card, and OperationsPanel covers the full incident history', () => {
@@ -648,8 +649,8 @@ describe('BlastReportModal', () => {
 
       openReport(modal, state, setNow);
 
-      expect(modal.root.textContent).toContain('Oz Trill was killed by a projection');
-      expect(modal.root.textContent).toContain('Dorian Kask was injured by a projection');
+      expect(modal.root.textContent).toContain('Oz Trill was killed by flying rock');
+      expect(modal.root.textContent).toContain('Dorian Kask was injured by flying rock');
     });
   });
 });
@@ -684,5 +685,27 @@ describe('BlastReportModal wet holes note (#1348)', () => {
     const text = modal.root.textContent ?? '';
     expect(text).toMatch(/wet holes: 2/i);
     expect(text).not.toMatch(/fizzled/i);
+  });
+});
+
+describe('BlastReportModal rating cap note (#1349)', () => {
+  for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize'] as const) {
+    it(`renders the ${cap} cap note`, () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({ ratingCap: cap });
+      openReport(modal, state, setNow);
+      expect(modal.root.textContent).toContain(t(`ui.blast_workshop.report.rating_cap_${cap}`));
+    });
+  }
+
+  it('renders no cap note without ratingCap', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport();
+    openReport(modal, state, setNow);
+    for (const cap of ['death', 'casualty_or_destruction', 'wet_holes', 'oversize']) {
+      expect(modal.root.textContent).not.toContain(t(`ui.blast_workshop.report.rating_cap_${cap}`));
+    }
   });
 });

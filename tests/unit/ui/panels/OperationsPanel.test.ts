@@ -141,7 +141,7 @@ describe('OperationsPanel', () => {
     state.damage.accidents.push(makeAccident({ type: 'vehicle_damage', entityId: 7 }));
     panel.show();
     panel.update(state);
-    expect(panel.root.textContent).toContain('A vehicle took projection damage');
+    expect(panel.root.textContent).toContain('A vehicle took flying rock damage');
   });
 
   it('keeps seismic damage textually distinct from blast damage', () => {
