@@ -40,7 +40,6 @@ export function formatPricePerKg(price: number): string {
  * @returns Rounded, grouped string including the `$` symbol.
  */
 export function formatDollars(amount: number): string {
-  // TODO: implement
-  void amount;
-  return undefined as unknown as string;
+  const body = formatMoney(amount);
+  return body.startsWith('-') ? `-$${body.slice(1)}` : `$${body}`;
 }
