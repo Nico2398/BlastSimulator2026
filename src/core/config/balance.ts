@@ -385,6 +385,14 @@ export const CHARGE_HOLE_REFERENCE_AMOUNT_KG = 5;
  *  never under-stem what a player could ever click. */
 export const MIN_STEMMING_M = 0.5;
 
+/** Default explosive amount (kg) the Charge panel opens with. */
+// TODO: placeholder holds the old panel value; implementation sets 4 (#1330).
+export const CHARGE_DEFAULT_AMOUNT_KG = 5;
+
+/** Default stemming column (m) the Charge panel opens with. */
+// TODO: placeholder holds the old panel value; implementation sets 2.5 (#1330).
+export const CHARGE_DEFAULT_STEMMING_M = 2;
+
 /**
  * Largest rows×cols product `drill_plan grid` will build in one command
  * (#572, mirrors #569's MAX_CLAIM_BRIDGE_CHUNKS bound-the-work approach).
