@@ -253,7 +253,10 @@ export function blastCommand(
     success: true,
     output: [
       t('mining.blast.report_header'),
-      `Rating: ${result.rating.toUpperCase()}`,
+      `Rating: ${(state.lastBlastReport?.rating ?? result.rating).toUpperCase()}`,
+      ...(state.lastBlastReport?.ratingCap
+        ? [t(`mining.blast.rating_cap_${state.lastBlastReport.ratingCap}`, { base: state.lastBlastReport.baseRating?.toUpperCase() ?? '' })]
+        : []),
       `Cleared voxels: ${result.clearedVoxels}`,
       `Cracked voxels: ${result.crackedVoxels}`,
       `Fragments: ${result.fragmentCount}`,

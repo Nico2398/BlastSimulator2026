@@ -231,6 +231,10 @@ export class BlastReportModal {
     ], 4));
 
     const notes: HTMLElement[] = [];
+    if (report.ratingCap) {
+      notes.push(this.makeNoteCard('rock', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
+        t(`ui.blast_workshop.report.rating_cap_${report.ratingCap}`)));
+    }
     const oreReport = state.lastOreReport;
     if (oreReport && oreReport.estimatedYieldKg > 0) {
       notes.push(this.makeOreCard(oreReport));

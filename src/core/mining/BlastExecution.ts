@@ -6,7 +6,7 @@ import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
 import type { WetBlastHoles } from './WetHoles.js';
-import type { BlastRatingCap } from './BlastRatingCaps.js';
+import { applyRatingCaps, type BlastRatingCap } from './BlastRatingCaps.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
 import type { BlastPlan } from './BlastPlan.js';
@@ -183,9 +183,20 @@ export interface SecondaryBlastReport {
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
 export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = [], wetHoles: WetBlastHoles = { wet: [], fizzled: [] }, secondaryBlasts: SecondaryBlastReport[] = []): BlastReport {
+  const destroyedIds = new Set<number>(result.destroyedBuildings.map(b => b.buildingId));
+  for (const a of accidents) if (a.type === 'building_destroyed') destroyedIds.add(a.entityId);
+  const { rating, cap } = applyRatingCaps(result.rating, {
+    deaths: accidents.filter(a => a.type === 'death').length,
+    injuries: accidents.filter(a => a.type === 'injury').length,
+    destroyedBuildings: destroyedIds.size,
+    wetHoleCount: wetHoles.wet.length,
+    oversizedFragments: result.oversizedFragments,
+    fragmentCount: result.fragmentCount,
+  });
   return {
     tick,
-    rating: result.rating,
+    rating,
+    ...(cap ? { baseRating: result.rating, ratingCap: cap } : {}),
     clearedVoxels: result.clearedVoxels,
     crackedVoxels: result.crackedVoxels,
     fragmentCount: result.fragmentCount,

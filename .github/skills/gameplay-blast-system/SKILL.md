@@ -162,6 +162,23 @@ Rating is driven by **how far rock was actually thrown** (`THROW_DISTANCE_BAD` /
 in its own muck pile is a good blast however fast it left. `BlastReport.maxProjectionDistanceM` is that
 traced `maxThrowDistance`, so the report modal, console and rating agree.
 
+### Rating caps (#1349)
+
+`calculateRating` stays the base rule (`BlastResult.rating`). `buildBlastReport` then applies hard
+ceilings via `applyRatingCaps` (`BlastRatingCaps.ts`), so `BlastReport.rating` is the capped value;
+`baseRating` and `ratingCap` are set only when a cap actually lowered it (cap = first rule that did).
+Caps only lower; precedence, most severe first:
+
+| Cap id | Condition | Ceiling |
+|--------|-----------|---------|
+| `death` | any employee death | catastrophic |
+| `casualty_or_destruction` | any injury, or any destroyed building (union by id of `result.destroyedBuildings` and `building_destroyed` accidents) | bad |
+| `wet_holes` | any `wetHoleIds` (fizzled or not) | good |
+| `oversize` | oversized fragments / fragments strictly above `BLAST_OVERSIZE_SHARE_CAP` (0.30, 0 fragments = 0 share) | good |
+
+Vehicle-only loss does not cap. Console `Rating:` and the report modal read the capped value; the
+modal shows a note card first and the console a `mining.blast.rating_cap_*` line when a cap applied.
+
 ## Playback
 
 `FragmentAnimator` walks each fragment from where it broke to where it settled. Horizontal motion is
