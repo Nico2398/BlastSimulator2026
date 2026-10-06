@@ -3067,7 +3067,7 @@
   "tutorial.stage.open_blast": "Ouvrez le panneau Minage depuis la barre d'outils.",
   "tutorial.stage.grid_tool": "Appuyez sur Grille pour disposer les trous de forage.",
   "tutorial.stage.drill_area": "Cliquez n’importe où dans le carré bleu entouré dans la scène. La grille s’y aligne. Réglez ensuite Espacement sur 4 m et Profondeur sur 8 m.",
-  "tutorial.stage.charge_all": "Réglez Quantité sur 4 kg et Bourrage sur 2,5 m, puis appuyez sur Charger tous les trous.",
+  "tutorial.stage.charge_all": "Réglez Quantité sur 4 kg et Bourrage sur 2,4 m, puis appuyez sur Charger tous les trous.",
   "tutorial.stage.open_sequence_tab": "Cliquez sur l'onglet 3 Séquence dans le panneau Minage.",
   "tutorial.stage.auto_sequence": "Appuyez sur Séquence auto (motif en V) pour régler les retards de détonation.",
   "tutorial.stage.sound_horn": "Cliquez sur Sonner la corne et évacuez la zone de tir avant de tirer.",
