@@ -575,7 +575,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
     if (!mainMenu.visible) uiManager.show();
   }
   if (ctx.state) tutorial.onCommandExecuted(ctx.state);
-  // Deferred while the tutorial overlay is active: its own "victory" step
+  // Deferred while the tutorial overlay is active: its own "free-play" step
   // already waits on this exact state.levelEndReason transition and shows a
   // brief congratulations card of its own — the real recap takes over once
   // that finishes, rather than both fighting for the screen at once.

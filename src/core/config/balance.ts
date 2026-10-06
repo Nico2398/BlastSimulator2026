@@ -1681,3 +1681,14 @@ export const ENV_CAUSE_NUISANCE_MAX = 45;
 
 /** Max cached reachability fills in OrderReachability (#1427). One grid-sized Uint8Array per key, so memory is bounded by this cap. */
 export const ORDER_REACH_CACHE_MAX_KEYS = 64;
+
+/**
+ * Contract price multiplier for the tutorial level (#959, #1328). The level's
+ * single scripted blast and ~$300k of one-time setup mean market-rate prices
+ * can never out-earn the mine's own drain; bisected on the full free-play
+ * playthrough (tests/integration/tutorial.integration.test.ts, no fire/scrap
+ * hacks): 40.0 goes bankrupt, 44.0 is the lowest winning value tried, 64.0 is
+ * already won inside the guided part. 52.0 sits mid-window so one upstream
+ * change does not make the tutorial unwinnable (or trivially won) again.
+ */
+export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 52.0;

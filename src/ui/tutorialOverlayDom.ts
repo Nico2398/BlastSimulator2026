@@ -4,7 +4,7 @@
 
 import { el } from './dom.js';
 import { iconEl, IconName } from './icons.js';
-import { LocaleTextRegistry } from './localeText.js';
+import { LocaleTextRegistry, type LocaleParams } from './localeText.js';
 
 /**
  * Build a title-row status chip: a hidden `span.bs-tutorial-chip <modifier>`
@@ -17,12 +17,13 @@ function buildTutorialChip(
   tooltipKey: string,
   textKey: string,
   icon?: IconName,
+  textParams?: LocaleParams,
 ): { chip: HTMLElement; textEl: HTMLElement } {
   const chip = el('span', { className, attrs: { style: 'display:none' } });
   locale.bindTitle(chip, tooltipKey);
   if (icon) chip.appendChild(iconEl(icon, 8));
   const textEl = el('span', {});
-  locale.bindText(textEl, textKey);
+  locale.bindText(textEl, textKey, textParams);
   chip.appendChild(textEl);
   return { chip, textEl };
 }
@@ -46,6 +47,13 @@ export interface TutorialCardElements {
   pausedChipEl: HTMLElement;
   /** The "waiting" chip, sibling of `pausedEl` — hidden until a stage's issued order is spent. */
   waitingChipEl: HTMLElement;
+  /** The goal chip (net profit vs target), hidden until a step with `goalChip` shows (#1328). */
+  goalChipEl: HTMLElement;
+  /**
+   * Interpolation params the goal chip's text is bound to. Mutated in place
+   * by TutorialOverlay each guide tick, then re-applied through `locale`.
+   */
+  goalChipParams: LocaleParams;
   stepCounter: HTMLElement;
   progressEl: HTMLElement;
   commandsLabel: HTMLElement;
@@ -122,12 +130,19 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
     locale, 'bs-tutorial-chip bs-tutorial-waiting', 'tutorial.waiting_tooltip', 'tutorial.waiting_chip',
   );
 
+  // Net profit vs the level's target, shown once free play begins (#1328).
+  const goalChipParams: LocaleParams = { profit: '', target: '' };
+  const { chip: goalChipEl } = buildTutorialChip(
+    locale, 'bs-tutorial-chip bs-tutorial-goal', 'tutorial.goal_chip_tooltip', 'tutorial.goal_chip',
+    undefined, goalChipParams,
+  );
+
   const stepCounter = document.createElement('div');
   stepCounter.className = 'bs-tutorial-progress';
 
   const titleRow = el('div', {
     attrs: { style: 'display:flex;align-items:center;gap:9px;flex-wrap:wrap' },
-    children: [titleEl, pausedEl, waitingChipEl, stepCounter],
+    children: [titleEl, pausedEl, waitingChipEl, goalChipEl, stepCounter],
   });
 
   const textEl = document.createElement('p');
@@ -168,7 +183,7 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   container.appendChild(overlay);
 
   return {
-    overlay, box, titleEl, textEl, stageEl, stageLine, pausedEl, pausedChipEl, waitingChipEl, stepCounter,
-    progressEl, commandsLabel, commandsHint, locale,
+    overlay, box, titleEl, textEl, stageEl, stageLine, pausedEl, pausedChipEl, waitingChipEl, goalChipEl, goalChipParams,
+    stepCounter, progressEl, commandsLabel, commandsHint, locale,
   };
 }

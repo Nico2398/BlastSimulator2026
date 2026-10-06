@@ -53,7 +53,7 @@ describe('tutorial stage table', () => {
     // Auto-advancing and terminal cards are the only ones allowed to have none.
     for (const step of TUTORIAL_STEPS) {
       const isPassive = step.autoAdvanceMs !== undefined
-        || step.id === 'victory' || step.id === 'congratulations';
+        || step.id === 'free-play' || step.id === 'congratulations';
       if (isPassive) continue;
       expect(
         stagesFor(step.id, step.highlightTarget).length,
@@ -139,10 +139,10 @@ describe('tutorial stage table', () => {
       expect(TUTORIAL_STAGES['speed-normal-after-dig']).toBeUndefined();
     });
 
-    it('tick-advance targets the speed-button group container, not a single specific data-speed button', () => {
-      const target = TUTORIAL_STAGES['tick-advance']![0]!.target;
-      expect(target).not.toMatch(/data-speed="\d+"/);
-      expect(target).toBe('#bs-hud-top .bs-speed-btn');
+    it('no stage entries remain for the removed set-policy / tick-advance / victory steps (#1328)', () => {
+      for (const id of ['set-policy', 'tick-advance', 'victory', 'free-play']) {
+        expect(TUTORIAL_STAGES[id], id).toBeUndefined();
+      }
     });
   });
 
@@ -170,7 +170,7 @@ describe('tutorial stage table', () => {
       // haul-debris (#552) is deliberately excluded: hauling self-dispatches
       // now, so the step is a single watch-only stage, not a click sequence.
       'hire-surveyor', 'survey', 'drill-plan', 'blast', 'contract-accept',
-      'vehicle-buy-assign', 'build-storage', 'box-cut', 'set-policy',
+      'vehicle-buy-assign', 'build-storage', 'box-cut',
     ]) {
       expect(TUTORIAL_STAGES[stepId]!.length, `${stepId} should be multi-stage`)
         .toBeGreaterThan(1);
@@ -490,7 +490,7 @@ describe('spentWhen / waitingKey wiring (#1014)', () => {
     });
   }
 
-  it.each(['sequence', 'evacuate-zone', 'tick-advance', 'train-driller', 'train-digger'])(
+  it.each(['sequence', 'evacuate-zone', 'train-driller', 'train-digger'])(
     '%s carries no spentWhen on any of its stages',
     (stepId) => {
       const stages = TUTORIAL_STAGES[stepId]!;

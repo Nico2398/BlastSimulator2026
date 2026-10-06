@@ -57,8 +57,8 @@ describe('set_policy', () => {
   });
 });
 
-describe('the tutorial Site Policy step', () => {
-  const step = TUTORIAL_STEPS.find(s => s.id === 'set-policy')!;
+describe('the tutorial early Site Policy step', () => {
+  const step = TUTORIAL_STEPS.find(s => s.id === 'set-early-policy')!;
 
   it('completes when the player presses Apply with the settings unchanged', () => {
     const ctx = makeCtx();

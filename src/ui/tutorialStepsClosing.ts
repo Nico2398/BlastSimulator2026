@@ -2,15 +2,14 @@
 // Split out of tutorialSteps.ts (#557's evacuate-zone step addition made
 // that file cover two unrelated concerns — the closing sequence below is
 // its own single responsibility, separate from the rest of the step list).
-// Steps 19-22: apply the real shift policy, let the clock run, hit the
-// level's profit target, and the closing card.
+// Last two steps: free play (rails lifted, play on to the profit target) and
+// the closing card.
 
 import type { GameState } from '../core/state/GameState.js';
 import type { FinanceState } from '../core/economy/Finance.js';
 import type { TutorialStep } from './tutorialSteps.js';
-import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
 import { getFinancialReport } from '../core/economy/Finance.js';
-import { formatMoney } from '../core/economy/formatMoney.js';
+import { formatDollars } from '../core/economy/formatMoney.js';
 import { getLevel } from '../core/campaign/Level.js';
 import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
 import type { DefeatReason } from './screens/LevelEndScreen.js';
@@ -29,66 +28,29 @@ export function victoryProgress(
   return { profit, target, remaining: Math.max(0, target - profit) };
 }
 
+/** Profit target the tutorial level is won at. */
+function tutorialTarget(): number {
+  return getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
+}
+
 export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
-  // ── Step 19: set-policy ──
+  // ── free-play ──
+  // The guided part ends with the first ore sale. From here every rail is
+  // lifted and the clock is never held (`guided: false`); the goal chip shows
+  // net profit against the level's target. Only a genuine win completes this
+  // step — `state.levelEnded` alone also goes true on bankruptcy/arrest/
+  // ecological_shutdown/worker_revolt (#959); any other terminal reason is
+  // handled by TutorialOverlay's own defeat short-circuit from every step.
   {
-    id: 'set-policy',
-    titleKey: 'tutorial.step20.title',
-    textKey: 'tutorial.step20',
-    commands: ['set_policy mode:shift_8h'],
-    highlightTarget: TOOLBAR_TARGET.settings,
-    // Completes when a policy is applied, not when one of its values happens to
-    // differ. Comparing values left a player who pressed Apply on the settings
-    // already showing — the common case, since the form mirrors the policy in
-    // force — watching a "Site policy updated" message while the tutorial sat
-    // on the step forever.
-    captureSnapshot: (state: GameState) => ({
-      policyRevision: state.sitePolicy?.revision ?? 0,
+    id: 'free-play',
+    titleKey: 'tutorial.free_play.title',
+    textKey: 'tutorial.free_play',
+    guided: false,
+    goalChip: true,
+    textParamsFor: (state: GameState) => ({
+      ...goalChipParams(state),
+      remaining: formatDollars(victoryProgress(state.finances, tutorialTarget()).remaining),
     }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const before = (snapshot.policyRevision as number | undefined) ?? 0;
-      return (state.sitePolicy?.revision ?? 0) > before;
-    },
-  },
-
-  // ── Step 20: tick-advance ──
-  {
-    id: 'tick-advance',
-    titleKey: 'tutorial.step21.title',
-    textKey: 'tutorial.step21',
-    // The whole point of this step is that the clock runs.
-    tickBudget: 30,
-    waitsOnWork: true,
-    highlightTarget: '#bs-hud-top .bs-speed-btn',
-    captureSnapshot: (state: GameState) => ({
-      prevTick: state.tickCount ?? 0,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevTick as number;
-      return (state.tickCount ?? 0) > prev + 5;
-    },
-  },
-
-  // ── Step 21: victory ──
-  {
-    id: 'victory',
-    titleKey: 'tutorial.step22.title',
-    textKey: 'tutorial.step22',
-    // Waits on the level's profit target, which only accrues while time runs.
-    tickBudget: 60,
-    waitsOnWork: true,
-    highlightTarget: '#bs-hud-scores',
-    textParamsFor: (state: GameState) => {
-      const target = getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
-      const { profit, remaining } = victoryProgress(state.finances, target);
-      return { profit: formatMoney(profit), target: formatMoney(target), remaining: formatMoney(remaining) };
-    },
-    // Only a genuine win completes this step — `state.levelEnded` alone also
-    // goes true on bankruptcy/arrest/ecological_shutdown/worker_revolt, which
-    // used to hand straight to the congratulations card on a loss (#959).
-    // Any other terminal reason is handled generically by TutorialOverlay's
-    // own defeat short-circuit (jumpToLastStep via shortCircuitOnDefeat),
-    // which fires from every step, not just this one.
     isComplete: (state: GameState) => state.levelEnded === true && state.levelEndReason === 'completed',
   },
 
@@ -97,8 +59,8 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     id: 'congratulations',
     titleKey: 'tutorial.complete_title',
     textKey: 'tutorial.complete_text',
-    // A defeat reaches this card via the short-circuit above rather than via
-    // 'victory' completing, so its title/text still have to reflect what
+    // A defeat reaches this card via the short-circuit rather than via
+    // 'free-play' completing, so its title/text still have to reflect what
     // actually happened instead of always congratulating (#959).
     titleKeyFor: (state: GameState) => (
       isDefeatReason(state.levelEndReason)
@@ -113,3 +75,9 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     isComplete: () => true,
   },
 ];
+
+/** Interpolation params for the goal chip: formatted net profit and profit target (#1328). */
+export function goalChipParams(state: GameState): { profit: string; target: string } {
+  const target = tutorialTarget();
+  return { profit: formatDollars(victoryProgress(state.finances, target).profit), target: formatDollars(target) };
+}
