@@ -8,6 +8,7 @@ import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
 import { goalChipParams } from './tutorialStepsClosing.js';
+import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
 import { GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
@@ -315,6 +316,7 @@ export class TutorialOverlay {
 
   /** Resumes the tutorial from state.tutorialProgress; false when there is nothing to resume (#1333). */
   resume(state: GameState): boolean {
+    if (state.campaign.activeLevelId !== TUTORIAL_LEVEL_ID) return false;
     const progress = readTutorialProgress(state, TUTORIAL_STEPS.length);
     if (!progress) return false;
     this.activate(progress.stepIndex, progress.snapshot);

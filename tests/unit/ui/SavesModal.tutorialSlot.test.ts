@@ -26,7 +26,7 @@ describe('autoSaveSlotFor', () => {
 describe('SavesModal autosave slot by level (#1333)', () => {
   let state: GameState;
   let modal: SavesModal;
-  let save: ReturnType<typeof vi.fn>;
+  let save: ReturnType<typeof vi.fn<any[], Promise<void>>>;
 
   beforeEach(() => {
     state = createGame({ seed: 42 });

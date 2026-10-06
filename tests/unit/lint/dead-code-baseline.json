@@ -194,7 +194,6 @@
     "src/ui/panels/BlastWorkshop.ts:StepId",
     "src/ui/panels/SavesModal.ts:GetStateCallback",
     "src/ui/panels/SavesModal.ts:OnLoadCallback",
-    "src/ui/panels/SavesModal.ts:TUTORIAL_AUTO_SAVE_SLOT",
     "src/ui/panels/SettingsPanel.ts:GetStateCallback",
     "src/ui/scene/ParamStrip.ts:ParamStripField",
     "src/ui/scene/PlacementController.ts:PlacementPhase",
