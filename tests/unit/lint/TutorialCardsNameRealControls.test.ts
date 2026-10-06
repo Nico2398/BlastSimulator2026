@@ -96,7 +96,9 @@ describe.each(Object.keys(LOCALES))('tutorial stepper values are named on the ca
   it.each(cases)('%s names its values', (cardKey, values) => {
     const card = locale[cardKey] as string;
     for (const v of values) {
-      expect(new RegExp(`(^|[^0-9.])${v.replace('.', '\\.')}(?![0-9])`).test(card), `[${code}] ${cardKey} lacks "${v}": ${card}`).toBe(true);
+      // fr writes the decimal separator as a comma ("2,5 m").
+      const sep = code === 'fr' ? '[.,]' : '\\.';
+      expect(new RegExp(`(^|[^0-9.,])${v.replace('.', sep)}(?![0-9])`).test(card), `[${code}] ${cardKey} lacks "${v}": ${card}`).toBe(true);
     }
   });
 });

@@ -442,7 +442,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1387: +11 keys (crew notifications), both locales: 3670.
     // #1424: +1 key (ui.minimap.vehicle), both locales: 3677.
     // #1328: -9 keys (set-policy/tick-advance/victory cards, 3 stage hints), +4 (free_play x2, goal_chip x2): 3672.
-    expect(Object.keys(en).length).toBe(3672);
+    // #1338: +1 key (economy.contract.none_fillable), both locales: 3673.
+    expect(Object.keys(en).length).toBe(3673);
   });
 });
 
