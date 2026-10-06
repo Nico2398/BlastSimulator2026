@@ -154,10 +154,10 @@ export class SettingsPanel extends PanelBase {
     const replayBtn = button('ghost', t('ui.settings.replay_tutorial'), { dataAction: 'replay-tutorial', onClick: () => this.handleReplayTutorial() });
     replayBtn.style.width = '100%';
     this.locale.bindText(replayBtn.querySelector('span') as HTMLElement, 'ui.settings.replay_tutorial');
-    const savesBtn = button('ghost', t('ui.settings.save_and_load'), { onClick: () => this.handleOpenSaves() });
+    const savesBtn = button('ghost', t('ui.settings.save_and_load'), { dataAction: 'open-saves', onClick: () => this.handleOpenSaves() });
     savesBtn.style.width = '100%';
     this.locale.bindText(savesBtn.querySelector('span') as HTMLElement, 'ui.settings.save_and_load');
-    const returnBtn = button('danger', t('ui.settings.return_to_menu'), { onClick: () => this.handleReturnToMenu() });
+    const returnBtn = button('danger', t('ui.settings.return_to_menu'), { dataAction: 'return-to-menu', onClick: () => this.handleReturnToMenu() });
     returnBtn.style.width = '100%';
     this.locale.bindText(returnBtn.querySelector('span') as HTMLElement, 'ui.settings.return_to_menu');
 

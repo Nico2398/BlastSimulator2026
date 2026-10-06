@@ -36,8 +36,17 @@ export const PANEL_OPEN_SELECTOR = '[data-panel]';
 /** The tutorial card's exit button (#1332). */
 export const TUTORIAL_EXIT_SELECTOR = '[data-action="tutorial-exit"]';
 
-/** Selectors the rails allow so Settings session controls stay reachable (#1332). Skeleton: empty. */
-export const SETTINGS_SESSION_SELECTORS: readonly string[] = [];
+/**
+ * Settings session controls the rails always allow (#1332): language pills,
+ * volume sliders, Save & Load, Return to Menu. Replay Tutorial is deliberately
+ * absent — restarting the tutorial from inside it is not a session control.
+ */
+export const SETTINGS_SESSION_SELECTORS: readonly string[] = [
+  '#bs-settings-panel [data-lang]',
+  '#bs-settings-panel input[type="range"]',
+  '#bs-settings-panel [data-action="open-saves"]',
+  '#bs-settings-panel [data-action="return-to-menu"]',
+];
 
 /**
  * Snapshot shape for a hire step: ids of the employees who already hold the

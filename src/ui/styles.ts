@@ -505,8 +505,9 @@ body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-cleara
    tutorial mid-step and lose it, which is the whole reason these rails exist.
    Written as "not marked allowed" so a control rendered between two passes of
    the guide is inert from its first frame rather than briefly live.
-   The coach card itself carries no button/select/input (no Skip, no Next, no
-   close — see tutorialOverlayDom.ts), so it needs no exemption from this rule. */
+   The coach card's one button (Exit tutorial, #1332) and the Settings session
+   controls are exempted by tutorialRails.ts's permanently-allowed list, which
+   marks them allowed; there is no Skip and no Next. */
 body.bs-tutorial-guided button:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided select:not(.bs-tutorial-allowed),
 body.bs-tutorial-guided input:not(.bs-tutorial-allowed),
@@ -514,6 +515,20 @@ body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
   pointer-events: none;
   opacity: 0.4;
   filter: saturate(0.3);
+}
+.bs-tutorial-exit {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--bsx-hairline);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--bsx-text-muted);
+  font: 600 10px/1.4 var(--bsx-font-ui);
+  cursor: pointer;
+}
+.bs-tutorial-exit:hover {
+  color: var(--bsx-text);
+  border-color: var(--bsx-text-muted);
 }
 .bs-tutorial-stage {
   font: 600 11px/1.4 var(--bsx-font-ui);

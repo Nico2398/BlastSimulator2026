@@ -320,7 +320,7 @@ Language, audio volumes/mute per channel (master/ambient/SFX/UI at minimum — `
 Slot cards with name, date, campaign summary (level, day, cash), load/save/delete with confirms, autosave badge, export/import. Nice-to-have: slot thumbnail (canvas grab).
 
 ### 6.17 Tutorial
-Re-skin of the coach card (title, body, "do this" hint, step x/y, progress, PAUSED chip, command hints for power users) + highlight treatment on arbitrary controls. Must keep: bottom docking, never covering the highlighted control, rails inertness, tick-budget pause. 23 steps currently reference: speed button, toolbar buttons (survey/blast/contracts/vehicles/build/employees/settings), score panel, balance, event badge — all must remain highlightable in the new layout.
+Re-skin of the coach card (title, body, "do this" hint, step x/y, progress, PAUSED chip, command hints for power users) + highlight treatment on arbitrary controls. Must keep: bottom docking, never covering the highlighted control, rails inertness, tick-budget pause. One muted "Exit tutorial" button in the title row (behind a confirm; marks the tutorial completed) — no Next, no Skip. Rails always allow that button and the Settings session controls (language, volume, Save & Load, Return to Menu; not Replay Tutorial) (#1332). 23 steps currently reference: speed button, toolbar buttons (survey/blast/contracts/vehicles/build/employees/settings), score panel, balance, event badge — all must remain highlightable in the new layout.
 
 ---
 

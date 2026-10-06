@@ -61,6 +61,7 @@ export class TutorialOverlay {
   private autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
   private guideTimer: ReturnType<typeof setInterval> | null = null;
   private gameConsole: ((cmd: string) => CommandResult) | null = null;
+  private confirmHandler: ((config: ConfirmModalConfig) => void) | null = null;
 
   constructor(container: HTMLElement) {
     const els = buildTutorialCard(container);
@@ -83,6 +84,7 @@ export class TutorialOverlay {
     this.commandsLabel = els.commandsLabel;
     this.commandsHint = els.commandsHint;
     this.locale = els.locale;
+    els.exitBtn.addEventListener('click', () => this.requestExit());
   }
 
   start(state?: GameState): void {
@@ -309,18 +311,26 @@ export class TutorialOverlay {
   }
 
   /** Injects the confirm-modal opener used by requestExit (#1332). */
-  setConfirmHandler(_cb: (config: ConfirmModalConfig) => void): void {
-    // TODO: implement
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    this.confirmHandler = cb;
   }
 
   /** Asks the player to confirm leaving the tutorial (#1332). */
   requestExit(): void {
-    // TODO: implement
+    if (!this.confirmHandler) { this.exit(); return; }
+    this.confirmHandler({
+      icon: 'warn',
+      title: t('tutorial.exit_confirm_title'),
+      body: t('tutorial.exit_confirm_body'),
+      confirmLabel: t('tutorial.exit_confirm_button'),
+      onConfirm: () => this.exit(),
+    });
   }
 
   /** Leaves the tutorial immediately (#1332). */
   exit(): void {
-    // TODO: implement
+    if (!this._active) return;
+    this.finish();
   }
 
   private finish(): void {

@@ -54,7 +54,7 @@ export interface TutorialCardElements {
    * by TutorialOverlay each guide tick, then re-applied through `locale`.
    */
   goalChipParams: LocaleParams;
-  /** Exit button (`data-action="tutorial-exit"`). Skeleton: created, not attached or wired. */
+  /** Exit button (`data-action="tutorial-exit"`) in the title row; TutorialOverlay wires its click. */
   exitBtn: HTMLButtonElement;
   stepCounter: HTMLElement;
   progressEl: HTMLElement;
@@ -75,16 +75,11 @@ export interface TutorialCardElements {
  * The wrapper is a bottom-docked, click-through strip rather than a modal
  * scrim: the card has to coexist with the control each step points at.
  *
- * No buttons anywhere in this tree. There is no "Next", no "Skip", and no
- * close/dismiss control — the only way through a step is to perform it (see
- * the "no escape hatch" tests in TutorialOverlay.test.ts). The design comp
- * this reskin ports (`docs/BlastSim game UI design/BlastSim UI.dc.html`,
- * `endCoach` on the coach card) and an early phase-list bullet from the
- * (since-completed) implementation plan both show a close (x) button; both
- * predate the deliberate, later, explicitly-tested decision recorded here and
- * in `docs/ui-redesign-spec.md` §6.17 (which lists the card's elements
- * without one). The spec and the tests — written after and more specifically
- * than the old phase-list bullet — win: no close button.
+ * Exactly one button: the muted "Exit tutorial" ghost button in the title row
+ * (`data-action="tutorial-exit"`, #1332). There is no "Next" and no "Skip" — the
+ * only way through a step is to perform it — but the player can always leave,
+ * behind a confirm owned by TutorialOverlay.requestExit(). The rails keep it
+ * live through TUTORIAL_EXIT_SELECTOR (tutorialRails.ts).
  */
 export function buildTutorialCard(container: HTMLElement): TutorialCardElements {
   const overlay = document.createElement('div');
@@ -142,9 +137,16 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   const stepCounter = document.createElement('div');
   stepCounter.className = 'bs-tutorial-progress';
 
+  const exitBtn = document.createElement('button');
+  exitBtn.type = 'button';
+  exitBtn.className = 'bs-tutorial-exit';
+  exitBtn.dataset.action = 'tutorial-exit';
+  locale.bindText(exitBtn, 'tutorial.exit');
+  locale.bindTitle(exitBtn, 'tutorial.exit_tooltip');
+
   const titleRow = el('div', {
     attrs: { style: 'display:flex;align-items:center;gap:9px;flex-wrap:wrap' },
-    children: [titleEl, pausedEl, waitingChipEl, goalChipEl, stepCounter],
+    children: [titleEl, pausedEl, waitingChipEl, goalChipEl, stepCounter, exitBtn],
   });
 
   const textEl = document.createElement('p');
@@ -183,9 +185,6 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   box.append(progressTrack, contentRow);
   overlay.appendChild(box);
   container.appendChild(overlay);
-
-  const exitBtn = document.createElement('button');
-  exitBtn.dataset.action = 'tutorial-exit';
 
   return {
     overlay, box, titleEl, textEl, stageEl, stageLine, pausedEl, pausedChipEl, waitingChipEl, goalChipEl, goalChipParams,
