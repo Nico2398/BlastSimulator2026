@@ -58,6 +58,13 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Campaign profile store contract (#1312): the storage key and the injectable storage type are
+  // the unit-tested surface, and clearCampaignProfile is the profile's documented wipe; production
+  // persists via save/load only.
+  'src/persistence/CampaignProfile.ts:recordBestStars',
+  'src/persistence/CampaignProfileStore.ts:CAMPAIGN_PROFILE_STORAGE_KEY',
+  'src/persistence/CampaignProfileStore.ts:ProfileStorage',
+  'src/persistence/CampaignProfileStore.ts:clearCampaignProfile',
   // Radius formula is the unit-tested contract of resolveSecondaryBlasts (#1394); only the resolver calls it in production.
   'src/core/entities/SecondaryBlast.ts:secondaryBlastRadiusM',
   // Read off `window` by the scenario harness, never imported.

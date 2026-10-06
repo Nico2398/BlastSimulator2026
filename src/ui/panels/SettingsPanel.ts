@@ -236,8 +236,19 @@ export class SettingsPanel extends PanelBase {
   }
 
   private handleReplayTutorial(): void {
-    this.onCloseCb?.();
-    this.onReplayTutorialCb?.();
+    const replay = (): void => {
+      this.onCloseCb?.();
+      this.onReplayTutorialCb?.();
+    };
+    // A live game is discarded by the replay, so ask first, like Return to Menu.
+    if (this.getState?.() == null) { replay(); return; }
+    this.onConfirmRequestCb?.({
+      icon: 'warn',
+      title: t('ui.settings.replay_confirm_title'),
+      body: t('ui.settings.replay_confirm_body'),
+      confirmLabel: t('ui.settings.replay_confirm_button'),
+      onConfirm: replay,
+    });
   }
 
   private handleOpenSaves(): void {

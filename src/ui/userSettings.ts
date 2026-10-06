@@ -3,6 +3,7 @@
 import type { Locale } from '../core/i18n/I18n.js';
 import type { VolumeChannel } from '../audio/AudioManager.js';
 import { AUDIO_DEFAULT_VOLUMES } from '../core/config/balance.js';
+import { resolveStorage } from '../persistence/browserStorage.js';
 
 export const SETTINGS_STORAGE_KEY = 'bs_settings_v1';
 
@@ -17,15 +18,6 @@ const VOLUME_CHANNELS = Object.keys(AUDIO_DEFAULT_VOLUMES) as VolumeChannel[];
 
 function clampVolume(value: number): number {
   return Math.max(0, Math.min(1, value));
-}
-
-function resolveStorage(storage?: SettingsStorage | null): SettingsStorage | null {
-  if (storage !== undefined) return storage;
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
 }
 
 export function loadSettings(storage?: SettingsStorage | null): StoredSettings {
