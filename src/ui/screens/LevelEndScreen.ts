@@ -148,8 +148,8 @@ export class LevelEndScreen {
     this.defeatBackBtn = button('ghost', t('ui.level_end.back_to_portfolio'), {
       dataAction: 'back-to-portfolio',
       onClick: () => {
-        if (this.lastState?.campaign.activeLevelId) this.onBackToPortfolio?.();
-        else this.onBackToSandbox?.();
+        if (this.isSandbox(this.lastState)) this.onBackToSandbox?.();
+        else this.onBackToPortfolio?.();
       },
     });
     this.defeatBackBtn.style.flex = '1';
@@ -250,6 +250,11 @@ export class LevelEndScreen {
     this.defeatTipTextEl.textContent = '';
     this.defeatStatGridEl.replaceChildren();
     this.defeatRetryBtn.textContent = '';
+  }
+
+  /** Sandbox runs have no active campaign level — endless free play. */
+  private isSandbox(state: GameState | null): boolean {
+    return !state?.campaign.activeLevelId;
   }
 
   private nextLevelId(state: GameState): string | null {
@@ -373,11 +378,17 @@ export class LevelEndScreen {
     this.defeatStatGridEl.replaceChildren(statGrid(this.defeatStats(reason, state), 4));
 
     const activeId = state.campaign.activeLevelId;
-    const level = activeId ? getLevel(activeId) : undefined;
-    const levelName = activeId ? (level ? t(level.nameKey) : '') : t('sandbox.level.name');
+    const sandbox = this.isSandbox(state);
+    let levelName = '';
+    if (sandbox) {
+      levelName = t('sandbox.level.name');
+    } else {
+      const level = activeId ? getLevel(activeId) : undefined;
+      if (level) levelName = t(level.nameKey);
+    }
     this.defeatRetryBtn.textContent = '';
     this.defeatRetryBtn.appendChild(el('span', { text: t('ui.level_end.retry', { level: levelName }) }));
-    this.defeatBackBtn.textContent = t(activeId ? 'ui.level_end.back_to_portfolio' : 'ui.level_end.back_to_sandbox');
+    this.defeatBackBtn.textContent = t(sandbox ? 'ui.level_end.back_to_sandbox' : 'ui.level_end.back_to_portfolio');
   }
 
   private defeatTipKey(reason: DefeatReason, state: GameState): string {

@@ -4,7 +4,7 @@
 import type { LevelDef } from '../core/campaign/Level.js';
 import { sandboxLevelDef, type SandboxConfig } from '../core/campaign/Sandbox.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
-import type { LoadingSiteInfo } from './LoadingScreen.js';
+import type { LoadingBriefingRow, LoadingSiteInfo } from './LoadingScreen.js';
 
 /**
  * Biome id (campaign LevelDef.biome / SandboxConfig.biome) → loading screen
@@ -19,6 +19,14 @@ const BIOME_CATEGORY_KEY: Record<string, string> = {
 };
 const DEFAULT_BIOME_CATEGORY_KEY = 'ui.portfolio.biome.mountain';
 
+/** Briefing rows every site shows: starting cash, then available explosives. */
+function briefingBase(level: LevelDef): LoadingBriefingRow[] {
+  return [
+    { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
+    { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
+  ];
+}
+
 /** Loading screen content for a campaign level entry. */
 export function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
   return {
@@ -27,9 +35,8 @@ export function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
     difficulty: level.difficultyTier,
     descriptionKey: level.descKey,
     briefing: [
-      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
+      ...briefingBase(level),
       { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
-      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
     ],
   };
 }
@@ -42,9 +49,6 @@ export function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteI
     biomeCategoryKey: BIOME_CATEGORY_KEY[config.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
     difficulty: 0,
     descriptionKey: 'loading.sandbox_subtitle',
-    briefing: [
-      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
-      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
-    ],
+    briefing: briefingBase(level),
   };
 }
