@@ -379,6 +379,228 @@
           "levelEnded": false
         }
       }
+    },
+    {
+      "command": "state",
+      "description": "#1312: with a live game, Player opens Settings and clicks Replay Tutorial; a confirm modal must appear (the live game would be discarded). Interaction-only proof; `state` is the inert paired command. The 500 ms wait copies the scroll preamble above: no observable condition exists to poll for the wheel's compositor scroll settling.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-settings-panel"
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 400
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": 2000
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel [data-action=\"replay-tutorial\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-cancel\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"
+      }
+    },
+    {
+      "command": "state",
+      "description": "#1312: Player cancels the replay confirm; the modal closes and the live game is kept (Settings still open).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-cancel\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-settings-panel .bsx-btn-danger"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-settings-panel .bsx-btn-danger",
+        "blocked": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-cancel\"]",
+        "equals": {
+          "levelEnded": false
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "#1312: Player returns to the main menu through Settings and opens the Sandbox panel. Settings is still open and scrolled from the previous step, so no toggle click.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickLabel",
+          "label": "Return to Menu"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-main-menu #bs-menu-sandbox"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu #bs-menu-sandbox"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-sandbox-start"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-sandbox-start"
+      }
+    },
+    {
+      "command": "state",
+      "description": "#1312: Player starts a default sandbox site; the HUD (TopBar Site Map) is reachable.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-sandbox-start"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-return-map",
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": ".bs-return-map",
+        "blocked": "#bs-sandbox-start"
+      },
+      "timeout": 120
+    },
+    {
+      "command": "state",
+      "description": "#1312: Player opens the Site Map from the sandbox; Grumpstone Ridge must show a Start button because the profile (outside GameState) kept the Dusty Hollow completion across the sandbox game. A locked card has no start button.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": ".bs-return-map"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"grumpstone_ridge\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"grumpstone_ridge\"]"
+      }
+    },
+    {
+      "command": "state",
+      "description": "#1312: Player backs out to the sandbox site, returns to the main menu through Settings and clicks New Campaign; progress exists so a confirm modal must appear. The 500 ms wait copies the scroll preamble above: no observable condition exists to poll for the wheel's compositor scroll settling.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-world-map-back-to-site"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-settings-panel"
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 400
+        },
+        {
+          "type": "wheel",
+          "deltaX": 0,
+          "deltaY": 2000
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickLabel",
+          "label": "Return to Menu"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-main-menu #bs-menu-new-campaign"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-main-menu #bs-menu-new-campaign"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]",
+        "blocked": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+      }
+    },
+    {
+      "command": "state",
+      "description": "#1312: Player confirms Erase and Start Over; the Portfolio shows only level 1 unlocked: Dusty Hollow startable, Grumpstone Ridge locked (no start button). The lock row is waited on directly since a locked card has no Start control to probe.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-world-map div[data-level=\"grumpstone_ridge\"] [data-role=\"lock\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]"
+      }
     }
   ]
 }

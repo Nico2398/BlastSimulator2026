@@ -2609,8 +2609,9 @@
   "ui.level_end.star_rating.safety_pass": "Aucune victime cette session.",
   "ui.level_end.star_rating.safety_fail": "{count} victime(s) cette session. Zéro est la barre.",
   "ui.level_end.star_rating.ecology_label": "Écologie",
-  "ui.level_end.star_rating.ecology_pass": "Meilleur score {score}. Il fallait 60.",
-  "ui.level_end.star_rating.ecology_fail": "Meilleur score {score}, en dessous des 60 requis.",
+  "ui.level_end.star_rating.ecology_pass": "Score final {score}. Il fallait {min} à la fin.",
+  "ui.level_end.star_rating.ecology_fail": "Score final {score}, en dessous des {min} requis à la fin.",
+  "ui.level_end.star_rating.best_note": "Meilleur : {stars}★, cette partie : {run}★",
   "ui.level_end.replay": "REJOUER POUR TROIS ÉTOILES",
   "ui.level_end.continue": "CONTINUER VERS {level}",
   "ui.level_end.back_to_portfolio": "RETOUR AU PORTEFEUILLE",
@@ -3671,5 +3672,12 @@
   "notification.pip.contract_tip": "Le contrat #{id} expire dans {duration}",
   "notification.contract_expiring_title": "Le contrat #{id} expire bientôt",
   "notification.contract_expiring_body": "Il reste {duration} — pénalité de {penalty} $ en cas de défaut.",
-  "saveload.summary": "{cash} $ — Jour {day}"
+  "saveload.summary": "{cash} $ — Jour {day}",
+  "campaign.reset_success": "Profil de campagne réinitialisé. Chaque niveau retrouve son état initial.",
+  "ui.settings.replay_confirm_title": "Rejouer le tutoriel ?",
+  "ui.settings.replay_confirm_body": "Votre partie en cours sera abandonnée. La progression de la campagne est conservée.",
+  "ui.settings.replay_confirm_button": "Rejouer le tutoriel",
+  "ui.menu.new_campaign_confirm_title": "Commencer une nouvelle campagne ?",
+  "ui.menu.new_campaign_confirm_body": "Cela efface votre progression : niveaux débloqués, profits et étoiles. Les sauvegardes ne sont pas supprimées.",
+  "ui.menu.new_campaign_confirm_button": "Effacer et recommencer"
 }

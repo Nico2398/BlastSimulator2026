@@ -2609,8 +2609,9 @@
   "ui.level_end.star_rating.safety_pass": "No casualties this session.",
   "ui.level_end.star_rating.safety_fail": "{count} casualties this session. Zero is the bar.",
   "ui.level_end.star_rating.ecology_label": "Ecology",
-  "ui.level_end.star_rating.ecology_pass": "Best score {score}. Needed 60.",
-  "ui.level_end.star_rating.ecology_fail": "Best score {score}, short of the 60 needed.",
+  "ui.level_end.star_rating.ecology_pass": "Final score {score}. Needed {min} at the end.",
+  "ui.level_end.star_rating.ecology_fail": "Final score {score}, short of the {min} needed at the end.",
+  "ui.level_end.star_rating.best_note": "Best: {stars}★, this run: {run}★",
   "ui.level_end.replay": "REPLAY FOR THREE STARS",
   "ui.level_end.continue": "CONTINUE TO {level}",
   "ui.level_end.back_to_portfolio": "BACK TO PORTFOLIO",
@@ -3671,5 +3672,12 @@
   "notification.pip.contract_tip": "Contract #{id} expires in {duration}",
   "notification.contract_expiring_title": "Contract #{id} is expiring soon",
   "notification.contract_expiring_body": "{duration} left — penalty ${penalty} if it lapses.",
-  "saveload.summary": "${cash} — Day {day}"
+  "saveload.summary": "${cash} — Day {day}",
+  "campaign.reset_success": "Campaign profile reset. Every level is back to its starting state.",
+  "ui.settings.replay_confirm_title": "Replay the tutorial?",
+  "ui.settings.replay_confirm_body": "Your current game will be discarded. Campaign progress is kept.",
+  "ui.settings.replay_confirm_button": "Replay Tutorial",
+  "ui.menu.new_campaign_confirm_title": "Start a new campaign?",
+  "ui.menu.new_campaign_confirm_body": "This erases your campaign progress: unlocked levels, profits and stars. Saved games are not deleted.",
+  "ui.menu.new_campaign_confirm_button": "Erase and Start Over"
 }

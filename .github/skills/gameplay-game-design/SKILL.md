@@ -157,6 +157,8 @@ Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing
 ### Progression
 Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-3) for replayability.
 
+**Star rating (#1311):** one rating, computed by `calculateStarRating` (`SuccessTracker`) from the end-of-run values: 1 star each for profit target reached, no deaths, and ecology at the end (`finalEcology`) >= `STAR_ECOLOGY_MIN` (60); minimum 1 star on completion. On level completion `checkLevelComplete` persists it with `recordStars` as `LevelProgress.bestStars` (max-merge, a replay only raises it; `getBestStars` falls back to 1 for old completed saves). The Portfolio card, its x / 9 total and the level-end star row all read the stored best; the level-end breakdown shows this run, with a note when it is below the best.
+
 ### Win/Lose per Level
 - **Lose:** Bankruptcy, arrest (corruption), ecology=0, well-being=0
 - **Arrest:** mafia exposure >= `ARREST_EXPOSURE_THRESHOLD` (0.9) arrests immediately. `ARREST_WARNING_EXPOSURE` (0.75) fires one `arrest:warning` event (toast) and shows an exposure pip (warn, critical from 0.9); the warning re-arms when exposure drops under 0.75. A jump past 0.9 skips the warning.
@@ -172,6 +174,7 @@ Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-
 - **Auto-save** every 2 game minutes in dedicated slot
 - **Cross-session persistence** via IndexedDB
 - **Fallback and confirms (#1325):** when IndexedDB fails its startup probe (missing, blocked, errored, 3 s timeout) saves go to a session-only in-memory backend — never a file download per save; the Saves modal shows a persistent notice and save status says "this session only". Autosave failure shows one error per failure streak. Overwrite (filled manual slots only; the auto slot has none), Delete, and Load ask for confirmation; Load confirms only when a live, unfinished game would be discarded. Empty SAVE HERE and MainMenu CONTINUE never confirm. Manual `.json` export remains the durable escape hatch.
+- **Campaign profile (#1312):** campaign progress lives in its own persistent profile (`src/persistence/CampaignProfile.ts`, localStorage key `bs_campaign_profile_v1`, in `GameContext.campaignProfile`), outside any `GameState`. Campaign levels (tier > 0) play on the profile's own campaign, so completion, best profit and stars (`bestStars`) write straight to it. Sandbox, the Tutorial and `new_game` use a throwaway campaign and never read or write the profile. Loading a save merges monotonically into the profile (unlocks, completions, profit, stars only ever increase; an old save never lowers newer progress). New Campaign asks for confirmation when progress exists, then resets the profile (console: `campaign reset`). Settings -> Replay Tutorial confirms before discarding a live game. Storage access is try/catch-wrapped; blocked storage degrades to an in-memory profile. Scenario mode ignores the stored profile.
 - **Save size tracks play, not level size** (v7): a save stores the claimed-chunk set plus the voxel data of the chunks play actually changed. Every other chunk is regenerated from the seed on load, which is exact because generation is a pure function of position and seed.
 
 ## Time Management

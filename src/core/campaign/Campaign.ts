@@ -18,6 +18,8 @@ export interface LevelProgress {
   cumulativeProfit: number;
   /** Best single-session profit (for star rating). */
   bestSessionProfit: number;
+  /** Best star rating earned (0 = none). Absent in old saves: use getBestStars. */
+  bestStars?: 0 | 1 | 2 | 3;
 }
 
 export interface CampaignState {
@@ -44,6 +46,7 @@ export function createCampaignState(): CampaignState {
       completed: false,
       cumulativeProfit: 0,
       bestSessionProfit: 0,
+      bestStars: 0,
     };
   }
 
@@ -82,7 +85,7 @@ export function recordProfit(
   const nowComplete = entry.cumulativeProfit >= level.unlockThreshold;
   if (!wasCompleted && nowComplete) {
     entry.completed = true;
-    _unlockNext(campaign, levelId);
+    unlockNextLevel(campaign, levelId);
     campaign.campaignComplete = isCampaignComplete(campaign);
     return true;
   }
@@ -91,7 +94,7 @@ export function recordProfit(
 }
 
 /** Unlock the level that follows the given level (by difficulty tier order). */
-function _unlockNext(campaign: CampaignState, completedId: string): void {
+export function unlockNextLevel(campaign: CampaignState, completedId: string): void {
   const all = getAllLevels();
   const idx = all.findIndex(l => l.id === completedId);
   if (idx < 0 || idx + 1 >= all.length) return;
@@ -137,6 +140,20 @@ export function startLevel(campaign: CampaignState, levelId: string): boolean {
 /** Return to world map (clear active level). */
 export function returnToWorldMap(campaign: CampaignState): void {
   campaign.activeLevelId = null;
+}
+
+/** Merge a star rating into a level's best (max, clamped 0..3); unknown level ignored. */
+export function recordStars(campaign: CampaignState, levelId: string, stars: number): void {
+  const entry = campaign.levels[levelId];
+  if (!entry) return;
+  const clamped = Math.max(0, Math.min(3, Math.floor(stars))) as 0 | 1 | 2 | 3;
+  if (clamped > getBestStars(entry)) entry.bestStars = clamped;
+}
+
+/** Best stars for a level: bestStars, else 1 when completed, else 0. */
+export function getBestStars(progress: LevelProgress | undefined): number {
+  if (!progress) return 0;
+  return progress.bestStars ?? (progress.completed ? 1 : 0);
 }
 
 /** Get progress for a specific level. */

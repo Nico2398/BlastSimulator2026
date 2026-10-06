@@ -12,6 +12,7 @@
 // untouched column's strata still alternate rock ids with depth after the
 // round trip.
 
+import { createCampaignProfile } from '../../src/persistence/CampaignProfile.js';
 import { describe, it, expect } from 'vitest';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
@@ -42,6 +43,7 @@ const UNTOUCHED_COLUMN_Z = 100;
 function makeEmptyGameContext(): GameContext {
   const ctx: GameContext = {
     state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter(),
+    campaignProfile: createCampaignProfile(),
   };
   subscribeNavGridToUpdates(ctx.emitter, () => buildNavGridSyncTarget(ctx));
   return ctx;
@@ -56,7 +58,7 @@ function startTreraniumDepths(): GameContext {
   const ctx = makeEmptyGameContext();
   const bootstrap = campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
   if (!bootstrap.success) throw new Error(`campaignStartCommand(tutorial_pit) failed: ${bootstrap.output}`);
-  const entry = ctx.state!.campaign.levels['treranium_depths'];
+  const entry = ctx.campaignProfile.campaign.levels['treranium_depths'];
   if (!entry) throw new Error('treranium_depths has no campaign progress entry');
   entry.unlocked = true;
 

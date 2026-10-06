@@ -15,6 +15,7 @@ import {
   recordProfit,
   startLevel,
   returnToWorldMap,
+  getBestStars,
 } from '../../src/core/campaign/Campaign.js';
 import { getLevel, getAllLevels } from '../../src/core/campaign/Level.js';
 import {
@@ -25,6 +26,9 @@ import {
 } from '../../src/core/campaign/SuccessTracker.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { createGame } from '../../src/core/state/GameState.js';
+import { checkLevelComplete } from '../../src/core/campaign/LevelTransition.js';
+import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { addIncome, addExpense } from '../../src/core/economy/Finance.js';
 import { STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
@@ -34,6 +38,8 @@ import { chargeCommand } from '../../src/console/commands/mining.js';
 import { addHole } from '../../src/core/mining/DrillPlan.js';
 import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
 import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlanQueue.js';
+import { createRunner } from '../../src/console/createRunner.js';
+import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -288,7 +294,7 @@ describe('Campaign', () => {
     const stats3 = createLevelStats();
     stats3.totalWealth = 100000; // >= profitTarget
     stats3.casualties = 0;      // zero deaths
-    stats3.bestEcology = 80;    // >= 60
+    stats3.finalEcology = 80;    // >= 60
 
     const rating3 = calculateStarRating(stats3, threshold);
     expect(rating3.stars).toBe(3);
@@ -300,7 +306,7 @@ describe('Campaign', () => {
     const stats2 = createLevelStats();
     stats2.totalWealth = 100000; // pass
     stats2.casualties = 0;       // pass
-    stats2.bestEcology = 30;    // fail (< 60)
+    stats2.finalEcology = 30;    // fail (< 60)
 
     const rating2 = calculateStarRating(stats2, threshold);
     expect(rating2.stars).toBe(2);
@@ -312,7 +318,7 @@ describe('Campaign', () => {
     const stats1a = createLevelStats();
     stats1a.totalWealth = 100000; // pass
     stats1a.casualties = 3;       // fail
-    stats1a.bestEcology = 30;    // fail
+    stats1a.finalEcology = 30;    // fail
 
     const rating1a = calculateStarRating(stats1a, threshold);
     expect(rating1a.stars).toBe(1);
@@ -324,7 +330,7 @@ describe('Campaign', () => {
     const stats1b = createLevelStats();
     stats1b.totalWealth = 0;    // fail
     stats1b.casualties = 5;     // fail
-    stats1b.bestEcology = 0;    // fail
+    stats1b.finalEcology = 0;    // fail
 
     const rating1b = calculateStarRating(stats1b, threshold);
     expect(rating1b.stars).toBe(1);
@@ -336,7 +342,7 @@ describe('Campaign', () => {
     const statsEdge = createLevelStats();
     statsEdge.totalWealth = 80000;  // exactly profitTarget
     statsEdge.casualties = 0;       // zero deaths
-    statsEdge.bestEcology = 60;     // exactly 60
+    statsEdge.finalEcology = 60;     // exactly 60
 
     const ratingEdge = calculateStarRating(statsEdge, threshold);
     expect(ratingEdge.stars).toBe(3);
@@ -791,5 +797,273 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
     expect(st.pendingActions.length).toBe(queued);
     expect(st.plannedDrillHoles).toHaveLength(0);
     expect(st.cash).toBe(cash);
+  });
+});
+
+// ── Campaign profile outside GameState (#1312) ─────────────────────────────
+
+describe('Campaign profile (#1312)', () => {
+  let runner: ConsoleRunner;
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    const made = createRunner();
+    runner = made.runner;
+    ctx = made.ctx;
+  });
+
+  /** Complete dusty_hollow through the debug command, so grumpstone_ridge unlocks in the profile. */
+  function completeDustyHollow(): void {
+    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    expect(runner.run('campaign complete').success).toBe(true);
+  }
+
+  it('campaign status with a game lists the profile levels', () => {
+    runner.run('new_game seed:42');
+    const r = runner.run('campaign status');
+    expect(r.success).toBe(true);
+    expect(r.output).toContain('dusty_hollow');
+    expect(r.output).toContain('grumpstone_ridge');
+  });
+
+  it('campaign status with a game shows progress held in the profile', () => {
+    runner.run('new_game seed:42');
+    ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked = true;
+    ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed = true;
+    const out = runner.run('campaign status').output;
+    const line = out.split('\n').find(l => l.includes('dusty_hollow'))!;
+    expect(line).toContain('Completed');
+  });
+
+  it('campaign start of a tier>0 level aliases state.campaign to the profile campaign', () => {
+    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    expect(ctx.state!.campaign).toBe(ctx.campaignProfile.campaign);
+    expect(ctx.state!.campaign.activeLevelId).toBe('dusty_hollow');
+  });
+
+  it('campaign complete writes the completion and the next unlock to the profile', () => {
+    completeDustyHollow();
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(true);
+  });
+
+  it('campaign complete level:<id> on a new_game state updates the profile', () => {
+    runner.run('new_game seed:42');
+    const r = runner.run('campaign complete level:grumpstone_ridge');
+    expect(r.success).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.completed).toBe(true);
+  });
+
+  it('tick-pipeline level completion writes profit, completion and stars to the profile', () => {
+    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    const threshold = getLevel('dusty_hollow')!.unlockThreshold;
+    addIncome(ctx.state!.finances, threshold + 10000, 'contracts', 'test:profile', ctx.state!.tickCount);
+    ctx.state!.cash = ctx.state!.finances.cash;
+    runner.run('tick 1');
+    expect(ctx.state!.levelEndReason).toBe('completed');
+    const entry = ctx.campaignProfile.campaign.levels['dusty_hollow']!;
+    expect(entry.completed).toBe(true);
+    expect(entry.cumulativeProfit).toBeGreaterThanOrEqual(threshold);
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(true);
+    const stars = ctx.campaignProfile.bestStars['dusty_hollow'];
+    expect(stars).toBeGreaterThanOrEqual(1);
+    expect(stars).toBeLessThanOrEqual(3);
+  });
+
+  it('level:complete records bestStars as the maximum, never lowering', () => {
+    ctx.campaignProfile.bestStars['dusty_hollow'] = 3;
+    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    const threshold = getLevel('dusty_hollow')!.unlockThreshold;
+    addIncome(ctx.state!.finances, threshold + 10000, 'contracts', 'test:profile', ctx.state!.tickCount);
+    ctx.state!.cash = ctx.state!.finances.cash;
+    // A casualty guarantees a rating below three stars.
+    ctx.state!.levelStats.casualties = 1;
+    runner.run('tick 1');
+    expect(ctx.state!.levelEndReason).toBe('completed');
+    expect(ctx.campaignProfile.bestStars['dusty_hollow']).toBe(3);
+  });
+
+  it('progress survives a sandbox start', () => {
+    completeDustyHollow();
+    expect(runner.run('sandbox start biome:desert_badlands difficulty:easy seed:1').success).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(true);
+    const status = runner.run('campaign status').output;
+    expect(status.split('\n').find(l => l.includes('grumpstone_ridge'))).not.toContain('Locked');
+  });
+
+  it('progress survives new_game', () => {
+    completeDustyHollow();
+    expect(runner.run('new_game seed:7').success).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(true);
+  });
+
+  it('new_game state carries a throwaway campaign, not the profile object', () => {
+    completeDustyHollow();
+    runner.run('new_game seed:7');
+    expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
+  });
+
+  it('grumpstone_ridge starts after a sandbox session once dusty_hollow was completed', () => {
+    completeDustyHollow();
+    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:1');
+    const r = runner.run('campaign start level:grumpstone_ridge');
+    expect(r.success).toBe(true);
+    expect(ctx.state!.campaign.activeLevelId).toBe('grumpstone_ridge');
+  });
+
+  it('grumpstone_ridge starts after new_game once dusty_hollow was completed', () => {
+    completeDustyHollow();
+    runner.run('new_game seed:7');
+    expect(runner.run('campaign start level:grumpstone_ridge').success).toBe(true);
+  });
+
+  it('grumpstone_ridge is locked for a player with no progress', () => {
+    const r = runner.run('campaign start level:grumpstone_ridge');
+    expect(r.success).toBe(false);
+  });
+
+  it('tutorial start never reads or writes the profile', () => {
+    completeDustyHollow();
+    const before = JSON.parse(JSON.stringify(ctx.campaignProfile));
+    expect(runner.run('campaign start level:tutorial_pit').success).toBe(true);
+    expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
+    expect(runner.run('campaign complete').success).toBe(true);
+    expect(ctx.campaignProfile).toEqual(before);
+  });
+
+  it('tutorial campaign does not see profile progress', () => {
+    completeDustyHollow();
+    runner.run('campaign start level:tutorial_pit');
+    expect(ctx.state!.campaign.levels['dusty_hollow']!.completed).toBe(false);
+    expect(ctx.state!.campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
+  });
+
+  it('tutorial completion leaves the profile tutorial entry untouched', () => {
+    runner.run('campaign start level:tutorial_pit');
+    runner.run('campaign complete');
+    expect(ctx.campaignProfile.campaign.levels['tutorial_pit']!.completed).toBe(false);
+    expect(ctx.campaignProfile.bestStars['tutorial_pit']).toBeUndefined();
+  });
+
+  it('campaign reset wipes the profile and re-locks grumpstone_ridge', () => {
+    completeDustyHollow();
+    const r = runner.run('campaign reset');
+    expect(r.success).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(false);
+    expect(ctx.campaignProfile.bestStars).toEqual({});
+    runner.run('new_game seed:7');
+    expect(runner.run('campaign start level:grumpstone_ridge').success).toBe(false);
+  });
+
+  it('campaign reset works with no game loaded and keeps the profile object', () => {
+    const profile = ctx.campaignProfile;
+    const campaign = profile.campaign;
+    ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked = true;
+    expect(runner.run('campaign reset').success).toBe(true);
+    expect(ctx.campaignProfile).toBe(profile);
+    expect(ctx.campaignProfile.campaign).toBe(campaign);
+    expect(campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
+  });
+
+  it('load merges the saved campaign into an empty profile', () => {
+    completeDustyHollow();
+    runner.run('save slot:profile_merge');
+    runner.run('campaign reset');
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(false);
+    expect(runner.run('load slot:profile_merge').success).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(true);
+  });
+
+  it('load never lowers a profile that is ahead of the save', () => {
+    runner.run('new_game seed:7');
+    runner.run('save slot:profile_old');
+    completeDustyHollow();
+    expect(runner.run('load slot:profile_old').success).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(true);
+  });
+
+  it('loading a campaign-level save re-aliases state.campaign to the profile', () => {
+    runner.run('campaign start level:dusty_hollow');
+    runner.run('save slot:profile_level');
+    runner.run('new_game seed:7');
+    expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
+    expect(runner.run('load slot:profile_level').success).toBe(true);
+    expect(ctx.state!.campaign.activeLevelId).toBe('dusty_hollow');
+    expect(ctx.state!.campaign).toBe(ctx.campaignProfile.campaign);
+  });
+
+  it('loading a non-campaign save does not alias state.campaign to the profile', () => {
+    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:1');
+    runner.run('save slot:profile_sandbox');
+    runner.run('campaign start level:dusty_hollow');
+    expect(runner.run('load slot:profile_sandbox').success).toBe(true);
+    expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
+  });
+
+  it('completing a level after loading a campaign-level save still writes to the profile', () => {
+    runner.run('campaign start level:dusty_hollow');
+    runner.run('save slot:profile_level2');
+    runner.run('new_game seed:7');
+    runner.run('load slot:profile_level2');
+    expect(runner.run('campaign complete').success).toBe(true);
+    expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(true);
+  });
+});
+
+// ── #1311: single star rating, stored and persisted ─────────────────────────
+
+describe('Campaign star persistence (#1311)', () => {
+  function sessionAtThreshold(campaign: ReturnType<typeof createCampaignState>, levelId: string, opts: { deaths: number; ecologyPeak: number; ecologyEnd: number }) {
+    const state = createGame({ seed: 42 });
+    state.campaign = campaign;
+    startLevel(campaign, levelId);
+    const level = getLevel(levelId)!;
+    addIncome(state.finances, level.unlockThreshold, 'sales', 'test', 0);
+    state.damage.deathCount = opts.deaths;
+    state.scores.ecology = opts.ecologyPeak;
+    snapshotStats(state.levelStats, state);
+    state.scores.ecology = opts.ecologyEnd; // ecology drops before the end
+    snapshotStats(state.levelStats, state);
+    return state;
+  }
+
+  it('the end-of-run ecology, not the peak, decides the ecology star', () => {
+    const campaign = createCampaignState();
+    const state = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 90, ecologyEnd: 40 });
+    const result = checkLevelComplete(state, campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(2);
+    expect(getBestStars(campaign.levels['dusty_hollow'])).toBe(2);
+  });
+
+  it('a clean, green run stores 3 stars', () => {
+    const campaign = createCampaignState();
+    const state = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 70, ecologyEnd: 65 });
+    checkLevelComplete(state, campaign, new EventEmitter());
+    expect(campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+  });
+
+  it('stored stars survive save and load, and a worse replay after load does not lower them', () => {
+    const campaign = createCampaignState();
+    const first = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 70, ecologyEnd: 70 });
+    checkLevelComplete(first, campaign, new EventEmitter());
+
+    const loaded = deserialize(serialize(first));
+    expect(loaded.campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+
+    const replay = sessionAtThreshold(loaded.campaign, 'dusty_hollow', { deaths: 3, ecologyPeak: 20, ecologyEnd: 20 });
+    const result = checkLevelComplete(replay, loaded.campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(1);
+    expect(loaded.campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+  });
+
+  it('other levels stay at 0 stars', () => {
+    const campaign = createCampaignState();
+    const state = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 70, ecologyEnd: 70 });
+    checkLevelComplete(state, campaign, new EventEmitter());
+    expect(getBestStars(campaign.levels['grumpstone_ridge'])).toBe(0);
   });
 });

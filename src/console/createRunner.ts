@@ -55,6 +55,8 @@ import {
   campaignStatusCommand,
   campaignCompleteCommand,
   campaignStartCommand,
+  campaignResetCommand,
+  recordLevelResultInProfile,
   statsCommand,
   tutorialStartCommand,
 } from './commands/campaign.js';
@@ -62,6 +64,7 @@ import { sandboxCommand } from './commands/sandbox.js';
 import { stateCommand } from './commands/state.js';
 import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
+import { createCampaignProfile } from '../persistence/CampaignProfile.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
 import { subscribeNavGridToUpdates } from '../core/nav/NavGridSync.js';
 
@@ -146,7 +149,7 @@ export function createRunner(): RunnerWithContext {
   setupEvents();
 
   const emitter = new EventEmitter();
-  const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter };
+  const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter, campaignProfile: createCampaignProfile() };
   // A paused game never ticks, so a hire, fire, purchase, sale or new order made
   // by command would leave ghost colours stale until resume (#1306). A running
   // game re-classifies on its next tick, and a bare `tick` does so itself.
@@ -164,6 +167,13 @@ export function createRunner(): RunnerWithContext {
   // Reads ctx fresh on every event so it tracks `new_game` replacing
   // ctx.state/ctx.grid, rather than a snapshot taken here at wiring-time.
   subscribeNavGridToUpdates(emitter, () => buildNavGridSyncTarget(ctx));
+
+  // A won campaign level lands in the persistent profile with its star rating
+  // (#1312). The stats snapshot precedes the emit (GameOverConditions), so
+  // levelStats already reads the finished session.
+  emitter.on('level:complete', ({ levelId }) => {
+    if (ctx.state) recordLevelResultInProfile(ctx, ctx.state, levelId);
+  });
 
   // --- World commands (Phase 2) ---
   runner.register('new_game', 'Create a new game (mine_type:desert seed:42)', (args, named) =>
@@ -284,13 +294,14 @@ export function createRunner(): RunnerWithContext {
   );
 
   // --- Campaign commands (Phase 7) ---
-  runner.register('campaign', 'Campaign (status|start level:<id>|complete [level:<id>])', (args, named): CommandResult => {
+  runner.register('campaign', 'Campaign (status|start level:<id>|complete [level:<id>]|reset)', (args, named): CommandResult => {
     const sub = args[0] ?? named['sub'] ?? 'status';
     const rest = args.slice(1);
     if (sub === 'status') return campaignStatusCommand(ctx, rest, named);
     if (sub === 'start') return campaignStartCommand(ctx, rest, named);
     if (sub === 'complete') return campaignCompleteCommand(ctx, rest, named);
-    return { success: false, output: `Unknown sub-command: "${sub}". Use: status | start | complete` };
+    if (sub === 'reset') return campaignResetCommand(ctx, rest, named);
+    return { success: false, output: `Unknown sub-command: "${sub}". Use: status | start | complete | reset` };
   });
   runner.register('sandbox', 'Sandbox mode (start biome:<id> seed:<n|random> size:<n> ...)', (args, named) =>
     sandboxCommand(ctx, args, named),

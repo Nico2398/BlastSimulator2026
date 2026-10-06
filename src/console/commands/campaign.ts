@@ -4,15 +4,29 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
-import { getLevelProgress, createCampaignState, recordProfit, isCampaignDone } from '../../core/campaign/Campaign.js';
+import { getLevelProgress, createCampaignState, isCampaignDone, isCampaignLevel } from '../../core/campaign/Campaign.js';
 import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
-import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
+import { createGameForLevel, settleLevelResult } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
-import { calculateStarRating, snapshotStats } from '../../core/campaign/SuccessTracker.js';
+import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
+import { mergeCampaignIntoProfile, resetCampaignProfile } from '../../persistence/CampaignProfile.js';
+import type { GameState } from '../../core/state/GameState.js';
+
+/**
+ * Fold a finished campaign level into the persistent profile: the session's
+ * campaign (a no-op when aliased to the profile) and its star rating. Tier 0
+ * (tutorial) never touches the profile. Needs `state.levelStats` snapshotted.
+ */
+export function recordLevelResultInProfile(ctx: GameContext, state: GameState, levelId: string): void {
+  const level = getLevel(levelId);
+  if (!level || !isCampaignLevel(level)) return;
+  const rating = calculateStarRating(state.levelStats, level.unlockThreshold);
+  mergeCampaignIntoProfile(ctx.campaignProfile, state.campaign, { [levelId]: rating.stars });
+}
 // ── campaign status ──
 
 export function campaignStatusCommand(
@@ -23,7 +37,7 @@ export function campaignStatusCommand(
   if (!ctx.state) {
     return { success: false, output: t('console.no_game_loaded') };
   }
-  const campaign = ctx.state.campaign;
+  const campaign = ctx.campaignProfile.campaign;
   const lines: string[] = ['Campaign Status:'];
   for (const lvl of getAllLevels()) {
     const prog = getLevelProgress(campaign, lvl.id);
@@ -38,7 +52,7 @@ export function campaignStatusCommand(
   if (isCampaignDone(campaign)) {
     lines.push(t('campaign.status_complete'));
   }
-  const active = campaign.activeLevelId ?? '(world map)';
+  const active = ctx.state.campaign.activeLevelId ?? '(world map)';
   lines.push(`Active: ${active}`);
   return { success: true, output: lines.join('\n') };
 }
@@ -80,8 +94,8 @@ export function campaignCompleteCommand(
     addIncome(ctx.state.finances, shortfall, 'contracts', 'debug:force_complete', ctx.state.tickCount);
   }
   ctx.state.cash = ctx.state.finances.cash;
-  snapshotStats(ctx.state.levelStats, ctx.state);
-  recordProfit(ctx.state.campaign, levelId, ctx.state.levelStats.totalWealth);
+  settleLevelResult(ctx.state, ctx.state.campaign, levelId, level.unlockThreshold);
+  recordLevelResultInProfile(ctx, ctx.state, levelId);
   ctx.state.levelEnded = true;
   ctx.state.levelEndReason = 'completed';
 
@@ -103,14 +117,11 @@ export function campaignStartCommand(
     return { success: false, output: t('campaign.start_usage') };
   }
 
-  // No prior game means no prior progress either — a fresh CampaignState is
-  // exactly what a preceding `new_game` would have produced, since neither
-  // this command nor createGameForLevel reads anything else off the old
-  // state. main.ts's own WorldMap "Start Level" handler already relies on
-  // this equivalence (`ctx.state ? [] : ['new_game']`) to skip a redundant
-  // new_game before a player's very first level; this makes the console
-  // command itself tolerate the same case instead of erroring on it.
-  const campaign = ctx.state?.campaign ?? createCampaignState();
+  // Campaign levels (tier > 0) play on the persistent profile itself, so core
+  // recordProfit writes progress straight into it. The tutorial and any other
+  // mode keep a throwaway campaign and never touch the profile (#1312).
+  const target = getLevel(levelId);
+  const campaign = target && isCampaignLevel(target) ? ctx.campaignProfile.campaign : createCampaignState();
 
   // `staffed:`, mirroring new_game/sandbox start's own opt-in (#551): a
   // pre-hired roster and pre-purchased fleet, so a scenario that only needs
@@ -180,6 +191,17 @@ export function campaignStartCommand(
       staffedSuffix: staffedSuffix(flags.staffed),
     }),
   };
+}
+
+// ── campaign reset ──
+
+export function campaignResetCommand(
+  ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  resetCampaignProfile(ctx.campaignProfile);
+  return { success: true, output: t('campaign.reset_success') };
 }
 
 // ── tutorial start ──

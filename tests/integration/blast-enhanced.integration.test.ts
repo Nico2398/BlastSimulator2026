@@ -378,8 +378,8 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32').success).toBe(true);
-    recordProfit(ctx.state!.campaign, 'tutorial_pit', 5000);
-    recordProfit(ctx.state!.campaign, 'dusty_hollow', 80000);
+    recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
+    recordProfit(ctx.campaignProfile.campaign, 'dusty_hollow', 80000);
     expect(run('campaign start level:grumpstone_ridge cash:500000').success).toBe(true);
     const state = ctx.state!;
     state.softwareTier = opts.tier ?? 4;
