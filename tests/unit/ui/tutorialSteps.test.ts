@@ -4,7 +4,7 @@ import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSt
 import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import { victoryProgress, goalChipParams } from '../../../src/ui/tutorialStepsClosing.js';
-import { stagesFor, TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
+import { TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
 import { createFinanceState, addIncome, addExpense, getFinancialReport } from '../../../src/core/economy/Finance.js';
 import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
