@@ -4,11 +4,11 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
-import { getLevelProgress, createCampaignState, recordProfit, recordStars, isCampaignDone } from '../../core/campaign/Campaign.js';
+import { getLevelProgress, createCampaignState, isCampaignDone } from '../../core/campaign/Campaign.js';
 import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
-import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
+import { createGameForLevel, settleLevelResult } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
-import { calculateStarRating, snapshotStats } from '../../core/campaign/SuccessTracker.js';
+import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
@@ -80,9 +80,7 @@ export function campaignCompleteCommand(
     addIncome(ctx.state.finances, shortfall, 'contracts', 'debug:force_complete', ctx.state.tickCount);
   }
   ctx.state.cash = ctx.state.finances.cash;
-  snapshotStats(ctx.state.levelStats, ctx.state);
-  recordProfit(ctx.state.campaign, levelId, ctx.state.levelStats.totalWealth);
-  recordStars(ctx.state.campaign, levelId, calculateStarRating(ctx.state.levelStats, level.unlockThreshold).stars);
+  settleLevelResult(ctx.state, ctx.state.campaign, levelId, level.unlockThreshold);
   ctx.state.levelEnded = true;
   ctx.state.levelEndReason = 'completed';
 

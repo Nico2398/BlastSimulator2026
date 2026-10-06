@@ -27,6 +27,26 @@ export interface LevelCompleteResult {
   summary: LevelCompleteSummary | null;
 }
 
+// ── Result settlement ──
+
+/**
+ * Snapshot the session's stats and record profit and stars on the campaign.
+ * `profit` defaults to the snapshot's total wealth. Returns the star rating.
+ */
+export function settleLevelResult(
+  state: GameState,
+  campaign: CampaignState,
+  levelId: string,
+  unlockThreshold: number,
+  profit?: number,
+): number {
+  snapshotStats(state.levelStats, state);
+  recordProfit(campaign, levelId, profit ?? state.levelStats.totalWealth);
+  const { stars } = calculateStarRating(state.levelStats, unlockThreshold);
+  recordStars(campaign, levelId, stars);
+  return stars;
+}
+
 // ── Threshold check ──
 
 /**
@@ -61,10 +81,7 @@ export function checkLevelComplete(
 
   // Threshold reached — close the session (guards repeat triggers), record, build summary
   state.levelEnded = true;
-  recordProfit(campaign, levelId, profit);
-  snapshotStats(state.levelStats, state);
-  const { stars } = calculateStarRating(state.levelStats, level.unlockThreshold);
-  recordStars(campaign, levelId, stars);
+  const stars = settleLevelResult(state, campaign, levelId, level.unlockThreshold, profit);
 
   const summary: LevelCompleteSummary = {
     levelId,
