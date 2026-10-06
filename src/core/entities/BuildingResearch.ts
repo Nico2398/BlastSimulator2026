@@ -3,6 +3,7 @@
 
 import type { BuildingType, BuildingTier, BuildingState, ResearchTask } from './Building.js';
 import { getResearchTaskDef } from '../config/balance.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 
 export type { ResearchTask };
 
@@ -134,7 +135,11 @@ export interface CancelledResearch {
  * task's ticksRemaining; when it reaches 0, set
  * unlockedTiers[targetType] = targetTier and remove it from the queue.
  */
-export function tickResearch(state: BuildingState): CancelledResearch | undefined {
+export function tickResearch(
+  state: BuildingState,
+  emitter?: Pick<EventEmitter, 'emit'>,
+): CancelledResearch | undefined {
+  void emitter;
   const task = state.researchQueue[0];
   if (!task) return undefined;
   if (!hasActiveResearchCenter(state)) {
@@ -178,4 +183,11 @@ export function isResearchQueued(
   return state.researchQueue.some(
     (task) => task.targetType === type && task.targetTier === tier,
   );
+}
+
+/** Progress of a queued research task: ticks elapsed, total ticks, and elapsed/total fraction (0..1). */
+export function getResearchProgress(task: ResearchTask): { elapsed: number; total: number; fraction: number } {
+  void task;
+  // TODO: implement
+  return { elapsed: 0, total: 0, fraction: 0 };
 }
