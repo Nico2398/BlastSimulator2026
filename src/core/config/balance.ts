@@ -1678,3 +1678,6 @@ export const ENV_CAUSE_ECOLOGY_MAX = 45;
 
 /** Nuisance score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
 export const ENV_CAUSE_NUISANCE_MAX = 45;
+
+/** Max cached reachability fills in OrderReachability (#1427). One grid-sized Uint8Array per key, so memory is bounded by this cap. */
+export const ORDER_REACH_CACHE_MAX_KEYS = 64;

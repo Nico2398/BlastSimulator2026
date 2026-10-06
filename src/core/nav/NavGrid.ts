@@ -177,6 +177,17 @@ export class NavGrid {
    * `cellAt`, which takes world coordinates, over indexing this directly.
    */
   readonly cells: NavCell[][];
+  /**
+   * Bumped whenever any cell's type, clearance or surfaceY changes, so derived
+   * caches (e.g. reachability fills) can key on it. Code writing cells
+   * directly, bypassing `setCellAt`, must call `bumpRevision`.
+   */
+  revision = 0;
+
+  /** Mark the grid as changed; invalidates caches keyed on `revision`. */
+  bumpRevision(): void {
+    // TODO: implement
+  }
 
   constructor(
     width: number,
