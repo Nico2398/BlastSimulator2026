@@ -228,7 +228,7 @@ export class CrewPanel extends PanelBase {
       expanded ? 'rgba(255,176,46,.4)' : e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
     };background:${expanded ? 'rgba(255,176,46,.07)' : 'var(--bsx-card)'}`;
 
-    const toggle = el('button', { className: 'bs-detail-toggle', attrs: { style: 'flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;cursor:pointer;text-align:left' } });
+    const toggle = el('button', { className: 'bs-detail-toggle', attrs: { style: 'flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:transparent;color:var(--bsx-text-primary);cursor:pointer;text-align:left' } });
     toggle.addEventListener('click', () => {
       this.expandedId = expanded ? null : e.id;
       this.lastSignature = '';
