@@ -7,6 +7,9 @@ import type { LevelStats } from '../../../../src/core/campaign/SuccessTracker.js
 import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import type { ShiftMode } from '../../../../src/core/entities/SitePolicy.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
+import { recordStars, getBestStars } from '../../../../src/core/campaign/Campaign.js';
+import { calculateStarRating } from '../../../../src/core/campaign/SuccessTracker.js';
+import { getLevel } from '../../../../src/core/campaign/Level.js';
 import { TICKS_PER_DAY, REVOLT_TICKS } from '../../../../src/core/config/balance.js';
 
 function mount(): { container: HTMLDivElement; screen: LevelEndScreen } {
@@ -21,7 +24,15 @@ function stateAtLevelEnd(overrides: Partial<LevelStats> = {}, levelId = 'dusty_h
   s.levelEnded = true;
   s.levelEndReason = 'completed';
   Object.assign(s.levelStats, overrides);
+  // checkLevelComplete stores the session's rating before the screen opens.
+  const target = getLevel(levelId)?.unlockThreshold ?? 0;
+  recordStars(s.campaign, levelId, calculateStarRating(s.levelStats, target).stars);
   return s;
+}
+
+function earnedStarCount(container: HTMLElement): number {
+  const stars = container.querySelectorAll('#bs-level-end-screen bs-icon[name="star"]');
+  return Array.from(stars).filter(st => (st as HTMLElement).style.color === 'var(--bsx-amber)').length;
 }
 
 type DefeatReason = 'bankruptcy' | 'arrest' | 'ecological_shutdown' | 'worker_revolt';
@@ -35,11 +46,12 @@ function stateAtDefeat(reason: DefeatReason, levelId = 'dusty_hollow'): GameStat
 }
 
 // dusty_hollow's unlockThreshold is 80000; treranium_depths is the last level.
-const THREE_STAR: Partial<LevelStats> = { totalWealth: 100000, casualties: 0, bestEcology: 75 };
-const ONE_STAR: Partial<LevelStats> = { totalWealth: 1000, casualties: 2, bestEcology: 10 };
+const THREE_STAR: Partial<LevelStats> = { totalWealth: 100000, casualties: 0, bestEcology: 75, finalEcology: 75 };
+const ONE_STAR: Partial<LevelStats> = { totalWealth: 1000, casualties: 2, bestEcology: 10, finalEcology: 10 };
 
 describe('LevelEndScreen', () => {
   afterEach(() => {
+    document.body.innerHTML = ''; // a failed assertion skips dispose(); don't leak a screen into later tests
     setLocale('en');
   });
 
@@ -98,6 +110,36 @@ describe('LevelEndScreen', () => {
     screen.dispose();
   });
 
+  it('victory star row shows the stored best stars, the same value the world map reads (#1311)', () => {
+    const { container, screen } = mount();
+    const state = stateAtLevelEnd(ONE_STAR); // this session is worth 1 star ...
+    recordStars(state.campaign, 'dusty_hollow', 3); // ... but a past run stored 3
+    expect(getBestStars(state.campaign.levels['dusty_hollow'])).toBe(3);
+    screen.update(state);
+    expect(earnedStarCount(container)).toBe(3);
+    screen.dispose();
+  });
+
+  it('replay button stays hidden when the stored best is 3 even if this session scored lower (#1311)', () => {
+    const { container, screen } = mount();
+    const state = stateAtLevelEnd(ONE_STAR);
+    recordStars(state.campaign, 'dusty_hollow', 3);
+    screen.update(state);
+    const replay = container.querySelector<HTMLButtonElement>('#bs-level-end-screen [data-action="replay"]');
+    expect(replay!.style.display).toBe('none');
+    screen.dispose();
+  });
+
+  it('ecology row reads the end-of-run ecology, not the peak (#1311)', () => {
+    const { container, screen } = mount();
+    screen.update(stateAtLevelEnd({ totalWealth: 100000, casualties: 0, bestEcology: 90, finalEcology: 40 }));
+    const names = Array.from(container.querySelectorAll('#bs-level-end-screen bs-icon'))
+      .map(i => i.getAttribute('name')).filter(n => n === 'check' || n === 'x');
+    expect(names).toEqual(['check', 'check', 'x']); // profit, safety, ecology
+    expect(earnedStarCount(container)).toBe(2);
+    screen.dispose();
+  });
+
   it('stat grid shows the real LevelStats figures', () => {
     const { container, screen } = mount();
     const state = stateAtLevelEnd({
@@ -118,7 +160,7 @@ describe('LevelEndScreen', () => {
   it('the star-rating breakdown marks each criterion with check or x matching its real pass/fail', () => {
     const { container, screen } = mount();
     // Profit pass, safety fail, ecology pass.
-    screen.update(stateAtLevelEnd({ totalWealth: 100000, casualties: 3, bestEcology: 75 }));
+    screen.update(stateAtLevelEnd({ totalWealth: 100000, casualties: 3, bestEcology: 75, finalEcology: 75 }));
 
     const icons = container.querySelectorAll('#bs-level-end-screen bs-icon');
     const names = Array.from(icons).map(i => i.getAttribute('name'));
@@ -130,7 +172,7 @@ describe('LevelEndScreen', () => {
 
   it('safety-fail note names the real casualty count, not a misleading score bar', () => {
     const { container, screen } = mount();
-    screen.update(stateAtLevelEnd({ totalWealth: 100000, casualties: 3, bestEcology: 75 }));
+    screen.update(stateAtLevelEnd({ totalWealth: 100000, casualties: 3, bestEcology: 75, finalEcology: 75 }));
     expect(container.querySelector('#bs-level-end-screen')!.textContent).toContain('3 casualties');
     screen.dispose();
   });
