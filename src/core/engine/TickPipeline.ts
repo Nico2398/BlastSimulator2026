@@ -155,7 +155,7 @@ export function runTick(
   state.tickCount++;
   state.time += BASE_TICK_MS;
 
-  // 0. Weather — own persisted rng stream, before events read it
+  // 0. Weather — own persisted rng stream, advanced before events read it
   tickWeather(state.weather);
 
   // 1. Event system

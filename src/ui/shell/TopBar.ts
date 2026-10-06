@@ -280,11 +280,9 @@ export class TopBar {
     this.clockValue.textContent = `${String(hour).padStart(2, '0')}:00`;
 
     // Weather
-    if (weather) {
-      this.lastWeather = weather;
-      this.weatherIcon.setAttribute('name', WEATHER_ICON[weather] ?? 'sun');
-      this.weatherBtn.title = t(`hud.weather.${weather}`);
-    }
+    this.lastWeather = weather;
+    this.weatherIcon.setAttribute('name', WEATHER_ICON[weather] ?? 'sun');
+    this.weatherBtn.title = t(`hud.weather.${weather}`);
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
 
     // Speed / pause

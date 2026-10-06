@@ -58,6 +58,11 @@ export interface WeatherCycleState {
   rngState: number;
 }
 
+/** True when `value` is a weather state name (type guard for untrusted/saved data). */
+export function isWeatherState(value: unknown): value is WeatherState {
+  return typeof value === 'string' && (ALL_WEATHER_STATES as readonly string[]).includes(value);
+}
+
 /** Create initial weather cycle from seed. */
 export function createWeatherCycle(seed: number): WeatherCycleState {
   const rngState = (seed + WEATHER_RNG_SEED_OFFSET) | 0;
@@ -97,19 +102,22 @@ export function forceAdvance(cycle: WeatherCycleState, rng: Random): WeatherCycl
   return advanceWeather(cycle, rng);
 }
 
+/** Run `step` on the cycle's own persisted PRNG stream, then store the stream's new state. */
+function withCycleRng(cycle: WeatherCycleState, step: (rng: Random) => void): void {
+  const rng = Random.fromState(cycle.rngState);
+  step(rng);
+  cycle.rngState = rng.snapshot();
+}
+
 /** Advance the cycle one tick on its own persisted PRNG stream; returns the resulting weather. */
 export function tickWeather(cycle: WeatherCycleState): WeatherState {
-  const rng = Random.fromState(cycle.rngState);
-  advanceWeather(cycle, rng);
-  cycle.rngState = rng.snapshot();
+  withCycleRng(cycle, rng => advanceWeather(cycle, rng));
   return cycle.current;
 }
 
 /** Force transition to the next weather state on the cycle's own PRNG stream (testing/console). */
 export function forceAdvanceInState(cycle: WeatherCycleState): WeatherCycleState {
-  const rng = Random.fromState(cycle.rngState);
-  forceAdvance(cycle, rng);
-  cycle.rngState = rng.snapshot();
+  withCycleRng(cycle, rng => forceAdvance(cycle, rng));
   return cycle;
 }
 

@@ -131,14 +131,13 @@ describe('forecast', () => {
     expect(cycle.history).toEqual(before.history);
   });
 
-  it('does not consume the rng it was given', () => {
+  it('leaves the cycle rngState unchanged', () => {
     const cycle = createWeatherCycle(17);
-    const rng = new Random(17);
-    const expected = new Random(17).next();
+    const rngBefore = cycle.rngState;
 
     forecast(cycle, 14);
 
-    expect(rng.next()).toBe(expected);
+    expect(cycle.rngState).toBe(rngBefore);
   });
 
   it('a longer horizon extends, rather than reruns, a shorter one', () => {

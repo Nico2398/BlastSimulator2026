@@ -5,7 +5,7 @@
 
 import type { GameState } from '../core/state/GameState.js';
 import { firstEmptyLayerAboveGround, type VoxelGrid } from '../core/world/VoxelGrid.js';
-import type { WeatherCycleState, WeatherState } from '../core/weather/WeatherCycle.js';
+import type { WeatherState } from '../core/weather/WeatherCycle.js';
 import type { ZoneBounds } from '../core/entities/Zone.js';
 import { isInZone, isZoneStillBlastThreatened } from '../core/entities/Zone.js';
 import type { BuildingMesh } from './BuildingMesh.js';
@@ -31,7 +31,6 @@ import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './Su
  */
 export interface SyncDeps {
   state: GameState;
-  weatherCycle: WeatherCycleState | undefined;
   buildings: BuildingMesh | null;
   renderedBuildingIds: Set<number>;
   vehicles: VehicleMesh | null;
@@ -60,10 +59,9 @@ export interface SyncDeps {
 
 /**
  * Fields syncGameRendererEntities() mutates that the caller (GameRenderer)
- * must write back. `lastWeather` is only present when the original's guard
- * (`this.skybox && ctx.weatherCycle`) would have reassigned it — a
- * null-skybox/present-weatherCycle call must leave the caller's existing
- * value untouched, matching the pre-split behaviour exactly.
+ * must write back. `lastWeather` is only present when a skybox exists to
+ * receive the weather — a null-skybox call must leave the caller's existing
+ * value untouched.
  */
 export interface SyncResult {
   lastGhostRevision: number;
@@ -207,10 +205,10 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   }
 
   // Sync weather
-  if (deps.skybox && deps.weatherCycle) {
-    lastWeather = deps.weatherCycle.current;
-    deps.skybox.setWeather(deps.weatherCycle.current);
-    deps.clouds?.setWeather(deps.weatherCycle.current);
+  if (deps.skybox) {
+    lastWeather = state.weather.current;
+    deps.skybox.setWeather(lastWeather);
+    deps.clouds?.setWeather(lastWeather);
   }
 
   // Sync survey confidence overlay

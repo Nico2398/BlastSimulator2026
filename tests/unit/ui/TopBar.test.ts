@@ -4,7 +4,7 @@ import { TopBar, formatBalance, netPerTick } from '../../../src/ui/shell/TopBar.
 import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
-import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
 
@@ -156,6 +156,18 @@ describe('TopBar (redesign P1)', () => {
       expect(popover.style.display).not.toBe('none');
       expect(popover.textContent).toContain('Heavy Rain');
       expect(popover.textContent).toContain('flooding fast');
+      topBar.dispose();
+    });
+
+    it('shows the no-data fallback when opened before any update()', () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const topBar = new TopBar(container);
+      const weatherBtn = container.querySelector<HTMLButtonElement>('.bs-weather')!;
+      weatherBtn.click();
+      const popover = weatherBtn.nextElementSibling as HTMLElement;
+      expect(popover.style.display).not.toBe('none');
+      expect(popover.textContent).toContain(t('ui.weather.no_data'));
       topBar.dispose();
     });
 

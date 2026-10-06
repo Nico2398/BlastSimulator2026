@@ -115,7 +115,7 @@ describe('Random — snapshot / fromState (#1403)', () => {
     expect(b.next()).toBe(a.next());
   });
 
-  it('works for edge seeds (0 and negative)', () => {
+  it('works for edge seeds (0, negative and 2**31)', () => {
     for (const seed of [0, -1, 2 ** 31]) {
       const a = new Random(seed);
       a.next();

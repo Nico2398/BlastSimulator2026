@@ -132,8 +132,7 @@ describe('weather persists with the save (#1403)', () => {
   });
 
   it('saves carry the current SAVE_VERSION', () => {
-    expect(SAVE_VERSION).toBe(30);
-    expect(JSON.parse(serialize(createGame({ seed: SEED }))).version).toBe(30);
+    expect(JSON.parse(serialize(createGame({ seed: SEED }))).version).toBe(SAVE_VERSION);
   });
 
   it('a v29 save without weather loads with a valid cycle at SAVE_VERSION', () => {

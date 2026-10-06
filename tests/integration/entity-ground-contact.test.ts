@@ -70,7 +70,6 @@ function sync(engine: RunnerWithContext, h: Harness): void {
   const grid = engine.ctx.grid!;
   const deps: SyncDeps = {
     state: engine.ctx.state!,
-    weatherCycle: undefined,
     buildings: h.buildings,
     renderedBuildingIds: h.renderedBuildingIds,
     vehicles: h.vehicles,
