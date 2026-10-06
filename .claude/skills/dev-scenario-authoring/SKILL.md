@@ -61,6 +61,10 @@ Command mode has a `success: boolean` on every command result, and a step's own 
 
 A step whose command throws a real exception still fails regardless of `commandOutcome` — only a `success: false` return is a "refusal" this field can declare expected.
 
+## Interaction-only steps (`interactionOnly`)
+
+`interactionOnly: true` (`ScenarioStepDef`) plays a step only in interaction mode; command mode records it as skipped (success, current state, `expect` not evaluated). For beats whose count depends on the game's clock: the browser spends real ticks on every click and wait, so a free-play economy that pays out in four sales under the console's near-instant clock needs thirteen under the browser's (`tutorial-interactive`, #1338). The steps both modes share keep their `expect`s and the terminal step still proves the outcome in both, so an interaction-only step adds more of the same play, never a check. Never use it to hide a step that fails in command mode.
+
 ## Step repetition (`repeat`)
 
 `repeat` (`ScenarioStepDef`, `scripts/shared/scenario-types.ts`) runs a step's command (command mode) or full `interaction` array (interaction mode) `N` times in immediate succession before `expect` is evaluated, instead of writing `N` byte-identical step objects. Absent, or `1`, is a no-op — no behavior change from a step that never used it. `0`, a negative number, or a non-integer is invalid and fails the step immediately, naming the step and the offending value.

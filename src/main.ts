@@ -35,7 +35,7 @@ import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
-import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams } from './core/events/TrafficJams.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
@@ -683,6 +683,7 @@ window.__gameState = () => {
     // that offer's own Accept button (issue #1263 CI-fix). Mirrors
     // console-api.ts's own field so both modes read the same thing.
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, s.logistics.storedMassKg),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,

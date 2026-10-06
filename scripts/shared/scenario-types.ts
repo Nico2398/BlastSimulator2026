@@ -361,6 +361,18 @@ export interface ScenarioStepDef {
    */
   commandOutcome?: 'refused' | 'either';
   /**
+   * The step plays only in interaction mode; command mode records it as
+   * skipped (success, current state, `expect` not evaluated) and moves on.
+   *
+   * For beats whose count depends on the game's own clock: the browser run
+   * spends real ticks on every click and wait, so a free-play economy that
+   * pays out in two sales under the console's near-instant clock needs a dozen
+   * under the browser's. The steps every mode shares keep their `expect`s and
+   * the terminal step still proves the outcome in both, so an interaction-only
+   * beat never stands in for a check — it only adds more of the same play.
+   */
+  interactionOnly?: boolean;
+  /**
    * Run this step's command (command mode) or full `interaction` array
    * (interaction mode) `repeat` times in immediate succession before
    * `expect` is evaluated, instead of writing `repeat` byte-identical step

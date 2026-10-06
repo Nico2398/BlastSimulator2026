@@ -7,7 +7,7 @@ import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
-import { hasFillableOreSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
+import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
 
@@ -108,6 +108,12 @@ export interface SerializableGameState {
    * stock against, so mere presence in the pool is the whole condition.
    */
   rubbleDisposalOffered: boolean;
+  /**
+   * True when the pool holds an offer the site can fill in full right now, ore_sale
+   * or rubble_disposal (`hasFillableSaleOffer`, #1338). The free-play wait: any
+   * sale keeps the shared warehouse drained so haulers keep bringing ore in.
+   */
+  fillableSaleOffered: boolean;
   /** Employees killed so far (state.damage.deathCount) — a blast's projections can kill anyone standing in the cleared columns; proves a fatality genuinely happened rather than being inferred from a flat employeeCount. */
   deathCount: number;
   /** Fleet-wide count of driver-boarding events (state.vehicles.driverBoardingCount). */
@@ -197,6 +203,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
+    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, s.logistics.storedMassKg),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,
