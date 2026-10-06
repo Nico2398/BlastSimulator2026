@@ -156,7 +156,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     isPaused: s.isPaused,
     timeScale: s.timeScale,
     mineType: s.mineType,
-    weather: ctx.state?.weather.current ?? null,
+    weather: s.weather.current,
     worldSizeX: s.world?.sizeX ?? null,
     worldSizeZ: s.world?.sizeZ ?? null,
     worldMinX: s.world?.minX ?? null,
