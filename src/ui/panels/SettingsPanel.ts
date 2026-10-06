@@ -151,7 +151,7 @@ export class SettingsPanel extends PanelBase {
     // ── Session (game-dependent; hidden until update() sees a live game) ──
     const sessionHeader = sectionHeader(t('ui.settings.session'));
     this.locale.bindText(sessionHeader.querySelector('.bsx-section-label') as HTMLElement, 'ui.settings.session');
-    const replayBtn = button('ghost', t('ui.settings.replay_tutorial'), { onClick: () => this.handleReplayTutorial() });
+    const replayBtn = button('ghost', t('ui.settings.replay_tutorial'), { dataAction: 'replay-tutorial', onClick: () => this.handleReplayTutorial() });
     replayBtn.style.width = '100%';
     this.locale.bindText(replayBtn.querySelector('span') as HTMLElement, 'ui.settings.replay_tutorial');
     const savesBtn = button('ghost', t('ui.settings.save_and_load'), { onClick: () => this.handleOpenSaves() });
