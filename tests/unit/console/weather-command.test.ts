@@ -34,13 +34,27 @@ describe('weatherCommand', () => {
     expect(result.output).toContain('Weather:');
   });
 
+  it('"advance" mutates ctx.state.weather on its own persisted stream', () => {
+    const ctx = makeCtx();
+    const before = ctx.state!.weather.rngState;
+    const result = weatherCommand(ctx, ['advance'], {});
+    expect(result.output).toBe(`Weather: ${ctx.state!.weather.current}`);
+    expect(ctx.state!.weather.rngState).not.toBe(before);
+  });
+
+  it('bare command reads ctx.state.weather', () => {
+    const ctx = makeCtx();
+    ctx.state!.weather.current = 'heat_wave';
+    expect(weatherCommand(ctx, [], {}).output).toBe('Current weather: heat_wave');
+  });
+
   describe('"set" branch', () => {
     it('sets weather directly to the requested state', () => {
       const ctx = makeCtx();
       const result = weatherCommand(ctx, ['set', 'storm'], {});
       expect(result.success).toBe(true);
       expect(result.output).toBe('Weather: storm');
-      expect(ctx.weatherCycle!.current).toBe('storm');
+      expect(ctx.state!.weather.current).toBe('storm');
     });
 
     it('works for every valid weather state', () => {
@@ -48,7 +62,7 @@ describe('weatherCommand', () => {
       for (const state of ALL_WEATHER_STATES) {
         const result = weatherCommand(ctx, ['set', state], {});
         expect(result.success).toBe(true);
-        expect(ctx.weatherCycle!.current).toBe(state);
+        expect(ctx.state!.weather.current).toBe(state);
       }
     });
 
@@ -67,12 +81,13 @@ describe('weatherCommand', () => {
       expect(result.output).toContain('sunny');
     });
 
-    it('lazily initializes the weather cycle on first use', () => {
+    it('writes through to ctx.state.weather (same object, no shadow cycle)', () => {
       const ctx = makeCtx();
-      delete ctx.weatherCycle; // new_game seeds it (#1459); this covers a ctx that never started a game
-      expect(ctx.weatherCycle).toBeUndefined();
+      const weather = ctx.state!.weather;
       weatherCommand(ctx, ['set', 'cloudy'], {});
-      expect(ctx.weatherCycle).toBeDefined();
+      expect(ctx.state!.weather).toBe(weather);
+      expect(weather.current).toBe('cloudy');
+      expect(weather.history[weather.history.length - 1]).toBe('cloudy');
     });
   });
 });
