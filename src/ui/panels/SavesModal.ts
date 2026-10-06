@@ -21,6 +21,7 @@ import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { getLevel } from '../../core/campaign/Level.js';
 import type { SaveBackendKind } from '../../persistence/selectBackend.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
+import { TUTORIAL_LEVEL_ID } from '../tutorialTrigger.js';
 
 /** Returns null when the state was loaded, or a player-facing refusal reason. */
 export type OnLoadCallback = (state: GameState) => string | null;
@@ -30,9 +31,11 @@ export const AUTO_SAVE_SLOT = 'auto';
 export const TUTORIAL_AUTO_SAVE_SLOT = 'auto_tutorial';
 
 /** Auto-save slot for a level; the tutorial gets its own so it never overwrites campaign progress (#1333). */
-export function autoSaveSlotFor(_levelId: string | null | undefined): string {
-  return AUTO_SAVE_SLOT; // TODO: implement
+export function autoSaveSlotFor(levelId: string | null | undefined): string {
+  return levelId === TUTORIAL_LEVEL_ID ? TUTORIAL_AUTO_SAVE_SLOT : AUTO_SAVE_SLOT;
 }
+
+const isAutoSlot = (slotId: string): boolean => slotId === AUTO_SAVE_SLOT || slotId === TUTORIAL_AUTO_SAVE_SLOT;
 const THUMB_STYLE = 'width:58px;height:40px;border-radius:4px;flex:0 0 auto;'
   + 'background:repeating-linear-gradient(135deg,#2a3038 0 6px,#1d232b 6px 12px)';
 
@@ -53,6 +56,7 @@ function slotNumber(slotId: string): string | null {
 /** Localized slot name derived from the id; `fallback` is returned for ids with no known name. */
 function slotName(slotId: string, fallback: string): string {
   if (slotId === AUTO_SAVE_SLOT) return t('saveload.auto_name');
+  if (slotId === TUTORIAL_AUTO_SAVE_SLOT) return t('saveload.tutorial_auto_name');
   const n = slotNumber(slotId);
   return n === null ? fallback : t('saveload.slot_name', { n });
 }
@@ -235,7 +239,8 @@ export class SavesModal {
     try {
       const data = serialize(state);
       const summary = this.summaryOf(state);
-      await this.backend.save(AUTO_SAVE_SLOT, t('saveload.auto_name'), data, summary, state.campaign.activeLevelId);
+      const slotId = autoSaveSlotFor(state.campaign.activeLevelId);
+      await this.backend.save(slotId, slotName(slotId, slotId), data, summary, state.campaign.activeLevelId);
       if (this.autoSaveFailing) {
         this.autoSaveFailing = false;
         if (this.statusEl.textContent === t('ui.saves.autosave_failed')) this.setStatus('');
@@ -270,7 +275,7 @@ export class SavesModal {
       return;
     }
     const byId = new Map(metas.map(m => [m.slotId, m]));
-    const slotIds = [AUTO_SAVE_SLOT, ...Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => `slot_${i + 1}`)];
+    const slotIds = [AUTO_SAVE_SLOT, TUTORIAL_AUTO_SAVE_SLOT, ...Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => `slot_${i + 1}`)];
 
     for (const slotId of slotIds) {
       this.slotList.appendChild(this.slotCard(slotId, byId.get(slotId) ?? null));
@@ -283,7 +288,7 @@ export class SavesModal {
   }
 
   private slotCard(slotId: string, meta: SaveMeta | null): HTMLElement {
-    const isAuto = slotId === AUTO_SAVE_SLOT;
+    const isAuto = isAutoSlot(slotId);
 
     if (!meta) {
       const card = el('div', { attrs: {
@@ -297,7 +302,7 @@ export class SavesModal {
       // copy and no button, rather than falling into the SAVE HERE branch
       // below with a nonsense "Slot auto — empty" label.
       const label = el('span', {
-        text: isAuto ? t('ui.saves.auto_empty') : t('ui.saves.slot_empty', { n: slotNumber(slotId) ?? slotId }),
+        text: isAuto ? t(slotId === TUTORIAL_AUTO_SAVE_SLOT ? 'ui.saves.tutorial_auto_empty' : 'ui.saves.auto_empty') : t('ui.saves.slot_empty', { n: slotNumber(slotId) ?? slotId }),
         attrs: { style: 'flex:1;font:400 12px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
       });
       card.append(thumb, label);

@@ -22,7 +22,7 @@ import type { AudioManager, AudioCategory } from '../../audio/AudioManager.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SaveBackend } from '../../core/state/SaveBackend.js';
 import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from '../settingsHooks.js';
-import { AUTO_SAVE_SLOT, relativeTime } from './SavesModal.js';
+import { autoSaveSlotFor, relativeTime } from './SavesModal.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 
 export type GetStateCallback = () => GameState | null;
@@ -280,7 +280,7 @@ export class SettingsPanel extends PanelBase {
     if (!this.backend || !state) return t('ui.settings.return_confirm_body_none');
     try {
       const metas = await this.backend.list();
-      const auto = metas.find(m => m.slotId === AUTO_SAVE_SLOT);
+      const auto = metas.find(m => m.slotId === autoSaveSlotFor(state.campaign.activeLevelId));
       if (!auto) return t('ui.settings.return_confirm_body_none');
       return t('ui.settings.return_confirm_body', { time: relativeTime(auto.timestamp) });
     } catch {

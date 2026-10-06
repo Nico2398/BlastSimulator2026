@@ -8,26 +8,32 @@ export interface TutorialProgress {
 }
 
 export function recordTutorialProgress(
-  _state: GameState,
-  _stepIndex: number,
-  _snapshot: Record<string, unknown>,
+  state: GameState,
+  stepIndex: number,
+  snapshot: Record<string, unknown>,
 ): void {
-  // TODO: implement
+  state.tutorialProgress = { stepIndex, snapshot: { ...snapshot } };
 }
 
-export function clearTutorialProgress(_state: GameState): void {
-  // TODO: implement
+export function clearTutorialProgress(state: GameState): void {
+  state.tutorialProgress = null;
 }
 
 /** Validated progress, or null when absent or stepIndex is outside [0, stepCount). */
 export function readTutorialProgress(
-  _state: Pick<GameState, 'tutorialProgress'>,
-  _stepCount: number,
+  state: Pick<GameState, 'tutorialProgress'>,
+  stepCount: number,
 ): TutorialProgress | null {
-  return null; // TODO: implement
+  const progress = sanitizeTutorialProgress(state.tutorialProgress);
+  if (!progress || progress.stepIndex >= stepCount) return null;
+  return progress;
 }
 
 /** Coerces untrusted deserialized data; undefined when malformed. */
-export function sanitizeTutorialProgress(_raw: unknown): TutorialProgress | undefined {
-  return undefined; // TODO: implement
+export function sanitizeTutorialProgress(raw: unknown): TutorialProgress | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const { stepIndex, snapshot } = raw as Record<string, unknown>;
+  if (typeof stepIndex !== 'number' || !Number.isInteger(stepIndex) || stepIndex < 0) return undefined;
+  if (typeof snapshot !== 'object' || snapshot === null || Array.isArray(snapshot)) return undefined;
+  return { stepIndex, snapshot: snapshot as Record<string, unknown> };
 }
