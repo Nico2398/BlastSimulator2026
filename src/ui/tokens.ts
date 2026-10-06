@@ -119,6 +119,9 @@ export const TOKENS_CSS = `
 }
 
 .bsx-root, .bsx-root * { box-sizing: border-box; font-family: var(--bsx-font-ui); }
+.bsx-root { color: var(--bsx-text-primary); }
+/* Zero specificity: form controls default to buttontext/fieldtext, not the inherited colour; component class rules and :disabled colours still win. */
+:where(.bsx-root) :where(button, input, select, textarea) { color: inherit; }
 .bsx-mono { font-family: var(--bsx-font-mono); font-variant-numeric: tabular-nums; }
 
 /* ── section header: micro-label + hairline rule ── */
