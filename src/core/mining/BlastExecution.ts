@@ -6,6 +6,7 @@ import type { Vec3 } from '../math/Vec3.js';
 import type { Village } from '../world/Structures.js';
 import { length as vecLength, vec3 } from '../math/Vec3.js';
 import type { WetBlastHoles } from './WetHoles.js';
+import type { BlastRatingCap } from './BlastRatingCaps.js';
 import type { DrillHole } from './DrillPlan.js';
 // HoleCharge used via plan.charges values
 import type { BlastPlan } from './BlastPlan.js';
@@ -136,6 +137,10 @@ export interface BlastReport {
   /** Tick the blast fired on, for the report's timestamp. */
   tick: number;
   rating: BlastRating;
+  /** Rating before any cap lowered it; set only when a cap applied. */
+  baseRating?: BlastRating;
+  /** The cap that lowered `rating`, when one did. */
+  ratingCap?: BlastRatingCap;
   clearedVoxels: number;
   crackedVoxels: number;
   fragmentCount: number;

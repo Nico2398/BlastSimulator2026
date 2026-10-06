@@ -587,6 +587,9 @@ export const FLOATING_FRAGMENT_CLEARANCE = 1.0;
 export const THROW_DISTANCE_BAD = 12;
 export const THROW_DISTANCE_CATASTROPHIC = 25;
 
+/** Share of fragments that may be oversized before the blast rating is capped. */
+export const BLAST_OVERSIZE_SHARE_CAP = 0.30;
+
 /** Minimum fragment render height (voxels) above the grid floor. */
 export const FRAGMENT_MIN_RENDER_Y = 0.05;
 
