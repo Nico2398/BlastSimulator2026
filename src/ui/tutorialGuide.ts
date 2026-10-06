@@ -116,8 +116,8 @@ export function resolveWaitStatus(stages: TutorialStage[], state: GameState | nu
 /**
  * Modal overlays. Their controls stay live no matter which stage is active: a
  * modal covers the whole screen, so blocking its own buttons would seal the
- * game behind it with nothing left to click — and there is no Skip button to
- * escape with any more.
+ * game behind it with nothing left to click — and the card's Exit button sits
+ * behind the same rails.
  */
 const MODAL_SELECTOR = '.bs-confirm-overlay';
 

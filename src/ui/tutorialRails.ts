@@ -11,7 +11,9 @@ import {
   applyRails, clearRails, resolveStageIndex, resolveWaitStatus, decideClock, DEFAULT_TICK_BUDGET,
 } from './tutorialGuide.js';
 import { setPickerRegion } from './tutorialPickerRegion.js';
-import { SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR } from './tutorialStepHelpers.js';
+import {
+  SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS,
+} from './tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from './panels/PanelBase.js';
 
 /**
@@ -22,9 +24,13 @@ import { PANEL_CLOSE_SELECTOR } from './panels/PanelBase.js';
  *   game-state action, so it is always allowed too (#1041) — gating stays on
  *   the controls *inside* a panel (the active stage's own target/also set),
  *   not on getting to that panel in the first place.
+ * - the card's own Exit button and the Settings session controls (language,
+ *   volume, Save & Load, Return to Menu) so the player can always leave or
+ *   manage the session (#1332). Replay Tutorial stays gated.
  */
 const BASE_PERMANENTLY_ALLOWED: readonly string[] = [
   SPEED_BUTTON_GROUP, PANEL_OPEN_SELECTOR, PANEL_CLOSE_SELECTOR,
+  TUTORIAL_EXIT_SELECTOR, ...SETTINGS_SESSION_SELECTORS,
 ];
 
 export interface RailsStep {

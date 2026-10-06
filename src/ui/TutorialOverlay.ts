@@ -10,6 +10,7 @@ import { goalChipParams } from './tutorialStepsClosing.js';
 import { GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
+import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 
 /**
  * How often (ms) the guide re-reads the DOM.
@@ -60,6 +61,7 @@ export class TutorialOverlay {
   private autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
   private guideTimer: ReturnType<typeof setInterval> | null = null;
   private gameConsole: ((cmd: string) => CommandResult) | null = null;
+  private confirmHandler: ((config: ConfirmModalConfig) => void) | null = null;
 
   constructor(container: HTMLElement) {
     const els = buildTutorialCard(container);
@@ -82,6 +84,7 @@ export class TutorialOverlay {
     this.commandsLabel = els.commandsLabel;
     this.commandsHint = els.commandsHint;
     this.locale = els.locale;
+    els.exitBtn.addEventListener('click', () => this.requestExit());
   }
 
   start(state?: GameState): void {
@@ -303,12 +306,40 @@ export class TutorialOverlay {
    * Stop entry point when the live level switches away from the tutorial map.
    */
   abandon(): void {
-    if (!this._active) return;
-    this.teardown();
+    this.end(false);
+  }
+
+  /** Injects the confirm-modal opener used by requestExit (#1332). */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    this.confirmHandler = cb;
+  }
+
+  /** Asks the player to confirm leaving the tutorial (#1332). */
+  requestExit(): void {
+    if (!this.confirmHandler) { this.exit(); return; }
+    this.confirmHandler({
+      icon: 'warn',
+      title: t('tutorial.exit_confirm_title'),
+      body: t('tutorial.exit_confirm_body'),
+      confirmLabel: t('tutorial.exit_confirm_button'),
+      onConfirm: () => this.exit(),
+    });
+  }
+
+  /** Leaves the tutorial immediately (#1332). */
+  exit(): void {
+    this.end(true);
   }
 
   private finish(): void {
+    this.end(true);
+  }
+
+  /** Single teardown path; `markDone` records bs_tutorial_done so it will not auto-start again. */
+  private end(markDone: boolean): void {
+    if (!this._active) return;
     this.teardown();
+    if (!markDone) return;
     try {
       localStorage.setItem('bs_tutorial_done', '1');
     } catch {

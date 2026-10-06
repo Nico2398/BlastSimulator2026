@@ -354,6 +354,7 @@ function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Pr
 
 // --- Tutorial ---
 const tutorial = new TutorialOverlay(uiContainer);
+tutorial.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 const tutorialPitLevel = getLevel(TUTORIAL_LEVEL_ID);
 mainMenu.setOnTutorial(() => {
   mainMenu.hide();
@@ -1006,6 +1007,7 @@ uiManager.setSpeedChangeHandler((speed) => {
   window.__gameConsole(`time speed ${speed}`);
 });
 uiManager.setQuitHandler(() => {
+  tutorial.abandon(); // lifts the rails so the menu is clickable
   levelEndScreen.hide();
   mainMenu.show();
   uiManager.hide();

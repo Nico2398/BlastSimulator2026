@@ -21,6 +21,7 @@ import { saveLocale, saveVolume } from '../userSettings.js';
 import type { AudioManager, AudioCategory } from '../../audio/AudioManager.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SaveBackend } from '../../core/state/SaveBackend.js';
+import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from '../settingsHooks.js';
 import { AUTO_SAVE_SLOT, relativeTime } from './SavesModal.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 
@@ -62,7 +63,7 @@ export class SettingsPanel extends PanelBase {
 
   constructor(container: HTMLElement) {
     super(el('div', { className: 'bsx-root', attrs: {
-      id: 'bs-settings-panel',
+      id: SETTINGS_PANEL_ID,
       // Appended to the root container so its z-index beats the main menu
       // (var(--bsx-z-menu)) — inside leftCol's fixed stacking context it
       // would be capped relative to root, same reasoning as SavesModal.
@@ -154,10 +155,10 @@ export class SettingsPanel extends PanelBase {
     const replayBtn = button('ghost', t('ui.settings.replay_tutorial'), { dataAction: 'replay-tutorial', onClick: () => this.handleReplayTutorial() });
     replayBtn.style.width = '100%';
     this.locale.bindText(replayBtn.querySelector('span') as HTMLElement, 'ui.settings.replay_tutorial');
-    const savesBtn = button('ghost', t('ui.settings.save_and_load'), { onClick: () => this.handleOpenSaves() });
+    const savesBtn = button('ghost', t('ui.settings.save_and_load'), { dataAction: OPEN_SAVES_ACTION, onClick: () => this.handleOpenSaves() });
     savesBtn.style.width = '100%';
     this.locale.bindText(savesBtn.querySelector('span') as HTMLElement, 'ui.settings.save_and_load');
-    const returnBtn = button('danger', t('ui.settings.return_to_menu'), { onClick: () => this.handleReturnToMenu() });
+    const returnBtn = button('danger', t('ui.settings.return_to_menu'), { dataAction: RETURN_TO_MENU_ACTION, onClick: () => this.handleReturnToMenu() });
     returnBtn.style.width = '100%';
     this.locale.bindText(returnBtn.querySelector('span') as HTMLElement, 'ui.settings.return_to_menu');
 

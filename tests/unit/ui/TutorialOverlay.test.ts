@@ -8,6 +8,8 @@ import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { addIncome } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { buildTutorialCard } from '../../../src/ui/tutorialOverlayDom.js';
+import type { ConfirmModalConfig } from '../../../src/ui/panels/ConfirmModal.js';
 
 function createMockState(): GameState {
   return createGame({ seed: 42, mineType: 'tutorial' });
@@ -143,10 +145,12 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('no escape hatch', () => {
-    it('exposes no skip method — the tutorial cannot be abandoned', () => {
+    it('exposes no skip method — leaving goes through exit(), never skip() (#1332)', () => {
       const tut = new TutorialOverlay(container) as unknown as Record<string, unknown>;
       overlay = tut as unknown as TutorialOverlay;
       expect(tut['skip']).toBeUndefined();
+      expect(typeof tut['exit']).toBe('function');
+      expect(typeof tut['requestExit']).toBe('function');
     });
 
     it('finishing deactivates, hides the overlay and unpauses the game', () => {
@@ -301,7 +305,7 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('next button and commands hint', () => {
-    it('renders NO Skip control — the tutorial cannot be abandoned', () => {
+    it('renders NO Skip control — leaving is the Exit control only (#1332)', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -317,12 +321,16 @@ describe('TutorialOverlay (12.4)', () => {
       expect(container.querySelector('.bs-btn-next')).toBeNull();
     });
 
-    it('the card carries no buttons at all', () => {
+    it('the card carries exactly one button, the exit one (#1332)', () => {
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
 
-      expect(container.querySelectorAll('.bs-tutorial-box button')).toHaveLength(0);
+      const buttons = container.querySelectorAll('.bs-tutorial-box button');
+      expect(buttons).toHaveLength(1);
+      expect((buttons[0] as HTMLElement).dataset['action']).toBe('tutorial-exit');
+      expect(container.querySelector('.bs-btn-skip')).toBeNull();
+      expect(container.querySelector('.bs-btn-next')).toBeNull();
       expect(tut.isActive).toBe(true);
     });
 
@@ -1045,5 +1053,138 @@ describe('TutorialOverlay (12.4)', () => {
       const waitingChip = container.querySelector('.bs-tutorial-waiting') as HTMLElement;
       expect(waitingChip.style.display).toBe('none');
     });
+  });
+});
+
+describe('TutorialOverlay exit (#1332)', () => {
+  let container: HTMLDivElement;
+  let tut: TutorialOverlay;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    try { localStorage.removeItem('bs_tutorial_done'); } catch { /* ignore */ }
+    tut = new TutorialOverlay(container);
+  });
+
+  afterEach(() => {
+    tut.dispose();
+    container.remove();
+    setLocale('en');
+  });
+
+  const exitBtn = () => container.querySelector('.bs-tutorial-box [data-action="tutorial-exit"]') as HTMLButtonElement | null;
+  const cardHidden = () => (container.querySelector('.bs-tutorial-overlay') as HTMLElement).style.display === 'none';
+
+  it('renders the exit button inside the card with the localised label', () => {
+    tut.start(createMockState());
+    expect(exitBtn()).not.toBeNull();
+    expect(exitBtn()!.textContent).toContain(t('tutorial.exit'));
+    expect(t('tutorial.exit')).not.toBe('tutorial.exit');
+  });
+
+  it('exposes the button as exitBtn on the card elements', () => {
+    const host = document.createElement('div');
+    const { exitBtn: found } = buildTutorialCard(host);
+    expect(found).toBeInstanceOf(HTMLButtonElement);
+    expect(found.getAttribute('data-action')).toBe('tutorial-exit');
+    expect(host.contains(found)).toBe(true);
+  });
+
+  it('exit label differs between en and fr, and keys exist', () => {
+    const keys = ['tutorial.exit', 'tutorial.exit_tooltip', 'tutorial.exit_confirm_title', 'tutorial.exit_confirm_body', 'tutorial.exit_confirm_button'];
+    const en = keys.map(k => t(k));
+    setLocale('fr');
+    const fr = keys.map(k => t(k));
+    keys.forEach((k, i) => {
+      expect(en[i], `${k} en`).not.toBe(k);
+      expect(fr[i], `${k} fr`).not.toBe(k);
+      expect(fr[i], `${k} differs`).not.toBe(en[i]);
+    });
+  });
+
+  it('exit() is a no-op while inactive and does not record completion', () => {
+    expect(() => tut.exit()).not.toThrow();
+    expect(tut.isActive).toBe(false);
+    expect(localStorage.getItem('bs_tutorial_done')).toBeNull();
+  });
+
+  it('exit() tears down: inactive, card hidden, guided class off, clock released', () => {
+    const state = createMockState();
+    tut.start(state);
+    state.isPaused = true;
+    tut.exit();
+    expect(tut.isActive).toBe(false);
+    expect(cardHidden()).toBe(true);
+    expect(document.body.classList.contains('bs-tutorial-guided')).toBe(false);
+    expect(state.isPaused).toBe(false);
+  });
+
+  it('exit() marks the tutorial completed so it never auto-starts again', () => {
+    tut.start(createMockState());
+    tut.exit();
+    expect(localStorage.getItem('bs_tutorial_done')).toBe('1');
+    expect(TutorialOverlay.isCompleted()).toBe(true);
+  });
+
+  it('start() works again after exit (Replay Tutorial)', () => {
+    tut.start(createMockState());
+    tut.exit();
+    tut.start(createMockState());
+    expect(tut.isActive).toBe(true);
+    expect(cardHidden()).toBe(false);
+  });
+
+  it('requestExit() without a handler exits directly', () => {
+    tut.start(createMockState());
+    tut.requestExit();
+    expect(tut.isActive).toBe(false);
+    expect(TutorialOverlay.isCompleted()).toBe(true);
+  });
+
+  it('requestExit() with a handler opens a confirm and keeps the tutorial running', () => {
+    const configs: ConfirmModalConfig[] = [];
+    tut.setConfirmHandler(c => configs.push(c));
+    tut.start(createMockState());
+    tut.requestExit();
+    expect(configs).toHaveLength(1);
+    expect(configs[0]!.title).toBe(t('tutorial.exit_confirm_title'));
+    expect(configs[0]!.body).toBe(t('tutorial.exit_confirm_body'));
+    expect(configs[0]!.confirmLabel).toBe(t('tutorial.exit_confirm_button'));
+    expect(tut.isActive).toBe(true);
+    expect(TutorialOverlay.isCompleted()).toBe(false);
+  });
+
+  it('confirming exits the tutorial', () => {
+    let cfg: ConfirmModalConfig | null = null;
+    tut.setConfirmHandler(c => { cfg = c; });
+    tut.start(createMockState());
+    tut.requestExit();
+    cfg!.onConfirm();
+    expect(tut.isActive).toBe(false);
+    expect(TutorialOverlay.isCompleted()).toBe(true);
+  });
+
+  it('cancelling (never calling onConfirm) leaves the tutorial active', () => {
+    tut.setConfirmHandler(() => { /* player pressed Cancel */ });
+    tut.start(createMockState());
+    tut.requestExit();
+    expect(tut.isActive).toBe(true);
+    expect(cardHidden()).toBe(false);
+  });
+
+  it('clicking the exit button routes through the confirm handler', () => {
+    const configs: ConfirmModalConfig[] = [];
+    tut.setConfirmHandler(c => configs.push(c));
+    tut.start(createMockState());
+    exitBtn()!.click();
+    expect(configs).toHaveLength(1);
+    expect(tut.isActive).toBe(true);
+  });
+
+  it('clicking the exit button with no handler exits', () => {
+    tut.start(createMockState());
+    exitBtn()!.click();
+    expect(tut.isActive).toBe(false);
   });
 });

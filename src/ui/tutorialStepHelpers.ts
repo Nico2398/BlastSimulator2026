@@ -7,6 +7,7 @@ import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { computeDangerZone, isZoneClear } from '../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../core/config/balance.js';
+import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from './settingsHooks.js';
 import { hasOutstandingVehicleWork } from './tutorialGuide.js';
 
 /**
@@ -32,6 +33,21 @@ export const SPEED_BUTTON_GROUP = '#bs-hud-top .bs-speed-btn button[data-speed]'
  *  display alike, generic over `data-panel`'s value so a new panel needs no
  *  new rails entry (#1041). */
 export const PANEL_OPEN_SELECTOR = '[data-panel]';
+
+/** The tutorial card's exit button (#1332). */
+export const TUTORIAL_EXIT_SELECTOR = '[data-action="tutorial-exit"]';
+
+/**
+ * Settings session controls the rails always allow (#1332): language pills,
+ * volume sliders, Save & Load, Return to Menu. Replay Tutorial is deliberately
+ * absent — restarting the tutorial from inside it is not a session control.
+ */
+export const SETTINGS_SESSION_SELECTORS: readonly string[] = [
+  `#${SETTINGS_PANEL_ID} [data-lang]`,
+  `#${SETTINGS_PANEL_ID} input[type="range"]`,
+  `#${SETTINGS_PANEL_ID} [data-action="${OPEN_SAVES_ACTION}"]`,
+  `#${SETTINGS_PANEL_ID} [data-action="${RETURN_TO_MENU_ACTION}"]`,
+];
 
 /**
  * Snapshot shape for a hire step: ids of the employees who already hold the
