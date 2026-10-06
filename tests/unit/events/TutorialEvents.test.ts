@@ -171,7 +171,7 @@ describe('tutorial event definitions', () => {
       tickCount: 0,
       lawsuitCount: 0,
       activeContractCount: 0,
-      weatherId: 'sunny',
+      weatherId: 'sunny' as const,
     };
 
     expect(ev.canFire(ctx)).toBe(true);

@@ -18,7 +18,7 @@ import { getAllBiomes, getBiome } from '../../core/world/BiomeCatalog.js';
 import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
-import { regenerateGrid, resetWeatherForNewGame } from './world.js';
+import { regenerateGrid } from './world.js';
 import { staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
@@ -79,7 +79,6 @@ export function sandboxCommand(
     scoreDecayRate: level.scoreDecayRate,
     ...(flags.staffed ? { staffed: true } : {}),
   });
-  resetWeatherForNewGame(ctx, config.seed);
   ctx.state.world = createWorldState(level.gridX, level.datum, level.gridZ, true);
 
   regenerateGrid(ctx, {

@@ -264,7 +264,7 @@ export class GameRenderer {
     if (!ctx.state) return;
     const result = syncGameRendererEntities({
       state: ctx.state,
-      weatherCycle: ctx.weatherCycle,
+      weatherCycle: ctx.state?.weather,
       buildings: this.buildings,
       renderedBuildingIds: this.renderedBuildingIds,
       vehicles: this.vehicles,

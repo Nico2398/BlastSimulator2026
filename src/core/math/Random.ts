@@ -53,12 +53,12 @@ export class Random {
 
   /** Current internal state; `Random.fromState(snapshot())` continues the same sequence. */
   snapshot(): number {
-    throw new Error('not implemented'); // TODO: implement
+    return this.state;
   }
 
   /** Rebuild a generator that continues from a `snapshot()` value. */
-  static fromState(_state: number): Random {
-    throw new Error('not implemented'); // TODO: implement
+  static fromState(state: number): Random {
+    return new Random(state);
   }
 
   /** Independent copy that continues the same sequence — advancing it never affects the original. */

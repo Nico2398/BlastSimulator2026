@@ -22,6 +22,7 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { ExpenseCategory } from '../economy/Finance.js';
 import { addExpense, addIncome } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
+import { tickWeather } from '../weather/WeatherCycle.js';
 import { buildTickEventContext } from './TickEventContext.js';
 import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
@@ -153,6 +154,9 @@ export function runTick(
 ): TickReport {
   state.tickCount++;
   state.time += BASE_TICK_MS;
+
+  // 0. Weather — own persisted rng stream, before events read it
+  tickWeather(state.weather);
 
   // 1. Event system
   const evCtx = buildTickEventContext(state);

@@ -21,6 +21,6 @@ export function buildTickEventContext(s: GameState): EventContext {
     tickCount: s.tickCount,
     lawsuitCount: s.corruption.attempts.filter(a => a.target === 'judge').length,
     activeContractCount: s.contracts.active.length,
-    weatherId: 'clear', // TODO: wire actual weather when available
+    weatherId: s.weather.current,
   };
 }

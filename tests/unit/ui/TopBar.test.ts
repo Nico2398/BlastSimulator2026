@@ -4,7 +4,6 @@ import { TopBar, formatBalance, netPerTick } from '../../../src/ui/shell/TopBar.
 import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
-import { Random } from '../../../src/core/math/Random.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
@@ -29,7 +28,7 @@ describe('TopBar (redesign P1)', () => {
     document.body.appendChild(container);
     const topBar = new TopBar(container);
     const center = new NotificationCenter();
-    topBar.update(makeState(), undefined, undefined, center);
+    topBar.update(makeState(), center);
     expect(container.querySelector('.bs-balance')?.textContent).toContain('75');
     topBar.dispose();
   });
@@ -39,7 +38,7 @@ describe('TopBar (redesign P1)', () => {
     document.body.appendChild(container);
     const topBar = new TopBar(container);
     const center = new NotificationCenter();
-    topBar.update(makeState(), undefined, undefined, center);
+    topBar.update(makeState(), center);
     // Day 3 (50/24 = 2.08 → day 3)
     expect(container.querySelector('#bs-hud-top')?.textContent).toContain('3');
     topBar.dispose();
@@ -52,7 +51,7 @@ describe('TopBar (redesign P1)', () => {
     const center = new NotificationCenter();
     const state = makeState();
     state.timeScale = 4;
-    topBar.update(state, undefined, undefined, center);
+    topBar.update(state, center);
     const btn = container.querySelector<HTMLButtonElement>('.bs-speed-btn button[data-speed="4"]');
     expect(btn?.style.background).toContain('--bsx-amber');
     topBar.dispose();
@@ -63,7 +62,7 @@ describe('TopBar (redesign P1)', () => {
     document.body.appendChild(container);
     const topBar = new TopBar(container);
     const center = new NotificationCenter();
-    topBar.update(makeState(), undefined, undefined, center);
+    topBar.update(makeState(), center);
     const callback = vi.fn();
     topBar.setSpeedChangeHandler(callback);
     container.querySelector<HTMLButtonElement>('.bs-speed-btn button[data-speed="8"]')?.click();
@@ -76,7 +75,7 @@ describe('TopBar (redesign P1)', () => {
     document.body.appendChild(container);
     const topBar = new TopBar(container);
     const center = new NotificationCenter();
-    topBar.update(makeState(), undefined, undefined, center);
+    topBar.update(makeState(), center);
     const callback = vi.fn();
     topBar.setTogglePauseHandler(callback);
     container.querySelector<HTMLButtonElement>('.bs-speed-btn button:first-child')?.click();
@@ -91,7 +90,7 @@ describe('TopBar (redesign P1)', () => {
     const center = new NotificationCenter();
     const state = makeState();
     state.scores.safety = 80;
-    topBar.update(state, undefined, undefined, center);
+    topBar.update(state, center);
     const scores = container.querySelector('#bs-hud-scores');
     expect(scores?.textContent).toContain('80');
     topBar.dispose();
@@ -104,7 +103,7 @@ describe('TopBar (redesign P1)', () => {
     const center = new NotificationCenter();
     const state = makeState();
     state.events.pendingEvent = { eventId: 'test_event', firedAtTick: 1 };
-    topBar.update(state, undefined, undefined, center);
+    topBar.update(state, center);
     expect(container.querySelector('.bs-event-badge')).not.toBeNull();
     topBar.dispose();
   });
@@ -116,7 +115,7 @@ describe('TopBar (redesign P1)', () => {
     const center = new NotificationCenter();
     const state = makeState();
     state.events.pendingEvent = null;
-    topBar.update(state, undefined, undefined, center);
+    topBar.update(state, center);
     expect(container.querySelector('.bs-event-badge')).toBeNull();
     topBar.dispose();
   });
@@ -126,7 +125,7 @@ describe('TopBar (redesign P1)', () => {
     document.body.appendChild(container);
     const topBar = new TopBar(container);
     const center = new NotificationCenter();
-    topBar.update(makeState(), makeWeatherCycle('storm'), new Random(1), center);
+    topBar.update({ ...makeState(), weather: makeWeatherCycle('storm') }, center);
     expect(container.querySelector('.bs-weather bs-icon')?.getAttribute('name')).toBe('storm');
     topBar.dispose();
   });
@@ -138,7 +137,7 @@ describe('TopBar (redesign P1)', () => {
       const topBar = new TopBar(container);
       const center = new NotificationCenter();
       const state = makeState();
-      topBar.update(state, makeWeatherCycle(current), new Random(1), center);
+      topBar.update({ ...state, weather: makeWeatherCycle(current) }, center);
       const weatherBtn = container.querySelector<HTMLButtonElement>('.bs-weather')!;
       return { topBar, container, center, state, weatherBtn };
     }
@@ -216,23 +215,9 @@ describe('TopBar (redesign P1)', () => {
     it('re-renders while open as update() is called again', () => {
       const { topBar, container, weatherBtn, center, state } = setUp('sunny');
       weatherBtn.click();
-      topBar.update(state, makeWeatherCycle('storm'), new Random(1), center);
+      topBar.update({ ...state, weather: makeWeatherCycle('storm') }, center);
       const popover = container.querySelector<HTMLElement>('.bs-weather')!.nextElementSibling as HTMLElement;
       expect(popover.textContent).toContain('Storm');
-      topBar.dispose();
-    });
-
-    it('does not throw and shows a fallback when weatherCycle/rng are unavailable', () => {
-      const container = document.createElement('div');
-      document.body.appendChild(container);
-      const topBar = new TopBar(container);
-      const center = new NotificationCenter();
-      topBar.update(makeState(), undefined, undefined, center);
-      const weatherBtn = container.querySelector<HTMLButtonElement>('.bs-weather')!;
-      expect(() => weatherBtn.click()).not.toThrow();
-      const popover = weatherBtn.nextElementSibling as HTMLElement;
-      expect(popover.style.display).not.toBe('none');
-      expect(popover.textContent).toContain('unavailable');
       topBar.dispose();
     });
 
@@ -265,7 +250,7 @@ describe('TopBar (redesign P1)', () => {
       acceptedAtTick: 50, penaltyAmount: 10, earlyBonus: 0, completed: false, expired: false,
     });
     state.tickCount = 52; // 5 remaining ticks
-    topBar.update(state, undefined, undefined, center);
+    topBar.update(state, center);
     const nav = vi.fn();
     topBar.setNavigateHandler(nav);
     const pip = Array.from(container.querySelectorAll('button')).find(b => b.title.includes('expires'));
@@ -279,7 +264,7 @@ describe('TopBar (redesign P1)', () => {
     document.body.appendChild(container);
     const topBar = new TopBar(container);
     const center = new NotificationCenter();
-    topBar.update(makeState(), undefined, undefined, center);
+    topBar.update(makeState(), center);
     const nav = vi.fn();
     topBar.setNavigateHandler(nav);
     container.querySelector<HTMLButtonElement>('[data-action="open-finances"]')?.click();
@@ -298,7 +283,7 @@ describe('TopBar (redesign P1)', () => {
     const topBar = new TopBar(container);
     try {
       const center = new NotificationCenter();
-      topBar.update(makeState(), undefined, undefined, center);
+      topBar.update(makeState(), center);
       const balanceBtn = container.querySelector<HTMLButtonElement>('[data-action="open-finances"]');
       expect(balanceBtn).not.toBeNull();
       expect(balanceBtn?.dataset['panel']).toBe('finances');
@@ -334,7 +319,7 @@ describe('TopBar (redesign P1)', () => {
       const center = new NotificationCenter();
       const state = makeState();
       state.cash = -500.4;
-      topBar.update(state, undefined, undefined, center);
+      topBar.update(state, center);
       const balEl = container.querySelector('.bs-balance') as HTMLElement;
       expect(balEl.textContent).toBe('-$500');
       expect(balEl.style.color).not.toBe('');
@@ -378,7 +363,7 @@ describe('TopBar (redesign P1)', () => {
     document.body.appendChild(container);
     const topBar = new TopBar(container);
     const center = new NotificationCenter();
-    topBar.update(createGame({ seed: 1, mineType: 'desert' }), undefined, undefined, center);
+    topBar.update(createGame({ seed: 1, mineType: 'desert' }), center);
     const scoresEl = container.querySelector('#bs-hud-scores');
     expect(scoresEl?.children.length).toBe(4);
     topBar.dispose();
@@ -393,7 +378,7 @@ describe('TopBar (redesign P1)', () => {
       const topBar = new TopBar(container);
       const center = new NotificationCenter();
       const state = createGame({ seed: 1, mineType: 'desert' });
-      topBar.update(state, undefined, undefined, center);
+      topBar.update(state, center);
       const titles = () =>
         Array.from(container.querySelector('#bs-hud-scores')!.children).map(c => c.getAttribute('title') ?? '');
       return { topBar, center, state, titles };
@@ -486,7 +471,7 @@ describe('TopBar (redesign P1)', () => {
       const before = titles();
       state.scores.safety = 33;
       state.scores.ecology = 12;
-      topBar.update(state, undefined, undefined, center);
+      topBar.update(state, center);
       expect(titles()).toEqual(before);
       expect(titles()[2]).toBe(ECO_EN);
       topBar.dispose();

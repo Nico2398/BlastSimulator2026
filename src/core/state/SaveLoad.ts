@@ -8,6 +8,7 @@ import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
 import type { Employee, EmployeeRole } from '../entities/Employee.js';
 import { getStorageCapacity } from '../entities/Building.js';
+import { createWeatherCycle, ALL_WEATHER_STATES } from '../weather/WeatherCycle.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 
 /**
@@ -518,7 +519,18 @@ export function backfillRaises(obj: Record<string, unknown>): void {
 
 /** v29 -> v30 (#1403): backfill `weather`. Mutates `obj` in place. */
 function migrateV29ToV30(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO: implement
+  const w = obj['weather'];
+  const valid = typeof w === 'object' && w !== null && (() => {
+    const c = w as { current?: unknown; ticksRemaining?: unknown; rngState?: unknown; history?: unknown };
+    return typeof c.current === 'string' && (ALL_WEATHER_STATES as readonly string[]).includes(c.current)
+      && typeof c.ticksRemaining === 'number' && Number.isFinite(c.ticksRemaining)
+      && typeof c.rngState === 'number' && Number.isFinite(c.rngState)
+      && Array.isArray(c.history);
+  })();
+  if (!valid) {
+    const seed = obj['seed'];
+    obj['weather'] = createWeatherCycle(typeof seed === 'number' && Number.isFinite(seed) ? seed : 0);
+  }
   return obj;
 }
 

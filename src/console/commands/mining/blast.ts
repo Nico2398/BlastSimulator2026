@@ -51,11 +51,6 @@ export function blastCommand(
   if (assembled.error) return assembled.error;
   const plan = assembled.plan;
 
-  // ctx.weatherCycle may not exist yet (created lazily by the `weather`
-  // command, eagerly by main.ts on new_game/campaign start/sandbox start —
-  // see console-api.ts's `weather` field doc) — 'sunny' (not raining) is the
-  // correct fallback either way, since createWeatherCycle's own initial
-  // state is always 'sunny' regardless of seed.
   const wetHoleIds = wetHoleIdSet(ctx);
   const villages = levelVillagePositions(ctx);
   const result = executeBlast(plan, ctx.grid!, villages, undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);

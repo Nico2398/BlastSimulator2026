@@ -5,12 +5,11 @@ import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGame, requireGameWithSub, resolveHoleId } from './shared.js';
 import {
-  forceAdvance,
+  forceAdvanceInState,
   setWeather,
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../../core/weather/WeatherCycle.js';
-import { resetWeatherForNewGame } from '../world.js';
 import { buyTubing, installTubing } from '../../../core/mining/Tubing.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 
@@ -22,11 +21,10 @@ export function weatherCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  if (!ctx.weatherCycle) resetWeatherForNewGame(ctx, ctx.state!.seed);
-  const weather = ctx.weatherCycle!;
+  const weather = ctx.state!.weather;
 
   if (args[0] === 'advance') {
-    forceAdvance(weather, ctx.rng!);
+    forceAdvanceInState(weather);
     return { success: true, output: `Weather: ${weather.current}` };
   }
 

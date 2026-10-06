@@ -9,9 +9,8 @@ import { el, sectionHeader } from '../dom.js';
 import { t } from '../../core/i18n/I18n.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import { forecast, rainIntensity, type WeatherState, type WeatherCycleState } from '../../core/weather/WeatherCycle.js';
+import { forecast, rainIntensity, type WeatherState } from '../../core/weather/WeatherCycle.js';
 import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather/WeatherAdvisory.js';
-import type { Random } from '../../core/math/Random.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
@@ -109,8 +108,6 @@ export class TopBar {
   private onSiteMap?: () => void;
 
   private lastWeather: WeatherState = 'sunny';
-  private lastWeatherCycle: WeatherCycleState | undefined;
-  private lastRng: Random | undefined;
   private lastState: GameState | undefined;
   private weatherPopoverOpen = false;
   private currentSpeed = 1;
@@ -263,11 +260,9 @@ export class TopBar {
   setOpenSavesHandler(cb: () => void): void { this.onOpenSaves = cb; }
   setSiteMapHandler(cb: () => void): void { this.onSiteMap = cb; }
 
-  update(state: GameState, weatherCycle: WeatherCycleState | undefined, rng: Random | undefined, center: NotificationCenter): void {
-    const weather = weatherCycle?.current;
+  update(state: GameState, center: NotificationCenter): void {
+    const weather = state.weather.current;
     this.lastState = state;
-    this.lastWeatherCycle = weatherCycle;
-    this.lastRng = rng;
     // Balance + trend
     this.balanceValue.textContent = formatBalance(state.cash);
     this.balanceValue.style.color = state.cash < 0 ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
@@ -366,9 +361,7 @@ export class TopBar {
    */
   private renderWeatherPopover(): void {
     const state = this.lastState;
-    const cycle = this.lastWeatherCycle;
-    const rng = this.lastRng;
-    if (!state || !cycle || !rng) {
+    if (!state) {
       this.weatherPopoverEl.replaceChildren(el('div', {
         text: t('ui.weather.no_data'),
         attrs: { style: 'padding:16px;font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
@@ -376,6 +369,7 @@ export class TopBar {
       return;
     }
 
+    const cycle = state.weather;
     const days = forecast(cycle, FORECAST_DAYS);
     const advisory = computeWeatherAdvisory(state, cycle.current, days);
     const today = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;

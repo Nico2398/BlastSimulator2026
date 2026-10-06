@@ -389,15 +389,13 @@ describe('GameRenderer — wind and clouds (#458 T7.1/D12)', () => {
   });
 
   it('a weather change reaches CloudLayer — storm raises cloud coverage toward its dense target', async () => {
-    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
     const ctx = makeCtx();
-    ctx.weatherCycle = createWeatherCycle(ctx.state!.seed);
     renderer.syncFromContext(ctx);
 
     const uniforms = renderer.terrain!.sharedMaterial.customUniforms;
-    ctx.weatherCycle.current = 'storm';
+    ctx.state!.weather.current = 'storm';
     renderer.syncFromContext(ctx); // pushes the new weather into skybox + clouds
     for (let i = 0; i < 200; i++) renderer.update(0.05);
 
@@ -416,8 +414,8 @@ describe('GameRenderer — lastWeather guard, no skybox (#767)', () => {
     // through the public API before a game is loaded or after dispose() —
     // states where weatherCycle/lastGrid aren't independently constructible.
     const { syncGameRendererEntities } = await import('../../../src/renderer/GameRendererSync.js');
-    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
     const state = createGame({ seed: 42, startingCash: 100_000 });
+    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
     const weatherCycle = createWeatherCycle(42);
     weatherCycle.current = 'storm';
 
