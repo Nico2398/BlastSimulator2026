@@ -7,12 +7,14 @@ import { describe, it, expect } from 'vitest';
 import { siteBounds } from '../../../src/console/commands/buildingHelpers.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { DEFAULT_GRID_SIZE } from '../../../src/core/config/balance.js';
+import { createCampaignProfile } from '../../../src/persistence/CampaignProfile.js';
 import type { GameContext } from '../../../src/console/commands/world.js';
 
 function emptyContext(): GameContext {
   return {
     state: null,
     grid: null,
+    campaignProfile: createCampaignProfile(),
     landscape: null,
     playableArea: null,
     emitter: new EventEmitter(),

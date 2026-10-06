@@ -20,6 +20,7 @@ import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type Serialize
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
+import type { CampaignProfile } from '../../persistence/CampaignProfile.js';
 import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
 /**
@@ -63,6 +64,8 @@ export interface GameContext {
   playableArea: PlayableArea | null;
   /** Event emitter for game-over and campaign events. Listeners attached in main.ts/console.ts. */
   emitter: EventEmitter;
+  /** Campaign progress kept outside GameState; survives new games and level starts (#1312). */
+  campaignProfile: CampaignProfile;
 }
 
 /**

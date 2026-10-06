@@ -62,6 +62,7 @@ import { sandboxCommand } from './commands/sandbox.js';
 import { stateCommand } from './commands/state.js';
 import { saveCommand, loadCommand } from './commands/saveload.js';
 import { setupEvents } from '../core/events/index.js';
+import { createCampaignProfile } from '../persistence/CampaignProfile.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
 import { subscribeNavGridToUpdates } from '../core/nav/NavGridSync.js';
 
@@ -146,7 +147,7 @@ export function createRunner(): RunnerWithContext {
   setupEvents();
 
   const emitter = new EventEmitter();
-  const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter };
+  const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter, campaignProfile: createCampaignProfile() };
   // A paused game never ticks, so a hire, fire, purchase, sale or new order made
   // by command would leave ghost colours stale until resume (#1306). A running
   // game re-classifies on its next tick, and a bare `tick` does so itself.
