@@ -620,10 +620,10 @@ describe('TutorialOverlay (12.4)', () => {
       // the 34-length array #923 produced; #1015 removes
       // speed-up-for-dig/speed-normal-after-dig, dropping the array to 32
       // entries and the last index to 31.
-      tut.stepIndex = 31;
+      tut.stepIndex = 29;
       tut.render();
 
-      tut.stepIndex = 29;
+      const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
       const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
       // After implementation: keys changed to tutorial.complete_title / tutorial.complete_text
       // which translate to "Tutorial Complete!" and the completion text.
