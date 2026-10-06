@@ -16,6 +16,23 @@ export const COLOR_HOLE = '#4040d0';
 export const COLOR_CREW = '#6ad0f0';
 export const COLOR_VEHICLE = '#c0c040';
 
+/** One drawn mini-map layer: the single source for legend entries and draw fills. */
+export interface MiniMapLayer {
+  id: 'rock' | 'ore' | 'building' | 'vehicle' | 'crew' | 'hole';
+  color: string;
+  /** i18n key of the legend label. */
+  labelKey: string;
+}
+
+/** Every layer the mini-map draws, in legend order. */
+export const MINIMAP_LAYERS: readonly MiniMapLayer[] = []; // TODO: implement
+
+/** Fill colour of the layer with the given id. */
+export function layerColor(_id: MiniMapLayer['id']): string {
+  // TODO: implement
+  return '';
+}
+
 /** Base terrain tint before elevation shading, as RGB components. */
 const ROCK_RGB: readonly [number, number, number] = [80, 128, 160];
 /** Elevation shading range: lowest bench this dark, highest this bright. */
