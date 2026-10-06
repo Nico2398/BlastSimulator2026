@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Count every flood fill the nav layer performs, whichever entry point the
 // implementation picks — the cost contract is about fills, not actors.
-const fills = vi.hoisted(() => ({ count: 0 }));
+const fills = vi.hoisted(() => ({ count: 0, labels: 0 }));
 vi.mock('../../../src/core/nav/NavGridReachability.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/core/nav/NavGridReachability.js')>();
   const wrap = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A): R => { fills.count++; return fn(...args); };
@@ -21,18 +21,24 @@ vi.mock('../../../src/core/nav/NavGridReachability.js', async (importOriginal) =
     computeReachableSet: wrap(actual.computeReachableSet),
     computeClimbReachableSet: wrap(actual.computeClimbReachableSet),
     computeClimbReachableSetFromSources: wrap(actual.computeClimbReachableSetFromSources),
+    // Whole-grid component labelling is counted apart from fills (#1427).
+    computeClimbComponents: (...args: Parameters<typeof actual.computeClimbComponents>) => {
+      fills.labels++;
+      return actual.computeClimbComponents(...args);
+    },
   };
 });
 
 import { createGame, type GameState, type PendingAction, type ActionType } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
+import { hireEmployee, fireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import { ORDER_REACH_CACHE_MAX_KEYS } from '../../../src/core/config/balance.js';
 import {
   orderActorKey,
   buildOrderReachability,
@@ -91,7 +97,7 @@ function queue(
 
 const ghostOf = (state: GameState, id: number) => state.ghostPreviews.find(g => g.id === id)!;
 
-beforeEach(() => { fills.count = 0; });
+beforeEach(() => { fills.count = 0; fills.labels = 0; });
 
 describe('orderActorKey (#1306)', () => {
   const base = { requiredSkill: null, requiredVehicleRole: null, targetEmployeeId: null } as const;
@@ -631,5 +637,435 @@ describe('classifyQueuedOrders — a temporarily unavailable holder is not nobod
     expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(false);
     state.employees.employees[0]!.alive = false;
     expect(classifyQueuedOrders(state).unqualifiedIds.has(id)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Caching (#1427): fills and labellings are reused until their inputs change.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('reachability cache (#1427)', () => {
+  /** Two pools: skill-free (everyone) and geology (one holder). Employees start in region A. */
+  function stage() {
+    const state = makeState();
+    const plain = hire(state, IN_A);
+    const geo = hire(state, { x: 4, z: 7 }, ['geology']);
+    const free = queue(state, 'survey', IN_A_TARGET);
+    const gated = queue(state, 'survey', IN_A_TARGET, { requiredSkill: 'geology' });
+    return { state, plain, geo, free, gated };
+  }
+  const verdicts = (state: GameState) => Object.fromEntries(judgeQueuedOrders(state));
+
+  it('a second call with nothing changed performs no fills and no labellings', () => {
+    const { state } = stage();
+    queue(state, 'rest', IN_A_TARGET, { targetEmployeeId: state.employees.employees[0]!.id });
+    judgeQueuedOrders(state);
+    expect(fills.count).toBeGreaterThan(0);
+    expect(fills.labels).toBeGreaterThan(0);
+    fills.count = 0; fills.labels = 0;
+    judgeQueuedOrders(state);
+    refreshOrderReachability(state);
+    classifyQueuedOrders(state);
+    expect(fills.count).toBe(0);
+    expect(fills.labels).toBe(0);
+  });
+
+  it('buildOrderReachability reuses cached fills across calls', () => {
+    const { state } = stage();
+    const actions = state.pendingActions.filter(a => a.status === 'queued');
+    buildOrderReachability(state, actions);
+    fills.count = 0;
+    buildOrderReachability(state, actions);
+    expect(fills.count).toBe(0);
+  });
+
+  it('ticks of unrelated state (ghost churn, new orders on known keys) do not refill', () => {
+    const { state } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    queue(state, 'survey', IN_B_TARGET);
+    judgeQueuedOrders(state);
+    expect(fills.count).toBe(0);
+  });
+
+  it('moving one actor to a new cell refills only the keys it belongs to', () => {
+    const { state, plain, free, gated } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    plain.x = IN_B.x; plain.z = IN_B.z; // holds no skill: only the skill-free pool contains it
+    const v = verdicts(state);
+    expect(fills.count).toBe(1);
+    expect(v[free]).toBe('reachable'); // geology holder is still in A, so A stays covered
+    expect(v[gated]).toBe('reachable');
+  });
+
+  it('a verdict follows a lone actor that moves across the wall', () => {
+    const state = makeState();
+    const emp = hire(state, IN_A);
+    const id = queue(state, 'survey', IN_A_TARGET);
+    expect(verdicts(state)[id]).toBe('reachable');
+    emp.x = IN_B.x; emp.z = IN_B.z;
+    expect(verdicts(state)[id]).toBe('unreachable');
+    emp.x = IN_A.x; emp.z = IN_A.z;
+    expect(verdicts(state)[id]).toBe('reachable');
+  });
+
+  it('moving a skill holder refills its skill pool and the skill-free pool', () => {
+    const { state, geo } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    geo.x = IN_B.x; geo.z = IN_B.z;
+    judgeQueuedOrders(state);
+    expect(fills.count).toBe(2);
+  });
+
+  it('moving within the same rounded cell does not refill', () => {
+    const { state, plain, geo } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    plain.x += 0.3; plain.z -= 0.2;
+    geo.x -= 0.4; geo.z += 0.4;
+    judgeQueuedOrders(state);
+    expect(fills.count).toBe(0);
+  });
+
+  it('the order in which employees sit on the roster does not defeat the cache', () => {
+    const { state } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    state.employees.employees.reverse();
+    judgeQueuedOrders(state);
+    expect(fills.count).toBe(0);
+  });
+
+  it('hiring a new candidate refills its pools and firing it refills again', () => {
+    const { state } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    const extra = hire(state, IN_B);
+    const v = verdicts(state);
+    expect(fills.count).toBeGreaterThan(0);
+    expect(v).toBeDefined();
+    fills.count = 0;
+    expect(fireEmployee(state.employees, extra.id).success).toBe(true);
+    judgeQueuedOrders(state);
+    expect(fills.count).toBeGreaterThan(0);
+  });
+
+  it('killing the only candidate of a key is seen on the next call', () => {
+    const { state, geo, gated } = stage();
+    expect(verdicts(state)[gated]).toBe('reachable');
+    killEmployee(state.employees, geo.id);
+    expect(verdicts(state)[gated]).toBe('unreachable');
+    expect(buildOrderReachability(state, state.pendingActions.filter(a => a.id === gated)).hasActor(
+      orderActorKey(state.pendingActions.find(a => a.id === gated)!),
+    )).toBe(false);
+  });
+
+  it('a nav-grid cell edit invalidates the cached fills', () => {
+    const { state, free } = stage();
+    queue(state, 'survey', IN_B_TARGET);
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    state.navGrid!.setCellAt(WALL_X, 5, { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    const v = verdicts(state);
+    expect(fills.count).toBeGreaterThanOrEqual(2);
+    expect(v[free]).toBe('reachable');
+  });
+
+  it('a nav edit opening a doorway flips an unreachable verdict', () => {
+    const state = makeState();
+    hire(state, IN_A);
+    const id = queue(state, 'survey', IN_B_TARGET);
+    expect(verdicts(state)[id]).toBe('unreachable');
+    state.navGrid!.setCellAt(WALL_X, 5, { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+    expect(verdicts(state)[id]).toBe('reachable');
+  });
+
+  it('an edit that bypasses setCellAt but calls bumpRevision invalidates too', () => {
+    const state = makeState();
+    hire(state, IN_A);
+    const id = queue(state, 'survey', IN_B_TARGET);
+    expect(verdicts(state)[id]).toBe('unreachable');
+    state.navGrid!.cellAt(WALL_X, 5)!.type = 'walkable';
+    state.navGrid!.cellAt(WALL_X, 5)!.moveCost = 1.0;
+    state.navGrid!.bumpRevision();
+    expect(verdicts(state)[id]).toBe('reachable');
+  });
+
+  it('fragment and vehicle occupancy writes do not invalidate', () => {
+    const { state } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0; fills.labels = 0;
+    state.navGrid!.addFragmentOccupant(8, 8);
+    state.navGrid!.removeFragmentOccupant(8, 8);
+    state.navGrid!.cellAt(7, 7)!.vehicleOccupied = true;
+    judgeQueuedOrders(state);
+    expect(fills.count).toBe(0);
+    expect(fills.labels).toBe(0);
+  });
+
+  it('replacing the nav grid with an identical-looking one invalidates', () => {
+    const { state } = stage();
+    judgeQueuedOrders(state);
+    fills.count = 0;
+    state.navGrid = makeGrid(true);
+    judgeQueuedOrders(state);
+    expect(fills.count).toBeGreaterThanOrEqual(2);
+  });
+
+  it('replacing the nav grid changes verdicts to match the new grid', () => {
+    const state = makeState(true);
+    hire(state, IN_A);
+    const id = queue(state, 'survey', IN_B_TARGET);
+    expect(verdicts(state)[id]).toBe('unreachable');
+    state.navGrid = makeGrid(false);
+    expect(verdicts(state)[id]).toBe('reachable');
+  });
+
+  it('clearing the nav grid yields no verdicts, and restoring it recomputes', () => {
+    const { state } = stage();
+    judgeQueuedOrders(state);
+    const grid = state.navGrid;
+    state.navGrid = null;
+    expect(judgeQueuedOrders(state).size).toBe(0);
+    state.navGrid = grid;
+    expect(judgeQueuedOrders(state).size).toBe(2);
+  });
+
+  it('separate game states never share cached pools', () => {
+    const a = makeState();
+    const b = makeState();
+    hire(a, IN_A);
+    hire(b, IN_B);
+    const ida = queue(a, 'survey', IN_A_TARGET);
+    const idb = queue(b, 'survey', IN_A_TARGET);
+    expect(verdicts(a)[ida]).toBe('reachable');
+    expect(verdicts(b)[idb]).toBe('unreachable');
+  });
+
+  describe('foot component labelling', () => {
+    function stageRest() {
+      const state = makeState();
+      const a = hire(state, IN_A);
+      const b = hire(state, IN_B);
+      const ra = queue(state, 'rest', IN_B_TARGET, { targetEmployeeId: a.id });
+      const rb = queue(state, 'rest', IN_B_TARGET, { targetEmployeeId: b.id });
+      return { state, a, b, ra, rb };
+    }
+
+    it('labels once for many targeted orders, and never fills for them', () => {
+      const { state } = stageRest();
+      judgeQueuedOrders(state);
+      expect(fills.labels).toBe(1);
+      expect(fills.count).toBe(0);
+    });
+
+    it('is reused on the next call', () => {
+      const { state } = stageRest();
+      judgeQueuedOrders(state);
+      fills.labels = 0;
+      judgeQueuedOrders(state);
+      expect(fills.labels).toBe(0);
+    });
+
+    it('survives an actor move (position is read live) and the verdict follows', () => {
+      const { state, a, ra } = stageRest();
+      expect(verdicts(state)[ra]).toBe('unreachable');
+      fills.labels = 0;
+      a.x = IN_B.x; a.z = IN_B.z;
+      expect(verdicts(state)[ra]).toBe('reachable');
+      expect(fills.labels).toBe(0);
+    });
+
+    it('is recomputed after a nav edit', () => {
+      const { state, ra } = stageRest();
+      expect(verdicts(state)[ra]).toBe('unreachable');
+      fills.labels = 0;
+      state.navGrid!.setCellAt(WALL_X, 5, { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+      expect(verdicts(state)[ra]).toBe('reachable');
+      expect(fills.labels).toBe(1);
+    });
+
+    it('is recomputed when the nav grid is replaced', () => {
+      const { state } = stageRest();
+      judgeQueuedOrders(state);
+      fills.labels = 0;
+      state.navGrid = makeGrid(true);
+      judgeQueuedOrders(state);
+      expect(fills.labels).toBe(1);
+    });
+  });
+
+  describe('vehicle-gated pools', () => {
+    function stageVehicle() {
+      const state = makeState();
+      const driver = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger]);
+      const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x + 1, IN_A.z);
+      const id = queue(state, 'level_ground', IN_A_TARGET, { requiredVehicleRole: 'rock_digger' });
+      return { state, driver, vehicle, id };
+    }
+
+    it('is reused when neither driver, vehicle nor grid changed', () => {
+      const { state } = stageVehicle();
+      judgeQueuedOrders(state);
+      fills.count = 0;
+      judgeQueuedOrders(state);
+      expect(fills.count).toBe(0);
+    });
+
+    it('moving the vehicle to another cell refills and updates the verdict', () => {
+      const { state, vehicle, id } = stageVehicle();
+      expect(verdicts(state)[id]).toBe('reachable');
+      fills.count = 0;
+      vehicle.x = IN_B.x; vehicle.z = IN_B.z; // parked across the wall, nobody driving it
+      expect(verdicts(state)[id]).toBe('unreachable');
+      expect(fills.count).toBeGreaterThan(0);
+    });
+
+    it('moving the vehicle within its rounded cell does not refill', () => {
+      const { state, vehicle } = stageVehicle();
+      judgeQueuedOrders(state);
+      fills.count = 0;
+      vehicle.x += 0.25;
+      judgeQueuedOrders(state);
+      expect(fills.count).toBe(0);
+    });
+
+    it('a driver change on the vehicle refills', () => {
+      const { state, driver, vehicle, id } = stageVehicle();
+      vehicle.x = IN_B.x; vehicle.z = IN_B.z;
+      expect(verdicts(state)[id]).toBe('unreachable');
+      fills.count = 0;
+      // Driver boards: the vehicle is usable wherever it is, and sits in B.
+      vehicle.occupantIds = [driver.id];
+      driver.x = IN_B.x; driver.z = IN_B.z;
+      driver.mountedVehicleId = vehicle.id;
+      const v = verdicts(state);
+      expect(fills.count).toBeGreaterThan(0);
+      expect(v[id]).toBe('unreachable'); // target is in A, vehicle and driver are in B
+    });
+
+    it('purchasing a further vehicle is seen without a stale cache', () => {
+      const { state, vehicle, id } = stageVehicle();
+      vehicle.x = IN_B.x; vehicle.z = IN_B.z;
+      expect(verdicts(state)[id]).toBe('unreachable');
+      purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z + 1);
+      expect(verdicts(state)[id]).toBe('reachable');
+    });
+  });
+
+  describe('LRU cap', () => {
+    /** One fill-backed key per employee: vehicle-gated and aimed at that employee. */
+    function stageKeys(count: number): GameState {
+      const state = makeState(false);
+      for (let i = 0; i < count; i++) {
+        const emp = hire(state, { x: i % WIDTH, z: (i * 5) % HEIGHT }, [ROLE_LICENCE_REQUIRED.rock_digger]);
+        purchaseVehicle(state.vehicles, 'rock_digger', emp.x, emp.z);
+        queue(state, 'level_ground', IN_A_TARGET, { requiredVehicleRole: 'rock_digger', targetEmployeeId: emp.id });
+      }
+      return state;
+    }
+
+    it('keeps every key cached while under the cap', () => {
+      const state = stageKeys(10);
+      judgeQueuedOrders(state);
+      fills.count = 0;
+      judgeQueuedOrders(state);
+      expect(fills.count).toBe(0);
+    });
+
+    it('does not retain more than the cap: a pass over cap+2 distinct keys refills again', () => {
+      const state = stageKeys(ORDER_REACH_CACHE_MAX_KEYS + 2);
+      judgeQueuedOrders(state);
+      fills.count = 0;
+      judgeQueuedOrders(state);
+      expect(fills.count).toBeGreaterThan(0);
+    });
+
+    it('a pass over exactly the cap is fully cached', () => {
+      const state = stageKeys(ORDER_REACH_CACHE_MAX_KEYS);
+      judgeQueuedOrders(state);
+      fills.count = 0;
+      judgeQueuedOrders(state);
+      expect(fills.count).toBe(0);
+    });
+  });
+});
+
+describe('cached verdicts equal fresh verdicts over random mutation sequences (#1427)', () => {
+  const walkable = (): NavCell => ({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+  const blockedCell = (): NavCell => ({ type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false });
+
+  function cloneGrid(g: NavGrid): NavGrid {
+    return new NavGrid(g.width, g.height, g.cells.map(r => r.map(c => ({ ...c }))), g.maxSurfaceY, g.originX, g.originZ, g.maxClimbY);
+  }
+
+  /** Oracle: a shallow twin has its own cache (new WeakMap key) and a fresh grid object. */
+  function fresh(state: GameState): Record<number, string> {
+    const twin = { ...state, navGrid: cloneGrid(state.navGrid!) } as GameState;
+    return Object.fromEntries(judgeQueuedOrders(twin));
+  }
+
+  const SKILLS = [null, 'geology', 'blasting'] as const;
+  const ROLES = [null, 'rock_digger'] as const;
+
+  it.each([1, 2, 3, 4, 5, 6])('seed %i: judgements agree after each mutation', (seed) => {
+    const rng = new Random(seed);
+    const pickInt = (n: number): number => Math.min(n - 1, Math.floor(rng.next() * n));
+    const state = makeState(true);
+    for (let i = 0; i < 4; i++) {
+      hire(state, { x: pickInt(WIDTH), z: pickInt(HEIGHT) }, [ROLE_LICENCE_REQUIRED.rock_digger, 'geology']);
+    }
+    purchaseVehicle(state.vehicles, 'rock_digger', pickInt(WIDTH), pickInt(HEIGHT));
+
+    for (let step = 0; step < 60; step++) {
+      const emps = state.employees.employees;
+      switch (pickInt(8)) {
+        case 0: { // move an actor to a fresh cell
+          const e = emps[pickInt(Math.max(1, emps.length))];
+          if (e) { e.x = pickInt(WIDTH); e.z = pickInt(HEIGHT); }
+          break;
+        }
+        case 1: { // jitter within a cell
+          const e = emps[pickInt(Math.max(1, emps.length))];
+          if (e) { e.x += (rng.next() - 0.5) * 0.4; e.z += (rng.next() - 0.5) * 0.4; }
+          break;
+        }
+        case 2: // hire
+          hire(state, { x: pickInt(WIDTH), z: pickInt(HEIGHT) }, rng.next() < 0.5 ? ['geology'] : [ROLE_LICENCE_REQUIRED.rock_digger]);
+          break;
+        case 3: { // fire or kill
+          const e = emps[pickInt(Math.max(1, emps.length))];
+          if (e) { if (rng.next() < 0.5) fireEmployee(state.employees, e.id); else killEmployee(state.employees, e.id); }
+          break;
+        }
+        case 4: // nav edit
+          state.navGrid!.setCellAt(pickInt(WIDTH), pickInt(HEIGHT), rng.next() < 0.5 ? blockedCell() : walkable());
+          break;
+        case 5: { // queue an order
+          const skill = SKILLS[pickInt(SKILLS.length)]!;
+          const role = ROLES[pickInt(ROLES.length)]!;
+          queue(state, 'survey', { x: pickInt(WIDTH), z: pickInt(HEIGHT) }, { requiredSkill: skill as never, requiredVehicleRole: role });
+          break;
+        }
+        case 6: { // drop an order, or buy / move a vehicle
+          if (rng.next() < 0.5 && state.pendingActions.length > 0) {
+            state.pendingActions.splice(pickInt(state.pendingActions.length), 1);
+          } else if (state.vehicles.vehicles.length === 0 || rng.next() < 0.3) {
+            purchaseVehicle(state.vehicles, 'rock_digger', pickInt(WIDTH), pickInt(HEIGHT));
+          } else {
+            const v = state.vehicles.vehicles[pickInt(state.vehicles.vehicles.length)]!;
+            v.x = pickInt(WIDTH); v.z = pickInt(HEIGHT);
+          }
+          break;
+        }
+        default: // rest order aimed at one employee
+          if (emps.length > 0) {
+            queue(state, 'rest', { x: pickInt(WIDTH), z: pickInt(HEIGHT) }, { targetEmployeeId: emps[pickInt(emps.length)]!.id });
+          }
+      }
+      expect(Object.fromEntries(judgeQueuedOrders(state)), `seed ${seed} step ${step}`).toEqual(fresh(state));
+    }
   });
 });

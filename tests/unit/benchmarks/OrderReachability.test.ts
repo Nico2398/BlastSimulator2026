@@ -13,9 +13,9 @@ import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import { refreshOrderReachability } from '../../../src/core/engine/OrderReachability.js';
 
-const SIZE = 100;
+const DEFAULT_SIZE = 100;
 
-function makeState(actorCount: number, restOrders = 0): GameState {
+function makeState(actorCount: number, restOrders = 0, SIZE = DEFAULT_SIZE): GameState {
   const state = createGame({ seed: 42 });
   const cells: NavCell[][] = [];
   for (let z = 0; z < SIZE; z++) {
@@ -87,5 +87,37 @@ describe('refreshOrderReachability benchmark (#1306)', () => {
 
   it('judges 50 targeted rest orders on top of 100 pooled ones well inside a tick budget', () => {
     expect(medianMs(makeState(200, 50))).toBeLessThan(25);
+  });
+});
+
+describe('refreshOrderReachability steady-state cache benchmark (#1427)', () => {
+  const BIG = 160; // treranium_depths-sized grid
+
+  function median(samples: number[]): number {
+    const sorted = [...samples].sort((a, b) => a - b);
+    return sorted[(sorted.length / 2) | 0]!;
+  }
+
+  /** Cost of the first call on a fresh state: every fill and labelling is cold. */
+  function coldMs(): number {
+    const samples: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const state = makeState(200, 50, BIG);
+      const t0 = performance.now();
+      refreshOrderReachability(state);
+      samples.push(performance.now() - t0);
+    }
+    return median(samples);
+  }
+
+  it('an unchanged world re-judges 160x160 with many orders and actors in under 5 ms', () => {
+    const state = makeState(200, 50, BIG);
+    expect(medianMs(state, 15)).toBeLessThan(5);
+  });
+
+  it('an unchanged world costs under 20% of the cold call', () => {
+    const cold = coldMs();
+    const steady = medianMs(makeState(200, 50, BIG), 15);
+    expect(steady).toBeLessThan(cold * 0.2);
   });
 });
