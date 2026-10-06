@@ -186,7 +186,7 @@ export class NavGrid {
 
   /** Mark the grid as changed; invalidates caches keyed on `revision`. */
   bumpRevision(): void {
-    // TODO: implement
+    this.revision++;
   }
 
   constructor(
@@ -225,7 +225,10 @@ export class NavGrid {
   /** Overwrite the cell at world (x, z). No-op outside the covered box. */
   setCellAt(x: number, z: number, cell: NavCell): void {
     const row = this.cells[z - this.originZ];
-    if (row && x >= this.originX && x < this.maxX) row[x - this.originX] = cell;
+    if (row && x >= this.originX && x < this.maxX) {
+      row[x - this.originX] = cell;
+      this.bumpRevision();
+    }
   }
 
   /**
@@ -690,6 +693,7 @@ export class NavGrid {
         cell.clearance = dist === undefined ? NAV_CLEARANCE_MAX_CELLS : Math.min(dist, NAV_CLEARANCE_MAX_CELLS);
       }
     }
+    navGrid.bumpRevision();
   }
 
   /**
