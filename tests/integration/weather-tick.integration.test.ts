@@ -202,6 +202,7 @@ describe('weather feeds events (#1403)', () => {
     for (let i = 0; i < 6000 && !found; i++) {
       state.weather.current = 'storm';
       state.weather.ticksRemaining = 50; // hold the storm for the whole run
+      state.events.actionCountSinceEvent = 100; // no player here; satisfy the action cooldown gate
       const report = runTick(state, null, new Random(state.seed + state.tickCount), new EventEmitter(), { checkInvariants: false });
       if (report.firedEvent) {
         const def = getEventById(report.firedEvent.eventId);

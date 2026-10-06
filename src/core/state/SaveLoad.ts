@@ -835,6 +835,8 @@ export function deserialize(json: string): GameState {
   // current-version saves that lack a valid counter.
   migrateV28ToV29(obj);
   migrateV29ToV30(obj);
+  // Every migration above has run: the state is now at the current version.
+  obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);
   backfillRaises(obj);
 
