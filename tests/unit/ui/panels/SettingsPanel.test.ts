@@ -559,8 +559,10 @@ describe('SettingsPanel — persists locale and volumes (#1324)', () => {
       const { container, panel } = mount();
       panel.update(createGame({ seed: 1, mineType: 'desert' }));
       panel.show();
-      const saves = container.querySelector('#bs-settings-panel [data-action="open-saves"]');
-      const menu = container.querySelector('#bs-settings-panel [data-action="return-to-menu"]');
+      const saves = container.querySelector('[data-action="open-saves"]');
+      const menu = container.querySelector('[data-action="return-to-menu"]');
+      // Scoped to the container: earlier tests leave same-id panels in document.body.
+      expect(saves?.closest('#bs-settings-panel')).not.toBeNull();
       expect(saves?.textContent).toContain(t('ui.settings.save_and_load'));
       expect(menu?.textContent).toContain(t('ui.settings.return_to_menu'));
       panel.dispose();

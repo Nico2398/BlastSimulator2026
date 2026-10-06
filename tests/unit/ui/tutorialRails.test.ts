@@ -867,7 +867,7 @@ describe('exit and Settings session controls are always allowed (#1332)', () => 
     expect(TUTORIAL_EXIT_SELECTOR).toBe('[data-action="tutorial-exit"]');
     expect(SETTINGS_SESSION_SELECTORS).toEqual([
       '#bs-settings-panel [data-lang]',
-      '#bs-settings-panel input[type=range]',
+      '#bs-settings-panel input[type="range"]',
       '#bs-settings-panel [data-action="open-saves"]',
       '#bs-settings-panel [data-action="return-to-menu"]',
     ]);
