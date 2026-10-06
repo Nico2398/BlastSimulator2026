@@ -15,6 +15,8 @@ import { el, button, card, statGrid } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
+import { getBestStars } from '../../core/campaign/Campaign.js';
+import { STAR_ECOLOGY_MIN } from '../../core/config/balance.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { getCampaignLevels, isCampaignDone, isFinalCampaignLevel } from '../../core/campaign/Campaign.js';
 import { getLevel } from '../../core/campaign/Level.js';
@@ -258,8 +260,10 @@ export class LevelEndScreen {
     const target = level?.unlockThreshold ?? 0;
     const rating = calculateStarRating(stats, target);
 
+    const bestStars = Math.max(getBestStars(activeId ? state.campaign.levels[activeId] : undefined), rating.stars);
+
     this.starRow.replaceChildren(...Array.from({ length: 3 }, (_, i) => {
-      const earned = i < rating.stars;
+      const earned = i < bestStars;
       const star = iconEl('star', 34);
       star.style.color = earned ? 'var(--bsx-amber)' : 'rgba(255,255,255,.16)';
       return star;
@@ -301,13 +305,21 @@ export class LevelEndScreen {
           count: `${stats.casualties}`,
         })),
       this.starRatingRow(rating.details.ecologyPass, t('ui.level_end.star_rating.ecology_label'),
-        `${Math.round(stats.bestEcology)}`,
+        `${Math.round(stats.finalEcology)}`,
         t(rating.details.ecologyPass ? 'ui.level_end.star_rating.ecology_pass' : 'ui.level_end.star_rating.ecology_fail', {
-          score: `${Math.round(stats.bestEcology)}`,
+          score: `${Math.round(stats.finalEcology)}`,
+          min: `${STAR_ECOLOGY_MIN}`,
         })),
     );
 
-    this.replayBtn.style.display = rating.stars < 3 ? '' : 'none';
+    if (rating.stars < bestStars) {
+      this.starRatingRows.appendChild(el('div', {
+        text: t('ui.level_end.star_rating.best_note', { stars: `${bestStars}`, run: `${rating.stars}` }),
+        attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
+      }));
+    }
+
+    this.replayBtn.style.display = bestStars < 3 ? '' : 'none';
 
     const nextId = this.nextLevelId(state);
     const nextLevel = nextId ? getLevel(nextId) : undefined;

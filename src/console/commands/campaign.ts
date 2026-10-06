@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
-import { getLevelProgress, createCampaignState, recordProfit, isCampaignDone } from '../../core/campaign/Campaign.js';
+import { getLevelProgress, createCampaignState, recordProfit, recordStars, isCampaignDone } from '../../core/campaign/Campaign.js';
 import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
 import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
@@ -82,6 +82,7 @@ export function campaignCompleteCommand(
   ctx.state.cash = ctx.state.finances.cash;
   snapshotStats(ctx.state.levelStats, ctx.state);
   recordProfit(ctx.state.campaign, levelId, ctx.state.levelStats.totalWealth);
+  recordStars(ctx.state.campaign, levelId, calculateStarRating(ctx.state.levelStats, level.unlockThreshold).stars);
   ctx.state.levelEnded = true;
   ctx.state.levelEndReason = 'completed';
 

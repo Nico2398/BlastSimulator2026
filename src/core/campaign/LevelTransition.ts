@@ -3,8 +3,9 @@
 
 import { createGame, createWorldState, type GameConfig, type GameState } from '../state/GameState.js';
 import { getLevel } from './Level.js';
-import { recordProfit, startLevel, type CampaignState } from './Campaign.js';
+import { recordProfit, recordStars, startLevel, type CampaignState } from './Campaign.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
 import { getFinancialReport } from '../economy/Finance.js';
 
 // ── Types ──
@@ -61,6 +62,9 @@ export function checkLevelComplete(
   // Threshold reached — close the session (guards repeat triggers), record, build summary
   state.levelEnded = true;
   recordProfit(campaign, levelId, profit);
+  snapshotStats(state.levelStats, state);
+  const { stars } = calculateStarRating(state.levelStats, level.unlockThreshold);
+  recordStars(campaign, levelId, stars);
 
   const summary: LevelCompleteSummary = {
     levelId,
@@ -70,7 +74,7 @@ export function checkLevelComplete(
     finalWellBeing: state.scores.wellBeing,
     finalEcology: state.scores.ecology,
     finalSafety: state.scores.safety,
-    stars: 0, // TODO: implement
+    stars,
   };
 
   emitter.emit('level:complete', summary);

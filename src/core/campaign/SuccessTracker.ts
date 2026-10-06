@@ -6,6 +6,7 @@ import type { GameState } from '../state/GameState.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { getFinancialReport } from '../economy/Finance.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
+import { STAR_ECOLOGY_MIN } from '../config/balance.js';
 
 // ── Types ──
 
@@ -68,6 +69,7 @@ export function snapshotStats(stats: LevelStats, state: GameState): void {
   stats.casualties = state.damage.deathCount;
   stats.blastsPerformed = state.damage.blastCount;
 
+  stats.finalEcology = state.scores.ecology;
   if (state.scores.ecology > stats.bestEcology) {
     stats.bestEcology = state.scores.ecology;
   }
@@ -112,7 +114,7 @@ export function updateDepth(stats: LevelStats, voxelY: number, surfaceY: number)
  * Criteria (each worth 1 star point, minimum 1 star always awarded):
  *   - Profit star:   totalWealth >= profitTarget (level's unlock threshold)
  *   - Safety star:   casualties === 0 (zero deaths)
- *   - Ecology star:  bestEcology >= 60 (maintained good environmental record)
+ *   - Ecology star:  finalEcology >= STAR_ECOLOGY_MIN (ecology at the end of the run)
  *
  * Scoring:
  *   0 criteria = 1 star (minimum)
@@ -123,7 +125,7 @@ export function updateDepth(stats: LevelStats, voxelY: number, surfaceY: number)
 export function calculateStarRating(stats: LevelStats, profitTarget: number): StarRating {
   const profitPass = stats.totalWealth >= profitTarget;
   const safetyPass = stats.casualties === 0;
-  const ecologyPass = stats.bestEcology >= 60;
+  const ecologyPass = stats.finalEcology >= STAR_ECOLOGY_MIN;
 
   const passCount = [profitPass, safetyPass, ecologyPass].filter(Boolean).length;
   const stars = (Math.max(1, passCount) as 1 | 2 | 3);

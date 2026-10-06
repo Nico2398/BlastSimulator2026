@@ -143,14 +143,17 @@ export function returnToWorldMap(campaign: CampaignState): void {
 }
 
 /** Merge a star rating into a level's best (max, clamped 0..3); unknown level ignored. */
-export function recordStars(_campaign: CampaignState, _levelId: string, _stars: number): void {
-  // TODO: implement
+export function recordStars(campaign: CampaignState, levelId: string, stars: number): void {
+  const entry = campaign.levels[levelId];
+  if (!entry) return;
+  const clamped = Math.max(0, Math.min(3, Math.floor(stars))) as 0 | 1 | 2 | 3;
+  if (clamped > getBestStars(entry)) entry.bestStars = clamped;
 }
 
 /** Best stars for a level: bestStars, else 1 when completed, else 0. */
-export function getBestStars(_progress: LevelProgress | undefined): number {
-  // TODO: implement
-  return 0;
+export function getBestStars(progress: LevelProgress | undefined): number {
+  if (!progress) return 0;
+  return progress.bestStars ?? (progress.completed ? 1 : 0);
 }
 
 /** Get progress for a specific level. */

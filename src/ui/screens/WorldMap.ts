@@ -9,7 +9,7 @@ import { el } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { CampaignState } from '../../core/campaign/Campaign.js';
-import { getCampaignLevels } from '../../core/campaign/Campaign.js';
+import { getBestStars, getCampaignLevels } from '../../core/campaign/Campaign.js';
 import type { LevelDef } from '../../core/campaign/Level.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 
@@ -159,10 +159,10 @@ export class WorldMap {
       const unlocked = prog?.unlocked ?? (lvl.difficultyTier === 1);
       const completed = prog?.completed ?? false;
       const profit = prog?.bestSessionProfit ?? 0;
-      const stars = completed ? this.starsForProfit(profit, lvl.unlockThreshold) : 0;
+      const stars = getBestStars(prog);
       earnedStars += stars;
       const prevLevel = idx > 0 ? levels[idx - 1] : undefined;
-      return this.levelCard(lvl, unlocked, completed, profit, prevLevel);
+      return this.levelCard(lvl, unlocked, completed, profit, stars, prevLevel);
     }));
 
     const totalStars = levels.length * 3;
@@ -170,9 +170,8 @@ export class WorldMap {
     this.starProgressBarFill.style.width = `${totalStars > 0 ? (earnedStars / totalStars) * 100 : 0}%`;
   }
 
-  private levelCard(lvl: LevelDef, unlocked: boolean, completed: boolean, profit: number, prevLevel: LevelDef | undefined): HTMLElement {
+  private levelCard(lvl: LevelDef, unlocked: boolean, completed: boolean, profit: number, stars: number, prevLevel: LevelDef | undefined): HTMLElement {
     const style = BIOME_STYLE[lvl.biome] ?? DEFAULT_BIOME_STYLE;
-    const stars = completed ? this.starsForProfit(profit, lvl.unlockThreshold) : 0;
 
     const card = el('div', { attrs: {
       style: `border-radius:9px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.45);display:flex;flex-direction:column;`
@@ -260,12 +259,5 @@ export class WorldMap {
     const valueEl = el('span', { text: value, attrs: { style: `margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:${color}` } });
     row.append(iconWrap, label, valueEl);
     return row;
-  }
-
-  private starsForProfit(profit: number, threshold: number): number {
-    if (profit >= threshold * 2) return 3;
-    if (profit >= threshold) return 2;
-    if (profit >= threshold * 0.5) return 1;
-    return 0;
   }
 }
