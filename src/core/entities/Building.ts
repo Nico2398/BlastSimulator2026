@@ -585,7 +585,7 @@ export function checkFootprintPlacement(
 
 export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';
 export {
-  queueResearchTask, tickResearch, getResearchProgress, isTierUnlocked, isResearchQueued,
+  queueResearchTask, tickResearch, getResearchProgress, isTierUnlocked,
   hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,
   type QueueBlockCode, type CancelledResearch,
 } from './BuildingResearch.js';

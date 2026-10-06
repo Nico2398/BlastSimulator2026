@@ -237,7 +237,7 @@ export function runTick(
   //       unlocking its target tier when it completes. If the enabling
   //       Research Center was destroyed mid-flight, the task is cancelled
   //       and its cost refunded instead.
-  const researchCancelled = tickResearch(state.buildings);
+  const researchCancelled = tickResearch(state.buildings, emitter);
   if (researchCancelled) {
     state.cash += researchCancelled.refund;
     addIncome(state.finances, researchCancelled.refund, 'refund',
