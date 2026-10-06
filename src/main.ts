@@ -27,6 +27,8 @@ import { loadSettings } from './ui/userSettings.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { selectSaveBackend } from './persistence/selectBackend.js';
+import { loadCampaignProfile, saveCampaignProfile } from './persistence/CampaignProfileStore.js';
+import { mergeCampaignIntoProfile, resetCampaignProfile, hasCampaignProgress } from './persistence/CampaignProfile.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
@@ -193,8 +195,22 @@ mainMenu.setOnNewCampaign(() => {
   // Show world map so the player can pick a level. The tutorial (tutorial_pit
   // only, if not yet completed) triggers later, once that level is entered — starting it
   // here would stack its coach-marks on top of the level-selection cards.
-  mainMenu.hide();
-  worldMap.show(null);
+  const begin = (): void => {
+    mainMenu.hide();
+    worldMap.show(ctx.campaignProfile.campaign);
+  };
+  if (!hasCampaignProgress(ctx.campaignProfile)) { begin(); return; }
+  uiManager.showConfirm({
+    icon: 'warn',
+    title: t('ui.menu.new_campaign_confirm_title'),
+    body: t('ui.menu.new_campaign_confirm_body'),
+    confirmLabel: t('ui.menu.new_campaign_confirm_button'),
+    onConfirm: () => {
+      resetCampaignProfile(ctx.campaignProfile);
+      persistCampaignProfile();
+      begin();
+    },
+  });
 });
 mainMenu.setOnContinue((slotId) => {
   // The menu stays up until the load succeeds (onLoad hides it): it is the gate
@@ -240,7 +256,7 @@ mainMenu.setOnResume(() => { mainMenu.hide(); uiManager.show(); });
 worldMap.setOnReturnToSite(() => { worldMap.hide(); uiManager.show(); });
 function startLevel(levelId: string): void {
   worldMap.hide();
-  // `campaign start` builds its own CampaignState when none exists yet, so a
+  // `campaign start` plays campaign levels on the persistent profile, so a
   // first-ever level entry needs no priming new_game (and no throwaway
   // terrain generation for a sandbox world this never shows).
   const level = getLevel(levelId);
@@ -275,7 +291,7 @@ levelEndScreen.setOnContinue((nextLevelId) => {
 });
 levelEndScreen.setOnBackToPortfolio(() => {
   levelEndScreen.hide();
-  worldMap.show(ctx.state?.campaign ?? null);
+  worldMap.show(ctx.campaignProfile.campaign);
 });
 
 // --- Level loading ---
@@ -430,6 +446,20 @@ document.addEventListener('pointerdown', () => {
 // window.__gameConsole(cmd) routes commands to the same ConsoleRunner used in CLI mode.
 // Required by scripts/screenshot.ts to drive the game from headless Chrome.
 const { runner, ctx, emitter } = createRunner();
+
+// Campaign progress outlives any one GameState (#1312). Scenario runs ignore
+// (and never write) the stored profile so a shared browser's leftovers cannot
+// make a scenario depend on what ran before it.
+if (!scenarioMode) {
+  const stored = loadCampaignProfile();
+  mergeCampaignIntoProfile(ctx.campaignProfile, stored.campaign, stored.bestStars);
+}
+const persistCampaignProfile = (): void => {
+  if (!scenarioMode) saveCampaignProfile(ctx.campaignProfile);
+};
+// Registered after createRunner's own level:complete listener, which records
+// the stars, so the saved profile already holds this win.
+emitter.on('level:complete', persistCampaignProfile);
 
 // --- Subscribe to game-over emitter events for UI notifications ---
 emitter.on('bankruptcy:triggered', ({ cash }) => {
@@ -1022,7 +1052,7 @@ uiManager.setQuitHandler(() => {
 uiManager.setSiteMapHandler(() => {
   savesModal.hide();
   uiManager.closeActivePanel();
-  worldMap.show(ctx.state?.campaign ?? null, { canReturnToSite: isLiveGame() });
+  worldMap.show(ctx.campaignProfile.campaign, { canReturnToSite: isLiveGame() });
 });
 uiManager.setOpenSavesHandler(() => savesModal.show());
 uiManager.setMapFocusHandler((x, z) => {
@@ -1154,6 +1184,7 @@ savesModal.setOnLoad((state) => {
   }
   // Same level-entry fix-ups as starting a level (#571, #1315). `state`, not
   // `ctx.state`: loadGridForState assigned it, but TS cannot see that.
+  persistCampaignProfile();
   onLevelStateReplaced(state);
   if (tutorial.isActive) tutorial.abandon();
   worldMap.hide();

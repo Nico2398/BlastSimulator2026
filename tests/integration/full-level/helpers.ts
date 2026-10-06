@@ -46,11 +46,11 @@ function _unlockTreraniumDepths(campaign: any): void {
 export function makeCampaignCtx(levelId: string): GameContext {
   const ctx = createBaseContext();
   if (levelId === 'dusty_hollow') {
-    _unlockDustyHollow(ctx.state!.campaign);
+    _unlockDustyHollow(ctx.campaignProfile.campaign);
   } else if (levelId === 'grumpstone_ridge') {
-    _unlockGrumpstoneRidge(ctx.state!.campaign);
+    _unlockGrumpstoneRidge(ctx.campaignProfile.campaign);
   } else if (levelId === 'treranium_depths') {
-    _unlockTreraniumDepths(ctx.state!.campaign);
+    _unlockTreraniumDepths(ctx.campaignProfile.campaign);
   }
   // tutorial_pit is unlocked by default — no unlock needed
   campaignStartCommand(ctx, [], { level: levelId });

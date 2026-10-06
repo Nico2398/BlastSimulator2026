@@ -7,6 +7,7 @@
 // `makeGameContext` for one with a fresh game already started.
 
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { createCampaignProfile } from '../../src/persistence/CampaignProfile.js';
 import { newGameCommand, buildNavGridSyncTarget, type GameContext, type LandscapeHandle } from '../../src/console/commands/world.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
@@ -37,6 +38,7 @@ export function makeEmptyGameContext(overrides?: GameContextOverrides): GameCont
     landscape: overrides?.landscape !== undefined ? overrides.landscape : null,
     playableArea: overrides?.playableArea !== undefined ? overrides.playableArea : null,
     emitter: overrides?.emitter !== undefined ? overrides.emitter : new EventEmitter(),
+    campaignProfile: createCampaignProfile(),
   };
 
   // Mirrors createRunner.ts's own wiring (#1146, #1161) — every test built on

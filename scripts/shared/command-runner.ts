@@ -2,6 +2,7 @@
 // Runs scenario steps in pure Node.js (no browser, no Puppeteer).
 // Used by both scenario-test.ts (single scenario) and run-all-scenarios.ts (batch).
 
+import { resetCampaignProfile } from '../../src/persistence/CampaignProfile.js';
 import { mkdirSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
@@ -306,6 +307,10 @@ export function runScenario(
   const errors: string[] = [];
 
   console.log(`\n[${name}] Running ${steps.length} steps...`);
+
+  // The campaign profile outlives any one game (#1312), and a batch shares one
+  // engine: without this reset an earlier scenario's unlocks leak into the next.
+  resetCampaignProfile(engine.ctx.campaignProfile);
 
   try {
     const results = runSteps(engine, steps, outDir, reportDrift);

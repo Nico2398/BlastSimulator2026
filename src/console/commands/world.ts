@@ -20,6 +20,9 @@ import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type Serialize
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
+import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
+import { getLevel } from '../../core/campaign/Level.js';
+import { isCampaignLevel } from '../../core/campaign/Campaign.js';
 import { regionForColumns, buildingFootprintOccupants, type NavGridSyncTarget } from '../../core/nav/NavGridSync.js';
 
 /**
@@ -63,6 +66,8 @@ export interface GameContext {
   playableArea: PlayableArea | null;
   /** Event emitter for game-over and campaign events. Listeners attached in main.ts/console.ts. */
   emitter: EventEmitter;
+  /** Campaign progress kept outside GameState; survives new games and level starts (#1312). */
+  campaignProfile: CampaignProfile;
 }
 
 /**
@@ -396,7 +401,25 @@ export function loadGridForState(ctx: GameContext, state: GameState): string | n
     const { voxels: _loaded, ...world } = state.world;
     state.world = world;
   }
+  adoptLoadedCampaign(ctx, state);
   return null;
+}
+
+/**
+ * A loaded save only ever raises the persistent campaign profile (#1312). When
+ * it was saved mid campaign level, the state goes back onto the profile's own
+ * campaign so the level's profit keeps landing in it, keeping the saved
+ * active level.
+ */
+function adoptLoadedCampaign(ctx: GameContext, state: GameState): void {
+  const profile = ctx.campaignProfile;
+  mergeCampaignIntoProfile(profile, state.campaign);
+  const activeId = state.campaign.activeLevelId;
+  const level = activeId ? getLevel(activeId) : undefined;
+  if (level && isCampaignLevel(level)) {
+    state.campaign = profile.campaign;
+    profile.campaign.activeLevelId = activeId;
+  }
 }
 
 /**

@@ -266,3 +266,40 @@ describe('parseSandboxArgs', () => {
     expect(parsed).toEqual({});
   });
 });
+
+describe('sandbox mode vs the campaign profile (#1312)', () => {
+  it('leaves a progressed profile deep-equal untouched', () => {
+    const { runner, ctx } = createRunner();
+    ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed = true;
+    ctx.campaignProfile.campaign.levels['dusty_hollow']!.cumulativeProfit = 90000;
+    ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked = true;
+    ctx.campaignProfile.bestStars['dusty_hollow'] = 2;
+    const before = JSON.parse(JSON.stringify(ctx.campaignProfile));
+
+    expect(runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5').success).toBe(true);
+    runner.run('tick 3');
+
+    expect(ctx.campaignProfile).toEqual(before);
+  });
+
+  it('leaves a fresh profile untouched', () => {
+    const { runner, ctx } = createRunner();
+    const before = JSON.parse(JSON.stringify(ctx.campaignProfile));
+    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:5');
+    expect(ctx.campaignProfile).toEqual(before);
+  });
+
+  it('gives the sandbox state a throwaway campaign that is not the profile object', () => {
+    const { runner, ctx } = createRunner();
+    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:5');
+    expect(ctx.state!.campaign).not.toBe(ctx.campaignProfile.campaign);
+    expect(ctx.state!.campaign.activeLevelId).not.toBe('dusty_hollow');
+  });
+
+  it('mutating the sandbox campaign does not leak into the profile', () => {
+    const { runner, ctx } = createRunner();
+    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:5');
+    ctx.state!.campaign.levels['grumpstone_ridge']!.unlocked = true;
+    expect(ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked).toBe(false);
+  });
+});
