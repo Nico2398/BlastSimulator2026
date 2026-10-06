@@ -615,7 +615,7 @@ describe('Event gating (#1412)', () => {
 
     it('lawsuit_dust_fashion is unselectable on a fresh site', () => {
       const ctx = freshCtx();
-      expect(getEventById('lawsuit_dust_fashion')!.canFire(ctx)).toBe(true); // own gate is loose
+      expect(getEventById('lawsuit_dust_fashion')!.canFire(ctx)).toBe(false); // own gate requires an environmental cause
       for (const seed of SEEDS) {
         expect(selectEvent('lawsuit', ctx, new Random(seed))?.id).not.toBe('lawsuit_dust_fashion');
       }

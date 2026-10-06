@@ -71,8 +71,8 @@ describe('buildTickEventContext', () => {
     expect(ctx.hasBuilding('freight_warehouse')).toBe(false);
     expect(ctx.hasDrillPlan).toBe(true);
     expect(ctx.tickCount).toBe(42);
-    // a judge corruption attempt is not a lawsuit (#1412)
-    expect(ctx.lawsuitCount).toBe(0);
+    // one registered lawsuit id fired; the unregistered id is ignored (#1412)
+    expect(ctx.lawsuitCount).toBe(1);
     expect(ctx.activeContractCount).toBe(1);
     expect(ctx.weatherId).toBe(state.weather.current);
     expect(ctx.scores).toBe(state.scores);
