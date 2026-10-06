@@ -1671,7 +1671,7 @@
           "type": "assert",
           "selector": ".bs-tutorial-goal",
           "property": "className",
-          "expectedValue": "bs-tutorial-goal"
+          "expectedValue": "bs-tutorial-chip bs-tutorial-goal"
         },
         {
           "type": "screenshot"
