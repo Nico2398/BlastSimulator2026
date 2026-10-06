@@ -233,6 +233,49 @@ describe('Contract system', () => {
       expect(findContract(pool, { type: 'ore_sale' })).toBe(pool[1]);
     });
 
+    describe('fillable (#1338)', () => {
+      const offer = (id: number, materialId: string, quantityKg: number, type = 'ore_sale' as const) =>
+        ({ id, type, materialId, quantityKg } as never);
+
+      it('prefers the ore_sale offer collectedOre already covers over an earlier uncovered one', () => {
+        const pool = [offer(1, 'rustite', 500), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 100, dirtite: 150 })).toBe(pool[1]);
+      });
+
+      it('treats stock exactly equal to quantityKg as covered', () => {
+        const pool = [offer(1, 'rustite', 200)];
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 200 })).toBe(pool[0]);
+      });
+
+      it('just under quantityKg is not covered', () => {
+        const pool = [offer(1, 'rustite', 200)];
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 199.9 })).toBeNull();
+      });
+
+      it('returns null when no offer is covered, even though a plain match exists', () => {
+        const pool = [offer(1, 'rustite', 500), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { type: 'ore_sale' }, {})).toBe(pool[0]);
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 1 })).toBeNull();
+      });
+
+      it('ignores non-ore_sale offers even when stock covers their quantity', () => {
+        const pool = [offer(1, 'rustite', 10, 'supply' as never)];
+        expect(findContract(pool, { fillable: true, materialId: 'rustite' }, { rustite: 999 })).toBeNull();
+      });
+
+      it('combines with materialId: only that material may be the covered one', () => {
+        const pool = [offer(1, 'rustite', 100), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { materialId: 'dirtite', fillable: true }, { rustite: 500 })).toBeNull();
+        expect(findContract(pool, { materialId: 'dirtite', fillable: true }, { rustite: 500, dirtite: 100 })).toBe(pool[1]);
+      });
+
+      it('absent or false flag leaves selection unchanged', () => {
+        const pool = [offer(1, 'rustite', 500), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { type: 'ore_sale' }, { dirtite: 999 })).toBe(pool[0]);
+        expect(findContract(pool, { type: 'ore_sale', fillable: false }, { dirtite: 999 })).toBe(pool[0]);
+      });
+    });
+
     it('returns null when no selector field is set — nothing to search for', () => {
       const state = createContractState();
       generateContracts(state, new Random(42), 0);

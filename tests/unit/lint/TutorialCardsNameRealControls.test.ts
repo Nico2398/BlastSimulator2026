@@ -34,7 +34,15 @@ const CARD_CONTROLS: Record<string, string[]> = {
   'stage.survey_method': ['survey.seismic'],
   'stage.survey_run': ['ui.survey.pick_target_scene'],
   'stage.grid_tool': ['ui.blast_workshop.drill.grid_tool'],
-  'stage.charge_all': ['ui.blast_workshop.charge.charge_all'],
+  'stage.drill_area': [
+    'ui.blast_workshop.drill.spacing',
+    'ui.blast_workshop.drill.depth',
+  ],
+  'stage.charge_all': [
+    'ui.blast_workshop.charge.charge_all',
+    'ui.blast_workshop.charge.amount',
+    'ui.blast_workshop.charge.stemming',
+  ],
   'stage.auto_sequence': ['ui.blast_workshop.sequence.auto'],
   'stage.execute': ['ui.blast_workshop.footer.fire'],
   'stage.contract_accept': ['ui.contracts.accept'],
@@ -73,5 +81,22 @@ describe.each(Object.keys(LOCALES))('tutorial cards name real controls (%s)', (c
       card.includes(label),
       `[${code}] ${cardKey} must contain the exact control label "${label}" (${labelKey}); card reads: "${card}"`,
     ).toBe(true);
+  });
+});
+
+// The cards must also quote the stepper values the scenario sets (#1338), so a
+// player following the card lands on the exact drill grid and charge the
+// tutorial expects.
+describe.each(Object.keys(LOCALES))('tutorial stepper values are named on the cards (%s)', (code) => {
+  const locale = LOCALES[code] as Record<string, string>;
+  const cases: Array<[string, string[]]> = [
+    ['tutorial.stage.drill_area', ['4', '8']],
+    ['tutorial.stage.charge_all', ['4', '2.5']],
+  ];
+  it.each(cases)('%s names its values', (cardKey, values) => {
+    const card = locale[cardKey] as string;
+    for (const v of values) {
+      expect(new RegExp(`(^|[^0-9.])${v.replace('.', '\\.')}(?![0-9])`).test(card), `[${code}] ${cardKey} lacks "${v}": ${card}`).toBe(true);
+    }
   });
 });
