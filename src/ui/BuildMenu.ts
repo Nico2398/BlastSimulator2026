@@ -636,7 +636,7 @@ export class BuildMenu extends PanelBase {
       let progressEl = existing;
       if (!progressEl) {
         progressEl = el('span', { className: 'bs-build-research-progress' });
-        progressEl.style.cssText = 'flex:0 1 auto;font:500 9px/1.2 var(--bsx-font-mono);color:var(--bsx-text-micro)';
+        progressEl.style.cssText = 'flex:1 1 100%;font:500 9px/1.2 var(--bsx-font-mono);color:var(--bsx-text-micro)';
         row.append(progressEl);
       }
       progressEl.textContent = t('ui.build.research_progress', {
@@ -697,17 +697,17 @@ export class BuildMenu extends PanelBase {
     row.className = 'bs-build-placed-row';
     row.dataset['buildingId'] = String(b.id);
     row.style.cssText =
-      'display:flex;align-items:center;gap:4px;padding:7px 8px;' +
+      'display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:7px 8px;' +
       'border:1px solid var(--bsx-hairline);border-radius:6px;background:var(--bsx-card)';
 
     const info = document.createElement('div');
-    info.style.cssText = 'flex:1 1 50%;min-width:0;font-size:10px;color:var(--bsx-text-tinted);overflow-wrap:break-word';
+    info.style.cssText = 'flex:1 1 100%;min-width:0;font-size:10px;color:var(--bsx-text-tinted);overflow-wrap:break-word';
     info.title = `${b.type} T${b.tier} at (${b.x},${b.z})`;
     info.textContent = `#${b.id} ${t(`building.${b.type}.t${b.tier}.name`)} (${b.x},${b.z})`;
 
     const moveBtn = document.createElement('button');
     moveBtn.className = 'bsx-btn bs-build-move-btn';
-    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     moveBtn.textContent = t('ui.build.move');
     moveBtn.title = `$${getMoveCost(b)}`;
     moveBtn.disabled = this.lastCash < getMoveCost(b);
@@ -724,7 +724,7 @@ export class BuildMenu extends PanelBase {
 
     const upgradeBtn = document.createElement('button');
     upgradeBtn.className = 'bsx-btn bsx-btn-primary bs-build-upgrade-btn';
-    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     upgradeBtn.textContent = t('ui.build.upgrade');
     this.applyUpgradeState(upgradeBtn, b, this.lastCash, reservations);
     upgradeBtn.addEventListener('click', () => {
@@ -738,7 +738,7 @@ export class BuildMenu extends PanelBase {
 
     const researchBtn = document.createElement('button');
     researchBtn.className = 'bsx-btn bsx-btn-locked bs-build-research-btn';
-    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     researchBtn.textContent = t('ui.build.queue_research_button');
     researchBtn.addEventListener('click', () => {
       if (nextTier !== null) this.queueResearch(b.type, nextTier);
@@ -746,7 +746,7 @@ export class BuildMenu extends PanelBase {
 
     const demolishBtn = document.createElement('button');
     demolishBtn.className = 'bsx-btn bsx-btn-danger bs-build-demolish-btn';
-    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     demolishBtn.textContent = t('ui.build.demolish');
     demolishBtn.title = `$${def.demolishCost}`;
     demolishBtn.disabled = this.lastCash < getDemolishCost(b);

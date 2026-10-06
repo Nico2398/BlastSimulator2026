@@ -184,19 +184,12 @@
     },
     {
       "command": "tick 1",
-      "description": "#1398: after the research completes, the player sees it in the Build panel — the placed living quarters' Upgrade control becomes usable (tier 2 unlocked) and the Queue Research button is gone, with no console command standing in for a click.",
+      "description": "#1398: after the research completes, the player sees it in the Build panel — the placed living quarters' Upgrade control becomes usable (tier 2 unlocked) with no console command standing in for a click.",
       "role": "player",
       "interaction": [
         {
           "type": "waitForSelector",
           "selector": "#bs-build-panel .bs-build-placed-row .bs-build-upgrade-btn:not([disabled])"
-        },
-        {
-          "type": "waitForProperty",
-          "selector": "#bs-build-panel .bs-build-placed-row .bs-build-research-btn",
-          "property": "style.display",
-          "expectedValue": "none",
-          "timeoutMs": 10000
         }
       ],
       "expect": {

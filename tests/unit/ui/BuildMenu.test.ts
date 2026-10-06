@@ -96,7 +96,7 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
 
     const info = row.querySelector<HTMLElement>('div');
     expect(info).not.toBeNull();
-    expect(info!.style.flex).toBe('1 1 50%');
+    expect(info!.style.flex).toBe('1 1 100%');
     expect(info!.style.minWidth).toBe('0px');
     // Sanity: only CSS changed, label text still complete.
     expect(info!.textContent).toContain('#1');
@@ -117,8 +117,8 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(researchBtn!.style.display).not.toBe('none');
 
     for (const btn of [moveBtn, upgradeBtn, researchBtn, demolishBtn]) {
-      expect(btn!.style.flex).toBe('0 1 auto');
-      expect(btn!.style.whiteSpace).toBe('normal');
+      expect(btn!.style.flex).toBe('0 0 auto');
+      expect(btn!.style.whiteSpace).toBe('nowrap');
     }
   });
 
@@ -135,7 +135,7 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
 
     const info = row.querySelector<HTMLElement>('div');
     expect(info).not.toBeNull();
-    expect(info!.style.flex).toBe('1 1 50%');
+    expect(info!.style.flex).toBe('1 1 100%');
     expect(info!.style.minWidth).toBe('0px');
     expect(info!.textContent).toContain('#2');
     expect(info!.textContent).toContain('(5,5)');
@@ -152,8 +152,8 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(researchBtn!.style.display).toBe('none');
 
     for (const btn of [moveBtn, upgradeBtn, demolishBtn]) {
-      expect(btn!.style.flex).toBe('0 1 auto');
-      expect(btn!.style.whiteSpace).toBe('normal');
+      expect(btn!.style.flex).toBe('0 0 auto');
+      expect(btn!.style.whiteSpace).toBe('nowrap');
     }
   });
 });
