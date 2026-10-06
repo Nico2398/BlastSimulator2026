@@ -50,10 +50,9 @@ describe('tutorial stage table', () => {
   });
 
   it('every step the player must act on has stages', () => {
-    // Auto-advancing and terminal cards are the only ones allowed to have none.
+    // Terminal cards are the only ones allowed to have none.
     for (const step of TUTORIAL_STEPS) {
-      const isPassive = step.autoAdvanceMs !== undefined
-        || step.id === 'free-play' || step.id === 'congratulations';
+      const isPassive = step.id === 'free-play' || step.id === 'congratulations';
       if (isPassive) continue;
       expect(
         stagesFor(step.id, step.highlightTarget).length,
@@ -568,5 +567,28 @@ describe('REGION.boxcut stays orderable at some depth (#1210)', () => {
       if (result.success) succeededAtLeastOnce = true;
     }
     expect(succeededAtLeastOnce).toBe(true);
+  });
+});
+
+describe('scores/finances/needs stages (#1334)', () => {
+  const OWN_STAGES = [
+    { stepId: 'finances', targetPart: '.bs-balance', hintKey: 'tutorial.stage.open_finances' },
+    { stepId: 'needs', targetPart: '#bs-toolbar [data-panel="employees"]', hintKey: 'tutorial.stage.check_needs' },
+    { stepId: 'scores', targetPart: '#bs-hud-scores', hintKey: 'tutorial.stage.inspect_scores' },
+  ];
+
+  it.each(OWN_STAGES)('$stepId has its own stage, not the generic hint', ({ stepId, targetPart, hintKey }) => {
+    const step = TUTORIAL_STEPS.find(s => s.id === stepId)!;
+    const stages = TUTORIAL_STAGES[stepId];
+    expect(stages, `no TUTORIAL_STAGES entry for ${stepId}`).toBeDefined();
+    expect(stages!.length).toBeGreaterThan(0);
+    expect(stages![0]!.target).toContain(targetPart);
+    expect(stages![0]!.hintKey).toBe(hintKey);
+    expect(stagesFor(step.id, step.highlightTarget)[0]!.hintKey).not.toBe('tutorial.stage.generic');
+  });
+
+  it.each(OWN_STAGES)('$hintKey exists in en.json and fr.json', ({ hintKey }) => {
+    expect(messages[hintKey], `missing en key ${hintKey}`).toBeTruthy();
+    expect(messagesFr[hintKey], `missing fr key ${hintKey}`).toBeTruthy();
   });
 });

@@ -497,4 +497,45 @@ describe('TopBar (redesign P1)', () => {
       }
     });
   });
+
+  describe('scores inspect counter (#1334)', () => {
+    function mount() {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const topBar = new TopBar(container);
+      topBar.update(makeState(), new NotificationCenter());
+      const hud = container.querySelector('#bs-hud-scores') as HTMLElement;
+      return { topBar, hud, container };
+    }
+
+    it('starts with no inspections', () => {
+      const { topBar, hud } = mount();
+      expect(Number(hud.dataset['inspectCount'] ?? 0)).toBe(0);
+      topBar.dispose();
+    });
+
+    it('pointerenter on #bs-hud-scores increments dataset.inspectCount', () => {
+      const { topBar, hud } = mount();
+      hud.dispatchEvent(new Event('pointerenter'));
+      expect(hud.dataset['inspectCount']).toBe('1');
+      hud.dispatchEvent(new Event('pointerenter'));
+      expect(hud.dataset['inspectCount']).toBe('2');
+      topBar.dispose();
+    });
+
+    it('click on #bs-hud-scores increments dataset.inspectCount', () => {
+      const { topBar, hud } = mount();
+      hud.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(hud.dataset['inspectCount']).toBe('1');
+      topBar.dispose();
+    });
+
+    it('survives a repaint of the scores', () => {
+      const { topBar, hud } = mount();
+      hud.dispatchEvent(new Event('pointerenter'));
+      topBar.update(makeState(), new NotificationCenter());
+      expect(hud.dataset['inspectCount']).toBe('1');
+      topBar.dispose();
+    });
+  });
 });
