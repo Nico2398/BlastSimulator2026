@@ -170,7 +170,7 @@ describe.each(['en', 'fr'] as const)('panel text colour (%s)', locale => {
     panel.show();
     const s = populated();
     s.collectedOre['dirtite'] = 40;
-    s.accidents = [{ tick: 0, type: 'injury', entityId: 1, fragmentId: 1, kineticEnergy: 200 }] as GameState['accidents'];
+    s.damage.accidents = [{ tick: 0, type: 'injury', entityId: 1, fragmentId: 1, kineticEnergy: 200 }] as GameState['damage']['accidents'];
     panel.update(s);
     expectNoDefaultColour(panel.root);
   });

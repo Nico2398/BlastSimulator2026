@@ -36,6 +36,8 @@ import type { PlacementKit } from '../scene/PlacementKit.js';
 import { armPointPick } from '../scene/PlacementKit.js';
 
 
+const TIER_BTN_BASE_STYLE = 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left';
+
 export class FleetPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private onNavigateCb?: (panel: 'crew') => void;
@@ -226,7 +228,7 @@ export class FleetPanel extends PanelBase {
     const m = VEHICLE_TIER_MULTIPLIERS[tier];
     const btn = el('button', {
       className: 'bs-fleet-tier-btn',
-      attrs: { style: 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);cursor:pointer;text-align:left', 'data-role': role, 'data-tier': String(tier), 'data-vtype': role },
+      attrs: { style: TIER_BTN_BASE_STYLE, 'data-role': role, 'data-tier': String(tier), 'data-vtype': role },
     });
     const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
     info.append(
@@ -246,8 +248,8 @@ export class FleetPanel extends PanelBase {
 
   private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean): void {
     btn.disabled = !affordable;
-    btn.style.opacity = affordable ? '1' : '.45';
-    btn.style.cursor = affordable ? 'pointer' : 'not-allowed';
+    // Rewrite the whole attribute: mutating btn.style piecemeal can drop the var() colour in some CSSOM implementations.
+    btn.setAttribute('style', `${TIER_BTN_BASE_STYLE};opacity:${affordable ? '1' : '.45'};cursor:${affordable ? 'pointer' : 'not-allowed'}`);
   }
 
   private refreshDealershipAffordability(cash: number): void {
