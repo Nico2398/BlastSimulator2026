@@ -1392,6 +1392,17 @@
       }
     },
     {
+      "command": "weather set sunny",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "description": "Pin dry weather right before the blast: console ticks drift the weather (#1403), and rain would weaken the water-sensitive boomite charges.",
+      "role": "bootstrap"
+    },
+    {
       "command": "blast",
       "timeout": 100,
       "frames": 6,
