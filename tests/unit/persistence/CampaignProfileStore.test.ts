@@ -5,7 +5,6 @@ import {
   CAMPAIGN_PROFILE_STORAGE_KEY,
   loadCampaignProfile,
   saveCampaignProfile,
-  clearCampaignProfile,
   type ProfileStorage,
 } from '../../../src/persistence/CampaignProfileStore.js';
 import {
@@ -81,28 +80,10 @@ describe('CampaignProfileStore', () => {
     expect(saveCampaignProfile(progressed(), s)).toBe(false);
   });
 
-  it('clear removes the stored profile', () => {
-    const s = memoryStorage();
-    saveCampaignProfile(progressed(), s);
-    clearCampaignProfile(s);
-    expect(s.data.has(CAMPAIGN_PROFILE_STORAGE_KEY)).toBe(false);
-    expect(loadCampaignProfile(s)).toEqual(createCampaignProfile());
-  });
-
-  it('clear does not throw when removeItem throws', () => {
-    const s: ProfileStorage = {
-      getItem: () => null,
-      setItem: () => {},
-      removeItem: () => { throw new Error('denied'); },
-    };
-    expect(() => clearCampaignProfile(s)).not.toThrow();
-  });
-
   it('degrades gracefully when localStorage does not exist at all', () => {
     vi.stubGlobal('localStorage', undefined);
     expect(loadCampaignProfile()).toEqual(createCampaignProfile());
     expect(saveCampaignProfile(createCampaignProfile())).toBe(false);
-    expect(() => clearCampaignProfile()).not.toThrow();
   });
 
   it('defaults to the global localStorage when no storage is passed', () => {
@@ -111,7 +92,5 @@ describe('CampaignProfileStore', () => {
     const p = progressed();
     expect(saveCampaignProfile(p)).toBe(true);
     expect(loadCampaignProfile()).toEqual(p);
-    clearCampaignProfile();
-    expect(s.data.size).toBe(0);
   });
 });

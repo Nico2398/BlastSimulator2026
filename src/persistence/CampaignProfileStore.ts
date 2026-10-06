@@ -30,12 +30,3 @@ export function saveCampaignProfile(profile: CampaignProfile, storage?: ProfileS
     return false;
   }
 }
-
-/** Remove the stored profile. */
-export function clearCampaignProfile(storage?: ProfileStorage): void {
-  try {
-    resolveStorage(storage)?.removeItem(CAMPAIGN_PROFILE_STORAGE_KEY);
-  } catch {
-    // storage blocked: nothing to clear
-  }
-}

@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Campaign profile: campaign progress kept outside GameState (#1312)
 // Pure data + merge helpers. Storage lives in CampaignProfileStore.ts.
 
-import { createCampaignState, isCampaignComplete, type CampaignState } from '../core/campaign/Campaign.js';
+import { createCampaignState, isCampaignComplete, unlockNextLevel, type CampaignState } from '../core/campaign/Campaign.js';
 import { getAllLevels } from '../core/campaign/Level.js';
 
 export interface CampaignProfile {
@@ -29,12 +29,8 @@ function finiteOr(value: unknown, fallback: number): number {
 
 /** Completing a level unlocks the one after it (by level order). */
 function unlockSuccessorsOfCompleted(campaign: CampaignState): void {
-  const all = getAllLevels();
-  for (let i = 0; i + 1 < all.length; i++) {
-    if (campaign.levels[all[i]!.id]?.completed) {
-      const next = campaign.levels[all[i + 1]!.id];
-      if (next) next.unlocked = true;
-    }
+  for (const level of getAllLevels()) {
+    if (campaign.levels[level.id]?.completed) unlockNextLevel(campaign, level.id);
   }
 }
 
@@ -69,8 +65,8 @@ export function mergeCampaignIntoProfile(
 
 /** Raise a level's best stars (never lowers). */
 export function recordBestStars(profile: CampaignProfile, levelId: string, stars: number): void {
-  if (!profile.campaign.levels[levelId]) return;
-  profile.bestStars[levelId] = Math.max(profile.bestStars[levelId] ?? 0, clampStars(stars)) as Stars;
+  if (!Object.hasOwn(profile.campaign.levels, levelId)) return;
+  profile.bestStars[levelId] = Math.max((Object.hasOwn(profile.bestStars, levelId) ? profile.bestStars[levelId]! : 0), clampStars(stars)) as Stars;
 }
 
 /** Reset the profile to a fresh state, in place (object identity preserved). */

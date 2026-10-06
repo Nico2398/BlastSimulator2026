@@ -373,7 +373,8 @@ describe('SettingsPanel', () => {
         clickReplay(panel);
         await vi.waitFor(() => { if (!requested) throw new Error('confirm not requested yet'); });
 
-        expect(requested).not.toBeNull();
+        expect(requested!.title).toBe(t('ui.settings.replay_confirm_title'));
+        expect(requested!.body).toBe(t('ui.settings.replay_confirm_body'));
         expect(replayed).toBe(false);
         panel.dispose();
       });

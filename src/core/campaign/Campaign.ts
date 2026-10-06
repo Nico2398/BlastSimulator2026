@@ -82,7 +82,7 @@ export function recordProfit(
   const nowComplete = entry.cumulativeProfit >= level.unlockThreshold;
   if (!wasCompleted && nowComplete) {
     entry.completed = true;
-    _unlockNext(campaign, levelId);
+    unlockNextLevel(campaign, levelId);
     campaign.campaignComplete = isCampaignComplete(campaign);
     return true;
   }
@@ -91,7 +91,7 @@ export function recordProfit(
 }
 
 /** Unlock the level that follows the given level (by difficulty tier order). */
-function _unlockNext(campaign: CampaignState, completedId: string): void {
+export function unlockNextLevel(campaign: CampaignState, completedId: string): void {
   const all = getAllLevels();
   const idx = all.findIndex(l => l.id === completedId);
   if (idx < 0 || idx + 1 >= all.length) return;
