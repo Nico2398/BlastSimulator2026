@@ -147,8 +147,7 @@ export class TutorialOverlay {
     this.stopGuide();
     this.clearAutoAdvance();
     this.rails.clear();
-    document.body.classList.remove(GUIDED_CLASS);
-    this.goalChipEl.style.display = 'none';
+    this.hideGuidedChrome();
     this.overlay.remove();
   }
 
@@ -189,6 +188,12 @@ export class TutorialOverlay {
       this.rails.releaseClock(state);
     }
     this.refreshGuide();
+  }
+
+  /** Drop the rails class and hide the goal chip (tutorial ending or disposed). */
+  private hideGuidedChrome(): void {
+    document.body.classList.remove(GUIDED_CLASS);
+    this.goalChipEl.style.display = 'none';
   }
 
   private step(): RailsStep {
@@ -315,8 +320,7 @@ export class TutorialOverlay {
     this.stopGuide();
     this.clearAutoAdvance();
     this.rails.clear();
-    document.body.classList.remove(GUIDED_CLASS);
-    this.goalChipEl.style.display = 'none';
+    this.hideGuidedChrome();
     this.snapshots = {};
     this._active = false;
     if (this.gameState) {
@@ -389,8 +393,7 @@ export class TutorialOverlay {
 
   /** Show the goal chip on `goalChip` steps and refresh its live figures; bound through the locale registry. */
   private renderGoalChip(): void {
-    const step = TUTORIAL_STEPS[this.stepIndex];
-    const show = step?.goalChip === true && this.gameState !== null;
+    const show = TUTORIAL_STEPS[this.stepIndex]?.goalChip === true && this.gameState !== null;
     this.goalChipEl.style.display = show ? '' : 'none';
     if (show && this.gameState) {
       Object.assign(this.goalParams, goalChipParams(this.gameState));

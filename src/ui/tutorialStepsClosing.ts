@@ -28,6 +28,11 @@ export function victoryProgress(
   return { profit, target, remaining: Math.max(0, target - profit) };
 }
 
+/** Profit target the tutorial level is won at. */
+function tutorialTarget(): number {
+  return getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
+}
+
 export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
   // ── free-play ──
   // The guided part ends with the first ore sale. From here every rail is
@@ -42,11 +47,10 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     textKey: 'tutorial.free_play',
     guided: false,
     goalChip: true,
-    textParamsFor: (state: GameState) => {
-      const target = getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
-      const { profit, remaining } = victoryProgress(state.finances, target);
-      return { profit: formatDollars(profit), target: formatDollars(target), remaining: formatDollars(remaining) };
-    },
+    textParamsFor: (state: GameState) => ({
+      ...goalChipParams(state),
+      remaining: formatDollars(victoryProgress(state.finances, tutorialTarget()).remaining),
+    }),
     isComplete: (state: GameState) => state.levelEnded === true && state.levelEndReason === 'completed',
   },
 
@@ -74,6 +78,6 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
 
 /** Interpolation params for the goal chip: formatted net profit and profit target (#1328). */
 export function goalChipParams(state: GameState): { profit: string; target: string } {
-  const target = getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
+  const target = tutorialTarget();
   return { profit: formatDollars(victoryProgress(state.finances, target).profit), target: formatDollars(target) };
 }

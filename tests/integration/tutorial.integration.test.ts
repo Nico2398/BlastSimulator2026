@@ -892,7 +892,7 @@ describe('full tutorial playthrough ends WON by following the cards then playing
     expect(commandsRun.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
   }, 300_000);
 
-  it('the goal chip reports net profit against the win target while free play runs', () => {
+  it('the goal chip params match net profit and the win target right after the guided phase', () => {
     const { run, state } = newTutorial();
     playGuidedPhase(run, state);
 
