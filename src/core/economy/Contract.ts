@@ -302,16 +302,16 @@ export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean 
 export function findContract(
   pool: readonly Contract[],
   selector: ContractSelector,
-  _collectedOre: Readonly<Record<string, number>> = {},
+  collectedOre: Readonly<Record<string, number>> = {},
 ): Contract | null {
-  // TODO: implement `selector.fillable` using _collectedOre (#1338)
-  if (selector.id !== undefined) {
-    return pool.find(c => c.id === selector.id) ?? null;
+  if (selector.id === undefined && selector.type === undefined && selector.materialId === undefined && !selector.fillable) {
+    return null;
   }
-  if (selector.type === undefined && selector.materialId === undefined) return null;
   return pool.find(c =>
-    (selector.type === undefined || c.type === selector.type)
-    && (selector.materialId === undefined || c.materialId === selector.materialId),
+    (selector.id === undefined || c.id === selector.id)
+    && (selector.type === undefined || c.type === selector.type)
+    && (selector.materialId === undefined || c.materialId === selector.materialId)
+    && (!selector.fillable || hasFillableOreSaleOffer([c], collectedOre)),
   ) ?? null;
 }
 
