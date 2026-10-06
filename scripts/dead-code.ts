@@ -60,8 +60,10 @@ const ALWAYS_LIVE = new Set<string>([
 const LIVE_EXPORTS = new Set<string>([
   // Radius formula is the unit-tested contract of resolveSecondaryBlasts (#1394); only the resolver calls it in production.
   'src/core/entities/SecondaryBlast.ts:secondaryBlastRadiusM',
-  // Unit-tested contract of the scores tutorial step (#1334); only createUiActionStep calls it in production.
+  // Unit-tested contract of the scores tutorial step (#1334); only createUiActionStep uses these in production.
   'src/ui/tutorialStepHelpers.ts:readScoresInspectCount',
+  'src/ui/tutorialStepHelpers.ts:isPanelVisible',
+  'src/ui/tutorialStepHelpers.ts:UiAction',
   // Read off `window` by the scenario harness, never imported.
   'src/ui/uiActionProbe.ts:probeUiAction',
   'src/ui/tutorialStateProbe.ts:probeTutorialState',
