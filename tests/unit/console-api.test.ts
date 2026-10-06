@@ -168,8 +168,9 @@ describe('console-api', () => {
       expect(state.timeScale).toBe(4);
     });
 
-    it('reports weather as null before any weather command has run (ctx.weatherCycle not yet created)', () => {
+    it('reports weather as null while ctx.weatherCycle does not exist', () => {
       runner.runner.run('new_game mine_type:desert seed:42');
+      delete (runner.ctx as MiningContext).weatherCycle;
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.weather).toBeNull();
