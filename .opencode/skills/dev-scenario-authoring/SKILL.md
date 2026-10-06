@@ -63,7 +63,7 @@ A step whose command throws a real exception still fails regardless of `commandO
 
 ## Interaction-only steps (`interactionOnly`)
 
-`interactionOnly: true` (`ScenarioStepDef`) plays a step only in interaction mode; command mode records it as skipped (success, current state, `expect` not evaluated). For beats whose count depends on the game's clock: the browser spends real ticks on every click and wait, so a free-play economy that pays out in four sales under the console's near-instant clock needs thirteen under the browser's (`tutorial-interactive`, #1338). The steps both modes share keep their `expect`s and the terminal step still proves the outcome in both, so an interaction-only step adds more of the same play, never a check. Never use it to hide a step that fails in command mode.
+`interactionOnly: true` (`ScenarioStepDef`) plays a step only in interaction mode; command mode records it as skipped (success, current state, `expect` not evaluated). For beats whose count depends on the game's clock: the browser spends real ticks on every click and wait, so a free-play economy that pays out in four sales under the console's near-instant clock needs thirteen under the browser's (`tutorial-interactive`, #1338). The steps both modes share keep their `expect`s and the terminal step still proves the outcome in both, so an interaction-only step adds more of the same play, never a check. Interaction mode skips an interaction-only step once the level has already ended on its own (the mine is frozen, the goal is reached), so a count that is generous for one trajectory stays valid for a shorter one. Never use it to hide a step that fails in command mode.
 
 ## Step repetition (`repeat`)
 

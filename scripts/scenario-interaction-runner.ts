@@ -227,6 +227,23 @@ export async function runScenarioInteraction(
       const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
       const stepScreenshotPaths: string[] = [];
 
+      // An interaction-only step adds more of the same play (see
+      // ScenarioStepDef.interactionOnly). Once the level has ended on its own
+      // the mine is frozen and the goal is reached, so there is nothing left
+      // to play: record it skipped rather than wait on a clock that cannot run.
+      const skipIfLevelEnded = async (): Promise<boolean> => {
+        if (!step.interactionOnly) return false;
+        const current = await gameState(page);
+        if (current['levelEnded'] !== true) return false;
+        console.log('  skipped: interaction-only step, level already ended');
+        results.push({
+          step: i, command: step.command, commandOutput: 'skipped: level already ended',
+          gameState: current, uiState: null, screenshotPath: '', statePath: '',
+        });
+        return true;
+      };
+      if (await skipIfLevelEnded()) continue;
+
       try {
         // A step that exceeds the outer budget names the action in flight (last
         // reported progress), not a bare "Step N timed out" (PR #616 review).
@@ -297,6 +314,9 @@ export async function runScenarioInteraction(
           outDir, enableScreenshots, frames, intervalMs, shots, skipBlastPlayback, results,
         });
       } catch (err: unknown) {
+        // The level can end during this very step (the tick after the last sale
+        // lands): the wait then stalls on a frozen mine. Same skip, decided late.
+        if (await skipIfLevelEnded()) continue;
         const errorMsg = describeStepFailure(step, err);
         console.error(`  ERROR: ${errorMsg}`);
         results.push({
