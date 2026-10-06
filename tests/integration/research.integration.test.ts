@@ -447,3 +447,59 @@ describe('research → tick → unlock end-to-end (#410, #442)', () => {
     expect(finalStatus.output.toLowerCase()).toMatch(/no.*research|empty|none/);
   });
 });
+
+// ── #1398: research events through the tick command ──────────────────────────
+
+describe('Research Center — events through the tick command (#1398)', () => {
+  let ctx: GameContext;
+  beforeEach(() => {
+    ctx = makeCtx();
+    placeResearchCenter(ctx);
+  });
+
+  function record(): Array<{ event: string; payload: unknown }> {
+    const seen: Array<{ event: string; payload: unknown }> = [];
+    ctx.emitter.on('research:completed', (p) => seen.push({ event: 'research:completed', payload: p }));
+    ctx.emitter.on('research:cancelled', (p) => seen.push({ event: 'research:cancelled', payload: p }));
+    return seen;
+  }
+
+  it('emits research:completed when a tier-2 task finishes on tick', () => {
+    const seen = record();
+    queueResearchTask(ctx.state!.buildings, 'driving_center', 2);
+    tickCommand(ctx, ['1'], {});
+    expect(seen).toEqual([{ event: 'research:completed', payload: { targetType: 'driving_center', targetTier: 2 } }]);
+  });
+
+  it('emits completed exactly once for a multi-tick tier-3 task', () => {
+    queueResearchTask(ctx.state!.buildings, 'driving_center', 2);
+    tickCommand(ctx, ['1'], {});
+    queueResearchTask(ctx.state!.buildings, 'driving_center', 3);
+    const seen = record();
+    const ticks = ctx.state!.buildings.researchQueue[0]!.ticksRemaining;
+    tickCommand(ctx, [String(ticks + 5)], {});
+    expect(seen).toEqual([{ event: 'research:completed', payload: { targetType: 'driving_center', targetTier: 3 } }]);
+  });
+
+  it('emits no research event while a task is in progress', () => {
+    queueResearchTask(ctx.state!.buildings, 'driving_center', 2);
+    tickCommand(ctx, ['1'], {});
+    queueResearchTask(ctx.state!.buildings, 'driving_center', 3);
+    const seen = record();
+    tickCommand(ctx, ['3'], {});
+    expect(seen).toHaveLength(0);
+  });
+
+  it('emits research:cancelled with the refund when the research center is destroyed', () => {
+    queueResearchTask(ctx.state!.buildings, 'driving_center', 2);
+    tickCommand(ctx, ['1'], {});
+    queueResearchTask(ctx.state!.buildings, 'driving_center', 3);
+    ctx.state!.buildings.buildings = ctx.state!.buildings.buildings.filter((b) => b.type !== 'research_center');
+    const seen = record();
+    tickCommand(ctx, ['1'], {});
+    expect(seen).toEqual([{
+      event: 'research:cancelled',
+      payload: { targetType: 'driving_center', targetTier: 3, refund: 12000 },
+    }]);
+  });
+});
