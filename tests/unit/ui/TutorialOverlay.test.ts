@@ -8,6 +8,7 @@ import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { addIncome } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { buildTutorialCard } from '../../../src/ui/tutorialOverlayDom.js';
 import type { ConfirmModalConfig } from '../../../src/ui/panels/ConfirmModal.js';
 
 function createMockState(): GameState {
@@ -1083,10 +1084,11 @@ describe('TutorialOverlay exit (#1332)', () => {
   });
 
   it('exposes the button as exitBtn on the card elements', () => {
-    const els = (tut as any).els ?? (tut as any).card;
-    const found = els?.exitBtn ?? exitBtn();
+    const host = document.createElement('div');
+    const { exitBtn: found } = buildTutorialCard(host);
     expect(found).toBeInstanceOf(HTMLButtonElement);
-    expect(container.contains(found)).toBe(true);
+    expect(found.getAttribute('data-action')).toBe('tutorial-exit');
+    expect(host.contains(found)).toBe(true);
   });
 
   it('exit label differs between en and fr, and keys exist', () => {

@@ -306,8 +306,7 @@ export class TutorialOverlay {
    * Stop entry point when the live level switches away from the tutorial map.
    */
   abandon(): void {
-    if (!this._active) return;
-    this.teardown();
+    this.end(false);
   }
 
   /** Injects the confirm-modal opener used by requestExit (#1332). */
@@ -329,12 +328,18 @@ export class TutorialOverlay {
 
   /** Leaves the tutorial immediately (#1332). */
   exit(): void {
-    if (!this._active) return;
-    this.finish();
+    this.end(true);
   }
 
   private finish(): void {
+    this.end(true);
+  }
+
+  /** Single teardown path; `markDone` records bs_tutorial_done so it will not auto-start again. */
+  private end(markDone: boolean): void {
+    if (!this._active) return;
     this.teardown();
+    if (!markDone) return;
     try {
       localStorage.setItem('bs_tutorial_done', '1');
     } catch {

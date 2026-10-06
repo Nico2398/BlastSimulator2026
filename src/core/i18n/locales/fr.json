@@ -3045,7 +3045,7 @@
   "tutorial.exit": "Quitter le tutoriel",
   "tutorial.exit_tooltip": "Quitter le tutoriel et continuer à jouer sans guidage.",
   "tutorial.exit_confirm_title": "Quitter le tutoriel ?",
-  "tutorial.exit_confirm_body": "Votre progression sur cette partie est perdue et le tutoriel ne se lancera plus tout seul. Vous pouvez le rejouer à tout moment depuis Paramètres > Rejouer le tutoriel.",
+  "tutorial.exit_confirm_body": "Le tutoriel se termine et votre partie continue. Le tutoriel ne se lancera plus tout seul. Vous pouvez le rejouer à tout moment depuis Paramètres > Rejouer le tutoriel.",
   "tutorial.exit_confirm_button": "Quitter le tutoriel",
   "tutorial.free_play.title": "Jeu libre",
   "tutorial.free_play": "Les rails sont retirés. Continuez à livrer du minerai via les Contrats et gardez la mine en marche. Profit net jusqu'ici : {profit} sur {target}. Encore {remaining} à gagner. Les Opérations gardent votre politique de quarts si l'équipe en a besoin.",

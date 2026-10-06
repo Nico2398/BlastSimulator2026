@@ -7,6 +7,7 @@ import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { computeDangerZone, isZoneClear } from '../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../core/config/balance.js';
+import { SETTINGS_PANEL_ID, OPEN_SAVES_ACTION, RETURN_TO_MENU_ACTION } from './settingsHooks.js';
 import { hasOutstandingVehicleWork } from './tutorialGuide.js';
 
 /**
@@ -42,10 +43,10 @@ export const TUTORIAL_EXIT_SELECTOR = '[data-action="tutorial-exit"]';
  * absent — restarting the tutorial from inside it is not a session control.
  */
 export const SETTINGS_SESSION_SELECTORS: readonly string[] = [
-  '#bs-settings-panel [data-lang]',
-  '#bs-settings-panel input[type="range"]',
-  '#bs-settings-panel [data-action="open-saves"]',
-  '#bs-settings-panel [data-action="return-to-menu"]',
+  `#${SETTINGS_PANEL_ID} [data-lang]`,
+  `#${SETTINGS_PANEL_ID} input[type="range"]`,
+  `#${SETTINGS_PANEL_ID} [data-action="${OPEN_SAVES_ACTION}"]`,
+  `#${SETTINGS_PANEL_ID} [data-action="${RETURN_TO_MENU_ACTION}"]`,
 ];
 
 /**
