@@ -8,12 +8,8 @@ import { iconEl } from './icons.js';
 import { paintToggleButton } from './dom.js';
 import {
   MAP_SIZE,
-  COLOR_ROCK,
-  COLOR_ORE,
-  COLOR_BUILDING,
-  COLOR_HOLE,
-  COLOR_CREW,
-  COLOR_VEHICLE,
+  MINIMAP_LAYERS,
+  layerColor,
   drawTerrain,
   drawGridLines,
   drawSurveyedOre,
@@ -29,7 +25,8 @@ import type { NavGrid } from '../core/nav/NavGrid.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './shell/LayoutRegistry.js';
 import { MINIMAP_WIDTH_PX, MINIMAP_HEIGHT_PX, MINIMAP_EDGE_OFFSET_PX } from './tokens.js';
 
-const LEGEND_HEIGHT = 16;
+/** Two wrapped rows of 10px labels; MINIMAP_HEIGHT_PX is sized from this. */
+const LEGEND_MIN_HEIGHT = 33;
 
 /**
  * Bottom-right corner panel (#983). Fixed size in both axes — see the
@@ -111,22 +108,21 @@ export class MiniMap {
     this.canvas.addEventListener('click', (e) => this.handleClick(e));
 
     const legend = document.createElement('div');
-    legend.style.cssText = `display:flex;gap:6px;padding:3px 6px 6px;height:${LEGEND_HEIGHT}px;font-size:9px;align-items:center`;
+    legend.style.cssText = `display:flex;flex-wrap:wrap;gap:3px 6px;padding:3px 6px 6px;min-height:${LEGEND_MIN_HEIGHT}px;font-size:10px;align-items:center`;
 
-    const items: [string, string][] = [
-      [COLOR_ROCK, 'ui.minimap.rock'],
-      [COLOR_ORE, 'ui.minimap.ore'],
-      [COLOR_BUILDING, 'ui.minimap.building'],
-      [COLOR_HOLE, 'ui.minimap.hole'],
-      [COLOR_CREW, 'ui.minimap.crew'],
-    ];
-    for (const [color, labelKey] of items) {
+    for (const layer of MINIMAP_LAYERS) {
+      const entry = document.createElement('span');
+      entry.dataset.layer = layer.id;
+      entry.style.cssText = 'display:inline-flex;align-items:center;gap:3px';
       const swatch = document.createElement('span');
-      swatch.style.cssText = `display:inline-block;width:8px;height:8px;background:${color};border-radius:1px`;
+      swatch.dataset.legendSwatch = '';
+      swatch.style.cssText = `display:inline-block;width:8px;height:8px;background:${layer.color};border-radius:1px`;
       const txt = document.createElement('span');
-      txt.style.color = '#908070';
-      this.locale.bindText(txt, labelKey);
-      legend.append(swatch, txt);
+      txt.dataset.legendLabel = '';
+      txt.style.cssText = 'color:var(--bsx-text-secondary);font-size:10px';
+      this.locale.bindText(txt, layer.labelKey);
+      entry.append(swatch, txt);
+      legend.append(entry);
     }
 
     this.ctx2d = this.canvas.getContext('2d')!;
@@ -210,7 +206,7 @@ export class MiniMap {
     drawSurveyedOre(ctx, state, proj);
 
     // Draw buildings
-    ctx.fillStyle = COLOR_BUILDING;
+    ctx.fillStyle = layerColor('building');
     for (const b of state.buildings.buildings) {
       ctx.fillRect(
         Math.floor(projectX(proj, b.x)) - 2,
@@ -220,7 +216,7 @@ export class MiniMap {
     }
 
     // Draw vehicles
-    ctx.fillStyle = COLOR_VEHICLE;
+    ctx.fillStyle = layerColor('vehicle');
     for (const v of state.vehicles.vehicles) {
       ctx.fillRect(
         Math.floor(projectX(proj, v.x)) - 1,
@@ -230,7 +226,7 @@ export class MiniMap {
     }
 
     // Draw crew
-    ctx.fillStyle = COLOR_CREW;
+    ctx.fillStyle = layerColor('crew');
     for (const e of state.employees.employees) {
       // Inside a building (#1202): no body of their own on the ground to draw.
       if (!e.alive || isInsideBuilding(e.locomotion)) continue;
@@ -240,7 +236,7 @@ export class MiniMap {
     }
 
     // Draw drill holes
-    ctx.fillStyle = COLOR_HOLE;
+    ctx.fillStyle = layerColor('hole');
     for (const h of state.drillHoles) {
       ctx.beginPath();
       ctx.arc(projectX(proj, h.x), projectZ(proj, h.z), 2, 0, Math.PI * 2);

@@ -34,8 +34,8 @@ export const SPACING_3_PX = 12;
  * the same in every language.
  */
 export const MINIMAP_WIDTH_PX = 252;
-/** Border (2) + header (26) + canvas margin-top (6) + MAP_SIZE (120) + legend (16). */
-export const MINIMAP_HEIGHT_PX = 170;
+/** Border (2) + header (26) + canvas margin-top (6) + MAP_SIZE (120) + legend (33, two wrapped rows). */
+export const MINIMAP_HEIGHT_PX = 187;
 /** Distance from the right and bottom viewport edges. */
 export const MINIMAP_EDGE_OFFSET_PX = 10;
 

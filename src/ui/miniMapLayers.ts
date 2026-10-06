@@ -8,16 +8,16 @@ import type { NavGrid, NavCellType } from '../core/nav/NavGrid.js';
 
 export const MAP_SIZE = 120; // px
 
-/** Legend swatch colours — every one of these must actually be drawn. */
-export const COLOR_ROCK = '#5080a0';
-export const COLOR_ORE = '#e8b040';
-export const COLOR_BUILDING = '#a06030';
-export const COLOR_HOLE = '#4040d0';
-export const COLOR_CREW = '#6ad0f0';
-export const COLOR_VEHICLE = '#c0c040';
+/** Layer colours — MINIMAP_LAYERS derives the legend from these, and update() draws with them. */
+const COLOR_ROCK = '#5080a0';
+const COLOR_ORE = '#e8b040';
+const COLOR_BUILDING = '#a06030';
+const COLOR_HOLE = '#4040d0';
+const COLOR_CREW = '#6ad0f0';
+const COLOR_VEHICLE = '#c0c040';
 
 /** One drawn mini-map layer: the single source for legend entries and draw fills. */
-export interface MiniMapLayer {
+interface MiniMapLayer {
   id: 'rock' | 'ore' | 'building' | 'vehicle' | 'crew' | 'hole';
   color: string;
   /** i18n key of the legend label. */
@@ -25,12 +25,18 @@ export interface MiniMapLayer {
 }
 
 /** Every layer the mini-map draws, in legend order. */
-export const MINIMAP_LAYERS: readonly MiniMapLayer[] = []; // TODO: implement
+export const MINIMAP_LAYERS: readonly MiniMapLayer[] = [
+  { id: 'rock', color: COLOR_ROCK, labelKey: 'ui.minimap.rock' },
+  { id: 'ore', color: COLOR_ORE, labelKey: 'ui.minimap.ore' },
+  { id: 'building', color: COLOR_BUILDING, labelKey: 'ui.minimap.building' },
+  { id: 'vehicle', color: COLOR_VEHICLE, labelKey: 'ui.minimap.vehicle' },
+  { id: 'crew', color: COLOR_CREW, labelKey: 'ui.minimap.crew' },
+  { id: 'hole', color: COLOR_HOLE, labelKey: 'ui.minimap.hole' },
+];
 
 /** Fill colour of the layer with the given id. */
-export function layerColor(_id: MiniMapLayer['id']): string {
-  // TODO: implement
-  return '';
+export function layerColor(id: MiniMapLayer['id']): string {
+  return MINIMAP_LAYERS.find((l) => l.id === id)!.color;
 }
 
 /** Base terrain tint before elevation shading, as RGB components. */

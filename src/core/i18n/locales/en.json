@@ -2712,6 +2712,7 @@
   "ui.minimap.building": "Building",
   "ui.minimap.hole": "Hole",
   "ui.minimap.crew": "Crew",
+  "ui.minimap.vehicle": "Vehicle",
   "ui.back": "Back",
   "saveload.title": "Save / Load",
   "saveload.save": "Save",
