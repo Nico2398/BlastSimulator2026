@@ -31,3 +31,16 @@ export function formatPricePerKg(price: number): string {
     maximumFractionDigits: decimals,
   });
 }
+
+/**
+ * Format a cash amount as a full currency string with the sign in front of
+ * the `$`: 1234 -> "$1,234", -145000 -> "-$145,000", -0.4 -> "$0".
+ *
+ * @param amount - Dollar value, possibly fractional and possibly negative.
+ * @returns Rounded, grouped string including the `$` symbol.
+ */
+export function formatDollars(amount: number): string {
+  // TODO: implement
+  void amount;
+  return undefined as unknown as string;
+}
