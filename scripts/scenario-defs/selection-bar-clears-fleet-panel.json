@@ -1,0 +1,68 @@
+{
+  "name": "selection-bar-clears-fleet-panel",
+  "description": "#1423: at 1280x720 with the Fleet and Crew panels open in the left column, selecting an employee shows the selection bar. Reaches the state only: no step goal compares two element rects (expect has no rect-disjoint form), so the geometric proof lives in tests/unit/ui/shell/layoutRegions.test.ts. A vehicle cannot be selected by a player click without scene picking; the Fleet panel's locate button only moves the camera.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:32 staffed:true",
+      "timeout": 30,
+      "description": "Setup: staffed site so Fleet and Crew have cards",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Shrink to 1280x720 and open the Fleet panel via the rail",
+      "interaction": [
+        {
+          "type": "viewport",
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-vehicle-panel .bs-fleet-tier-btn",
+        "note": "Fleet panel must be open in the left column"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Open Crew and locate an employee so the selection bar appears beside the open left-column panels",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-employee-id] [data-action=\"locate\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id] [data-action=\"locate\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-selection-bar [data-action=\"detail\"]",
+        "note": "selection bar visible while a left-column panel is open"
+      }
+    }
+  ]
+}

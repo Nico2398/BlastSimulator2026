@@ -215,6 +215,9 @@ export function scrollBoundedSection(
 // buttons, and a scrolling body. Only the id, the icon, the accent and the
 // body's gap differ, so the shell is built here and the panels supply those.
 
+/** Width of every slide-out panel card, in px. */
+export const PANEL_WIDTH_PX = 372;
+
 /** Accent tint of a panel's header icon chip. */
 type PanelAccent = 'amber' | 'info' | 'critical' | 'ore';
 
@@ -239,7 +242,7 @@ const TRAILING_BTN_STYLE =
 export function panelRoot(id: string): HTMLElement {
   const root = el('div', { className: 'bsx-root', attrs: { id } });
   root.style.cssText = [
-    'flex-direction:column', 'width:372px', 'max-height:100%',
+    'flex-direction:column', `width:${PANEL_WIDTH_PX}px`, 'max-height:100%',
     'border-radius:8px', 'background:var(--bsx-panel)', 'border:1px solid var(--bsx-hairline-strong)',
     'box-shadow:0 18px 44px rgba(0,0,0,.55)', 'overflow:hidden', 'pointer-events:all',
   ].join(';');

@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Selection bar (redesign P2)
-// Bottom-center action bar shown while a scene entity is selected. Purely
+// Bottom-center action bar shown while a scene entity is selected, shifted right
+// of the left column (#1423) when the viewport is too narrow to centre it. Purely
 // presentational: renders the right button set for the selected kind and
 // reports which one was clicked — main.ts owns what each action actually does.
 
@@ -12,12 +13,15 @@ import { nextRampWidth } from '../../core/mining/RampWidening.js';
 import type { RampWidth } from '../../core/config/balance.js';
 import { describeRamp } from '../describeRamp.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
+import { LEFT_COL_RIGHT_EDGE_PX } from './LeftColumn.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { describeStatus } from '../fleetDetailSections.js';
 import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
+/** Minimum horizontal gap between the selection bar and the left column's right edge. */
+export const SELECTION_BAR_LEFT_COL_GAP_PX = 8;
 /** Bottom offset of the bar, matching its `bottom:` inline style below. */
 const SELECTION_BAR_BOTTOM_OFFSET_PX = 22;
 /** Root row horizontal padding, matching its inline style below. */
@@ -67,20 +71,36 @@ const SELECTION_BAR_BUTTON_WIDTH_PX = 120;
  */
 const SELECTION_BAR_MAX_ACTIONS = 3;
 
-/** Bottom-center bar, sized for the widest action set (employee and building selection) so the declared envelope covers every entity kind. */
-function selectionBarBounds(viewport: Viewport): Rect {
+/** Declared envelope width: the widest action set (employee and building selection) so it covers every entity kind. */
+const SELECTION_BAR_WIDTH_PX = (() => {
   const actionsWidth = SELECTION_BAR_MAX_ACTIONS * SELECTION_BAR_BUTTON_WIDTH_PX
     + (SELECTION_BAR_MAX_ACTIONS - 1) * SELECTION_BAR_BUTTON_GAP_PX;
   const identityWidth = SELECTION_BAR_IDENTITY_MIN_WIDTH_PX + SELECTION_BAR_IDENTITY_PADDING_RIGHT_PX + SELECTION_BAR_IDENTITY_BORDER_PX;
-  const width = SELECTION_BAR_BORDER_PX * 2
+  return SELECTION_BAR_BORDER_PX * 2
     + SELECTION_BAR_PADDING_X_PX * 2
     + identityWidth
     + SELECTION_BAR_ROOT_GAP_PX * 2
     + actionsWidth
     + SELECTION_BAR_CLOSE_BTN_PX;
+})();
+/** Smallest centre-x that keeps the bar's left edge clear of the left column plus the gap. */
+const SELECTION_BAR_MIN_CENTER_PX = LEFT_COL_RIGHT_EDGE_PX + SELECTION_BAR_LEFT_COL_GAP_PX + SELECTION_BAR_WIDTH_PX / 2;
+
+/**
+ * Inline `left` of the bar (its centre, given translateX(-50%)): viewport centre,
+ * pushed right when that would cover the left column. Exported because jsdom's
+ * CSS parser drops max(), so tests read this string instead of the style property.
+ */
+export function selectionBarLeftCss(): string {
+  return `max(50%, ${SELECTION_BAR_MIN_CENTER_PX}px)`;
+}
+
+/** Bottom-center bar, sized for the widest action set; shifted right at narrow viewports so it never covers the left column. */
+function selectionBarBounds(viewport: Viewport): Rect {
+  const width = SELECTION_BAR_WIDTH_PX;
   const height = SELECTION_BAR_BORDER_PX * 2 + SELECTION_BAR_PADDING_Y_PX * 2 + SELECTION_BAR_CONTENT_HEIGHT_PX;
   return {
-    x: (viewport.width - width) / 2,
+    x: Math.max((viewport.width - width) / 2, LEFT_COL_RIGHT_EDGE_PX + SELECTION_BAR_LEFT_COL_GAP_PX),
     y: viewport.height - SELECTION_BAR_BOTTOM_OFFSET_PX - height,
     width,
     height,
@@ -107,12 +127,14 @@ export class SelectionBar {
   constructor(container: HTMLElement) {
     this.root = el('div', { className: 'bsx-root', attrs: { id: 'bs-selection-bar' } });
     this.root.style.cssText = [
-      'position:fixed', 'left:50%', `bottom:${SELECTION_BAR_BOTTOM_OFFSET_PX}px`, 'transform:translateX(-50%)',
+      'position:fixed', `bottom:${SELECTION_BAR_BOTTOM_OFFSET_PX}px`, 'transform:translateX(-50%)',
       'z-index:var(--bsx-z-panel)', 'align-items:center', `gap:${SELECTION_BAR_ROOT_GAP_PX}px`,
       `padding:${SELECTION_BAR_PADDING_Y_PX}px ${SELECTION_BAR_PADDING_X_PX}px`, 'border-radius:var(--bsx-r-panel)', 'background:rgba(18,22,28,.96)',
       'border:1px solid var(--bsx-hairline-strong)', 'box-shadow:0 10px 30px rgba(0,0,0,.45)',
       'pointer-events:all',
     ].join(';');
+    // Set via the style property for the same jsdom reason as display below; mirrors selectionBarBounds().
+    this.root.style.left = selectionBarLeftCss();
     this.root.style.display = 'none'; // set separately — jsdom's cssText parser can drop this declaration when it shares a cssText string with a var(...) value
 
     const identity = el('div');
