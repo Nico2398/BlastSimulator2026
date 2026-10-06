@@ -18,6 +18,8 @@ import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { describeStatus } from '../fleetDetailSections.js';
 import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
+/** Minimum horizontal gap between the selection bar and the left column's right edge. */
+export const SELECTION_BAR_LEFT_COL_GAP_PX = 8;
 /** Bottom offset of the bar, matching its `bottom:` inline style below. */
 const SELECTION_BAR_BOTTOM_OFFSET_PX = 22;
 /** Root row horizontal padding, matching its inline style below. */
