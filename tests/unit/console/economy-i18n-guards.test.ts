@@ -74,25 +74,25 @@ describe('economy.ts usage strings — English literal + fr divergence', () => {
     {
       name: 'contract accept — no id/material selector',
       englishLiteral:
-        'Usage: contract accept <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]',
+        'Usage: contract accept <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true]',
       run: (ctx) => contractCommand(ctx, ['accept'], {}),
     },
     {
       name: 'contract decline — no id/material selector',
       englishLiteral:
-        'Usage: contract decline <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]',
+        'Usage: contract decline <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true]',
       run: (ctx) => contractCommand(ctx, ['decline'], {}),
     },
     {
       name: 'contract deliver — missing amount',
       englishLiteral:
-        'Usage: contract deliver <id> amount:<kg> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] amount:<kg>',
+        'Usage: contract deliver <id> amount:<kg> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true] amount:<kg>',
       run: (ctx) => contractCommand(ctx, ['deliver'], {}),
     },
     {
       name: 'contract negotiate — no id/material selector',
       englishLiteral:
-        'Usage: contract negotiate <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]',
+        'Usage: contract negotiate <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true]',
       run: (ctx) => contractCommand(ctx, ['negotiate'], {}),
     },
     {

@@ -8,6 +8,8 @@ import {
   checkDeadlines,
   findContract,
   hasFillableOreSaleOffer,
+  hasFillableSaleOffer,
+  isFillableSaleOffer,
   hasRubbleDisposalOffer,
 } from '../../../src/core/economy/Contract.js';
 import {
@@ -207,6 +209,15 @@ describe('Contract system', () => {
       expect(findContract(state.available, { id: target.id })).toBe(target);
     });
 
+    it('ANDs id with the other selector fields: matching type finds it, mismatching type is null', () => {
+      const pool = [
+        { id: 1, type: 'ore_sale' as const, materialId: 'rustite' } as never,
+        { id: 2, type: 'supply' as const, materialId: 'dirtite' } as never,
+      ];
+      expect(findContract(pool, { id: 2, type: 'supply' })).toBe(pool[1]);
+      expect(findContract(pool, { id: 2, type: 'ore_sale' })).toBeNull();
+    });
+
     it('finds the first contract matching type and materialId', () => {
       const pool = [
         { id: 1, type: 'ore_sale' as const, materialId: 'rustite' } as never,
@@ -231,6 +242,49 @@ describe('Contract system', () => {
         { id: 2, type: 'ore_sale' as const, materialId: 'rustite' } as never,
       ];
       expect(findContract(pool, { type: 'ore_sale' })).toBe(pool[1]);
+    });
+
+    describe('fillable (#1338)', () => {
+      const offer = (id: number, materialId: string, quantityKg: number, type = 'ore_sale' as const) =>
+        ({ id, type, materialId, quantityKg } as never);
+
+      it('prefers the ore_sale offer collectedOre already covers over an earlier uncovered one', () => {
+        const pool = [offer(1, 'rustite', 500), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 100, dirtite: 150 })).toBe(pool[1]);
+      });
+
+      it('treats stock exactly equal to quantityKg as covered', () => {
+        const pool = [offer(1, 'rustite', 200)];
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 200 })).toBe(pool[0]);
+      });
+
+      it('just under quantityKg is not covered', () => {
+        const pool = [offer(1, 'rustite', 200)];
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 199.9 })).toBeNull();
+      });
+
+      it('returns null when no offer is covered, even though a plain match exists', () => {
+        const pool = [offer(1, 'rustite', 500), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { type: 'ore_sale' }, {})).toBe(pool[0]);
+        expect(findContract(pool, { type: 'ore_sale', fillable: true }, { rustite: 1 })).toBeNull();
+      });
+
+      it('ignores non-ore_sale offers even when stock covers their quantity', () => {
+        const pool = [offer(1, 'rustite', 10, 'supply' as never)];
+        expect(findContract(pool, { fillable: true, materialId: 'rustite' }, { rustite: 999 })).toBeNull();
+      });
+
+      it('combines with materialId: only that material may be the covered one', () => {
+        const pool = [offer(1, 'rustite', 100), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { materialId: 'dirtite', fillable: true }, { rustite: 500 })).toBeNull();
+        expect(findContract(pool, { materialId: 'dirtite', fillable: true }, { rustite: 500, dirtite: 100 })).toBe(pool[1]);
+      });
+
+      it('absent or false flag leaves selection unchanged', () => {
+        const pool = [offer(1, 'rustite', 500), offer(2, 'dirtite', 100)];
+        expect(findContract(pool, { type: 'ore_sale' }, { dirtite: 999 })).toBe(pool[0]);
+        expect(findContract(pool, { type: 'ore_sale', fillable: false }, { dirtite: 999 })).toBe(pool[0]);
+      });
     });
 
     it('returns null when no selector field is set — nothing to search for', () => {
@@ -444,5 +498,35 @@ describe('Contract system', () => {
       }
       expect(saw).toBe(true);
     });
+  });
+});
+
+describe('fillable sale offers: ore_sale or rubble_disposal (#1338)', () => {
+  it('an ore_sale is fillable when its ore is covered, exactly equal included', () => {
+    expect(isFillableSaleOffer(offer({ quantityKg: 100 }), { dirtite: 100 }, 0)).toBe(true);
+    expect(isFillableSaleOffer(offer({ quantityKg: 100 }), { dirtite: 99.9 }, 5000)).toBe(false);
+  });
+
+  it('a rubble_disposal is judged against stored mass, not ore', () => {
+    const rubble = offer({ type: 'rubble_disposal', materialId: '', quantityKg: 300 });
+    expect(isFillableSaleOffer(rubble, { dirtite: 5000 }, 300)).toBe(true);
+    expect(isFillableSaleOffer(rubble, {}, 299)).toBe(false);
+  });
+
+  it('a supply contract is never a one-click sale', () => {
+    expect(isFillableSaleOffer(offer({ type: 'supply', quantityKg: 10 }), { dirtite: 999 }, 999)).toBe(false);
+  });
+
+  it('hasFillableSaleOffer is true when only the rubble offer is covered', () => {
+    const pool = [offer({ quantityKg: 500 }), offer({ id: 2, type: 'rubble_disposal', materialId: '', quantityKg: 200 })];
+    expect(hasFillableSaleOffer(pool, {}, 200)).toBe(true);
+    expect(hasFillableSaleOffer(pool, {}, 100)).toBe(false);
+    expect(hasFillableSaleOffer([], { dirtite: 999 }, 999)).toBe(false);
+  });
+
+  it('findContract fillable resolves a covered rubble offer once stored mass is passed', () => {
+    const pool = [offer({ id: 1, quantityKg: 500 }), offer({ id: 2, type: 'rubble_disposal', materialId: '', quantityKg: 200 })];
+    expect(findContract(pool, { fillable: true }, {}, 250)).toBe(pool[1]);
+    expect(findContract(pool, { fillable: true }, {})).toBeNull();
   });
 });

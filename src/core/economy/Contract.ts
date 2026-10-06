@@ -242,6 +242,12 @@ export interface ContractSelector {
   id?: number;
   type?: ContractType;
   materialId?: string;
+  /**
+   * Match only an offer the site can fill in full (`isFillableSaleOffer`:
+   * ore_sale against `collectedOre`, rubble_disposal against stored mass);
+   * none covered means no match (#1338).
+   */
+  fillable?: boolean;
 }
 
 /**
@@ -262,8 +268,38 @@ export function hasFillableOreSaleOffer(
   collectedOre: Readonly<Record<string, number>>,
 ): boolean {
   return available.some(
-    c => c.type === 'ore_sale' && (collectedOre[c.materialId] ?? 0) >= c.quantityKg,
+    c => c.type === 'ore_sale' && isFillableSaleOffer(c, collectedOre, 0),
   );
+}
+
+/**
+ * True when `offer` is a sale the site can fill in full today: an `ore_sale`
+ * asking no more of its ore than `collectedOre` holds, or a `rubble_disposal`
+ * asking no more than the raw `storedMassKg` (rubble has no material of its
+ * own). `supply` is a recurring bulk deal, never a one-click sale (#1338).
+ */
+export function isFillableSaleOffer(
+  offer: Contract,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): boolean {
+  if (offer.type === 'ore_sale') return (collectedOre[offer.materialId] ?? 0) >= offer.quantityKg;
+  if (offer.type === 'rubble_disposal') return storedMassKg >= offer.quantityKg;
+  return false;
+}
+
+/**
+ * True when `available` holds any offer `isFillableSaleOffer` accepts: the
+ * condition a free-play player waits on, since ore and rubble share one
+ * warehouse and selling either one frees room for the haulers to bring more
+ * (#1338). Exposed in the state dumps as `fillableSaleOffered`.
+ */
+export function hasFillableSaleOffer(
+  available: readonly Contract[],
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): boolean {
+  return available.some(c => isFillableSaleOffer(c, collectedOre, storedMassKg));
 }
 
 /**
@@ -289,19 +325,25 @@ export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean 
 }
 
 /**
- * Find a contract in `pool` by `selector.id` if given, else by the first
- * entry matching `selector.type`/`selector.materialId` (either or both).
- * Null when no selector field is set (nothing to search for) or nothing in
- * `pool` matches.
+ * Find the first contract in `pool` matching every selector field given
+ * (`id`, `type`, `materialId`, `fillable` are ANDed, so an `id` whose
+ * contract has another `type` is no match). Null when no selector field is
+ * set (nothing to search for) or nothing in `pool` matches.
  */
-export function findContract(pool: readonly Contract[], selector: ContractSelector): Contract | null {
-  if (selector.id !== undefined) {
-    return pool.find(c => c.id === selector.id) ?? null;
+export function findContract(
+  pool: readonly Contract[],
+  selector: ContractSelector,
+  collectedOre: Readonly<Record<string, number>> = {},
+  storedMassKg = 0,
+): Contract | null {
+  if (selector.id === undefined && selector.type === undefined && selector.materialId === undefined && !selector.fillable) {
+    return null;
   }
-  if (selector.type === undefined && selector.materialId === undefined) return null;
   return pool.find(c =>
-    (selector.type === undefined || c.type === selector.type)
-    && (selector.materialId === undefined || c.materialId === selector.materialId),
+    (selector.id === undefined || c.id === selector.id)
+    && (selector.type === undefined || c.type === selector.type)
+    && (selector.materialId === undefined || c.materialId === selector.materialId)
+    && (!selector.fillable || isFillableSaleOffer(c, collectedOre, storedMassKg)),
   ) ?? null;
 }
 

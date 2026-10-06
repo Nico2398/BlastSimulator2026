@@ -89,8 +89,10 @@ function parseContractSelector(args: string[], named: Record<string, string>): C
     ? (typeRaw as ContractType)
     : undefined;
   const materialId = named['material'];
-  if (type === undefined && materialId === undefined) return null;
+  const fillable = named['fillable'] === 'true';
+  if (type === undefined && materialId === undefined && !fillable) return null;
   return {
+    ...(fillable ? { fillable } : {}),
     ...(type !== undefined ? { type } : {}),
     ...(materialId !== undefined ? { materialId } : {}),
   };
@@ -108,10 +110,12 @@ function resolveContract(
   args: string[],
   named: Record<string, string>,
   usage: string,
+  stock: { collectedOre: Readonly<Record<string, number>>; logistics: { storedMassKg: number } },
 ): Contract | CommandResult {
   const selector = parseContractSelector(args, named);
   if (!selector) return { success: false, output: usage };
-  const contract = findContract(pool, selector);
+  const contract = findContract(pool, selector, stock.collectedOre, stock.logistics.storedMassKg);
+  if (!contract && selector.fillable) return { success: false, output: t('economy.contract.none_fillable') };
   if (!contract) return { success: false, output: `Contract ${describeContractSelector(selector)} not found.` };
   return contract;
 }
@@ -145,7 +149,7 @@ export function contractCommand(
 
     case 'accept': {
       const usage = t('economy.contract.usage_accept');
-      const resolved = resolveContract(state.contracts.available, args, named, usage);
+      const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
       const contract = acceptContract(state.contracts, resolved.id, state.tickCount);
       if (!contract) return { success: false, output: `Contract #${resolved.id} not found in available list.` };
@@ -154,7 +158,7 @@ export function contractCommand(
 
     case 'decline': {
       const usage = t('economy.contract.usage_decline');
-      const resolved = resolveContract(state.contracts.available, args, named, usage);
+      const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
       state.contracts.available = state.contracts.available.filter(c => c.id !== resolved.id);
       return { success: true, output: `Declined contract #${resolved.id}.` };
@@ -182,7 +186,7 @@ export function contractCommand(
       if (!Number.isFinite(amount) || amount <= 0) {
         return { success: false, output: usage };
       }
-      const resolved = resolveContract(state.contracts.active, args, named, usage);
+      const resolved = resolveContract(state.contracts.active, args, named, usage, state);
       if ('success' in resolved) return resolved;
       const contract = resolved;
       const id = contract.id;
@@ -214,7 +218,7 @@ export function contractCommand(
 
     case 'negotiate': {
       const usage = t('economy.contract.usage_negotiate');
-      const resolved = resolveContract(state.contracts.available, args, named, usage);
+      const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
       const id = resolved.id;
       const result = negotiateContractAtTick(state.contracts, id, 0, state.seed, state.tickCount);

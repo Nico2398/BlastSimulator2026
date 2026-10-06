@@ -155,3 +155,15 @@ describe('command-mode runSteps honors a step\'s repeat field (issue #696)', () 
     expect(results[1]!.error).toMatch(/waitUntil/i);
   });
 });
+
+describe('command-mode runSteps skips interactionOnly steps (#1338)', () => {
+  it('records the step as skipped: nothing runs, expect is not evaluated', () => {
+    const results = run([
+      { command: 'new_game seed:42' },
+      { command: 'employee hire role:driller', interactionOnly: true, expect: { changedBy: { employeeCount: 1 } } },
+    ]);
+    expect(results[1]!.error).toBeUndefined();
+    expect(results[1]!.commandOutput).toContain('skipped');
+    expect(results[1]!.gameState?.['employeeCount']).toBe(0);
+  });
+});

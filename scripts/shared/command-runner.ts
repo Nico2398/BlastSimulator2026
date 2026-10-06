@@ -217,7 +217,11 @@ export function runSteps(
         throw new Error(`repeat and waitUntil cannot combine on the same step (step ${i}, "${step.command}")`);
       }
 
-      if (waitUntilAction) {
+      if (step.interactionOnly) {
+        // Skipped, not passed: nothing ran, so `expect` has nothing to judge.
+        result = { success: true, output: 'skipped: interaction-mode-only step' };
+        gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+      } else if (waitUntilAction) {
         const waited = runWaitUntil(engine, waitUntilAction);
         result = { success: true, output: waited.output };
         gameState = waited.gameState;
@@ -248,7 +252,7 @@ export function runSteps(
         }
       }
 
-      if (step.expect) {
+      if (step.expect && !step.interactionOnly) {
         const goalResult = checkGoalAgainstState(step.expect, before, gameState);
         if (reportDrift && goalResult.mismatches.length > 0) {
           driftMismatches = goalResult.mismatches;
