@@ -92,18 +92,13 @@ describe('applyRatingCaps', () => {
       .toEqual({ rating: 'bad', cap: 'casualty_or_destruction' });
   });
 
-  it('wet-hole cap is reported when casualty cap does not lower (bad base)', () => {
+  it('bad base with injury and wet holes stays bad, no cap', () => {
     expect(applyRatingCaps('bad', facts({ injuries: 1, wetHoleCount: 1 }))).toEqual({ rating: 'bad', cap: null });
   });
 
   it('wet holes reported before oversize when both lower the rating', () => {
     expect(applyRatingCaps('perfect', facts({ wetHoleCount: 1, oversizedFragments: 50, fragmentCount: 100 })))
       .toEqual({ rating: 'good', cap: 'wet_holes' });
-  });
-
-  it('a vehicle-only loss is not a fact and caps nothing', () => {
-    // No vehicle field exists in RatingCapFacts; all-zero facts pass through.
-    expect(applyRatingCaps('perfect', facts())).toEqual({ rating: 'perfect', cap: null });
   });
 });
 

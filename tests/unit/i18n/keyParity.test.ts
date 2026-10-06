@@ -447,7 +447,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1312: +7 keys (campaign.reset_success, replay and new-campaign confirm dialogs), both locales: 3681.
     // #1321: +1 key (ui.level_end.back_to_sandbox), both locales: 3682.
     // #1332: +5 keys (tutorial.exit*), both locales: 3687.
-    // #1349: +8 keys (rating cap keys), across both locales: 3695.
+    // #1349: +8 en keys per locale (4 ui + 4 console rating cap keys): 3695.
     expect(Object.keys(en).length).toBe(3695);
   });
 });
