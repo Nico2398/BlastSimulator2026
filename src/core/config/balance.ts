@@ -1681,3 +1681,6 @@ export const ENV_CAUSE_NUISANCE_MAX = 45;
 
 /** Max cached reachability fills in OrderReachability (#1427). One grid-sized Uint8Array per key, so memory is bounded by this cap. */
 export const ORDER_REACH_CACHE_MAX_KEYS = 64;
+
+/** Contract price multiplier for the tutorial level; mirrors the literal in Level.ts (#1328). */
+export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 32.0;

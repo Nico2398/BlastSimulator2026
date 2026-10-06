@@ -42,6 +42,10 @@ export interface TutorialStep {
    * the player's job.
    */
   commands?: string[];
+  /** `false` marks a step past the guided part: rails are lifted (#1328). */
+  guided?: false;
+  /** `true` renders the goal chip (net profit vs target) on this step (#1328). */
+  goalChip?: true;
   /**
    * Commands the tutorial runs itself when the step opens. Reserved for scripted
    * demonstrations (the event pop-up), not for doing the player's work.

@@ -113,3 +113,9 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     isComplete: () => true,
   },
 ];
+
+/** Interpolation params for the goal chip: formatted net profit and profit target (#1328). */
+export function goalChipParams(_state: GameState): { profit: string; target: string } {
+  // TODO: implement
+  return undefined as unknown as { profit: string; target: string };
+}

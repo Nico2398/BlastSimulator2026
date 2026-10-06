@@ -33,6 +33,8 @@ export interface RailsStep {
   tickBudget?: number;
   waitsOnWork?: boolean;
   clockMustRun?: (state: GameState) => boolean;
+  /** `false` once the guided part is over and rails are lifted (#1328). */
+  guided?: boolean;
 }
 
 /** What the card should show about the current stage and the clock. */
