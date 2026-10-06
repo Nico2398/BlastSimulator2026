@@ -1,9 +1,10 @@
-// BlastSimulator2026 — the interactive tutorial scenario plays the real game (#1338).
+// BlastSimulator2026 — the interactive tutorial scenarios play the real game (#1338, #1517).
 //
-// tutorial-interactive.json must be a player's run: real starting cash, no
-// test-only skill grants, no forced win. Only time control may stay a
-// console-level setup step; everything else is a click, an observation or a
-// guard. The run ends because the level ends, not because a command ended it.
+// tutorial-interactive.json and tutorial-steps-visual.json must be a player's
+// run: real starting cash, no test-only skill grants, no forced win. Only time
+// control may stay a console-level setup step; everything else is a click, an
+// observation or a guard. The run ends because the level ends, not because a
+// command ended it.
 
 import { describe, it, expect } from 'vitest';
 import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';

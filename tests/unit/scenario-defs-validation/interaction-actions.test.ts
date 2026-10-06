@@ -540,15 +540,15 @@ describe('tutorial-interactive.json — every post-blast step has a declared tim
 // This block covers an earlier, non-contiguous set of steps scattered
 // through the pre-blast portion of the file (hiring, training, building,
 // drilling, charging) whose declared `timeout` (30s, or 40s for the
-// drill_plan step, index shifted by #921's driver-assign-step removal — see
-// EXPECTED_COMMANDS_BY_INDEX below) is too tight for this file's own 3-shot
-// `shots` array (["overview","closeup","birdseye"]) capture cost under
-// `--screenshots` interaction mode. Two of these steps have already
-// produced deterministic timeout failures in production runs — step 2
-// ("time resume") reproduced twice — even though the underlying action
+// drill_plan step) is too tight for this file's own 3-shot `shots` array
+// (["overview","closeup","birdseye"]) capture cost under `--screenshots`
+// interaction mode. Step 2 ("time resume") produced a deterministic timeout
+// failure twice in production runs even though the underlying action
 // completed successfully in-browser before the outer deadline fired, the
 // same "formula-correct budget, too tight in practice" shape #776/#740
 // already documented for this file's post-blast stretch.
+// (Indices in EXPECTED_COMMANDS_BY_INDEX are re-read off the JSON after
+// #1517 removed the bootstrap steps and #921 the driver-assign step.)
 //
 // Located by literal index (not by command-shape search like the #776
 // blocks above, matching this file's own #816 caution about index drift)
