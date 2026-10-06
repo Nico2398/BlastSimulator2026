@@ -658,6 +658,24 @@ function floodFillFromSources(
   return { width, height, count };
 }
 
+function reachSourceCellX(navGrid: NavGrid, x: number): number {
+  return Math.round(navGrid.clampX(x));
+}
+
+function reachSourceCellZ(navGrid: NavGrid, z: number): number {
+  return Math.round(navGrid.clampZ(z));
+}
+
+/**
+ * Row-major index of the cell `computeClimbReachableSetFromSources` floods from
+ * for a source at (x, z): same clamp and rounding, so two sources with the same
+ * index seed identical fills.
+ */
+export function reachSourceCellIndex(navGrid: NavGrid, x: number, z: number): number {
+  return (reachSourceCellZ(navGrid, z) - navGrid.originZ) * navGrid.width
+    + (reachSourceCellX(navGrid, x) - navGrid.originX);
+}
+
 /**
  * `computeClimbReachableSet` flooded from several sources at once (#1306): a cell
  * is in the set when it is climb-reachable from at least one source. Each source
@@ -671,8 +689,8 @@ export function computeClimbReachableSetFromSources(
 ): ReachableSet {
   if (sources.length === 0) return EMPTY_REACHABLE_SET;
   const cells = sources.map(s => ({
-    x: Math.round(navGrid.clampX(s.x)),
-    z: Math.round(navGrid.clampZ(s.z)),
+    x: reachSourceCellX(navGrid, s.x),
+    z: reachSourceCellZ(navGrid, s.z),
   }));
   return snapshotFill(navGrid, cells, true, requiredClearance);
 }

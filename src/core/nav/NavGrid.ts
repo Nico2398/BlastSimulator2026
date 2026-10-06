@@ -177,6 +177,17 @@ export class NavGrid {
    * `cellAt`, which takes world coordinates, over indexing this directly.
    */
   readonly cells: NavCell[][];
+  /**
+   * Bumped whenever any cell's type, clearance or surfaceY changes, so derived
+   * caches (e.g. reachability fills) can key on it. Code writing cells
+   * directly, bypassing `setCellAt`, must call `bumpRevision`.
+   */
+  revision = 0;
+
+  /** Mark the grid as changed; invalidates caches keyed on `revision`. */
+  bumpRevision(): void {
+    this.revision++;
+  }
 
   constructor(
     width: number,
@@ -214,7 +225,10 @@ export class NavGrid {
   /** Overwrite the cell at world (x, z). No-op outside the covered box. */
   setCellAt(x: number, z: number, cell: NavCell): void {
     const row = this.cells[z - this.originZ];
-    if (row && x >= this.originX && x < this.maxX) row[x - this.originX] = cell;
+    if (row && x >= this.originX && x < this.maxX) {
+      row[x - this.originX] = cell;
+      this.bumpRevision();
+    }
   }
 
   /**
@@ -679,6 +693,7 @@ export class NavGrid {
         cell.clearance = dist === undefined ? NAV_CLEARANCE_MAX_CELLS : Math.min(dist, NAV_CLEARANCE_MAX_CELLS);
       }
     }
+    navGrid.bumpRevision();
   }
 
   /**
