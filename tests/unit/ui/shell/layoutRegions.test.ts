@@ -30,7 +30,7 @@ import { SelectionBar } from '../../../../src/ui/shell/SelectionBar.js';
 import { ActivityLog } from '../../../../src/ui/shell/ActivityLog.js';
 import { MiniMap } from '../../../../src/ui/MiniMap.js';
 import { LeftColumn, LEFT_COL_RIGHT_EDGE_PX } from '../../../../src/ui/shell/LeftColumn.js';
-import { SELECTION_BAR_LEFT_COL_GAP_PX } from '../../../../src/ui/shell/SelectionBar.js';
+import { SELECTION_BAR_LEFT_COL_GAP_PX, selectionBarLeftCss } from '../../../../src/ui/shell/SelectionBar.js';
 import {
   LayoutRegistry,
   shellLayoutRegistry,
@@ -159,11 +159,11 @@ describe('selection bar never covers the left column (#1423)', () => {
   });
 
   it.each(SHELL_VIEWPORT_MATRIX)('inline left CSS resolves to the same centre as the declared bounds at %o', (viewport) => {
-    const root = container.querySelector<HTMLElement>('#bs-selection-bar')!;
     const bar = boundsFor('selection-bar', viewport);
-    // Expected form: left:max(50%, calc(Npx)) with translateX(-50%), so `left` is the bar centre.
-    const left = root.style.left;
-    const m = /^max\(\s*50%\s*,\s*calc\(\s*(-?\d+(?:\.\d+)?)px\s*\)\s*\)$/.exec(left);
+    // jsdom drops max() from style.left, so read the string the constructor assigns.
+    // Expected form: max(50%, Npx) with translateX(-50%), so `left` is the bar centre.
+    const left = selectionBarLeftCss();
+    const m = /^max\(\s*50%\s*,\s*(-?\d+(?:\.\d+)?)px\s*\)$/.exec(left);
     expect(m, `unexpected inline left "${left}"`).not.toBeNull();
     const centre = Math.max(viewport.width / 2, Number(m![1]));
     expect(centre).toBeCloseTo(bar.x + bar.width / 2, 3);

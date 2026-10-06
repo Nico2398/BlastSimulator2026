@@ -21,7 +21,7 @@ import { describeStatus } from '../fleetDetailSections.js';
 import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
 /** Minimum horizontal gap between the selection bar and the left column's right edge. */
-const SELECTION_BAR_LEFT_COL_GAP_PX = 8;
+export const SELECTION_BAR_LEFT_COL_GAP_PX = 8;
 /** Bottom offset of the bar, matching its `bottom:` inline style below. */
 const SELECTION_BAR_BOTTOM_OFFSET_PX = 22;
 /** Root row horizontal padding, matching its inline style below. */
@@ -86,6 +86,15 @@ const SELECTION_BAR_WIDTH_PX = (() => {
 /** Smallest centre-x that keeps the bar's left edge clear of the left column plus the gap. */
 const SELECTION_BAR_MIN_CENTER_PX = LEFT_COL_RIGHT_EDGE_PX + SELECTION_BAR_LEFT_COL_GAP_PX + SELECTION_BAR_WIDTH_PX / 2;
 
+/**
+ * Inline `left` of the bar (its centre, given translateX(-50%)): viewport centre,
+ * pushed right when that would cover the left column. Exported because jsdom's
+ * CSS parser drops max(), so tests read this string instead of the style property.
+ */
+export function selectionBarLeftCss(): string {
+  return `max(50%, ${SELECTION_BAR_MIN_CENTER_PX}px)`;
+}
+
 /** Bottom-center bar, sized for the widest action set; shifted right at narrow viewports so it never covers the left column. */
 function selectionBarBounds(viewport: Viewport): Rect {
   const width = SELECTION_BAR_WIDTH_PX;
@@ -125,7 +134,7 @@ export class SelectionBar {
       'pointer-events:all',
     ].join(';');
     // Set via the style property for the same jsdom reason as display below; mirrors selectionBarBounds().
-    this.root.style.left = `max(50%, ${SELECTION_BAR_MIN_CENTER_PX}px)`;
+    this.root.style.left = selectionBarLeftCss();
     this.root.style.display = 'none'; // set separately — jsdom's cssText parser can drop this declaration when it shares a cssText string with a var(...) value
 
     const identity = el('div');

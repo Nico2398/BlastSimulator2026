@@ -16,7 +16,7 @@ const LEFT_COL_BOTTOM_MARGIN_PX = 10;
 export const LEFT_COL_RIGHT_EDGE_PX: number = LEFT_COL_LEFT_PX + PANEL_WIDTH_PX;
 
 /** Worst-case envelope of the column for a viewport. */
-function leftColumnBounds(viewport: Viewport): Rect {
+export function leftColumnBounds(viewport: Viewport): Rect {
   return {
     x: LEFT_COL_LEFT_PX,
     y: LEFT_COL_TOP_PX,
