@@ -1,0 +1,81 @@
+{
+  "name": "tutorial-exit-and-settings",
+  "description": "#1332: mid-tutorial the player can always reach Settings session controls (language pill) and can leave the tutorial through its Exit button behind a confirm. Afterwards the rails are lifted: a Crew-panel hire button that was inert while the card pointed at the first hire is usable. Every beat after setup is a real click.",
+  "steps": [
+    {
+      "command": "campaign start level:tutorial_pit",
+      "timeout": 30,
+      "description": "Setup: load Tutorial Pit.",
+      "role": "setup",
+      "interaction": [{ "type": "command", "command": "campaign start level:tutorial_pit" }]
+    },
+    {
+      "command": "tutorial_start",
+      "timeout": 30,
+      "description": "Setup: start the tutorial; the card points at hiring a surveyor.",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "tutorial_start" },
+        { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
+        { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
+      ],
+      "expect": { "tutorialStep": "hire-surveyor" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player opens Settings mid-tutorial (panel navigation is always allowed).",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
+        { "type": "awaitUsable", "selector": "#bs-settings-panel [data-lang=\"fr\"]" }
+      ],
+      "expect": { "usable": "#bs-settings-panel [data-lang=\"fr\"]" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player clicks the fr language pill; session controls are reachable at every tutorial step. The Return to Menu button stays usable too.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-settings-panel [data-lang=\"fr\"]" },
+        { "type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" }
+      ],
+      "expect": { "usable": "#bs-settings-panel [data-action=\"return-to-menu\"]" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player closes Settings, then clicks the card's Exit control; a confirm opens and the tutorial is still running.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-settings-panel [data-panel-close]" },
+        { "type": "awaitUsable", "selector": "#bs-tutorial-overlay [data-action=\"tutorial-exit\"]" },
+        { "type": "clickSelector", "selector": "#bs-tutorial-overlay [data-action=\"tutorial-exit\"]" },
+        { "type": "awaitUsable", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" }
+      ],
+      "expect": { "usable": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]", "tutorialStep": "hire-surveyor" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player confirms; the tutorial overlay is gone.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" }
+      ],
+      "expect": { "blocked": "#bs-tutorial-overlay [data-action=\"tutorial-exit\"]" }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Rails lifted: the Crew panel's Driller hire button (inert while the card pointed at the surveyor) is now usable.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "awaitUsable", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
+      ],
+      "expect": { "usable": "#bs-employee-panel [data-role=\"driller\"]" }
+    }
+  ]
+}

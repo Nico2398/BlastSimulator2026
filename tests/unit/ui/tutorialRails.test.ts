@@ -8,7 +8,7 @@ import { t } from '../../../src/core/i18n/I18n.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getPickerRegion } from '../../../src/ui/tutorialPickerRegion.js';
 import { stagesFor } from '../../../src/ui/tutorialStages.js';
-import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR } from '../../../src/ui/tutorialStepHelpers.js';
+import { SPEED_BUTTON_GROUP, SURVEY_OVERLAY_TOGGLE_TARGET, PANEL_OPEN_SELECTOR, TUTORIAL_EXIT_SELECTOR, SETTINGS_SESSION_SELECTORS } from '../../../src/ui/tutorialStepHelpers.js';
 import { PANEL_CLOSE_SELECTOR } from '../../../src/ui/panels/PanelBase.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
@@ -831,5 +831,68 @@ describe('TutorialRails — waiting state (#1014)', () => {
     expect(view.waiting).toBe(false);
     expect(view.waitingHint).toBe('');
     expect(open.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+  });
+});
+
+// #1332: the player can always leave the tutorial and always reach session controls.
+describe('exit and Settings session controls are always allowed (#1332)', () => {
+  function settingsPanel(): Record<string, HTMLElement> {
+    const panel = document.createElement('div');
+    panel.id = 'bs-settings-panel';
+    const mk = (tag: string, attrs: Record<string, string>) => {
+      const e = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      panel.appendChild(withBox(e));
+      return e;
+    };
+    const els = {
+      fr: mk('button', { 'data-lang': 'fr' }),
+      volume: mk('input', { type: 'range' }),
+      saves: mk('button', { 'data-action': 'open-saves' }),
+      menu: mk('button', { 'data-action': 'return-to-menu' }),
+      replay: mk('button', { 'data-action': 'replay-tutorial' }),
+    };
+    document.body.appendChild(panel);
+    return els;
+  }
+
+  function exitButton(): HTMLElement {
+    const b = document.createElement('button');
+    b.dataset['action'] = 'tutorial-exit';
+    document.body.appendChild(b);
+    return withBox(b);
+  }
+
+  it('the selector constants name the documented controls', () => {
+    expect(TUTORIAL_EXIT_SELECTOR).toBe('[data-action="tutorial-exit"]');
+    expect(SETTINGS_SESSION_SELECTORS).toEqual([
+      '#bs-settings-panel [data-lang]',
+      '#bs-settings-panel input[type=range]',
+      '#bs-settings-panel [data-action="open-saves"]',
+      '#bs-settings-panel [data-action="return-to-menu"]',
+    ]);
+  });
+
+  it.each(['hire-surveyor', 'set-early-policy', 'box-cut', 'blast'])('at step %s the exit and session controls are allowed', (id) => {
+    toolbarCrew();
+    const exit = exitButton();
+    const s = settingsPanel();
+    const rails = new TutorialRails();
+    rails.beginStep({ id }, state());
+    rails.refresh();
+    expect(exit.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(s['fr']!.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(s['volume']!.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(s['saves']!.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(s['menu']!.classList.contains(ALLOWED_CLASS)).toBe(true);
+  });
+
+  it('replay-tutorial stays gated', () => {
+    toolbarCrew();
+    const s = settingsPanel();
+    const rails = new TutorialRails();
+    rails.beginStep({ id: 'hire-surveyor' }, state());
+    rails.refresh();
+    expect(s['replay']!.classList.contains(ALLOWED_CLASS)).toBe(false);
   });
 });
