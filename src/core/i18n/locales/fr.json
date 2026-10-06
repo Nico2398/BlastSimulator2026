@@ -2469,6 +2469,7 @@
   "ui.crew.location": "POSITION",
   "ui.crew.location_aboard": "À bord de {vehicle}",
   "ui.crew.location_walking": "En route vers ({x}, {z})",
+  "ui.crew.location_stuck": "Bloqué en ({x}, {z})",
   "ui.crew.location_bench": "Palier {bench} ({x}, {z})",
   "ui.crew.location_coords": "({x}, {z})",
   "ui.crew.needs": "BESOINS",

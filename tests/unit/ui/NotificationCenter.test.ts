@@ -278,10 +278,8 @@ describe('NotificationCenter (redesign P1)', () => {
       });
     });
 
-    it('derives a fleet pip counting stuck vehicles', () => {
-      // #1138: isMoveStuck lives on the driving Employee now, not the
-      // vehicle — a stuck vehicle is one whose occupant (occupantIds[0])
-      // reads isMoveStuck: true.
+    it('derives a crew pip counting stuck employees, drivers included', () => {
+      // #1138: isMoveStuck lives on the driving Employee, not the vehicle.
       const center = new NotificationCenter();
       const state = makeState();
       const { employee } = hireEmployee(state.employees, 'driller', new Random(1), 0, 0);
@@ -291,7 +289,9 @@ describe('NotificationCenter (redesign P1)', () => {
         payload: null, occupantIds: [employee.id],
       });
       const pips = center.update(state);
-      expect(pips.find(p => p.kind === 'fleet')?.label).toBe('1');
+      const pip = pips.find(p => p.tip === t('notification.pip.crew_stuck_tip', { count: 1 }));
+      expect(pip?.kind).toBe('crew');
+      expect(pip?.label).toBe('1');
     });
 
     it('derives a contract pip and fires exactly one expiry toast per contract', () => {
@@ -834,7 +834,7 @@ describe('NotificationCenter localization (#1417)', () => {
     setLocale('fr');
     const center = new NotificationCenter();
     const pips = center.update(stressedState());
-    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'contract']) {
       expect(pips.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
     }
     const text = allText(pips);
@@ -848,13 +848,14 @@ describe('NotificationCenter localization (#1417)', () => {
     setLocale('fr');
     const fr = new NotificationCenter().update(state);
     expect(fr.length).toBe(en.length);
-    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract']) {
+    for (const kind of ['event', 'ecology', 'bankruptcy', 'crew', 'contract']) {
       expect(en.some(p => p.kind === kind), `pip ${kind} present`).toBe(true);
     }
-    for (const e of en.filter(p => ['event', 'ecology', 'bankruptcy', 'crew', 'fleet', 'contract'].includes(p.kind))) {
+    for (const e of en.filter(p => ['event', 'ecology', 'bankruptcy', 'crew', 'contract'].includes(p.kind))) {
       const f = fr.find(p => p.kind === e.kind)!;
       expect(f.tip, `${e.kind} tip`).not.toBe(e.tip);
     }
+    expect(fr.some(p => p.tip === t('notification.pip.crew_stuck_tip', { count: 1 })), 'stuck pip in fr').toBe(true);
   });
 
   it('the low-cash pip tooltip in fr names the threshold and is not the English sentence', () => {

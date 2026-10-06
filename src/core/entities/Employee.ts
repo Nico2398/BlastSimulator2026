@@ -521,6 +521,11 @@ export function killEmployee(state: EmployeeState, employeeId: number): boolean 
   return true;
 }
 
+/** Number of actions an employee holds: the active one plus the queued follow-ups (#1387). */
+export function employeeQueueDepth(emp: Pick<Employee, 'activeActionId' | 'taskQueue'>): number {
+  return (emp.activeActionId !== null ? 1 : 0) + emp.taskQueue.length;
+}
+
 export { HIRING_COSTS, BASE_SALARIES };
 // ── Skill & Training functions ──
 
@@ -561,8 +566,3 @@ export {
   planTraining, startTraining, enrolInTraining, tickTraining,
   isEnrolledInTraining, isSchoolFull,
 } from './EmployeeTraining.js';
-
-/** Number of actions an employee holds: the active one plus the queued follow-ups (#1387). */
-export function employeeQueueDepth(emp: Pick<Employee, 'activeActionId' | 'taskQueue'>): number {
-  return (emp.activeActionId !== null ? 1 : 0) + emp.taskQueue.length;
-}

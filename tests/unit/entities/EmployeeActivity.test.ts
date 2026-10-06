@@ -210,9 +210,7 @@ describe('computeEmployeeActivity — stuck (#1387)', () => {
     const veh = makeVehicle({ occupantIds: [emp.id] });
     const vs = makeVehicleState([veh]);
     vs.reservations = [{ vehicleId: veh.id, actionId: 1 } as never];
-    const kind = computeEmployeeActivity(emp, vs).kind;
-    expect(['driving', 'driving_to_task']).toContain(kind);
-    expect(kind).not.toBe('stuck');
+    expect(computeEmployeeActivity(emp, vs).kind).toBe('driving_to_task');
   });
 
   it('keeps a stuck employee mid-task working', () => {

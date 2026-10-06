@@ -193,6 +193,12 @@ describe('makeHiredLocationStrip', () => {
     expect(makeHiredLocationStrip(makeEmployee({ id: 1 }), state).textContent).toContain('Aboard #4');
   });
 
+  it('reports the current position, not a walk, while stuck', () => {
+    const strip = makeHiredLocationStrip(makeEmployee({ x: 3, z: 4, destinationX: 12, destinationZ: 8, isMoveStuck: true }), makeState());
+    expect(strip.textContent).toContain('Stuck at (3, 4)');
+    expect(strip.textContent).not.toContain('Walking to');
+  });
+
   it('reports the destination while walking to it', () => {
     const strip = makeHiredLocationStrip(makeEmployee({ destinationX: 12, destinationZ: 8 }), makeState());
     expect(strip.textContent).toContain('Walking to (12, 8)');

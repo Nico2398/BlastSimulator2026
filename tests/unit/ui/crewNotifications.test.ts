@@ -149,10 +149,13 @@ describe('wireCrewNotifications', () => {
   });
 
   it('localizes through the active locale', () => {
+    emitter.fire('employee:collapsed', { employeeId: empId, needKey: 'fatigue' });
+    const english = notes[0]!;
     setLocale('fr');
     emitter.fire('employee:collapsed', { employeeId: empId, needKey: 'fatigue' });
-    expect(notes[0]!.title).toBe(t('notification.title.crew'));
     setLocale('en');
+    expect(notes[1]!.body).not.toBe(english.body);
+    expect(notes[1]!.body).toContain(empName);
   });
 
   describe('cooldown for stuck / abandoned', () => {

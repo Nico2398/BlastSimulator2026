@@ -167,7 +167,7 @@ export class NotificationCenter {
     }
     const stuckCount = state.employees.employees.filter(e => e.alive && e.isMoveStuck).length;
     if (stuckCount > 0) {
-      pips.push({ kind: 'fleet', icon: 'vehicle', label: String(stuckCount), tone: 'warn', tip: t('notification.pip.crew_stuck_tip', { count: stuckCount }) });
+      pips.push({ kind: 'crew', icon: 'crew', label: String(stuckCount), tone: 'warn', tip: t('notification.pip.crew_stuck_tip', { count: stuckCount }) });
     }
     const jams = findTrafficJams(state.builtRamps, state.employees.employees);
     if (jams.length > 0) {
