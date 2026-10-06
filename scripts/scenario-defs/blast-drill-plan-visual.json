@@ -43,6 +43,11 @@
           "value": 5
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
@@ -90,8 +95,12 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": ["holeCount"],
-        "decreased": ["orderedHoleCount"],
+        "increased": [
+          "holeCount"
+        ],
+        "decreased": [
+          "orderedHoleCount"
+        ],
         "note": "Some holes have landed in drillHoles (real) while others remain in plannedDrillHoles (ghosts) — proves the split actually works."
       }
     },

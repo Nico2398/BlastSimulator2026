@@ -85,6 +85,16 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
           "property": "textContent",

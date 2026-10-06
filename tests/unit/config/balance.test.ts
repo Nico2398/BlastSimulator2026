@@ -18,6 +18,8 @@ import {
   NEED_HARD_THRESHOLDS,
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_GRID_DEFAULT_DEPTH_M,
+  CHARGE_DEFAULT_AMOUNT_KG,
+  CHARGE_DEFAULT_STEMMING_M,
 } from '../../../src/core/config/balance.js';
 
 // 30 real-minutes at 1x = 1800 ticks
@@ -270,11 +272,21 @@ describe('Drill grid tool defaults (#1072)', () => {
     expect(DRILL_GRID_DEFAULT_DEPTH_M).toBeDefined();
   });
 
-  it('DRILL_GRID_DEFAULT_SPACING_M is 3 — the grid tool strip starts its spacing stepper at 3m', () => {
-    expect(DRILL_GRID_DEFAULT_SPACING_M).toBe(3);
+  it('DRILL_GRID_DEFAULT_SPACING_M is 4 — the grid tool strip starts its spacing stepper at 4m (#1330)', () => {
+    expect(DRILL_GRID_DEFAULT_SPACING_M).toBe(4);
   });
 
-  it('DRILL_GRID_DEFAULT_DEPTH_M is 6 — the grid tool strip starts its depth stepper at 6m', () => {
-    expect(DRILL_GRID_DEFAULT_DEPTH_M).toBe(6);
+  it('DRILL_GRID_DEFAULT_DEPTH_M is 8 — the grid tool strip starts its depth stepper at 8m (#1330)', () => {
+    expect(DRILL_GRID_DEFAULT_DEPTH_M).toBe(8);
+  });
+});
+
+describe('Charge panel defaults (#1330)', () => {
+  it('CHARGE_DEFAULT_AMOUNT_KG is 4', () => {
+    expect(CHARGE_DEFAULT_AMOUNT_KG).toBe(4);
+  });
+
+  it('CHARGE_DEFAULT_STEMMING_M is 2.5', () => {
+    expect(CHARGE_DEFAULT_STEMMING_M).toBe(2.5);
   });
 });

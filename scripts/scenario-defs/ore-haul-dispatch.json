@@ -41,6 +41,11 @@
           "value": 8
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
           "type": "dragTiles",
           "x1": 18,
           "z1": 19,
@@ -88,6 +93,16 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "description": "DEFAULT_AMOUNT_KG (5) and DEFAULT_STEMMING_M (2) in Charge.ts already match this command's declared amount/stemming, so no stepper clicks are needed before Charge All.",
       "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"

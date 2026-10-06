@@ -6,6 +6,7 @@ import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { getExplosive, getAllExplosives } from '../../../../../src/core/world/ExplosiveCatalog.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
+import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../../../../src/core/config/balance.js';
 
 const holeCounter = { nextHoleId: 1 };
 
@@ -90,8 +91,11 @@ describe('ChargeStep', () => {
     const cmd = gameConsole.mock.calls[0]![0] as string;
     expect(cmd).toContain('charge hole:*');
     expect(cmd).toContain('explosive:krackle');
-    expect(cmd).toContain('amount:5kg');
-    expect(cmd).toContain('stemming:2m');
+    expect(cmd).toContain(`amount:${CHARGE_DEFAULT_AMOUNT_KG}kg`);
+    expect(cmd).toContain(`stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
+    // #1330: the retuned panel defaults, spelled out
+    expect(cmd).toContain('amount:4kg');
+    expect(cmd).toContain('stemming:2.5m');
   });
 
   it('renders one per-hole row per drill hole, keyed by data-hole, each with its own charge button', () => {
@@ -117,7 +121,7 @@ describe('ChargeStep', () => {
     (step.root.querySelector(`[data-hole="${h2.id}"] [data-action="charge-hole"]`) as HTMLButtonElement).click();
 
     expect(gameConsole).toHaveBeenCalledTimes(1);
-    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h2.id} explosive:krackle amount:5kg stemming:2m`);
+    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h2.id} explosive:krackle amount:${CHARGE_DEFAULT_AMOUNT_KG}kg stemming:${CHARGE_DEFAULT_STEMMING_M}m`);
   });
 
   it('a per-hole Charge button picks up the amount/stemming steppers, not the defaults', () => {
@@ -127,13 +131,15 @@ describe('ChargeStep', () => {
     step.update(state, 'sunny');
 
     const amountIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[1] as HTMLButtonElement;
-    amountIncBtn.click(); // 5 kg → 6 kg
+    amountIncBtn.click(); // default kg → default + 1 kg
     const stemmingIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[3] as HTMLButtonElement;
-    stemmingIncBtn.click(); // 2.0 m → 2.2 m
+    stemmingIncBtn.click(); // default m → one stemming step up (step size not pinned here)
+    const stemmingShown = parseFloat(step.root.querySelector('[data-field="stemming"] .bsx-stepper-value')!.textContent!);
+    expect(stemmingShown).toBeGreaterThan(CHARGE_DEFAULT_STEMMING_M);
 
     (step.root.querySelector(`[data-hole="${h1.id}"] [data-action="charge-hole"]`) as HTMLButtonElement).click();
 
-    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h1.id} explosive:boomite amount:6kg stemming:2.2m`);
+    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h1.id} explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG + 1}kg stemming:${stemmingShown}m`);
   });
 
   it('marks a charged hole distinguishable from an uncharged one and shows its charge', () => {
@@ -352,12 +358,12 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15); // shallowest: default 5 kg (2.5 m) + 2 m > 4 m
+    addHole(holeCounter, state.drillHoles, 13, 10, 4, 0.15); // shallowest: default 4 kg (2 m column) + 2.5 m stemming > 4 m
     step.update(state, 'sunny');
 
     expect(chargeAll(step).disabled).toBe(true);
-    // max for the 4 m hole under 2 m stemming = (4 - 2) * 2 = 4 kg
-    expect(reasonText(step)).toMatch(/at most 4 kg/);
+    // max for the 4 m hole under 2.5 m stemming = (4 - 2.5) * 2 = 3 kg
+    expect(reasonText(step)).toMatch(/at most 3 kg/);
   });
 
   it('shows no overflow reason and leaves Charge All enabled when the charge fits every hole', () => {

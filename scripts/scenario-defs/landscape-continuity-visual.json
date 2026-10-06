@@ -324,6 +324,16 @@
           "pitch": 60
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "dragTiles",
           "x1": 1,
           "z1": 22,
@@ -382,6 +392,16 @@
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
         },
         {
           "type": "clickSelector",

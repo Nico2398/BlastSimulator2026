@@ -28,7 +28,14 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { computeDangerZone } from '../../src/core/entities/Zone.js';
-import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
+import {
+  BLAST_DANGER_MARGIN_M,
+  DRILL_GRID_DEFAULT_SPACING_M,
+  DRILL_GRID_DEFAULT_DEPTH_M,
+  CHARGE_DEFAULT_AMOUNT_KG,
+  CHARGE_DEFAULT_STEMMING_M,
+} from '../../src/core/config/balance.js';
+import { REGION } from '../../src/ui/tutorialStages.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -712,6 +719,78 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     expect((report!.accidents ?? []).some(a => a.type === 'vehicle_destroyed')).toBe(false);
 
     // Still teaches a real shot: rock actually broke.
+    expect(report!.clearedVoxels).toBeGreaterThan(0);
+  });
+});
+
+// ── #1330: the blast panel's own defaults must rate good or better ─────────
+//
+// A player who opens the panels and accepts every default on the tutorial
+// square should get a clean shot. The commands are built from the balance
+// constants (not read from TUTORIAL_STEPS) so this proves the defaults
+// themselves, whatever the tutorial cards say.
+describe('panel default parameters on the tutorial square rate good or better (#1330)', () => {
+  it('drills a 3x3 grid and charges with the defaults, then blasts cleanly', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    const state = ctx.state!;
+
+    const boxCutStep = TUTORIAL_STEPS.find((s) => s.id === 'box-cut')!;
+    expect(run(boxCutStep.commands![0]!).success).toBe(true);
+    for (let i = 0; i < 400 && state.plannedRamps.length > 0; i++) {
+      for (const emp of state.employees.employees) emp.fatigue = 100;
+      run('tick 1');
+    }
+    expect(state.plannedRamps.length).toBe(0);
+
+    const spacing = DRILL_GRID_DEFAULT_SPACING_M;
+    const cols = Math.round((REGION.drill.x2 - REGION.drill.x1) / spacing) + 1;
+    const rows = Math.round((REGION.drill.z2 - REGION.drill.z1) / spacing) + 1;
+    expect(cols).toBe(3);
+    expect(rows).toBe(3);
+    const drill = run(
+      `drill_plan grid rows:${rows} cols:${cols} spacing:${spacing} depth:${DRILL_GRID_DEFAULT_DEPTH_M} start:${REGION.drill.x1},${REGION.drill.z1}`,
+    );
+    expect(drill.success, drill.output).toBe(true);
+    for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
+      for (const emp of state.employees.employees) emp.fatigue = 100;
+      run('tick 1');
+    }
+    expect(state.plannedDrillHoles.length).toBe(0);
+    expect(state.drillHoles.length).toBe(9);
+
+    const charge = run(
+      `charge hole:* explosive:boomite amount:${CHARGE_DEFAULT_AMOUNT_KG} stemming:${CHARGE_DEFAULT_STEMMING_M}`,
+    );
+    expect(charge.success, charge.output).toBe(true);
+    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+      for (const emp of state.employees.employees) emp.fatigue = 100;
+      run('tick 1');
+    }
+    expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
+
+    expect(run('sequence auto').success).toBe(true);
+
+    const preAlive = state.employees.employees.filter(e => e.alive).length;
+    const preVehicles = state.vehicles.vehicles.length;
+    const preDeaths = state.damage.deathCount;
+    for (const emp of state.employees.employees) { emp.x = 2; emp.z = 2; }
+    for (const veh of state.vehicles.vehicles) { veh.x = 2; veh.z = 2; }
+
+    const blast = run('blast');
+    expect(blast.success, blast.output).toBe(true);
+
+    const report = state.lastBlastReport;
+    expect(report).not.toBeNull();
+    expect(['good', 'perfect']).toContain(report!.rating);
+    expect(report!.destroyedBuildings.length).toBe(0);
+    expect(state.employees.employees.filter(e => e.alive).length).toBe(preAlive);
+    expect(state.damage.deathCount).toBe(preDeaths);
+    expect(state.vehicles.vehicles.length).toBe(preVehicles);
+    expect(state.vehicles.vehicles.every(v => v.hp > 0)).toBe(true);
+    expect((report!.accidents ?? []).some(a => a.type === 'death' || a.type === 'vehicle_destroyed')).toBe(false);
     expect(report!.clearedVoxels).toBeGreaterThan(0);
   });
 });

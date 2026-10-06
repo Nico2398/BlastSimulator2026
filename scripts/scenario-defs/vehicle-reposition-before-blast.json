@@ -110,6 +110,11 @@
           "value": 8
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
@@ -154,6 +159,16 @@
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
       "description": "The same reckless, under-stemmed overcharge (0.5m on 8m holes) blast-unevacuated-casualties.json fires -- the whole point is that THIS exact pattern is dangerous enough to cost a vehicle when nothing is moved out of the way.",
       "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 8
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 0.5
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"

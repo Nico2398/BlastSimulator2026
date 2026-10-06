@@ -42,6 +42,11 @@
           "value": 2
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
@@ -105,6 +110,11 @@
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
           "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
         },
         {
           "type": "assert",
