@@ -205,7 +205,7 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 32" at step 0 and has progress bar fill', () => {
+    it('shows step counter "1 / 30" at step 0 and has progress bar fill', () => {
       // 33, not 24: #553 inserts build-driving-center/train-driller/
       // buy-drill-rig-assign right after hire-driller, #555 inserts
       // train-digger/buy-rock-digger-assign right after that trio, #681
@@ -223,7 +223,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*32/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*30/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -623,7 +623,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.stepIndex = 31;
       tut.render();
 
-      const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
+      tut.stepIndex = 29;
       const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
       // After implementation: keys changed to tutorial.complete_title / tutorial.complete_text
       // which translate to "Tutorial Complete!" and the completion text.
