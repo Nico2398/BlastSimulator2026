@@ -226,7 +226,7 @@ export class FleetPanel extends PanelBase {
     const m = VEHICLE_TIER_MULTIPLIERS[tier];
     const btn = el('button', {
       className: 'bs-fleet-tier-btn',
-      attrs: { style: 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);cursor:pointer;text-align:left', 'data-role': role, 'data-tier': String(tier), 'data-vtype': role },
+      attrs: { style: 'display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card);color:var(--bsx-text-primary);cursor:pointer;text-align:left', 'data-role': role, 'data-tier': String(tier), 'data-vtype': role },
     });
     const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
     info.append(
