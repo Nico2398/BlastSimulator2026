@@ -323,7 +323,6 @@ export class TutorialOverlay {
     this.gameState = state;
     this.rails.beginStep(this.step(), state);
     state.isPaused = true;
-    this.armAutoAdvance(TUTORIAL_STEPS[this.stepIndex]);
     this.render();
     if (this.stepIndex === LAST_STEP_INDEX) {
       this.jumpToLastStep();
@@ -396,16 +395,6 @@ export class TutorialOverlay {
     }
 
     if (this.gameState) recordTutorialProgress(this.gameState, this.stepIndex, this.snapshots ?? {});
-    this.armAutoAdvance(step);
-  }
-
-  private armAutoAdvance(step: (typeof TUTORIAL_STEPS)[number] | undefined): void {
-    this.clearAutoAdvance();
-    if (step?.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0) {
-      this.autoAdvanceTimer = setTimeout(() => {
-        this.advanceToNextStep();
-      }, step.autoAdvanceMs);
-    }
   }
 
   // ── Guide loop ──

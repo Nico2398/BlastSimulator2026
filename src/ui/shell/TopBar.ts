@@ -215,6 +215,13 @@ export class TopBar {
     // ── Scores ──
     this.scoresEl = el('div', { attrs: { id: 'bs-hud-scores' } });
     this.scoresEl.style.cssText = 'display:flex;align-items:center;gap:2px;padding:0 10px;flex:0 0 auto;border-left:1px solid var(--bsx-hairline)';
+    // Inspect counter the tutorial reads (#1334): UI-only, never touches GameState.
+    this.scoresEl.dataset['inspectCount'] = '0';
+    const countInspect = (): void => {
+      this.scoresEl.dataset['inspectCount'] = String(Number(this.scoresEl.dataset['inspectCount']) + 1);
+    };
+    this.scoresEl.addEventListener('pointerenter', countInspect);
+    this.scoresEl.addEventListener('click', countInspect);
 
     // ── Right cluster: log, saves, site map ──
     const rightWrap = el('div');

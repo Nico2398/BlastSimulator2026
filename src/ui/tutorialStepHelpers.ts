@@ -174,13 +174,31 @@ export function createComparisonStep(
   };
 }
 
-/**
- * Helper: create a step that auto-advances after 2000ms.
- */
-export function createAutoAdvanceStep(
+/** Player UI action that completes an informational tutorial step. */
+export type UiAction =
+  | { kind: 'panel'; rootSelector: string } // completes while that panel root is displayed
+  | { kind: 'scores' }; // completes when #bs-hud-scores inspectCount > snapshot
+
+/** True when the element matching rootSelector exists and is displayed. */
+export function isPanelVisible(rootSelector: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const el = document.querySelector(rootSelector) as HTMLElement | null;
+  return el !== null && el.style.display !== 'none';
+}
+
+/** Read the scores HUD inspectCount (0 when absent). */
+export function readScoresInspectCount(): number {
+  if (typeof document === 'undefined') return 0;
+  const el = document.getElementById('bs-hud-scores');
+  return Number(el?.dataset['inspectCount'] ?? 0) || 0;
+}
+
+/** Helper: create a step that completes on a player UI action, never on a timer. */
+export function createUiActionStep(
   id: string,
   titleKey: string,
   textKey: string,
+  action: UiAction,
   captureSnapshot?: (state: GameState) => Record<string, unknown>,
   highlightTarget?: string,
 ): TutorialStep {
@@ -188,41 +206,16 @@ export function createAutoAdvanceStep(
     id,
     titleKey,
     textKey,
-    autoAdvanceMs: 2000,
-    ...(captureSnapshot ? { captureSnapshot } : {}),
     ...(highlightTarget ? { highlightTarget } : {}),
-    isComplete: () => true,
+    captureSnapshot: (state: GameState) => ({
+      ...(captureSnapshot ? captureSnapshot(state) : {}),
+      inspectCount: readScoresInspectCount(),
+    }),
+    isComplete: (_state: GameState, snapshot: Record<string, unknown>) =>
+      action.kind === 'panel'
+        ? isPanelVisible(action.rootSelector)
+        : readScoresInspectCount() > (Number(snapshot?.inspectCount) || 0),
   };
-}
-
-/** Player UI action that completes an informational tutorial step. */
-export type UiAction =
-  | { kind: 'panel'; rootSelector: string } // completes while that panel root is displayed
-  | { kind: 'scores' }; // completes when #bs-hud-scores inspectCount > snapshot
-
-/** True when the element matching rootSelector exists and is displayed. */
-export function isPanelVisible(_rootSelector: string): boolean {
-  // TODO: implement
-  return false;
-}
-
-/** Read the scores HUD inspectCount (0 when absent). */
-export function readScoresInspectCount(): number {
-  // TODO: implement
-  return 0;
-}
-
-/** Helper: create a step that completes on a player UI action, never on a timer. */
-export function createUiActionStep(
-  _id: string,
-  _titleKey: string,
-  _textKey: string,
-  _action: UiAction,
-  _captureSnapshot?: (state: GameState) => Record<string, unknown>,
-  _highlightTarget?: string,
-): TutorialStep {
-  // TODO: implement
-  throw new Error('not implemented');
 }
 
 /** Count nav grid cells matching a given type. */
