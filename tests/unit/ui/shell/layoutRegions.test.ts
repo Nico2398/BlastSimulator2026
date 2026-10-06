@@ -20,7 +20,7 @@
 // time). Vitest isolates modules per test *file* by default, so this
 // singleton starts empty for this file, but state still accumulates across
 // the `it` blocks *within* this file since they all import the same module
-// instance — hence disposing all 6 real regions in `afterAll`, once, rather
+// instance — hence disposing all 7 real regions in `afterAll`, once, rather
 // than re-mounting per test.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TopBar } from '../../../../src/ui/shell/TopBar.js';
@@ -29,6 +29,8 @@ import { Toasts } from '../../../../src/ui/shell/Toasts.js';
 import { SelectionBar } from '../../../../src/ui/shell/SelectionBar.js';
 import { ActivityLog } from '../../../../src/ui/shell/ActivityLog.js';
 import { MiniMap } from '../../../../src/ui/MiniMap.js';
+import { LeftColumn, LEFT_COL_RIGHT_EDGE_PX } from '../../../../src/ui/shell/LeftColumn.js';
+import { SELECTION_BAR_LEFT_COL_GAP_PX } from '../../../../src/ui/shell/SelectionBar.js';
 import {
   LayoutRegistry,
   shellLayoutRegistry,
@@ -39,7 +41,7 @@ import {
 } from '../../../../src/ui/shell/LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX } from '../../../../src/ui/tokens.js';
 
-const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'selection-bar', 'activity-log', 'minimap'] as const;
+const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'selection-bar', 'activity-log', 'minimap', 'left-col'] as const;
 
 /** Declared bounds of a registered region at a viewport, by id. */
 function boundsFor(id: string, viewport: { width: number; height: number }): Rect {
@@ -68,6 +70,7 @@ describe('shell regions — layout matrix (#956)', () => {
   let selectionBar!: SelectionBar;
   let activityLog!: ActivityLog;
   let miniMap!: MiniMap;
+  let leftColumn!: LeftColumn;
 
   beforeAll(() => {
     const container = mountContainer();
@@ -77,6 +80,7 @@ describe('shell regions — layout matrix (#956)', () => {
     selectionBar = new SelectionBar(container);
     activityLog = new ActivityLog(container);
     miniMap = new MiniMap(container);
+    leftColumn = new LeftColumn(container);
   });
 
   afterAll(() => {
@@ -88,9 +92,10 @@ describe('shell regions — layout matrix (#956)', () => {
     selectionBar?.dispose();
     activityLog?.dispose();
     miniMap?.dispose();
+    leftColumn?.dispose();
   });
 
-  it('registers exactly the 6 expected shell regions on construction', () => {
+  it('registers exactly the 7 expected shell regions on construction', () => {
     const ids = shellLayoutRegistry.list().map(r => r.id).sort();
     expect(ids).toEqual([...EXPECTED_IDS].sort());
   });
@@ -120,6 +125,53 @@ describe('shell regions — layout matrix (#956)', () => {
       }
     }
     expect(overlaps, `hud regions overlapping at ${JSON.stringify(viewport)}:\n${overlaps.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('selection bar never covers the left column (#1423)', () => {
+  let container!: HTMLDivElement;
+  let selectionBar!: SelectionBar;
+  let leftColumn!: LeftColumn;
+
+  beforeAll(() => {
+    container = mountContainer();
+    selectionBar = new SelectionBar(container);
+    leftColumn = new LeftColumn(container);
+  });
+
+  afterAll(() => {
+    selectionBar.dispose();
+    leftColumn.dispose();
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('selection bar bounds do not intersect left-col bounds at %o', (viewport) => {
+    const bar = boundsFor('selection-bar', viewport);
+    const col = boundsFor('left-col', viewport);
+    expect(
+      rectsIntersect(bar, col),
+      `selection-bar ${JSON.stringify(bar)} intersects left-col ${JSON.stringify(col)}`,
+    ).toBe(false);
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('selection bar keeps the gap right of the column at %o', (viewport) => {
+    const bar = boundsFor('selection-bar', viewport);
+    expect(bar.x).toBeGreaterThanOrEqual(LEFT_COL_RIGHT_EDGE_PX + SELECTION_BAR_LEFT_COL_GAP_PX);
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX)('inline left CSS resolves to the same centre as the declared bounds at %o', (viewport) => {
+    const root = container.querySelector<HTMLElement>('#bs-selection-bar')!;
+    const bar = boundsFor('selection-bar', viewport);
+    // Expected form: left:max(50%, calc(Npx)) with translateX(-50%), so `left` is the bar centre.
+    const left = root.style.left;
+    const m = /^max\(\s*50%\s*,\s*calc\(\s*(-?\d+(?:\.\d+)?)px\s*\)\s*\)$/.exec(left);
+    expect(m, `unexpected inline left "${left}"`).not.toBeNull();
+    const centre = Math.max(viewport.width / 2, Number(m![1]));
+    expect(centre).toBeCloseTo(bar.x + bar.width / 2, 3);
+  });
+
+  it.each(SHELL_VIEWPORT_MATRIX.filter(v => v.width >= 1920))('bar stays centred at wide viewport %o', (viewport) => {
+    const bar = boundsFor('selection-bar', viewport);
+    expect(bar.x).toBeCloseTo((viewport.width - bar.width) / 2, 3);
   });
 });
 
