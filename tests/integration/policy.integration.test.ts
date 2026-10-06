@@ -10,7 +10,6 @@ import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import { employeeCommand } from '../../src/console/commands/entities.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
-import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 
 function makeCtx(): GameContext {
@@ -54,48 +53,6 @@ describe('set_policy', () => {
     const before = ctx.state!.sitePolicy.revision;
     for (let i = 0; i < 3; i++) setPolicyCommand(ctx, [], { mode: 'continuous' });
     expect(ctx.state!.sitePolicy.revision).toBe(before + 3);
-  });
-});
-
-describe('the tutorial Site Policy step', () => {
-  const step = TUTORIAL_STEPS.find(s => s.id === 'set-policy')!;
-
-  it('completes when the player presses Apply with the settings unchanged', () => {
-    const ctx = makeCtx();
-    // Whatever the policy currently is, that is what the form shows.
-    const current = ctx.state!.sitePolicy;
-    const snapshot = step.captureSnapshot!(ctx.state!);
-
-    setPolicyCommand(ctx, [], {
-      mode: current.shiftMode,
-      fatigue: String(current.fatigueRestThreshold),
-    });
-
-    expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
-  });
-
-  it('completes when the player changes the shift schedule first', () => {
-    const ctx = makeCtx();
-    const snapshot = step.captureSnapshot!(ctx.state!);
-
-    setPolicyCommand(ctx, [], { mode: 'shift_12h', fatigue: '25' });
-
-    expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
-  });
-
-  it('stays incomplete until Apply is pressed', () => {
-    const ctx = makeCtx();
-    const snapshot = step.captureSnapshot!(ctx.state!);
-    expect(step.isComplete(ctx.state!, snapshot)).toBe(false);
-  });
-
-  it('stays incomplete when the command was rejected', () => {
-    const ctx = makeCtx();
-    const snapshot = step.captureSnapshot!(ctx.state!);
-
-    setPolicyCommand(ctx, [], { mode: 'nonsense' });
-
-    expect(step.isComplete(ctx.state!, snapshot)).toBe(false);
   });
 });
 

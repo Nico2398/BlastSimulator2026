@@ -574,7 +574,7 @@ describe('resolveWaitStatus — steps that must never enter waiting (#1014)', ()
     return s;
   }
 
-  it.each(['sequence', 'evacuate-zone', 'tick-advance'])(
+  it.each(['sequence', 'evacuate-zone'])(
     '%s never reports waiting, no matter how "spent" every domain looks',
     (stepId) => {
       expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, maximallySpentState()))
@@ -590,9 +590,9 @@ describe('resolveWaitStatus — steps that must never enter waiting (#1014)', ()
     },
   );
 
-  it('victory (no keyed TUTORIAL_STAGES entry — falls back to a generic single stage) never reports waiting', () => {
-    const step = TUTORIAL_STEPS.find(s => s.id === 'victory')!;
-    const stages = stagesFor('victory', step.highlightTarget);
+  it('free-play (no keyed TUTORIAL_STAGES entry — falls back to a generic single stage) never reports waiting', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'free-play')!;
+    const stages = stagesFor('free-play', step.highlightTarget);
     expect(resolveWaitStatus(stages, maximallySpentState())).toEqual({ waiting: false, waitingKey: null });
   });
 

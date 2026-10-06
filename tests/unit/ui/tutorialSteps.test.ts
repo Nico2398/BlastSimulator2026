@@ -3,17 +3,18 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import { victoryProgress } from '../../../src/ui/tutorialStepsClosing.js';
-import { stagesFor } from '../../../src/ui/tutorialStages.js';
+import { victoryProgress, goalChipParams } from '../../../src/ui/tutorialStepsClosing.js';
+import { stagesFor, TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
 import { createFinanceState, addIncome, addExpense, getFinancialReport } from '../../../src/core/economy/Finance.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { TUTORIAL_LEVEL_ID } from '../../../src/ui/tutorialTrigger.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 32 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(32);
+  it('has exactly 30 entries (#1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(30);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -142,15 +143,12 @@ describe('tutorialSteps', () => {
       // forward.
       'contract-accept',
       'haul-debris',
-      // #959: replaces 'contract-deliver' -- the tutorial never actually
-      // hauled and sold the blasted ore for money, so a player following it
-      // to the letter finished with negative cash.
-      'sell-ore',
       'finances',
       'needs',
-      'set-policy',
-      'tick-advance',
-      'victory',
+      // #959/#1328: sell-ore closes the guided part (after finances/needs);
+      // 'free-play' lifts the rails and shows the goal chip.
+      'sell-ore',
+      'free-play',
       'congratulations',
     ];
     const actualIds = TUTORIAL_STEPS.map(s => s.id);
@@ -210,38 +208,6 @@ describe('tutorialSteps', () => {
     expect(scores.autoAdvanceMs).toBe(2000);
     expect(finances.autoAdvanceMs).toBe(2000);
     expect(needs.autoAdvanceMs).toBe(2000);
-  });
-
-  // ── set-policy ───────────────────────────────────────────────────────────
-  describe('step 19 (set-policy)', () => {
-    const step = TUTORIAL_STEPS.find(s => s.id === 'set-policy')!;
-
-    const stateWith = (revision: number) =>
-      ({ sitePolicy: { shiftMode: 'shift_8h', revision } } as unknown as GameState);
-
-    it('completes when a policy is applied, even with every value unchanged', () => {
-      // The reported bug: pressing Apply on the settings already in force is the
-      // common case, since the form mirrors the current policy. Comparing values
-      // concluded nothing had happened and the tutorial sat there forever while
-      // the panel said "Site policy updated".
-      const snap = step.captureSnapshot!(stateWith(0));
-      expect(step.isComplete(stateWith(1), snap)).toBe(true);
-    });
-
-    it('does not complete before the player applies anything', () => {
-      const snap = step.captureSnapshot!(stateWith(3));
-      expect(step.isComplete(stateWith(3), snap)).toBe(false);
-    });
-
-    it('does not complete on a policy applied before the step opened', () => {
-      const snap = step.captureSnapshot!(stateWith(5));
-      expect(step.isComplete(stateWith(4), snap)).toBe(false);
-    });
-
-    it('survives a state with no site policy at all', () => {
-      const empty = {} as unknown as GameState;
-      expect(() => step.isComplete(empty, step.captureSnapshot!(empty))).not.toThrow();
-    });
   });
 
   // ── 14 (event-fire-resolve) ──────────────────────────────────────────────
@@ -376,7 +342,7 @@ describe('tutorialSteps', () => {
       'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-accept', 'haul-debris', 'sell-ore',
-      'finances', 'box-cut', 'needs', 'tick-advance',
+      'finances', 'box-cut', 'needs',
     ]);
     for (const step of TUTORIAL_STEPS) {
       if (stepsWithTarget.has(step.id)) {
@@ -530,7 +496,7 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned after build-storage/contract-accept and before sell-ore', () => {
+    it('exists, positioned after build-storage/contract-accept and before finances', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
       const acceptIdx = ids.indexOf('contract-accept');
@@ -543,8 +509,10 @@ describe('tutorialSteps', () => {
       // deadline watching a construction site.
       expect(acceptIdx).toBe(buildIdx + 1);
       expect(haulIdx).toBe(acceptIdx + 1);
-      // #959: 'sell-ore' replaces the old 'contract-deliver' step here.
-      expect(sellOreIdx).toBe(haulIdx + 1);
+      // #1328: finances/needs sit between haul-debris and sell-ore now, so
+      // the first sale is the last guided step.
+      expect(ids[haulIdx + 1]).toBe('finances');
+      expect(sellOreIdx).toBe(ids.indexOf('needs') + 1);
     });
 
     it('completes when storedMassKg increases past the value captured when the step opened', () => {
@@ -1063,8 +1031,8 @@ describe('box-cut step (#1210) — completion tracks nextPlannedRampId/plannedRa
 });
 
 
-describe('victory step card (#1329) — honest about progress before the level ends', () => {
-  const step = TUTORIAL_STEPS.find((s) => s.id === 'victory')!;
+describe('free-play step card (#1329/#1328) — honest about progress before the level ends', () => {
+  const step = TUTORIAL_STEPS.find((s) => s.id === 'free-play')!;
   const target = getLevel(TUTORIAL_LEVEL_ID)!.unlockThreshold;
   const originalLocale = getLocale();
   afterEach(() => setLocale(originalLocale));
@@ -1152,12 +1120,6 @@ describe('victory step card (#1329) — honest about progress before the level e
       expect(body).toContain('3,800');
     });
 
-    it('en body names the action: contracts and delivering', () => {
-      const { body } = render(stateWith(1200), 'en');
-      expect(body).toMatch(/contract/i);
-      expect(body).toMatch(/deliver/i);
-    });
-
     it('fr body carries the same figures', () => {
       const { body } = render(stateWith(1200), 'fr');
       expect(body).toMatch(/1[,\s\u202f\u00a0.]?200/);
@@ -1183,21 +1145,71 @@ describe('victory step card (#1329) — honest about progress before the level e
     });
   });
 
-  describe('stage hint', () => {
-    it('victory stage uses tutorial.stage.earn_profit, not the generic hint', () => {
-      const stages = stagesFor('victory', step.highlightTarget);
-      expect(stages.length).toBeGreaterThan(0);
-      expect(stages.some((s) => s.hintKey === 'tutorial.stage.earn_profit')).toBe(true);
-      expect(stages.some((s) => s.hintKey === 'tutorial.stage.generic')).toBe(false);
+  describe('free-play step (#1328) — rails lifted, goal chip shown', () => {
+    it('is guided:false with the goal chip and no clock-holding fields', () => {
+      expect(step.guided).toBe(false);
+      expect(step.goalChip).toBe(true);
+      expect(step.tickBudget).toBeUndefined();
+      expect(step.waitsOnWork).toBeUndefined();
     });
-    it('earn_profit is translated and differs between en and fr', () => {
+    it('sits between sell-ore and congratulations', () => {
+      const ids = TUTORIAL_STEPS.map((x) => x.id);
+      const i = ids.indexOf('free-play');
+      expect(ids[i - 1]).toBe('sell-ore');
+      expect(ids[i + 1]).toBe('congratulations');
+    });
+    it('every other step stays guided', () => {
+      for (const other of TUTORIAL_STEPS) {
+        if (other.id === 'free-play' || other.id === 'congratulations') continue;
+        expect(other.guided, other.id).toBeUndefined();
+        expect(other.goalChip, other.id).toBeUndefined();
+      }
+    });
+    it('removed ids are gone', () => {
+      const ids = TUTORIAL_STEPS.map((x) => x.id);
+      for (const gone of ['set-policy', 'tick-advance', 'victory']) expect(ids).not.toContain(gone);
+    });
+    it('no stage entry for free-play (nothing to click)', () => {
+      expect(TUTORIAL_STAGES['free-play']).toBeUndefined();
+    });
+  });
+
+  describe('goalChipParams (#1328)', () => {
+    it('formats profit and target as money strings', () => {
+      expect(goalChipParams(stateWith(1200))).toEqual({
+        profit: formatMoney(1200),
+        target: formatMoney(target),
+      });
+    });
+    it('zero profit', () => {
+      expect(goalChipParams(stateWith(0)).profit).toBe(formatMoney(0));
+    });
+    it('negative profit reads -$N', () => {
+      const p = goalChipParams(stateWith(-300));
+      expect(p.profit).toBe(formatMoney(-300));
+      expect(p.profit).toContain('-');
+      expect(p.profit).toContain('300');
+    });
+    it('profit above target is reported as-is', () => {
+      expect(goalChipParams(stateWith(target + 700)).profit).toBe(formatMoney(target + 700));
+    });
+  });
+
+  describe('goal chip i18n (#1328)', () => {
+    it.each(['en', 'fr'] as const)('%s has goal chip keys and free-play card text', (loc) => {
+      setLocale(loc);
+      for (const key of ['tutorial.goal_chip', 'tutorial.goal_chip_tooltip', step.titleKey, step.textKey]) {
+        expect(t(key, { profit: '$1', target: '$2', remaining: '$3' }), key).not.toBe(key);
+      }
+      const chip = t('tutorial.goal_chip', { profit: '$1,234', target: '$5,000' });
+      expect(chip).toContain('$1,234');
+      expect(chip).toContain('$5,000');
+    });
+    it('chip text differs between en and fr', () => {
       setLocale('en');
-      const en = t('tutorial.stage.earn_profit');
+      const en = t('tutorial.goal_chip', { profit: '$1', target: '$2' });
       setLocale('fr');
-      const fr = t('tutorial.stage.earn_profit');
-      expect(en).not.toBe('tutorial.stage.earn_profit');
-      expect(fr).not.toBe('tutorial.stage.earn_profit');
-      expect(en.length).toBeGreaterThan(0);
+      const fr = t('tutorial.goal_chip', { profit: '$1', target: '$2' });
       expect(en).not.toBe(fr);
     });
   });

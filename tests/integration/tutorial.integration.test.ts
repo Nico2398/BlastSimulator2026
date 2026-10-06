@@ -21,6 +21,8 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 import { TutorialRails } from '../../src/ui/tutorialRails.js';
+import { formatMoney } from '../../src/core/economy/formatMoney.js';
+import { goalChipParams } from '../../src/ui/tutorialStepsClosing.js';
 import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
@@ -143,7 +145,7 @@ describe('Tutorial flow', () => {
 // separately in tutorial-pause.integration.test.ts.
 
 describe('haul-debris step (#552): self-dispatching, no manual command', () => {
-  it('is the 25th of 32 tutorial steps (0-based index 24), between contract-accept and sell-ore', () => {
+  it('is the 25th of 30 tutorial steps (0-based index 24), between contract-accept and finances', () => {
     // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
     // right after hire-driller, shifting every later step (including this
     // one) up by 3 from their pre-#553 positions. #555 inserts
@@ -174,7 +176,12 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     expect(idx).toBe(24);
     expect(ids[idx - 1]).toBe('contract-accept');
     expect(ids[idx - 2]).toBe('build-storage');
-    expect(ids[idx + 1]).toBe('sell-ore');
+    // #1328: finances and needs now sit between haul-debris and sell-ore, so
+    // the first sale is the last guided step (it is followed by 'free-play').
+    expect(ids[idx + 1]).toBe('finances');
+    expect(ids[idx + 2]).toBe('needs');
+    expect(ids[idx + 3]).toBe('sell-ore');
+    expect(ids.slice(-2)).toEqual(['free-play', 'congratulations']);
   });
 
   it('completes via automatic hauling alone: fragments move on_ground -> stored with no "vehicle haul" command issued', () => {
@@ -709,144 +716,57 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
   });
 });
 
-// ── #959: the tutorial must end WON, with positive cash, not bankrupt ──
+// ── #1328: the tutorial can be WON by following the cards ──
 //
-// The reported bug: a player who does exactly what the tutorial teaches
-// finishes deep in the red, yet the closing card still reads "Tutorial
-// Complete!" — 'victory' (tutorialStepsClosing.ts) completes on any
-// `state.levelEnded === true`, which bankruptcy/arrest/ecological_shutdown/
-// worker_revolt all set just as readily as a genuine win, and
-// 'congratulations' always shows the same success copy regardless. The
-// other, structural half of the same bug: nothing in TUTORIAL_STEPS ever
-// hauls and sells the ore the tutorial's own scripted blast produces, so the
-// operating deficit the rest of the level runs up (hires, buildings,
-// vehicles, two full drill-charge-blast cycles) never has anything to offset
-// it. This test drives every TUTORIAL_STEPS command in order, through a
-// real console + real ticking, exactly the way a player follows the card
-// deck, and proves the level can actually be WON — cash positive,
-// `levelEndReason` genuinely 'completed', netProfit past the level's own
-// unlockThreshold — not just declared won by a step whose own condition
-// cannot tell a win from a bankruptcy.
-describe('full tutorial playthrough ends WON with positive cash, not bankrupt-but-congratulated (#959)', () => {
-  /**
-   * Advance ticks one at a time, topping up every living employee's fatigue
-   * (the same anti-collapse hack every other real-tick-driving test in this
-   * file already uses) and auto-resolving any pending event (tutorial_pit's
-   * own eventFreqMultiplier is 0, so the only pending event this can ever see
-   * is the one 'event-fire-resolve' fires itself) — stops the instant
-   * `done()` reads true, or after `maxTicks`.
-   */
-  /** Tracks stagnation for windDownOnceExhausted — see its own doc comment. */
-  interface StagnationTracker { lastStoredMassKg: number; lastCompletedCount: number; stagnantTicks: number }
+// The guided part ends after the first ore sale ('sell-ore'). From the
+// 'free-play' step on the rails are lifted and the clock is never held: the
+// player plays on with ordinary actions toward the profit threshold, and the
+// tutorial victory still fires on levelEndReason === 'completed'.
+//
+// This playthrough is deliberately honest: the guided phase runs only each
+// step's own commands (plus the two documented carve-outs, evacuate-zone and
+// toggle-survey-overlay, which have no console equivalent a player would
+// use), and free play uses only what a player can do with every control
+// enabled: tick, contract accept/deliver, event choose. No layoffs, no
+// vehicle scrapping, no demolition, no fatigue writes, no auto-sell hacks
+// beyond accepting/delivering contracts.
+describe('full tutorial playthrough ends WON by following the cards then playing on (#1328)', () => {
+  /** Free-play tick ceiling, a constant so a slow win cannot hide behind a raised cap. */
+  const FREE_PLAY_TICK_CAP = 6000;
+  const FORBIDDEN_COMMAND = /^(employee fire|vehicle scrap|build destroy|vehicle sell)\b/;
 
-  function tickUntil(
-    run: (cmd: string) => { success: boolean; output: string },
-    state: GameState,
-    maxTicks: number,
-    done: () => boolean,
-    stagnation: StagnationTracker,
-  ): void {
-    for (let i = 0; i < maxTicks && !done(); i++) {
-      for (const emp of state.employees.employees) {
-        if (emp.alive) emp.fatigue = 100;
-      }
-      if (state.events.pendingEvent) run('event choose 0');
-      run('tick 1');
-      sellCompletableContracts(run, state);
-      windDownOnceExhausted(run, state, stagnation);
-    }
+  type Run = (cmd: string) => { success: boolean; output: string };
+
+  /** One ordinary player tick: resolve a pending event, then let time pass. */
+  function playTick(run: Run, state: GameState): void {
+    if (state.events.pendingEvent) run('event choose 0');
+    run('tick 1');
+  }
+
+  /** Advance ticks until `done()` reads true or `maxTicks` pass. */
+  function tickUntil(run: Run, state: GameState, maxTicks: number, done: () => boolean): void {
+    for (let i = 0; i < maxTicks && !done(); i++) playTick(run, state);
   }
 
   /**
-   * Once nothing has actually moved for a long stretch — no more stock ever
-   * arriving in storage, no contract ever completing — the last remaining
-   * employee (the driver) and vehicle (the debris_hauler) are pure ongoing
-   * cost with no further income to show for it, and never will be: some
-   * fraction of a real blast's debris always lands somewhere no NavGrid
-   * route reaches without a ramp this tutorial never digs (#953's own
-   * "fresh blast crater's walled-off interior" case) — that remainder is
-   * never coming in, no matter how long this waits. A real operator lays
-   * off and sells off down to nobody and nothing once the job has
-   * genuinely stopped producing, same reasoning as the mass layoff/scrap/
-   * demolish right after 'sell-ore' (#959). Idempotent: no-ops once already
-   * wound down (empty roster/fleet).
+   * Ordinary contract play, the same actions the Contracts panel offers:
+   * deliver stock against accepted ore_sale/rubble_disposal contracts, and
+   * accept an offer only when current stock covers it in full (an
+   * unfulfilled contract costs a penalty). ore_sale is preferred.
    */
-  function windDownOnceExhausted(
-    run: (cmd: string) => { success: boolean; output: string },
-    state: GameState,
-    stagnation: StagnationTracker,
-  ): void {
-    // Only once already down to the post-sell-ore minimal crew (driver +
-    // hauler) — before that, stagnation just means the blast hasn't
-    // happened yet, not that the job is done. Generalized (#1130) from a
-    // strict "exactly one employee total" to tolerate a permanently
-    // unionized non-driver straggler the sell-ore layoff loop below could
-    // never fire in the first place: exactly one driver, every OTHER
-    // employee still on the roster unionized (nobody the layoff loop could
-    // have gotten rid of), and exactly one vehicle.
-    const drivers = state.employees.employees.filter((e) => e.role === 'driver');
-    const nonDrivers = state.employees.employees.filter((e) => e.role !== 'driver');
-    if (drivers.length !== 1 || !nonDrivers.every((e) => e.unionized) || state.vehicles.vehicles.length !== 1) return;
-
-    const completedCount = state.contracts.completedHistory.filter((c) => c.completed).length;
-    if (state.logistics.storedMassKg !== stagnation.lastStoredMassKg || completedCount !== stagnation.lastCompletedCount) {
-      stagnation.lastStoredMassKg = state.logistics.storedMassKg;
-      stagnation.lastCompletedCount = completedCount;
-      stagnation.stagnantTicks = 0;
-      return;
-    }
-    stagnation.stagnantTicks++;
-    if (stagnation.stagnantTicks < 300) return;
-
-    for (const emp of [...state.employees.employees]) run(`employee fire ${emp.id}`);
-    for (const veh of [...state.vehicles.vehicles]) run(`vehicle scrap ${veh.id}`);
-  }
-
-  /**
-   * Keep every ore_sale/rubble_disposal contract this blast's own hauled-in
-   * yield can plausibly pay moving, real-player style: top up delivery on
-   * every already-ACCEPTED contract with whatever stock is on hand right
-   * now (a contract doesn't have to be paid off in one delivery — repeated
-   * partial deliveries against the same contract, as hauling keeps bringing
-   * more in, complete it before its deadline same as one big delivery
-   * would), and accept a fresh offer only when CURRENT stock already covers
-   * it in full: an offer accepted on partial stock alone, hoping more
-   * arrives before its 30-100 tick deadline, risks the full penalty
-   * (30% of quantity*price) on top of zero income if it doesn't — and at
-   * a high enough price multiplier that penalty outweighs everything this
-   * loop already banked (confirmed empirically: a looser "any nonzero
-   * stock" gate here drove `expense:fines` past `income:contracts` once
-   * the level's own contractPriceMultiplier rose to cover its setup costs).
-   * `ore_sale` is preferred over
-   * `rubble_disposal` when both match: both draw from the same physical
-   * stored fragments (a rubble sale is FIFO over ALL stored mass, ore-
-   * bearing or not — Logistics.ts's consumeStoredOre reaches for barren
-   * fragments first for exactly this reason), and ore is worth far more per
-   * kg (#959: the tutorial's own single small-contract ceiling before this
-   * left the level chronically unable to recoup its own setup costs).
-   */
-  function sellCompletableContracts(
-    run: (cmd: string) => { success: boolean; output: string },
-    state: GameState,
-  ): void {
+  function playContracts(run: Run, state: GameState): void {
     const stockOf = (materialId: string) => (
       materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
     );
-
-    // Top up every already-accepted contract first — this is what lets a
-    // contract larger than any single haul batch still complete over time.
     for (const active of [...state.contracts.active]) {
       if (active.type !== 'ore_sale' && active.type !== 'rubble_disposal') continue;
       const amount = Math.min(active.quantityKg - active.deliveredKg, stockOf(active.materialId));
       if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
     }
-
-    // Then accept fresh offers with at least some matching stock right now,
-    // ore_sale first.
     for (let guard = 0; guard < 8; guard++) {
-      const fullyCovered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
-      const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && fullyCovered(c))
-        ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && fullyCovered(c));
+      const covered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
+      const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && covered(c))
+        ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c));
       if (!offer) return;
       if (!run(`contract accept ${offer.id}`).success) return;
       const active = state.contracts.active.find((c) => c.id === offer.id);
@@ -856,115 +776,44 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
     }
   }
 
-  it('drives every TUTORIAL_STEPS command in order to a genuine, profitable level completion', () => {
-    const { runner, ctx } = createRunner();
-    const run = (cmd: string) => runner.run(cmd);
-
-    expect(run('campaign start level:tutorial_pit').success).toBe(true);
-    const state = ctx.state!;
-    // #1264: this full playthrough's whole crew (surveyor, driller, blaster,
-    // drivers) converging on shared holes/hauls end to end is exactly the
-    // multi-agent shape agent occupancy governs — unconditional since #1207.
-    const stagnation: StagnationTracker = { lastStoredMassKg: -1, lastCompletedCount: -1, stagnantTicks: 0 };
-
+  /** Play the guided steps (everything before 'free-play') via each step's own commands. */
+  function playGuidedPhase(run: Run, state: GameState): void {
     for (const step of TUTORIAL_STEPS) {
-      // 'drill-plan' is a createComparisonStep that completes on the FIRST
-      // ordered hole landing, not all of them, by design (see its own
-      // comment in tutorialSteps.ts) — the rail moves on long before a
-      // multi-hole grid finishes drilling. Unlike 'charge' below it (whose
-      // own isComplete already requires every hole charged, #926), a
-      // `charge hole:*` issued the instant this step's card opens would only
-      // reach whichever holes had already landed, permanently leaving the
-      // rest un-chargeable once landed later. Draining the drill queue first
-      // is what a patient real player effectively achieves by not clicking
-      // Charge All until the plan visibly stops changing.
-      //
-      // A blanket "drain until state.pendingActions is empty" was tried and
-      // rejected here: once fragments hit the ground after 'blast', an
-      // unclaimed haul_debris PendingAction sits queued (no hauler exists
-      // yet at that point in the deck) and never resolves on its own,
-      // burning the entire tick budget on every later step for nothing —
-      // exactly the outstanding-work signal TutorialRails' own clock-hold
-      // exists to stop paying for by pausing instead of ticking.
-      if (step.id === 'charge') {
-        tickUntil(run, state, 500, () => state.plannedDrillHoles.length === 0, stagnation);
-      }
-
+      if (step.id === 'free-play') return;
       const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
+      const maxTicks = Math.max(500, (step.tickBudget ?? 20) * 25);
+      const complete = () => step.isComplete(state, snapshot);
 
-      // ── Steps this Node-level test cannot drive exactly as a player would ──
+      // Charge only once the drill queue has drained, as a patient player
+      // clicking Charge All after the plan stops changing would.
+      if (step.id === 'charge') tickUntil(run, state, 500, () => state.plannedDrillHoles.length === 0);
 
       if (step.id === 'toggle-survey-overlay') {
-        // Genuinely DOM-only: the step completes on a single click of a real
-        // button's aria-pressed state, with no console equivalent at all
-        // (see its own step definition). Out of scope for a console-driven
-        // playthrough — the interaction-mode scenario channel covers the
-        // real click. Treated as satisfied so the rest of the deck can be
-        // driven without a step this test structurally cannot exercise.
+        // Carve-out: a DOM-only click (aria-pressed), no console equivalent;
+        // the interaction-mode scenarios drive the real click.
         continue;
       }
 
       if (step.id === 'contract-accept') {
-        // The step's own `commands` hint hardcodes `contract accept 1` —
-        // by the time this step is actually reached, the survey/drilling/
-        // charging/hauling stretch above has spent well over
-        // CONTRACT_REFRESH_INTERVAL ticks, so the offer pool has already
-        // rotated past id 1 (#597/#635's own reason for preferring a
-        // type/material selector). Accept a real offer from the live pool
-        // instead of trusting the stale hint literally.
-        //
-        // Which offer matters, and taking the pool's leading one made this
-        // test's verdict depend on arbitrary timing. An offer's penalty is
-        // `quantityKg * basePricePerKg * 0.3` (Contract.ts) with no ceiling
-        // relative to the player's cash, so the pool routinely holds offers
-        // this tutorial's one debris_hauler cannot possibly deliver before
-        // the deadline. Taking `available[0]` accepted whichever of those
-        // happened to lead the pool at whatever tick the run reached this
-        // step: on `main` that was a 21k-penalty offer and the level ended
-        // `completed`; under #1151's slope gate the same step is reached
-        // ~180 ticks later, the pool has rotated, and the leading offer
-        // carried a 406,932 penalty against ~120k cash — one expiry
-        // bankrupting a run that is otherwise healthy and winnable. The old
-        // selection passed by luck of timing, not because the deck was
-        // sound, so any change to travel time could flip it either way.
-        //
-        // Take the smallest offer on the board instead: deterministic,
-        // deliverable by a single tier-1 hauler, and the same rule
-        // `sellCompletableContracts` already applies below ("never an
-        // oversized one that would strand the stock in an un-completable
-        // deal until it expires for a penalty", #959). A player who accepts
-        // a contract ten times their cash and goes bankrupt is the game
-        // working, not a defect — this test is about whether the tutorial
-        // deck can be *won* when played sensibly.
+        // The hint's `contract accept 1` goes stale once the pool rotates; a
+        // player accepts a real offer. Smallest offer: deliverable by one
+        // tier-1 hauler, so no penalty strands the run.
         const offer = [...state.contracts.available].sort((a, b) => a.quantityKg - b.quantityKg)[0];
         expect(offer, 'no contract available to accept at all').toBeDefined();
         expect(run(`contract accept ${offer!.id}`).success).toBe(true);
-        tickUntil(run, state, 500, () => step.isComplete(state, snapshot), stagnation);
-        expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
+        tickUntil(run, state, maxTicks, complete);
+        expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
         continue;
       }
 
       if (step.id === 'evacuate-zone') {
-        // No console command hint at all (the step teaches "Sound the Horn",
-        // BlastWorkshop.ts's Fire step, whose own handler dispatches `zone
-        // clear ...`) — but by the time this step is reached, the driller
-        // and digger have gone idle (no vehicle-gated task left to run) and
-        // are not currently boarding either vehicle, so `clearZone` reports
-        // both driverless and permanently strands them (Zone.ts: "a
-        // driverless vehicle can never advance on tick — order it out
-        // anyway and it just sits there... report it stranded either way").
-        // Actually driving a vehicle back out is its own multi-step
-        // interaction this Node-level playthrough doesn't otherwise need to
-        // exercise, so — matching this same file's own precedent just above
-        // ("blast refuses to fire on an occupied zone", `emp.x = 44` /
-        // `veh.x = 44`) — clear the zone directly by relocating every
-        // employee and vehicle to a corner beyond it, the same primitive a
-        // real evacuation would leave them at.
+        // Carve-out: the step teaches "Sound the Horn" (no console hint);
+        // relocate crew and fleet beyond the danger zone, the state a real
+        // evacuation leaves them in.
         const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
         expect(zone, 'no drill holes to compute a danger zone from').not.toBeNull();
-        const z = zone!;
-        const safeX = z.x1 - 5;
-        const safeZ = z.z1 - 5;
+        const safeX = zone!.x1 - 5;
+        const safeZ = zone!.z1 - 5;
         for (const emp of state.employees.employees) {
           if (!emp.alive) continue;
           emp.x = safeX;
@@ -974,173 +823,99 @@ describe('full tutorial playthrough ends WON with positive cash, not bankrupt-bu
           veh.x = safeX;
           veh.z = safeZ;
         }
-        expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
+        expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
         continue;
       }
-
-      if (step.id === 'sell-ore') {
-        // #959's own missing half, driven for real: `sellCompletableContracts`
-        // (run every tick via `tickUntil`) repeatedly accepts and fully pays
-        // off whichever available ore_sale/rubble_disposal contract this
-        // blast's own hauled-in stock can close in one delivery — never an
-        // oversized one that would strand the stock in an un-completable
-        // deal until it expires for a penalty. A tier-1 freight_warehouse
-        // only holds 2000kg (#959 planner note) and most of a real blast's
-        // mass is oversized rock a debris_hauler alone can't move (needs a
-        // rock_fragmenter this tutorial never introduces), so this can take
-        // many haul/sell cycles — hence the generous tick budget, matching
-        // 'victory' below rather than the tighter default.
-        tickUntil(run, state, 1500, () => step.isComplete(state, snapshot), stagnation);
-        expect(
-          step.isComplete(state, snapshot),
-          'tutorial step "sell-ore" never completed -- stub isComplete is hardcoded false (#959)',
-        ).toBe(true);
-
-        // Every lesson the tutorial's roster exists to teach is taught by
-        // this point (survey, drilling, driving, management) — a cost-
-        // conscious real operator, watching the balance sheet this deep in
-        // the red (payroll is by far the single biggest expense category),
-        // lays off everyone but the driver still needed to keep hauling and
-        // selling the remaining stock, same as `employee fire` already lets
-        // a player do at any time. Not a scripted step of its own (nothing
-        // in TUTORIAL_STEPS teaches it), just the obviously rational move
-        // this driving loop takes on the level's own behalf from here to
-        // the profit line, exactly as `sellCompletableContracts` already
-        // does for selling (#959).
-        for (const emp of [...state.employees.employees]) {
-          if (emp.role !== 'driver') {
-            const fireResult = run(`employee fire ${emp.id}`);
-            // A unionized employee's refusal is expected (fireEmployee,
-            // Employee.ts) — they simply stay employed, and
-            // windDownOnceExhausted's own crew-size check (#1130) already
-            // tolerates a unionized non-driver straggler surviving this
-            // loop. Any OTHER refusal reason is a real regression — fail
-            // loudly here rather than silently draining cash on an
-            // unfireable-for-an-unknown-reason employee for the rest of the
-            // run (#1130's own regression: the loop used to swallow every
-            // refusal reason unconditionally).
-            if (!fireResult.success && !emp.unionized) {
-              throw new Error(
-                `Setup: employee fire ${emp.id} failed for a reason other than unionization -- ${fireResult.output}`,
-              );
-            }
-          }
-        }
-
-        // Same logic for the fleet: the drill_rig and rock_digger already
-        // did their one job (the box-cut and its drill plan) and have no
-        // further use for the rest of this run — `vehicle scrap` stops
-        // their per-tick maintenance/fuel draw AND returns their residual
-        // value as cash, same real-player move as the layoffs just above.
-        // The debris_hauler stays: it's still doing the only paying job
-        // left, hauling stock in for `sellCompletableContracts` to sell.
-        for (const veh of [...state.vehicles.vehicles]) {
-          if (veh.type !== 'debris_hauler') run(`vehicle scrap ${veh.id}`);
-        }
-
-        // living_quarters (rest) and driving_center (training) have taught
-        // their lessons too and cost real per-tick upkeep (`operatingCostPerTick`
-        // — 6 and 8 respectively at tier 1) for the rest of this run with no
-        // further use: their one-time demolish cost (2500 + 3000) pays for
-        // itself in well under 400 ticks against a run this long. The
-        // freight_warehouse stays: it's the only reason any of this selling
-        // works at all.
-        for (const b of [...state.buildings.buildings]) {
-          if (b.type !== 'freight_warehouse') run(`build destroy ${b.id}`);
-        }
-        continue;
-      }
-
-      // ── Every other step: run its own commands/autoCommands, then tick ──
 
       for (const cmd of step.autoCommands ?? []) run(cmd);
       for (const cmd of step.commands ?? []) run(cmd);
 
-      // 'victory' gets a much bigger allowance than the generic
-      // tickBudget-derived default: with the level's own crew/fleet paid
-      // off and wound down (see the mass layoff/scrap/demolish above), the
-      // remaining wait is purely how long the contract board takes to roll
-      // enough matching ore_sale/rubble_disposal offers to finish paying
-      // off the level's own setup cost — empirically ~2400 ticks with seed
-      // 42's own RNG stream, comfortably inside this budget with margin for
-      // the run varying slightly as unrelated code changes land.
-      tickUntil(run, state, step.id === 'victory' ? 4000 : Math.max(500, (step.tickBudget ?? 20) * 25), () => step.isComplete(state, snapshot), stagnation);
+      if (step.id === 'sell-ore') {
+        // The step is "sell ore to a contract": accept and deliver, tick on.
+        for (let i = 0; i < maxTicks && !complete(); i++) {
+          playContracts(run, state);
+          playTick(run, state);
+        }
+      } else {
+        tickUntil(run, state, maxTicks, complete);
+      }
+      expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
+    }
+  }
 
-      expect(step.isComplete(state, snapshot), `tutorial step "${step.id}" never completed`).toBe(true);
+  function newTutorial() {
+    const { runner, ctx } = createRunner();
+    const commandsRun: string[] = [];
+    const run: Run = (cmd) => {
+      commandsRun.push(cmd);
+      return runner.run(cmd);
+    };
+    expect(run('campaign start level:tutorial_pit').success).toBe(true);
+    return { run, state: ctx.state!, commandsRun };
+  }
+
+  it('follows the cards to the first sale, then plays on freely to a genuine, solvent win', () => {
+    const { run, state, commandsRun } = newTutorial();
+    const freePlay = TUTORIAL_STEPS.find((s) => s.id === 'free-play')!;
+    const target = getLevel('tutorial_pit')!.unlockThreshold;
+
+    playGuidedPhase(run, state);
+
+    // The guided part is over: the level is still running and not yet won.
+    expect(state.levelEnded).toBe(false);
+    expect(freePlay.isComplete(state, {})).toBe(false);
+
+    // Free play: rails lifted, the clock is the player's. Drive the real
+    // rails object over the real step so a clock hold is caught.
+    const rails = new TutorialRails();
+    rails.beginStep(freePlay, state);
+    expect(state.isPaused).toBe(false);
+
+    let ticks = 0;
+    while (!state.levelEnded && ticks < FREE_PLAY_TICK_CAP) {
+      playContracts(run, state);
+      playTick(run, state);
+      rails.updateClock(state);
+      expect(state.isPaused, `clock held in free play at tick ${state.tickCount}`).toBe(false);
+      ticks++;
     }
 
-    // Every step reported complete -- including 'victory' and
-    // 'congratulations' -- so the level must have genuinely ended WON, not
-    // merely have `levelEnded === true` for any reason at all (#959's own
-    // 'victory' bug: today it accepts a bankruptcy/arrest/ecological_shutdown/
-    // worker_revolt just as readily as a real win).
-    expect(state.levelEndReason).toBe('completed');
+    expect(state.levelEndReason, `not won within ${FREE_PLAY_TICK_CAP} free-play ticks`).toBe('completed');
+    expect(state.levelEndReason).not.toBe('bankruptcy');
     expect(state.cash).toBeGreaterThan(0);
+    expect(freePlay.isComplete(state, {})).toBe(true);
 
-    const level = getLevel('tutorial_pit')!;
     const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
-    expect(netProfit).toBeGreaterThanOrEqual(level.unlockThreshold);
+    expect(netProfit).toBeGreaterThanOrEqual(target);
+
+    // Honesty guard: no layoff / scrap / demolish hack anywhere in the run.
+    expect(commandsRun.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
+  }, 300_000);
+
+  it('the goal chip reports net profit against the win target while free play runs', () => {
+    const { run, state } = newTutorial();
+    playGuidedPhase(run, state);
+
+    const target = getLevel('tutorial_pit')!.unlockThreshold;
+    const chip = goalChipParams(state);
+    const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
+    expect(chip.target).toBe(formatMoney(target));
+    expect(chip.profit).toBe(formatMoney(netProfit));
   }, 120_000);
 
-  // #1130: windDownOnceExhausted's crew-size gate was generalized from a
-  // strict "exactly one employee total" to a form that also tolerates a
-  // permanently-unionized non-driver straggler the sell-ore layoff loop
-  // could never have fired in the first place (fireEmployee always refuses
-  // a unionized employee). The full playthrough above never actually
-  // distinguishes the two guards -- stagnantTicks never reaches the 300-tick
-  // threshold either way on that run -- so this drives the exact fixture
-  // the generalization exists for directly, with no dependency on reaching
-  // that stretch of a 4000-tick playthrough.
-  it('windDownOnceExhausted generalized crew-size guard fires the deeper teardown for a driver + permanently-unionized straggler + one vehicle, where the old strict guard would not (#1130)', () => {
-    const { runner, ctx } = createRunner();
-    const run = (cmd: string) => runner.run(cmd);
+  it('after the first sale no rail disables a control and the clock is not held, however long the player idles', () => {
+    const { run, state } = newTutorial();
+    playGuidedPhase(run, state);
 
-    expect(run('campaign start level:tutorial_pit').success).toBe(true);
-    const state = ctx.state!;
+    const freePlay = TUTORIAL_STEPS.find((s) => s.id === 'free-play')!;
+    const rails = new TutorialRails();
+    rails.beginStep(freePlay, state);
+    expect(rails.refresh(state).stageTotal).toBe(0);
 
-    // Build the exact fixture the generalized guard is meant to tolerate:
-    // one driver (ordinarily fireable) + one non-driver who is permanently
-    // unionized (fireEmployee always refuses them, so no layoff loop could
-    // ever get the roster down to 1 the old guard's way) + one vehicle.
-    expect(run('employee hire role:driver').success).toBe(true);
-    expect(run('employee hire role:surveyor').success).toBe(true);
-    expect(run('vehicle buy debris_hauler').success).toBe(true);
-
-    const driver = state.employees.employees.find((e) => e.role === 'driver');
-    const straggler = state.employees.employees.find((e) => e.role !== 'driver');
-    expect(driver, 'fixture setup: no driver on the roster').toBeDefined();
-    expect(straggler, 'fixture setup: no non-driver on the roster').toBeDefined();
-    driver!.unionized = false;
-    straggler!.unionized = true;
-
-    expect(state.employees.employees.length).toBe(2);
-    expect(state.vehicles.vehicles.length).toBe(1);
-
-    // The old strict guard (pre-#1130): `state.employees.employees.length
-    // !== 1`. With 2 employees on this fixture's roster, that condition is
-    // true, so the old code returns immediately on every call, before ever
-    // touching `stagnation` -- it would never reach, let alone cross, the
-    // 300-tick threshold below, no matter how long the state stayed
-    // stagnant. Proves this fixture actually distinguishes the two guards,
-    // rather than happening to satisfy both.
-    const oldStrictGuardWouldSkip = state.employees.employees.length !== 1;
-    expect(oldStrictGuardWouldSkip).toBe(true);
-
-    // Drive windDownOnceExhausted directly, well past its 300-tick
-    // threshold, with storedMassKg/completedHistory held fixed (no ticking
-    // at all) so every call after the first sees genuine stagnation. Call 1
-    // only seeds the tracker's baseline (its -1 sentinels never match the
-    // real values, so it resets stagnantTicks to 0 and returns); calls 2-301
-    // walk stagnantTicks from 0 up through the 300 threshold.
-    const stagnation: StagnationTracker = { lastStoredMassKg: -1, lastCompletedCount: -1, stagnantTicks: 0 };
-    for (let i = 0; i < 301; i++) windDownOnceExhausted(run, state, stagnation);
-
-    // The deeper teardown fired under the new, generalized guard: the
-    // driver (not unionized) got fired, the permanently-unionized straggler
-    // stayed (fireEmployee refuses them -- exactly why the old strict guard
-    // could never have driven this crew down to 1 on its own), and the
-    // single vehicle got scrapped.
-    expect(state.employees.employees.map((e) => e.id)).toEqual([straggler!.id]);
-    expect(state.vehicles.vehicles.length).toBe(0);
-  });
+    for (let i = 0; i < 400 && !state.levelEnded; i++) {
+      playTick(run, state);
+      expect(rails.updateClock(state)).toBe(false);
+      expect(state.isPaused).toBe(false);
+    }
+  }, 120_000);
 });

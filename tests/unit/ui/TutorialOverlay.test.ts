@@ -858,13 +858,14 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
-  describe('victory card live figures (#1329)', () => {
+  describe('free-play card live figures (#1329/#1328)', () => {
     it('refreshes the body text on a guide tick when net profit changes', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       const state = createMockState();
       tut.start(state);
-      while (TUTORIAL_STEPS[tut.stepIndex]!.id !== 'victory') tut.advanceToNextStep();
+      for (let i = 0; i < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tut.stepIndex]!.id !== 'free-play'; i++) tut.advanceToNextStep();
+      expect(TUTORIAL_STEPS[tut.stepIndex]!.id).toBe('free-play');
 
       const textEl = container.querySelector('.bs-panel-text') as HTMLElement;
       const before = textEl.textContent;
@@ -874,6 +875,106 @@ describe('TutorialOverlay (12.4)', () => {
 
       expect(textEl.textContent).not.toBe(before);
       expect(textEl.textContent).toContain('1,234');
+    });
+  });
+
+  describe('free play lifts the rails and shows the goal chip (#1328)', () => {
+    const chip = (): HTMLElement | null => document.querySelector('.bs-tutorial-goal');
+    const chipShown = (): boolean => !!chip() && chip()!.style.display !== 'none';
+    function advanceTo(tut: any, id: string): void {
+      for (let i = 0; i < TUTORIAL_STEPS.length && TUTORIAL_STEPS[tut.stepIndex]!.id !== id; i++) tut.advanceToNextStep();
+      expect(TUTORIAL_STEPS[tut.stepIndex]!.id).toBe(id);
+    }
+
+    it('body keeps bs-tutorial-guided on guided steps and drops it on free-play', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      advanceTo(tut, 'sell-ore');
+      expect(document.body.classList.contains('bs-tutorial-guided')).toBe(true);
+      tut.advanceToNextStep();
+      expect(TUTORIAL_STEPS[tut.stepIndex]!.id).toBe('free-play');
+      expect(document.body.classList.contains('bs-tutorial-guided')).toBe(false);
+    });
+
+    it('goal chip is hidden on guided steps', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      expect(chipShown()).toBe(false);
+      advanceTo(tut, 'sell-ore');
+      expect(chipShown()).toBe(false);
+    });
+
+    it('goal chip shows profit and target on free-play', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceTo(tut, 'free-play');
+      addIncome(state.finances, 1234, 'contracts', 'test income', 1);
+      tut.tickGuide();
+      expect(chipShown()).toBe(true);
+      expect(chip()!.textContent).toContain('1,234');
+      expect(chip()!.textContent).toContain('5,000');
+    });
+
+    it('goal chip is hidden again on the closing card', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      advanceTo(tut, 'free-play');
+      tut.advanceToNextStep();
+      expect(TUTORIAL_STEPS[tut.stepIndex]!.id).toBe('congratulations');
+      expect(chipShown()).toBe(false);
+    });
+
+    it('does not hold the clock on free-play however many ticks pass', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceTo(tut, 'free-play');
+      for (let i = 0; i < 5; i++) {
+        state.tickCount += 200;
+        tut.tickGuide();
+        expect(state.isPaused).toBe(false);
+      }
+    });
+
+    it('a defeat on free-play still jumps to the closing card with the chip hidden', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceTo(tut, 'free-play');
+      state.levelEnded = true;
+      state.levelEndReason = 'bankruptcy';
+      tut.onCommandExecuted(state);
+      expect(tut.stepIndex).toBe(TOTAL_TUTORIAL_STEPS - 1);
+      expect(chipShown()).toBe(false);
+    });
+
+    it('a win on free-play advances to congratulations', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      const state = createMockState();
+      tut.start(state);
+      advanceTo(tut, 'free-play');
+      state.levelEnded = true;
+      state.levelEndReason = 'completed';
+      tut.onCommandExecuted(state);
+      expect(TUTORIAL_STEPS[tut.stepIndex]!.id).toBe('congratulations');
+    });
+
+    it('teardown hides the chip', () => {
+      const tut = new TutorialOverlay(container) as any;
+      overlay = tut;
+      tut.start(createMockState());
+      advanceTo(tut, 'free-play');
+      expect(chipShown()).toBe(true);
+      tut.abandon();
+      expect(chipShown()).toBe(false);
     });
   });
 

@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { TUTORIAL_STEPS_CLOSING } from '../../../src/ui/tutorialStepsClosing.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
-const victory = TUTORIAL_STEPS_CLOSING.find((s) => s.id === 'victory')!;
+const freePlay = TUTORIAL_STEPS_CLOSING.find((s) => s.id === 'free-play')!;
 const congratulations = TUTORIAL_STEPS_CLOSING.find((s) => s.id === 'congratulations')!;
 
 function stateWith(levelEnded: boolean, levelEndReason: GameState['levelEndReason']): GameState {
@@ -20,12 +20,14 @@ function stateWith(levelEnded: boolean, levelEndReason: GameState['levelEndReaso
 }
 
 describe('tutorialStepsClosing (#959)', () => {
-  it('both closing steps exist', () => {
-    expect(victory).toBeDefined();
+  it('both closing steps exist, and the removed ones are gone', () => {
+    expect(freePlay).toBeDefined();
     expect(congratulations).toBeDefined();
+    const ids = TUTORIAL_STEPS_CLOSING.map((x) => x.id);
+    for (const gone of ['set-policy', 'tick-advance', 'victory']) expect(ids).not.toContain(gone);
   });
 
-  describe('victory.isComplete', () => {
+  describe('free-play.isComplete', () => {
     const DEFEAT_REASONS: GameState['levelEndReason'][] = [
       'bankruptcy', 'arrest', 'ecological_shutdown', 'worker_revolt',
     ];
@@ -33,30 +35,30 @@ describe('tutorialStepsClosing (#959)', () => {
     for (const reason of DEFEAT_REASONS) {
       it(`returns false when levelEndReason is '${reason}', even with levelEnded === true`, () => {
         const state = stateWith(true, reason);
-        expect(victory.isComplete(state, {})).toBe(false);
+        expect(freePlay.isComplete(state, {})).toBe(false);
       });
     }
 
     it("returns true when levelEndReason is 'completed'", () => {
       const state = stateWith(true, 'completed');
-      expect(victory.isComplete(state, {})).toBe(true);
+      expect(freePlay.isComplete(state, {})).toBe(true);
     });
 
     it('returns false when the level has not ended at all (levelEndReason null)', () => {
       const state = stateWith(false, null);
-      expect(victory.isComplete(state, {})).toBe(false);
+      expect(freePlay.isComplete(state, {})).toBe(false);
     });
 
     it('returns false when levelEndReason is completed but levelEnded is somehow still false', () => {
       // Defensive: completion should require the level to have genuinely
       // ended, not merely carry a stale reason from a previous run.
       const state = stateWith(false, 'completed');
-      expect(victory.isComplete(state, {})).toBe(false);
+      expect(freePlay.isComplete(state, {})).toBe(false);
     });
 
     it('does not throw against a minimal state with no levelEndReason field at all', () => {
       const state = {} as unknown as GameState;
-      expect(() => victory.isComplete(state, {})).not.toThrow();
+      expect(() => freePlay.isComplete(state, {})).not.toThrow();
     });
   });
 

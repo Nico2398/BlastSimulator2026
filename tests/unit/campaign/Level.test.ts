@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { getLevel, getAllLevels, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../../../src/core/config/balance.js';
 
 describe('Level definition system (7.1)', () => {
   it('getLevel("dusty_hollow") returns valid level data with all required fields', () => {
@@ -198,5 +199,11 @@ describe('level explosive availability (#1357)', () => {
   it('isExplosiveAvailable allows everything for null and unknown level ids', () => {
     expect(isExplosiveAvailable(null, 'dynatomics')).toBe(true);
     expect(isExplosiveAvailable('nonexistent_mine', 'dynatomics')).toBe(true);
+  });
+});
+
+describe('tutorial_pit contract price multiplier (#1328)', () => {
+  it('Level.ts uses the balance.ts constant rather than a duplicate literal', () => {
+    expect(getLevel('tutorial_pit')!.contractPriceMultiplier).toBe(TUTORIAL_CONTRACT_PRICE_MULTIPLIER);
   });
 });

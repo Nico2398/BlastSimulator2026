@@ -156,6 +156,62 @@ describe('TutorialRails', () => {
     expect(stray.classList.contains(ALLOWED_CLASS)).toBe(false);
   });
 
+  describe('unguided step (#1328)', () => {
+    it('clears rails marks and reports no stages', () => {
+      const stray = withBox(document.createElement('button'));
+      stray.classList.add(ALLOWED_CLASS, HIGHLIGHT_CLASS);
+      document.body.appendChild(stray);
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'hire-surveyor' }, state());
+      rails.beginStep({ id: 'free-play', guided: false }, state());
+      const view = rails.refresh(state());
+      expect(view.stageTotal).toBe(0);
+      expect(view.hint).toBe('');
+      expect(stray.classList.contains(ALLOWED_CLASS)).toBe(false);
+      expect(stray.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+    });
+
+    it('releases a held clock when the step begins', () => {
+      const s = state();
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'hire-surveyor' }, s);
+      s.tickCount = DEFAULT_TICK_BUDGET;
+      rails.updateClock(s);
+      expect(s.isPaused).toBe(true);
+      rails.beginStep({ id: 'free-play', guided: false }, s);
+      expect(s.isPaused).toBe(false);
+      expect(rails.clockHeld).toBe(false);
+    });
+
+    it('updateClock never pauses afterward, even far past the default budget', () => {
+      const s = state();
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'free-play', guided: false }, s);
+      for (const tick of [DEFAULT_TICK_BUDGET, DEFAULT_TICK_BUDGET * 10, 100000]) {
+        s.tickCount = tick;
+        expect(rails.updateClock(s)).toBe(false);
+        expect(s.isPaused).toBe(false);
+      }
+    });
+
+    it('a guided step after an unguided one holds the clock again (no leaked flag)', () => {
+      const s = state();
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'free-play', guided: false }, s);
+      rails.beginStep({ id: 'hire-surveyor' }, s);
+      s.tickCount = DEFAULT_TICK_BUDGET;
+      expect(rails.updateClock(s)).toBe(true);
+    });
+
+    it('guided: true behaves as before', () => {
+      const s = state();
+      const rails = new TutorialRails();
+      rails.beginStep({ id: 'hire-surveyor', guided: true }, s);
+      s.tickCount = DEFAULT_TICK_BUDGET;
+      expect(rails.updateClock(s)).toBe(true);
+    });
+  });
+
   it('starts a step with the clock running', () => {
     const s = state();
     s.isPaused = true;
