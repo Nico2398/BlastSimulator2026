@@ -58,7 +58,7 @@ function startTreraniumDepths(): GameContext {
   const ctx = makeEmptyGameContext();
   const bootstrap = campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
   if (!bootstrap.success) throw new Error(`campaignStartCommand(tutorial_pit) failed: ${bootstrap.output}`);
-  const entry = ctx.state!.campaign.levels['treranium_depths'];
+  const entry = ctx.campaignProfile.campaign.levels['treranium_depths'];
   if (!entry) throw new Error('treranium_depths has no campaign progress entry');
   entry.unlocked = true;
 
