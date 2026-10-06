@@ -154,6 +154,17 @@
       }
     },
     {
+      "command": "weather set sunny",
+      "description": "Pin dry weather right before firing: weather now ticks with the game (#1403), and rain would fizzle the water-sensitive boomite. Bootstrap: weather has no UI control.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "blast",
       "interaction": [
         {

@@ -123,7 +123,7 @@ export function assembleValidBlastPlan(
 
 /** Ids of drilled holes currently wet (rain-flooded); weather defaults to 'sunny' before the cycle exists. */
 export function wetHoleIdSet(ctx: MiningContext): Set<string> {
-  return wetHoleIdsFor(ctx.state!, ctx.weatherCycle?.current ?? 'sunny');
+  return wetHoleIdsFor(ctx.state!, ctx.state!.weather.current);
 }
 
 /** Vibration targets for the current level's villages (none when no playable area is loaded). */

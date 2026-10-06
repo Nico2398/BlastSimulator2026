@@ -6,9 +6,12 @@ import {
   forceAdvance,
   setWeather,
   forecast,
+  tickWeather,
+  forceAdvanceInState,
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../../src/core/weather/WeatherCycle.js';
+import { WEATHER_HISTORY_MAX } from '../../../src/core/config/balance.js';
 import {
   updateHoleFlooding,
   isHoleFlooded,
@@ -98,21 +101,21 @@ describe('forecast', () => {
     const cycleA = createWeatherCycle(42);
     const cycleB = createWeatherCycle(42);
 
-    const a = forecast(cycleA, new Random(1), 14);
-    const b = forecast(cycleB, new Random(1), 14);
+    const a = forecast(cycleA, 14);
+    const b = forecast(cycleB, 14);
 
     expect(a).toEqual(b);
   });
 
   it('returns n entries, one per day', () => {
     const cycle = createWeatherCycle(3);
-    expect(forecast(cycle, new Random(3), 14)).toHaveLength(14);
-    expect(forecast(cycle, new Random(3), 5)).toHaveLength(5);
+    expect(forecast(cycle, 14)).toHaveLength(14);
+    expect(forecast(cycle, 5)).toHaveLength(5);
   });
 
   it('every entry is a valid weather state', () => {
     const cycle = createWeatherCycle(9);
-    for (const day of forecast(cycle, new Random(9), 14)) {
+    for (const day of forecast(cycle, 14)) {
       expect(ALL_WEATHER_STATES).toContain(day);
     }
   });
@@ -121,26 +124,25 @@ describe('forecast', () => {
     const cycle = createWeatherCycle(11);
     const before = { current: cycle.current, ticksRemaining: cycle.ticksRemaining, history: [...cycle.history] };
 
-    forecast(cycle, new Random(11), 14);
+    forecast(cycle, 14);
 
     expect(cycle.current).toBe(before.current);
     expect(cycle.ticksRemaining).toBe(before.ticksRemaining);
     expect(cycle.history).toEqual(before.history);
   });
 
-  it('does not consume the rng it was given', () => {
+  it('leaves the cycle rngState unchanged', () => {
     const cycle = createWeatherCycle(17);
-    const rng = new Random(17);
-    const expected = new Random(17).next();
+    const rngBefore = cycle.rngState;
 
-    forecast(cycle, rng, 14);
+    forecast(cycle, 14);
 
-    expect(rng.next()).toBe(expected);
+    expect(cycle.rngState).toBe(rngBefore);
   });
 
   it('a longer horizon extends, rather than reruns, a shorter one', () => {
-    const short = forecast(createWeatherCycle(21), new Random(21), 5);
-    const long = forecast(createWeatherCycle(21), new Random(21), 14);
+    const short = forecast(createWeatherCycle(21), 5);
+    const long = forecast(createWeatherCycle(21), 14);
 
     expect(long.slice(0, 5)).toEqual(short);
   });
@@ -191,5 +193,98 @@ describe('WeatherEffects', () => {
     const charge = { explosiveId: 'boomite', amountKg: 3, stemmingM: 2 };
 
     expect(willChargeFail(charge, flood, 8)).toBe(false);
+  });
+});
+
+describe('tickWeather (#1403)', () => {
+  it('returns the cycle\'s current state', () => {
+    const cycle = createWeatherCycle(42);
+    for (let i = 0; i < 60; i++) {
+      expect(tickWeather(cycle)).toBe(cycle.current);
+    }
+  });
+
+  it('matches advanceWeather driven by Random.fromState(rngState)', () => {
+    const a = createWeatherCycle(7);
+    const b = structuredClone(a);
+    const rng = Random.fromState(b.rngState);
+    for (let i = 0; i < 500; i++) {
+      tickWeather(a);
+      advanceWeather(b, rng);
+      expect(a.current).toBe(b.current);
+      expect(a.ticksRemaining).toBe(b.ticksRemaining);
+    }
+  });
+
+  it('persists the advanced PRNG state in rngState', () => {
+    const cycle = createWeatherCycle(7);
+    const initial = cycle.rngState;
+    for (let i = 0; i < 100; i++) tickWeather(cycle);
+    expect(cycle.rngState).not.toBe(initial);
+  });
+
+  it('a structuredClone mid-run continues identically', () => {
+    const a = createWeatherCycle(11);
+    for (let i = 0; i < 37; i++) tickWeather(a);
+    const b = structuredClone(a);
+    for (let i = 0; i < 200; i++) {
+      tickWeather(a);
+      tickWeather(b);
+    }
+    expect(b).toEqual(a);
+  });
+
+  it('is deterministic per seed and differs across seeds', () => {
+    const run = (seed: number) => {
+      const c = createWeatherCycle(seed);
+      for (let i = 0; i < 1000; i++) tickWeather(c);
+      return c.history.join(',');
+    };
+    expect(run(5)).toBe(run(5));
+    expect(run(5)).not.toBe(run(6));
+  });
+
+  it('caps history at WEATHER_HISTORY_MAX over a very long run', () => {
+    const cycle = createWeatherCycle(3);
+    for (let i = 0; i < 10000; i++) tickWeather(cycle);
+    expect(cycle.history.length).toBeLessThanOrEqual(WEATHER_HISTORY_MAX);
+    expect(cycle.history[cycle.history.length - 1]).toBe(cycle.current);
+  });
+
+  it('only ever yields valid states', () => {
+    const cycle = createWeatherCycle(99);
+    for (let i = 0; i < 2000; i++) expect(ALL_WEATHER_STATES).toContain(tickWeather(cycle));
+  });
+});
+
+describe('forceAdvanceInState (#1403)', () => {
+  it('moves to a new duration window and records the state in history', () => {
+    const cycle = createWeatherCycle(42);
+    const before = cycle.history.length;
+    forceAdvanceInState(cycle);
+    expect(ALL_WEATHER_STATES).toContain(cycle.current);
+    expect(cycle.ticksRemaining).toBeGreaterThan(0);
+    expect(cycle.history[cycle.history.length - 1]).toBe(cycle.current);
+    expect(cycle.history.length).toBeGreaterThanOrEqual(Math.min(before + 1, WEATHER_HISTORY_MAX));
+  });
+
+  it('advances rngState and is reproducible from a clone', () => {
+    const a = createWeatherCycle(42);
+    const b = structuredClone(a);
+    forceAdvanceInState(a);
+    forceAdvanceInState(b);
+    expect(a).toEqual(b);
+    expect(a.rngState).not.toBe(42);
+  });
+});
+
+describe('forecast vs tickWeather (#1403)', () => {
+  it.each([1, 2, 5, 14])('forecast(cycle, n)[n-1] equals state after n*24 ticks (n=%i)', (n) => {
+    const cycle = createWeatherCycle(123);
+    for (let i = 0; i < 50; i++) tickWeather(cycle);
+    const predicted = forecast(cycle, n);
+    const live = structuredClone(cycle);
+    for (let i = 0; i < n * 24; i++) tickWeather(live);
+    expect(predicted[n - 1]).toBe(live.current);
   });
 });

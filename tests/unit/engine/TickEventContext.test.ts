@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { buildTickEventContext } from '../../../src/core/engine/TickEventContext.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { ALL_WEATHER_STATES } from '../../../src/core/weather/WeatherCycle.js';
 import { hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 
 const SEED = 42;
@@ -67,7 +68,23 @@ describe('buildTickEventContext', () => {
     expect(ctx.tickCount).toBe(42);
     expect(ctx.lawsuitCount).toBe(1);
     expect(ctx.activeContractCount).toBe(1);
-    expect(ctx.weatherId).toBe('clear');
+    expect(ctx.weatherId).toBe(state.weather.current);
     expect(ctx.scores).toBe(state.scores);
+  });
+});
+
+describe('buildTickEventContext weatherId (#1403)', () => {
+  it.each(ALL_WEATHER_STATES)('reports %s from state.weather.current', (weather) => {
+    const state = createGame({ seed: SEED });
+    state.weather.current = weather;
+    expect(buildTickEventContext(state).weatherId).toBe(weather);
+  });
+
+  it('never reports the placeholder "clear"', () => {
+    const state = createGame({ seed: SEED });
+    for (const weather of ALL_WEATHER_STATES) {
+      state.weather.current = weather;
+      expect(buildTickEventContext(state).weatherId).not.toBe('clear');
+    }
   });
 });

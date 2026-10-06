@@ -389,15 +389,13 @@ describe('GameRenderer — wind and clouds (#458 T7.1/D12)', () => {
   });
 
   it('a weather change reaches CloudLayer — storm raises cloud coverage toward its dense target', async () => {
-    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
     const ctx = makeCtx();
-    ctx.weatherCycle = createWeatherCycle(ctx.state!.seed);
     renderer.syncFromContext(ctx);
 
     const uniforms = renderer.terrain!.sharedMaterial.customUniforms;
-    ctx.weatherCycle.current = 'storm';
+    ctx.state!.weather.current = 'storm';
     renderer.syncFromContext(ctx); // pushes the new weather into skybox + clouds
     for (let i = 0; i < 200; i++) renderer.update(0.05);
 
@@ -406,24 +404,17 @@ describe('GameRenderer — wind and clouds (#458 T7.1/D12)', () => {
 });
 
 describe('GameRenderer — lastWeather guard, no skybox (#767)', () => {
-  it('syncGameRendererEntities leaves lastWeather unset when skybox is null, even with a weatherCycle present', async () => {
-    // #767's split briefly dropped the pre-split guard (`this.skybox &&
-    // ctx.weatherCycle`) — syncGameRendererEntities() always computed
-    // lastWeather from weatherCycle alone (defaulting to 'sunny' with no
-    // weatherCycle at all) and GameRenderer.ts copied it back
-    // unconditionally, so a null skybox no longer blocked the write. Drives
-    // the exported sync function directly, since skybox is only ever null
-    // through the public API before a game is loaded or after dispose() —
-    // states where weatherCycle/lastGrid aren't independently constructible.
+  it('syncGameRendererEntities leaves lastWeather unset when skybox is null, even with non-default weather', async () => {
+    // #767's split briefly dropped the guard that a null skybox blocks the
+    // lastWeather write-back. Drives the exported sync function directly,
+    // since skybox is only ever null through the public API before a game is
+    // loaded or after dispose().
     const { syncGameRendererEntities } = await import('../../../src/renderer/GameRendererSync.js');
-    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
     const state = createGame({ seed: 42, startingCash: 100_000 });
-    const weatherCycle = createWeatherCycle(42);
-    weatherCycle.current = 'storm';
+    state.weather.current = 'storm';
 
     const result = syncGameRendererEntities({
       state,
-      weatherCycle,
       buildings: null,
       renderedBuildingIds: new Set(),
       vehicles: null,
@@ -437,7 +428,7 @@ describe('GameRenderer — lastWeather guard, no skybox (#767)', () => {
       terrainMeshRevision: 0,
       lastSyncedTerrainRevision: -1,
       taskProgress: null,
-      skybox: null, // guard should block the write regardless of weatherCycle
+      skybox: null, // no skybox: nothing receives the weather
       clouds: null,
       zone: null,
       getTerrainSurfaceY: () => 0,

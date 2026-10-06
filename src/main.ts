@@ -29,7 +29,7 @@ import { AudioHooks } from './audio/AudioHooks.js';
 import { selectSaveBackend } from './persistence/selectBackend.js';
 import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { terrainConfigOf, ensureLandscape, resetWeatherForNewGame, loadGridForState, stateForSave } from './console/commands/world.js';
+import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
@@ -500,7 +500,6 @@ function onLevelStateReplaced(state: GameState): void {
   scenePicking.clearSelection();
   placementController.disarm();
   levelEndScreen.reset();
-  resetWeatherForNewGame(ctx, state.seed);
   // The tutorial's steps are tuned to its own map: a swap to any other level
   // ends it (#1319), else it would block that level's end screen.
   if (tutorial.isActive && !shouldKeepTutorialRunning(state.campaign.activeLevelId)) tutorial.abandon();
@@ -563,13 +562,13 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   audioHooks.onUIClick();
 
   // Weather change audio
-  if (ctx.weatherCycle) {
-    audioHooks.onWeatherChange(ctx.weatherCycle.current);
+  if (ctx.state) {
+    audioHooks.onWeatherChange(ctx.state.weather.current);
   }
 
   // Update UI after every command
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
+    uiManager.update(ctx.state, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
     // A game exists — reveal HUD chrome unless the player is looking at the
     // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
     // command so no entry point (button, console, scenario harness) can miss it.
@@ -599,7 +598,7 @@ window.__gameState = () => {
     isPaused: s.isPaused,
     timeScale: s.timeScale,
     mineType: s.mineType,
-    weather: ctx.weatherCycle?.current ?? null,
+    weather: ctx.state?.weather.current ?? null,
     // The site's live bounding box, so a harness can map grid coordinates to
     // the tile picker without inferring them from a terrain bounding box that
     // blasts and ramps change underneath it. Size is a bounding box, not a
@@ -1239,7 +1238,7 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
+    uiManager.update(ctx.state, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
     if (!mainMenu.visible) uiManager.show();
     if (!fullScreenMenuUp()) savesModal.onTick(ctx.state);
   }

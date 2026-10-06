@@ -245,13 +245,13 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     // Arm + open the report with a real collapse duration (5s) longer than
     // the 3000ms floor — matches main.ts's own call shape (weatherCycle, rng,
     // tutorialActive, blastPlaybackDurationS), UIManager.update's 5th param.
-    uiManager.update(ctx.state!, undefined, undefined, false, 5);
+    uiManager.update(ctx.state!, false, 5);
     nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!, undefined, undefined, false, 5);
+    uiManager.update(ctx.state!, false, 5);
     expect(uiManager.blastReportModalVisible).toBe(false); // still mid-collapse, past the old floor
 
     nowSpy.mockReturnValue(5000);
-    uiManager.update(ctx.state!, undefined, undefined, false, 5);
+    uiManager.update(ctx.state!, false, 5);
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     // Player dismisses before saving.
@@ -274,9 +274,9 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     // would pass 0 here — asserted for both 0 and a stale-looking 5 to prove
     // the guard doesn't depend on which one arrives).
     nowSpy.mockReturnValue(10000);
-    uiManager.update(ctx.state!, undefined, undefined, false, 0);
+    uiManager.update(ctx.state!, false, 0);
     nowSpy.mockReturnValue(50000);
-    uiManager.update(ctx.state!, undefined, undefined, false, 5);
+    uiManager.update(ctx.state!, false, 5);
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
@@ -292,14 +292,14 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     const { runner, ctx } = createRunner();
     fireBlast(runner, ctx);
 
-    uiManager.update(ctx.state!, undefined, undefined, false, 5); // arms with a 5s real duration, still waiting it out
+    uiManager.update(ctx.state!, false, 5); // arms with a 5s real duration, still waiting it out
     expect(uiManager.blastReportModalPending).toBe(true);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
     // Even past the old 3000ms floor, still pending — the real duration
     // hasn't elapsed yet.
     nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
-    uiManager.update(ctx.state!, undefined, undefined, false, 5);
+    uiManager.update(ctx.state!, false, 5);
     expect(uiManager.blastReportModalPending).toBe(true);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
@@ -311,7 +311,7 @@ describe('BlastReportModal — does not re-arm after save/load once dismissed (#
     expect(uiManager.blastReportModalVisible).toBe(false);
 
     nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
-    uiManager.update(ctx.state!, undefined, undefined, false, 0);
+    uiManager.update(ctx.state!, false, 0);
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);

@@ -56,6 +56,8 @@ describe('getTerrainSurfaceY reflects the post-blast grid (#1007)', () => {
     driveDrillPlanToCompletion(runner, ctx);
     runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     driveChargePlanToCompletion(runner, ctx);
+    // Weather ticks with the game (#1403); rain would fizzle boomite. Pin dry.
+    runner.run('weather set sunny');
     runner.run('sequence auto delay_step:25');
     const blastResult = runner.run('blast');
     expect(blastResult.success).toBe(true);

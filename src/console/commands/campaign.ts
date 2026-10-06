@@ -2,7 +2,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import { regenerateGrid, resetWeatherForNewGame } from './world.js';
+import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
 import { getLevelProgress, createCampaignState, recordProfit, isCampaignDone } from '../../core/campaign/Campaign.js';
 import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
@@ -129,7 +129,6 @@ export function campaignStartCommand(
   }
 
   ctx.state = newState;
-  resetWeatherForNewGame(ctx, ctx.state.seed);
   ctx.state.campaign = campaign;
 
   // `cash:` override, mirroring new_game's own knob (world.ts). Without it a

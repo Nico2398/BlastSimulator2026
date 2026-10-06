@@ -264,7 +264,6 @@ export class GameRenderer {
     if (!ctx.state) return;
     const result = syncGameRendererEntities({
       state: ctx.state,
-      weatherCycle: ctx.weatherCycle,
       buildings: this.buildings,
       renderedBuildingIds: this.renderedBuildingIds,
       vehicles: this.vehicles,
@@ -289,8 +288,7 @@ export class GameRenderer {
     });
     this.lastGhostRevision = result.lastGhostRevision;
     this.lastSyncedTerrainRevision = result.lastSyncedTerrainRevision;
-    // Matches the pre-split guard (`this.skybox && ctx.weatherCycle`) exactly:
-    // syncGameRendererEntities() only returns lastWeather when that guard held.
+    // syncGameRendererEntities() only returns lastWeather when a skybox received it.
     if (result.lastWeather !== undefined) {
       this.lastWeather = result.lastWeather;
     }

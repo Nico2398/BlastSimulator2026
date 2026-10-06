@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Weather → blast wiring, through the real console
-// runner and game loop. Proves ctx.weatherCycle (set via `weather set`)
+// runner and game loop. Proves state.weather (set via `weather set`)
 // actually reaches executeBlast's wetHoleIds (BlastExecution.ts), not just
 // that the `weather` command reports a state.
 
@@ -38,11 +38,14 @@ function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, ma
   }
 }
 
-function drillChargeSequenceBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string) {
+// Weather ticks with the game (#1403), so a weather set before the long drill
+// and charge drives has drifted by blast time. Pin it right before the blast.
+function drillChargeSequenceBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string, weather = 'sunny') {
   runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
   driveDrillPlanToCompletion(runner, ctx);
   runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
   driveChargePlanToCompletion(runner, ctx);
+  runner.run(`weather set ${weather}`);
   runner.run('sequence auto delay_step:25');
   return runner.run('blast');
 }
@@ -57,7 +60,7 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    const wetBlast = drillChargeSequenceBlast(wet.runner, wet.ctx, 'boomite');
+    const wetBlast = drillChargeSequenceBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
     expect(wetBlast.success).toBe(true);
 
     const dryReport = dry.ctx.state!.lastBlastReport!;
@@ -75,7 +78,7 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    const wetBlast = drillChargeSequenceBlast(wet.runner, wet.ctx, 'krackle');
+    const wetBlast = drillChargeSequenceBlast(wet.runner, wet.ctx, 'krackle', 'heavy_rain');
     expect(wetBlast.success).toBe(true);
 
     expect(wet.ctx.state!.lastBlastReport!.clearedVoxels)
@@ -96,6 +99,7 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
     }
     tubed.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     driveChargePlanToCompletion(tubed.runner, tubed.ctx);
+    tubed.runner.run('weather set heavy_rain');
     tubed.runner.run('sequence auto delay_step:25');
     const tubedBlast = tubed.runner.run('blast');
     expect(tubedBlast.success).toBe(true);
@@ -117,7 +121,7 @@ describe('console blast output reports wet holes (#1348)', () => {
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    const result = drillChargeSequenceBlast(wet.runner, wet.ctx, 'boomite');
+    const result = drillChargeSequenceBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
     expect(result.success).toBe(true);
     expect(result.output).toMatch(/Wet holes: 6 \(6 fizzled\)/);
   });
@@ -146,6 +150,7 @@ describe('software previews model wet holes like the real blast (#1347)', () => 
     driveDrillPlanToCompletion(game.runner, game.ctx);
     game.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     driveChargePlanToCompletion(game.runner, game.ctx);
+    game.runner.run(`weather set ${weather ?? 'sunny'}`);
     game.runner.run('sequence auto delay_step:25');
     game.ctx.state!.softwareTier = 3;
     return game;
@@ -185,6 +190,7 @@ describe('blast report lists wet and fizzled holes (#1348)', () => {
     game.runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
     driveChargePlanToCompletion(game.runner, game.ctx);
     const chargedIds = Object.keys(game.ctx.state!.chargesByHole).sort();
+    game.runner.run(`weather set ${weather ?? 'sunny'}`);
     game.runner.run('sequence auto delay_step:25');
     expect(game.runner.run('blast').success).toBe(true);
     return { report: game.ctx.state!.lastBlastReport!, chargedIds };

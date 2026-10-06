@@ -166,7 +166,6 @@ describe('buildSurveyOverlayOptions()', () => {
 function makeZoneSyncDeps(state: GameState, characters: CharacterMesh): SyncDeps {
   return {
     state,
-    weatherCycle: undefined,
     buildings: null,
     renderedBuildingIds: new Set(),
     vehicles: null,

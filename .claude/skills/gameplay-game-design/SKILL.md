@@ -136,7 +136,7 @@ Fictional humorous names. "Treranium" (très rare, high value), common ores, exo
 Procedural cycle: sunny → cloudy → rain → heavy rain → storm → heat wave → cold snap.
 Rain fills drill holes. Water-sensitive explosives fail without tubing. Porous rock = faster water infiltration.
 Tubing is purchasable per-hole waterproofing.
-Every game start (browser level swap, console `new_game`, sandbox start, campaign start) reseeds weather via `createWeatherCycle(seed)` and `Random(seed + 1000)`; console commands use `resetWeatherForNewGame` (`src/console/commands/world.ts`), and a refused start leaves weather untouched.
+Weather advances once per tick in `runTick` (`tickWeather`, right after time advances, before events read `weatherId`) and lives in `GameState.weather` (`WeatherCycleState`), persisted with the save (v30) with its own PRNG stream `rngState` (mulberry32 int32, seeded `seed + WEATHER_RNG_SEED_OFFSET`); history is capped at `WEATHER_HISTORY_MAX`. The TopBar forecast runs the same `tickWeather` primitive on a clone, so forecast day N equals the live weather after N days of ticks. `createGame` reseeds weather for every start (browser level swap, console `new_game`, sandbox, campaign); a refused start leaves the old state untouched. `weather advance` uses `forceAdvanceInState`.
 Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing a hole or firing the blast drops its tubing record with no refund; unused inventory persists.
 
 ## Safety & Projection Profiles

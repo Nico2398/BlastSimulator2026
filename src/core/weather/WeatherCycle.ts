@@ -3,7 +3,7 @@
 // Uses seeded PRNG for deterministic sequences.
 
 import { Random } from '../math/Random.js';
-import { TICKS_PER_DAY } from '../config/balance.js';
+import { TICKS_PER_DAY, WEATHER_RNG_SEED_OFFSET, WEATHER_HISTORY_MAX } from '../config/balance.js';
 
 // ── Weather states ──
 
@@ -54,17 +54,26 @@ export interface WeatherCycleState {
   current: WeatherState;
   ticksRemaining: number;
   history: WeatherState[];
+  /** Internal PRNG state of the cycle's own stream, persisted with the save. */
+  rngState: number;
+}
+
+/** True when `value` is a weather state name (type guard for untrusted/saved data). */
+export function isWeatherState(value: unknown): value is WeatherState {
+  return typeof value === 'string' && (ALL_WEATHER_STATES as readonly string[]).includes(value);
 }
 
 /** Create initial weather cycle from seed. */
 export function createWeatherCycle(seed: number): WeatherCycleState {
-  const rng = new Random(seed);
+  const rngState = (seed + WEATHER_RNG_SEED_OFFSET) | 0;
+  const rng = new Random(rngState);
   const initial: WeatherState = 'sunny';
   const duration = rng.nextInt(DURATION_RANGES[initial][0], DURATION_RANGES[initial][1]);
   return {
     current: initial,
     ticksRemaining: duration,
     history: [initial],
+    rngState,
   };
 }
 
@@ -81,7 +90,7 @@ export function advanceWeather(cycle: WeatherCycleState, rng: Random): WeatherCy
     const range = DURATION_RANGES[next];
     cycle.current = next;
     cycle.ticksRemaining = rng.nextInt(range[0], range[1]);
-    cycle.history.push(next);
+    pushHistory(cycle, next);
   }
 
   return cycle;
@@ -93,6 +102,25 @@ export function forceAdvance(cycle: WeatherCycleState, rng: Random): WeatherCycl
   return advanceWeather(cycle, rng);
 }
 
+/** Run `step` on the cycle's own persisted PRNG stream, then store the stream's new state. */
+function withCycleRng(cycle: WeatherCycleState, step: (rng: Random) => void): void {
+  const rng = Random.fromState(cycle.rngState);
+  step(rng);
+  cycle.rngState = rng.snapshot();
+}
+
+/** Advance the cycle one tick on its own persisted PRNG stream; returns the resulting weather. */
+export function tickWeather(cycle: WeatherCycleState): WeatherState {
+  withCycleRng(cycle, rng => advanceWeather(cycle, rng));
+  return cycle.current;
+}
+
+/** Force transition to the next weather state on the cycle's own PRNG stream (testing/console). */
+export function forceAdvanceInState(cycle: WeatherCycleState): WeatherCycleState {
+  withCycleRng(cycle, rng => forceAdvance(cycle, rng));
+  return cycle;
+}
+
 /**
  * Force the weather cycle directly to a given state, bypassing the
  * probabilistic transition table. `advance` is randomized by design — a
@@ -102,37 +130,40 @@ export function forceAdvance(cycle: WeatherCycleState, rng: Random): WeatherCycl
 export function setWeather(cycle: WeatherCycleState, state: WeatherState): WeatherCycleState {
   cycle.current = state;
   cycle.ticksRemaining = DURATION_RANGES[state][1];
-  cycle.history.push(state);
+  pushHistory(cycle, state);
   return cycle;
 }
 
 /**
- * Deterministic lookahead: the weather on each of the next `n` days.
- * Simulates forward on a clone of both `cycle` and `rng` — the live cycle
- * and its rng stream are untouched, so calling this doesn't consume any
- * randomness the real game loop would otherwise use.
+ * Deterministic lookahead: the weather on each of the next `n` days, ticking a
+ * clone of `cycle` with the same primitive the pipeline uses — so entry N-1
+ * equals the live `current` after N*TICKS_PER_DAY real ticks. The live cycle
+ * (history and rngState included) is untouched.
  *
  * Returns `n` entries for days 1..n (tomorrow through day+n) — today is
  * deliberately excluded. A popover showing "today" alongside this outlook
  * must read `cycle.current` directly rather than treating index 0 of this
  * result as today, so the two can never disagree.
  */
-export function forecast(cycle: WeatherCycleState, rng: Random, n = 14): WeatherState[] {
-  const simCycle: WeatherCycleState = {
-    current: cycle.current,
-    ticksRemaining: cycle.ticksRemaining,
-    history: [],
-  };
-  const simRng = rng.clone();
+export function forecast(cycle: WeatherCycleState, n = 14): WeatherState[] {
+  const sim: WeatherCycleState = { ...cycle, history: [] };
   const days: WeatherState[] = [];
   for (let day = 0; day < n; day++) {
-    for (let tick = 0; tick < TICKS_PER_DAY; tick++) advanceWeather(simCycle, simRng);
-    days.push(simCycle.current);
+    for (let tick = 0; tick < TICKS_PER_DAY; tick++) tickWeather(sim);
+    days.push(sim.current);
   }
   return days;
 }
 
 // ── Helpers ──
+
+/** Append to history, dropping the oldest entries past WEATHER_HISTORY_MAX. */
+function pushHistory(cycle: WeatherCycleState, state: WeatherState): void {
+  cycle.history.push(state);
+  if (cycle.history.length > WEATHER_HISTORY_MAX) {
+    cycle.history.splice(0, cycle.history.length - WEATHER_HISTORY_MAX);
+  }
+}
 
 function pickNextState(current: WeatherState, rng: Random): WeatherState {
   const options = TRANSITIONS[current];

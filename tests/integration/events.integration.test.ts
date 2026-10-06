@@ -82,7 +82,7 @@ function makeEventCtx(overrides: Partial<{
     tickCount: overrides.tickCount ?? 0,
     lawsuitCount: overrides.lawsuitCount ?? 0,
     activeContractCount: overrides.activeContractCount ?? 0,
-    weatherId: 'clear',
+    weatherId: 'sunny' as const,
   };
 }
 

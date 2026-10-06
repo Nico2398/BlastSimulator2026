@@ -8,6 +8,8 @@ import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
 import type { Employee, EmployeeRole } from '../entities/Employee.js';
 import { getStorageCapacity } from '../entities/Building.js';
+import { createWeatherCycle, isWeatherState } from '../weather/WeatherCycle.js';
+import { WEATHER_HISTORY_MAX } from '../config/balance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 
 /**
@@ -516,6 +518,28 @@ export function backfillRaises(obj: Record<string, unknown>): void {
   }
 }
 
+/**
+ * v29 -> v30 (#1403): backfill `weather`; a malformed block is replaced by a
+ * fresh cycle, a valid one has its history filtered to known states and capped.
+ * Mutates `obj` in place.
+ */
+function migrateV29ToV30(obj: Record<string, unknown>): Record<string, unknown> {
+  const w = obj['weather'];
+  const c = (typeof w === 'object' && w !== null ? w : {}) as
+    { current?: unknown; ticksRemaining?: unknown; rngState?: unknown; history?: unknown };
+  const valid = isWeatherState(c.current)
+    && typeof c.ticksRemaining === 'number' && Number.isFinite(c.ticksRemaining)
+    && typeof c.rngState === 'number' && Number.isFinite(c.rngState)
+    && Array.isArray(c.history);
+  if (valid) {
+    c.history = (c.history as unknown[]).filter(isWeatherState).slice(-WEATHER_HISTORY_MAX);
+  } else {
+    const seed = obj['seed'];
+    obj['weather'] = createWeatherCycle(typeof seed === 'number' && Number.isFinite(seed) ? seed : 0);
+  }
+  return obj;
+}
+
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
 function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
   const current = obj['nextHoleId'];
@@ -816,6 +840,9 @@ export function deserialize(json: string): GameState {
   // v28 -> v29: GameState.nextHoleId (#1352). Idempotent, so also guards
   // current-version saves that lack a valid counter.
   migrateV28ToV29(obj);
+  migrateV29ToV30(obj);
+  // Every migration above has run: the state is now at the current version.
+  obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);
   backfillRaises(obj);
 

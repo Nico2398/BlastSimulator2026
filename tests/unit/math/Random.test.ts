@@ -82,3 +82,45 @@ describe('Random — clone', () => {
     expect(clone.next()).toBe(expected);
   });
 });
+
+describe('Random — snapshot / fromState (#1403)', () => {
+  it('fromState(snapshot()) continues the same sequence', () => {
+    const a = new Random(42);
+    for (let i = 0; i < 17; i++) a.next();
+    const b = Random.fromState(a.snapshot());
+    for (let i = 0; i < 100; i++) expect(b.next()).toBe(a.next());
+  });
+
+  it('snapshot is a finite number that changes as values are drawn', () => {
+    const rng = new Random(9);
+    const s0 = rng.snapshot();
+    rng.next();
+    const s1 = rng.snapshot();
+    expect(Number.isFinite(s0)).toBe(true);
+    expect(s1).not.toBe(s0);
+  });
+
+  it('snapshot does not advance the generator', () => {
+    const a = new Random(5);
+    const b = new Random(5);
+    a.snapshot();
+    a.snapshot();
+    expect(a.next()).toBe(b.next());
+  });
+
+  it('snapshot survives a JSON round trip', () => {
+    const a = new Random(77);
+    a.next();
+    const b = Random.fromState(JSON.parse(JSON.stringify(a.snapshot())) as number);
+    expect(b.next()).toBe(a.next());
+  });
+
+  it('works for edge seeds (0, negative and 2**31)', () => {
+    for (const seed of [0, -1, 2 ** 31]) {
+      const a = new Random(seed);
+      a.next();
+      const b = Random.fromState(a.snapshot());
+      expect(b.nextInt(0, 1000)).toBe(a.nextInt(0, 1000));
+    }
+  });
+});

@@ -312,6 +312,22 @@
       }
     },
     {
+      "command": "weather set heavy_rain",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set heavy_rain"
+        }
+      ],
+      "description": "Re-pin the rain right before the blast: console ticks now drift the weather (#1403), so the rain set earlier may have passed. The flood mechanic reads the weather at blast time.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "weather": "heavy_rain"
+        }
+      }
+    },
+    {
       "command": "blast",
       "description": "boomite is waterSensitive:true (ExplosiveCatalog.ts); every hole here is flooded (raining, no tubing installed -- WetHoles.ts's wetHoles()) so this blast now genuinely detonates weak (Finding #39: BlastExecution.ts never wired the water/flood mechanic into the real energy calculation at all -- waterEffect/wetHoles existed but had zero effect on any blast until this fix). No state field exposes the blast report's clearedVoxels/rating directly, so the weakening itself is proven by dedicated tests rather than a scenario assertion: a direct trace of this exact command sequence shows 27 cleared voxels / $83,500 ore value flooded vs. 395 cleared voxels / $1,337,550 dry (~14x weaker, same seed/grid/charge) -- confirmed end-to-end through the real console command pipeline by tests/integration/weather-blast.integration.test.ts, and at the physics level by new tests in BlastCalc.test.ts/BlastExecution.test.ts. (Figures predate the #554-followup 9-hole -> 4-hole grid trim; the weak-vs-dry ratio this proves is unaffected by grid size, so left as the original measurement rather than re-run for an unasserted description.)",
       "interaction": [

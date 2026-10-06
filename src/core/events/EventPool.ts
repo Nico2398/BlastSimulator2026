@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Event pool: defines event structure
 // Each event has weight coefficients, prerequisites, and decision options.
 
+import type { WeatherState } from '../weather/WeatherCycle.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 
 // ── Event types ──
@@ -80,7 +81,7 @@ export interface EventContext {
   tickCount: number;
   lawsuitCount: number;
   activeContractCount: number;
-  weatherId: string;
+  weatherId: WeatherState;
 }
 
 // ── Event pool ──
