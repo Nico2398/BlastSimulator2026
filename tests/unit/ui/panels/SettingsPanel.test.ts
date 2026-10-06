@@ -352,6 +352,70 @@ describe('SettingsPanel', () => {
       expect(returned).toBe(true);
       panel.dispose();
     });
+
+    describe('REPLAY TUTORIAL (#1312)', () => {
+      function clickReplay(panel: SettingsPanel): void {
+        const btn = Array.from(panel.root.querySelectorAll('button')).find(b => b.textContent === t('ui.settings.replay_tutorial'))!;
+        btn.click();
+      }
+
+      it('with a live game requests a confirm and does not replay until confirmed', async () => {
+        const { panel } = mount();
+        const state = createGame({ seed: 1, mineType: 'desert' });
+        panel.update(state);
+        panel.setGetState(() => state);
+        panel.show();
+        let replayed = false;
+        let requested: ConfirmModalConfig | null = null;
+        panel.setReplayTutorialHandler(() => { replayed = true; });
+        panel.setConfirmHandler((config) => { requested = config; });
+
+        clickReplay(panel);
+        await vi.waitFor(() => { if (!requested) throw new Error('confirm not requested yet'); });
+
+        expect(requested).not.toBeNull();
+        expect(replayed).toBe(false);
+        panel.dispose();
+      });
+
+      it('confirming the replay closes the panel and fires the replay handler', async () => {
+        const { panel } = mount();
+        const state = createGame({ seed: 1, mineType: 'desert' });
+        panel.update(state);
+        panel.setGetState(() => state);
+        panel.show();
+        let closed = false;
+        let replayed = false;
+        let requested: ConfirmModalConfig | null = null;
+        panel.setCloseHandler(() => { closed = true; });
+        panel.setReplayTutorialHandler(() => { replayed = true; });
+        panel.setConfirmHandler((config) => { requested = config; });
+
+        clickReplay(panel);
+        await vi.waitFor(() => { if (!requested) throw new Error('confirm not requested yet'); });
+        requested!.onConfirm();
+
+        expect(closed).toBe(true);
+        expect(replayed).toBe(true);
+        panel.dispose();
+      });
+
+      it('with no game replays directly without a confirm', () => {
+        const { panel } = mount();
+        panel.setGetState(() => null);
+        panel.show();
+        let replayed = false;
+        let requested = false;
+        panel.setReplayTutorialHandler(() => { replayed = true; });
+        panel.setConfirmHandler(() => { requested = true; });
+
+        clickReplay(panel);
+
+        expect(replayed).toBe(true);
+        expect(requested).toBe(false);
+        panel.dispose();
+      });
+    });
   });
 
   it('a locale refresh re-renders static chrome', () => {
