@@ -13,7 +13,7 @@
 //
 // DO NOT implement anything here — only add implementation to src/.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createBuildingState,
   placeBuilding,
@@ -27,6 +27,7 @@ import {
   queueResearchTask,
   getQueueBlockCode,
   tickResearch,
+  getResearchProgress,
   isTierUnlocked,
   isResearchQueued,
   type ResearchCondition,
@@ -707,5 +708,138 @@ describe('isResearchQueued', () => {
     queueResearchTask(state, 'driving_center', 2);
     tickResearch(state); // completes and shifts the task off the queue
     expect(isResearchQueued(state, 'driving_center', 2)).toBe(false);
+  });
+});
+
+// ── #1398: research events + progress ────────────────────────────────────────
+
+function makeEmitterSpy() {
+  return { emit: vi.fn() };
+}
+
+describe('tickResearch — events (#1398)', () => {
+  let state: BuildingState;
+  beforeEach(() => {
+    state = freshState();
+    placeResearchCenter(state);
+  });
+
+  it('emits research:completed once with type and tier when a task finishes', () => {
+    const emitter = makeEmitterSpy();
+    queueResearchTask(state, 'driving_center', 2);
+    tickResearch(state, emitter);
+    expect(emitter.emit).toHaveBeenCalledTimes(1);
+    expect(emitter.emit).toHaveBeenCalledWith('research:completed', { targetType: 'driving_center', targetTier: 2 });
+  });
+
+  it('emits research:completed only after unlockedTiers is set', () => {
+    let unlockedAtEmit: number | undefined;
+    const emitter = { emit: vi.fn(() => { unlockedAtEmit = state.unlockedTiers['driving_center']; }) };
+    queueResearchTask(state, 'driving_center', 2);
+    tickResearch(state, emitter);
+    expect(unlockedAtEmit).toBe(2);
+  });
+
+  it('does not emit while a task is still in progress', () => {
+    queueResearchTask(state, 'driving_center', 2);
+    tickResearch(state);
+    queueResearchTask(state, 'driving_center', 3);
+    const emitter = makeEmitterSpy();
+    tickResearch(state, emitter);
+    expect(state.researchQueue).toHaveLength(1);
+    expect(emitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('emits completion for the final tick of a multi-tick task, exactly once', () => {
+    queueResearchTask(state, 'driving_center', 2);
+    tickResearch(state);
+    queueResearchTask(state, 'driving_center', 3);
+    const emitter = makeEmitterSpy();
+    const ticks = state.researchQueue[0]!.ticksRemaining;
+    for (let i = 0; i < ticks; i++) tickResearch(state, emitter);
+    expect(emitter.emit).toHaveBeenCalledTimes(1);
+    expect(emitter.emit).toHaveBeenCalledWith('research:completed', { targetType: 'driving_center', targetTier: 3 });
+  });
+
+  it('emits research:cancelled with refund when the research center is gone, and returns the same refund', () => {
+    queueResearchTask(state, 'driving_center', 2);
+    tickResearch(state);
+    queueResearchTask(state, 'driving_center', 3);
+    state.buildings = state.buildings.filter((b) => b.type !== 'research_center');
+    const emitter = makeEmitterSpy();
+    const result = tickResearch(state, emitter);
+    const refund = getResearchTaskDef('driving_center', 3).cost;
+    expect(result).toEqual({ targetType: 'driving_center', targetTier: 3, refund });
+    expect(emitter.emit).toHaveBeenCalledTimes(1);
+    expect(emitter.emit).toHaveBeenCalledWith('research:cancelled', { targetType: 'driving_center', targetTier: 3, refund });
+  });
+
+  it('does not emit completed when cancelling', () => {
+    queueResearchTask(state, 'driving_center', 2);
+    state.buildings = state.buildings.filter((b) => b.type !== 'research_center');
+    const emitter = makeEmitterSpy();
+    tickResearch(state, emitter);
+    expect(emitter.emit).not.toHaveBeenCalledWith('research:completed', expect.anything());
+  });
+
+  it('emits nothing on an empty queue', () => {
+    const emitter = makeEmitterSpy();
+    tickResearch(state, emitter);
+    expect(emitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('queue of two: completions are emitted in queue order, one per task', () => {
+    const emitter = makeEmitterSpy();
+    queueResearchTask(state, 'driving_center', 2);
+    queueResearchTask(state, 'blasting_academy', 2);
+    tickResearch(state, emitter);
+    tickResearch(state, emitter);
+    expect(emitter.emit.mock.calls).toEqual([
+      ['research:completed', { targetType: 'driving_center', targetTier: 2 }],
+      ['research:completed', { targetType: 'blasting_academy', targetTier: 2 }],
+    ]);
+  });
+
+  it('behaves identically without an emitter (no throw, same state)', () => {
+    queueResearchTask(state, 'driving_center', 2);
+    expect(() => tickResearch(state)).not.toThrow();
+    expect(state.unlockedTiers['driving_center']).toBe(2);
+    expect(state.researchQueue).toHaveLength(0);
+  });
+});
+
+describe('getResearchProgress (#1398)', () => {
+  const task = (ticksRemaining: number): ResearchTask => ({
+    targetType: 'driving_center', targetTier: 3, ticksRemaining, cost: 12000, conditions: [],
+  });
+
+  it('reports total from the task def and elapsed = total - ticksRemaining', () => {
+    const p = getResearchProgress(task(50));
+    expect(p.total).toBe(getResearchTaskDef('driving_center', 3).ticks);
+    expect(p.elapsed).toBe(0);
+    expect(p.fraction).toBe(0);
+  });
+
+  it('midway: half elapsed gives fraction 0.5', () => {
+    const total = getResearchTaskDef('driving_center', 3).ticks;
+    const p = getResearchProgress(task(total / 2));
+    expect(p.elapsed).toBe(total / 2);
+    expect(p.fraction).toBeCloseTo(0.5, 5);
+  });
+
+  it('finished (ticksRemaining 0) gives fraction 1', () => {
+    expect(getResearchProgress(task(0)).fraction).toBe(1);
+  });
+
+  it('zero-tick task (tier 2) gives fraction 1 and total 0', () => {
+    const t2: ResearchTask = { targetType: 'driving_center', targetTier: 2, ticksRemaining: 0, cost: 5000, conditions: [] };
+    const p = getResearchProgress(t2);
+    expect(p.total).toBe(0);
+    expect(p.fraction).toBe(1);
+  });
+
+  it('clamps fraction to 0..1 for out-of-range ticksRemaining', () => {
+    expect(getResearchProgress(task(9999)).fraction).toBe(0);
+    expect(getResearchProgress(task(-5)).fraction).toBe(1);
   });
 });

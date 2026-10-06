@@ -26,7 +26,7 @@ import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
-import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+import { RAMP_DEFAULT_WIDTH, RESEARCH_TASK_DEFS } from '../../../src/core/config/balance.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
 
@@ -96,7 +96,7 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
 
     const info = row.querySelector<HTMLElement>('div');
     expect(info).not.toBeNull();
-    expect(info!.style.flex).toBe('1 1 50%');
+    expect(info!.style.flex).toBe('1 1 100%');
     expect(info!.style.minWidth).toBe('0px');
     // Sanity: only CSS changed, label text still complete.
     expect(info!.textContent).toContain('#1');
@@ -117,8 +117,8 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(researchBtn!.style.display).not.toBe('none');
 
     for (const btn of [moveBtn, upgradeBtn, researchBtn, demolishBtn]) {
-      expect(btn!.style.flex).toBe('0 1 auto');
-      expect(btn!.style.whiteSpace).toBe('normal');
+      expect(btn!.style.flex).toBe('0 0 auto');
+      expect(btn!.style.whiteSpace).toBe('nowrap');
     }
   });
 
@@ -135,7 +135,7 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
 
     const info = row.querySelector<HTMLElement>('div');
     expect(info).not.toBeNull();
-    expect(info!.style.flex).toBe('1 1 50%');
+    expect(info!.style.flex).toBe('1 1 100%');
     expect(info!.style.minWidth).toBe('0px');
     expect(info!.textContent).toContain('#2');
     expect(info!.textContent).toContain('(5,5)');
@@ -152,8 +152,8 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(researchBtn!.style.display).toBe('none');
 
     for (const btn of [moveBtn, upgradeBtn, demolishBtn]) {
-      expect(btn!.style.flex).toBe('0 1 auto');
-      expect(btn!.style.whiteSpace).toBe('normal');
+      expect(btn!.style.flex).toBe('0 0 auto');
+      expect(btn!.style.whiteSpace).toBe('nowrap');
     }
   });
 });
@@ -1113,5 +1113,145 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
     gameConsole.mockReturnValue({ success: true, output: '' });
     expect(controller.simulateConfirm()).toBe(true);
     expect(overlay.flashConfirm).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── #1398: research cost/duration on the button, progress while queued ──────
+
+describe('BuildMenu — research cost, duration and progress (#1398)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+    menu.setGameConsole(vi.fn<[string], CommandResult>().mockReturnValue({ success: true, output: '' }));
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+  });
+
+  const catalogRow = (type: string) => container.querySelector<HTMLElement>(`[data-build-type="${type}"]`)!;
+
+  function selectTier(row: HTMLElement, tier: 2 | 3): void {
+    const sel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    sel.value = String(tier);
+    sel.dispatchEvent(new Event('change'));
+  }
+
+  /** Tier 2 already unlocked so tier 3 is the locked next tier. */
+  function stateWithTier2(): GameState {
+    const state = makeMockState();
+    state.buildings.unlockedTiers['management_office'] = 2;
+    return state;
+  }
+
+  it('en.json defines the cost and progress keys', async () => {
+    const en = (await import('../../../src/core/i18n/locales/en.json')).default as Record<string, string>;
+    expect(en['ui.build.queue_research_cost']).toContain('{cost}');
+    expect(en['ui.build.queue_research_cost']).toContain('{duration}');
+    expect(en['ui.build.research_progress']).toContain('{percent}');
+    expect(en['ui.build.research_progress']).toContain('{remaining}');
+  });
+
+  for (const tier of [2, 3] as const) {
+    it(`catalog research button shows cost and duration for tier ${tier}`, () => {
+      const state = makeMockState();
+      if (tier === 3) state.buildings.unlockedTiers['management_office'] = 2;
+      menu.update(state);
+      const row = catalogRow('management_office');
+      selectTier(row, tier);
+      const def = RESEARCH_TASK_DEFS['management_office'][tier];
+      const label = row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!.textContent ?? '';
+      expect(label).toContain(formatMoney(def.cost));
+      expect(label).toContain(String(def.ticks));
+      expect(label).toBe(t('ui.build.queue_research_cost', { cost: formatMoney(def.cost), duration: def.ticks }));
+    });
+
+    it(`placed row research button shows cost and duration for tier ${tier}`, () => {
+      const state = makeMockState();
+      state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: (tier - 1) as 1 | 2 })];
+      if (tier === 3) state.buildings.unlockedTiers['management_office'] = 2;
+      menu.update(state);
+      const def = RESEARCH_TASK_DEFS['management_office'][tier];
+      const label = findPlacedRow(container, 1).querySelector<HTMLButtonElement>('.bs-build-research-btn')!.textContent ?? '';
+      expect(label).toContain(formatMoney(def.cost));
+      expect(label).toContain(String(def.ticks));
+    });
+  }
+
+  it('catalog research button label updates when the tier selector changes', () => {
+    const state = stateWithTier2();
+    state.buildings.unlockedTiers = {};
+    menu.update(state);
+    const row = catalogRow('management_office');
+    const btn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!;
+    selectTier(row, 2);
+    const label2 = btn.textContent;
+    state.buildings.unlockedTiers['management_office'] = 2;
+    menu.update({ ...state });
+    selectTier(row, 3);
+    const label3 = btn.textContent;
+    expect(label3).not.toBe(label2);
+    expect(label3).toContain(formatMoney(RESEARCH_TASK_DEFS['management_office'][3].cost));
+  });
+
+  it('queued task shows a progress element and hides the button (catalog row)', () => {
+    const state = stateWithTier2();
+    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 25, cost: 12000, conditions: [] });
+    menu.update(state);
+    const row = catalogRow('management_office');
+    selectTier(row, 3);
+    const progress = row.querySelector<HTMLElement>('.bs-build-research-progress');
+    expect(progress).not.toBeNull();
+    expect(progress!.textContent).toBe(t('ui.build.research_progress', { percent: 50, remaining: 25 }));
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!.style.display).toBe('none');
+  });
+
+  it('queued task shows a progress element and hides the button (placed row)', () => {
+    const state = stateWithTier2();
+    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
+    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 25, cost: 12000, conditions: [] });
+    menu.update(state);
+    const row = findPlacedRow(container, 1);
+    const progress = row.querySelector<HTMLElement>('.bs-build-research-progress');
+    expect(progress).not.toBeNull();
+    expect(progress!.textContent).toBe(t('ui.build.research_progress', { percent: 50, remaining: 25 }));
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!.style.display).toBe('none');
+  });
+
+  it('no progress element when nothing is queued', () => {
+    const state = stateWithTier2();
+    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
+    menu.update(state);
+    selectTier(catalogRow('management_office'), 3);
+    expect(container.querySelector('.bs-build-research-progress')).toBeNull();
+  });
+
+  it('progress advances as ticksRemaining drops (placed row)', () => {
+    const state = stateWithTier2();
+    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
+    const task = { targetType: 'management_office' as const, targetTier: 3 as const, ticksRemaining: 40, cost: 12000, conditions: [] };
+    state.buildings.researchQueue.push(task);
+    menu.update(state);
+    const before = findPlacedRow(container, 1).querySelector<HTMLElement>('.bs-build-research-progress')!.textContent;
+    expect(before).toBe(t('ui.build.research_progress', { percent: 20, remaining: 40 }));
+
+    task.ticksRemaining = 10;
+    menu.update(state);
+    const after = findPlacedRow(container, 1).querySelector<HTMLElement>('.bs-build-research-progress')!.textContent;
+    expect(after).toBe(t('ui.build.research_progress', { percent: 80, remaining: 10 }));
+  });
+
+  it('progress element disappears and button state resets once research completes', () => {
+    const state = stateWithTier2();
+    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
+    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 5, cost: 12000, conditions: [] });
+    menu.update(state);
+    state.buildings.researchQueue = [];
+    state.buildings.unlockedTiers['management_office'] = 3;
+    menu.update(state);
+    expect(container.querySelector('.bs-build-research-progress')).toBeNull();
   });
 });

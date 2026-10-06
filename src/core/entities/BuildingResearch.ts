@@ -3,6 +3,7 @@
 
 import type { BuildingType, BuildingTier, BuildingState, ResearchTask } from './Building.js';
 import { getResearchTaskDef } from '../config/balance.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 
 export type { ResearchTask };
 
@@ -134,17 +135,23 @@ export interface CancelledResearch {
  * task's ticksRemaining; when it reaches 0, set
  * unlockedTiers[targetType] = targetTier and remove it from the queue.
  */
-export function tickResearch(state: BuildingState): CancelledResearch | undefined {
+export function tickResearch(
+  state: BuildingState,
+  emitter?: Pick<EventEmitter, 'emit'>,
+): CancelledResearch | undefined {
   const task = state.researchQueue[0];
   if (!task) return undefined;
   if (!hasActiveResearchCenter(state)) {
     state.researchQueue.shift();
-    return { targetType: task.targetType, targetTier: task.targetTier, refund: task.cost };
+    const cancelled = { targetType: task.targetType, targetTier: task.targetTier, refund: task.cost };
+    emitter?.emit('research:cancelled', cancelled);
+    return cancelled;
   }
   task.ticksRemaining -= 1;
   if (task.ticksRemaining <= 0) {
     state.unlockedTiers[task.targetType] = task.targetTier;
     state.researchQueue.shift();
+    emitter?.emit('research:completed', { targetType: task.targetType, targetTier: task.targetTier });
   }
   return undefined;
 }
@@ -178,4 +185,12 @@ export function isResearchQueued(
   return state.researchQueue.some(
     (task) => task.targetType === type && task.targetTier === tier,
   );
+}
+
+/** Progress of a queued research task: ticks elapsed, total ticks, and elapsed/total fraction (0..1). */
+export function getResearchProgress(task: ResearchTask): { elapsed: number; total: number; fraction: number } {
+  const total = getResearchTaskDef(task.targetType, task.targetTier).ticks;
+  const elapsed = Math.max(0, total - task.ticksRemaining);
+  const fraction = total <= 0 ? 1 : Math.min(1, Math.max(0, elapsed / total));
+  return { elapsed, total, fraction };
 }

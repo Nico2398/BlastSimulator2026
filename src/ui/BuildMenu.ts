@@ -44,7 +44,7 @@ import {
   getUpgradeCost,
   getMoveCost,
   isTierUnlocked,
-  isResearchQueued,
+  getResearchProgress,
   isFootprintBuildable,
   type BuildingType,
   type BuildingTier,
@@ -54,7 +54,8 @@ import {
 import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementKit } from './scene/PlacementKit.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
-import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, type RampWidth } from '../core/config/balance.js';
+import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWidth } from '../core/config/balance.js';
+import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { buildDemolishConfirm } from './demolishConfirm.js';
@@ -184,6 +185,7 @@ export class BuildMenu extends PanelBase {
       this.refreshPlacedList(state.buildings.buildings);
     }
     if (unlockedChanged || queueChanged) this.refreshCatalogButtons(state.cash);
+    else if (state.buildings.researchQueue.length > 0) this.refreshResearchProgress();
 
     const plannedSig = state.plannedBuildings.map((pb) => `${pb.id}:${pb.type}`).join(',');
     if (plannedSig !== this.lastPlannedBuildingsSignature) {
@@ -548,7 +550,7 @@ export class BuildMenu extends PanelBase {
     const placeBtn = button('primary', t('ui.build.place'), {
       onClick: () => {
         const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-        if (tier > 1 && this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier)) {
+        if (this.isTierLocked(type, tier)) {
           this.setStatus(t('ui.build.research_required', { tier }));
           return;
         }
@@ -607,19 +609,81 @@ export class BuildMenu extends PanelBase {
     }
   }
 
-  private refreshCatalogButtons(cash: number): void {
-    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) {
-      const type = row.dataset['buildType'] as BuildingType | undefined;
-      if (!type) continue;
-      const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-      const def = getBuildingDef(type, tier);
-      const locked = tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
-      const queued = locked && !!this.lastState && isResearchQueued(this.lastState.buildings, type, tier);
-      const btn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn');
-      if (btn) btn.disabled = cash < def.constructionCost || locked;
-      const researchBtn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
-      if (researchBtn) researchBtn.style.display = locked && !queued ? '' : 'none';
+  /**
+   * Label the research button with its cost and duration, or — when a task for
+   * that building/tier is already queued — hide it and show the live progress.
+   */
+  private syncResearchControls(
+    row: HTMLElement,
+    type: BuildingType,
+    tier: BuildingTier | null,
+    locked: boolean,
+  ): void {
+    const btn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
+    if (!btn) return;
+    const researchTier = tier !== null && tier > 1 ? (tier as 2 | 3) : null;
+    if (researchTier !== null) {
+      const def = getResearchTaskDef(type, researchTier);
+      btn.textContent = t('ui.build.queue_research_cost', { cost: formatMoney(def.cost), duration: def.ticks });
     }
+    const task = locked && researchTier !== null
+      ? this.lastState?.buildings.researchQueue.find((r) => r.targetType === type && r.targetTier === researchTier)
+      : undefined;
+    btn.style.display = locked && !task ? '' : 'none';
+    const existing = row.querySelector<HTMLElement>('.bs-build-research-progress');
+    if (task) {
+      const { fraction } = getResearchProgress(task);
+      let progressEl = existing;
+      if (!progressEl) {
+        progressEl = el('span', { className: 'bs-build-research-progress' });
+        progressEl.style.cssText = 'flex:1 1 100%;font:500 9px/1.2 var(--bsx-font-mono);color:var(--bsx-text-micro)';
+        row.append(progressEl);
+      }
+      progressEl.textContent = t('ui.build.research_progress', {
+        percent: Math.round(fraction * 100),
+        remaining: task.ticksRemaining,
+      });
+    } else {
+      existing?.remove();
+    }
+  }
+
+  /** True when `tier` of `type` still needs research (tier 1 is always available). */
+  private isTierLocked(type: BuildingType, tier: BuildingTier): boolean {
+    return tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
+  }
+
+  private nextTierOf(b: Building): BuildingTier | null {
+    return b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
+  }
+
+  /** Update progress text on existing rows in place (called every tick while research is queued). */
+  private refreshResearchProgress(): void {
+    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) this.syncCatalogRow(row);
+    const buildings = this.lastState?.buildings.buildings ?? [];
+    for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
+      const b = buildings.find((bb) => bb.id === Number(row.dataset['buildingId']));
+      if (!b) continue;
+      const nextTier = this.nextTierOf(b);
+      if (nextTier !== null) this.syncResearchControls(row, b.type, nextTier, this.isTierLocked(b.type, nextTier));
+    }
+  }
+
+  private refreshCatalogButtons(cash: number): void {
+    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) this.syncCatalogRow(row, cash);
+  }
+
+  /** Sync one catalog row: buy-button state (when `cash` given) and research controls. */
+  private syncCatalogRow(row: HTMLElement, cash?: number): void {
+    const type = row.dataset['buildType'] as BuildingType | undefined;
+    if (!type) return;
+    const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
+    const locked = this.isTierLocked(type, tier);
+    if (cash !== undefined) {
+      const btn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn');
+      if (btn) btn.disabled = cash < getBuildingDef(type, tier).constructionCost || locked;
+    }
+    this.syncResearchControls(row, type, tier, locked);
   }
 
   // ── Placed buildings list ──────────────────────────────────────────────────
@@ -639,17 +703,17 @@ export class BuildMenu extends PanelBase {
     row.className = 'bs-build-placed-row';
     row.dataset['buildingId'] = String(b.id);
     row.style.cssText =
-      'display:flex;align-items:center;gap:4px;padding:7px 8px;' +
+      'display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:7px 8px;' +
       'border:1px solid var(--bsx-hairline);border-radius:6px;background:var(--bsx-card)';
 
     const info = document.createElement('div');
-    info.style.cssText = 'flex:1 1 50%;min-width:0;font-size:10px;color:var(--bsx-text-tinted);overflow-wrap:break-word';
+    info.style.cssText = 'flex:1 1 100%;min-width:0;font-size:10px;color:var(--bsx-text-tinted);overflow-wrap:break-word';
     info.title = `${b.type} T${b.tier} at (${b.x},${b.z})`;
     info.textContent = `#${b.id} ${t(`building.${b.type}.t${b.tier}.name`)} (${b.x},${b.z})`;
 
     const moveBtn = document.createElement('button');
     moveBtn.className = 'bsx-btn bs-build-move-btn';
-    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     moveBtn.textContent = t('ui.build.move');
     moveBtn.title = `$${getMoveCost(b)}`;
     moveBtn.disabled = this.lastCash < getMoveCost(b);
@@ -661,13 +725,12 @@ export class BuildMenu extends PanelBase {
       }, b.id);
     });
 
-    const nextTier = b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
-    const nextLocked = nextTier !== null && !!this.lastState && !isTierUnlocked(this.lastState.buildings, b.type, nextTier);
-    const nextQueued = nextTier !== null && nextLocked && !!this.lastState && isResearchQueued(this.lastState.buildings, b.type, nextTier);
+    const nextTier = this.nextTierOf(b);
+    const nextLocked = nextTier !== null && this.isTierLocked(b.type, nextTier);
 
     const upgradeBtn = document.createElement('button');
     upgradeBtn.className = 'bsx-btn bsx-btn-primary bs-build-upgrade-btn';
-    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    upgradeBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     upgradeBtn.textContent = t('ui.build.upgrade');
     this.applyUpgradeState(upgradeBtn, b, this.lastCash, reservations);
     upgradeBtn.addEventListener('click', () => {
@@ -681,16 +744,15 @@ export class BuildMenu extends PanelBase {
 
     const researchBtn = document.createElement('button');
     researchBtn.className = 'bsx-btn bsx-btn-locked bs-build-research-btn';
-    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    researchBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     researchBtn.textContent = t('ui.build.queue_research_button');
-    researchBtn.style.display = nextTier !== null && nextLocked && !nextQueued ? '' : 'none';
     researchBtn.addEventListener('click', () => {
       if (nextTier !== null) this.queueResearch(b.type, nextTier);
     });
 
     const demolishBtn = document.createElement('button');
     demolishBtn.className = 'bsx-btn bsx-btn-danger bs-build-demolish-btn';
-    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
+    demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 0 auto;white-space:nowrap;height:auto';
     demolishBtn.textContent = t('ui.build.demolish');
     demolishBtn.title = `$${def.demolishCost}`;
     demolishBtn.disabled = this.lastCash < getDemolishCost(b);
@@ -702,6 +764,7 @@ export class BuildMenu extends PanelBase {
     });
 
     row.append(info, moveBtn, upgradeBtn, researchBtn, demolishBtn);
+    this.syncResearchControls(row, b.type, nextTier, nextLocked);
     return row;
   }
 }

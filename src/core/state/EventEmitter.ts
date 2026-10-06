@@ -2,6 +2,7 @@
 // Pure TypeScript, no DOM. Core emits events; renderer/UI/audio subscribe.
 
 import type { SkillCategory } from '../entities/Employee.js';
+import type { BuildingType } from '../entities/Building.js';
 
 /** Inclusive-bounds voxel-space region, shared by every terrain/nav-affecting event's payload. */
 type TerrainRegion = { minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number };
@@ -33,6 +34,10 @@ export interface GameEventMap {
   'employee:trained': { employeeId: number; skill: SkillCategory; level: number; isNew: boolean };
   /** A mid-course trainee's school was demolished (#1203) — the course is cancelled and its fee refunded. */
   'employee:training_cancelled': { employeeId: number; skill: SkillCategory; buildingId: number; refund: number };
+  /** Fired when a Research Center task finishes and unlocks a tier. */
+  'research:completed': { targetType: BuildingType; targetTier: 2 | 3 };
+  /** Fired when a research task is cancelled (Research Center lost); `refund` is the cost returned. */
+  'research:cancelled': { targetType: BuildingType; targetTier: 2 | 3; refund: number };
   'employee:need_warning': { employeeId: number; needKey: string };
   'employee:collapsed': { employeeId: number; needKey: string };
   'employee:shift_change': { employeeId: number };
