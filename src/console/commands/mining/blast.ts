@@ -213,10 +213,11 @@ export function blastCommand(
   // was placed (charge.ts, #1341), so the blast itself never touches cash.
   const spent = plannedChargesCost(state.chargesByHole);
   const wetReport = classifyWetChargedHoles(plan.charges, wetHoleIds);
-  state.lastBlastReport = buildBlastReport(
+  const report = buildBlastReport(
     result, state.tickCount, spent, thisBlastAccidents,
     wetReport, secondaryReports,
   );
+  state.lastBlastReport = report;
 
   // Clear drill plan after blast (holes are consumed)
   resetPlanState(state);
@@ -253,7 +254,10 @@ export function blastCommand(
     success: true,
     output: [
       t('mining.blast.report_header'),
-      `Rating: ${result.rating.toUpperCase()}`,
+      `Rating: ${report.rating.toUpperCase()}`,
+      ...(report.ratingCap
+        ? [t(`mining.blast.rating_cap_${report.ratingCap}`, { base: report.baseRating?.toUpperCase() ?? '' })]
+        : []),
       `Cleared voxels: ${result.clearedVoxels}`,
       `Cracked voxels: ${result.crackedVoxels}`,
       `Fragments: ${result.fragmentCount}`,
