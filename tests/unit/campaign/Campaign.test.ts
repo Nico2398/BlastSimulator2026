@@ -8,6 +8,8 @@ import {
   isCampaignLevel,
   isFinalCampaignLevel,
   isCampaignComplete,
+  recordStars,
+  getBestStars,
 } from '../../../src/core/campaign/Campaign.js';
 import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
@@ -182,5 +184,94 @@ describe('campaign completion excludes the tutorial (#1320)', () => {
     const c = createCampaignState();
     c.levels['tutorial_pit']!.completed = true;
     expect(isCampaignComplete(c)).toBe(false);
+  });
+});
+
+describe('best stars (#1311)', () => {
+  it('createCampaignState starts every level at 0 stars', () => {
+    const c = createCampaignState();
+    for (const lvl of getAllLevels()) {
+      expect(c.levels[lvl.id]!.bestStars).toBe(0);
+      expect(getBestStars(c.levels[lvl.id])).toBe(0);
+    }
+  });
+
+  it('recordStars stores a first rating', () => {
+    const c = createCampaignState();
+    recordStars(c, 'dusty_hollow', 2);
+    expect(c.levels['dusty_hollow']!.bestStars).toBe(2);
+  });
+
+  it('recordStars only raises: a worse replay keeps the best', () => {
+    const c = createCampaignState();
+    recordStars(c, 'dusty_hollow', 3);
+    recordStars(c, 'dusty_hollow', 1);
+    expect(c.levels['dusty_hollow']!.bestStars).toBe(3);
+    recordStars(c, 'grumpstone_ridge', 1);
+    recordStars(c, 'grumpstone_ridge', 2);
+    expect(c.levels['grumpstone_ridge']!.bestStars).toBe(2);
+  });
+
+  it('recordStars clamps to 0..3', () => {
+    const c = createCampaignState();
+    recordStars(c, 'dusty_hollow', 7);
+    expect(c.levels['dusty_hollow']!.bestStars).toBe(3);
+    recordStars(c, 'grumpstone_ridge', -2);
+    expect(c.levels['grumpstone_ridge']!.bestStars).toBe(0);
+  });
+
+  it('recordStars ignores an unknown level without throwing', () => {
+    const c = createCampaignState();
+    const before = JSON.stringify(c);
+    expect(() => recordStars(c, 'no_such_level', 3)).not.toThrow();
+    expect(JSON.stringify(c)).toBe(before);
+    expect(c.levels['no_such_level']).toBeUndefined();
+  });
+
+  it('recordStars upgrades a legacy entry that has no bestStars field', () => {
+    const c = createCampaignState();
+    delete c.levels['dusty_hollow']!.bestStars;
+    recordStars(c, 'dusty_hollow', 2);
+    expect(c.levels['dusty_hollow']!.bestStars).toBe(2);
+  });
+
+  it('getBestStars returns the stored value when present', () => {
+    const c = createCampaignState();
+    const p = c.levels['dusty_hollow']!;
+    p.completed = true;
+    p.bestStars = 3;
+    expect(getBestStars(p)).toBe(3);
+  });
+
+  it('getBestStars: stored 0 on an incomplete level stays 0', () => {
+    const c = createCampaignState();
+    expect(getBestStars(c.levels['dusty_hollow'])).toBe(0);
+  });
+
+  it('getBestStars: legacy completed level without the field reads 1', () => {
+    const c = createCampaignState();
+    const p = c.levels['dusty_hollow']!;
+    delete p.bestStars;
+    p.completed = true;
+    expect(getBestStars(p)).toBe(1);
+  });
+
+  it('getBestStars: legacy uncompleted level without the field reads 0', () => {
+    const c = createCampaignState();
+    const p = c.levels['dusty_hollow']!;
+    delete p.bestStars;
+    expect(getBestStars(p)).toBe(0);
+  });
+
+  it('getBestStars(undefined) is 0', () => {
+    expect(getBestStars(undefined)).toBe(0);
+  });
+
+  it('bestStars survives a save/load round trip', () => {
+    const state = createGame({ seed: 42 });
+    recordStars(state.campaign, 'dusty_hollow', 3);
+    const restored = deserialize(serialize(state));
+    expect(restored.campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+    expect(getBestStars(restored.campaign.levels['dusty_hollow'])).toBe(3);
   });
 });

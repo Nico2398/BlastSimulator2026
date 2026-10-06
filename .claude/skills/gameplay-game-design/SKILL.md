@@ -157,6 +157,8 @@ Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing
 ### Progression
 Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-3) for replayability.
 
+**Star rating (#1311):** one rating, computed by `calculateStarRating` (`SuccessTracker`) from the end-of-run values: 1 star each for profit target reached, no deaths, and ecology at the end (`finalEcology`) >= `STAR_ECOLOGY_MIN` (60); minimum 1 star on completion. On level completion `checkLevelComplete` persists it with `recordStars` as `LevelProgress.bestStars` (max-merge, a replay only raises it; `getBestStars` falls back to 1 for old completed saves). The Portfolio card, its x / 9 total and the level-end star row all read the stored best; the level-end breakdown shows this run, with a note when it is below the best.
+
 ### Win/Lose per Level
 - **Lose:** Bankruptcy, arrest (corruption), ecology=0, well-being=0
 - **Arrest:** mafia exposure >= `ARREST_EXPOSURE_THRESHOLD` (0.9) arrests immediately. `ARREST_WARNING_EXPOSURE` (0.75) fires one `arrest:warning` event (toast) and shows an exposure pip (warn, critical from 0.9); the warning re-arms when exposure drops under 0.75. A jump past 0.9 skips the warning.

@@ -13,7 +13,7 @@ function mount(): { container: HTMLDivElement; map: WorldMap } {
 function makeCampaign(overrides: Partial<CampaignState['levels']> = {}): CampaignState {
   return {
     levels: {
-      dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 160000, bestSessionProfit: 160000 }, // >= 80k threshold x2 -> 3 stars
+      dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 160000, bestSessionProfit: 160000, bestStars: 3 }, // stored 3 stars
       grumpstone_ridge: { levelId: 'grumpstone_ridge', unlocked: true, completed: false, cumulativeProfit: 0, bestSessionProfit: 0 },
       treranium_depths: { levelId: 'treranium_depths', unlocked: false, completed: false, cumulativeProfit: 0, bestSessionProfit: 0 },
       ...overrides,
@@ -121,6 +121,58 @@ describe('WorldMap', () => {
     const text = container.textContent ?? '';
     expect(text).toContain('3 / 9');
     map.dispose();
+  });
+
+  describe('stored stars (#1311)', () => {
+    function earnedByLevel(container: HTMLElement, id: string): number {
+      const stars = container.querySelectorAll(`#bs-world-map [data-level="${id}"] bs-icon[name="star"]`);
+      return Array.from(stars).filter(s => (s as HTMLElement).style.color === 'var(--bsx-amber)').length;
+    }
+
+    it('card shows the stored bestStars, not a profit tier (profit 1x threshold but 3 stored)', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign({
+        dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 80000, bestSessionProfit: 80000, bestStars: 3 },
+      }));
+      expect(earnedByLevel(container, 'dusty_hollow')).toBe(3);
+      map.dispose();
+    });
+
+    it('a rich run with a low stored rating still shows the low rating', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign({
+        dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 400000, bestSessionProfit: 400000, bestStars: 1 },
+      }));
+      expect(earnedByLevel(container, 'dusty_hollow')).toBe(1);
+      map.dispose();
+    });
+
+    it('header total sums the stored values across levels', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign({
+        dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 1, bestSessionProfit: 1, bestStars: 2 },
+        grumpstone_ridge: { levelId: 'grumpstone_ridge', unlocked: true, completed: true, cumulativeProfit: 1, bestSessionProfit: 1, bestStars: 3 },
+      }));
+      expect(container.textContent).toContain('5 / 9');
+      map.dispose();
+    });
+
+    it('a legacy completed level without bestStars shows 1 star', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign({
+        dusty_hollow: { levelId: 'dusty_hollow', unlocked: true, completed: true, cumulativeProfit: 999999, bestSessionProfit: 999999 },
+      }));
+      expect(earnedByLevel(container, 'dusty_hollow')).toBe(1);
+      expect(container.textContent).toContain('1 / 9');
+      map.dispose();
+    });
+
+    it('an uncompleted level shows 0 stars', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign());
+      expect(earnedByLevel(container, 'grumpstone_ridge')).toBe(0);
+      map.dispose();
+    });
   });
 
   it('shows REPLAY (not START LEVEL) for an already-completed, unlocked level', () => {

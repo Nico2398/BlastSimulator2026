@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { checkGameOverConditions } from '../../../src/core/engine/GameOverConditions.js';
 import { checkLevelComplete, createGameForLevel } from '../../../src/core/campaign/LevelTransition.js';
-import { createCampaignState, startLevel } from '../../../src/core/campaign/Campaign.js';
+import { createCampaignState, startLevel, recordStars, getBestStars } from '../../../src/core/campaign/Campaign.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
@@ -257,5 +257,94 @@ describe('Level completion and transition (7.3)', () => {
       expect(campaign.levels[level.id]!.cumulativeProfit).toBe(cumulative);
       expect(handler).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe('level completion records stars (#1311)', () => {
+  /** Session at the profit threshold with the given safety/ecology end state. */
+  function finishedSession(opts: { deaths: number; ecology: number; profitMultiple?: number }) {
+    const state = createGame({ seed: 42 });
+    const campaign = createCampaignState();
+    const level = getAllLevels()[0]!;
+    startLevel(campaign, level.id);
+    addIncome(state.finances, level.unlockThreshold * (opts.profitMultiple ?? 1), 'sales', 'test', 0);
+    state.damage.deathCount = opts.deaths;
+    state.scores.ecology = opts.ecology;
+    state.levelStats.casualties = opts.deaths;
+    state.levelStats.finalEcology = opts.ecology;
+    state.levelStats.bestEcology = opts.ecology;
+    state.levelStats.totalWealth = level.unlockThreshold * (opts.profitMultiple ?? 1);
+    return { state, campaign, level };
+  }
+
+  it('clean run with good ecology records and reports 3 stars', () => {
+    const { state, campaign, level } = finishedSession({ deaths: 0, ecology: 75 });
+    const result = checkLevelComplete(state, campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(3);
+    expect(campaign.levels[level.id]!.bestStars).toBe(3);
+    expect(getBestStars(campaign.levels[level.id])).toBe(3);
+  });
+
+  it('a death costs the safety star', () => {
+    const { state, campaign, level } = finishedSession({ deaths: 2, ecology: 75 });
+    const result = checkLevelComplete(state, campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(2);
+    expect(campaign.levels[level.id]!.bestStars).toBe(2);
+  });
+
+  it('poor ecology costs the ecology star', () => {
+    const { state, campaign } = finishedSession({ deaths: 0, ecology: 59 });
+    expect(checkLevelComplete(state, campaign, new EventEmitter()).summary!.stars).toBe(2);
+  });
+
+  it('deaths and poor ecology still leave the profit star: 1 star', () => {
+    const { state, campaign, level } = finishedSession({ deaths: 3, ecology: 10 });
+    const result = checkLevelComplete(state, campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(1);
+    expect(campaign.levels[level.id]!.bestStars).toBe(1);
+  });
+
+  it('the level:complete event carries the stars', () => {
+    const { state, campaign } = finishedSession({ deaths: 0, ecology: 75 });
+    const emitter = new EventEmitter();
+    const handler = vi.fn();
+    emitter.on('level:complete', handler);
+    checkLevelComplete(state, campaign, emitter);
+    expect(handler.mock.calls[0]![0].stars).toBe(3);
+  });
+
+  it('a worse replay does not lower the stored stars', () => {
+    const { state, campaign, level } = finishedSession({ deaths: 0, ecology: 75 });
+    checkLevelComplete(state, campaign, new EventEmitter());
+    expect(campaign.levels[level.id]!.bestStars).toBe(3);
+
+    const replay = finishedSession({ deaths: 4, ecology: 5 });
+    replay.campaign.levels[level.id] = campaign.levels[level.id]!;
+    replay.campaign.activeLevelId = level.id;
+    const result = checkLevelComplete(replay.state, replay.campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(1);
+    expect(replay.campaign.levels[level.id]!.bestStars).toBe(3);
+  });
+
+  it('a better replay raises the stored stars', () => {
+    const { state, campaign, level } = finishedSession({ deaths: 5, ecology: 5 });
+    checkLevelComplete(state, campaign, new EventEmitter());
+    expect(campaign.levels[level.id]!.bestStars).toBe(1);
+
+    recordStars(campaign, level.id, 1); // idempotent at same value
+    const replay = finishedSession({ deaths: 0, ecology: 80 });
+    replay.campaign.levels[level.id] = campaign.levels[level.id]!;
+    checkLevelComplete(replay.state, replay.campaign, new EventEmitter());
+    expect(replay.campaign.levels[level.id]!.bestStars).toBe(3);
+  });
+
+  it('no stars are recorded when the threshold is not reached', () => {
+    const state = createGame({ seed: 42 });
+    const campaign = createCampaignState();
+    const level = getAllLevels()[0]!;
+    startLevel(campaign, level.id);
+    addIncome(state.finances, level.unlockThreshold - 1, 'sales', 'test', 0);
+    checkLevelComplete(state, campaign, new EventEmitter());
+    expect(campaign.levels[level.id]!.bestStars).toBe(0);
   });
 });

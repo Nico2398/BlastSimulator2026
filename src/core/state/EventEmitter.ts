@@ -19,7 +19,7 @@ export interface GameEventMap {
   'time:tick': { dt: number };
 
   // Phase 7 — Campaign events
-  'level:complete': { levelId: string; totalProfit: number; blastsPerformed: number; casualties: number; finalWellBeing: number; finalEcology: number; finalSafety: number };
+  'level:complete': { levelId: string; totalProfit: number; blastsPerformed: number; casualties: number; finalWellBeing: number; finalEcology: number; finalSafety: number; stars: number };
   'bankruptcy:warning': { cash: number; ticksRemaining: number };
   'bankruptcy:triggered': { cash: number };
   'arrest:triggered': { exposure: number };

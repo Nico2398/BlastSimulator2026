@@ -15,6 +15,7 @@ import {
   recordProfit,
   startLevel,
   returnToWorldMap,
+  getBestStars,
 } from '../../src/core/campaign/Campaign.js';
 import { getLevel, getAllLevels } from '../../src/core/campaign/Level.js';
 import {
@@ -25,6 +26,9 @@ import {
 } from '../../src/core/campaign/SuccessTracker.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { createGame } from '../../src/core/state/GameState.js';
+import { checkLevelComplete } from '../../src/core/campaign/LevelTransition.js';
+import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { addIncome, addExpense } from '../../src/core/economy/Finance.js';
 import { STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
@@ -290,7 +294,7 @@ describe('Campaign', () => {
     const stats3 = createLevelStats();
     stats3.totalWealth = 100000; // >= profitTarget
     stats3.casualties = 0;      // zero deaths
-    stats3.bestEcology = 80;    // >= 60
+    stats3.finalEcology = 80;    // >= 60
 
     const rating3 = calculateStarRating(stats3, threshold);
     expect(rating3.stars).toBe(3);
@@ -302,7 +306,7 @@ describe('Campaign', () => {
     const stats2 = createLevelStats();
     stats2.totalWealth = 100000; // pass
     stats2.casualties = 0;       // pass
-    stats2.bestEcology = 30;    // fail (< 60)
+    stats2.finalEcology = 30;    // fail (< 60)
 
     const rating2 = calculateStarRating(stats2, threshold);
     expect(rating2.stars).toBe(2);
@@ -314,7 +318,7 @@ describe('Campaign', () => {
     const stats1a = createLevelStats();
     stats1a.totalWealth = 100000; // pass
     stats1a.casualties = 3;       // fail
-    stats1a.bestEcology = 30;    // fail
+    stats1a.finalEcology = 30;    // fail
 
     const rating1a = calculateStarRating(stats1a, threshold);
     expect(rating1a.stars).toBe(1);
@@ -326,7 +330,7 @@ describe('Campaign', () => {
     const stats1b = createLevelStats();
     stats1b.totalWealth = 0;    // fail
     stats1b.casualties = 5;     // fail
-    stats1b.bestEcology = 0;    // fail
+    stats1b.finalEcology = 0;    // fail
 
     const rating1b = calculateStarRating(stats1b, threshold);
     expect(rating1b.stars).toBe(1);
@@ -338,7 +342,7 @@ describe('Campaign', () => {
     const statsEdge = createLevelStats();
     statsEdge.totalWealth = 80000;  // exactly profitTarget
     statsEdge.casualties = 0;       // zero deaths
-    statsEdge.bestEcology = 60;     // exactly 60
+    statsEdge.finalEcology = 60;     // exactly 60
 
     const ratingEdge = calculateStarRating(statsEdge, threshold);
     expect(ratingEdge.stars).toBe(3);
@@ -1007,5 +1011,59 @@ describe('Campaign profile (#1312)', () => {
     runner.run('load slot:profile_level2');
     expect(runner.run('campaign complete').success).toBe(true);
     expect(ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed).toBe(true);
+  });
+});
+
+// ── #1311: single star rating, stored and persisted ─────────────────────────
+
+describe('Campaign star persistence (#1311)', () => {
+  function sessionAtThreshold(campaign: ReturnType<typeof createCampaignState>, levelId: string, opts: { deaths: number; ecologyPeak: number; ecologyEnd: number }) {
+    const state = createGame({ seed: 42 });
+    state.campaign = campaign;
+    startLevel(campaign, levelId);
+    const level = getLevel(levelId)!;
+    addIncome(state.finances, level.unlockThreshold, 'sales', 'test', 0);
+    state.damage.deathCount = opts.deaths;
+    state.scores.ecology = opts.ecologyPeak;
+    snapshotStats(state.levelStats, state);
+    state.scores.ecology = opts.ecologyEnd; // ecology drops before the end
+    snapshotStats(state.levelStats, state);
+    return state;
+  }
+
+  it('the end-of-run ecology, not the peak, decides the ecology star', () => {
+    const campaign = createCampaignState();
+    const state = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 90, ecologyEnd: 40 });
+    const result = checkLevelComplete(state, campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(2);
+    expect(getBestStars(campaign.levels['dusty_hollow'])).toBe(2);
+  });
+
+  it('a clean, green run stores 3 stars', () => {
+    const campaign = createCampaignState();
+    const state = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 70, ecologyEnd: 65 });
+    checkLevelComplete(state, campaign, new EventEmitter());
+    expect(campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+  });
+
+  it('stored stars survive save and load, and a worse replay after load does not lower them', () => {
+    const campaign = createCampaignState();
+    const first = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 70, ecologyEnd: 70 });
+    checkLevelComplete(first, campaign, new EventEmitter());
+
+    const loaded = deserialize(serialize(first));
+    expect(loaded.campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+
+    const replay = sessionAtThreshold(loaded.campaign, 'dusty_hollow', { deaths: 3, ecologyPeak: 20, ecologyEnd: 20 });
+    const result = checkLevelComplete(replay, loaded.campaign, new EventEmitter());
+    expect(result.summary!.stars).toBe(1);
+    expect(loaded.campaign.levels['dusty_hollow']!.bestStars).toBe(3);
+  });
+
+  it('other levels stay at 0 stars', () => {
+    const campaign = createCampaignState();
+    const state = sessionAtThreshold(campaign, 'dusty_hollow', { deaths: 0, ecologyPeak: 70, ecologyEnd: 70 });
+    checkLevelComplete(state, campaign, new EventEmitter());
+    expect(getBestStars(campaign.levels['grumpstone_ridge'])).toBe(0);
   });
 });

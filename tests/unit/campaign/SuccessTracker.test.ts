@@ -10,6 +10,8 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import type { Vec3 } from '../../../src/core/math/Vec3.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
+import { STAR_ECOLOGY_MIN } from '../../../src/core/config/balance.js';
+import { serializeLevelStats, deserializeLevelStats } from '../../../src/core/campaign/SuccessTracker.js';
 
 const zeroVec: Vec3 = { x: 0, y: 0, z: 0 };
 
@@ -103,7 +105,7 @@ describe('Success tracker (7.8)', () => {
     const stats = createLevelStats();
     stats.totalWealth = 100000;
     stats.casualties = 0;
-    stats.bestEcology = 70;
+    stats.finalEcology = 70;
 
     const rating = calculateStarRating(stats, 80000);
     expect(rating.stars).toBe(3);
@@ -116,7 +118,7 @@ describe('Success tracker (7.8)', () => {
     const stats = createLevelStats();
     stats.totalWealth = 100000;
     stats.casualties = 0;
-    stats.bestEcology = 30; // below 60
+    stats.finalEcology = 30; // below 60
 
     const rating = calculateStarRating(stats, 80000);
     expect(rating.stars).toBe(2);
@@ -129,7 +131,7 @@ describe('Success tracker (7.8)', () => {
     const stats = createLevelStats();
     stats.totalWealth = 0;
     stats.casualties = 5;
-    stats.bestEcology = 0;
+    stats.finalEcology = 0;
 
     const rating = calculateStarRating(stats, 80000);
     expect(rating.stars).toBe(1);
@@ -139,10 +141,100 @@ describe('Success tracker (7.8)', () => {
     const stats = createLevelStats();
     stats.totalWealth = 0;
     stats.casualties = 0; // safety pass
-    stats.bestEcology = 0;
+    stats.finalEcology = 0;
 
     const rating = calculateStarRating(stats, 80000);
     expect(rating.stars).toBe(1);
     expect(rating.details.safetyPass).toBe(true);
+  });
+
+  // ── #1311: single star rating, ecology judged at the END of the run ──
+
+  describe('star rating (#1311)', () => {
+    function rate(over: Partial<ReturnType<typeof createLevelStats>>, target = 80000) {
+      const stats = createLevelStats();
+      Object.assign(stats, over);
+      return calculateStarRating(stats, target);
+    }
+
+    it('STAR_ECOLOGY_MIN is 60', () => {
+      expect(STAR_ECOLOGY_MIN).toBe(60);
+    });
+
+    it('ecology star uses finalEcology, not the bestEcology peak (peak 80, end 50)', () => {
+      const r = rate({ totalWealth: 100000, casualties: 0, bestEcology: 80, finalEcology: 50 });
+      expect(r.details.ecologyPass).toBe(false);
+      expect(r.stars).toBe(2);
+    });
+
+    it('a high final ecology passes even when the recorded peak is lower', () => {
+      const r = rate({ totalWealth: 100000, casualties: 0, bestEcology: 10, finalEcology: 75 });
+      expect(r.details.ecologyPass).toBe(true);
+      expect(r.stars).toBe(3);
+    });
+
+    it('ecology boundary: 59 fails, 60 passes', () => {
+      expect(rate({ finalEcology: 59 }).details.ecologyPass).toBe(false);
+      expect(rate({ finalEcology: STAR_ECOLOGY_MIN }).details.ecologyPass).toBe(true);
+    });
+
+    it('profit criterion alone gives 1 star', () => {
+      const r = rate({ totalWealth: 80000, casualties: 2, finalEcology: 0 });
+      expect(r.details).toEqual({ profitPass: true, safetyPass: false, ecologyPass: false });
+      expect(r.stars).toBe(1);
+    });
+
+    it('profit + ecology gives 2 stars when someone died', () => {
+      const r = rate({ totalWealth: 80000, casualties: 1, finalEcology: 70 });
+      expect(r.details.safetyPass).toBe(false);
+      expect(r.stars).toBe(2);
+    });
+
+    it('safety + ecology gives 2 stars when profit is short', () => {
+      const r = rate({ totalWealth: 79999, casualties: 0, finalEcology: 70 });
+      expect(r.details.profitPass).toBe(false);
+      expect(r.stars).toBe(2);
+    });
+
+    it('a death removes the safety star', () => {
+      const clean = rate({ totalWealth: 100000, casualties: 0, finalEcology: 70 });
+      const dead = rate({ totalWealth: 100000, casualties: 1, finalEcology: 70 });
+      expect(clean.stars).toBe(3);
+      expect(dead.stars).toBe(2);
+    });
+
+    it('clamps to a minimum of 1 star with no criterion met', () => {
+      const r = rate({ totalWealth: 0, casualties: 4, finalEcology: 0, bestEcology: 90 });
+      expect(r.stars).toBe(1);
+    });
+
+    it('snapshotStats overwrites finalEcology with the current score, including drops', () => {
+      const state = createGame({ seed: 1 });
+      const stats = createLevelStats();
+      state.scores.ecology = 80;
+      snapshotStats(stats, state);
+      expect(stats.finalEcology).toBe(80);
+      expect(stats.bestEcology).toBe(80);
+
+      state.scores.ecology = 50;
+      snapshotStats(stats, state);
+      expect(stats.finalEcology).toBe(50);
+      expect(stats.bestEcology).toBe(80);
+    });
+
+    it('createLevelStats starts finalEcology at 0', () => {
+      expect(createLevelStats().finalEcology).toBe(0);
+    });
+
+    it('finalEcology survives a serialize/deserialize round trip', () => {
+      const stats = createLevelStats();
+      stats.finalEcology = 42;
+      const raw = JSON.parse(JSON.stringify(serializeLevelStats(stats))) as Record<string, unknown>;
+      expect(deserializeLevelStats(raw).finalEcology).toBe(42);
+    });
+
+    it('deserialize of an old save without finalEcology yields 0', () => {
+      expect(deserializeLevelStats({ totalWealth: 5, bestEcology: 90 }).finalEcology).toBe(0);
+    });
   });
 });
