@@ -11,6 +11,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { forecast, rainIntensity, type WeatherState } from '../../core/weather/WeatherCycle.js';
 import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather/WeatherAdvisory.js';
+import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
@@ -58,9 +59,7 @@ const ALERT_ROUTE: Partial<Record<AlertPip['kind'], PanelName>> = {
  * otherwise ("$-1,234.567").
  */
 export function formatBalance(cash: number): string {
-  const rounded = Math.round(cash);
-  const magnitude = Math.abs(rounded).toLocaleString('en-US');
-  return rounded < 0 ? `-$${magnitude}` : `$${magnitude}`;
+  return formatDollars(cash);
 }
 
 /** Net income/expense per tick over the trailing window, from raw transactions. */

@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { formatMoney, formatPricePerKg } from '../../../src/core/economy/formatMoney.js';
+import { formatMoney, formatPricePerKg, formatDollars } from '../../../src/core/economy/formatMoney.js';
+import { formatBalance } from '../../../src/ui/shell/TopBar.js';
 
 describe('formatMoney', () => {
   it('rounds a float to whole dollars', () => {
@@ -37,5 +39,32 @@ describe('formatPricePerKg', () => {
 
   it('groups thousands', () => {
     expect(formatPricePerKg(2500)).toBe('2,500.00');
+  });
+});
+
+describe('formatDollars', () => {
+  const cases: Array<[number, string]> = [
+    [-145000, '-$145,000'],
+    [75000, '$75,000'],
+    [0, '$0'],
+    [-0.4, '$0'],
+    [-37799.853, '-$37,800'],
+    [1234567.5, '$1,234,568'],
+  ];
+
+  for (const [amount, expected] of cases) {
+    it(`formats ${amount} as ${expected}`, () => {
+      expect(formatDollars(amount)).toBe(expected);
+    });
+  }
+
+  it('never puts the minus sign after the currency symbol', () => {
+    expect(formatDollars(-25832.4)).not.toContain('$-');
+  });
+
+  it('formatBalance (TopBar) agrees with formatDollars', () => {
+    for (const [amount] of cases) {
+      expect(formatBalance(amount)).toBe(formatDollars(amount));
+    }
   });
 });
