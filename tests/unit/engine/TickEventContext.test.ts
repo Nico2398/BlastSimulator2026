@@ -9,14 +9,21 @@
 // corpse permanently inflated the count fed to every event's canFire/
 // weightCoeff check.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { buildTickEventContext } from '../../../src/core/engine/TickEventContext.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ALL_WEATHER_STATES } from '../../../src/core/weather/WeatherCycle.js';
+import { setupEvents } from '../../../src/core/events/index.js';
 import { hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 
+import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
+import { LAWSUIT_EVENTS_1 } from '../../../src/core/events/LawsuitEvents1.js';
+
 const SEED = 42;
+
+// Leave no registry state behind for other tests in this worker.
+afterEach(() => clearEvents());
 
 describe('buildTickEventContext', () => {
   it('reports employeeCount over the living roster only, excluding a killed employee still physically present in the array', () => {
@@ -51,7 +58,9 @@ describe('buildTickEventContext', () => {
     });
     state.drillHoles.push({ id: 'h1', x: 0, z: 0, depth: 5, diameter: 0.1 });
     state.tickCount = 42;
-    state.corruption.attempts.push({ target: 'judge', tick: 1, cost: 0, success: false });
+    clearEvents();
+    registerEvents([LAWSUIT_EVENTS_1.find(e => e.id === 'lawsuit_wrongful_death')!]);
+    state.events.firedEventIds.push('lawsuit_wrongful_death', 'not_a_registered_event');
     state.contracts.active.push({
       id: 1, type: 'ore_sale', materialId: 'iron', description: '', quantityKg: 100,
       deliveredKg: 0, pricePerKg: 5, deadlineTicks: 100, acceptedAtTick: 0,
@@ -66,6 +75,7 @@ describe('buildTickEventContext', () => {
     expect(ctx.hasBuilding('freight_warehouse')).toBe(false);
     expect(ctx.hasDrillPlan).toBe(true);
     expect(ctx.tickCount).toBe(42);
+    // one registered lawsuit id fired; the unregistered id is ignored (#1412)
     expect(ctx.lawsuitCount).toBe(1);
     expect(ctx.activeContractCount).toBe(1);
     expect(ctx.weatherId).toBe(state.weather.current);
@@ -86,5 +96,54 @@ describe('buildTickEventContext weatherId (#1403)', () => {
       state.weather.current = weather;
       expect(buildTickEventContext(state).weatherId).not.toBe('clear');
     }
+  });
+});
+
+describe('buildTickEventContext lawsuitCount (#1412)', () => {
+  it('is 0 when no event has fired', () => {
+    const state = createGame({ seed: SEED });
+    expect(buildTickEventContext(state).lawsuitCount).toBe(0);
+  });
+
+  it('counts fired event ids whose category is lawsuit', () => {
+    const state = createGame({ seed: SEED });
+    setupEvents();
+    state.events.firedEventIds = ['lawsuit_dust_fashion', 'lawsuit_wrongful_death'];
+    expect(buildTickEventContext(state).lawsuitCount).toBe(2);
+  });
+
+  it('excludes non-lawsuit and unknown ids', () => {
+    const state = createGame({ seed: SEED });
+    setupEvents();
+    state.events.firedEventIds = ['lawsuit_dust_fashion', 'union_coffee_uprising', 'no_such_event'];
+    expect(buildTickEventContext(state).lawsuitCount).toBe(1);
+  });
+
+  it('ignores judge corruption attempts', () => {
+    const state = createGame({ seed: SEED });
+    setupEvents();
+    state.corruption.attempts.push({ target: 'judge', tick: 1, cost: 0, success: true });
+    state.corruption.attempts.push({ target: 'judge', tick: 2, cost: 0, success: false });
+    expect(buildTickEventContext(state).lawsuitCount).toBe(0);
+  });
+});
+
+describe('buildTickEventContext hasBlasted (#1412)', () => {
+  it('is false when no blast has happened', () => {
+    const state = createGame({ seed: SEED });
+    state.damage.blastCount = 0;
+    expect(buildTickEventContext(state).hasBlasted).toBe(false);
+  });
+
+  it('is true after one blast', () => {
+    const state = createGame({ seed: SEED });
+    state.damage.blastCount = 1;
+    expect(buildTickEventContext(state).hasBlasted).toBe(true);
+  });
+
+  it('is true after many blasts', () => {
+    const state = createGame({ seed: SEED });
+    state.damage.blastCount = 7;
+    expect(buildTickEventContext(state).hasBlasted).toBe(true);
   });
 });

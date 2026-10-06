@@ -1672,3 +1672,9 @@ export const WEATHER_HISTORY_MAX = 32;
 
 /** Minimum ticks between two crew toasts of the same kind for the same employee (#1387). */
 export const CREW_TOAST_COOLDOWN_TICKS = 30;
+
+/** Ecology score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
+export const ENV_CAUSE_ECOLOGY_MAX = 45;
+
+/** Nuisance score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
+export const ENV_CAUSE_NUISANCE_MAX = 45;

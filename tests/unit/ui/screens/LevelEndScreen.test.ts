@@ -356,7 +356,8 @@ describe('LevelEndScreen', () => {
       screen.update(state);
 
       const text = container.querySelector('#bs-level-end-screen')!.textContent!;
-      expect(text).toContain('12,345'); // final balance (negative)
+      expect(text).toContain('-$12,345'); // final balance (negative), sign before the $
+      expect(text).not.toContain('$-');
       expect(text).toContain('5,500'); // salaries only: 4000 + 1500, excludes the fuel expense
       screen.dispose();
     });

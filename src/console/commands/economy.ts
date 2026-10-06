@@ -14,6 +14,7 @@ import {
 } from '../../core/economy/Contract.js';
 import { negotiateContractAtTick } from '../../core/economy/Negotiation.js';
 import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
+import { formatDollars } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
@@ -33,25 +34,25 @@ export function financesCommand(
   const report = getFinancialReport(state.finances, state.tickCount, 0);
 
   const lines = [
-    `Balance: $${balance.toFixed(2)}`,
+    `Balance: ${formatDollars(balance)}`,
     `Bankrupt: ${state.bankruptcy.bankrupt ? 'YES' : 'No'}`,
     '',
-    `Total income:   $${report.totalIncome.toFixed(2)}`,
-    `Total expenses: $${report.totalExpenses.toFixed(2)}`,
-    `Net profit:     $${report.netProfit.toFixed(2)}`,
+    `Total income:   ${formatDollars(report.totalIncome)}`,
+    `Total expenses: ${formatDollars(report.totalExpenses)}`,
+    `Net profit:     ${formatDollars(report.netProfit)}`,
   ];
 
   if (report.incomeByCategory.length > 0) {
     lines.push('', 'Income breakdown:');
     for (const c of report.incomeByCategory) {
-      lines.push(`  ${c.category}: $${c.total.toFixed(2)}`);
+      lines.push(`  ${c.category}: ${formatDollars(c.total)}`);
     }
   }
 
   if (report.expensesByCategory.length > 0) {
     lines.push('', 'Expense breakdown:');
     for (const c of report.expensesByCategory) {
-      lines.push(`  ${c.category}: $${c.total.toFixed(2)}`);
+      lines.push(`  ${c.category}: ${formatDollars(c.total)}`);
     }
   }
 
@@ -61,7 +62,7 @@ export function financesCommand(
     lines.push('', 'Recent transactions:');
     for (const t of recent) {
       const sign = t.type === 'income' ? '+' : '-';
-      lines.push(`  [tick ${t.tick}] ${sign}$${t.amount.toFixed(2)} (${t.category}) ${t.description}`);
+      lines.push(`  [tick ${t.tick}] ${sign}${formatDollars(t.amount)} (${t.category}) ${t.description}`);
     }
   }
 

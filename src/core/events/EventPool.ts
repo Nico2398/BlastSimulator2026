@@ -3,6 +3,7 @@
 
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
+import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX } from '../config/balance.js';
 
 // ── Event types ──
 
@@ -82,6 +83,15 @@ export interface EventContext {
   lawsuitCount: number;
   activeContractCount: number;
   weatherId: WeatherState;
+  /** True once the player has fired at least one blast (#1412). */
+  hasBlasted: boolean;
+}
+
+/** Whether environmental events have a plausible cause yet (#1412). */
+export function hasEnvironmentalCause(ctx: Pick<EventContext, 'hasBlasted' | 'scores'>): boolean {
+  return ctx.hasBlasted
+    || ctx.scores.ecology < ENV_CAUSE_ECOLOGY_MAX
+    || ctx.scores.nuisance < ENV_CAUSE_NUISANCE_MAX;
 }
 
 // ── Event pool ──

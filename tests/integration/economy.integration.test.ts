@@ -439,8 +439,8 @@ describe('Economy', () => {
     expect(result.output).toContain('Net profit:');
 
     // Fresh game: $50,000 starting cash, no transactions
-    expect(result.output).toContain('$50000.00');
-    expect(result.output).toContain('$0.00');
+    expect(result.output).toContain('$50,000');
+    expect(result.output).toContain('$0');
   });
 
   // ── 10. negotiateContract changes terms ────────────────────────────────────

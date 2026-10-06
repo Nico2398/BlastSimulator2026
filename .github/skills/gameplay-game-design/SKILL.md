@@ -78,6 +78,8 @@ Unionized employees cannot be fired. Affected by well-being score.
 ### Architecture
 Events grouped into categories with independent timers. Timer fires → check available events → roll weighted selection → fire event. Weights + values depend on player scores.
 
+Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an employee exists and `lawsuit` until some cause exists (environmental cause, a death, or staff). Environmental lawsuits additionally require `hasEnvironmentalCause` (a blast fired, or ecology/nuisance strictly below `ENV_CAUSE_*_MAX` = 45, under the initial 50). `lawsuitCount` counts fired lawsuit-category events.
+
 ### Categories
 - **Unions:** Strike threats, wage demands, safety complaints, overtime protests
 - **Politics/External:** Supplier wars, competitor mines, activist blockades, regulation changes, tax audits
