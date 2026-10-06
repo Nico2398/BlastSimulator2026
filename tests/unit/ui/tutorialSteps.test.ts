@@ -6,7 +6,7 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import { victoryProgress, goalChipParams } from '../../../src/ui/tutorialStepsClosing.js';
 import { stagesFor, TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
 import { createFinanceState, addIncome, addExpense, getFinancialReport } from '../../../src/core/economy/Finance.js';
-import { formatMoney } from '../../../src/core/economy/formatMoney.js';
+import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { TUTORIAL_LEVEL_ID } from '../../../src/ui/tutorialTrigger.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
@@ -1177,21 +1177,21 @@ describe('free-play step card (#1329/#1328) — honest about progress before the
   describe('goalChipParams (#1328)', () => {
     it('formats profit and target as money strings', () => {
       expect(goalChipParams(stateWith(1200))).toEqual({
-        profit: formatMoney(1200),
-        target: formatMoney(target),
+        profit: formatDollars(1200),
+        target: formatDollars(target),
       });
     });
     it('zero profit', () => {
-      expect(goalChipParams(stateWith(0)).profit).toBe(formatMoney(0));
+      expect(goalChipParams(stateWith(0)).profit).toBe(formatDollars(0));
     });
     it('negative profit reads -$N', () => {
       const p = goalChipParams(stateWith(-300));
-      expect(p.profit).toBe(formatMoney(-300));
+      expect(p.profit).toBe(formatDollars(-300));
       expect(p.profit).toContain('-');
       expect(p.profit).toContain('300');
     });
     it('profit above target is reported as-is', () => {
-      expect(goalChipParams(stateWith(target + 700)).profit).toBe(formatMoney(target + 700));
+      expect(goalChipParams(stateWith(target + 700)).profit).toBe(formatDollars(target + 700));
     });
   });
 

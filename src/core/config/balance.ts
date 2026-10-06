@@ -1685,8 +1685,10 @@ export const ORDER_REACH_CACHE_MAX_KEYS = 64;
 /**
  * Contract price multiplier for the tutorial level (#959, #1328). The level's
  * single scripted blast and ~$300k of one-time setup mean market-rate prices
- * can never out-earn the mine's own drain; bisected on the full playthrough
- * (24.0 loses, 28.0 wins), 32.0 is the winning value plus margin so one
- * upstream change does not make the tutorial unwinnable again.
+ * can never out-earn the mine's own drain; bisected on the full free-play
+ * playthrough (tests/integration/tutorial.integration.test.ts, no fire/scrap
+ * hacks): 40.0 goes bankrupt, 44.0 is the lowest winning value tried, 64.0 is
+ * already won inside the guided part. 52.0 sits mid-window so one upstream
+ * change does not make the tutorial unwinnable (or trivially won) again.
  */
-export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 32.0;
+export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 52.0;

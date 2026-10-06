@@ -10,6 +10,7 @@ import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import { employeeCommand } from '../../src/console/commands/entities.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
+import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 import { makeGameContext } from '../helpers/gameContext.js';
 
 function makeCtx(): GameContext {

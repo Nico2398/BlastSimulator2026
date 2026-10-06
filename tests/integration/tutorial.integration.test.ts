@@ -21,7 +21,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 import { TutorialRails } from '../../src/ui/tutorialRails.js';
-import { formatMoney } from '../../src/core/economy/formatMoney.js';
+import { formatDollars } from '../../src/core/economy/formatMoney.js';
 import { goalChipParams } from '../../src/ui/tutorialStepsClosing.js';
 import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
@@ -899,8 +899,8 @@ describe('full tutorial playthrough ends WON by following the cards then playing
     const target = getLevel('tutorial_pit')!.unlockThreshold;
     const chip = goalChipParams(state);
     const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
-    expect(chip.target).toBe(formatMoney(target));
-    expect(chip.profit).toBe(formatMoney(netProfit));
+    expect(chip.target).toBe(formatDollars(target));
+    expect(chip.profit).toBe(formatDollars(netProfit));
   }, 120_000);
 
   it('after the first sale no rail disables a control and the clock is not held, however long the player idles', () => {

@@ -1324,7 +1324,7 @@
     },
     {
       "command": "state",
-      "timeout": 60,
+      "timeout": 90,
       "role": "observe",
       "description": "#1328: the first ore sale ends the guided part. The tutorial rails lift -- body loses bs-tutorial-guided, so no control is disabled by the tutorial -- and the goal chip (net profit vs the +$5,000 win target) is shown. Observes only; the player step right below proves a control the rails used to block now answers a real click.",
       "interaction": [

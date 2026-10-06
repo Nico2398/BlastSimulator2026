@@ -9,7 +9,7 @@ import type { GameState } from '../core/state/GameState.js';
 import type { FinanceState } from '../core/economy/Finance.js';
 import type { TutorialStep } from './tutorialSteps.js';
 import { getFinancialReport } from '../core/economy/Finance.js';
-import { formatMoney } from '../core/economy/formatMoney.js';
+import { formatDollars } from '../core/economy/formatMoney.js';
 import { getLevel } from '../core/campaign/Level.js';
 import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
 import type { DefeatReason } from './screens/LevelEndScreen.js';
@@ -26,12 +26,6 @@ export function victoryProgress(
 ): { profit: number; target: number; remaining: number } {
   const profit = getFinancialReport(finances, 0).netProfit;
   return { profit, target, remaining: Math.max(0, target - profit) };
-}
-
-/** Money with the sign in front of the dollar sign: `$1,200`, `-$300`. */
-function dollars(amount: number): string {
-  const text = formatMoney(amount);
-  return text.startsWith('-') ? `-$${text.slice(1)}` : `$${text}`;
 }
 
 export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
@@ -51,7 +45,7 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
     textParamsFor: (state: GameState) => {
       const target = getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
       const { profit, remaining } = victoryProgress(state.finances, target);
-      return { profit: dollars(profit), target: dollars(target), remaining: dollars(remaining) };
+      return { profit: formatDollars(profit), target: formatDollars(target), remaining: formatDollars(remaining) };
     },
     isComplete: (state: GameState) => state.levelEnded === true && state.levelEndReason === 'completed',
   },
@@ -81,5 +75,5 @@ export const TUTORIAL_STEPS_CLOSING: TutorialStep[] = [
 /** Interpolation params for the goal chip: formatted net profit and profit target (#1328). */
 export function goalChipParams(state: GameState): { profit: string; target: string } {
   const target = getLevel(TUTORIAL_LEVEL_ID)?.unlockThreshold ?? 0;
-  return { profit: dollars(victoryProgress(state.finances, target).profit), target: dollars(target) };
+  return { profit: formatDollars(victoryProgress(state.finances, target).profit), target: formatDollars(target) };
 }
