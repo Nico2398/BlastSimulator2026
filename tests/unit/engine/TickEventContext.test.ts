@@ -14,6 +14,7 @@ import { buildTickEventContext } from '../../../src/core/engine/TickEventContext
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { ALL_WEATHER_STATES } from '../../../src/core/weather/WeatherCycle.js';
+import { setupEvents } from '../../../src/core/events/index.js';
 import { hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 
 const SEED = 42;
@@ -66,7 +67,8 @@ describe('buildTickEventContext', () => {
     expect(ctx.hasBuilding('freight_warehouse')).toBe(false);
     expect(ctx.hasDrillPlan).toBe(true);
     expect(ctx.tickCount).toBe(42);
-    expect(ctx.lawsuitCount).toBe(1);
+    // a judge corruption attempt is not a lawsuit (#1412)
+    expect(ctx.lawsuitCount).toBe(0);
     expect(ctx.activeContractCount).toBe(1);
     expect(ctx.weatherId).toBe(state.weather.current);
     expect(ctx.scores).toBe(state.scores);
@@ -86,5 +88,54 @@ describe('buildTickEventContext weatherId (#1403)', () => {
       state.weather.current = weather;
       expect(buildTickEventContext(state).weatherId).not.toBe('clear');
     }
+  });
+});
+
+describe('buildTickEventContext lawsuitCount (#1412)', () => {
+  it('is 0 when no event has fired', () => {
+    const state = createGame({ seed: SEED });
+    expect(buildTickEventContext(state).lawsuitCount).toBe(0);
+  });
+
+  it('counts fired event ids whose category is lawsuit', () => {
+    const state = createGame({ seed: SEED });
+    setupEvents();
+    state.events.firedEventIds = ['lawsuit_dust_fashion', 'lawsuit_wrongful_death'];
+    expect(buildTickEventContext(state).lawsuitCount).toBe(2);
+  });
+
+  it('excludes non-lawsuit and unknown ids', () => {
+    const state = createGame({ seed: SEED });
+    setupEvents();
+    state.events.firedEventIds = ['lawsuit_dust_fashion', 'union_coffee_uprising', 'no_such_event'];
+    expect(buildTickEventContext(state).lawsuitCount).toBe(1);
+  });
+
+  it('ignores judge corruption attempts', () => {
+    const state = createGame({ seed: SEED });
+    setupEvents();
+    state.corruption.attempts.push({ target: 'judge', tick: 1, cost: 0, success: true });
+    state.corruption.attempts.push({ target: 'judge', tick: 2, cost: 0, success: false });
+    expect(buildTickEventContext(state).lawsuitCount).toBe(0);
+  });
+});
+
+describe('buildTickEventContext hasBlasted (#1412)', () => {
+  it('is false when no blast has happened', () => {
+    const state = createGame({ seed: SEED });
+    state.damage.blastCount = 0;
+    expect(buildTickEventContext(state).hasBlasted).toBe(false);
+  });
+
+  it('is true after one blast', () => {
+    const state = createGame({ seed: SEED });
+    state.damage.blastCount = 1;
+    expect(buildTickEventContext(state).hasBlasted).toBe(true);
+  });
+
+  it('is true after many blasts', () => {
+    const state = createGame({ seed: SEED });
+    state.damage.blastCount = 7;
+    expect(buildTickEventContext(state).hasBlasted).toBe(true);
   });
 });
