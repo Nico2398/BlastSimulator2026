@@ -21,6 +21,9 @@ const BASE_TIMER: Record<TimerCategory, number> = { ...EVENT_BASE_TIMERS };
 
 // ── Timer state ──
 
+/** Per-category prerequisite gating event selection (#1412). Not applied yet. */
+export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {};
+
 export interface CategoryTimer {
   category: EventCategory;
   remaining: number;

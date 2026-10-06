@@ -42,6 +42,7 @@ function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
     lawsuitCount: 1,
     activeContractCount: 1,
     weatherId: 'sunny',
+    hasBlasted: false,
     ...overrides,
   };
 }

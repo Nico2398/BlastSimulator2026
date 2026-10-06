@@ -22,5 +22,6 @@ export function buildTickEventContext(s: GameState): EventContext {
     lawsuitCount: s.corruption.attempts.filter(a => a.target === 'judge').length,
     activeContractCount: s.contracts.active.length,
     weatherId: s.weather.current,
+    hasBlasted: false, // TODO: implement (#1412)
   };
 }

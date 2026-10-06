@@ -172,6 +172,7 @@ describe('tutorial event definitions', () => {
       lawsuitCount: 0,
       activeContractCount: 0,
       weatherId: 'sunny' as const,
+      hasBlasted: false,
     };
 
     expect(ev.canFire(ctx)).toBe(true);

@@ -82,6 +82,15 @@ export interface EventContext {
   lawsuitCount: number;
   activeContractCount: number;
   weatherId: WeatherState;
+  /** True once the player has fired at least one blast (#1412). */
+  hasBlasted: boolean;
+}
+
+/** Whether environmental events have a plausible cause yet (#1412). */
+export function hasEnvironmentalCause(ctx: Pick<EventContext, 'hasBlasted' | 'scores'>): boolean {
+  // TODO: implement
+  void ctx;
+  return true;
 }
 
 // ── Event pool ──
