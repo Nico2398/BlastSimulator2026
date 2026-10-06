@@ -80,7 +80,7 @@ describe('economy.ts usage strings — English literal + fr divergence', () => {
     {
       name: 'contract decline — no id/material selector',
       englishLiteral:
-        'Usage: contract decline <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]',
+        'Usage: contract decline <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true]',
       run: (ctx) => contractCommand(ctx, ['decline'], {}),
     },
     {
@@ -92,7 +92,7 @@ describe('economy.ts usage strings — English literal + fr divergence', () => {
     {
       name: 'contract negotiate — no id/material selector',
       englishLiteral:
-        'Usage: contract negotiate <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]',
+        'Usage: contract negotiate <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] [fillable:true]',
       run: (ctx) => contractCommand(ctx, ['negotiate'], {}),
     },
     {

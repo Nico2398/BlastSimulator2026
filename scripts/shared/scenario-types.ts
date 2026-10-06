@@ -366,8 +366,9 @@ export interface ScenarioStepDef {
    *
    * For beats whose count depends on the game's own clock: the browser run
    * spends real ticks on every click and wait, so a free-play economy that
-   * pays out in two sales under the console's near-instant clock needs a dozen
-   * under the browser's. The steps every mode shares keep their `expect`s and
+   * pays out in a few sales under the console's near-instant clock needs many
+   * more under the browser's (counts live in the skill and the scenario, not
+   * here). The steps every mode shares keep their `expect`s and
    * the terminal step still proves the outcome in both, so an interaction-only
    * beat never stands in for a check — it only adds more of the same play.
    */

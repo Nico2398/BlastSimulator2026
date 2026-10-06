@@ -72,18 +72,37 @@ describe('tutorial-interactive.json plays honestly (#1338)', () => {
     expect(waits.length).toBeGreaterThan(0);
   });
 
-  it('free play sells with fillable:true and waits on fillableOreSaleOffered before each round', () => {
-    const sale = (s: ScenarioStepDef) => /^contract (accept|deliver) type:ore_sale/.test(s.command);
-    const sales = steps.filter(sale);
-    expect(sales.length).toBeGreaterThanOrEqual(2);
-    for (const s of sales) expect(s.command, s.command).toContain('fillable:true');
-    sales.forEach((s) => {
-      if (!s.command.startsWith('contract accept')) return;
+  it('free play: every contract accept/deliver in a fillable round carries fillable:true, accepts follow a fillable-offer wait', () => {
+    const isTrade = (s: ScenarioStepDef) => /^contract (accept|deliver)\b/.test(s.command);
+    // Free play starts at the first fillable trade; earlier trades are scripted tutorial beats.
+    const firstFillable = steps.findIndex((s) => isTrade(s) && s.command.includes('fillable:true'));
+    expect(firstFillable).toBeGreaterThan(-1);
+    const trades = steps.slice(firstFillable).filter(isTrade);
+    expect(trades.length).toBeGreaterThanOrEqual(2);
+    const waitsOnFillable = (s: ScenarioStepDef) =>
+      (s.interaction ?? []).some(
+        (a) =>
+          a.type === 'waitUntil'
+          && ['fillableOreSaleOffered', 'fillableSaleOffered'].includes((a as { field?: string }).field ?? ''),
+      );
+    for (const s of trades) {
+      expect(s.command, s.command).toContain('fillable:true');
+      if (!s.command.startsWith('contract accept')) continue;
       const prev = steps[steps.indexOf(s) - 1]!;
-      expect(
-        (prev.interaction ?? []).some((a) => a.type === 'waitUntil' && (a as { field?: string }).field === 'fillableOreSaleOffered'),
-        `${s.command} must follow a waitUntil fillableOreSaleOffered`,
-      ).toBe(true);
-    });
+      expect(waitsOnFillable(prev), `${s.command} must follow a waitUntil on a fillable offer`).toBe(true);
+    }
   });
+
+  it('the levelEnded waitUntil sits on the last gameplay step', () => {
+    const waitsLevelEnded = (s: ScenarioStepDef) =>
+      (s.interaction ?? []).some((a) => a.type === 'waitUntil' && (a as { field?: string }).field === 'levelEnded');
+    const idx = steps.map(waitsLevelEnded).lastIndexOf(true);
+    expect(idx).toBeGreaterThan(-1);
+    // Nothing after it but observation/guard steps: no player or setup play follows the win.
+    expect(steps.slice(idx + 1).filter((s) => s.role === 'player' || s.role === 'setup').map((s) => s.command)).toEqual([]);
+  });
+
+  // Recorded decision (#1338): tutorial_start / time resume / tick setup steps
+  // are harness time control. They advance or release the clock and mutate no
+  // game state a player could not reach, so they are allowed (TIME_CONTROL_COMMANDS).
 });

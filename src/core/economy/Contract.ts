@@ -268,7 +268,7 @@ export function hasFillableOreSaleOffer(
   collectedOre: Readonly<Record<string, number>>,
 ): boolean {
   return available.some(
-    c => c.type === 'ore_sale' && (collectedOre[c.materialId] ?? 0) >= c.quantityKg,
+    c => c.type === 'ore_sale' && isFillableSaleOffer(c, collectedOre, 0),
   );
 }
 
@@ -325,10 +325,10 @@ export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean 
 }
 
 /**
- * Find a contract in `pool` by `selector.id` if given, else by the first
- * entry matching `selector.type`/`selector.materialId` (either or both).
- * Null when no selector field is set (nothing to search for) or nothing in
- * `pool` matches.
+ * Find the first contract in `pool` matching every selector field given
+ * (`id`, `type`, `materialId`, `fillable` are ANDed, so an `id` whose
+ * contract has another `type` is no match). Null when no selector field is
+ * set (nothing to search for) or nothing in `pool` matches.
  */
 export function findContract(
   pool: readonly Contract[],

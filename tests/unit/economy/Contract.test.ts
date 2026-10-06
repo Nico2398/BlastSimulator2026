@@ -209,6 +209,15 @@ describe('Contract system', () => {
       expect(findContract(state.available, { id: target.id })).toBe(target);
     });
 
+    it('ANDs id with the other selector fields: matching type finds it, mismatching type is null', () => {
+      const pool = [
+        { id: 1, type: 'ore_sale' as const, materialId: 'rustite' } as never,
+        { id: 2, type: 'supply' as const, materialId: 'dirtite' } as never,
+      ];
+      expect(findContract(pool, { id: 2, type: 'supply' })).toBe(pool[1]);
+      expect(findContract(pool, { id: 2, type: 'ore_sale' })).toBeNull();
+    });
+
     it('finds the first contract matching type and materialId', () => {
       const pool = [
         { id: 1, type: 'ore_sale' as const, materialId: 'rustite' } as never,
