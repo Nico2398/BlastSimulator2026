@@ -54,6 +54,8 @@ export interface WeatherCycleState {
   current: WeatherState;
   ticksRemaining: number;
   history: WeatherState[];
+  /** Internal PRNG state of the cycle's own stream, persisted with the save. */
+  rngState: number;
 }
 
 /** Create initial weather cycle from seed. */
@@ -65,6 +67,7 @@ export function createWeatherCycle(seed: number): WeatherCycleState {
     current: initial,
     ticksRemaining: duration,
     history: [initial],
+    rngState: seed,
   };
 }
 
@@ -93,6 +96,16 @@ export function forceAdvance(cycle: WeatherCycleState, rng: Random): WeatherCycl
   return advanceWeather(cycle, rng);
 }
 
+/** Advance the cycle one tick on its own persisted PRNG stream; returns the resulting weather. */
+export function tickWeather(_cycle: WeatherCycleState): WeatherState {
+  throw new Error('not implemented'); // TODO: implement
+}
+
+/** Force transition to the next weather state on the cycle's own PRNG stream (testing/console). */
+export function forceAdvanceInState(_cycle: WeatherCycleState): WeatherCycleState {
+  throw new Error('not implemented'); // TODO: implement
+}
+
 /**
  * Force the weather cycle directly to a given state, bypassing the
  * probabilistic transition table. `advance` is randomized by design — a
@@ -117,13 +130,14 @@ export function setWeather(cycle: WeatherCycleState, state: WeatherState): Weath
  * must read `cycle.current` directly rather than treating index 0 of this
  * result as today, so the two can never disagree.
  */
-export function forecast(cycle: WeatherCycleState, rng: Random, n = 14): WeatherState[] {
+export function forecast(cycle: WeatherCycleState, n = 14): WeatherState[] {
   const simCycle: WeatherCycleState = {
     current: cycle.current,
     ticksRemaining: cycle.ticksRemaining,
     history: [],
+    rngState: cycle.rngState,
   };
-  const simRng = rng.clone();
+  const simRng = new Random(cycle.rngState);
   const days: WeatherState[] = [];
   for (let day = 0; day < n; day++) {
     for (let tick = 0; tick < TICKS_PER_DAY; tick++) advanceWeather(simCycle, simRng);

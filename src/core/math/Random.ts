@@ -51,6 +51,16 @@ export class Random {
     return mean + stdDev * z0;
   }
 
+  /** Current internal state; `Random.fromState(snapshot())` continues the same sequence. */
+  snapshot(): number {
+    throw new Error('not implemented'); // TODO: implement
+  }
+
+  /** Rebuild a generator that continues from a `snapshot()` value. */
+  static fromState(_state: number): Random {
+    throw new Error('not implemented'); // TODO: implement
+  }
+
   /** Independent copy that continues the same sequence — advancing it never affects the original. */
   clone(): Random {
     const copy = new Random(0);

@@ -516,6 +516,12 @@ export function backfillRaises(obj: Record<string, unknown>): void {
   }
 }
 
+/** v29 -> v30 (#1403): backfill `weather`. Mutates `obj` in place. */
+function migrateV29ToV30(obj: Record<string, unknown>): Record<string, unknown> {
+  // TODO: implement
+  return obj;
+}
+
 /** v28 -> v29 (#1352): backfill `nextHoleId` past every saved hole id. Mutates `obj` in place. */
 function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> {
   const current = obj['nextHoleId'];
@@ -816,6 +822,7 @@ export function deserialize(json: string): GameState {
   // v28 -> v29: GameState.nextHoleId (#1352). Idempotent, so also guards
   // current-version saves that lack a valid counter.
   migrateV28ToV29(obj);
+  migrateV29ToV30(obj);
   backfillRaisedUnqualified(obj);
   backfillRaises(obj);
 

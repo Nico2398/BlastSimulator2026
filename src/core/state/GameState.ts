@@ -48,6 +48,8 @@ import type { CampaignState } from '../campaign/Campaign.js';
 import { createCampaignState } from '../campaign/Campaign.js';
 import type { BankruptcyState } from '../campaign/Bankruptcy.js';
 import { createBankruptcyState } from '../campaign/Bankruptcy.js';
+import type { WeatherCycleState } from '../weather/WeatherCycle.js';
+import { createWeatherCycle } from '../weather/WeatherCycle.js';
 import type { ArrestState } from '../campaign/CriminalArrest.js';
 import { createArrestState } from '../campaign/CriminalArrest.js';
 import type { EcologicalState } from '../campaign/EcologicalDisaster.js';
@@ -141,7 +143,8 @@ import type { RampWidth } from '../config/balance.js';
 // v27 -> v28: EventSystemState gained `jamSilencedUntil` (#1208). A pre-v28
 // save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
 // v28 -> v29: nextHoleId (#1352)
-export const SAVE_VERSION = 29;
+// v29 -> v30: weather (#1403). See SaveLoad.ts's migrateV29ToV30.
+export const SAVE_VERSION = 30;
 
 export interface GameConfig {
   seed: number;
@@ -483,6 +486,8 @@ export interface GameState {
   plannedBuildings: PlannedBuilding[];
   /** Next ID to assign to a newly created PlannedBuilding. */
   nextPlannedBuildingId: number;
+  /** Weather cycle, ticked by the pipeline and persisted with the save (#1403). */
+  weather: WeatherCycleState;
 }
 
 export interface WorldState {
@@ -604,6 +609,7 @@ export function createGame(config: GameConfig): GameState {
     nextHoleId: 1,
     plannedBuildings: [],
     nextPlannedBuildingId: 1,
+    weather: createWeatherCycle(config.seed),
   };
 
   if (config.staffed) {
