@@ -1,0 +1,164 @@
+{
+  "name": "tutorial-save-resume",
+  "description": "#1333: tutorial progress survives save/load. The player hires the surveyor (card moves to Survey Terrain), quick-saves with F5 (tutorial games write their own auto_tutorial slot), returns to the main menu, clicks Continue, and the tutorial card is back on the same step.",
+  "steps": [
+    {
+      "command": "campaign start level:tutorial_pit",
+      "timeout": 30,
+      "description": "Setup: load Tutorial Pit.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:tutorial_pit"
+        }
+      ]
+    },
+    {
+      "command": "tutorial_start",
+      "timeout": 30,
+      "description": "Setup: start the tutorial on hire-surveyor.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tutorial_start"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tutorial-overlay"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "hire-surveyor"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "hire-surveyor"
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "timeout": 60,
+      "description": "Player opens Crew and hires the surveyor; the card advances to Survey Terrain.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "survey"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "survey",
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player presses F5 to quick-save mid-tutorial. A save slot write has no queryable DOM signal, so the following step proves it through Continue.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "keypress",
+          "key": "F5"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player opens Settings and clicks Return to Menu (confirming if asked).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-menu-continue"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-menu-continue"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Player opens Load Game from the main menu; the tutorial's own auto_tutorial slot is listed with a Load control.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-menu-load"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-saves-modal [data-slot=\"auto_tutorial\"] [data-action=\"load\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-saves-modal [data-slot=\"auto_tutorial\"] [data-action=\"load\"]"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "description": "Player closes the Saves modal with Esc and clicks Continue; the tutorial resumes on the same card (Survey Terrain), not step one.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "keypress",
+          "key": "Escape"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-menu-continue"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tutorial-overlay"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "survey"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "survey"
+      }
+    }
+  ]
+}

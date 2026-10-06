@@ -1153,10 +1153,13 @@ savesModal.setOnLoad((state) => {
   // `ctx.state`: loadGridForState assigned it, but TS cannot see that.
   persistCampaignProfile();
   onLevelStateReplaced(state);
+  // The overlay still holds the replaced state, so abandoning clears that
+  // state's progress, never the loaded one's (#1333).
   if (tutorial.isActive) tutorial.abandon();
   worldMap.hide();
   uiManager.show();
   gameRenderer.syncFromContext(ctx);
+  if (shouldKeepTutorialRunning(state.campaign.activeLevelId)) tutorial.resume(state);
   return null;
 });
 
