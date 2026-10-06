@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
-import { MINIMAP_LAYERS, layerColor, COLOR_VEHICLE } from '../../../src/ui/miniMapLayers.js';
+import { MINIMAP_LAYERS, layerColor } from '../../../src/ui/miniMapLayers.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
@@ -96,12 +96,11 @@ describe('MiniMap legend (#1424)', () => {
   it('lists vehicles with the colour the vehicle dots are drawn in', () => {
     stubContexts([]);
     const minimap = new MiniMap(document.body);
-    expect(COLOR_VEHICLE).toBe('#c0c040');
-    expect(layerColor('vehicle')).toBe(COLOR_VEHICLE);
+    expect(layerColor('vehicle')).toBe('#c0c040');
     const entry = legendEntries().find((e) => e.dataset['layer'] === 'vehicle')!;
     expect(entry).toBeDefined();
     const probe = document.createElement('span');
-    probe.style.background = COLOR_VEHICLE;
+    probe.style.background = layerColor('vehicle');
     expect(legendSwatch(entry).style.background).toBe(probe.style.background);
     expect(legendLabel(entry).textContent).toBe(t('ui.minimap.vehicle'));
     expect(legendLabel(entry).textContent).not.toBe('ui.minimap.vehicle');

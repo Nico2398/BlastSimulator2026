@@ -116,7 +116,8 @@ export class MiniMap {
       entry.style.cssText = 'display:inline-flex;align-items:center;gap:3px';
       const swatch = document.createElement('span');
       swatch.dataset.legendSwatch = '';
-      swatch.style.cssText = `display:inline-block;width:8px;height:8px;background:${layer.color};border-radius:1px`;
+      swatch.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:1px';
+      swatch.style.background = layer.color;
       const txt = document.createElement('span');
       txt.dataset.legendLabel = '';
       txt.style.cssText = 'color:var(--bsx-text-secondary);font-size:10px';
