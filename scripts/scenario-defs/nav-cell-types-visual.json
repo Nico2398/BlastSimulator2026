@@ -41,6 +41,16 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "dragTiles",
           "x1": 5,
           "z1": 5,

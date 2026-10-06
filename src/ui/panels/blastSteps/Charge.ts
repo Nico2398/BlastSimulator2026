@@ -35,7 +35,7 @@ import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../cor
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { TUBING_COST } from '../../../core/mining/Tubing.js';
-import { MIN_STEMMING_M } from '../../../core/config/balance.js';
+import { MIN_STEMMING_M, CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
@@ -43,8 +43,8 @@ import type { GameConsoleFn } from '../../gameConsole.js';
 
 
 const DEFAULT_EXPLOSIVE = 'boomite';
-const DEFAULT_AMOUNT_KG = 5;
-const DEFAULT_STEMMING_M = 2;
+/** Stemming stepper increment (m); 0.1 keeps 2.5 and whole-metre values reachable. */
+const STEMMING_STEP_M = 0.1;
 const TUBING_BUY_AMOUNT = 10;
 
 export class ChargeStep {
@@ -61,8 +61,8 @@ export class ChargeStep {
   private gameConsole?: GameConsoleFn;
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
   private allowedIds: readonly string[] = resolveAvailableExplosives(null);
-  private amountKg = DEFAULT_AMOUNT_KG;
-  private stemmingM = DEFAULT_STEMMING_M;
+  private amountKg = CHARGE_DEFAULT_AMOUNT_KG;
+  private stemmingM = CHARGE_DEFAULT_STEMMING_M;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -84,7 +84,7 @@ export class ChargeStep {
     const fieldLabelStyle = 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-micro)';
     const amountStepperEl = stepper(`${this.amountKg} kg`, () => this.adjustAmount(-1), () => this.adjustAmount(1));
     this.amountValueEl = amountStepperEl.querySelector('.bsx-stepper-value') as HTMLElement;
-    const stemmingStepperEl = stepper(`${this.stemmingM.toFixed(1)} m`, () => this.adjustStemming(-0.2), () => this.adjustStemming(0.2));
+    const stemmingStepperEl = stepper(`${this.stemmingM.toFixed(1)} m`, () => this.adjustStemming(-STEMMING_STEP_M), () => this.adjustStemming(STEMMING_STEP_M));
     this.stemmingValueEl = stemmingStepperEl.querySelector('.bsx-stepper-value') as HTMLElement;
 
     // data-field, same reasoning as ParamStrip.ts's grid spacing/depth

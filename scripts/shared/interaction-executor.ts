@@ -51,7 +51,7 @@ const SET_STEPPER_DEFAULT_MAX_CLICKS = 64;
 
 /**
  * Two displayed stepper values are "the same" within this. Stemming steps
- * by 0.2 and is rendered with `toFixed(1)`, so a target of 2 against a
+ * by 0.1 and is rendered with `toFixed(1)`, so a target of 2 against a
  * display of `2.0 m` must match, and a float sum like 1.2000000000000002
  * must not read as one step short.
  */
@@ -539,11 +539,11 @@ export async function executeActionOnPage(
           );
         }
         // A target off the control's own lattice (a 2.5 m stemming on a
-        // 0.2 m stepper that starts at 2.0) would otherwise oscillate 2.4 →
-        // 2.6 → 2.4 until `maxClicks`. Crossing the target without landing
+        // stepper with a coarser step than the gap) would otherwise oscillate
+        // either side of it until `maxClicks`. Crossing the target without landing
         // on it is the whole diagnosis, so say it now: the scenario declares
         // a value the control cannot reach, and the command must move to one
-        // it can (tutorial-interactive.json's 2.5 → 2.4 is the case).
+        // it can.
         const crossed = (current < action.value) !== (next < action.value)
           && Math.abs(next - action.value) > SET_STEPPER_TOLERANCE;
         if (crossed) {

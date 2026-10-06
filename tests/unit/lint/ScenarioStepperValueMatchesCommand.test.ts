@@ -6,7 +6,7 @@
 // click vocabulary could only drive by *counting*: N clicks on
 // `.bsx-stepper-btn:last-child` meant "the default plus N", and the default
 // lived in `src/`. The moment `DRILL_GRID_DEFAULT_SPACING_M`, a charge
-// panel's `DEFAULT_AMOUNT_KG` or a strip's persistence across steps changed,
+// panel's `CHARGE_DEFAULT_AMOUNT_KG` or a strip's persistence across steps changed,
 // every count was silently wrong while its command still read right —
 // PR #1070's first red shard was exactly that: `spacing:5` declared beside a
 // drag whose strip still sat at 3 m, ordering 24 holes where 6 were expected.

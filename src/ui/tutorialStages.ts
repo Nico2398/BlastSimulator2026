@@ -168,26 +168,10 @@ export const REGION = {
   // suggestion area, so nothing downstream of the survey moves.
   survey: { x1: 23, z1: 23, x2: 23, z2: 23, exact: true },
   // Sized to the grid it produces: the tool derives
-  // cols = round((x2 - x1) / spacing) + 1. This region predates Drill.ts's
-  // own DEFAULT_SPACING_M (3, not the 5 this region was originally sized
-  // for) -- the mismatch went unnoticed because the spacing stepper is
-  // unreachable this early in the rail (no path to it, confirmed live), so
-  // nothing here ever adjusts spacing away from the tool's own default, and
-  // charging used to be instant (pre-#553/#554) so the doubled 4×4=16-hole
-  // grid a 20→30 span actually produces at spacing 3 never had time to cost
-  // anything. Once charging became real, queued work, 16 holes was enough
-  // for a lone early-tutorial employee (no living quarters built yet) to
-  // collapse repeatedly and trigger a full worker revolt before finishing
-  // (issue #586 CI, tutorial-interactive.json). 20→26 at spacing 3 is
-  // round(6/3)+1=3 holes/side, 3×3=9 -- restoring the region to the
-  // originally-intended 3×3 grid for the spacing this tool actually opens
-  // at, not the 4×4 the stale 20→30/spacing-5 sizing silently grew it to.
-  // #949: the scripted `drill_plan` command moved to `spacing:4 start:22,20`
-  // (rated-`catastrophic` shot -- overloaded, under-stemmed, too close to the
-  // box-cut face -- needed both a lighter charge and a hole grid stood off
-  // further east from that face). A 3x3 grid at spacing 4 from (22,20) now
-  // spans (22,20)-(30,28); the region widens to match with the same margin
-  // convention as before.
+  // cols = round((x2 - x1) / spacing) + 1. The tool's default spacing is 4
+  // (DRILL_GRID_DEFAULT_SPACING_M), so the 8x8 span (22,20)-(30,28) yields a
+  // 3x3 grid of 9 holes untouched (#1330) -- not the 16-hole grid that
+  // collapsed a lone early-tutorial employee (#586).
   drill: { x1: 22, z1: 20, x2: 30, z2: 28, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
@@ -392,11 +376,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   // #949: `also` lists the amount/stemming steppers (Charge.ts, `data-field`
-  // convention) alongside Charge All — without them the scripted plan's
-  // amount:4/stemming:2.4 was unreachable by a real click: the panel opens at
-  // its own 5kg/2.0m defaults and nothing on this stage let a player move off
-  // them. Both stepper buttons (inc/dec) allowed, not just the direction the
-  // scripted plan happens to need.
+  // convention) alongside Charge All. The panel defaults now equal the scripted
+  // plan (CHARGE_DEFAULT_*, #1330), but the steppers stay reachable for
+  // adjustments. Both buttons (inc/dec) are allowed, not just the direction
+  // the plan happens to need.
   charge: [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     {

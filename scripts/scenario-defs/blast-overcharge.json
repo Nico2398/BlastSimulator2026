@@ -42,6 +42,11 @@
           "value": 5
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,

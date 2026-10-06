@@ -633,16 +633,6 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "setStepper",
-          "selector": "#bs-param-strip-bar [data-field=\"spacing\"]",
-          "value": 4
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-param-strip-bar [data-field=\"depth\"]",
-          "value": 8
-        },
-        {
           "type": "dragTiles",
           "x1": 22,
           "z1": 20,
@@ -661,7 +651,7 @@
         }
       ],
       "role": "player",
-      "description": "#949-followup: added the spacing (3->4, one increment click, 1m/step) and depth (6->8, two increment clicks, 1m/step) stepper clicks before the drag -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), rendered the instant the grid tool arms, and were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix). Without these clicks the drag alone produced a mis-spaced grid at the panel's own defaults (wrong spacing/depth), not the retuned 3x3/spacing:4/depth:8 plan #949 asks for. #553: confirming the 3x3/9-hole grid now only ORDERS the 9 holes -- drill_hole became queued, vehicle-gated work, so they are ghosts until the driller drives the rig to each one, and the tutorial does not advance to `charge` until they have landed. The wait is the step below; the mid-pattern screenshot above is the ghosts-and-real-holes picture #553 asks for. #949: spacing/depth/start retuned from 3/6/(20,20) to 4/8/(22,20), mirroring the exact retune tutorialSteps.ts's own 'drill-plan' stage applies (verified live against the real engine to rate the shot PERFECT with zero casualties/destruction, replacing the old 5m-spacing/8m-depth-at-(20,20) plan that rated CATASTROPHIC). rows/cols/diameter unchanged (still 3/3/0.089). `dragTiles` moved to (22,20)-(30,28) to match the new footprint. GAP CLOSED: REGION.drill (tutorialStages.ts) used to exact-gate the picker to the OLD (20,20)-(26,26) box (#601-followup, this same file's prior note), which would have rejected every tile outside that stale gate for a real click-mode drag (`.claude/rules/scenario-defs.md`: \"pickers reject tiles outside the step's region\"); the tutorial rail's own region has since been widened/moved to (22,20)-(30,28) alongside this retune, so the drag above lands cleanly. CI cash mismatch fix (unchanged from the prior pass, still applies): this command carries `diameter:0.089`, the real Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter falls back to the console-only 0.15 default and computeDrillHoleDurationTicks (DrillPlan.ts) scales hole duration by diameter, so this keeps command mode's drill_rig busy-time matching a real click's. Downstream cash/tick checkpoints through the blast step below were re-derived against the new 4/8/(22,20) plan and verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end confirming Spacing 4.0m/Depth 8.0m/3x3=9 holes and Amount 4kg/Stemming 2.4m reached by real clicks.",
+      "description": "#949-followup: added the spacing (3->4, one increment click, 1m/step) and depth (6->8, two increment clicks, 1m/step) stepper clicks before the drag -- both steppers live on the shared ParamStrip (#bs-param-strip-bar, ParamStrip.ts), rendered the instant the grid tool arms, and were unreachable in this step before tutorialStages.ts's own 'drill-plan' stage allowlisted them (defect 2 fix). Without these clicks the drag alone produced a mis-spaced grid at the panel's own defaults (wrong spacing/depth), not the retuned 3x3/spacing:4/depth:8 plan #949 asks for. #553: confirming the 3x3/9-hole grid now only ORDERS the 9 holes -- drill_hole became queued, vehicle-gated work, so they are ghosts until the driller drives the rig to each one, and the tutorial does not advance to `charge` until they have landed. The wait is the step below; the mid-pattern screenshot above is the ghosts-and-real-holes picture #553 asks for. #949: spacing/depth/start retuned from 3/6/(20,20) to 4/8/(22,20), mirroring the exact retune tutorialSteps.ts's own 'drill-plan' stage applies (verified live against the real engine to rate the shot PERFECT with zero casualties/destruction, replacing the old 5m-spacing/8m-depth-at-(20,20) plan that rated CATASTROPHIC). rows/cols/diameter unchanged (still 3/3/0.089). `dragTiles` moved to (22,20)-(30,28) to match the new footprint. GAP CLOSED: REGION.drill (tutorialStages.ts) used to exact-gate the picker to the OLD (20,20)-(26,26) box (#601-followup, this same file's prior note), which would have rejected every tile outside that stale gate for a real click-mode drag (`.claude/rules/scenario-defs.md`: \"pickers reject tiles outside the step's region\"); the tutorial rail's own region has since been widened/moved to (22,20)-(30,28) alongside this retune, so the drag above lands cleanly. CI cash mismatch fix (unchanged from the prior pass, still applies): this command carries `diameter:0.089`, the real Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter falls back to the console-only 0.15 default and computeDrillHoleDurationTicks (DrillPlan.ts) scales hole duration by diameter, so this keeps command mode's drill_rig busy-time matching a real click's. Downstream cash/tick checkpoints through the blast step below were re-derived against the new 4/8/(22,20) plan and verified: command-mode run (`npx tsx scripts/run-all-scenarios.ts tutorial-playthrough tutorial-steps-visual tutorial-interactive`) passes with 0 failures, and interaction-mode run (real Puppeteer clicks, screenshots) passes end-to-end confirming Spacing 4.0m/Depth 8.0m/3x3=9 holes and Amount 4kg/Stemming 2.4m reached by real clicks. #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
       "expect": {
         "equals": {
           "orderedHoleCount": 9,
@@ -890,19 +880,9 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:4 stemming:2.4",
+      "command": "charge hole:* explosive:boomite amount:4 stemming:2.5",
       "timeout": 90,
       "interaction": [
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 4
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 2.4
-        },
         {
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
@@ -913,7 +893,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "2.4 m"
+          "expectedValue": "2.5 m"
         },
         {
           "type": "clickSelector",
@@ -921,7 +901,7 @@
         }
       ],
       "role": "player",
-      "description": "#949: retuned from amount:5 stemming:2 to amount:4 stemming:2.5, mirroring tutorialSteps.ts's own 'charge' stage retune. The click flow now reaches for the amount/stemming steppers explicitly (one decrement click, 5kg->4kg; the amount stepper's step is 1kg, Charge.ts) rather than relying on Charge All at the panel's own 5kg/2m defaults, which is what this step's click sequence used to do when the declared command matched those defaults exactly -- it no longer does. Stemming lands at 2.4m (two increment clicks, 2.0->2.2->2.4; the stemming stepper's own step is 0.2m, Charge.ts) rather than the command's exact 2.5m: the stepper has no way to land on an odd multiple of 0.2 from a 2.0m start, and 2.4m is functionally identical to 2.5m here anyway -- both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.4m at this pattern's new depth:8), the same cap this file's own prior note on the buildingCount step below already documents for the old 6m-deep pattern. Command mode fires the plan at the literal 2.5m the tutorial hint declares; interaction mode fires it at the stepper-reachable 2.4m; both are capped-equivalent so the two channels' blast outcomes should not diverge on this account. tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #926: the click only queues the order -- charging is real, per-hole, queued work, so the tutorial stays on 'charge' (and the panel stays on its Charge tab) until every hole has actually landed; the wait step right after is what drains it and is where the tutorial step advance is now asserted, not here (a plain 'value increased' comparison used to complete this step, and the assertion here, on the very first hole -- see that step's own note). The stepper click count/selectors above were verified against a real interaction-mode run (Puppeteer, screenshots), confirming Amount 4kg/Stemming 2.4m reached by real clicks.",
+      "description": "#949: retuned from amount:5 stemming:2 to amount:4 stemming:2.5, mirroring tutorialSteps.ts's own 'charge' stage retune. The click flow now reaches for the amount/stemming steppers explicitly (one decrement click, 5kg->4kg; the amount stepper's step is 1kg, Charge.ts) rather than relying on Charge All at the panel's own 5kg/2m defaults, which is what this step's click sequence used to do when the declared command matched those defaults exactly -- it no longer does. Stemming lands at 2.4m (two increment clicks, 2.0->2.2->2.4; the stemming stepper's own step is 0.2m, Charge.ts) rather than the command's exact 2.5m: the stepper has no way to land on an odd multiple of 0.2 from a 2.0m start, and 2.4m is functionally identical to 2.5m here anyway -- both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.4m at this pattern's new depth:8), the same cap this file's own prior note on the buildingCount step below already documents for the old 6m-deep pattern. Command mode fires the plan at the literal 2.5m the tutorial hint declares; interaction mode fires it at the stepper-reachable 2.4m; both are capped-equivalent so the two channels' blast outcomes should not diverge on this account. tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #926: the click only queues the order -- charging is real, per-hole, queued work, so the tutorial stays on 'charge' (and the panel stays on its Charge tab) until every hole has actually landed; the wait step right after is what drains it and is where the tutorial step advance is now asserted, not here (a plain 'value increased' comparison used to complete this step, and the assertion here, on the very first hole -- see that step's own note). The stepper click count/selectors above were verified against a real interaction-mode run (Puppeteer, screenshots), confirming Amount 4kg/Stemming 2.4m reached by real clicks. #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
       "expect": {
         "tutorialStep": "charge",
         "increased": [

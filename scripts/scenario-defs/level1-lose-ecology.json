@@ -503,6 +503,11 @@
           "pitch": 60
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "dragTiles",
           "x1": 9,
           "z1": 4,

@@ -196,15 +196,16 @@ describe('DrillStep', () => {
     gridBtn.click();
     expect(controller.isArmed).toBe(true);
 
-    // 9m x 3m selection at 3m spacing (the tool's default) → 4 cols x 2 rows.
-    controller.simulateSelect({ x1: 10, z1: 10, x2: 19, z2: 13 });
+    // 8m x 4m selection at 4m spacing (the tool's default, #1330) → 3 cols x 2 rows.
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 18, z2: 14 });
     controller.simulateConfirm();
 
     expect(gameConsole).toHaveBeenCalledWith(expect.stringContaining('drill_plan grid'));
     const cmd = gameConsole.mock.calls[0]![0] as string;
     expect(cmd).toContain('rows:2');
-    expect(cmd).toContain('cols:4');
-    expect(cmd).toContain('spacing:3');
+    expect(cmd).toContain('cols:3');
+    expect(cmd).toContain('spacing:4');
+    expect(cmd).toContain('depth:8');
     expect(cmd).toContain('start:10,10');
   });
 
@@ -227,11 +228,11 @@ describe('DrillStep', () => {
     const state = makeState();
 
     (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
-    controller.simulateSelect({ x1: 10, z1: 10, x2: 19, z2: 13 });
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 18, z2: 14 });
     controller.simulateConfirm();
 
     step.update(state, 'sunny');
-    expect(step.root.textContent).toContain('4 × 2');
+    expect(step.root.textContent).toContain('3 × 2');
   });
 
   it('arms the add-hole (point) tool and confirming dispatches drill_plan add at the picked tile', () => {
@@ -441,8 +442,8 @@ describe('DrillStep — footprint awareness (#1359)', () => {
     step.update(makeStateWithFootprint(), 'sunny');
 
     (step.root.querySelector('[data-action="grid-tool"]') as HTMLButtonElement).click();
-    // 101 x 101 cells at 3 m spacing > MAX_DRILL_GRID_HOLES (10 000).
-    controller.simulateSelect({ x1: 10, z1: 10, x2: 310, z2: 310 });
+    // 101 x 101 cells at the 4 m default spacing > MAX_DRILL_GRID_HOLES (10 000).
+    controller.simulateSelect({ x1: 10, z1: 10, x2: 410, z2: 410 });
 
     const arg = lastStripArg(strip);
     expect(arg.result).not.toContain('skipped');

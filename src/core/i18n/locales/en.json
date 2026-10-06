@@ -3069,7 +3069,7 @@
   "tutorial.stage.open_blast": "Open the Blast panel from the toolbar.",
   "tutorial.stage.grid_tool": "Press Grid Tool to lay out drill holes.",
   "tutorial.stage.drill_area": "Click anywhere inside the blue square outlined in the scene. The grid snaps to it. Then set Spacing to 4 m and Depth to 8 m.",
-  "tutorial.stage.charge_all": "Set Amount to 4 kg and Stemming to 2.4 m, then press Charge All Holes.",
+  "tutorial.stage.charge_all": "Set Amount to 4 kg and Stemming to 2.5 m, then press Charge All Holes.",
   "tutorial.stage.open_sequence_tab": "Click the 3 Sequence tab in the Blast panel.",
   "tutorial.stage.auto_sequence": "Press Auto Sequence (V-Pattern) to set the detonation delays.",
   "tutorial.stage.sound_horn": "Click Sound the Horn and clear the blast zone before firing.",

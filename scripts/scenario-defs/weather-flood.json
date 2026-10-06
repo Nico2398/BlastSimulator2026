@@ -178,6 +178,16 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
@@ -229,6 +239,16 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
@@ -244,14 +264,19 @@
       "command": "tick 25",
       "description": "#554-followup (issue #586 CI, revised for the #554-followup grid trim): a real-time waitUntil here let real interaction-mode CI reach a genuine worker_revolt before the sequence step below (the level-end screen covered the whole panel) even though command mode's own deterministic trace never revolts -- same real-time-vs-deterministic-convergence mismatch already found and fixed this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json, scores-display-visual.json, survey-overlay-lifecycle.json). Deterministic tick-N/event-choose-0 chunked pattern, re-measured after the drill-plan grid trim (9 holes -> 4): with the drilling budget above also trimmed from a padded 220 ticks down to the 65 actually needed, the single driller now charges all 4 holes by ~tick 96-110 (measured from a fresh tick65 baseline) instead of the old plan's ~288 -- 3 rounds of tick 15 (45 ticks) gave comfortable margin without re-introducing the dead-tick padding that was driving wellBeing toward its sticky-zero floor for no reason. #680 re-measured: fixing the needs-drain misclassification (idle rate while walking toward a queued rest, not the working rate) shifts a forced-rest cycle earlier into this charging window, so all 4 holes now land by ~tick 128 -- bumped to 3 rounds of tick 25 (75 ticks) for comfortable margin.",
       "interaction": [
-        { "type": "command", "command": "tick 25" }
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
       ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
-        { "type": "resolveEventIfPending" }
+        {
+          "type": "resolveEventIfPending"
+        }
       ],
       "role": "player",
       "commandOutcome": "either"
@@ -259,14 +284,19 @@
     {
       "command": "tick 25",
       "interaction": [
-        { "type": "command", "command": "tick 25" }
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
       ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
-        { "type": "resolveEventIfPending" }
+        {
+          "type": "resolveEventIfPending"
+        }
       ],
       "role": "player",
       "commandOutcome": "either"
@@ -274,7 +304,10 @@
     {
       "command": "tick 25",
       "interaction": [
-        { "type": "command", "command": "tick 25" }
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
       ],
       "role": "setup",
       "expect": {
@@ -287,7 +320,9 @@
     {
       "command": "event choose 0",
       "interaction": [
-        { "type": "resolveEventIfPending" }
+        {
+          "type": "resolveEventIfPending"
+        }
       ],
       "role": "player",
       "commandOutcome": "either"

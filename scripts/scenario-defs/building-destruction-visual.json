@@ -24,7 +24,7 @@
     },
     {
       "command": "drill_plan add x:20 z:20 depth:6 diameter:0.089",
-      "description": "Ordered on open ground, before either warehouse exists (#553) — the single-hole add tool, not the grid tool, since the two target holes (exactly the warehouse origins below) aren't a rectangular pattern worth dragging. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real add-hole-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click never spent.",
+      "description": "Ordered on open ground, before either warehouse exists (#553) — the single-hole add tool, not the grid tool, since the two target holes (exactly the warehouse origins below) aren't a rectangular pattern worth dragging. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real add-hole-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click never spent. #1330: the add tool opens at the 8 m default depth, so the interaction steps depth back to 6 to match the command and keep the drill ticks within the tick-50 pad.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -44,6 +44,11 @@
           "z": 20
         },
         {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
           "type": "screenshot"
         },
         {
@@ -61,7 +66,7 @@
     },
     {
       "command": "drill_plan add x:25 z:25 depth:6 diameter:0.089",
-      "description": "BlastWorkshop auto-advances Drill -> Charge once a hole exists, so a second use of the Drill tools needs an explicit click back to the Drill tab ([data-step=\"1\"]) first, same as blast-drill-plan-ui.json's second grid use. diameter:0.089 added (issue #553 shared-mechanism finding): same fix as H1 above.",
+      "description": "BlastWorkshop auto-advances Drill -> Charge once a hole exists, so a second use of the Drill tools needs an explicit click back to the Drill tab ([data-step=\"1\"]) first, same as blast-drill-plan-ui.json's second grid use. diameter:0.089 added (issue #553 shared-mechanism finding): same fix as H1 above. #1330: the add tool opens at the 8 m default depth, so the interaction steps depth back to 6 to match the command and keep the drill ticks within the tick-50 pad.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -83,6 +88,11 @@
           "type": "pickTile",
           "x": 25,
           "z": 25
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
         },
         {
           "type": "screenshot"
