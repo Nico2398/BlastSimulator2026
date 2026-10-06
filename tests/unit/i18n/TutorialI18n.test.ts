@@ -35,13 +35,16 @@ function generateAllTutorialKeys(): string[] {
   // elsewhere in the flow (inside the box-cut wait) and have their own named
   // keys.
   for (let i = 1; i <= 23; i++) {
-    if (i === 1 || i === 18) continue;
+    // #1328: steps 20-22 (set-policy/tick-advance/victory) became free-play.
+    if (i === 1 || i === 18 || (i >= 20 && i <= 22)) continue;
     keys.push(`tutorial.step${i}`);
   }
   for (let i = 1; i <= 23; i++) {
-    if (i === 1 || i === 18) continue;
+    // #1328: steps 20-22 (set-policy/tick-advance/victory) became free-play.
+    if (i === 1 || i === 18 || (i >= 20 && i <= 22)) continue;
     keys.push(`tutorial.step${i}.title`);
   }
+  keys.push('tutorial.free_play', 'tutorial.free_play.title', 'tutorial.goal_chip', 'tutorial.goal_chip_tooltip');
   keys.push('tutorial.step_boxcut', 'tutorial.step_boxcut.title', 'tutorial.stage.boxcut_area');
   keys.push(
     'tutorial.done',

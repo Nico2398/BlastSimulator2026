@@ -1128,7 +1128,7 @@ describe('free-play step card (#1329/#1328) — honest about progress before the
 
     it('shows a zero remaining without breaking when profit already exceeds target', () => {
       const p = step.textParamsFor!(stateWith(target + 1));
-      expect(String(p.remaining)).toMatch(/^0$/);
+      expect(String(p.remaining)).toMatch(/^\$0$/);
     });
   });
 

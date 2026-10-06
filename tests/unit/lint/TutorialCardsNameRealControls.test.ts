@@ -44,7 +44,6 @@ const CARD_CONTROLS: Record<string, string[]> = {
   'stage.build_driving_center': ['ui.build.place'],
   'stage.policy_continuous': ['ui.policy.shift_mode', 'ui.policy.continuous'],
   step_earlypolicy: ['ui.policy.shift_mode', 'ui.policy.continuous'],
-  'stage.policy_apply': ['ui.policy.apply'],
   'stage.train_drill_rig': ['ui.crew.train'],
   'stage.train_excavator': ['ui.crew.train'],
   'stage.ramp_tool': ['ui.build.ramp'],

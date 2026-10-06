@@ -347,7 +347,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     // scenario) can click Apply immediately and silently keep the shift_8h
     // default instead of Continuous -- confirmed live (interaction mode
     // reported the Continuous button itself as inert/unreachable). Matches
-    // the later 'set-policy' stage's own working shape below: Apply is the
+    // the early-policy stage's own working shape: Apply is the
     // stage's target (so the rail actually reaches it), with the controls
     // that legitimately need to be clickable alongside it -- shift-mode
     // included -- allowed via `also`, rather than gated behind a stage of
@@ -529,30 +529,6 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       spentWhen: (state) => state.plannedRamps.length > 0,
       waitingKey: 'tutorial.waiting.excavating',
     }),
-  ],
-
-  'set-policy': [
-    { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
-    {
-      target: '#bs-policy-apply',
-      hintKey: 'tutorial.stage.policy_apply',
-      also: ['#bs-policy-shift', '#bs-policy-fatigue'],
-    },
-  ],
-
-  'tick-advance': [
-    { target: '#bs-hud-top .bs-speed-btn', hintKey: 'tutorial.stage.let_time_run' },
-  ],
-
-  // Contracts panel opening and the speed bar are permanently allowed (rails
-  // base set); the deliver controls inside the panel are listed so ore can
-  // actually be sold on this stage.
-  victory: [
-    {
-      target: '#bs-hud-scores',
-      hintKey: 'tutorial.stage.earn_profit',
-      also: ['#bs-contract-panel .bs-contract-deliver', '#bs-contract-panel .bs-contract-amount'],
-    },
   ],
 };
 

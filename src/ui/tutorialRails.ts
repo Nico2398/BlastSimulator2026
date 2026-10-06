@@ -60,13 +60,16 @@ export class TutorialRails {
   private waitsOnWork = false;
   private clockMustRun: ((state: GameState) => boolean) | undefined;
   private held = false;
+  /** True once the step lifted the rails: the clock is never held (#1328). */
+  private unguided = false;
   private lastProgressSignature: string | null = null;
   private lastProgressTick = 0;
   private lastProgressTrainingActive = false;
 
   /** Point the rails at a new step and reset its tick allowance. */
   beginStep(step: RailsStep, state: GameState | null): void {
-    this.stages = stagesFor(step.id, step.highlightTarget);
+    this.unguided = step.guided === false;
+    this.stages = this.unguided ? [] : stagesFor(step.id, step.highlightTarget);
     this.stageIndex = 0;
     this.budget = step.tickBudget ?? DEFAULT_TICK_BUDGET;
     this.waitsOnWork = step.waitsOnWork === true;
@@ -79,6 +82,7 @@ export class TutorialRails {
     // opens on the click that ends the previous stage, so publishing later
     // would leave that first picker unconstrained.
     setPickerRegion(this.stages.find(s => s.region)?.region ?? null);
+    if (this.unguided) clearRails();
     this.releaseClock(state);
   }
 
@@ -138,7 +142,7 @@ export class TutorialRails {
    * card is describing.
    */
   updateClock(state: GameState | null): boolean {
-    if (!state) return this.held;
+    if (!state || this.unguided) return this.held;
     const decision = decideClock(
       state, this.stepStartTick, this.budget, this.waitsOnWork,
       {
@@ -188,5 +192,6 @@ export class TutorialRails {
     this.stages = [];
     this.stageIndex = 0;
     this.held = false;
+    this.unguided = false;
   }
 }

@@ -6,8 +6,9 @@ import type { GameState } from '../core/state/GameState.js';
 import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
+import { goalChipParams } from './tutorialStepsClosing.js';
 import { GUIDED_CLASS } from './tutorialGuide.js';
-import { TutorialRails } from './tutorialRails.js';
+import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
 
 /**
@@ -43,6 +44,8 @@ export class TutorialOverlay {
   private readonly pausedEl: HTMLElement;
   private readonly pausedChipEl: HTMLElement;
   private readonly waitingChipEl: HTMLElement;
+  private readonly goalChipEl: HTMLElement;
+  private readonly goalParams: Record<string, string | number>;
   private readonly stepCounter: HTMLElement;
   private readonly progressEl: HTMLElement;
   private readonly commandsLabel: HTMLElement;
@@ -72,6 +75,8 @@ export class TutorialOverlay {
     // Its text is owned by `this.locale` now (bound in buildTutorialCard()); kept as
     // a field only so direct DOM introspection (tests, debugging) can still reach it.
     void this.pausedChipEl;
+    this.goalChipEl = els.goalChipEl;
+    this.goalParams = els.goalChipParams;
     this.stepCounter = els.stepCounter;
     this.progressEl = els.progressEl;
     this.commandsLabel = els.commandsLabel;
@@ -86,7 +91,7 @@ export class TutorialOverlay {
     this.snapshots = {};
     this._active = true;
     this.overlay.style.display = '';
-    document.body.classList.add(GUIDED_CLASS);
+    this.applyGuidedClass();
 
     if (state) {
       this.gameState = state;
@@ -143,6 +148,7 @@ export class TutorialOverlay {
     this.clearAutoAdvance();
     this.rails.clear();
     document.body.classList.remove(GUIDED_CLASS);
+    this.goalChipEl.style.display = 'none';
     this.overlay.remove();
   }
 
@@ -185,7 +191,7 @@ export class TutorialOverlay {
     this.refreshGuide();
   }
 
-  private step(): { id: string; highlightTarget?: string; tickBudget?: number } {
+  private step(): RailsStep {
     return TUTORIAL_STEPS[this.stepIndex] ?? { id: '' };
   }
 
@@ -256,6 +262,7 @@ export class TutorialOverlay {
     this.pausedEl.style.display = 'none';
 
     this.stepIndex = index;
+    this.applyGuidedClass();
     afterIndexSet?.();
 
     this.rails.beginStep(this.step(), this.gameState);
@@ -309,6 +316,7 @@ export class TutorialOverlay {
     this.clearAutoAdvance();
     this.rails.clear();
     document.body.classList.remove(GUIDED_CLASS);
+    this.goalChipEl.style.display = 'none';
     this.snapshots = {};
     this._active = false;
     if (this.gameState) {
@@ -366,8 +374,28 @@ export class TutorialOverlay {
 
     if (step?.textParamsFor) this.renderText(step);
     this.refreshGuide();
+    if (step?.guided === false) {
+      this.pausedEl.style.display = 'none';
+      return;
+    }
     const held = this.rails.updateClock(this.gameState);
     this.pausedEl.style.display = held ? '' : 'none';
+  }
+
+  /** Rails (inert controls) only apply while the current step is guided (#1328). */
+  private applyGuidedClass(): void {
+    document.body.classList.toggle(GUIDED_CLASS, this.step().guided !== false);
+  }
+
+  /** Show the goal chip on `goalChip` steps and refresh its live figures; bound through the locale registry. */
+  private renderGoalChip(): void {
+    const step = TUTORIAL_STEPS[this.stepIndex];
+    const show = step?.goalChip === true && this.gameState !== null;
+    this.goalChipEl.style.display = show ? '' : 'none';
+    if (show && this.gameState) {
+      Object.assign(this.goalParams, goalChipParams(this.gameState));
+      this.locale.refresh();
+    }
   }
 
   /** Move the rails onto whichever control the player should be using now. */
@@ -377,6 +405,7 @@ export class TutorialOverlay {
     this.stageEl.textContent = view.waiting ? view.waitingHint : view.hint;
     this.stageLine.classList.toggle('bs-tutorial-stage-line--waiting', view.waiting);
     this.waitingChipEl.style.display = view.waiting ? '' : 'none';
+    this.renderGoalChip();
   }
 
   private clearAutoAdvance(): void {

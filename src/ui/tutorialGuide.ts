@@ -173,7 +173,7 @@ function isStageTargetInsideModal(
  * Put the rails on the DOM: glow the stage's control, mark it and its helpers
  * live, and clear the marks from everything else.
  *
- * Blocking is done in CSS off `GUIDED_CLASS`, so a control that appears between
+ * Blocking is done in CSS off `GUIDED_CLASS` (dropped once the guided part is over), so a control that appears between
  * two passes is inert from the moment it is rendered rather than briefly
  * clickable.
  */
@@ -230,7 +230,7 @@ export function applyRails(
   if (target) target.classList.add(HIGHLIGHT_CLASS);
 }
 
-/** Take the rails off — used when the tutorial ends. */
+/** Take the rails off — used when the tutorial ends or its guided part is over (#1328). */
 export function clearRails(root: ParentNode = document): void {
   applyRails(undefined, root);
 }

@@ -135,9 +135,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // live pre-#700). 'continuous' has no shift-length cap (getShiftDurationTicks
   // returns Infinity) but shouldForceRest's fatigue-threshold check
   // still applies in every mode — exactly the protection this step exists
-  // to add, without capping how long a single queued task may run. The
-  // later set-policy step (unchanged) still teaches shift_8h once the grind
-  // is over.
+  // to add, without capping how long a single queued task may run.
+  // Ops keeps the policy panel for the player to revisit afterwards.
   {
     id: 'set-early-policy',
     titleKey: 'tutorial.step_earlypolicy.title',
@@ -475,6 +474,20 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     { tickBudget: 20, waitsOnWork: true },
   ),
 
+  // ── Step 16: finances ──
+  createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({
+    cash: state.cash,
+    contracts: { ...(state.contracts ?? {}) },
+  }), '#bs-hud-top .bs-balance'),
+
+  // ── Step 18: needs ──
+  createAutoAdvanceStep('needs', 'tutorial.step19.title', 'tutorial.step19', (state: GameState) => ({
+    employees: getEmployees(state).map(e => ({
+      id: (e as unknown as Record<string, unknown>).id as number ?? 0,
+      fatigue: (e as unknown as Record<string, unknown>).fatigue as number ?? 0,
+    })),
+  }), TOOLBAR_TARGET.employees),
+
   // ── Step 15: sell-ore ──
   // Replaces the old contract-deliver step (#959): the tutorial never hauled
   // and sold the blasted ore for money, so a player following it to the
@@ -505,21 +518,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     },
   ),
 
-  // ── Step 16: finances ──
-  createAutoAdvanceStep('finances', 'tutorial.step17.title', 'tutorial.step17', (state: GameState) => ({
-    cash: state.cash,
-    contracts: { ...(state.contracts ?? {}) },
-  }), '#bs-hud-top .bs-balance'),
-
-  // ── Step 18: needs ──
-  createAutoAdvanceStep('needs', 'tutorial.step19.title', 'tutorial.step19', (state: GameState) => ({
-    employees: getEmployees(state).map(e => ({
-      id: (e as unknown as Record<string, unknown>).id as number ?? 0,
-      fatigue: (e as unknown as Record<string, unknown>).fatigue as number ?? 0,
-    })),
-  }), TOOLBAR_TARGET.employees),
-
-  // ── Steps 19-22: set-policy, tick-advance, victory, congratulations ──
+  // ── free-play, congratulations ──
+  // Free play starts once the first ore sale lands; the guided part ends there (#1328).
   // Split into tutorialStepsClosing.ts (#557 — see that file's own header).
   ...TUTORIAL_STEPS_CLOSING,
 ];

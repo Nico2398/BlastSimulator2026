@@ -542,6 +542,10 @@ body.bs-tutorial-guided .bs-detail-toggle:not(.bs-tutorial-allowed) {
   background: rgba(85,168,255,.16);
   color: var(--bsx-info);
 }
+.bs-tutorial-goal {
+  background: rgba(79,199,107,.16);
+  color: var(--bsx-positive);
+}
 .bs-tutorial-stage-line {
   color: var(--bsx-amber);
 }

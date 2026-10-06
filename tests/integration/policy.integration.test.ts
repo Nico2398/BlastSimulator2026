@@ -56,6 +56,48 @@ describe('set_policy', () => {
   });
 });
 
+describe('the tutorial early Site Policy step', () => {
+  const step = TUTORIAL_STEPS.find(s => s.id === 'set-early-policy')!;
+
+  it('completes when the player presses Apply with the settings unchanged', () => {
+    const ctx = makeCtx();
+    // Whatever the policy currently is, that is what the form shows.
+    const current = ctx.state!.sitePolicy;
+    const snapshot = step.captureSnapshot!(ctx.state!);
+
+    setPolicyCommand(ctx, [], {
+      mode: current.shiftMode,
+      fatigue: String(current.fatigueRestThreshold),
+    });
+
+    expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
+  });
+
+  it('completes when the player changes the shift schedule first', () => {
+    const ctx = makeCtx();
+    const snapshot = step.captureSnapshot!(ctx.state!);
+
+    setPolicyCommand(ctx, [], { mode: 'shift_12h', fatigue: '25' });
+
+    expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
+  });
+
+  it('stays incomplete until Apply is pressed', () => {
+    const ctx = makeCtx();
+    const snapshot = step.captureSnapshot!(ctx.state!);
+    expect(step.isComplete(ctx.state!, snapshot)).toBe(false);
+  });
+
+  it('stays incomplete when the command was rejected', () => {
+    const ctx = makeCtx();
+    const snapshot = step.captureSnapshot!(ctx.state!);
+
+    setPolicyCommand(ctx, [], { mode: 'nonsense' });
+
+    expect(step.isComplete(ctx.state!, snapshot)).toBe(false);
+  });
+});
+
 describe('the default site policy is in force without any set_policy call (#1379)', () => {
   const UNTOUCHED_TICKS = 1000;
 
