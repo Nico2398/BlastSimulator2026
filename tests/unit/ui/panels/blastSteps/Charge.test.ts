@@ -192,7 +192,17 @@ describe('ChargeStep', () => {
     expect(Number(amountValue.textContent!.replace(' kg', ''))).toBe(popRock.minChargeKg);
   });
 
-  it('stemming stepper steps by 0.2m and floors at 0.5m', () => {
+  it('one stemming increment moves 2.5 -> 2.6 (0.1 m step)', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+
+    const stemmingValue = step.root.querySelectorAll('.bsx-stepper-value')[1] as HTMLElement;
+    expect(stemmingValue.textContent).toBe('2.5 m');
+    (step.root.querySelectorAll('.bsx-stepper-btn')[3] as HTMLButtonElement).click();
+    expect(stemmingValue.textContent).toBe('2.6 m');
+  });
+
+  it('stemming stepper floors at 0.5m', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
 

@@ -376,11 +376,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   // #949: `also` lists the amount/stemming steppers (Charge.ts, `data-field`
-  // convention) alongside Charge All — without them the scripted plan's
-  // amount/stemming plan was unreachable by a real click when the panel opened
-  // elsewhere; the defaults now equal the plan (CHARGE_DEFAULT_*, #1330) but
-  // the steppers stay reachable for adjustments. Both stepper buttons (inc/dec) allowed, not just the direction the
-  // scripted plan happens to need.
+  // convention) alongside Charge All. The panel defaults now equal the scripted
+  // plan (CHARGE_DEFAULT_*, #1330), but the steppers stay reachable for
+  // adjustments. Both buttons (inc/dec) are allowed, not just the direction
+  // the plan happens to need.
   charge: [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     {
