@@ -580,7 +580,7 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     20: 'vehicle buy rock_digger',
     21: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
     22: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089', // #949
-    31: 'charge hole:* explosive:boomite amount:4 stemming:2.4',
+    31: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
     35: 'sequence auto',
   };
 
