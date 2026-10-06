@@ -10,6 +10,7 @@ import { goalChipParams } from './tutorialStepsClosing.js';
 import { GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
+import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 
 /**
  * How often (ms) the guide re-reads the DOM.
@@ -305,6 +306,21 @@ export class TutorialOverlay {
   abandon(): void {
     if (!this._active) return;
     this.teardown();
+  }
+
+  /** Injects the confirm-modal opener used by requestExit (#1332). */
+  setConfirmHandler(_cb: (config: ConfirmModalConfig) => void): void {
+    // TODO: implement
+  }
+
+  /** Asks the player to confirm leaving the tutorial (#1332). */
+  requestExit(): void {
+    // TODO: implement
+  }
+
+  /** Leaves the tutorial immediately (#1332). */
+  exit(): void {
+    // TODO: implement
   }
 
   private finish(): void {

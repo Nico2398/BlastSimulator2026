@@ -54,6 +54,8 @@ export interface TutorialCardElements {
    * by TutorialOverlay each guide tick, then re-applied through `locale`.
    */
   goalChipParams: LocaleParams;
+  /** Exit button (`data-action="tutorial-exit"`). Skeleton: created, not attached or wired. */
+  exitBtn: HTMLButtonElement;
   stepCounter: HTMLElement;
   progressEl: HTMLElement;
   commandsLabel: HTMLElement;
@@ -182,8 +184,11 @@ export function buildTutorialCard(container: HTMLElement): TutorialCardElements 
   overlay.appendChild(box);
   container.appendChild(overlay);
 
+  const exitBtn = document.createElement('button');
+  exitBtn.dataset.action = 'tutorial-exit';
+
   return {
     overlay, box, titleEl, textEl, stageEl, stageLine, pausedEl, pausedChipEl, waitingChipEl, goalChipEl, goalChipParams,
-    stepCounter, progressEl, commandsLabel, commandsHint, locale,
+    exitBtn, stepCounter, progressEl, commandsLabel, commandsHint, locale,
   };
 }

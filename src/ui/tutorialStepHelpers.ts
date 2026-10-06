@@ -33,6 +33,12 @@ export const SPEED_BUTTON_GROUP = '#bs-hud-top .bs-speed-btn button[data-speed]'
  *  new rails entry (#1041). */
 export const PANEL_OPEN_SELECTOR = '[data-panel]';
 
+/** The tutorial card's exit button (#1332). */
+export const TUTORIAL_EXIT_SELECTOR = '[data-action="tutorial-exit"]';
+
+/** Selectors the rails allow so Settings session controls stay reachable (#1332). Skeleton: empty. */
+export const SETTINGS_SESSION_SELECTORS: readonly string[] = [];
+
 /**
  * Snapshot shape for a hire step: ids of the employees who already hold the
  * target role at capture time. Completion requires an employee with that
