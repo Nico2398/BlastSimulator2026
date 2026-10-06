@@ -195,6 +195,36 @@ export function createAutoAdvanceStep(
   };
 }
 
+/** Player UI action that completes an informational tutorial step. */
+export type UiAction =
+  | { kind: 'panel'; rootSelector: string } // completes while that panel root is displayed
+  | { kind: 'scores' }; // completes when #bs-hud-scores inspectCount > snapshot
+
+/** True when the element matching rootSelector exists and is displayed. */
+export function isPanelVisible(_rootSelector: string): boolean {
+  // TODO: implement
+  return false;
+}
+
+/** Read the scores HUD inspectCount (0 when absent). */
+export function readScoresInspectCount(): number {
+  // TODO: implement
+  return 0;
+}
+
+/** Helper: create a step that completes on a player UI action, never on a timer. */
+export function createUiActionStep(
+  _id: string,
+  _titleKey: string,
+  _textKey: string,
+  _action: UiAction,
+  _captureSnapshot?: (state: GameState) => Record<string, unknown>,
+  _highlightTarget?: string,
+): TutorialStep {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 /** Count nav grid cells matching a given type. */
 export function countNavCellsByType(
   cells: NavCell[][] | undefined,
