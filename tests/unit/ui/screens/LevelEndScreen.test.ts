@@ -771,4 +771,96 @@ describe('LevelEndScreen', () => {
       expect(renderText(revoltState('shift_8h', 'none'))).toContain(tips[1]);
     });
   });
+
+  describe('sandbox defeat buttons (#1321)', () => {
+    function sandboxDefeat(): GameState {
+      const s = stateAtDefeat('bankruptcy');
+      s.campaign.activeLevelId = null;
+      return s;
+    }
+    function btn(container: HTMLElement, action: string): HTMLButtonElement {
+      return container.querySelector<HTMLButtonElement>(`#bs-level-end-screen [data-action="${action}"]`)!;
+    }
+
+    it('Retry on a sandbox defeat calls onRetrySandbox once and never onReplay', () => {
+      const { container, screen } = mount();
+      let retries = 0;
+      const replays: string[] = [];
+      screen.setOnRetrySandbox(() => { retries++; });
+      screen.setOnReplay(id => { replays.push(id); });
+      screen.update(sandboxDefeat());
+      btn(container, 'retry').click();
+      expect(retries).toBe(1);
+      expect(replays).toEqual([]);
+      screen.dispose();
+    });
+
+    it('Back on a sandbox defeat calls onBackToSandbox, not onBackToPortfolio', () => {
+      const { container, screen } = mount();
+      let toSandbox = 0;
+      let toPortfolio = 0;
+      screen.setOnBackToSandbox(() => { toSandbox++; });
+      screen.setOnBackToPortfolio(() => { toPortfolio++; });
+      screen.update(sandboxDefeat());
+      btn(container, 'back-to-portfolio').click();
+      expect(toSandbox).toBe(1);
+      expect(toPortfolio).toBe(0);
+      screen.dispose();
+    });
+
+    it('campaign defeat keeps Retry -> onReplay(id) and Back -> onBackToPortfolio', () => {
+      const { container, screen } = mount();
+      const replays: string[] = [];
+      let toPortfolio = 0;
+      let retrySandbox = 0;
+      let toSandbox = 0;
+      screen.setOnReplay(id => { replays.push(id); });
+      screen.setOnBackToPortfolio(() => { toPortfolio++; });
+      screen.setOnRetrySandbox(() => { retrySandbox++; });
+      screen.setOnBackToSandbox(() => { toSandbox++; });
+      screen.update(stateAtDefeat('bankruptcy'));
+      btn(container, 'retry').click();
+      btn(container, 'back-to-portfolio').click();
+      expect(replays).toEqual(['dusty_hollow']);
+      expect(toPortfolio).toBe(1);
+      expect(retrySandbox).toBe(0);
+      expect(toSandbox).toBe(0);
+      screen.dispose();
+    });
+
+    it('sandbox defeat labels Retry with the sandbox level name and Back with the sandbox label', () => {
+      const { container, screen } = mount();
+      screen.update(sandboxDefeat());
+      expect(btn(container, 'retry').textContent).toContain(t('sandbox.level.name'));
+      expect(btn(container, 'back-to-portfolio').textContent).toBe(t('ui.level_end.back_to_sandbox'));
+      screen.dispose();
+    });
+
+    it('a later campaign defeat on the same instance shows the portfolio label again', () => {
+      const { container, screen } = mount();
+      screen.update(sandboxDefeat());
+      screen.reset();
+      screen.update(stateAtDefeat('bankruptcy'));
+      expect(btn(container, 'back-to-portfolio').textContent).toBe(t('ui.level_end.back_to_portfolio'));
+      expect(btn(container, 'retry').textContent).not.toContain(t('sandbox.level.name'));
+      screen.dispose();
+    });
+
+    it('locale refresh keeps the sandbox Back label in the new locale', () => {
+      const { container, screen } = mount();
+      screen.update(sandboxDefeat());
+      setLocale('fr');
+      screen.refreshLocale();
+      expect(btn(container, 'back-to-portfolio').textContent).toBe(t('ui.level_end.back_to_sandbox'));
+      expect(btn(container, 'back-to-portfolio').textContent).not.toBe(t('ui.level_end.back_to_portfolio'));
+      screen.dispose();
+    });
+
+    it('defines ui.level_end.back_to_sandbox in en and fr', () => {
+      for (const loc of ['en', 'fr'] as const) {
+        setLocale(loc);
+        expect(t('ui.level_end.back_to_sandbox')).not.toBe('ui.level_end.back_to_sandbox');
+      }
+    });
+  });
 });
