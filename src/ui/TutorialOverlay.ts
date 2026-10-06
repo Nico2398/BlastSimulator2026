@@ -3,10 +3,12 @@
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';
+import { clearTutorialProgress, readTutorialProgress, recordTutorialProgress } from '../core/state/TutorialProgress.js';
 import type { CommandResult } from '../console/ConsoleRunner.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from './tutorialSteps.js';
 import { buildTutorialCard } from './tutorialOverlayDom.js';
 import { goalChipParams } from './tutorialStepsClosing.js';
+import { TUTORIAL_LEVEL_ID } from './tutorialTrigger.js';
 import { GUIDED_CLASS } from './tutorialGuide.js';
 import { TutorialRails, type RailsStep } from './tutorialRails.js';
 import type { LocaleTextRegistry } from './localeText.js';
@@ -88,14 +90,7 @@ export class TutorialOverlay {
   }
 
   start(state?: GameState): void {
-    this.clearAutoAdvance();
-    this.stopGuide();
-    this.stepIndex = 0;
-    this.snapshots = {};
-    this._active = true;
-    this.overlay.style.display = '';
-    this.applyGuidedClass();
-
+    this.activate(0, {});
     if (state) {
       this.gameState = state;
       this.rails.beginStep(this.step(), state);
@@ -103,9 +98,19 @@ export class TutorialOverlay {
       state.isPaused = true;
       this.captureSnapshotForCurrentStep();
     }
-
     this.render();
     this.startGuide();
+  }
+
+  /** Shared setup head of start() and resume(): reset timers, show the card on `index`. */
+  private activate(index: number, snapshots: Record<string, unknown>): void {
+    this.clearAutoAdvance();
+    this.stopGuide();
+    this.stepIndex = index;
+    this.snapshots = snapshots;
+    this._active = true;
+    this.overlay.style.display = '';
+    this.applyGuidedClass();
   }
 
   get isActive(): boolean {
@@ -309,6 +314,25 @@ export class TutorialOverlay {
     this.end(false);
   }
 
+  /** Resumes the tutorial from state.tutorialProgress; false when there is nothing to resume (#1333). */
+  resume(state: GameState): boolean {
+    if (state.campaign.activeLevelId !== TUTORIAL_LEVEL_ID) return false;
+    const progress = readTutorialProgress(state, TUTORIAL_STEPS.length);
+    if (!progress) return false;
+    this.activate(progress.stepIndex, progress.snapshot);
+    this.gameState = state;
+    this.rails.beginStep(this.step(), state);
+    state.isPaused = true;
+    this.armAutoAdvance(TUTORIAL_STEPS[this.stepIndex]);
+    this.render();
+    if (this.stepIndex === LAST_STEP_INDEX) {
+      this.jumpToLastStep();
+    } else {
+      this.startGuide();
+    }
+    return true;
+  }
+
   /** Injects the confirm-modal opener used by requestExit (#1332). */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
     this.confirmHandler = cb;
@@ -355,6 +379,7 @@ export class TutorialOverlay {
     this.snapshots = {};
     this._active = false;
     if (this.gameState) {
+      clearTutorialProgress(this.gameState);
       this.gameState.isPaused = false;
     }
     this.pausedEl.style.display = 'none';
@@ -370,9 +395,13 @@ export class TutorialOverlay {
       this.snapshots = step.captureSnapshot(this.gameState);
     }
 
-    this.clearAutoAdvance();
+    if (this.gameState) recordTutorialProgress(this.gameState, this.stepIndex, this.snapshots ?? {});
+    this.armAutoAdvance(step);
+  }
 
-    if (step.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0) {
+  private armAutoAdvance(step: (typeof TUTORIAL_STEPS)[number] | undefined): void {
+    this.clearAutoAdvance();
+    if (step?.autoAdvanceMs !== undefined && step.autoAdvanceMs > 0) {
       this.autoAdvanceTimer = setTimeout(() => {
         this.advanceToNextStep();
       }, step.autoAdvanceMs);

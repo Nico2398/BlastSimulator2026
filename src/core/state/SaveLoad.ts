@@ -11,6 +11,7 @@ import { getStorageCapacity } from '../entities/Building.js';
 import { createWeatherCycle, isWeatherState } from '../weather/WeatherCycle.js';
 import { WEATHER_HISTORY_MAX } from '../config/balance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
+import { sanitizeTutorialProgress } from './TutorialProgress.js';
 
 /**
  * Serialize a GameState to a JSON string.
@@ -856,6 +857,11 @@ export function deserialize(json: string): GameState {
   // to carry. tickLocomotion rebuilds it from live state the first tick it
   // runs while agentOccupancy is null.
   (obj as Record<string, unknown>)['agentOccupancy'] = null;
+
+  // #1333: tutorial position is untrusted input; keep it only when well-formed.
+  const tutorialProgress = sanitizeTutorialProgress(obj['tutorialProgress']);
+  if (tutorialProgress) obj['tutorialProgress'] = tutorialProgress;
+  else delete obj['tutorialProgress'];
 
   const restored = obj as unknown as GameState;
   // Capacity is derived from the warehouses, never trusted from the save (#1369).

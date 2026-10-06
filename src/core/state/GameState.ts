@@ -6,6 +6,7 @@ import {
   STARTING_SITE_STAFFED_COMPOSITION,
   SPAWN_TILE_SPACING,
 } from '../config/balance.js';
+import type { TutorialProgress } from './TutorialProgress.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
 import type { HoleCharge, PlannedCharge } from '../mining/ChargePlan.js';
@@ -363,6 +364,8 @@ export interface GameState {
   timeScale: number;
   /** Whether the game loop is paused. */
   isPaused: boolean;
+  /** Tutorial position persisted with the save so load can resume it (#1333). Absent when no tutorial is active. */
+  tutorialProgress?: TutorialProgress;
 
   /** Mine type preset ID used for this game. */
   mineType: string;
