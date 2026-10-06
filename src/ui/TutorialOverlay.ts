@@ -60,7 +60,7 @@ export class TutorialOverlay {
   private readonly rails = new TutorialRails();
   private gameState: GameState | null = null;
   private snapshots: Record<string, unknown> | null = null;
-  private autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
+  private congratulationsTimer: ReturnType<typeof setTimeout> | null = null;
   private guideTimer: ReturnType<typeof setInterval> | null = null;
   private gameConsole: ((cmd: string) => CommandResult) | null = null;
   private confirmHandler: ((config: ConfirmModalConfig) => void) | null = null;
@@ -104,7 +104,7 @@ export class TutorialOverlay {
 
   /** Shared setup head of start() and resume(): reset timers, show the card on `index`. */
   private activate(index: number, snapshots: Record<string, unknown>): void {
-    this.clearAutoAdvance();
+    this.clearCongratulationsTimer();
     this.stopGuide();
     this.stepIndex = index;
     this.snapshots = snapshots;
@@ -153,7 +153,7 @@ export class TutorialOverlay {
 
   dispose(): void {
     this.stopGuide();
-    this.clearAutoAdvance();
+    this.clearCongratulationsTimer();
     this.rails.clear();
     this.hideGuidedChrome();
     this.overlay.remove();
@@ -221,8 +221,8 @@ export class TutorialOverlay {
    */
   private jumpToLastStep(): void {
     this.stopGuide();
-    this.clearAutoAdvance();
-    this.autoAdvanceTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
+    this.clearCongratulationsTimer();
+    this.congratulationsTimer = setTimeout(() => this.finish(), CONGRATULATIONS_DISPLAY_MS);
   }
 
   /**
@@ -372,7 +372,7 @@ export class TutorialOverlay {
 
   private teardown(): void {
     this.stopGuide();
-    this.clearAutoAdvance();
+    this.clearCongratulationsTimer();
     this.rails.clear();
     this.hideGuidedChrome();
     this.snapshots = {};
@@ -460,10 +460,10 @@ export class TutorialOverlay {
     this.renderGoalChip();
   }
 
-  private clearAutoAdvance(): void {
-    if (this.autoAdvanceTimer !== null) {
-      clearTimeout(this.autoAdvanceTimer);
-      this.autoAdvanceTimer = null;
+  private clearCongratulationsTimer(): void {
+    if (this.congratulationsTimer !== null) {
+      clearTimeout(this.congratulationsTimer);
+      this.congratulationsTimer = null;
     }
   }
 

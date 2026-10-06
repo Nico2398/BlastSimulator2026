@@ -260,7 +260,7 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
-  describe('auto-advance timer', () => {
+  describe('UI-action steps and congratulations timer', () => {
     it.each(['scores', 'finances', 'needs'])('%s step does not advance after 60s of fake time, only after the player acts (#1334)', (stepId) => {
       vi.useFakeTimers();
       const hud = document.createElement('div');
@@ -297,13 +297,15 @@ describe('TutorialOverlay (12.4)', () => {
       }
     });
 
-    it('finishing clears a pending auto-advance timer', () => {
-      // `as any` needed to access private autoAdvanceTimer for verification
+    it('finishing clears a pending congratulations timer', () => {
+      // `as any` needed to access private congratulationsTimer for verification
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
+      tut.jumpToLastStep();
+      expect(tut.congratulationsTimer).not.toBeNull();
       tut.finish();
-      expect(tut.autoAdvanceTimer).toBeNull();
+      expect(tut.congratulationsTimer).toBeNull();
     });
 
     it('poll timer advances the step once its condition becomes true', () => {

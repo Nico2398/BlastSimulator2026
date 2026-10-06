@@ -175,9 +175,9 @@ export function createComparisonStep(
 }
 
 /** Player UI action that completes an informational tutorial step. */
-export type UiAction =
+export type TutorialUiAction =
   | { kind: 'panel'; rootSelector: string } // completes while that panel root is displayed
-  | { kind: 'scores' }; // completes when #bs-hud-scores inspectCount > snapshot
+  | { kind: 'scores' }; // completes when #bs-hud-scores inspectCount changes from the snapshot, once above 0
 
 /** True when the element matching rootSelector exists and is displayed. */
 export function isPanelVisible(rootSelector: string): boolean {
@@ -202,7 +202,7 @@ export function createUiActionStep(
   id: string,
   titleKey: string,
   textKey: string,
-  action: UiAction,
+  action: TutorialUiAction,
   captureSnapshot?: (state: GameState) => Record<string, unknown>,
   highlightTarget?: string,
 ): TutorialStep {
@@ -213,12 +213,16 @@ export function createUiActionStep(
     ...(highlightTarget ? { highlightTarget } : {}),
     captureSnapshot: (state: GameState) => ({
       ...(captureSnapshot ? captureSnapshot(state) : {}),
-      inspectCount: readScoresInspectCount(),
+      ...(action.kind === 'scores' ? { inspectCount: readScoresInspectCount() } : {}),
     }),
-    isComplete: (_state: GameState, snapshot: Record<string, unknown>) =>
-      action.kind === 'panel'
-        ? isPanelVisible(action.rootSelector)
-        : readScoresInspectCount() > (Number(snapshot?.inspectCount) || 0),
+    isComplete: (_state: GameState, snapshot: Record<string, unknown>) => {
+      if (action.kind === 'panel') return isPanelVisible(action.rootSelector);
+      // TopBar resets the DOM counter to 0 on page load while a resumed snapshot
+      // keeps the old value, so "changed from baseline, and nonzero" (not ">")
+      // is the robust test: any inspect click moves the count off a stale baseline.
+      const count = readScoresInspectCount();
+      return count > 0 && count !== (Number(snapshot?.inspectCount) || 0);
+    },
   };
 }
 

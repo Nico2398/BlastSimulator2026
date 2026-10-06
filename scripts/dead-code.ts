@@ -63,7 +63,7 @@ const LIVE_EXPORTS = new Set<string>([
   // Unit-tested contract of the scores tutorial step (#1334); only createUiActionStep uses these in production.
   'src/ui/tutorialStepHelpers.ts:readScoresInspectCount',
   'src/ui/tutorialStepHelpers.ts:isPanelVisible',
-  'src/ui/tutorialStepHelpers.ts:UiAction',
+  'src/ui/tutorialStepHelpers.ts:TutorialUiAction',
   // Read off `window` by the scenario harness, never imported.
   'src/ui/uiActionProbe.ts:probeUiAction',
   'src/ui/tutorialStateProbe.ts:probeTutorialState',

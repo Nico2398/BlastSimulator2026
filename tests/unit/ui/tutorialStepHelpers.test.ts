@@ -5,10 +5,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   createUiActionStep, isPanelVisible, readScoresInspectCount,
 } from '../../../src/ui/tutorialStepHelpers.js';
-import type { UiAction } from '../../../src/ui/tutorialStepHelpers.js';
+import type { TutorialUiAction } from '../../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
-const SCORES: UiAction = { kind: 'scores' };
+const SCORES: TutorialUiAction = { kind: 'scores' };
 const STATE = { isPaused: false } as GameState;
 
 function addScoresHud(inspectCount?: number): HTMLElement {
@@ -118,6 +118,21 @@ describe('tutorialStepHelpers UI-action steps (#1334)', () => {
       const step = make();
       const snap = step.captureSnapshot!(STATE);
       expect(step.isComplete(STATE, snap)).toBe(false);
+    });
+
+    it('completes on a click after a resume restored a snapshot above the reset DOM count', () => {
+      const hud = addScoresHud(0); // TopBar reset the counter on page load
+      const step = make();
+      const staleSnap = { inspectCount: 5 }; // persisted before the reload
+      expect(step.isComplete(STATE, staleSnap)).toBe(false);
+      hud.dataset['inspectCount'] = '1';
+      expect(step.isComplete(STATE, staleSnap)).toBe(true);
+    });
+
+    it('stores inspectCount in the snapshot only for the scores action', () => {
+      addScoresHud(4);
+      const panel = createUiActionStep('p', 't', 'x', { kind: 'panel', rootSelector: '#a' });
+      expect('inspectCount' in panel.captureSnapshot!(STATE)).toBe(false);
     });
 
     it('keeps the caller-supplied snapshot fields alongside its own', () => {

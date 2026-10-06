@@ -350,10 +350,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // #707: not a plain createComparisonStep — the count alone goes up the
   // instant the simulation effect lands (blastCommand, synchronous), well
   // before BlastReportModal ever opens (its own 3s real-time delay, #545).
-  // The very next step ('scores') is an auto-completing step whose isComplete
-  // was unconditionally true, so the rail advanced blast -> scores ->
-  // event-fire-resolve within one guide poll (250ms) of the count changing —
-  // long before the report was even on screen, let alone closed. A click on
+  // Without a gate the rail advanced to the next step within one guide poll
+  // (250ms) of the count changing — long before the report was even on
+  // screen, let alone closed (the next step, 'scores', now waits for the
+  // player's own inspect click, but the gate still matters). A click on
   // the report's own CLOSE button then landed after the rail had already
   // moved on, against a control the guide no longer kept live. Gating
   // completion on `!isBlastReportOutstanding()` as well keeps this step (and
