@@ -34,6 +34,9 @@ export function campaignStatusCommand(
   _args: string[],
   _named: Record<string, string>,
 ): CommandResult {
+  if (!ctx.state) {
+    return { success: false, output: t('console.no_game_loaded') };
+  }
   const campaign = ctx.campaignProfile.campaign;
   const lines: string[] = ['Campaign Status:'];
   for (const lvl of getAllLevels()) {
@@ -49,7 +52,7 @@ export function campaignStatusCommand(
   if (isCampaignDone(campaign)) {
     lines.push(t('campaign.status_complete'));
   }
-  const active = ctx.state?.campaign.activeLevelId ?? '(world map)';
+  const active = ctx.state.campaign.activeLevelId ?? '(world map)';
   lines.push(`Active: ${active}`);
   return { success: true, output: lines.join('\n') };
 }

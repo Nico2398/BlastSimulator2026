@@ -814,14 +814,16 @@ describe('Campaign profile (#1312)', () => {
     expect(runner.run('campaign complete').success).toBe(true);
   }
 
-  it('campaign status works with no game and reads the profile', () => {
+  it('campaign status with a game lists the profile levels', () => {
+    runner.run('new_game seed:42');
     const r = runner.run('campaign status');
     expect(r.success).toBe(true);
     expect(r.output).toContain('dusty_hollow');
     expect(r.output).toContain('grumpstone_ridge');
   });
 
-  it('campaign status with no game shows progress held in the profile', () => {
+  it('campaign status with a game shows progress held in the profile', () => {
+    runner.run('new_game seed:42');
     ctx.campaignProfile.campaign.levels['grumpstone_ridge']!.unlocked = true;
     ctx.campaignProfile.campaign.levels['dusty_hollow']!.completed = true;
     const out = runner.run('campaign status').output;
