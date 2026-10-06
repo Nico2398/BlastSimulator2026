@@ -39,7 +39,7 @@ export function layerColor(id: MiniMapLayer['id']): string {
   return MINIMAP_LAYERS.find((l) => l.id === id)!.color;
 }
 
-/** Base terrain tint before elevation shading, as RGB components. */
+/** Base terrain tint before elevation shading, as RGB components (COLOR_ROCK #5080a0). */
 const ROCK_RGB: readonly [number, number, number] = [80, 128, 160];
 /** Elevation shading range: lowest bench this dark, highest this bright. */
 const SHADE_MIN = 0.45;
@@ -152,7 +152,7 @@ export function drawTerrain(
   const { scaleX, scaleZ } = proj;
   const nav = state.navGrid;
   if (!nav) {
-    ctx.fillStyle = COLOR_ROCK;
+    ctx.fillStyle = layerColor('rock');
     ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
     return;
   }
@@ -229,7 +229,7 @@ export function drawSurveyedOre(
       if (richest <= 0) continue;
 
       ctx.globalAlpha = Math.max(0.25, Math.min(1, richest));
-      ctx.fillStyle = COLOR_ORE;
+      ctx.fillStyle = layerColor('ore');
       ctx.fillRect(Math.floor(projectX(proj, x)), Math.floor(projectZ(proj, z)), cellW, cellH);
     }
   }

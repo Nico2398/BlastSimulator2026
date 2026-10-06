@@ -23,10 +23,7 @@ import type { GameState } from '../core/state/GameState.js';
 import { isInsideBuilding } from '../core/entities/EmployeeLocomotion.js';
 import type { NavGrid } from '../core/nav/NavGrid.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './shell/LayoutRegistry.js';
-import { MINIMAP_WIDTH_PX, MINIMAP_HEIGHT_PX, MINIMAP_EDGE_OFFSET_PX } from './tokens.js';
-
-/** Two wrapped rows of 10px labels; MINIMAP_HEIGHT_PX is sized from this. */
-const LEGEND_MIN_HEIGHT = 33;
+import { MINIMAP_WIDTH_PX, MINIMAP_HEIGHT_PX, MINIMAP_LEGEND_HEIGHT_PX, MINIMAP_EDGE_OFFSET_PX } from './tokens.js';
 
 /**
  * Bottom-right corner panel (#983). Fixed size in both axes — see the
@@ -108,7 +105,7 @@ export class MiniMap {
     this.canvas.addEventListener('click', (e) => this.handleClick(e));
 
     const legend = document.createElement('div');
-    legend.style.cssText = `display:flex;flex-wrap:wrap;gap:3px 6px;padding:3px 6px 6px;min-height:${LEGEND_MIN_HEIGHT}px;font-size:10px;align-items:center`;
+    legend.style.cssText = `display:flex;flex-wrap:wrap;gap:3px 6px;padding:3px 6px 6px;min-height:${MINIMAP_LEGEND_HEIGHT_PX}px;font-size:10px;align-items:center`;
 
     for (const layer of MINIMAP_LAYERS) {
       const entry = document.createElement('span');

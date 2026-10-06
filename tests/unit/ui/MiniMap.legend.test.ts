@@ -160,7 +160,7 @@ describe('MiniMap legend (#1424)', () => {
       const panel = hex(composite(PANEL_BG, scene));
       expect(contrastRatio(TEXT_SECONDARY, panel)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
     }
-    // The old colour fails the same check on the dark scene.
+    // The old colour fails the same check on the light scene.
     expect(contrastRatio('#908070', hex(composite(PANEL_BG, SCENE_LIGHT)))).toBeLessThan(WCAG_AA_NORMAL_TEXT);
   });
 
