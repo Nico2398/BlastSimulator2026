@@ -8,11 +8,20 @@ import {
   queueFollowUp,
   selectEvent,
   incrementActionCount,
+  CATEGORY_PREREQUISITE,
 } from '../../../src/core/events/EventSystem.js';
+import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX } from '../../../src/core/config/balance.js';
+import { UNION_EVENTS_1 } from '../../../src/core/events/UnionEvents1.js';
+import { UNION_EVENTS_2 } from '../../../src/core/events/UnionEvents2.js';
+import { LAWSUIT_EVENTS_1 } from '../../../src/core/events/LawsuitEvents1.js';
+import { LAWSUIT_EVENTS_2 } from '../../../src/core/events/LawsuitEvents2.js';
 import { MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS } from '../../../src/core/config/balance.js';
 import {
   registerEvents,
   clearEvents,
+  getEventsByCategory,
+  getEventById,
+  hasEnvironmentalCause,
   type EventDef,
   type EventContext,
 } from '../../../src/core/events/EventPool.js';
@@ -30,6 +39,7 @@ function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
     lawsuitCount: 0,
     activeContractCount: 0,
     weatherId: 'sunny',
+    hasBlasted: false,
     ...overrides,
   };
 }
@@ -523,5 +533,188 @@ describe('Event system engine', () => {
     expect(state.lastOutcome).toBeNull();
     expect(state.pendingEvent).not.toBeNull();
     expect(state.pendingEvent!.eventId).toBe('test1');
+  });
+});
+
+// ── Event gating (#1412) ──
+
+describe('Event gating (#1412)', () => {
+  const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+  const ENV_LAWSUIT_IDS = [
+    'lawsuit_dust_fashion',
+    'lawsuit_farmer_dust',
+    'lawsuit_environmental_agency',
+    'lawsuit_neighbor_vibrations',
+    'lawsuit_noise_restraining',
+  ];
+
+  beforeEach(() => {
+    clearEvents();
+    registerEvents(UNION_EVENTS_1);
+    registerEvents(UNION_EVENTS_2);
+    registerEvents(LAWSUIT_EVENTS_1);
+    registerEvents(LAWSUIT_EVENTS_2);
+  });
+
+  describe('union needs employees', () => {
+    it('returns null for every seed when employeeCount is 0', () => {
+      const ctx = makeCtx({ employeeCount: 0 });
+      for (const seed of SEEDS) {
+        expect(selectEvent('union', ctx, new Random(seed))).toBeNull();
+      }
+    });
+
+    it('selects union events whose own canFire passes when employeeCount is 1', () => {
+      const ctx = makeCtx({ employeeCount: 1 });
+      const eligible = getEventsByCategory('union').filter(e => !e.followUpOnly && e.canFire(ctx));
+      expect(eligible.length).toBeGreaterThan(0);
+      const eligibleIds = new Set(eligible.map(e => e.id));
+      const seen = new Set<string>();
+      for (const seed of SEEDS) {
+        const picked = selectEvent('union', ctx, new Random(seed));
+        expect(picked).not.toBeNull();
+        expect(eligibleIds.has(picked!.id)).toBe(true);
+        seen.add(picked!.id);
+      }
+      expect(seen.size).toBeGreaterThan(1);
+    });
+
+    it('still gates union with employeeCount 0 even when scores are terrible', () => {
+      const scores = createScoreState();
+      scores.wellBeing = 0;
+      const ctx = makeCtx({ employeeCount: 0, scores });
+      for (const seed of SEEDS) {
+        expect(selectEvent('union', ctx, new Random(seed))).toBeNull();
+      }
+    });
+
+    it('registers a union prerequisite in CATEGORY_PREREQUISITE', () => {
+      expect(CATEGORY_PREREQUISITE.union).toBeTypeOf('function');
+      expect(CATEGORY_PREREQUISITE.union!(makeCtx({ employeeCount: 0 }))).toBe(false);
+      expect(CATEGORY_PREREQUISITE.union!(makeCtx({ employeeCount: 1 }))).toBe(true);
+    });
+
+    it('does not gate politics on employeeCount', () => {
+      clearEvents();
+      registerEvents([makeEvent('p1', 'politics')]);
+      const ctx = makeCtx({ employeeCount: 0 });
+      expect(selectEvent('politics', ctx, new Random(1))?.id).toBe('p1');
+    });
+  });
+
+  describe('environmental lawsuits need a cause', () => {
+    // employeeCount 1 opens the category gate so the per-event canFire gate is what is exercised.
+    const freshCtx = () => makeCtx({ employeeCount: 1, deathCount: 0, hasBlasted: false });
+
+    it('never selects an environmental lawsuit on a fresh site', () => {
+      const ctx = freshCtx();
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
+      const pickedIds = SEEDS.map(seed => selectEvent('lawsuit', ctx, new Random(seed))?.id);
+      expect(pickedIds.some(id => id !== undefined)).toBe(true);
+      for (const id of pickedIds) expect(ENV_LAWSUIT_IDS).not.toContain(id);
+    });
+
+    it('lawsuit_dust_fashion is unselectable on a fresh site', () => {
+      const ctx = freshCtx();
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
+      expect(getEventById('lawsuit_dust_fashion')!.canFire(ctx)).toBe(false); // own gate requires an environmental cause
+      for (const seed of SEEDS) {
+        expect(selectEvent('lawsuit', ctx, new Random(seed))?.id).not.toBe('lawsuit_dust_fashion');
+      }
+    });
+
+    it('lawsuit_dust_fashion becomes selectable after the first blast', () => {
+      const ctx = makeCtx({ ...freshCtx(), hasBlasted: true });
+      const ids = SEEDS.map(s => selectEvent('lawsuit', ctx, new Random(s))?.id);
+      expect(ids).toContain('lawsuit_dust_fashion');
+    });
+
+    it('lawsuit_dust_fashion becomes selectable when ecology is low', () => {
+      const scores = createScoreState();
+      scores.ecology = ENV_CAUSE_ECOLOGY_MAX - 10;
+      const ctx = makeCtx({ ...freshCtx(), scores });
+      const ids = SEEDS.map(s => selectEvent('lawsuit', ctx, new Random(s))?.id);
+      expect(ids).toContain('lawsuit_dust_fashion');
+    });
+
+    it('lawsuit_dust_fashion becomes selectable when nuisance is low', () => {
+      const scores = createScoreState();
+      scores.nuisance = ENV_CAUSE_NUISANCE_MAX - 10;
+      const ctx = makeCtx({ ...freshCtx(), scores });
+      const ids = SEEDS.map(s => selectEvent('lawsuit', ctx, new Random(s))?.id);
+      expect(ids).toContain('lawsuit_dust_fashion');
+    });
+
+    it('registers a lawsuit prerequisite that is false on a fresh site and true after a blast', () => {
+      expect(CATEGORY_PREREQUISITE.lawsuit).toBeTypeOf('function');
+      const noCause = makeCtx({ employeeCount: 0, deathCount: 0, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(noCause)).toBe(false);
+      expect(CATEGORY_PREREQUISITE.lawsuit!(makeCtx({ ...noCause, hasBlasted: true }))).toBe(true);
+    });
+
+    it('lawsuit category gate opens on deathCount >= 1 alone', () => {
+      const ctx = makeCtx({ employeeCount: 0, deathCount: 1, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
+    });
+
+    it('lawsuit category gate opens on employeeCount >= 1 alone', () => {
+      const ctx = makeCtx({ employeeCount: 1, deathCount: 0, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
+    });
+
+    it('lawsuit category gate stays shut with no cause, no death, no staff', () => {
+      const ctx = makeCtx({ employeeCount: 0, deathCount: 0, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(false);
+      for (const seed of SEEDS) expect(selectEvent('lawsuit', ctx, new Random(seed))).toBeNull();
+    });
+  });
+
+  describe('follow-on lawsuits need prior lawsuits', () => {
+    // canFire gates written against lawsuitCount in LawsuitEvents1/2.
+    const FOLLOW_ON_IDS = ['lawsuit_insurance_counter', 'lawsuit_slip_and_fall'];
+
+    it('are never selected on a fresh state (lawsuitCount 0, nothing happened)', () => {
+      const ctx = makeCtx({ employeeCount: 1, lawsuitCount: 0, hasBlasted: false });
+      const pickedIds = SEEDS.map(seed => selectEvent('lawsuit', ctx, new Random(seed))?.id);
+      expect(pickedIds.some(id => id !== undefined)).toBe(true);
+      for (const id of pickedIds) expect(FOLLOW_ON_IDS).not.toContain(id);
+    });
+
+    it('lawsuitCount-gated events fail canFire at lawsuitCount 0', () => {
+      const ctx = makeCtx({ lawsuitCount: 0, tickCount: 1000, hasBlasted: true });
+      const gated = getEventsByCategory('lawsuit').filter(
+        e => e.canFire(makeCtx({ lawsuitCount: 10, tickCount: 1000, hasBlasted: true })) && !e.canFire(ctx),
+      );
+      expect(gated.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('hasEnvironmentalCause (#1412)', () => {
+  it('is false on a fresh site (not blasted, initial scores)', () => {
+    expect(hasEnvironmentalCause({ hasBlasted: false, scores: createScoreState() })).toBe(false);
+  });
+
+  it('is true once the player has blasted', () => {
+    expect(hasEnvironmentalCause({ hasBlasted: true, scores: createScoreState() })).toBe(true);
+  });
+
+  it('is true when ecology drops below ENV_CAUSE_ECOLOGY_MAX', () => {
+    const scores = createScoreState();
+    scores.ecology = ENV_CAUSE_ECOLOGY_MAX - 1;
+    expect(hasEnvironmentalCause({ hasBlasted: false, scores })).toBe(true);
+  });
+
+  it('is true when nuisance drops below ENV_CAUSE_NUISANCE_MAX', () => {
+    const scores = createScoreState();
+    scores.nuisance = ENV_CAUSE_NUISANCE_MAX - 1;
+    expect(hasEnvironmentalCause({ hasBlasted: false, scores })).toBe(true);
+  });
+
+  it('is false at exactly the thresholds (strict less-than)', () => {
+    const scores = createScoreState();
+    scores.ecology = ENV_CAUSE_ECOLOGY_MAX;
+    scores.nuisance = ENV_CAUSE_NUISANCE_MAX;
+    expect(hasEnvironmentalCause({ hasBlasted: false, scores })).toBe(false);
   });
 });
