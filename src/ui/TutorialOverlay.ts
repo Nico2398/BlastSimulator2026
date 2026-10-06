@@ -309,6 +309,11 @@ export class TutorialOverlay {
     this.end(false);
   }
 
+  /** Resumes the tutorial from state.tutorialProgress; false when there is nothing to resume (#1333). */
+  resume(_state: GameState): boolean {
+    return false; // TODO: implement
+  }
+
   /** Injects the confirm-modal opener used by requestExit (#1332). */
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
     this.confirmHandler = cb;

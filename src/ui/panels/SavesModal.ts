@@ -27,6 +27,12 @@ export type OnLoadCallback = (state: GameState) => string | null;
 export type GetStateCallback = () => GameState | null;
 
 export const AUTO_SAVE_SLOT = 'auto';
+export const TUTORIAL_AUTO_SAVE_SLOT = 'auto_tutorial';
+
+/** Auto-save slot for a level; the tutorial gets its own so it never overwrites campaign progress (#1333). */
+export function autoSaveSlotFor(_levelId: string | null | undefined): string {
+  return AUTO_SAVE_SLOT; // TODO: implement
+}
 const THUMB_STYLE = 'width:58px;height:40px;border-radius:4px;flex:0 0 auto;'
   + 'background:repeating-linear-gradient(135deg,#2a3038 0 6px,#1d232b 6px 12px)';
 
