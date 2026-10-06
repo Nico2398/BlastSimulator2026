@@ -52,7 +52,8 @@
         { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
         { "type": "awaitUsable", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" },
         { "type": "clickSelector", "selector": "#bs-settings-panel [data-action=\"return-to-menu\"]" },
-        { "type": "clickIfPresent", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" },
+        { "type": "awaitUsable", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" },
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay:not(#bs-event-dialog) [data-action=\"confirm-yes\"]" },
         { "type": "awaitUsable", "selector": "#bs-menu-continue" }
       ],
       "expect": { "usable": "#bs-menu-continue" }
