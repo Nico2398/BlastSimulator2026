@@ -93,13 +93,19 @@ describe('resolver controls', () => {
     expect(resolveLeafColour(div.firstElementChild!, facts).kind).toBe('inline');
   });
 
-  it('a button without colour blocks inheritance when the inherit rule is absent', () => {
+  it('a button blocks inheritance without a full inherit rule and passes it with one', () => {
     const bare = readStyleFacts('.bsx-root { color: var(--bsx-text-primary); }');
     const root = document.createElement('div');
     root.className = 'bsx-root';
     root.innerHTML = '<button><span>Hi</span></button>';
     expect(resolveLeafColour(root.querySelector('span')!, bare).kind).toBe('default');
-    const full = readStyleFacts('.bsx-root { color: var(--bsx-text-primary); } :where(.bsx-root) :where(button) { color: inherit; }');
+    const partial = readStyleFacts('.bsx-root { color: var(--bsx-text-primary); } :where(.bsx-root) :where(button) { color: inherit; }');
+    expect(partial.controlInherit).toBe(false);
+    const full = readStyleFacts(
+      '.bsx-root { color: var(--bsx-text-primary); } '
+      + ':where(.bsx-root) :where(button, input, select, textarea) { color: inherit; }',
+    );
+    expect(full.controlInherit).toBe(true);
     expect(resolveLeafColour(root.querySelector('span')!, full).kind).toBe('root-rule');
   });
 
@@ -135,6 +141,16 @@ describe.each(['en', 'fr'] as const)('panel text colour (%s)', locale => {
     const tiers = panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn');
     expect([...tiers].some(b => b.disabled)).toBe(true);
     expectNoDefaultColour(panel.root);
+    for (const b of tiers) {
+      const style = b.getAttribute('style') ?? '';
+      expect(style).toMatch(/(?<![-\w])color\s*:\s*var\(--bsx-text-primary\)/);
+      if (b.disabled) {
+        expect(style).toMatch(/opacity\s*:\s*\.45/);
+        expect(style).toContain('cursor:not-allowed');
+      } else {
+        expect(style).toContain('cursor:pointer');
+      }
+    }
   });
 
   it('FleetPanel tier button text is explicitly coloured', () => {

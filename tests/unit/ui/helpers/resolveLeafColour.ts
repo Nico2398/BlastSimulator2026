@@ -9,8 +9,8 @@
 //   - a class that some stylesheet rule gives a `color`,
 //   - a `.bsx-root` ancestor, but only when the stylesheet has a root colour rule.
 // A form control (button/input/select/textarea) with none of the above BLOCKS
-// inheritance — the UA gives it `buttontext` — unless the stylesheet carries a
-// `.bsx-root` form-control `color: inherit` rule.
+// inheritance — the UA gives it `buttontext` — unless the stylesheet carries
+// `.bsx-root` `color: inherit` rules covering all four form-control tags.
 
 export type LeafColour =
   | { kind: 'inline'; value: string }
@@ -23,7 +23,7 @@ export interface StyleFacts {
   colourClasses: Set<string>;
   /** `.bsx-root { color }` exists. */
   rootColour: boolean;
-  /** A `.bsx-root` rule targeting button/input/select/textarea sets `color: inherit`. */
+  /** `.bsx-root` rules set `color: inherit` on all of button, input, select and textarea. */
   controlInherit: boolean;
 }
 
@@ -31,9 +31,28 @@ const COLOUR_DECL = /(?<![-\w])color\s*:\s*([^;}]+)/;
 const FORM_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
 const UA_DEFAULTS = new Set(['', 'black', '#000', '#000000', 'buttontext', 'canvastext', 'initial']);
 
+/** Split a selector list on commas outside parentheses (`:is(a, b)` stays whole). */
+function splitTopLevel(list: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < list.length; i++) {
+    const ch = list[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (ch === ',' && depth === 0) {
+      parts.push(list.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(list.slice(start));
+  return parts;
+}
+
 /** Read the stylesheet text and extract the facts the resolver needs. */
 export function readStyleFacts(css: string): StyleFacts {
   const facts: StyleFacts = { colourClasses: new Set(), rootColour: false, controlInherit: false };
+  const inheritingTags = new Set<string>();
   const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
   let m: RegExpExecArray | null;
@@ -42,19 +61,20 @@ export function readStyleFacts(css: string): StyleFacts {
     const decl = COLOUR_DECL.exec(m[2]!);
     if (!decl) continue;
     const value = decl[1]!.trim();
-    for (const rawSel of selectorList.split(',')) {
+    for (const rawSel of splitTopLevel(selectorList)) {
       const sel = rawSel.trim();
       const flat = sel.replace(/:where\(([^)]*)\)/g, ' $1 ').replace(/\s+/g, ' ').trim();
       const isRootOnly = /^\.bsx-root$/.test(flat);
       if (isRootOnly && !UA_DEFAULTS.has(value) && value !== 'inherit') facts.rootColour = true;
-      if (/\.bsx-root\b/.test(flat) && /\b(button|input|select|textarea)\b/.test(flat) && value === 'inherit') {
-        facts.controlInherit = true;
+      if (/\.bsx-root\b/.test(flat) && value === 'inherit') {
+        for (const tag of flat.matchAll(/\b(button|input|select|textarea)\b/g)) inheritingTags.add(tag[1]!.toUpperCase());
       }
       const last = flat.split(/[\s>+~]+/).filter(Boolean).pop() ?? '';
       if (last === '*' || last.startsWith('.bsx-root')) continue;
       for (const c of last.matchAll(/\.([\w-]+)/g)) facts.colourClasses.add(c[1]!);
     }
   }
+  facts.controlInherit = [...FORM_TAGS].every(tag => inheritingTags.has(tag));
   return facts;
 }
 
