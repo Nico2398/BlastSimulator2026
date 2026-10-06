@@ -26,6 +26,8 @@ export interface LevelStats {
   bestEcology: number;
   /** Best safety score seen during the session. */
   bestSafety: number;
+  /** Ecology score at the latest snapshot (end-of-level value). */
+  finalEcology: number;
 }
 
 export interface StarRating {
@@ -50,6 +52,7 @@ export function createLevelStats(): LevelStats {
     casualties: 0,
     bestEcology: 0,
     bestSafety: 0,
+    finalEcology: 0,
   };
 }
 
@@ -151,6 +154,7 @@ export function deserializeLevelStats(raw: Record<string, unknown>): LevelStats 
   if (typeof raw['casualties'] === 'number') stats.casualties = raw['casualties'];
   if (typeof raw['bestEcology'] === 'number') stats.bestEcology = raw['bestEcology'];
   if (typeof raw['bestSafety'] === 'number') stats.bestSafety = raw['bestSafety'];
+  if (typeof raw['finalEcology'] === 'number') stats.finalEcology = raw['finalEcology'];
   if (Array.isArray(raw['uniqueOresExtracted'])) {
     stats.uniqueOresExtracted = new Set(raw['uniqueOresExtracted'] as string[]);
   }

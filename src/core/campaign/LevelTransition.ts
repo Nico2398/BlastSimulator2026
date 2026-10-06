@@ -17,6 +17,8 @@ export interface LevelCompleteSummary {
   finalWellBeing: number;
   finalEcology: number;
   finalSafety: number;
+  /** Star rating earned this session (0..3). */
+  stars: number;
 }
 
 export interface LevelCompleteResult {
@@ -68,6 +70,7 @@ export function checkLevelComplete(
     finalWellBeing: state.scores.wellBeing,
     finalEcology: state.scores.ecology,
     finalSafety: state.scores.safety,
+    stars: 0, // TODO: implement
   };
 
   emitter.emit('level:complete', summary);
