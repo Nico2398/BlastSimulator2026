@@ -182,8 +182,12 @@ export type UiAction =
 /** True when the element matching rootSelector exists and is displayed. */
 export function isPanelVisible(rootSelector: string): boolean {
   if (typeof document === 'undefined') return false;
-  const el = document.querySelector(rootSelector) as HTMLElement | null;
-  return el !== null && el.style.display !== 'none';
+  try {
+    const el = document.querySelector(rootSelector) as HTMLElement | null;
+    return el !== null && el.style.display !== 'none';
+  } catch {
+    return false; // invalid selector: treat as not visible
+  }
 }
 
 /** Read the scores HUD inspectCount (0 when absent). */

@@ -857,6 +857,7 @@
         }
       ],
       "expect": {
+        "usable": "#bs-hud-scores",
         "note": "The card must still be 'scores' until the click (the blast step waits on it); the click is what advances it. Exact next card is not asserted: event-fire-resolve drives itself and may already be past by the time the wait resolves."
       }
     },

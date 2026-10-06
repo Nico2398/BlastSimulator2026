@@ -873,6 +873,13 @@ describe('full tutorial playthrough ends WON by following the cards then playing
         continue;
       }
 
+      if (step.id === 'scores' || step.id === 'finances' || step.id === 'needs') {
+        // Carve-out (#1334): these cards complete only on a DOM action (hover/click
+        // the scores HUD, open the Finances/Crew panel) with no console equivalent;
+        // this headless run has no DOM, so the interaction-mode scenarios drive them.
+        continue;
+      }
+
       if (step.id === 'contract-accept') {
         // The hint's `contract accept 1` goes stale once the pool rotates; a
         // player accepts a real offer. Smallest offer: deliverable by one

@@ -87,7 +87,7 @@ describe('tutorialStepHelpers UI-action steps (#1334)', () => {
       expect(step.titleKey).toBe('title.key');
       expect(step.textKey).toBe('text.key');
       expect(step.highlightTarget).toBe('#bs-hud-scores');
-      expect(step.autoAdvanceMs).toBeUndefined();
+      expect('autoAdvanceMs' in step).toBe(false);
     });
 
     it('is not complete on a DOM-less run and never throws', () => {

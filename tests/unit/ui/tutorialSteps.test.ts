@@ -65,7 +65,7 @@ describe('tutorialSteps', () => {
   // ── 8 ────────────────────────────────────────────────────────────────────
   it('no tutorial step auto-dismisses on a timer (#1334)', () => {
     for (const step of TUTORIAL_STEPS) {
-      expect(step.autoAdvanceMs, `step "${step.id}"`).toBeUndefined();
+      expect('autoAdvanceMs' in step, `step "${step.id}"`).toBe(false);
     }
   });
 
@@ -204,7 +204,7 @@ describe('tutorialSteps', () => {
     const needs = TUTORIAL_STEPS.find((s) => s.id === 'needs')!;
     document.body.innerHTML = '';
     for (const step of [scores, finances, needs]) {
-      expect(step.autoAdvanceMs, step.id).toBeUndefined();
+      expect('autoAdvanceMs' in step, step.id).toBe(false);
       const state = { isPaused: false } as GameState;
       const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
       expect(step.isComplete(state, snapshot), step.id).toBe(false);
