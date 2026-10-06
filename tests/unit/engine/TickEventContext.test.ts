@@ -9,7 +9,7 @@
 // corpse permanently inflated the count fed to every event's canFire/
 // weightCoeff check.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { buildTickEventContext } from '../../../src/core/engine/TickEventContext.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -17,10 +17,13 @@ import { ALL_WEATHER_STATES } from '../../../src/core/weather/WeatherCycle.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 
-import { getEventById, registerEvents } from '../../../src/core/events/EventPool.js';
+import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
 import { LAWSUIT_EVENTS_1 } from '../../../src/core/events/LawsuitEvents1.js';
 
 const SEED = 42;
+
+// Leave no registry state behind for other tests in this worker.
+afterEach(() => clearEvents());
 
 describe('buildTickEventContext', () => {
   it('reports employeeCount over the living roster only, excluding a killed employee still physically present in the array', () => {
@@ -55,7 +58,8 @@ describe('buildTickEventContext', () => {
     });
     state.drillHoles.push({ id: 'h1', x: 0, z: 0, depth: 5, diameter: 0.1 });
     state.tickCount = 42;
-    if (!getEventById('lawsuit_wrongful_death')) registerEvents([LAWSUIT_EVENTS_1[0]!]);
+    clearEvents();
+    registerEvents([LAWSUIT_EVENTS_1.find(e => e.id === 'lawsuit_wrongful_death')!]);
     state.events.firedEventIds.push('lawsuit_wrongful_death', 'not_a_registered_event');
     state.contracts.active.push({
       id: 1, type: 'ore_sale', materialId: 'iron', description: '', quantityKg: 100,

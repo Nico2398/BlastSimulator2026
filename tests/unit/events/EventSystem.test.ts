@@ -603,18 +603,20 @@ describe('Event gating (#1412)', () => {
   });
 
   describe('environmental lawsuits need a cause', () => {
-    const freshCtx = () => makeCtx({ employeeCount: 0, deathCount: 0, hasBlasted: false });
+    // employeeCount 1 opens the category gate so the per-event canFire gate is what is exercised.
+    const freshCtx = () => makeCtx({ employeeCount: 1, deathCount: 0, hasBlasted: false });
 
     it('never selects an environmental lawsuit on a fresh site', () => {
       const ctx = freshCtx();
-      for (const seed of SEEDS) {
-        const picked = selectEvent('lawsuit', ctx, new Random(seed));
-        if (picked) expect(ENV_LAWSUIT_IDS).not.toContain(picked.id);
-      }
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
+      const pickedIds = SEEDS.map(seed => selectEvent('lawsuit', ctx, new Random(seed))?.id);
+      expect(pickedIds.some(id => id !== undefined)).toBe(true);
+      for (const id of pickedIds) expect(ENV_LAWSUIT_IDS).not.toContain(id);
     });
 
     it('lawsuit_dust_fashion is unselectable on a fresh site', () => {
       const ctx = freshCtx();
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
       expect(getEventById('lawsuit_dust_fashion')!.canFire(ctx)).toBe(false); // own gate requires an environmental cause
       for (const seed of SEEDS) {
         expect(selectEvent('lawsuit', ctx, new Random(seed))?.id).not.toBe('lawsuit_dust_fashion');
@@ -645,8 +647,25 @@ describe('Event gating (#1412)', () => {
 
     it('registers a lawsuit prerequisite that is false on a fresh site and true after a blast', () => {
       expect(CATEGORY_PREREQUISITE.lawsuit).toBeTypeOf('function');
-      expect(CATEGORY_PREREQUISITE.lawsuit!(freshCtx())).toBe(false);
-      expect(CATEGORY_PREREQUISITE.lawsuit!(makeCtx({ ...freshCtx(), hasBlasted: true }))).toBe(true);
+      const noCause = makeCtx({ employeeCount: 0, deathCount: 0, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(noCause)).toBe(false);
+      expect(CATEGORY_PREREQUISITE.lawsuit!(makeCtx({ ...noCause, hasBlasted: true }))).toBe(true);
+    });
+
+    it('lawsuit category gate opens on deathCount >= 1 alone', () => {
+      const ctx = makeCtx({ employeeCount: 0, deathCount: 1, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
+    });
+
+    it('lawsuit category gate opens on employeeCount >= 1 alone', () => {
+      const ctx = makeCtx({ employeeCount: 1, deathCount: 0, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(true);
+    });
+
+    it('lawsuit category gate stays shut with no cause, no death, no staff', () => {
+      const ctx = makeCtx({ employeeCount: 0, deathCount: 0, hasBlasted: false });
+      expect(CATEGORY_PREREQUISITE.lawsuit!(ctx)).toBe(false);
+      for (const seed of SEEDS) expect(selectEvent('lawsuit', ctx, new Random(seed))).toBeNull();
     });
   });
 
@@ -655,11 +674,10 @@ describe('Event gating (#1412)', () => {
     const FOLLOW_ON_IDS = ['lawsuit_insurance_counter', 'lawsuit_slip_and_fall'];
 
     it('are never selected on a fresh state (lawsuitCount 0, nothing happened)', () => {
-      const ctx = makeCtx({ employeeCount: 0, lawsuitCount: 0, hasBlasted: false });
-      for (const seed of SEEDS) {
-        const picked = selectEvent('lawsuit', ctx, new Random(seed));
-        if (picked) expect(FOLLOW_ON_IDS).not.toContain(picked.id);
-      }
+      const ctx = makeCtx({ employeeCount: 1, lawsuitCount: 0, hasBlasted: false });
+      const pickedIds = SEEDS.map(seed => selectEvent('lawsuit', ctx, new Random(seed))?.id);
+      expect(pickedIds.some(id => id !== undefined)).toBe(true);
+      for (const id of pickedIds) expect(FOLLOW_ON_IDS).not.toContain(id);
     });
 
     it('lawsuitCount-gated events fail canFire at lawsuitCount 0', () => {

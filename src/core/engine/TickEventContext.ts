@@ -7,11 +7,13 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventContext } from '../events/EventPool.js';
-import { getEventById } from '../events/EventPool.js';
+import { getEventsByCategory } from '../events/EventPool.js';
 import { getLivingEmployees } from '../entities/Employee.js';
 
 /** Build the EventContext from the current GameState. */
 export function buildTickEventContext(s: GameState): EventContext {
+  // Built per call: the pool can change at runtime (tests register events).
+  const lawsuitIds = new Set(getEventsByCategory('lawsuit').map(e => e.id));
   return {
     scores: s.scores,
     employeeCount: getLivingEmployees(s.employees.employees).length,
@@ -20,7 +22,7 @@ export function buildTickEventContext(s: GameState): EventContext {
     hasBuilding: (type: string) => s.buildings.buildings.some(b => b.type === type),
     hasDrillPlan: s.drillHoles.length > 0,
     tickCount: s.tickCount,
-    lawsuitCount: s.events.firedEventIds.filter(id => getEventById(id)?.category === 'lawsuit').length,
+    lawsuitCount: s.events.firedEventIds.filter(id => lawsuitIds.has(id)).length,
     activeContractCount: s.contracts.active.length,
     weatherId: s.weather.current,
     hasBlasted: s.damage.blastCount > 0,

@@ -21,13 +21,6 @@ const BASE_TIMER: Record<TimerCategory, number> = { ...EVENT_BASE_TIMERS };
 
 // ── Timer state ──
 
-/** Per-category prerequisite gating event selection (#1412). */
-export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {
-  union: (ctx) => ctx.employeeCount >= 1,
-  // A lawsuit needs some cause: pollution/blast, a death, or staff to sue.
-  lawsuit: (ctx) => hasEnvironmentalCause(ctx) || ctx.deathCount >= 1 || ctx.employeeCount >= 1,
-};
-
 export interface CategoryTimer {
   category: EventCategory;
   remaining: number;
@@ -227,6 +220,13 @@ export function incrementActionCount(state: EventSystemState): void {
 }
 
 // ── Selection ──
+
+/** Per-category prerequisite gating event selection (#1412). */
+export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {
+  union: (ctx) => ctx.employeeCount >= 1,
+  // A lawsuit needs some cause: pollution/blast, a death, or staff to sue.
+  lawsuit: (ctx) => hasEnvironmentalCause(ctx) || ctx.deathCount >= 1 || ctx.employeeCount >= 1,
+};
 
 /**
  * Select an event from a category using weighted random selection.
