@@ -3,6 +3,7 @@
 
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
+import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX } from '../config/balance.js';
 
 // ── Event types ──
 
@@ -88,9 +89,9 @@ export interface EventContext {
 
 /** Whether environmental events have a plausible cause yet (#1412). */
 export function hasEnvironmentalCause(ctx: Pick<EventContext, 'hasBlasted' | 'scores'>): boolean {
-  // TODO: implement
-  void ctx;
-  return true;
+  return ctx.hasBlasted
+    || ctx.scores.ecology < ENV_CAUSE_ECOLOGY_MAX
+    || ctx.scores.nuisance < ENV_CAUSE_NUISANCE_MAX;
 }
 
 // ── Event pool ──

@@ -7,6 +7,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventContext } from '../events/EventPool.js';
+import { getEventById } from '../events/EventPool.js';
 import { getLivingEmployees } from '../entities/Employee.js';
 
 /** Build the EventContext from the current GameState. */
@@ -19,9 +20,9 @@ export function buildTickEventContext(s: GameState): EventContext {
     hasBuilding: (type: string) => s.buildings.buildings.some(b => b.type === type),
     hasDrillPlan: s.drillHoles.length > 0,
     tickCount: s.tickCount,
-    lawsuitCount: s.corruption.attempts.filter(a => a.target === 'judge').length,
+    lawsuitCount: s.events.firedEventIds.filter(id => getEventById(id)?.category === 'lawsuit').length,
     activeContractCount: s.contracts.active.length,
     weatherId: s.weather.current,
-    hasBlasted: false, // TODO: implement (#1412)
+    hasBlasted: s.damage.blastCount > 0,
   };
 }

@@ -17,6 +17,9 @@ import { ALL_WEATHER_STATES } from '../../../src/core/weather/WeatherCycle.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 import { hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 
+import { getEventById, registerEvents } from '../../../src/core/events/EventPool.js';
+import { LAWSUIT_EVENTS_1 } from '../../../src/core/events/LawsuitEvents1.js';
+
 const SEED = 42;
 
 describe('buildTickEventContext', () => {
@@ -52,7 +55,8 @@ describe('buildTickEventContext', () => {
     });
     state.drillHoles.push({ id: 'h1', x: 0, z: 0, depth: 5, diameter: 0.1 });
     state.tickCount = 42;
-    state.corruption.attempts.push({ target: 'judge', tick: 1, cost: 0, success: false });
+    if (!getEventById('lawsuit_wrongful_death')) registerEvents([LAWSUIT_EVENTS_1[0]!]);
+    state.events.firedEventIds.push('lawsuit_wrongful_death', 'not_a_registered_event');
     state.contracts.active.push({
       id: 1, type: 'ore_sale', materialId: 'iron', description: '', quantityKg: 100,
       deliveredKg: 0, pricePerKg: 5, deadlineTicks: 100, acceptedAtTick: 0,

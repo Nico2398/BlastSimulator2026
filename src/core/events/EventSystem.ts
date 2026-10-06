@@ -5,7 +5,7 @@ import type { TrafficJam } from './TrafficJams.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
-import { getEventsByCategory, getEventById } from './EventPool.js';
+import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
 import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
@@ -21,8 +21,12 @@ const BASE_TIMER: Record<TimerCategory, number> = { ...EVENT_BASE_TIMERS };
 
 // ── Timer state ──
 
-/** Per-category prerequisite gating event selection (#1412). Not applied yet. */
-export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {};
+/** Per-category prerequisite gating event selection (#1412). */
+export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {
+  union: (ctx) => ctx.employeeCount >= 1,
+  // A lawsuit needs some cause: pollution/blast, a death, or staff to sue.
+  lawsuit: (ctx) => hasEnvironmentalCause(ctx) || ctx.deathCount >= 1 || ctx.employeeCount >= 1,
+};
 
 export interface CategoryTimer {
   category: EventCategory;
@@ -234,6 +238,7 @@ export function selectEvent(
   rng: Random,
   firedEventIds: string[] = [],
 ): EventDef | null {
+  if (CATEGORY_PREREQUISITE[category]?.(ctx) === false) return null;
   const events = getEventsByCategory(category);
   const available = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx));
 

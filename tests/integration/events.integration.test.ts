@@ -691,6 +691,9 @@ describe('Event system', () => {
       // Pre-warm tickCount to skip past the initial no-timer-activity zone
       ctx.state!.tickCount = 110;
 
+      // Union events need at least one employee (#1412)
+      hireEmployee(ctx.state!.employees, 'driller', new Random(1), 0, 0);
+
       // Set union timer to expire in 2 ticks
       const unionTimer = ctx.state!.events.timers.find(t => t.category === 'union')!;
       unionTimer.remaining = 2;
