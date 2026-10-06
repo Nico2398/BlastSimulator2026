@@ -369,11 +369,13 @@ export const DRILL_HOLE_DEFAULT_DIAMETER_M = 0.089;
 
 /** Hole spacing (m) the grid tool's placement strip opens at before the player
  *  steps it (#1069) — the value a scenario's dragTiles rectangle is measured
- *  against when its interaction array never clicks the spacing stepper. */
-export const DRILL_GRID_DEFAULT_SPACING_M = 3;
+ *  against when its interaction array never clicks the spacing stepper. Four
+ *  metres so the tutorial's 8x8 drill region computes a 3x3 grid untouched (#1330). */
+export const DRILL_GRID_DEFAULT_SPACING_M = 4;
 /** Hole depth (m) the grid tool's placement strip opens at before the player
- *  steps it (#1069), same reasoning as DRILL_GRID_DEFAULT_SPACING_M. */
-export const DRILL_GRID_DEFAULT_DEPTH_M = 6;
+ *  steps it (#1069), same reasoning as DRILL_GRID_DEFAULT_SPACING_M; 8 m matches the tutorial's
+ *  scripted plan (#1330). */
+export const DRILL_GRID_DEFAULT_DEPTH_M = 8;
 
 /** Ticks to load a charge at the reference amount (#554). */
 export const CHARGE_HOLE_BASE_DURATION_TICKS = 4;
@@ -385,13 +387,13 @@ export const CHARGE_HOLE_REFERENCE_AMOUNT_KG = 5;
  *  never under-stem what a player could ever click. */
 export const MIN_STEMMING_M = 0.5;
 
-/** Default explosive amount (kg) the Charge panel opens with. */
-// TODO: placeholder holds the old panel value; implementation sets 4 (#1330).
-export const CHARGE_DEFAULT_AMOUNT_KG = 5;
+/** Default explosive amount (kg) the Charge panel opens with. Equal to the
+ *  tutorial's scripted plan, which rates PERFECT (#1330). */
+export const CHARGE_DEFAULT_AMOUNT_KG = 4;
 
-/** Default stemming column (m) the Charge panel opens with. */
-// TODO: placeholder holds the old panel value; implementation sets 2.5 (#1330).
-export const CHARGE_DEFAULT_STEMMING_M = 2;
+/** Default stemming column (m) the Charge panel opens with. Equal to the
+ *  tutorial's scripted plan, which rates PERFECT (#1330). */
+export const CHARGE_DEFAULT_STEMMING_M = 2.5;
 
 /**
  * Largest rows×cols product `drill_plan grid` will build in one command
