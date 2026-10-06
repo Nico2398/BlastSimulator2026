@@ -2,12 +2,13 @@
 // Legal absurdity, ambulance chasers, and satirical courtroom drama.
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import { hasEnvironmentalCause } from './EventPool.js';
 
 export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 26 — Class action: chronic dust inhalation fashion damage
   ev('lawsuit_dust_fashion', 'lawsuit', {
     weight: (s) => 1.0 + 1.8 * r.nu(s),
-    canFire: (ctx) => ctx.tickCount > 15,
+    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.tickCount > 15,
     options: [
       { cashDelta: -25000, scoreDelta: { nuisance: -8 }, effectTag: 'dust_settlement' },
       { cashDelta: -5000, scoreDelta: { nuisance: 5 }, followUp: 'lawsuit_dust_fashion_appeal' },
@@ -36,7 +37,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 29 — Neighbor sues for aesthetic pollution
   ev('lawsuit_aesthetic_pollution', 'lawsuit', {
     weight: (s) => 0.8 + 1.6 * r.nu(s),
-    canFire: (ctx) => ctx.scores.nuisance > 40,
+    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.nuisance > 40,
     options: [
       { cashDelta: -15000, scoreDelta: { nuisance: -10, ecology: 5 }, effectTag: 'landscaping' },
       { cashDelta: 0, scoreDelta: { nuisance: 8 }, effectTag: 'beauty_is_subjective' },
@@ -57,7 +58,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 31 — Environmental cleanup order from government
   ev('lawsuit_env_cleanup_order', 'lawsuit', {
     weight: (s) => 1.5 + 2.0 * (1 - r.ec(s)),
-    canFire: (ctx) => ctx.scores.ecology < 45,
+    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.ecology < 45,
     options: [
       { cashDelta: -60000, scoreDelta: { ecology: 20, nuisance: -5 }, effectTag: 'full_cleanup' },
       { cashDelta: -20000, scoreDelta: { ecology: 8 }, effectTag: 'minimal_cleanup' },
@@ -77,7 +78,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 33 — Noise ordinance violation, multiple infractions
   ev('lawsuit_noise_infractions', 'lawsuit', {
     weight: (s) => 1.2 + 1.8 * r.nu(s),
-    canFire: (ctx) => ctx.lawsuitCount > 0,
+    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.lawsuitCount > 0,
     options: [
       { cashDelta: -35000, scoreDelta: { nuisance: -12 }, effectTag: 'install_noise_barriers' },
       { cashDelta: -15000, scoreDelta: { nuisance: -4 }, effectTag: 'pay_fines_only' },
@@ -98,7 +99,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 35 — Local school sues: blasts interrupt exams
   ev('lawsuit_school_exams', 'lawsuit', {
     weight: (s) => 1.0 + 1.5 * r.nu(s),
-    canFire: (ctx) => ctx.hasDrillPlan,
+    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.hasDrillPlan,
     options: [
       { cashDelta: -12000, scoreDelta: { nuisance: -10, wellBeing: 5 }, effectTag: 'blast_schedule_change' },
       { cashDelta: -25000, scoreDelta: { nuisance: -8 }, effectTag: 'fund_school_soundproofing' },
@@ -118,7 +119,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 37 — Joint lawsuit from multiple villages
   ev('lawsuit_village_coalition', 'lawsuit', {
     weight: (s) => 1.4 + 2.0 * r.nu(s) + 1.0 * (1 - r.ec(s)),
-    canFire: (ctx) => ctx.lawsuitCount > 2,
+    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.lawsuitCount > 2,
     options: [
       { cashDelta: -50000, scoreDelta: { nuisance: -15, ecology: 10 }, effectTag: 'mega_settlement' },
       { cashDelta: -15000, scoreDelta: { nuisance: 5 }, followUp: 'lawsuit_village_coalition_2' },
@@ -168,6 +169,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 42 — Professional mountaineer sues for ruining the mountain
   ev('lawsuit_mountaineer', 'lawsuit', {
     weight: (s) => 0.7 + 1.2 * (1 - r.ec(s)),
+    canFire: (ctx) => hasEnvironmentalCause(ctx),
     options: [
       { cashDelta: -15000, scoreDelta: { ecology: 8 }, effectTag: 'mountain_restoration_fund' },
       { cashDelta: 0, scoreDelta: { ecology: -5, nuisance: 5 }, effectTag: 'its_a_pit_not_a_peak' },
@@ -218,6 +220,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 47 — PETA sues for distressing local goat population
   ev('lawsuit_peta_goats', 'lawsuit', {
     weight: (s) => 0.8 + 1.4 * (1 - r.ec(s)),
+    canFire: (ctx) => hasEnvironmentalCause(ctx),
     options: [
       { cashDelta: -18000, scoreDelta: { ecology: 12, nuisance: -5 }, effectTag: 'goat_sanctuary' },
       { cashDelta: 0, scoreDelta: { ecology: -8, nuisance: 8 }, effectTag: 'goats_are_fine' },
