@@ -95,7 +95,12 @@ function sortedUniqueCells(navGrid: NavGrid, sources: ReadonlyArray<{ x: number;
   return [...cells].sort((a, b) => a - b);
 }
 
-/** Everything a fill-backed pool's reachable set depends on besides the grid. */
+/**
+ * Everything a fill-backed pool's reachable set depends on besides the grid.
+ * Vehicles key on their rounded position, not the clamped fill cell: `fillPool`
+ * tests the unclamped rounded cell against the on-foot set, so an out-of-grid
+ * vehicle must not share a signature with the in-grid one it clamps onto.
+ */
 function poolSignature(state: GameState, navGrid: NavGrid, req: ActorRequirements, employees: ReadonlyArray<Employee>): string {
   const cells = sortedUniqueCells(navGrid, employees).join(',');
   const role = req.requiredVehicleRole;
@@ -103,7 +108,7 @@ function poolSignature(state: GameState, navGrid: NavGrid, req: ActorRequirement
   const ids = employees.map(e => e.id).sort().join(',');
   const vehicles = state.vehicles.vehicles
     .filter(v => v.type === role)
-    .map(v => `${v.id}:${reachSourceCellIndex(navGrid, v.x, v.z)}:${vehicleDriverId(v) ?? '-'}`)
+    .map(v => `${v.id}:${Math.round(v.x)},${Math.round(v.z)}:${vehicleDriverId(v) ?? '-'}`)
     .sort()
     .join(',');
   return `${cells}|${ids}|${vehicles}`;
