@@ -573,10 +573,7 @@ export class BuildMenu extends PanelBase {
     researchBtn.classList.add('bs-build-research-btn');
     researchBtn.style.cssText = 'flex:0 1 auto;min-width:0;height:auto;padding:6px 8px;font-size:9px;white-space:normal;line-height:1.2;display:none';
 
-    const progressEl = el('span', { className: 'bs-build-research-progress' });
-    progressEl.style.cssText = 'flex:0 1 auto;font:500 9px/1.2 var(--bsx-font-mono);color:var(--bsx-text-micro);display:none';
-
-    row.append(iconChip, info, tierSel, placeBtn, researchBtn, progressEl);
+    row.append(iconChip, info, tierSel, placeBtn, researchBtn);
     return row;
   }
 
@@ -623,8 +620,7 @@ export class BuildMenu extends PanelBase {
     locked: boolean,
   ): void {
     const btn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
-    const progressEl = row.querySelector<HTMLElement>('.bs-build-research-progress');
-    if (!btn || !progressEl) return;
+    if (!btn) return;
     const researchTier = tier !== null && tier > 1 ? (tier as 2 | 3) : null;
     if (researchTier !== null) {
       const def = getResearchTaskDef(type, researchTier);
@@ -634,15 +630,21 @@ export class BuildMenu extends PanelBase {
       ? this.lastState?.buildings.researchQueue.find((r) => r.targetType === type && r.targetTier === researchTier)
       : undefined;
     btn.style.display = locked && !task ? '' : 'none';
+    const existing = row.querySelector<HTMLElement>('.bs-build-research-progress');
     if (task) {
       const { fraction } = getResearchProgress(task);
+      let progressEl = existing;
+      if (!progressEl) {
+        progressEl = el('span', { className: 'bs-build-research-progress' });
+        progressEl.style.cssText = 'flex:0 1 auto;font:500 9px/1.2 var(--bsx-font-mono);color:var(--bsx-text-micro)';
+        row.append(progressEl);
+      }
       progressEl.textContent = t('ui.build.research_progress', {
         percent: Math.round(fraction * 100),
         remaining: task.ticksRemaining,
       });
-      progressEl.style.display = '';
     } else {
-      progressEl.style.display = 'none';
+      existing?.remove();
     }
   }
 
@@ -742,10 +744,6 @@ export class BuildMenu extends PanelBase {
       if (nextTier !== null) this.queueResearch(b.type, nextTier);
     });
 
-    const progressEl = document.createElement('span');
-    progressEl.className = 'bs-build-research-progress';
-    progressEl.style.cssText = 'flex:0 1 auto;font:500 9px/1.2 var(--bsx-font-mono);color:var(--bsx-text-micro);display:none';
-
     const demolishBtn = document.createElement('button');
     demolishBtn.className = 'bsx-btn bsx-btn-danger bs-build-demolish-btn';
     demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
@@ -759,7 +757,7 @@ export class BuildMenu extends PanelBase {
       }));
     });
 
-    row.append(info, moveBtn, upgradeBtn, researchBtn, progressEl, demolishBtn);
+    row.append(info, moveBtn, upgradeBtn, researchBtn, demolishBtn);
     this.syncResearchControls(row, b.type, nextTier, nextLocked);
     return row;
   }

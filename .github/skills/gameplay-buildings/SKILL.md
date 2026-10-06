@@ -44,6 +44,8 @@ Research task shape:
 - **Conditions** (prerequisites already met — e.g. a specific other building already at a given tier, or another research already completed) — every task beyond the first upgrade has these too.
 - **Exception — first upgrade (tier 1 → tier 2) of any building type:** cost only, no duration, no conditions.
 
+`tickResearch` emits `research:completed` (tier unlocked) and `research:cancelled` (with refund); `wireResearchNotifications` raises the toasts. The Build Menu research button shows cost and duration (`ui.build.queue_research_cost`); once queued it is replaced by live progress (`getResearchProgress`, `.bs-build-research-progress`).
+
 Higher tiers: larger capacity, better performance, larger physical footprint.
 Upgrading: demolish old building → construct new tier on same/adjacent cleared ground.
 Both construction and demolition carry a cost.
