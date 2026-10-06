@@ -242,6 +242,11 @@ export interface ContractSelector {
   id?: number;
   type?: ContractType;
   materialId?: string;
+  /**
+   * Prefer an offer whose `quantityKg` `collectedOre` already covers (same
+   * predicate as `hasFillableOreSaleOffer`); none covered means no match (#1338).
+   */
+  fillable?: boolean;
 }
 
 /**
@@ -294,7 +299,12 @@ export function hasRubbleDisposalOffer(available: readonly Contract[]): boolean 
  * Null when no selector field is set (nothing to search for) or nothing in
  * `pool` matches.
  */
-export function findContract(pool: readonly Contract[], selector: ContractSelector): Contract | null {
+export function findContract(
+  pool: readonly Contract[],
+  selector: ContractSelector,
+  _collectedOre: Readonly<Record<string, number>> = {},
+): Contract | null {
+  // TODO: implement `selector.fillable` using _collectedOre (#1338)
   if (selector.id !== undefined) {
     return pool.find(c => c.id === selector.id) ?? null;
   }
