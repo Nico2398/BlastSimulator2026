@@ -550,7 +550,7 @@ export class BuildMenu extends PanelBase {
     const placeBtn = button('primary', t('ui.build.place'), {
       onClick: () => {
         const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-        if (tier > 1 && this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier)) {
+        if (this.isTierLocked(type, tier)) {
           this.setStatus(t('ui.build.research_required', { tier }));
           return;
         }
@@ -648,36 +648,42 @@ export class BuildMenu extends PanelBase {
     }
   }
 
+  /** True when `tier` of `type` still needs research (tier 1 is always available). */
+  private isTierLocked(type: BuildingType, tier: BuildingTier): boolean {
+    return tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
+  }
+
+  private nextTierOf(b: Building): BuildingTier | null {
+    return b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
+  }
+
   /** Update progress text on existing rows in place (called every tick while research is queued). */
   private refreshResearchProgress(): void {
-    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) {
-      const type = row.dataset['buildType'] as BuildingType | undefined;
-      if (!type) continue;
-      const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-      const locked = tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
-      this.syncResearchControls(row, type, tier, locked);
-    }
+    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) this.syncCatalogRow(row);
     const buildings = this.lastState?.buildings.buildings ?? [];
     for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
       const b = buildings.find((bb) => bb.id === Number(row.dataset['buildingId']));
-      if (!b || b.tier >= 3) continue;
-      const nextTier = (b.tier + 1) as BuildingTier;
-      const locked = !!this.lastState && !isTierUnlocked(this.lastState.buildings, b.type, nextTier);
-      this.syncResearchControls(row, b.type, nextTier, locked);
+      if (!b) continue;
+      const nextTier = this.nextTierOf(b);
+      if (nextTier !== null) this.syncResearchControls(row, b.type, nextTier, this.isTierLocked(b.type, nextTier));
     }
   }
 
   private refreshCatalogButtons(cash: number): void {
-    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) {
-      const type = row.dataset['buildType'] as BuildingType | undefined;
-      if (!type) continue;
-      const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-      const def = getBuildingDef(type, tier);
-      const locked = tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
+    for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) this.syncCatalogRow(row, cash);
+  }
+
+  /** Sync one catalog row: buy-button state (when `cash` given) and research controls. */
+  private syncCatalogRow(row: HTMLElement, cash?: number): void {
+    const type = row.dataset['buildType'] as BuildingType | undefined;
+    if (!type) return;
+    const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
+    const locked = this.isTierLocked(type, tier);
+    if (cash !== undefined) {
       const btn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn');
-      if (btn) btn.disabled = cash < def.constructionCost || locked;
-      this.syncResearchControls(row, type, tier, locked);
+      if (btn) btn.disabled = cash < getBuildingDef(type, tier).constructionCost || locked;
     }
+    this.syncResearchControls(row, type, tier, locked);
   }
 
   // ── Placed buildings list ──────────────────────────────────────────────────
@@ -719,8 +725,8 @@ export class BuildMenu extends PanelBase {
       }, b.id);
     });
 
-    const nextTier = b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
-    const nextLocked = nextTier !== null && !!this.lastState && !isTierUnlocked(this.lastState.buildings, b.type, nextTier);
+    const nextTier = this.nextTierOf(b);
+    const nextLocked = nextTier !== null && this.isTierLocked(b.type, nextTier);
 
     const upgradeBtn = document.createElement('button');
     upgradeBtn.className = 'bsx-btn bsx-btn-primary bs-build-upgrade-btn';
