@@ -3,8 +3,9 @@
 
 import { createGame, createWorldState, type GameConfig, type GameState } from '../state/GameState.js';
 import { getLevel } from './Level.js';
-import { recordProfit, startLevel, type CampaignState } from './Campaign.js';
+import { recordProfit, recordStars, startLevel, type CampaignState } from './Campaign.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
 import { getFinancialReport } from '../economy/Finance.js';
 
 // ── Types ──
@@ -17,11 +18,33 @@ export interface LevelCompleteSummary {
   finalWellBeing: number;
   finalEcology: number;
   finalSafety: number;
+  /** Star rating earned this session (0..3). */
+  stars: number;
 }
 
 export interface LevelCompleteResult {
   triggered: boolean;
   summary: LevelCompleteSummary | null;
+}
+
+// ── Result settlement ──
+
+/**
+ * Snapshot the session's stats and record profit and stars on the campaign.
+ * `profit` defaults to the snapshot's total wealth. Returns the star rating.
+ */
+export function settleLevelResult(
+  state: GameState,
+  campaign: CampaignState,
+  levelId: string,
+  unlockThreshold: number,
+  profit?: number,
+): number {
+  snapshotStats(state.levelStats, state);
+  recordProfit(campaign, levelId, profit ?? state.levelStats.totalWealth);
+  const { stars } = calculateStarRating(state.levelStats, unlockThreshold);
+  recordStars(campaign, levelId, stars);
+  return stars;
 }
 
 // ── Threshold check ──
@@ -58,7 +81,7 @@ export function checkLevelComplete(
 
   // Threshold reached — close the session (guards repeat triggers), record, build summary
   state.levelEnded = true;
-  recordProfit(campaign, levelId, profit);
+  const stars = settleLevelResult(state, campaign, levelId, level.unlockThreshold, profit);
 
   const summary: LevelCompleteSummary = {
     levelId,
@@ -68,6 +91,7 @@ export function checkLevelComplete(
     finalWellBeing: state.scores.wellBeing,
     finalEcology: state.scores.ecology,
     finalSafety: state.scores.safety,
+    stars,
   };
 
   emitter.emit('level:complete', summary);

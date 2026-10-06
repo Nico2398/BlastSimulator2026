@@ -17,6 +17,9 @@ export const TICKS_PER_DAY = 24;
 /** Starting cash for a new game ($). Real open-pit mines cost $10M+ to open; scaled down for gameplay. */
 export const STARTING_CASH = 50_000;
 
+/** Minimum final ecology score for the ecology star criterion. */
+export const STAR_ECOLOGY_MIN = 60;
+
 /** Ticks between employee pay cycles. 1 tick = 1 game-hour; 10 ticks ≈ 10 game-hours. */
 export const PAY_CYCLE_TICKS = 10;
 

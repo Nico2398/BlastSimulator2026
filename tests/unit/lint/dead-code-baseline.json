@@ -34,8 +34,6 @@
     "src/core/campaign/Sandbox.ts:SandboxDifficultyDef",
     "src/core/campaign/Sandbox.ts:SandboxFieldKind",
     "src/core/campaign/SuccessTracker.ts:StarRating",
-    "src/core/campaign/SuccessTracker.ts:deserializeLevelStats",
-    "src/core/campaign/SuccessTracker.ts:serializeLevelStats",
     "src/core/config/balance.ts:BLAST_ENERGY_EPSILON",
     "src/core/config/balance.ts:BRIBERY_COSTS",
     "src/core/config/balance.ts:FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE",
