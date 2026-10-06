@@ -445,7 +445,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1338: +1 key (economy.contract.none_fillable), both locales: 3673.
     // #1311: +1 key (best_note), both locales: 3674.
     // #1312: +7 keys (campaign.reset_success, replay and new-campaign confirm dialogs), both locales: 3681.
-    expect(Object.keys(en).length).toBe(3681);
+    // #1321: +1 key (ui.level_end.back_to_sandbox), both locales: 3682.
+    expect(Object.keys(en).length).toBe(3682);
   });
 });
 

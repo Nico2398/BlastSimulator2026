@@ -20,9 +20,9 @@ import { SandboxPanel } from './ui/SandboxPanel.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
-import { getLevel, getAllLevels, type LevelDef } from './core/campaign/Level.js';
-import { formatMoney } from './core/economy/formatMoney.js';
-import { SANDBOX_DEFAULTS, sandboxLevelDef, type SandboxConfig } from './core/campaign/Sandbox.js';
+import { getLevel, getAllLevels } from './core/campaign/Level.js';
+import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
+import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
@@ -303,50 +303,6 @@ levelEndScreen.setOnBackToPortfolio(() => {
 const loadingScreen = new LoadingScreen(uiContainer);
 
 /**
- * Biome id (campaign LevelDef.biome / SandboxConfig.biome) → loading screen
- * eyebrow category key. Mirrors WorldMap's own BIOME_STYLE categorisation
- * (screens/WorldMap.ts) — small local duplication of a 3-entry map rather
- * than exporting WorldMap's private table for one caller (#493).
- */
-const BIOME_CATEGORY_KEY: Record<string, string> = {
-  desert_badlands: 'ui.portfolio.biome.desert',
-  alpine_granite: 'ui.portfolio.biome.mountain',
-  tropical_karst: 'ui.portfolio.biome.tropical',
-};
-const DEFAULT_BIOME_CATEGORY_KEY = 'ui.portfolio.biome.mountain';
-
-/** Loading screen content (eyebrow/subtitle/briefing) for a campaign level entry. */
-function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
-  return {
-    siteNumber: level.difficultyTier,
-    biomeCategoryKey: BIOME_CATEGORY_KEY[level.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
-    difficulty: level.difficultyTier,
-    descriptionKey: level.descKey,
-    briefing: [
-      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
-      { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
-      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
-    ],
-  };
-}
-
-/** Loading screen content for a sandbox site — no site number, no difficulty pips. */
-function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
-  const level = sandboxLevelDef(config);
-  return {
-    siteNumber: null,
-    biomeCategoryKey: BIOME_CATEGORY_KEY[config.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
-    difficulty: 0,
-    descriptionKey: 'loading.sandbox_subtitle',
-    briefing: [
-      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
-      { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
-      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
-    ],
-  };
-}
-
-/**
  * Weighted LoadPhase costs for enterLevel() below (#474) — default-and-record,
  * since the sandbox this was tuned in measures the same load anywhere from
  * 16s to 32s (a property of the environment, not the game) and re-measuring
@@ -426,10 +382,19 @@ uiManager.setGetState(() => ctx.state);
 const sandboxPanel = new SandboxPanel(uiContainer);
 mainMenu.setOnSandbox(() => { mainMenu.hide(); sandboxPanel.show(); });
 sandboxPanel.setOnBack(() => { mainMenu.show(); });
-sandboxPanel.setOnStart((config) => {
+function startSandbox(config: SandboxConfig): void {
   void enterLevel([
     `sandbox start biome:${config.biome} difficulty:${config.difficulty} seed:${config.seed}`,
   ], buildSandboxLoadingSiteInfo(config));
+}
+sandboxPanel.setOnStart(startSandbox);
+levelEndScreen.setOnRetrySandbox(() => {
+  levelEndScreen.hide();
+  startSandbox(sandboxPanel.getConfig());
+});
+levelEndScreen.setOnBackToSandbox(() => {
+  levelEndScreen.hide();
+  sandboxPanel.show();
 });
 
 // --- Audio ---

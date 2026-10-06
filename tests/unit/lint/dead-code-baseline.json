@@ -173,7 +173,6 @@
     "src/ui/KeyboardShortcuts.ts:GameConsoleFn",
     "src/ui/KeyboardShortcuts.ts:ShortcutCallbacks",
     "src/ui/LoadingScreen.ts:LoadPhase",
-    "src/ui/LoadingScreen.ts:LoadingBriefingRow",
     "src/ui/MainMenu.ts:OnContinue",
     "src/ui/MainMenu.ts:OnLanguageChange",
     "src/ui/MainMenu.ts:OnLoad",
