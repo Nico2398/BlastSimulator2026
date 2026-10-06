@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // BlastSimulator2026 — Integration: tutorial progress survives save/load (#1333)
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { TutorialOverlay } from '../../src/ui/TutorialOverlay.js';
@@ -130,5 +130,54 @@ describe('Tutorial save/resume (#1333)', () => {
   it('resume returns false for a game that never had a tutorial', () => {
     const fresh = track(new TutorialOverlay(container));
     expect(fresh.resume(createGame({ seed: 1 }))).toBe(false);
+  });
+
+  it('resume at the last step shows the closing card and finishes after the display delay', () => {
+    vi.useFakeTimers();
+    try {
+      campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
+      const state: GameState = ctx.state!;
+      state.tutorialProgress = { stepIndex: TUTORIAL_STEPS.length - 1, snapshot: {} };
+      const fresh = track(new TutorialOverlay(container));
+      expect(fresh.resume(state)).toBe(true);
+      expect(internals(fresh).stepIndex).toBe(TUTORIAL_STEPS.length - 1);
+      expect(fresh.isActive).toBe(true);
+      vi.advanceTimersByTime(60_000);
+      expect(fresh.isActive).toBe(false);
+      expect(state.tutorialProgress).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resume re-arms the auto-advance timer of the resumed step', () => {
+    vi.useFakeTimers();
+    try {
+      const idx = TUTORIAL_STEPS.findIndex((s, i) => (s.autoAdvanceMs ?? 0) > 0 && i < TUTORIAL_STEPS.length - 1);
+      expect(idx).toBeGreaterThanOrEqual(0);
+      campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
+      const state: GameState = ctx.state!;
+      state.tutorialProgress = { stepIndex: idx, snapshot: {} };
+      const fresh = track(new TutorialOverlay(container));
+      expect(fresh.resume(state)).toBe(true);
+      expect(internals(fresh).stepIndex).toBe(idx);
+      vi.advanceTimersByTime(TUTORIAL_STEPS[idx]!.autoAdvanceMs! + 1);
+      expect(internals(fresh).stepIndex).toBe(idx + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('progress serialized before return-to-menu abandon survives for Continue', () => {
+    const o = track(startTutorial(ctx, container));
+    internals(o).landOnStep(POLICY_STEP);
+    // Return to Menu does not save; the autosave on disk is what Continue loads.
+    const autosave = serialize(ctx.state!);
+    o.abandon();
+    expect(ctx.state!.tutorialProgress).toBeUndefined();
+    const loaded = deserialize(autosave);
+    const fresh = track(new TutorialOverlay(container));
+    expect(fresh.resume(loaded)).toBe(true);
+    expect(internals(fresh).stepIndex).toBe(POLICY_STEP);
   });
 });

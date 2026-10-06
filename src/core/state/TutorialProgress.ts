@@ -1,5 +1,3 @@
-import type { GameState } from './GameState.js';
-
 /** Persisted tutorial position so a save/load can resume mid-tutorial (#1333). */
 export interface TutorialProgress {
   stepIndex: number;
@@ -7,21 +5,30 @@ export interface TutorialProgress {
   snapshot: Record<string, unknown>;
 }
 
+/**
+ * The one field these helpers touch. "No progress" is always the field being
+ * absent (never null): deserialize deletes it and clear removes it.
+ * Structural so GameState can import TutorialProgress without a type cycle.
+ */
+interface TutorialProgressHolder {
+  tutorialProgress?: TutorialProgress;
+}
+
 export function recordTutorialProgress(
-  state: GameState,
+  state: TutorialProgressHolder,
   stepIndex: number,
   snapshot: Record<string, unknown>,
 ): void {
   state.tutorialProgress = { stepIndex, snapshot: { ...snapshot } };
 }
 
-export function clearTutorialProgress(state: GameState): void {
-  state.tutorialProgress = null;
+export function clearTutorialProgress(state: TutorialProgressHolder): void {
+  delete state.tutorialProgress;
 }
 
 /** Validated progress, or null when absent or stepIndex is outside [0, stepCount). */
 export function readTutorialProgress(
-  state: Pick<GameState, 'tutorialProgress'>,
+  state: TutorialProgressHolder,
   stepCount: number,
 ): TutorialProgress | null {
   const progress = sanitizeTutorialProgress(state.tutorialProgress);

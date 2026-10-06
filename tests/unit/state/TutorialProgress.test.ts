@@ -55,7 +55,6 @@ describe('readTutorialProgress', () => {
 
   it('returns null when absent', () => {
     expect(readTutorialProgress({}, 10)).toBeNull();
-    expect(readTutorialProgress({ tutorialProgress: null }, 10)).toBeNull();
   });
 
   it('returns null when stepIndex equals stepCount', () => {

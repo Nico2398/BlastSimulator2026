@@ -365,7 +365,7 @@ export interface GameState {
   /** Whether the game loop is paused. */
   isPaused: boolean;
   /** Tutorial position persisted with the save so load can resume it (#1333). Absent when no tutorial is active. */
-  tutorialProgress?: TutorialProgress | null;
+  tutorialProgress?: TutorialProgress;
 
   /** Mine type preset ID used for this game. */
   mineType: string;

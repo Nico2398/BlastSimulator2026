@@ -35,7 +35,11 @@ export function autoSaveSlotFor(levelId: string | null | undefined): string {
   return levelId === TUTORIAL_LEVEL_ID ? TUTORIAL_AUTO_SAVE_SLOT : AUTO_SAVE_SLOT;
 }
 
-const isAutoSlot = (slotId: string): boolean => slotId === AUTO_SAVE_SLOT || slotId === TUTORIAL_AUTO_SAVE_SLOT;
+/** Tick-driven slots, in list order; they have no manual save/overwrite/delete. Keys stay literal so check:i18n sees them. */
+const AUTO_SLOTS: ReadonlyMap<string, { nameKey: string; emptyKey: string }> = new Map([
+  [AUTO_SAVE_SLOT, { nameKey: 'saveload.auto_name', emptyKey: 'ui.saves.auto_empty' }],
+  [TUTORIAL_AUTO_SAVE_SLOT, { nameKey: 'saveload.tutorial_auto_name', emptyKey: 'ui.saves.tutorial_auto_empty' }],
+]);
 const THUMB_STYLE = 'width:58px;height:40px;border-radius:4px;flex:0 0 auto;'
   + 'background:repeating-linear-gradient(135deg,#2a3038 0 6px,#1d232b 6px 12px)';
 
@@ -55,8 +59,8 @@ function slotNumber(slotId: string): string | null {
 
 /** Localized slot name derived from the id; `fallback` is returned for ids with no known name. */
 function slotName(slotId: string, fallback: string): string {
-  if (slotId === AUTO_SAVE_SLOT) return t('saveload.auto_name');
-  if (slotId === TUTORIAL_AUTO_SAVE_SLOT) return t('saveload.tutorial_auto_name');
+  const auto = AUTO_SLOTS.get(slotId);
+  if (auto) return t(auto.nameKey);
   const n = slotNumber(slotId);
   return n === null ? fallback : t('saveload.slot_name', { n });
 }
@@ -275,7 +279,7 @@ export class SavesModal {
       return;
     }
     const byId = new Map(metas.map(m => [m.slotId, m]));
-    const slotIds = [AUTO_SAVE_SLOT, TUTORIAL_AUTO_SAVE_SLOT, ...Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => `slot_${i + 1}`)];
+    const slotIds = [...AUTO_SLOTS.keys(), ...Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => `slot_${i + 1}`)];
 
     for (const slotId of slotIds) {
       this.slotList.appendChild(this.slotCard(slotId, byId.get(slotId) ?? null));
@@ -288,7 +292,8 @@ export class SavesModal {
   }
 
   private slotCard(slotId: string, meta: SaveMeta | null): HTMLElement {
-    const isAuto = isAutoSlot(slotId);
+    const autoSlot = AUTO_SLOTS.get(slotId);
+    const isAuto = autoSlot !== undefined;
 
     if (!meta) {
       const card = el('div', { attrs: {
@@ -302,7 +307,7 @@ export class SavesModal {
       // copy and no button, rather than falling into the SAVE HERE branch
       // below with a nonsense "Slot auto — empty" label.
       const label = el('span', {
-        text: isAuto ? t(slotId === TUTORIAL_AUTO_SAVE_SLOT ? 'ui.saves.tutorial_auto_empty' : 'ui.saves.auto_empty') : t('ui.saves.slot_empty', { n: slotNumber(slotId) ?? slotId }),
+        text: autoSlot ? t(autoSlot.emptyKey) : t('ui.saves.slot_empty', { n: slotNumber(slotId) ?? slotId }),
         attrs: { style: 'flex:1;font:400 12px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
       });
       card.append(thumb, label);
