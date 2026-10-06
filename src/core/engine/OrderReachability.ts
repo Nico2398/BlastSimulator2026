@@ -11,6 +11,7 @@
 // Temporary unavailability (injured, resting, training, busy) does not remove
 // an actor: alive and on the roster is enough.
 
+import type { NavGrid } from '../nav/NavGrid.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
@@ -20,10 +21,11 @@ import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
 import {
   computeClimbReachableSetFromSources,
   computeClimbComponents,
+  reachSourceCellIndex,
   type ClimbComponents,
   type ReachableSet,
 } from '../nav/NavGridReachability.js';
-import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
+import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, ORDER_REACH_CACHE_MAX_KEYS } from '../config/balance.js';
 
 /** Identity of the actor pool able to serve an order (skill + vehicle role, or one named employee). */
 type OrderActorKey = string;
@@ -59,22 +61,65 @@ function candidateEmployees(state: GameState, req: ActorRequirements): Employee[
   );
 }
 
-function buildActorPool(
-  state: GameState,
-  req: ActorRequirements,
-  footComponents: () => ClimbComponents,
-): ActorPool {
+/**
+ * Derived reachability per game state, never serialized. Valid for one nav grid
+ * at one `revision`: fills ignore occupancy, so only a cell write invalidates.
+ * `fills` is in least-recently-used order (oldest first).
+ */
+interface ReachCache {
+  navGrid: NavGrid;
+  revision: number;
+  components: ClimbComponents | null;
+  fills: Map<OrderActorKey, { signature: string; pool: ActorPool }>;
+}
+
+const reachCaches = new WeakMap<GameState, ReachCache>();
+
+function cacheFor(state: GameState): ReachCache | null {
   const navGrid = state.navGrid;
-  if (navGrid === null) return NO_ACTORS;
-  const employees = candidateEmployees(state, req);
-  if (employees.length === 0) return NO_ACTORS;
-
-  const [only] = employees;
-  if (req.targetEmployeeId !== null && req.requiredVehicleRole === null && only !== undefined) {
-    const components = footComponents();
-    return { hasActor: true, reachable: { has: (x, z) => components.canReach(only.x, only.z, x, z) } };
+  if (navGrid === null) {
+    reachCaches.delete(state);
+    return null;
   }
+  let cache = reachCaches.get(state);
+  if (cache === undefined || cache.navGrid !== navGrid || cache.revision !== navGrid.revision) {
+    cache = { navGrid, revision: navGrid.revision, components: null, fills: new Map() };
+    reachCaches.set(state, cache);
+  }
+  return cache;
+}
 
+function sortedUniqueCells(navGrid: NavGrid, sources: ReadonlyArray<{ x: number; z: number }>): number[] {
+  const cells = new Set<number>();
+  for (const s of sources) cells.add(reachSourceCellIndex(navGrid, s.x, s.z));
+  return [...cells].sort((a, b) => a - b);
+}
+
+/**
+ * Everything a fill-backed pool's reachable set depends on besides the grid.
+ * Vehicles key on their rounded position, not the clamped fill cell: `fillPool`
+ * tests the unclamped rounded cell against the on-foot set, so an out-of-grid
+ * vehicle must not share a signature with the in-grid one it clamps onto.
+ */
+function poolSignature(state: GameState, navGrid: NavGrid, req: ActorRequirements, employees: ReadonlyArray<Employee>): string {
+  const cells = sortedUniqueCells(navGrid, employees).join(',');
+  const role = req.requiredVehicleRole;
+  if (role === null) return cells;
+  const ids = employees.map(e => e.id).sort().join(',');
+  const vehicles = state.vehicles.vehicles
+    .filter(v => v.type === role)
+    .map(v => `${v.id}:${Math.round(v.x)},${Math.round(v.z)}:${vehicleDriverId(v) ?? '-'}`)
+    .sort()
+    .join(',');
+  return `${cells}|${ids}|${vehicles}`;
+}
+
+function fillPool(
+  state: GameState,
+  navGrid: NavGrid,
+  req: ActorRequirements,
+  employees: ReadonlyArray<Employee>,
+): ActorPool {
   const onFoot = computeClimbReachableSetFromSources(navGrid, employees, NAV_CLEARANCE_EMPLOYEE_CELLS);
   const role = req.requiredVehicleRole;
   if (role === null) return { hasActor: true, reachable: onFoot };
@@ -92,18 +137,51 @@ function buildActorPool(
   };
 }
 
+function buildActorPool(state: GameState, req: ActorRequirements, cache: ReachCache | null): ActorPool {
+  if (cache === null) return NO_ACTORS;
+  const navGrid = cache.navGrid;
+  const employees = candidateEmployees(state, req);
+  if (employees.length === 0) return NO_ACTORS;
+
+  const [only] = employees;
+  if (req.targetEmployeeId !== null && req.requiredVehicleRole === null && only !== undefined) {
+    const components = cache.components ??= computeClimbComponents(navGrid, NAV_CLEARANCE_EMPLOYEE_CELLS);
+    return { hasActor: true, reachable: { has: (x, z) => components.canReach(only.x, only.z, x, z) } };
+  }
+
+  const key = orderActorKey(req);
+  const signature = poolSignature(state, navGrid, req, employees);
+  const hit = cache.fills.get(key);
+  cache.fills.delete(key); // re-inserted below as most recently used
+  if (hit !== undefined && hit.signature === signature) {
+    cache.fills.set(key, hit);
+    return hit.pool;
+  }
+  const pool = fillPool(state, navGrid, req, employees);
+  cache.fills.set(key, { signature, pool });
+  return pool;
+}
+
+function evictOverflow(cache: ReachCache | null): void {
+  if (cache === null) return;
+  while (cache.fills.size > ORDER_REACH_CACHE_MAX_KEYS) {
+    const oldest = cache.fills.keys().next();
+    if (oldest.done === true) break;
+    cache.fills.delete(oldest.value);
+  }
+}
+
 export function buildOrderReachability(
   state: GameState,
   actions: ReadonlyArray<PendingAction>,
 ): OrderReachability {
   const pools = new Map<OrderActorKey, ActorPool>();
-  let components: ClimbComponents | null = null;
-  const footComponents = (): ClimbComponents =>
-    components ??= computeClimbComponents(state.navGrid!, NAV_CLEARANCE_EMPLOYEE_CELLS);
+  const cache = cacheFor(state);
   for (const action of actions) {
     const key = orderActorKey(action);
-    if (!pools.has(key)) pools.set(key, buildActorPool(state, action, footComponents));
+    if (!pools.has(key)) pools.set(key, buildActorPool(state, action, cache));
   }
+  evictOverflow(cache);
   return {
     canReach: (key, x, z) => pools.get(key)?.reachable?.has(x, z) ?? false,
     hasActor: key => pools.get(key)?.hasActor ?? false,

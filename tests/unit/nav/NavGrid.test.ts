@@ -2366,3 +2366,93 @@ describe('clearance field (#1154)', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NavGrid.revision — change counter for derived caches (#1427)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('NavGrid.revision (#1427)', () => {
+  const walkable = (): NavCell => ({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+  const blocked = (): NavCell => ({ type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false });
+  function flatGrid(size = 6): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < size; z++) cells.push(Array.from({ length: size }, walkable));
+    return new NavGrid(size, size, cells);
+  }
+
+  it('starts at 0', () => {
+    expect(flatGrid().revision).toBe(0);
+  });
+
+  it('bumpRevision increments the counter', () => {
+    const nav = flatGrid();
+    nav.bumpRevision();
+    expect(nav.revision).toBe(1);
+    nav.bumpRevision();
+    expect(nav.revision).toBe(2);
+  });
+
+  it('setCellAt inside the grid bumps the revision', () => {
+    const nav = flatGrid();
+    nav.setCellAt(2, 3, blocked());
+    expect(nav.revision).toBeGreaterThan(0);
+  });
+
+  it('every in-bounds setCellAt call bumps again', () => {
+    const nav = flatGrid();
+    nav.setCellAt(2, 3, blocked());
+    const after1 = nav.revision;
+    nav.setCellAt(2, 3, walkable());
+    expect(nav.revision).toBeGreaterThan(after1);
+  });
+
+  it('setCellAt outside the grid writes nothing and does not bump', () => {
+    const nav = flatGrid(6);
+    nav.setCellAt(-1, 2, blocked());
+    nav.setCellAt(2, -1, blocked());
+    nav.setCellAt(6, 2, blocked());
+    nav.setCellAt(2, 6, blocked());
+    expect(nav.revision).toBe(0);
+  });
+
+  it('fragment occupancy writes do not bump the revision', () => {
+    const nav = flatGrid();
+    nav.addFragmentOccupant(1, 1);
+    nav.addFragmentOccupant(1, 1);
+    nav.removeFragmentOccupant(1, 1);
+    expect(nav.cellAt(1, 1)!.fragmentOccupancy).toBe(1);
+    expect(nav.revision).toBe(0);
+  });
+
+  it('vehicle occupancy flag writes do not bump the revision', () => {
+    const nav = flatGrid();
+    nav.cellAt(2, 2)!.vehicleOccupied = true;
+    expect(nav.revision).toBe(0);
+  });
+
+  it('patchNavGrid that changes terrain bumps the revision', () => {
+    const grid = makeSolidGrid(10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const before = nav.revision;
+    for (let y = 0; y <= 4; y++) grid.clearVoxel(0, y, 0);
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 0, maxX: 0, minZ: 0, maxZ: 0 });
+    expect(nav.cellAt(0, 0)!.type).toBe('void');
+    expect(nav.revision).toBeGreaterThan(before);
+  });
+
+  it('patchNavGrid with an empty sentinel region does not bump', () => {
+    const grid = makeSolidGrid(10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const before = nav.revision;
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 0, maxX: -1, minZ: 0, maxZ: -1 });
+    expect(nav.revision).toBe(before);
+  });
+
+  it('patchNavGrid entirely outside the grid does not bump', () => {
+    const grid = makeSolidGrid(10, 10, 4);
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+    const before = nav.revision;
+    NavGrid.patchNavGrid(nav, grid, [], [], { minX: 50, maxX: 40, minZ: 0, maxZ: 0 });
+    expect(nav.revision).toBe(before);
+  });
+});
