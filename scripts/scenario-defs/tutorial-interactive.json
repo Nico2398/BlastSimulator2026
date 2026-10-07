@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the retired playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut. #1338: plays on honestly -- real starting cash, no bootstrap skill grants, no campaign complete; free-play sales (any ore_sale or rubble_disposal offer the warehouse already covers, via fillable:true) until the profit target ends the level on its own; with the driver hired before the box cut (#1339) the profit target takes a long run of sales.",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the retired playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut. #1338: plays on honestly -- real starting cash, no bootstrap skill grants, no campaign complete; free-play sales (any ore_sale or rubble_disposal offer the warehouse already covers, via fillable:true) until the profit target ends the level on its own; with the driver hired before the box cut (#1339) the profit target takes a long run of sales. #1363: the win counts operating profit, so the console clock reaches the target after five sales (steps 47-62); the later sales are interactionOnly because the browser's clock spends more ticks on payroll and needs them, and interaction mode skips them once the level has ended.",
   "skipBlastPlayback": true,
   "shots": [
     {
@@ -1565,7 +1565,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1594,7 +1595,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1623,7 +1625,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1643,7 +1646,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1672,7 +1676,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1701,7 +1706,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1721,7 +1727,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1750,7 +1757,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1779,7 +1787,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1799,7 +1808,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1828,7 +1838,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1857,7 +1868,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1877,7 +1889,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1906,7 +1919,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1935,7 +1949,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1955,7 +1970,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1984,7 +2000,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2013,7 +2030,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "interactionOnly": true
     },
     {
       "command": "wait_until field:levelEnded equals:true max_ticks:6000",
