@@ -11,6 +11,7 @@ import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 import { isDiagonalCornerClear } from './Pathfinding.js';
+import type { Rect } from '../world/WorldGen.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
@@ -677,6 +678,15 @@ export function reachSourceCellIndex(navGrid: NavGrid, x: number, z: number): nu
 }
 
 /**
+ * Hypothetical edits to the fill (#1391): `block` cells (min-inclusive,
+ * max-exclusive) count as impassable, `free` cells as passable.
+ */
+export interface FillOverrides {
+  block?: Rect;
+  free?: Rect;
+}
+
+/**
  * `computeClimbReachableSet` flooded from several sources at once (#1306): a cell
  * is in the set when it is climb-reachable from at least one source. Each source
  * is clamped into the grid like `computeClimbReachableSet`'s anchor, and a
@@ -686,6 +696,7 @@ export function computeClimbReachableSetFromSources(
   navGrid: NavGrid,
   sources: ReadonlyArray<{ x: number; z: number }>,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  _overrides?: FillOverrides,
 ): ReachableSet {
   if (sources.length === 0) return EMPTY_REACHABLE_SET;
   const cells = sources.map(s => ({
