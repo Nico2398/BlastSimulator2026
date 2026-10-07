@@ -19,12 +19,12 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow cash:400000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:400000",
       "description": "#947 CI-fix follow-up: bumped 200000 -> 400000. This file's drilling wait was converted from a hand-tuned, razor-thin `tick 50/50/50/50/30` pad (racing a fixed worker-revolt tick) to a `waitUntil` once `set_policy mode:shift_8h` (below) removed the revolt race by keeping well-being off the zero floor -- but forced rest under that policy costs real payroll/fuel ticks a pre-existing worker_revolt used to cut the file off from ever paying (direct trace: cash reached -$30,598 and tripped bankruptcy instead, mid-drilling, at the old 200000 starting cash). No absolute `cash` checkpoint anywhere else in this file depends on the exact starting figure -- every later assertion is a `changedBy`/`decreased` delta -- so this is a pure headroom bump, matching the same class of fix already used for the same class of problem in rock-fragmenter-breaking.json (#697).",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:400000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:400000"
         }
       ],
       "role": "setup",

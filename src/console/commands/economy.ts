@@ -42,6 +42,7 @@ export function financesCommand(
     `Total income:   ${formatDollars(report.totalIncome)}`,
     `Total expenses: ${formatDollars(report.totalExpenses)}`,
     `Net profit:     ${formatDollars(report.netProfit)}`,
+    `Operating profit: ${formatDollars(report.operatingProfit)}`,
   ];
 
   if (report.incomeByCategory.length > 0) {

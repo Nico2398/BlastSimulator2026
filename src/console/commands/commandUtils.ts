@@ -55,16 +55,26 @@ function parseBooleanFlag(raw: string | undefined): boolean | undefined | null {
 }
 
 /**
+ * Tri-state `staffed:` flag for `campaign start` (#1363): `undefined` when
+ * absent (the level opens with its own starting site), else true/false.
+ */
+export function parseOptionalStaffedFlag(raw: string | undefined): { staffed: boolean | undefined; error: null } | { staffed: undefined; error: string } {
+  const parsed = parseBooleanFlag(raw);
+  if (parsed === null) {
+    return { staffed: undefined, error: t('console.invalid_staffed_flag', { value: raw! }) };
+  }
+  return { staffed: parsed, error: null };
+}
+
+/**
  * Parses the `staffed:true|false` console flag shared by `new_game` and
  * `sandbox start`, defaulting to `false` when omitted. Returns an error
  * message when the raw value is present but not `true`/`false`, so both
  * callers can surface one unified message instead of duplicating the check.
  */
 export function parseStaffedFlag(raw: string | undefined): { staffed: boolean; error: null } | { staffed: false; error: string } {
-  const parsed = parseBooleanFlag(raw);
-  if (parsed === null) {
-    return { staffed: false, error: t('console.invalid_staffed_flag', { value: raw! }) };
-  }
-  return { staffed: parsed === true, error: null };
+  const parsed = parseOptionalStaffedFlag(raw);
+  if (parsed.error !== null) return { staffed: false, error: parsed.error };
+  return { staffed: parsed.staffed === true, error: null };
 }
 

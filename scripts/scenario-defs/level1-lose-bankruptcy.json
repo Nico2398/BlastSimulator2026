@@ -3,11 +3,11 @@
   "description": "Level 1 losing scenario: buy the whole fleet and a full crew, earn nothing, go bankrupt on running costs. The level is funded to exactly the shopping list ($147,500 on `campaign start`) so every purchase is a click a real player could make -- the scenario no longer reaches its loss by overdrawing on a purchase the UI would have refused. It reaches it the way the game intends: BANKRUPTCY_THRESHOLD is $5,000 (balance.ts), the spree ends on $0, and BANKRUPTCY_GRACE_TICKS = 100 ticks of payroll and upkeep with zero income finish the job at tick 100.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:147500",
+      "command": "campaign start level:dusty_hollow staffed:false cash:147500",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:147500"
+          "command": "campaign start level:dusty_hollow staffed:false cash:147500"
         }
       ],
       "role": "setup",

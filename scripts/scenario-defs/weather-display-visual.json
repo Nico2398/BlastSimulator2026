@@ -3,11 +3,11 @@
   "description": "Visual verification of the weather system: weather cycle (sunny → cloudy → rain → heavy rain → storm → heat wave → cold snap), weather indicator icon in HUD, weather command output, and visual effects on terrain appearance.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",

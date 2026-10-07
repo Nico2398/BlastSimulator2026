@@ -5,7 +5,43 @@ import { createCampaignState, startLevel, recordStars, getBestStars } from '../.
 import { createGame } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
+import { STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
 import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
+
+describe('Level completion counts operating profit (#1363)', () => {
+  function started() {
+    const state = createGame({ seed: 42 });
+    const campaign = createCampaignState();
+    const level = getLevel('dusty_hollow')!;
+    campaign.levels['dusty_hollow']!.unlocked = true;
+    startLevel(campaign, level.id);
+    return { state, campaign, level };
+  }
+
+  it('fires when operating profit reaches the threshold despite a large capital outlay', () => {
+    const { state, campaign, level } = started();
+    addExpense(state.finances, 92800, 'equipment', 'fleet', 0);
+    addExpense(state.finances, 15000, 'construction', 'warehouse', 0);
+    addIncome(state.finances, level.unlockThreshold, 'contracts', 'c', 1);
+    const result = checkLevelComplete(state, campaign, new EventEmitter());
+    expect(result.triggered).toBe(true);
+    expect(result.summary!.totalProfit).toBe(level.unlockThreshold);
+    expect(state.levelEnded).toBe(true);
+  });
+
+  it('does not fire when only refunds lift net profit past the threshold', () => {
+    const { state, campaign, level } = started();
+    addIncome(state.finances, level.unlockThreshold, 'refund', 'r', 0);
+    expect(checkLevelComplete(state, campaign, new EventEmitter()).triggered).toBe(false);
+  });
+
+  it('does not fire when running costs keep operating profit below the threshold', () => {
+    const { state, campaign, level } = started();
+    addIncome(state.finances, level.unlockThreshold + 500, 'contracts', 'c', 0);
+    addExpense(state.finances, 1000, 'salaries', 'w', 0);
+    expect(checkLevelComplete(state, campaign, new EventEmitter()).triggered).toBe(false);
+  });
+});
 
 describe('Level completion and transition (7.3)', () => {
   it('profit reaching threshold triggers level complete flag', () => {
@@ -54,7 +90,8 @@ describe('Level completion and transition (7.3)', () => {
 
     expect(result.triggered).toBe(true);
     const s = result.summary!;
-    expect(s.totalProfit).toBe(level.unlockThreshold + 5000 - 1000);
+    // Operating profit (#1363): the 'equipment' purchase is capital outlay, not counted.
+    expect(s.totalProfit).toBe(level.unlockThreshold + 5000);
     expect(s.blastsPerformed).toBe(7);
     expect(s.casualties).toBe(2);
     expect(s.finalWellBeing).toBe(65);
@@ -346,5 +383,49 @@ describe('level completion records stars (#1311)', () => {
     addIncome(state.finances, level.unlockThreshold - 1, 'sales', 'test', 0);
     checkLevelComplete(state, campaign, new EventEmitter());
     expect(campaign.levels[level.id]!.bestStars).toBe(0);
+  });
+});
+
+describe('createGameForLevel staffed is tri-state (#1363)', () => {
+  function unlocked() {
+    const campaign = createCampaignState();
+    campaign.levels['dusty_hollow']!.unlocked = true;
+    return campaign;
+  }
+
+  it('undefined on dusty_hollow opens with the level starting site roster and fleet', () => {
+    const state = createGameForLevel(unlocked(), 'dusty_hollow')!;
+    expect(state.employees.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver']);
+    expect(state.vehicles.vehicles.map(v => v.type).sort()).toEqual(['debris_hauler', 'drill_rig']);
+  });
+
+  it('undefined deducts no cash for the free crew and fleet', () => {
+    const state = createGameForLevel(unlocked(), 'dusty_hollow')!;
+    expect(state.cash).toBe(getLevel('dusty_hollow')!.startingCash);
+  });
+
+  it('false on dusty_hollow opens a bare site', () => {
+    const state = createGameForLevel(unlocked(), 'dusty_hollow', false)!;
+    expect(state.employees.employees).toHaveLength(0);
+    expect(state.vehicles.vehicles).toHaveLength(0);
+  });
+
+  it('true on dusty_hollow uses the global staffed composition, not the level one', () => {
+    const state = createGameForLevel(unlocked(), 'dusty_hollow', true)!;
+    expect(state.employees.employees).toHaveLength(STARTING_SITE_STAFFED_COMPOSITION.employees.length);
+    expect(state.vehicles.vehicles).toHaveLength(STARTING_SITE_STAFFED_COMPOSITION.vehicles.length);
+  });
+
+  it('undefined on the tutorial stays bare', () => {
+    const state = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
+    expect(state.employees.employees).toHaveLength(0);
+    expect(state.vehicles.vehicles).toHaveLength(0);
+  });
+
+  it('undefined on grumpstone_ridge stays bare', () => {
+    const campaign = createCampaignState();
+    campaign.levels['grumpstone_ridge']!.unlocked = true;
+    const state = createGameForLevel(campaign, 'grumpstone_ridge')!;
+    expect(state.employees.employees).toHaveLength(0);
   });
 });

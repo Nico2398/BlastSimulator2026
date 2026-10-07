@@ -18,12 +18,12 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "description": "A real (non-tutorial) level so the landscape zone + cloud disc are big enough to read clearly.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",

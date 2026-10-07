@@ -1067,7 +1067,7 @@ describe('free-play step card (#1329/#1328) — honest about progress before the
     });
     it('reads profit as the financial report net profit', () => {
       const f = financesWithProfit(1200);
-      expect(victoryProgress(f, target).profit).toBe(getFinancialReport(f, 0).netProfit);
+      expect(victoryProgress(f, target).profit).toBe(getFinancialReport(f, 0).operatingProfit);
       expect(victoryProgress(f, target).remaining).toBe(target - 1200);
     });
     it('profit above target clamps remaining to 0', () => {

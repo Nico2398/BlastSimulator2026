@@ -26,7 +26,7 @@ import { goalChipParams } from '../../src/ui/tutorialStepsClosing.js';
 import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
-import { getFinancialReport } from '../../src/core/economy/Finance.js';
+import { getOperatingProfit } from '../../src/core/economy/Finance.js';
 import { isFillableSaleOffer } from '../../src/core/economy/Contract.js';
 import { computeDangerZone } from '../../src/core/entities/Zone.js';
 import {
@@ -37,6 +37,7 @@ import {
   CHARGE_DEFAULT_STEMMING_M,
 } from '../../src/core/config/balance.js';
 import { REGION } from '../../src/ui/tutorialStages.js';
+import { FORBIDDEN_COMMAND, playContracts, playTick, tickUntil, type Run } from '../helpers/playthrough.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -772,48 +773,6 @@ describe('panel default parameters on the tutorial square rate good or better (#
 describe('full tutorial playthrough ends WON by following the cards then playing on (#1328)', () => {
   /** Free-play tick ceiling, a constant so a slow win cannot hide behind a raised cap. */
   const FREE_PLAY_TICK_CAP = 6000;
-  const FORBIDDEN_COMMAND = /^(employee fire|vehicle scrap|build destroy|vehicle sell)\b/;
-
-  type Run = (cmd: string) => { success: boolean; output: string };
-
-  /** One ordinary player tick: resolve a pending event, then let time pass. */
-  function playTick(run: Run, state: GameState): void {
-    if (state.events.pendingEvent) run('event choose 0');
-    run('tick 1');
-  }
-
-  /** Advance ticks until `done()` reads true or `maxTicks` pass. */
-  function tickUntil(run: Run, state: GameState, maxTicks: number, done: () => boolean): void {
-    for (let i = 0; i < maxTicks && !done(); i++) playTick(run, state);
-  }
-
-  /**
-   * Ordinary contract play, the same actions the Contracts panel offers:
-   * deliver stock against accepted ore_sale/rubble_disposal contracts, and
-   * accept an offer only when current stock covers it in full (an
-   * unfulfilled contract costs a penalty). ore_sale is preferred.
-   */
-  function playContracts(run: Run, state: GameState): void {
-    const stockOf = (materialId: string) => (
-      materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0)
-    );
-    for (const active of [...state.contracts.active]) {
-      if (active.type !== 'ore_sale' && active.type !== 'rubble_disposal') continue;
-      const amount = Math.min(active.quantityKg - active.deliveredKg, stockOf(active.materialId));
-      if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
-    }
-    for (let guard = 0; guard < 8; guard++) {
-      const covered = (c: typeof state.contracts.available[number]) => stockOf(c.materialId) >= c.quantityKg;
-      const offer = state.contracts.available.find((c) => c.type === 'ore_sale' && covered(c))
-        ?? state.contracts.available.find((c) => c.type === 'rubble_disposal' && covered(c));
-      if (!offer) return;
-      if (!run(`contract accept ${offer.id}`).success) return;
-      const active = state.contracts.active.find((c) => c.id === offer.id);
-      if (!active) return;
-      const amount = Math.min(active.quantityKg, stockOf(active.materialId));
-      if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
-    }
-  }
 
   /** Play the guided steps (everything before 'free-play') via each step's own commands. */
   function playGuidedPhase(run: Run, state: GameState): void {
@@ -937,8 +896,8 @@ describe('full tutorial playthrough ends WON by following the cards then playing
     expect(state.cash).toBeGreaterThan(0);
     expect(freePlay.isComplete(state, {})).toBe(true);
 
-    const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
-    expect(netProfit).toBeGreaterThanOrEqual(target);
+    const operatingProfit = getOperatingProfit(state.finances);
+    expect(operatingProfit).toBeGreaterThanOrEqual(target);
 
     // Honesty guard: no layoff / scrap / demolish hack anywhere in the run.
     expect(commandsRun.filter((c) => FORBIDDEN_COMMAND.test(c))).toEqual([]);
@@ -950,9 +909,9 @@ describe('full tutorial playthrough ends WON by following the cards then playing
 
     const target = getLevel('tutorial_pit')!.unlockThreshold;
     const chip = goalChipParams(state);
-    const netProfit = getFinancialReport(state.finances, state.tickCount, 0).netProfit;
+    const operatingProfit = getOperatingProfit(state.finances);
     expect(chip.target).toBe(formatDollars(target));
-    expect(chip.profit).toBe(formatDollars(netProfit));
+    expect(chip.profit).toBe(formatDollars(operatingProfit));
   }, 120_000);
 
   it('after the first sale no rail disables a control and the clock is not held, however long the player idles', () => {

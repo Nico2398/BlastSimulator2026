@@ -1178,6 +1178,38 @@ export interface StartingSiteVehicleSlot {
   readonly tier: VehicleTier;
 }
 
+export interface StartingBuildingSlot {
+  readonly type: BuildingType;
+  readonly tier: BuildingTier;
+}
+
+/** Driller, blaster and truck driver: the crew every starting site opens with. */
+const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
+  { role: 'driller', qualifications: [
+    { category: 'blasting', proficiencyLevel: 1 },
+    { category: 'driving.drill_rig', proficiencyLevel: 1 },
+  ] },
+  { role: 'blaster', qualifications: [
+    { category: 'blasting', proficiencyLevel: 1 },
+  ] },
+  { role: 'driver', qualifications: [
+    { category: 'driving.truck', proficiencyLevel: 1 },
+  ] },
+];
+
+/** Drill rig and debris hauler: the fleet every starting site opens with. */
+const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
+  { role: 'drill_rig', tier: 1 },
+  { role: 'debris_hauler', tier: 1 },
+];
+
+/** A starting site's pre-hired roster, pre-purchased fleet and pre-placed buildings. */
+export interface StartingSiteComposition {
+  readonly employees: readonly StartingSiteEmployeeSlot[];
+  readonly vehicles: readonly StartingSiteVehicleSlot[];
+  readonly buildings: readonly StartingBuildingSlot[];
+}
+
 /**
  * Composition of the opt-in staffed starting site (`new_game staffed:true` /
  * `sandbox start staffed:true`). Covers the licences and vehicle roles the
@@ -1185,21 +1217,10 @@ export interface StartingSiteVehicleSlot {
  * ready-to-work site instead of hiring/purchasing through the UI in every
  * unrelated scenario. See issue #551.
  */
-export const STARTING_SITE_STAFFED_COMPOSITION: {
-  readonly employees: readonly StartingSiteEmployeeSlot[];
-  readonly vehicles: readonly StartingSiteVehicleSlot[];
-} = {
+export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
+  buildings: [],
   employees: [
-    { role: 'driller', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-      { category: 'driving.drill_rig', proficiencyLevel: 1 },
-    ] },
-    { role: 'blaster', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-    ] },
-    { role: 'driver', qualifications: [
-      { category: 'driving.truck', proficiencyLevel: 1 },
-    ] },
+    ...BASE_STARTING_EMPLOYEES,
     // Both excavator drivers also hold the rock fragmenter licence, so either
     // can crew the fragmenter (it has a licence of its own since #1339).
     { role: 'driver', qualifications: [
@@ -1212,12 +1233,42 @@ export const STARTING_SITE_STAFFED_COMPOSITION: {
     ] },
   ],
   vehicles: [
-    { role: 'drill_rig', tier: 1 },
-    { role: 'debris_hauler', tier: 1 },
+    ...BASE_STARTING_VEHICLES,
     { role: 'rock_digger', tier: 1 },
     { role: 'rock_fragmenter', tier: 1 },
   ],
 } as const;
+
+/**
+ * Metres from the starting crew, toward the site centre, where a level's
+ * opening buildings start their placement search. Close enough to walk to,
+ * far enough that a footprint cannot wall a vehicle into the crew's own pocket.
+ */
+export const STARTING_BUILDING_STANDOFF_M = 12;
+
+/** Dusty Hollow's own opening crew, fleet and warehouse (#1363). */
+export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
+  employees: BASE_STARTING_EMPLOYEES,
+  vehicles: BASE_STARTING_VEHICLES,
+  buildings: [{ type: 'freight_warehouse', tier: 1 }],
+};
+
+/**
+ * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
+ * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
+ * operating-profit target before wellbeing collapses into a revolt (~tick
+ * 450-630) or cash runs out. Bisected on headless console playthroughs of
+ * `campaign start level:dusty_hollow` (seed 1138; tick, drill_plan, charge,
+ * sequence, zone clear, blast, contract accept/deliver, event choose 0; five
+ * play styles: 2x2/2x3 patterns, boomite/pop_rock, with and without a Living
+ * Quarters): at 5.0 every style ends in revolt or bankruptcy, 7.0 wins the
+ * fast styles only, 8.0 wins all but the slowest style, 9.0 wins all five in
+ * ~220-300 ticks. Lower values hit the worker-revolt wall (payroll ~$200/tick,
+ * morale capped at 70 without Living Quarters); above 10 the level is won
+ * trivially. 9.5 sits near the top of that window (one 2x2 blast already
+ * wins it, ~tick 200-300).
+ */
+export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 9.5;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
@@ -1715,15 +1766,17 @@ export const ENV_CAUSE_NUISANCE_MAX = 45;
 export const ORDER_REACH_CACHE_MAX_KEYS = 64;
 
 /**
- * Contract price multiplier for the tutorial level (#959, #1328). The level's
- * single scripted blast and ~$300k of one-time setup mean market-rate prices
- * can never out-earn the mine's own drain; bisected on the full free-play
- * playthrough (tests/integration/tutorial.integration.test.ts, no fire/scrap
- * hacks): 40.0 goes bankrupt, 44.0 is the lowest winning value tried, 64.0 is
- * already won inside the guided part. 52.0 sits mid-window so one upstream
- * change does not make the tutorial unwinnable (or trivially won) again.
+ * Contract price multiplier for the tutorial level (#959, #1328, #1363). The
+ * level's single scripted blast means market-rate prices can never out-earn
+ * the mine's own payroll. The win counts operating profit (#1363: the ~$300k
+ * of one-time equipment/construction no longer counts against it), bisected on
+ * the full free-play playthrough (tests/integration/tutorial.integration.test.ts,
+ * no fire/scrap hacks): 14.0 goes bankrupt, 16.0 is the lowest winning value
+ * tried, 300.0 still wins only in free play, 500.0 is already won inside the
+ * guided part. 80.0 sits mid-window (geometric) so one upstream change does
+ * not make the tutorial unwinnable (or trivially won) again.
  */
-export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 52.0;
+export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 80.0;
 
 /** Trailing window (ticks) over which operating income per hour is averaged (#1375). */
 export const OPERATING_INCOME_WINDOW_TICKS = 72;

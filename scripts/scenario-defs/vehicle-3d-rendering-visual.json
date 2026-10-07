@@ -3,12 +3,12 @@
   "description": "Visual check: all 5 vehicle roles render distinct 3D shapes at spawn with correct positioning",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:200000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:200000",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:200000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:200000"
         }
       ],
       "role": "setup",

@@ -3,11 +3,11 @@
   "description": "Visual verification of employee skill progression: XP gain from a dispatched task tracked across tick checkpoints, task duration scaling by proficiency, the pending-action ghost preview persisting while its target employee is busy, the ghost disappearing once claimed, and the employee detail panel reflecting each change.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",
