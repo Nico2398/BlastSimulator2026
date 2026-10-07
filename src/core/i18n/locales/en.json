@@ -3731,5 +3731,9 @@
   "ui.settings.replay_confirm_button": "Replay Tutorial",
   "ui.menu.new_campaign_confirm_title": "Start a new campaign?",
   "ui.menu.new_campaign_confirm_body": "This erases your campaign progress: unlocked levels, profits and stars. Saved games are not deleted.",
-  "ui.menu.new_campaign_confirm_button": "Erase and Start Over"
+  "ui.menu.new_campaign_confirm_button": "Erase and Start Over",
+  "entities.build_destroy_ordered": "Demolition of building #{id} ordered. Cost: ${cost}",
+  "entities.build_upgrade_ordered": "Upgrade of building #{id} ordered. Demolition first, then rebuild.",
+  "entities.build_demolish_already_ordered": "Building #{id} is already being demolished.",
+  "shell.selection.rebuilding": "Rebuilding…"
 }

@@ -3731,5 +3731,9 @@
   "ui.settings.replay_confirm_button": "Rejouer le tutoriel",
   "ui.menu.new_campaign_confirm_title": "Commencer une nouvelle campagne ?",
   "ui.menu.new_campaign_confirm_body": "Cela efface votre progression : niveaux débloqués, profits et étoiles. Les sauvegardes ne sont pas supprimées.",
-  "ui.menu.new_campaign_confirm_button": "Effacer et recommencer"
+  "ui.menu.new_campaign_confirm_button": "Effacer et recommencer",
+  "entities.build_destroy_ordered": "Démolition du bâtiment #{id} ordonnée. Coût : {cost} $",
+  "entities.build_upgrade_ordered": "Amélioration du bâtiment #{id} ordonnée. Démolition d'abord, puis reconstruction.",
+  "entities.build_demolish_already_ordered": "Le bâtiment #{id} est déjà en cours de démolition.",
+  "shell.selection.rebuilding": "Reconstruction…"
 }
