@@ -58,6 +58,10 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Unit-tested contract of the capacity unit table (#1377); production reads it only inside the tooltip builder.
+  'src/ui/catalogCardText.ts:BUILDING_CAPACITY_UNIT_KEY',
+  // Unit-tested contract of the $/h card format (#1377); production reaches it only through the card-line helpers.
+  'src/ui/catalogCardText.ts:formatPerHour',
   // Radius formula is the unit-tested contract of resolveSecondaryBlasts (#1394); only the resolver calls it in production.
   'src/core/entities/SecondaryBlast.ts:secondaryBlastRadiusM',
   // Unit-tested contract of the scores tutorial step (#1334); only createUiActionStep uses these in production.

@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BuildMenu } from '../../../src/ui/BuildMenu.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import { getBuildingDef, type Building } from '../../../src/core/entities/Building.js';
+import { getBuildingDef, type Building, type BuildingTier, type BuildingType } from '../../../src/core/entities/Building.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, PlacementChangeHandler } from '../../../src/ui/scene/PlacementController.js';
 import type { TileRegion } from '../../../src/ui/tutorialPickerRegion.js';
@@ -24,6 +24,7 @@ import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import { buildingCardLine, buildingCardTooltip } from '../../../src/ui/catalogCardText.js';
 import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
 import { RAMP_DEFAULT_WIDTH, RESEARCH_TASK_DEFS } from '../../../src/core/config/balance.js';
@@ -1253,5 +1254,58 @@ describe('BuildMenu — research cost, duration and progress (#1398)', () => {
     state.buildings.unlockedTiers['management_office'] = 3;
     menu.update(state);
     expect(container.querySelector('.bs-build-research-progress')).toBeNull();
+  });
+});
+
+describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+    menu.update(makeMockState());
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+  });
+
+  it('every catalog row has a .bs-build-desc span with the tier-1 line and a stats tooltip', () => {
+    const rows = container.querySelectorAll<HTMLElement>('[data-build-type]');
+    expect(rows.length).toBe(9);
+    for (const row of rows) {
+      const type = row.dataset['buildType'] as BuildingType;
+      const def = getBuildingDef(type, 1);
+      const desc = row.querySelector('.bs-build-desc');
+      expect(desc, type).not.toBeNull();
+      expect(desc!.textContent).toBe(buildingCardLine(def));
+      expect(row.title).toBe(buildingCardTooltip(def));
+      expect(row.title).toContain('×');
+    }
+  });
+
+  it('changing the tier selector updates the line and tooltip to that tier', () => {
+    const row = container.querySelector<HTMLElement>('[data-build-type="living_quarters"]')!;
+    const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    for (const tier of [3, 2, 1] as BuildingTier[]) {
+      tierSel.value = String(tier);
+      tierSel.dispatchEvent(new Event('change'));
+      const def = getBuildingDef('living_quarters', tier);
+      expect(row.querySelector('.bs-build-desc')!.textContent).toBe(buildingCardLine(def));
+      expect(row.title).toBe(buildingCardTooltip(def));
+    }
+  });
+
+  it('tier 1 and tier 3 rows render different tooltips for a type whose upkeep or capacity scales', () => {
+    const row = container.querySelector<HTMLElement>('[data-build-type="living_quarters"]')!;
+    const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    const titles: string[] = [];
+    for (const tier of [1, 3]) {
+      tierSel.value = String(tier);
+      tierSel.dispatchEvent(new Event('change'));
+      titles.push(row.title);
+    }
+    expect(titles[0]).not.toBe(titles[1]);
   });
 });
