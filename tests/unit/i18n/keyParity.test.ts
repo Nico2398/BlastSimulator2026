@@ -449,7 +449,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1332: +5 keys (tutorial.exit*), #1333: +2 keys (tutorial auto-save slot labels), both locales: 3689.
     // #1349: +8 keys per locale (4 ui + 4 console rating cap keys): 3697.
     // #1334: +3 keys (tutorial scores/finances/needs card text), both locales: 3700.
-    expect(Object.keys(en).length).toBe(3700);
+    // #1335: -3 keys (removed contract-accept step text)
+    expect(Object.keys(en).length).toBe(3697);
   });
 });
 
