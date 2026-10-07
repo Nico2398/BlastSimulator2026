@@ -5,6 +5,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { tickCommand, eventCommand, timeCommand } from '../../src/console/commands/events.js';
+import { corruptCommand } from '../../src/console/commands/corruption.js';
+import { mafiaCommand } from '../../src/console/commands/mafia.js';
+import { bribeFailureFine } from '../../src/core/economy/Corruption.js';
+import { getEventById } from '../../src/core/events/EventPool.js';
 import {
   createEventSystemState,
   tickEventSystem,
@@ -38,6 +42,11 @@ import {
   TRAFFIC_JAM_MIN_TICKS,
   FOLLOWUP_DELAY_TICKS,
   MAFIA_UNLOCK_THRESHOLD,
+  BRIBERY_FAILURE_CORRUPTION_DELTA,
+  INVESTIGATION_EXPOSURE_JUMP,
+  INVESTIGATION_FOLLOWUP_EVENT_ID,
+  ACCIDENT_EXPOSURE,
+  ACCIDENT_FAILURE_EXPOSURE_EXTRA,
 } from '../../src/core/config/balance.js';
 import type { BuiltRamp } from '../../src/core/state/GameState.js';
 import { rampFootprint } from '../../src/core/mining/RampWidening.js';
@@ -949,5 +958,85 @@ describe('unqualified_task_error — each option resolves the block (#1380)', ()
     expect(surveyor.pendingTrainingState ?? surveyor.trainingState).not.toBeNull();
     expectNoRefire(site, 10);
     expect(state.pendingActions.find(a => a.id === site.surveyActionId)?.blockedReason).toBe('no_qualified_employee');
+  });
+});
+
+// ── #1411: failed bribe / botched mafia consequences through the console ──
+
+describe('failed bribe and botched mafia consequences (#1411)', () => {
+  it('a failed bribe deducts cost plus the fine from cash and raises corruption by more than the base attempt', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+      const s = ctx.state!;
+      s.seed = seed;
+      s.cash = 1_000_000;
+      s.finances.cash = s.cash;
+      const nuisanceBefore = s.scores.nuisance;
+      const cashBefore = s.cash;
+      const out = corruptCommand(ctx, [], { target: 'judge' });
+      const attempt = s.corruption.attempts[s.corruption.attempts.length - 1]!;
+      if (attempt.success) continue;
+      expect(out.success).toBe(true);
+      const fine = bribeFailureFine(attempt.cost);
+      expect(fine).toBeGreaterThan(0);
+      expect(s.cash).toBe(cashBefore - attempt.cost - fine);
+      expect(s.scores.nuisance).toBeLessThan(nuisanceBefore);
+      expect(s.corruption.level).toBe(1 + BRIBERY_FAILURE_CORRUPTION_DELTA);
+      return;
+    }
+    expect.unreachable('no failed bribe in 200 seeds');
+  });
+
+  it('a successful bribe charges no fine', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+      const s = ctx.state!;
+      s.seed = seed;
+      s.cash = 1_000_000;
+      s.finances.cash = s.cash;
+      corruptCommand(ctx, [], { target: 'judge' });
+      const attempt = s.corruption.attempts[s.corruption.attempts.length - 1]!;
+      if (!attempt.success) continue;
+      expect(s.cash).toBe(1_000_000 - attempt.cost);
+      return;
+    }
+    expect.unreachable('no successful bribe in 200 seeds');
+  });
+
+  it('a botched mafia accident queues the police investigation follow-up and raises exposure', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+      const s = ctx.state!;
+      s.seed = seed;
+      s.cash = 1_000_000;
+      s.corruption.mafiaUnlocked = true;
+      const { employee } = hireEmployee(s.employees, 'driller', new Random(1), 0, 0);
+      const out = mafiaCommand(ctx, ['accident'], { employee: String(employee.id) });
+      expect(out.success).toBe(true);
+      if (employee.alive === false) continue; // accident succeeded
+      expect(s.events.followUpQueue).toContain(INVESTIGATION_FOLLOWUP_EVENT_ID);
+      expect(s.mafia.exposureRisk).toBeGreaterThanOrEqual(
+        ACCIDENT_EXPOSURE + ACCIDENT_FAILURE_EXPOSURE_EXTRA + INVESTIGATION_EXPOSURE_JUMP - 1e-9,
+      );
+      return;
+    }
+    expect.unreachable('no botched accident in 200 seeds');
+  });
+
+  it('choosing an investigation option that stonewalls raises mafia exposure', () => {
+    const base = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+    const def = getEventById('mafia_police_investigation');
+    expect(def).toBeDefined();
+    let raised = 0;
+    for (let i = 0; i < def!.options.length; i++) {
+      const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+      ctx.state!.mafia.exposureRisk = 0.3;
+      ctx.state!.events.pendingEvent = { eventId: 'mafia_police_investigation', firedAtTick: ctx.state!.tickCount };
+      const r = eventCommand(ctx, ['choose', String(i)], {});
+      expect(r.success).toBe(true);
+      if (ctx.state!.mafia.exposureRisk > 0.3) raised++;
+    }
+    expect(base.state).not.toBeNull();
+    expect(raised).toBeGreaterThanOrEqual(1);
   });
 });
