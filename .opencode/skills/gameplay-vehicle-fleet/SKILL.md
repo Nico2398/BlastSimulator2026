@@ -28,7 +28,7 @@ Five roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 
 | Role | Tier 1 | Tier 2 | Tier 3 | Function |
 |------|--------|--------|--------|---------|
-| **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Demolishes buildings; required for tier-upgrade workflow |
+| **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every demolition and tier upgrade (#1392): `build destroy` / `build upgrade` queue a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
 | **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to Freight Warehouse |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |

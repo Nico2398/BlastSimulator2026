@@ -23,6 +23,8 @@ import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
 import { addIncome } from '../economy/Finance.js';
+import { completeDemolition } from './BuildingDemolition.js';
+import { readDemolishPayload } from './DemolishPayload.js';
 import {
   makeFootprintRegion, levelBuildingFootprint,
   siteBoundsForGrid, refreshLogisticsCapacity, relocateFootprintOccupants,
@@ -187,6 +189,13 @@ export function applyTaskCompletion(
         state.chargesByHole[holeId] = loaded;
         report.chargeLoaded = { holeId, explosiveId: loaded.explosiveId, amountKg: loaded.amountKg };
       }
+    }
+
+    // A completed 'demolish_building' task lands here (#1392) — the building
+    // is removed only once a Building Destroyer has finished the work, and an
+    // upgrade's reserved place_building order is dispatched from it.
+    if (progress.actionType === 'demolish_building' && progress.actionPayload) {
+      completeDemolition(state, grid, emitter, readDemolishPayload(progress.actionPayload));
     }
 
     // A completed 'place_building' task lands here — the site becomes a real

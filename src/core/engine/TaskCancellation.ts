@@ -17,6 +17,7 @@ import { estimateLegDistance } from './PlanItinerary.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { releaseEmployeeFromHosts } from './Mount.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
+import { readDemolishPayload } from './DemolishPayload.js';
 import { releasePlannedOrderForCancelledAction, type FreedFootprint } from './CancelledOrderCleanup.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 
@@ -461,6 +462,8 @@ function actionOrderCost(action: PendingAction): number {
   // FULL construction cost was charged at order time (buildOrder.ts) and is
   // refunded in full on cancellation (#556), unlike a ramp's per-segment cost.
   if (action.type === 'place_building') return (action.payload['cost'] as number) ?? 0;
+  // A demolition order (and an upgrade's, whose cost covers the rebuild too) is charged in full at order time and refunded in full (#1392).
+  if (action.type === 'demolish_building') return readDemolishPayload(action.payload).cost;
   // A level-ground order is one atomic unit, not segmented — the FULL cost
   // was charged at order time (level.ts) and is refunded in full on
   // cancellation (#1009, mirrors place_building above).

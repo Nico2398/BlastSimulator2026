@@ -22,6 +22,7 @@ import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
+import { getMaxBuildingTier } from './core/entities/Building.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
@@ -651,6 +652,7 @@ window.__gameState = () => {
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
     buildingCount: s.buildings.buildings.length,
+    maxBuildingTier: getMaxBuildingTier(s.buildings),
     vehicleCount: s.vehicles.vehicles.length,
     // Mirrors serializeGameState (console-api.ts): active jams, silencing ignored (#1208).
     trafficJamCount: jams.length,
@@ -1078,6 +1080,10 @@ uiManager.registerEscLayer(() => !uiManager.confirmOpen && !uiManager.eventModal
 function reportIfFailed(title: string, result: CommandResult): void {
   if (!result.success) uiManager.notify({ severity: 'warn', title, body: result.output });
 }
+/** Order-style actions finish later, so success says "ordered" (the command's own output) rather than staying silent (#1392). */
+function reportOrderResult(title: string, result: CommandResult): void {
+  uiManager.notify({ severity: result.success ? 'info' : 'warn', title, body: result.output });
+}
 selectionBar.setActionHandler((action, entity) => {
   switch (action) {
     case 'detail':
@@ -1116,7 +1122,7 @@ selectionBar.setActionHandler((action, entity) => {
       break;
     }
     case 'upgrade':
-      reportIfFailed(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
+      reportOrderResult(t('shell.selection.upgrade'), window.__gameConsole(`build upgrade ${entity.id}`));
       break;
     case 'move':
       // Move needs a tile picker — the in-scene placement layer is P3's job.
@@ -1133,8 +1139,7 @@ selectionBar.setActionHandler((action, entity) => {
       const placedBuilding = ctx.state?.buildings.buildings.find(x => x.id === entity.id);
       if (!placedBuilding) break;
       uiManager.showConfirm(buildDemolishConfirm(placedBuilding, () => {
-        reportIfFailed(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
-        scenePicking.clearSelection(); // the entity is gone — nothing left to keep selected
+        reportOrderResult(t('shell.selection.demolish'), window.__gameConsole(`build destroy ${entity.id}`));
       }));
       break;
     }

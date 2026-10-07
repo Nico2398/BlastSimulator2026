@@ -53,6 +53,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   unreachableGhostCount: { type: 'number', description: 'Ghost previews flagged unreachable (drawn red): no actor able to perform the action can reach it (state.ghostPreviews with unreachable === true)' },
   pendingActionCount: { type: 'number', description: 'Queued-but-not-yet-claimed PendingActions, including auto-inserted rest tasks (state.pendingActions.length)' },
   buildingCount: { type: 'number' },
+  maxBuildingTier: { type: 'number', description: 'Highest tier among standing buildings, 0 when none' },
   vehicleCount: { type: 'number' },
   trafficJamCount: { type: 'number', description: 'Active traffic jams at chokepoints, silencing ignored (findTrafficJams, #1208)' },
   trafficJams: { type: 'array', description: 'One {kind, rampId} per active traffic jam; kind is ramp_head, pit_exit or passage (#1208)' },

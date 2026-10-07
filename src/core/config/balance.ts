@@ -912,7 +912,8 @@ export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 /**
  * Ticks a queued, unclaimed action with requiredVehicleRole === null (any
  * on-foot action class open to whoever is free — place_building, survey,
- * general_work, demolish_building) may sit waiting before it must win the
+ * general_work; demolish_building is not one of them since it requires a
+ * building_destroyer, #1392) may sit waiting before it must win the
  * next vehicle-gated completion's dispatch decision, overriding
  * tryContinueVehicleGatedAction's same-role continuity fast path
  * (VehicleContinuity.ts) regardless of cost ranking (#1000).
@@ -1733,6 +1734,15 @@ export const OPERATING_INCOME_WINDOW_TICKS = 72;
 
 /** Income categories that count as operating income (#1375). */
 export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
+
+/** Base demolition duration (ticks) per footprint cell, before tier scaling (#1392). */
+export const DEMOLITION_BASE_TICKS_PER_FOOTPRINT_CELL = 3;
+
+/** Demolition duration multiplier per building tier — sturdier buildings take longer (#1392). */
+export const DEMOLITION_TIER_MULTIPLIER = { 1: 1, 2: 1.5, 3: 2 } as const;
+
+/** Demolition speed factor per building_destroyer vehicle tier — bigger machines work faster (#1392). */
+export const DEMOLITION_VEHICLE_TIER_SPEED = { 1: 1, 2: 1.5, 3: 2.25 } as const;
 
 /**
  * Factor applied to a rock's breaking threshold per explosive tier it falls short of

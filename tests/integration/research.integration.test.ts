@@ -15,6 +15,7 @@ import { researchCommand } from '../../src/console/commands/research.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
 import { queueResearchTask, isTierUnlocked, placeBuilding } from '../../src/core/entities/Building.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { equipDemolition, tickUntilDemolished } from '../helpers/demolition.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,26 @@ function placeResearchCenter(ctx: GameContext, at = '20,20'): void {
   if (!result.success) {
     throw new Error(`test setup: failed to place research_center: ${result.error}`);
   }
+}
+
+/**
+ * Demolish a building the way the game does now (#1392): a Building Destroyer
+ * and a driver do the work over time. Queued research is pinned to a long
+ * duration first, so it is still in the queue — not finished — when the
+ * building finally goes.
+ */
+function demolishAndWait(ctx: GameContext, buildingId: number): void {
+  for (const task of ctx.state!.buildings.researchQueue) task.ticksRemaining = Math.max(task.ticksRemaining, 100_000);
+  equipDemolition(ctx);
+  const res = buildCommand(ctx, ['destroy', String(buildingId)], {});
+  if (!res.success) throw new Error(`test setup: destroy refused: ${res.output}`);
+  tickUntilDemolished(ctx);
+}
+
+function refundTotal(ctx: GameContext): number {
+  return ctx.state!.finances.transactions
+    .filter((t) => t.category === 'refund')
+    .reduce((sum, t) => sum + t.amount, 0);
 }
 
 // ── tickResearch wired into the tick command ─────────────────────────────────
@@ -309,16 +330,14 @@ describe('Research Center — destroyed mid-research cancels + refunds (#461)', 
     expect(ctx.state!.buildings.researchQueue).toHaveLength(1);
     expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 3)).toBe(false);
 
-    buildCommand(ctx, ['destroy', String(centerId)], {});
+    demolishAndWait(ctx, centerId);
     expect(ctx.state!.buildings.buildings.some((b) => b.type === 'research_center')).toBe(false);
 
-    const cashBefore = ctx.state!.cash;
     tickCommand(ctx, ['1'], {}); // cancellation tick
-    const cashAfter = ctx.state!.cash;
 
     expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
     expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 3)).toBe(false);
-    expect(cashAfter - cashBefore).toBe(cost);
+    expect(refundTotal(ctx)).toBe(cost);
 
     const refundTx = ctx.state!.finances.transactions.find((t) => t.category === 'refund');
     expect(refundTx).toBeDefined();
@@ -337,7 +356,9 @@ describe('Research Center — destroyed mid-research cancels + refunds (#461)', 
     tickCommand(ctx, ['1'], {});
     researchCommand(ctx, ['queue'], { type: 'driving_center', tier: '3' });
 
-    buildCommand(ctx, ['destroy', String(centerIds[0])], {});
+    equipDemolition(ctx);
+    expect(buildCommand(ctx, ['destroy', String(centerIds[0])], {}).success).toBe(true);
+    tickUntilDemolished(ctx);
     expect(ctx.state!.buildings.buildings.some((b) => b.type === 'research_center')).toBe(true);
 
     tickCommand(ctx, ['500'], {});
@@ -347,7 +368,7 @@ describe('Research Center — destroyed mid-research cancels + refunds (#461)', 
     expect(ctx.state!.finances.transactions.some((t) => t.category === 'refund')).toBe(false);
   });
 
-  it('cancels and refunds a queued tier-2 (0-tick) task destroyed before the next tick', () => {
+  it('cancels and refunds a queued tier-2 task once the demolition finishes', () => {
     const ctx = makeCtx();
     placeResearchCenter(ctx);
     const centerId = ctx.state!.buildings.buildings.find((b) => b.type === 'research_center')!.id;
@@ -355,7 +376,7 @@ describe('Research Center — destroyed mid-research cancels + refunds (#461)', 
     researchCommand(ctx, ['queue'], { type: 'geology_lab', tier: '2' });
     const cost = ctx.state!.buildings.researchQueue[0]!.cost;
 
-    buildCommand(ctx, ['destroy', String(centerId)], {});
+    demolishAndWait(ctx, centerId);
 
     tickCommand(ctx, ['1'], {});
 
@@ -378,16 +399,14 @@ describe('Research Center — destroyed mid-research cancels + refunds (#461)', 
     const cost2 = ctx.state!.buildings.researchQueue[1]!.cost;
     expect(ctx.state!.buildings.researchQueue).toHaveLength(2);
 
-    buildCommand(ctx, ['destroy', String(centerId)], {});
+    demolishAndWait(ctx, centerId);
 
-    const cashBefore = ctx.state!.cash;
     tickCommand(ctx, ['10'], {});
-    const cashAfter = ctx.state!.cash;
 
     expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
     expect(isTierUnlocked(ctx.state!.buildings, 'driving_center', 2)).toBe(false);
     expect(isTierUnlocked(ctx.state!.buildings, 'blasting_academy', 2)).toBe(false);
-    expect(cashAfter - cashBefore).toBe(cost1 + cost2);
+    expect(refundTotal(ctx)).toBe(cost1 + cost2);
 
     const refundTxs = ctx.state!.finances.transactions.filter((t) => t.category === 'refund');
     expect(refundTxs).toHaveLength(2);

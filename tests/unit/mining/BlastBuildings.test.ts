@@ -40,6 +40,7 @@ import {
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 
 import {
@@ -570,11 +571,17 @@ describe('build destroy — stocked explosive warehouse (#1394)', () => {
     state.cash = 1_000_000;
     const accidentsBefore = state.damage.accidents.length;
 
+    equipDemolition(ctx);
+    state.cash = 1_000_000;
+
     const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
 
+    // The order itself warns the player what the demolition will cost them (#1392).
     expect(result.success).toBe(true);
-    expect(result.output).toContain('80 kg of stored explosives were lost');
+    expect(result.output).toContain('80 kg of stored explosives');
     expect(result.output).toContain('no detonation');
+    expect(state.buildings.buildings.some(b => b.id === wh.id)).toBe(true);
+    tickUntilDemolished(ctx);
     expect(state.buildings.buildings.some(b => b.id === wh.id)).toBe(false);
     expect(state.damage.accidents.length).toBe(accidentsBefore);
     expect(state.lastBlastReport?.secondaryBlasts ?? []).toEqual([]);
@@ -585,10 +592,11 @@ describe('build destroy — stocked explosive warehouse (#1394)', () => {
     const state = ctx.state!;
     placeBuilding(state.buildings, 'explosive_warehouse', 10, 10, 32, 32);
     const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;
+    equipDemolition(ctx);
     state.cash = 1_000_000;
     const result = buildCommand(ctx, ['destroy', String(wh.id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toContain('stored explosives were lost');
+    expect(result.output).not.toContain('stored explosives');
   });
 });
 

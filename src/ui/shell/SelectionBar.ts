@@ -116,6 +116,11 @@ export type SelectionAction =
   | 'upgrade' | 'move' | 'demolish'
   | 'focus' | 'widen';
 
+/** True when no standing building has this id because its upgrade is being rebuilt (#1392). */
+function isUnderRebuild(id: number, state: GameState): boolean {
+  return !state.buildings.buildings.some(b => b.id === id) && state.plannedBuildings.some(pb => pb.buildingId === id);
+}
+
 export class SelectionBar {
   private readonly root: HTMLElement;
   private readonly titleEl: HTMLElement;
@@ -173,7 +178,8 @@ export class SelectionBar {
     this.titleEl.textContent = identity.title;
     this.subEl.textContent = identity.sub;
     const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
-    this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null));
+    const rebuilding = entity.kind === 'building' && isUnderRebuild(entity.id, state);
+    this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null, rebuilding));
     this.root.style.display = 'flex';
   }
 
@@ -186,6 +192,9 @@ export class SelectionBar {
     switch (entity.kind) {
       case 'building': {
         const b = state.buildings.buildings.find(x => x.id === entity.id);
+        // An upgrade in progress keeps its id on the reserved site while the old building is gone (#1392).
+        const site = b ? undefined : state.plannedBuildings.find(pb => pb.buildingId === entity.id);
+        if (site) return { title: t(`building.${site.type}.t${site.tier}.name`), sub: `#${site.buildingId} · ${t('shell.selection.rebuilding')}` };
         if (!b) return null;
         let sub = `#${b.id} · HP ${Math.round(b.hp)}`;
         const capacity = getBuildingPeopleCapacity(b.type, b.tier);
@@ -228,7 +237,7 @@ export class SelectionBar {
     }
   }
 
-  private buildActions(entity: EntityPick, nextWidth: RampWidth | null): HTMLElement[] {
+  private buildActions(entity: EntityPick, nextWidth: RampWidth | null, rebuilding: boolean): HTMLElement[] {
     const fire = (action: SelectionAction) => { if (this.current) this.onAction?.(action, this.current); };
     switch (entity.kind) {
       case 'employee':
@@ -244,9 +253,9 @@ export class SelectionBar {
         ];
       case 'building':
         return [
-          button('ghost', t('shell.selection.upgrade'), { icon: 'up', dataAction: 'upgrade', onClick: () => fire('upgrade') }),
-          button('ghost', t('shell.selection.move'), { icon: 'drive', dataAction: 'move', onClick: () => fire('move') }),
-          button('danger', t('shell.selection.demolish'), { icon: 'trash', dataAction: 'demolish', onClick: () => fire('demolish') }),
+          button('ghost', t('shell.selection.upgrade'), { icon: 'up', dataAction: 'upgrade', disabled: rebuilding, onClick: () => fire('upgrade') }),
+          button('ghost', t('shell.selection.move'), { icon: 'drive', dataAction: 'move', disabled: rebuilding, onClick: () => fire('move') }),
+          button('danger', t('shell.selection.demolish'), { icon: 'trash', dataAction: 'demolish', disabled: rebuilding, onClick: () => fire('demolish') }),
         ];
       case 'fragment':
         return [

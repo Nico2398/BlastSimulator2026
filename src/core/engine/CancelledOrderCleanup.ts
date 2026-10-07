@@ -7,6 +7,7 @@
 // event's Cancel option alike — gets the release (#554, #555, #556, #1380).
 
 import type { GameState, PendingAction } from '../state/GameState.js';
+import { readDemolishPayload } from './DemolishPayload.js';
 import { getDefSize, getBuildingDef } from '../entities/Building.js';
 
 /** Footprint a cancelled building order freed; the caller tells the nav grid. */
@@ -51,6 +52,18 @@ export function releasePlannedOrderForCancelledAction(
     const buildingOrderId = action.payload['buildingOrderId'];
     if (typeof buildingOrderId !== 'number') return null;
     const idx = state.plannedBuildings.findIndex(pb => pb.id === buildingOrderId);
+    if (idx === -1) return null;
+    const [order] = state.plannedBuildings.splice(idx, 1);
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(order!.type, order!.tier));
+    return { x: order!.x, z: order!.z, sizeX, sizeZ };
+  }
+
+  // A cancelled upgrade demolition drops the PlannedBuilding it reserved; the
+  // standing building is untouched. The freed footprint is the new tier's (#1392).
+  if (action.type === 'demolish_building') {
+    const { rebuildOrderId } = readDemolishPayload(action.payload);
+    if (rebuildOrderId === null) return null;
+    const idx = state.plannedBuildings.findIndex(pb => pb.id === rebuildOrderId);
     if (idx === -1) return null;
     const [order] = state.plannedBuildings.splice(idx, 1);
     const { sizeX, sizeZ } = getDefSize(getBuildingDef(order!.type, order!.tier));
