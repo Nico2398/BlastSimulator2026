@@ -531,7 +531,16 @@ export function backfillRaises(obj: Record<string, unknown>): void {
  */
 /** v31 -> v32 (#1370): Vehicle.payload (item or null) becomes Vehicle.cargo[]. */
 function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> {
-  return obj; // TODO: implement
+  const vehicles = (obj['vehicles'] as { vehicles?: unknown[] } | undefined)?.vehicles;
+  if (!Array.isArray(vehicles)) return obj;
+  for (const raw of vehicles) {
+    const v = raw as Record<string, unknown>;
+    if (Array.isArray(v['cargo'])) continue;
+    const payload = v['payload'];
+    v['cargo'] = typeof payload === 'object' && payload !== null ? [payload] : [];
+    delete v['payload'];
+  }
+  return obj;
 }
 
 function migrateV30ToV31(obj: Record<string, unknown>): Record<string, unknown> {

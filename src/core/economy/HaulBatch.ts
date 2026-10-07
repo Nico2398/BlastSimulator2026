@@ -11,10 +11,20 @@ export interface HaulCandidate {
  */
 export function selectHaulBatch(
   primary: HaulCandidate,
-  _ordered: readonly HaulCandidate[],
-  _capacityKg: number,
-  _roomKg: number,
-  _maxItems: number,
+  ordered: readonly HaulCandidate[],
+  capacityKg: number,
+  roomKg: number,
+  maxItems: number,
 ): HaulCandidate[] {
-  return [primary]; // TODO: implement
+  const batch = [primary];
+  // An over-capacity primary rides alone: its own mass already exhausts the limit.
+  let massKg = primary.massKg;
+  const limitKg = Math.min(capacityKg, roomKg);
+  for (const candidate of ordered) {
+    if (batch.length >= maxItems) break;
+    if (massKg + candidate.massKg > limitKg) continue; // a later, smaller one may still fit
+    batch.push(candidate);
+    massKg += candidate.massKg;
+  }
+  return batch;
 }

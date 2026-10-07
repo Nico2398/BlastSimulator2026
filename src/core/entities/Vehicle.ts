@@ -130,8 +130,8 @@ export interface HaulCargoItem {
 }
 
 /** Total mass (kg) aboard a vehicle. */
-export function vehicleCargoMassKg(_v: Pick<Vehicle, 'cargo'>): number {
-  return 0; // TODO: implement
+export function vehicleCargoMassKg(v: Pick<Vehicle, 'cargo'>): number {
+  return v.cargo.reduce((sum, item) => sum + item.massKg, 0);
 }
 
 export interface Vehicle {
