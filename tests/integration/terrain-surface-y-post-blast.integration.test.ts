@@ -58,7 +58,6 @@ describe('getTerrainSurfaceY reflects the post-blast grid (#1007)', () => {
     driveChargePlanToCompletion(runner, ctx);
     // Weather ticks with the game (#1403); rain would fizzle boomite. Pin dry.
     runner.run('weather set sunny');
-    runner.run('sequence auto delay_step:25');
     const blastResult = runner.run('blast');
     expect(blastResult.success).toBe(true);
     expect(ctx.state!.lastBlastReport!.clearedVoxels).toBeGreaterThan(0);

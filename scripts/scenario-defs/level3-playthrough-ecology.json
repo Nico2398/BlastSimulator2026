@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-ecology",
-  "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. #553 (drill_hole became a queued, vehicle-gated action) breaks the rest of the named premise for real, not just the depth-mismatch Finding #61 already covered: this file's 6 patterns (5x4/4x5/5x5/5x5/6x5/6x6, 156 holes total -- the largest drilling total of any file in this batch) used to write every hole into state.drillHoles in one frame; now each hole is a queued drill_hole action a licensed driller spends real ticks physically driving a drill_rig to sink, one at a time, before charging/sequencing/blasting (unchanged, still operate on state.drillHoles only) can touch it. staffed:true's own composition costs real ticks too -- five employees and four vehicles' payroll/maintenance/fuel accrue whether or not they ever work. Under those costs, against a starting budget that tops out at $92,800 (staffed:true's free $50,000, plus $42,800 scrapping the debris_hauler/rock_digger/rock_fragmenter this blast-only file never uses) with zero income anywhere in the file (no contracts, ever), this pass measured -- exhaustively, across paired vs. single drill_rig crews, immediate vs. deferred hiring, with and without the fleet scrap, with and without a relocate-before-blast maneuver that saves the rig from its own blast -- that the mine cannot survive past its first blast's aftermath. BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) always runs out before a second pattern can be drilled with a single-driller pace this budget can afford, let alone before three more patterns' worth of blasts (900+ ticks, the pre-#553 file's own requirement to first push ecology to 0) could ever fire. The result: pattern 1 drills and blasts for real (20 holes, krackle, single-driller, with the 7 hand-hires deferred to after drilling for cash reasons; 11 of 12 employees die; ecology crashes 50 -> 29.53; the drill_rig survives a deliberate relocate before firing). Pattern 2 orders its 20 holes for free but never drills a single one -- no licensed, equipped driller survives the budget to work it. Patterns 3-6 are never reached at all: continuing to narrate drill_plan cycles nothing can ever staff past this crew/licensing dead end would document nothing real. levelEndReason never reaches 'ecological_shutdown' -- the named premise's ending no longer holds, exactly the class of finding Finding #24 already established elsewhere in this file (the named thing doesn't happen; here is what really does, re-measured and asserted exactly). #586-followup (this session's own fix, real interaction-mode CI failure): a prior pass of this file additionally carried ~100 ticks of dead post-drilling/post-hiring tick padding before pattern 1's own charge step (holes and the 7-employee hire were both already done by real tick 260, but the charge command wasn't issued until real tick 360, sandbox-confirmed) -- long enough that it ate directly into BANKRUPTCY_GRACE_TICKS's margin and flipped levelEnded/levelEndReason to 'bankruptcy' *during pattern 1's own charge wait*, before its `sequence`/`blast` steps ever ran. That is what the interaction-mode click failure on `#bs-blast-panel [data-field=\"delay-step\"]` actually was -- the level-end overlay was already up, not a transient click race, and it stayed up (blocking every subsequent player-role click on the blast panel) for the rest of the file. Removing that dead padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's charge/sequence/blast for real: `levelEnded`/`levelEndReason`/`bankrupt` are false/null/false through the whole file now, not true/'bankruptcy'/true from partway through pattern 1 onward -- only pattern 2's own drill_plan-with-no-driller dead end (a crew/licensing limit, not a game-over state) still holds. #1379: the always-on default site policy is neutralized by an early set_policy mode:continuous fatigue:0 step; the re-measured run drills the 20-hole pattern by tick 190 (hires and the charge step now run from there, earlier than the pre-#1379 tick-260 narrative above), a Profit Sharing event at tick 130 and a Mining Ban Debate event at tick 261 change cash, wellBeing and ecology readings, all re-baselined to measured values.",
+  "description": "Level 3 (Treranium Depths) ecological shutdown scenario: massive krackle and obliviax blasts with no mitigation, long tick cycles to trigger ecology collapse. `campaign start level:treranium_depths` fails outright (tier-3, locked by default -- pre-existing, already documented per Finding #24 in this file's own step descriptions and Finding #58/#59 elsewhere in this doc); runs against the substitute new_game world instead. #553 (drill_hole became a queued, vehicle-gated action) breaks the rest of the named premise for real, not just the depth-mismatch Finding #61 already covered: this file's 6 patterns (5x4/4x5/5x5/5x5/6x5/6x6, 156 holes total -- the largest drilling total of any file in this batch) used to write every hole into state.drillHoles in one frame; now each hole is a queued drill_hole action a licensed driller spends real ticks physically driving a drill_rig to sink, one at a time, before charging/blasting (unchanged, still operate on state.drillHoles only) can touch it. staffed:true's own composition costs real ticks too -- five employees and four vehicles' payroll/maintenance/fuel accrue whether or not they ever work. Under those costs, against a starting budget that tops out at $92,800 (staffed:true's free $50,000, plus $42,800 scrapping the debris_hauler/rock_digger/rock_fragmenter this blast-only file never uses) with zero income anywhere in the file (no contracts, ever), this pass measured -- exhaustively, across paired vs. single drill_rig crews, immediate vs. deferred hiring, with and without the fleet scrap, with and without a relocate-before-blast maneuver that saves the rig from its own blast -- that the mine cannot survive past its first blast's aftermath. BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) always runs out before a second pattern can be drilled with a single-driller pace this budget can afford, let alone before three more patterns' worth of blasts (900+ ticks, the pre-#553 file's own requirement to first push ecology to 0) could ever fire. The result: pattern 1 drills and blasts for real (20 holes, krackle, single-driller, with the 7 hand-hires deferred to after drilling for cash reasons; 11 of 12 employees die; ecology crashes 50 -> 29.53; the drill_rig survives a deliberate relocate before firing). Pattern 2 orders its 20 holes for free but never drills a single one -- no licensed, equipped driller survives the budget to work it. Patterns 3-6 are never reached at all: continuing to narrate drill_plan cycles nothing can ever staff past this crew/licensing dead end would document nothing real. levelEndReason never reaches 'ecological_shutdown' -- the named premise's ending no longer holds, exactly the class of finding Finding #24 already established elsewhere in this file (the named thing doesn't happen; here is what really does, re-measured and asserted exactly). #586-followup (this session's own fix, real interaction-mode CI failure): a prior pass of this file additionally carried ~100 ticks of dead post-drilling/post-hiring tick padding before pattern 1's own charge step (holes and the 7-employee hire were both already done by real tick 260, but the charge command wasn't issued until real tick 360, sandbox-confirmed) -- long enough that it ate directly into BANKRUPTCY_GRACE_TICKS's margin and flipped levelEnded/levelEndReason to 'bankruptcy' *during pattern 1's own charge wait*, before its `blast` step ever ran. That is what the interaction-mode click failure on `#bs-blast-panel [data-field=\"delay-step\"]` actually was -- the level-end overlay was already up, not a transient click race, and it stayed up (blocking every subsequent player-role click on the blast panel) for the rest of the file. Removing that dead padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's charge/blast for real: `levelEnded`/`levelEndReason`/`bankrupt` are false/null/false through the whole file now, not true/'bankruptcy'/true from partway through pattern 1 onward -- only pattern 2's own drill_plan-with-no-driller dead end (a crew/licensing limit, not a game-over state) still holds. #1379: the always-on default site policy is neutralized by an early set_policy mode:continuous fatigue:0 step; the re-measured run drills the 20-hole pattern by tick 190 (hires and the charge step now run from there, earlier than the pre-#1379 tick-260 narrative above), a Profit Sharing event at tick 130 and a Mining Ban Debate event at tick 261 change cash, wellBeing and ecology readings, all re-baselined to measured values.",
   "steps": [
     {
       "command": "new_game seed:3666 staffed:true cash:70000",
@@ -309,7 +309,6 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "levelEnded": false,
           "levelEndReason": null
         },
@@ -1227,7 +1226,6 @@
           "tickCount": 235,
           "holeCount": 20,
           "orderedHoleCount": 0,
-          "sequencedCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1244,7 +1242,7 @@
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
       "timeout": 125,
-      "description": "#586-followup (this session's own fix, real interaction-mode CI failure): this step used to hard-assert `levelEnded:true, levelEndReason:'bankruptcy'` here, before pattern 1's own `sequence`/`blast` steps ever ran -- exactly what made the interaction-mode click on `#bs-blast-panel [data-step=\"3\"]` (the `sequence` step below) fail with 'element is covered by div': the level-end overlay was already up, blocking every player-role click on the blast panel for the rest of pattern 1. Root cause: ~100 ticks of dead post-drilling/post-hiring tick padding earlier in this file (holes and the 7-employee hire were both already done by real tick 260, but the charge step wasn't issued until real tick 360) ate into BANKRUPTCY_GRACE_TICKS's margin for no reason -- removing that padding (see the tick-15 step's own note above) lets charging finish at real tick 312 instead of 436, comfortably before bankruptcy fires. `levelEnded`/`levelEndReason` corrected to false/null -- sandbox-confirmed the mine survives pattern 1's charge, sequence, and blast for real now.",
+      "description": "#586-followup (this session's own fix, real interaction-mode CI failure): this step used to hard-assert `levelEnded:true, levelEndReason:'bankruptcy'` here, before pattern 1's own `blast` step ever ran -- exactly what made the interaction-mode click on `#bs-blast-panel [data-step=\"3\"]` (the `sequence` step below) fail with 'element is covered by div': the level-end overlay was already up, blocking every player-role click on the blast panel for the rest of pattern 1. Root cause: ~100 ticks of dead post-drilling/post-hiring tick padding earlier in this file (holes and the 7-employee hire were both already done by real tick 260, but the charge step wasn't issued until real tick 360) ate into BANKRUPTCY_GRACE_TICKS's margin for no reason -- removing that padding (see the tick-15 step's own note above) lets charging finish at real tick 312 instead of 436, comfortably before bankruptcy fires. `levelEnded`/`levelEndReason` corrected to false/null -- sandbox-confirmed the mine survives pattern 1's charge and blast for real now.",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -1274,47 +1272,11 @@
       }
     },
     {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 10
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts). 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts). #586-followup: this was never actually a transient-overlay race -- the level-end overlay was permanently up by this point (see the wait_until step's own note above), and this session's padding fix keeps the level running past this step for real. awaitUsable is kept regardless, matching the pattern used elsewhere in this batch. `levelEnded`/`levelEndReason` corrected to false/null.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 20,
-          "deathCount": 0,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -1341,7 +1303,6 @@
           "holeCount": 0,
           "orderedHoleCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "deathCount": 11,
           "employeeCount": 12,
           "vehicleCount": 1,
@@ -1441,7 +1402,6 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1468,7 +1428,6 @@
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1479,34 +1438,6 @@
           "tickCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
-      }
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
-        }
-      ],
-      "description": "Same gate as the charge step above -- with 0 drilled holes there is no Sequence tab content to click into. sequence auto reports \"0 holes\" and sequencedCount stays 0.",
-      "role": "guard",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "orderedHoleCount": 20,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "deathCount": 11,
-          "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
       }
     },
     {
@@ -1524,7 +1455,6 @@
           "holeCount": 0,
           "orderedHoleCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1595,7 +1525,7 @@
           "command": "tick 20"
         }
       ],
-      "description": "Finding #63 (this pass), rewritten for #554, then again for #586-followup: the file's real ending is no longer set here. #586-followup (this session's own fix): the pre-fix file's own ~100 ticks of dead post-drilling/post-hiring tick padding (see the `tick 15`/`wait_until` steps' own notes above) ate directly into BANKRUPTCY_GRACE_TICKS's margin, flipping levelEnded/levelEndReason to bankruptcy during pattern 1's own charge wait -- before its `sequence`/`blast` steps ever ran, which is what made a real interaction-mode click on the (by-then permanently covered) blast panel fail. Removing that padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's blast for real; this second pattern's own drill_plan (above) still can't be worked (no licensed driller survives the blast), but that is a crew/licensing dead end, not a game-over state. `cash` stays out of every remaining step's equality check for the same host-timing-sensitive reasons as the pre-#554 pass established (see the `move_here` step's own note) -- tick/hole/death/employee counts and level-end state stay exact. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): tickCount corrected 331 -> 333 -- rest now preempts mid-task/mid-drive more readily and restores fatigue further per session, so this 20-tick block needs 2 more ticks to reach the same landing condition (no pending work left to advance past). holeCount, orderedHoleCount, deathCount, employeeCount, and level-end state reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
+      "description": "Finding #63 (this pass), rewritten for #554, then again for #586-followup: the file's real ending is no longer set here. #586-followup (this session's own fix): the pre-fix file's own ~100 ticks of dead post-drilling/post-hiring tick padding (see the `tick 15`/`wait_until` steps' own notes above) ate directly into BANKRUPTCY_GRACE_TICKS's margin, flipping levelEnded/levelEndReason to bankruptcy during pattern 1's own charge wait -- before its `blast` step ever ran, which is what made a real interaction-mode click on the (by-then permanently covered) blast panel fail. Removing that padding lets charging finish at real tick 312 instead of 436, and the mine survives pattern 1's blast for real; this second pattern's own drill_plan (above) still can't be worked (no licensed driller survives the blast), but that is a crew/licensing dead end, not a game-over state. `cash` stays out of every remaining step's equality check for the same host-timing-sensitive reasons as the pre-#554 pass established (see the `move_here` step's own note) -- tick/hole/death/employee counts and level-end state stay exact. #945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): tickCount corrected 331 -> 333 -- rest now preempts mid-task/mid-drive more readily and restores fatigue further per session, so this 20-tick block needs 2 more ticks to reach the same landing condition (no pending work left to advance past). holeCount, orderedHoleCount, deathCount, employeeCount, and level-end state reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode.",
       "role": "setup",
       "expect": {
         "equals": {

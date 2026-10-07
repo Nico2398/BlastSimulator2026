@@ -196,7 +196,7 @@ describe('BlastReportModal', () => {
 
   it('opens again for a second blast fired on the same tick', () => {
     // Nothing forces the clock to advance between two plans — a player (or a
-    // scripted sequence) can drill/charge/sequence/fire twice with no tick
+    // scripted sequence) can drill/charge/fire twice with no tick
     // command in between, so both reports land on the same state.tickCount.
     // Gating on tick equality alone made the second report never reopen; the
     // fix compares report identity instead (buildBlastReport in mining.ts

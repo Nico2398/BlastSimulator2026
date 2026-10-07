@@ -4,7 +4,7 @@ import { expect } from 'vitest';
 import type { GameContext } from '../../../src/console/commands/world.js';
 import { campaignStartCommand, campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
-import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../../src/console/commands/mining.js';
+import { drillPlanCommand, chargeCommand, blastCommand } from '../../../src/console/commands/mining.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
@@ -155,7 +155,7 @@ export function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300):
 }
 
 /**
- * Perform a standard blast cycle: drill grid, charge all, auto-sequence, blast.
+ * Perform a standard blast cycle: drill grid, charge all, blast.
  * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
  * @param ctx The game context (cast to MiningContext internally for command compatibility).
  * @param originX X-coordinate of the drill grid origin.
@@ -176,7 +176,6 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
     amount: '5kg',
     stemming: '2m',
   });
-  sequenceCommand(ctx as any, ['auto'], {});
   const result = blastCommand(ctx as any, [], {});
   return result.output;
 }

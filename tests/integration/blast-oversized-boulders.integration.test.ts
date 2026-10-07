@@ -17,7 +17,6 @@ import { tickCommand } from '../../src/console/commands/events.js';
 import {
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
@@ -126,9 +125,6 @@ function blastUndercharged(ctx: GameContext): void {
   });
   expect(chargeResult.success).toBe(true);
   driveChargePlanToCompletion(ctx);
-
-  const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-  expect(seqResult.success).toBe(true);
 
   const blastResult = blastCommand(ctx as any, [], {});
   expect(blastResult.success).toBe(true);

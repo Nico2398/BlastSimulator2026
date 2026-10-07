@@ -213,7 +213,6 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
       }
       run('tick 1');
     }
-    expect(run('sequence auto delay_step:25').success).toBe(true);
     const blastResult = run('blast');
     expect(blastResult.success).toBe(true);
 
@@ -240,7 +239,7 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
 
 // ── evacuate before you fire (#557) ─────────────────────────────────────────
 //
-// The tutorial's evacuate-zone step (between 'sequence' and 'blast') exists
+// The tutorial's evacuate-zone step (between 'charge' and 'blast') exists
 // because the console command it's teaching has real teeth: with
 // ctx.tutorialActive set, `blast` refuses to fire while anyone is still
 // standing in the danger zone, and the refusal must leave the whole blast
@@ -267,7 +266,6 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
       }
       runCmd('tick 1');
     }
-    expect(runCmd('sequence auto delay_step:25').success).toBe(true);
     return { ctx, runCmd };
   }
 
@@ -336,7 +334,6 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
       }
       runCmd('tick 1');
     }
-    expect(runCmd('sequence auto delay_step:25').success).toBe(true);
 
     for (const emp of state.employees.employees) {
       emp.x = 16;
@@ -508,15 +505,15 @@ function tickIfUnpaused(
   return true;
 }
 
-// ── charge → sequence (#926): the step and the panel must never disagree ──
+// ── charge → evacuate-zone (#926): the step and the panel must never disagree ──
 //
 // BlastWorkshop.ts's suggestStep (not exported — its Charge-tab condition is
 // mirrored below as `stillOnChargeTab`) keeps the Blast Workshop on its
 // Charge tab for as long as any hole is still unlit. The 'charge' tutorial
 // step used to complete the instant the FIRST of several holes charged
 // (createComparisonStep's generic "value increased"), moving the tutorial on
-// to 'sequence' while the panel — correctly reading the plan as still
-// mid-charge — stayed on Charge. The Sequence tab's own controls live in a
+// to the next step while the panel — correctly reading the plan as still
+// mid-charge — stayed on Charge. The next tab's own controls live in a
 // hidden tab body at that point, so the rail had nothing reachable to point
 // at: a real dead end (issue #926). This test drains a real multi-hole
 // charge order through the real engine and pins the step's completion
@@ -570,11 +567,8 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
     expect(stillOnChargeTab(ctx.state!)).toBe(false);
     expect(step.isComplete(ctx.state!, {})).toBe(true);
 
-    // The run continues cleanly through sequence and blast.
-    const sequenceStep = TUTORIAL_STEPS.find(s => s.id === 'sequence')!;
-    const sequenceSnapshot = sequenceStep.captureSnapshot!(ctx.state!);
-    expect(run('sequence auto delay_step:25').success).toBe(true);
-    expect(sequenceStep.isComplete(ctx.state!, sequenceSnapshot)).toBe(true);
+    // The run continues straight to evacuate-zone and blast (no sequence step).
+    expect(TUTORIAL_STEPS.some(s => s.id === 'sequence')).toBe(false);
 
     const blastResult = run('blast');
     expect(blastResult.success, blastResult.output).toBe(true);
@@ -593,7 +587,7 @@ describe('charge (#926): completion never runs ahead of the panel\'s own Charge 
 // better, zero casualties, zero destroyed buildings/vehicles, real rock
 // still broken.
 describe('the tutorial\'s own scripted blast rates good or better (#949)', () => {
-  it('runs drill-plan/charge/sequence exactly as scripted and blasts cleanly', () => {
+  it('runs drill-plan/charge exactly as scripted and blasts cleanly', () => {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
 
@@ -638,11 +632,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
     }
     expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
-    // 5. sequence
-    const sequenceStep = TUTORIAL_STEPS.find((s) => s.id === 'sequence')!;
-    expect(run(sequenceStep.commands![0]!).success).toBe(true);
-
-    // 6. Evacuate crew and vehicles beyond the danger zone — mirrors the
+    // 5. Evacuate crew and vehicles beyond the danger zone — mirrors the
     // 'blast refuses to fire on an occupied zone' tests above, which move
     // everyone to a corner clear of computeDangerZone(state.drillHoles,
     // BLAST_DANGER_MARGIN_M). tutorial_pit is a 32x32 grid and the drill
@@ -661,7 +651,7 @@ describe('the tutorial\'s own scripted blast rates good or better (#949)', () =>
       veh.z = 2;
     }
 
-    // 7. blast
+    // 6. blast
     const blastResult = run('blast');
     expect(blastResult.success, blastResult.output).toBe(true);
 
@@ -742,7 +732,6 @@ describe('panel default parameters on the tutorial square rate good or better (#
     }
     expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
-    expect(run('sequence auto').success).toBe(true);
 
     const preAlive = state.employees.employees.filter(e => e.alive).length;
     const preVehicles = state.vehicles.vehicles.length;

@@ -58,7 +58,6 @@ function fireBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   }
   expect(Object.keys(ctx.state!.plannedChargesByHole).length).toBe(0);
 
-  expect(runner.run('sequence auto delay_step:25').success).toBe(true);
   expect(runner.run('blast').success).toBe(true);
   expect(ctx.state!.lastBlastReport).not.toBeNull();
 }

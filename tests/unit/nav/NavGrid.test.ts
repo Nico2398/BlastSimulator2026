@@ -24,7 +24,6 @@ import type { BlastRegion } from '../../../src/core/mining/BlastExecution.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { buildRamp } from '../../../src/core/mining/Ramp.js';
 import {
@@ -125,8 +124,7 @@ function makeBlastPlan(holes: DrillHole[]) {
   const holeDepths: Record<string, number> = {};
   for (const h of holes) holeDepths[h.id] = h.depth;
   const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 5, 1);
-  const delays = autoVPattern(holes, 25);
-  return assembleBlastPlan(holes, charges, delays);
+  return assembleBlastPlan(holes, charges);
 }
 
 /** Standard test grid: 20 × 10 × 20, solid rock y=0..4. */

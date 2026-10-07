@@ -16,7 +16,7 @@ import {
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { timeCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
-import { surveyCommand, drillPlanCommand, chargeCommand, sequenceCommand, blastCommand, buildRampCommand } from '../../../src/console/commands/mining.js';
+import { surveyCommand, drillPlanCommand, chargeCommand, blastCommand, buildRampCommand } from '../../../src/console/commands/mining.js';
 import { contractCommand } from '../../../src/console/commands/economy.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
@@ -133,10 +133,6 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(chargeResult.success).toBe(true);
     expect(chargeResult.output).toContain('Ordered charges');
     driveChargePlanToCompletion(ctx);
-
-    // 9. Auto-sequence
-    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-    expect(seqResult.success).toBe(true);
 
     // 10. Blast — expect BLAST REPORT
     const blastResult = blastCommand(ctx as any, [], {});

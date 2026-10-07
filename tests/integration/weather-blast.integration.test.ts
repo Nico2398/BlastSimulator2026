@@ -46,7 +46,6 @@ function drillChargeSequenceBlast(runner: ConsoleRunner, ctx: GameContext, explo
   runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
   driveChargePlanToCompletion(runner, ctx);
   runner.run(`weather set ${weather}`);
-  runner.run('sequence auto delay_step:25');
   return runner.run('blast');
 }
 
@@ -100,7 +99,6 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
     tubed.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     driveChargePlanToCompletion(tubed.runner, tubed.ctx);
     tubed.runner.run('weather set heavy_rain');
-    tubed.runner.run('sequence auto delay_step:25');
     const tubedBlast = tubed.runner.run('blast');
     expect(tubedBlast.success).toBe(true);
 
@@ -151,7 +149,6 @@ describe('software previews model wet holes like the real blast (#1347)', () => 
     game.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     driveChargePlanToCompletion(game.runner, game.ctx);
     game.runner.run(`weather set ${weather ?? 'sunny'}`);
-    game.runner.run('sequence auto delay_step:25');
     game.ctx.state!.softwareTier = 3;
     return game;
   }
@@ -191,7 +188,6 @@ describe('blast report lists wet and fizzled holes (#1348)', () => {
     driveChargePlanToCompletion(game.runner, game.ctx);
     const chargedIds = Object.keys(game.ctx.state!.chargesByHole).sort();
     game.runner.run(`weather set ${weather ?? 'sunny'}`);
-    game.runner.run('sequence auto delay_step:25');
     expect(game.runner.run('blast').success).toBe(true);
     return { report: game.ctx.state!.lastBlastReport!, chargedIds };
   }

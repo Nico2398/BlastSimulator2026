@@ -28,7 +28,6 @@ function chargedPlan(): GameState {
   const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
   const chargeResult = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-  state.sequenceDelays[hole.id] = 0;
   return state;
 }
 

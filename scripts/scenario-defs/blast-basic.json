@@ -1,6 +1,6 @@
 {
   "name": "blast-basic",
-  "description": "Full blast pipeline: create game, drill holes, charge, sequence, blast",
+  "description": "Full blast pipeline: create game, drill holes, charge, blast",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -168,24 +168,13 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 6
-        }
-      }
-    },
-    {
       "command": "blast",
       "timeout": 30,
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -211,8 +200,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero"
       }

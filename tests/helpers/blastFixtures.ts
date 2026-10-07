@@ -25,7 +25,7 @@ export function isPocketCell(x: number, z: number): boolean {
 }
 
 /**
- * Hires a driller, licenses them for the drill_rig, drills+charges+sequences
+ * Hires a driller, licenses them for the drill_rig, drills+charges
  * a single hole at (startX, startZ) with the given charge amount (spacing:3
  * depth:6 diameter:0.089, stemming:2 — this file's own verified parameters),
  * then detonates it. Returns the runner/state plus a bound `run` so callers
@@ -53,7 +53,6 @@ export function drillChargeAndBlast(startX: number, startZ: number, amount: numb
   tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 400);
   expect(Object.keys(state.plannedChargesByHole).length).toBe(0);
 
-  expect(run('sequence auto')).toMatchObject({ success: true });
   expect(run('blast')).toMatchObject({ success: true });
   expect(state.lastBlastReport).not.toBeNull();
 

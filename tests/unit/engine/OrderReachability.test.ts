@@ -400,7 +400,7 @@ describe('every action type is judged by the red rule (#1306)', () => {
   // fails typecheck, so the rule cannot silently skip a new action type.
   const ALL_ACTION_TYPES: Record<ActionType, true> = {
     drill_hole: true, charge_hole: true, dig_ramp_segment: true, level_ground: true,
-    set_sequence: true, place_building: true, demolish_building: true, survey: true,
+    place_building: true, demolish_building: true, survey: true,
     fragment_debris: true, haul_debris: true, rest: true, general_work: true,
   };
 

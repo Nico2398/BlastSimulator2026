@@ -47,7 +47,6 @@ describe('deserialize — v4→v5 migration for collectedOre (task 5.18)', () =>
       cash: 10000,
       drillHoles: [],
       chargesByHole: {},
-      sequenceDelays: {},
       savedPlans: {},
       finances: { cash: 10000, revenue: 0, expenses: 0, transactions: [], bankruptcyGraceTicks: 0 },
       contracts: { available: [], active: [], completedHistory: [], nextId: 1, lastRefreshTick: 0 },
@@ -1854,9 +1853,21 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
     expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(21);
   });
 
-  it('sequenceDelays keys count toward the max', () => {
+  it('a stray legacy sequenceDelays key loads fine, is ignored, and does not count toward the max', () => {
     const parsed = v28Save(p => { p['sequenceDelays'] = { H30: 100 }; });
-    expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(31);
+    const loaded = deserialize(JSON.stringify(parsed));
+    // The stray key is no longer read: it must not feed the hole-id counter.
+    expect(loaded.nextHoleId).toBe(1);
+  });
+
+  it('a stray sequenceDelays key inside a saved blast plan loads fine and is ignored', () => {
+    const parsed = v28Save(p => {
+      p['savedPlans'] = { default: { drillHoles: [], chargesByHole: {}, sequenceDelays: { H5: 25 } } };
+    });
+    const loaded = deserialize(JSON.stringify(parsed));
+    expect(loaded.savedPlans['default']).toBeDefined();
+    expect(loaded.savedPlans['default']!.drillHoles).toEqual([]);
+    expect(loaded.savedPlans['default']!.chargesByHole).toEqual({});
   });
 
   it('tubingState.installedHoles counts toward the max', () => {
@@ -1870,7 +1881,7 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
     const parsed = v28Save(p => {
       p['drillHoles'] = [hole('H3')];
       p['plannedDrillHoles'] = [hole('H5')];
-      p['sequenceDelays'] = { H8: 10 };
+      p['chargesByHole'] = { H8: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 } };
     });
     expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(9);
   });
@@ -1916,7 +1927,6 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
   it('a v28 save missing its hole collections migrates to nextHoleId 1', () => {
     const parsed = v28Save(p => {
       delete p['plannedChargesByHole'];
-      delete p['sequenceDelays'];
     });
     expect(deserialize(JSON.stringify(parsed)).nextHoleId).toBe(1);
   });

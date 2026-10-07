@@ -38,7 +38,6 @@ function prepareBlast(runner: ConsoleRunner, ctx: MiningContext): void {
   drain(runner, ctx, () => ctx.state!.plannedDrillHoles.length === 0);
   expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
   drain(runner, ctx, () => Object.keys(ctx.state!.plannedChargesByHole).length === 0);
-  expect(runner.run('sequence auto delay_step:25').success).toBe(true);
 }
 
 describe('console blast marks overlapping surveys stale (#1356)', () => {

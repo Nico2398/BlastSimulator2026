@@ -128,8 +128,7 @@
         "equals": {
           "orderedHoleCount": 0,
           "holeCount": 6,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "All 6 holes have landed — none lost, none left ordered forever. Not yet charged/sequenced (that's the Charge/Sequence steps, out of scope for this scenario)."
       }

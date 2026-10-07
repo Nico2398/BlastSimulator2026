@@ -121,7 +121,6 @@ describe('tutorialSteps', () => {
       // no dedicated lesson.
       'drill-plan',
       'charge',
-      'sequence',
       // #557: the blast zone must be evacuated before firing. Inserted right
       // before 'blast' so the rail cannot skip past it.
       'evacuate-zone',
@@ -345,7 +344,7 @@ describe('tutorialSteps', () => {
       'hire-surveyor', 'survey', 'toggle-survey-overlay', 'hire-driller',
       'build-driving-center', 'train-fragmenter', 'buy-drill-rig-assign',
       'buy-rock-digger-assign',
-      'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
+      'drill-plan', 'charge', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'sell-ore',
       'finances', 'box-cut', 'needs',
@@ -751,11 +750,11 @@ describe('tutorialSteps', () => {
   describe('evacuate-zone step (#557)', () => {
     const step = TUTORIAL_STEPS.find((s) => s.id === 'evacuate-zone')!;
 
-    it('exists between sequence and blast', () => {
+    it('exists between charge and blast', () => {
       const ids = TUTORIAL_STEPS.map((s) => s.id);
       const idx = ids.indexOf('evacuate-zone');
       expect(idx).toBeGreaterThan(-1);
-      expect(ids[idx - 1]).toBe('sequence');
+      expect(ids[idx - 1]).toBe('charge');
       expect(ids[idx + 1]).toBe('blast');
     });
 
@@ -916,9 +915,9 @@ describe('tutorialSteps', () => {
       ]);
     });
 
-    it('sequence keeps its existing 25-tick delay step, unchanged by the retune', () => {
-      const step = TUTORIAL_STEPS.find((s) => s.id === 'sequence')!;
-      expect(step.commands).toEqual(['sequence auto delay_step:25']);
+    it('has no sequence step (detonation sequencing was removed, #1344)', () => {
+      expect(TUTORIAL_STEPS.find((s) => s.id === 'sequence')).toBeUndefined();
+      expect(TUTORIAL_STEPS.some((s) => s.commands?.some((c) => c.startsWith('sequence')))).toBe(false);
     });
   });
 });

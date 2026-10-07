@@ -251,7 +251,7 @@
     },
     {
       "command": "charge hole:* explosive:rumblox amount:10 stemming:1",
-      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 — amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/sequence/blast pipeline in every run of this file's history — no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead — the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state — selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m — producing a normal, non-catastrophic blast (nuisance barely moved, 50→49.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5→15kg (10 clicks, 1kg/click) and the stemming stepper 2→1m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All — the same class of gap as Finding #4/#5, generalized to explosive selection. #1361: amount:10 (not 15) -- the 6m default hole holds at most (6-1)*2 = 10kg under 1m stemming, and a column that overflows the hole is refused.",
+      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 — amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/blast pipeline in every run of this file's history — no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead — the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state — selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m — producing a normal, non-catastrophic blast (nuisance barely moved, 50→49.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5→15kg (10 clicks, 1kg/click) and the stemming stepper 2→1m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All — the same class of gap as Finding #4/#5, generalized to explosive selection. #1361: amount:10 (not 15) -- the 6m default hole holds at most (6-1)*2 = 10kg under 1m stemming, and a column that overflows the hole is refused.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -322,29 +322,6 @@
       ],
       "role": "player",
       "commandOutcome": "either"
-    },
-    {
-      "command": "sequence auto delay_step:25",
-      "description": "#601-followup: leading `resolveEventIfPending` added, on the original theory that the preceding `event choose 0` step's own resolve and this step's first click were two separate real-time steps with a gap between them, and a timer event landing in that gap left its `.bs-confirm-overlay` backdrop covering the blast panel, failing this step's own `[data-step=\"3\"]` click with \"element is covered by div\". #707 (correction): that diagnosis was wrong, the same way #699 already found once for this exact symptom on this exact file (see the build-living-quarters step's own note). CI's `.bs-confirm-overlay` was the LevelEndScreen a genuine worker_revolt raises, not a random event's dialog -- direct-traced (command mode): `state.levelEndReason` reads `'worker_revolt'` partway through the wait_until immediately above this step, before this step ever runs, on both the pre- and post-#707 GameLoop.ts. A loop-until-drained `resolveEventIfPending` could never have closed that, and didn't (confirmed: CI kept failing here after this exact fix landed once already, PR #718's own history). The real fix is the living_quarters relocation in the build step above, which keeps `revolt.ticksAtZero` at 0 for the whole file; `resolveEventIfPending` stays here only for its own genuine, narrower purpose -- an actual pending random event (not a level-ending one) landing in the real-time gap between steps.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
     },
     {
       "command": "employee dispatch 2 x:30 z:15",
@@ -439,7 +416,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -463,8 +440,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "decreased": [
           "nuisance",
@@ -712,29 +688,6 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto delay_step:25",
-      "description": "#601-followup: leading `resolveEventIfPending` added -- same race grid 1's own sequence step found and fixed (see its own note): the preceding `event choose 0` step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\". #557 interaction-mode follow-up (correction): unverified for grid 2 specifically, but grid 3's own identical-looking step carried this exact same stale diagnosis and was wrong -- CI's real grid-3 failure is a genuine worker_revolt's LevelEndScreen, not an event dialog (`pendingEvent` stays `false` throughout; see that step's own corrected note for the full trace and the fixes attempted). Left uncorrected here pending a real repro against this specific step -- if this step ever fails in CI, check `state.levelEndReason` first, the same way, before trusting this comment.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "employee dispatch 3 x:20 z:35",
       "description": "#557: employee #3 built living_quarters (above) and, like employee #2 before grid 1's own blast, is a real casualty risk from idle-time dispatch pulling them into grid 2's own charge_hole pool work near (20,10)-(22,12) -- confirmed live, without this step employee #3 dies before ever reaching grid 3's own assign_skill. x:20 z:32 sits just past living_quarters' own (21,30) position, comfortably outside grid 2's padded zone (x:[5,37] z:[-5,27]) with a couple of metres to spare past the z:27 boundary. #928 fix: retargeted 32 -> 35 -- the completed living_quarters T1 occupies a real (21-23, 30-32) footprint, confirmed by direct findPath probe against this exact tick's navGrid: both (20,32) and even (20,29) (employee #3's old pre-#928 resting spot, see below) are genuinely unreachable, boxed in by the building on three sides. Pre-#928 timing never actually exercised this path (employee #3 happened to already be standing safely at (20,29) -- outside grid 2's own z:27 danger boundary -- when this step ran, so the unreachable target was never actually requested), but #928's rebalanced fatigue-only thresholds shift this employee's idle-time pool-work pickup earlier, landing them back at grid 2's own (20,12) charge_hole location before this step runs -- from there the old z:32 target left them permanently stuck (STUCK: can't find a path) and undefended against grid 2's own blast, a real death this step exists specifically to prevent. z:35 clears the building's footprint by 3 more metres and is confirmed reachable by direct findPath probe from (20,12). Companion fix (src/core/engine/ForceShiftRest.ts, #928): both forceShiftRest functions' `pendingTaskDuration !== null` guard now exempts a genuinely stuck walk (`isMoveStuck`) so a future unreachable claimed-task target doesn't permanently strand an employee outside every proactive-rest rescue path either -- belt and suspenders with this scenario-side retarget.",
       "interaction": [
@@ -806,7 +759,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -830,8 +783,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "decreased": [
           "nuisance",
@@ -1039,29 +991,6 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto delay_step:25",
-      "description": "#601-followup: leading `resolveEventIfPending` added, on the theory that the preceding step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\". #557 interaction-mode follow-up (correction): that diagnosis is wrong for CI's actual grid-3 failure, the same way #707 already found once for grid 1's own identical symptom on this identical file (see that step's own corrected note) -- direct-traced (command mode): `state.levelEndReason` reads `worker_revolt` from partway through this grid's own charge-drain wait_until onward (`pendingEvent` stays `false` throughout), so `resolveEventIfPending`'s pending-event check never has anything to resolve; the panel is covered by the LevelEndScreen a genuine revolt raises, not an event dialog. Root cause: with today's #557 crew-geometry fix, both employee #2 (grid 2's survivor) and employee #3 (grid 3's own driller) are alive and sharing this file's one living_quarters at the default hunger:60/fatigue:60 rest thresholds for the whole multi-thousand-tick file; their combined average wellbeing grinds to 0 and holds past REVOLT_TICKS by grid 3's own charge-drain, well before this step ever runs. Command mode never surfaces this as a failure (no UI gating on level-end state, so it keeps executing every remaining command regardless and this step's own `expect` still happens to hold on the unmodified seed-42 trace) -- interaction mode's LevelEndScreen is what actually catches it. Not yet fixed here: raising rest thresholds (tried 65-90, symmetric and asymmetric, applied at every point from the file's opening `set_policy` step through grid 3's own hire) and a second living_quarters (dedicated per grid, removing the shared-resource contention) were both tried and both still end in revolt somewhere in the file, just at a different tick each time -- NEED_REST_DURATIONS's short per-visit duration (hunger 2 ticks, fatigue 8) only refills whichever single gauge triggered the rest, so any threshold at or above roughly 72 oscillates between the two gauges without ever clearing both and stalls drilling solid instead of protecting it, and the random-event timing this file's own tick trajectory shifts on every attempted change made the search too noisy to converge within reasonable effort. A working fix likely needs a structural change beyond a scenario-JSON-only edit (a researched living_quarters tier upgrade for its faster replenishment, or restructuring so grid 2 and grid 3 never have two living employees drawing on one rest facility at once) -- filed as a follow-up rather than landed here.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "description": "Blast 3/3 — the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
       "interaction": [
@@ -1070,7 +999,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -1094,8 +1023,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "decreased": [
           "nuisance",

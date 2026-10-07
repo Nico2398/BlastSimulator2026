@@ -1835,8 +1835,7 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 24,
-          "sequencedCount": 0
+          "holeCount": 24
         },
         "increased": [
           "orderedChargeCount"
@@ -1868,52 +1867,17 @@
           "surveyCount": 3,
           "holeCount": 24,
           "chargedCount": 24,
-          "sequencedCount": 0,
           "orderedChargeCount": 0
-        }
-      }
-    },
-    {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 25
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
-          "sequencedCount": 24
         }
       }
     },
     {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -1947,8 +1911,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },

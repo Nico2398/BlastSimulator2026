@@ -22,7 +22,6 @@ import { VoxelGrid, computeVoxelColumnSurfaceY, setVoxelColumnSurfaceHeight } fr
 import { replayTerrainEdits } from '../../src/core/world/TerrainEdits.js';
 import { createGridPlan, digVoxel } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import { defineRampSegments, carveRampSegment, type RampDef } from '../../src/core/mining/Ramp.js';
@@ -118,8 +117,7 @@ describe('TerrainEdits — record and replay against a dusty_hollow-shaped grid 
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const blastResult = executeBlast(plan, live, []);
     expect(blastResult).not.toBeNull();

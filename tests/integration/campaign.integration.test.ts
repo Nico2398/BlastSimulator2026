@@ -787,7 +787,6 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
     const saved = {
       drillHoles: [{ id: 'H1', x: 12, z: 12, depth: 6, diameter: 0.15 }],
       chargesByHole: { H1: { explosiveId: 'dynatomics', amountKg: 3, stemmingM: 2 } },
-      sequenceDelays: {},
     };
 
     const r = queueSavedBlastPlan(ctx as never, saved as never, 'plan');

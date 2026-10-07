@@ -11,7 +11,6 @@ import { tickCommand } from '../../src/console/commands/events.js';
 import {
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
@@ -776,9 +775,6 @@ describe('Economy', () => {
     expect(chargeResult.success).toBe(true);
     driveChargePlanToCompletion(ctx);
 
-    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-    expect(seqResult.success).toBe(true);
-
     const blastResult = blastCommand(ctx as any, [], {});
     expect(blastResult.success).toBe(true);
     expect(ctx.state!.logistics.fragments.length).toBeGreaterThan(0);
@@ -1058,9 +1054,6 @@ describe('Economy', () => {
     });
     expect(chargeResult.success).toBe(true);
     driveChargePlanToCompletion(ctx);
-
-    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-    expect(seqResult.success).toBe(true);
 
     const blastResult = blastCommand(ctx as any, [], {});
     expect(blastResult.success).toBe(true);
