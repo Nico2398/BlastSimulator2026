@@ -292,6 +292,8 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
       tickCommand(ctx, ['1'], {});
       ticks++;
     }
-    expect(ctx.state!.logistics.storedMassKg).toBeCloseTo(storedBefore + pieceMass, 6);
+    // #1370: the trip may batch neighbouring pieces, so the stored growth is at least the piece's own mass.
+    expect(ctx.state!.logistics.fragments.find(f => f.fragment.id === piece.fragment.id)!.state).toBe('stored');
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThanOrEqual(storedBefore + pieceMass - 1e-6);
   });
 });

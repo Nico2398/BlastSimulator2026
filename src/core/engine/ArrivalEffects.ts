@@ -155,6 +155,10 @@ export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: Ev
     if (!deliverToDepot(state.logistics, fragmentId, state.collectedOre)) continue;
     delivered++;
     emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
+    // An extra's own haul action is normally consumed at load; sweep any still queued.
+    const leftover = state.pendingActions.find(a =>
+      a.type === 'haul_debris' && a.status === 'queued' && a.holderId === null && a.payload['fragmentId'] === fragmentId);
+    if (leftover) completePendingAction(state, leftover.id);
   }
   if (delivered === 0) return false;
 

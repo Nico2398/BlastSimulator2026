@@ -1314,6 +1314,7 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
     const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
     const rawVehicle = vehiclesList[0]!;
     delete rawVehicle['payload'];
+    delete rawVehicle['cargo']; // a real pre-v32 save never has it
     rawVehicle['haulingPhase'] = 'to_depot';
     rawVehicle['haulingFragmentId'] = 42;
     rawVehicle['payloadKg'] = 850;

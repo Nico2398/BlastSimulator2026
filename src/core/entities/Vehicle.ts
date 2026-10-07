@@ -124,7 +124,7 @@ export function vehicleRequiredClearanceCells(vehicle: Vehicle): number {
 // ── Vehicle instance ──
 
 /** One fragment aboard a hauler (#1370). */
-export interface HaulCargoItem {
+interface HaulCargoItem {
   fragmentId: number;
   massKg: number;
 }

@@ -48,6 +48,7 @@ describe('batched hauling (#1370)', () => {
   it('a tier-1 hauler loads at least two small fragments in one trip and one unload stores them all', () => {
     const { run, state, vehicleId, emitter } = setup();
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    state.logistics.storageCapacityKg = Math.max(state.logistics.storageCapacityKg, 20000); // starting depot holds only 2000 kg
     const frags = [makeFragment(9001, 5, 6), makeFragment(9002, 6, 6), makeFragment(9003, 7, 6)];
     addBlastFragments(state.logistics, frags, state.navGrid);
     syncHaulDispatch(state);

@@ -51,7 +51,7 @@ and fuel.
 
 Units the field names do not state: `capacity` is kg for a Debris Hauler, m³/tick for a Rock
 Digger, holes/tick for a Drill Rig. `nameKey` is an i18n key of the form `vehicle.<role>.tier<N>`.
-Only a Debris Hauler carries cargo.
+Only a Debris Hauler carries cargo: `Vehicle.cargo`, a list of `{ fragmentId, massKg }` (`vehicleCargoMassKg` sums it). Hauler capacity is 4000 kg at tier 1 (6400, 10000 at tiers 2, 3).
 
 ## Driver Licensing
 
@@ -217,13 +217,25 @@ Cargo stays in the vehicle when its occupant alights. Nothing is dropped on the 
 Both are ordinary itineraries with effect steps, not phase machines:
 
 ```
-haul:  [foot -> hauler, board] [drive -> fragment, effect 'load'] [drive -> depot, effect 'unload']
+haul:  [foot -> hauler, board] [drive -> fragment, effect 'load'] ([drive -> extra fragment, effect 'load' + targetId])* [drive -> depot, effect 'unload']
 break: [foot -> fragmenter, board] [drive -> boulder, effect 'split']
 ```
 
 Hauling is self-dispatching: each tick `HaulDispatch.ts` queues one `haul_debris` action per
 on-ground fragment not already covered (an oversized fragment queues `fragment_debris` instead).
-A destination targeting a depot resolves through the building-approach-cell lookup
+
+Multi-fragment cargo (#1370): after the primary `load` leg, `planFragmentTaskItinerary` adds one
+extra `load` leg (step `targetId` = fragment id) per nearby fragment chosen by `selectHaulBatch`
+(`HaulBatch.ts`). Candidates are on-ground, non-oversized, within `HAUL_BATCH_RADIUS_CELLS`
+(nearest first), with a queued, unclaimed `haul_debris`; at most `HAUL_BATCH_MAX_ITEMS` ride, and
+their cumulative mass stays within the tier capacity and `storageRoomKg`. The primary always rides,
+so a fragment heavier than the tier capacity rides alone (the load gauge clamps at 100%); an extra
+that overflows is skipped and a later, smaller one may still fit. On arrival an extra consumes its
+own haul action; one that is gone, claimed or no longer fits is a soft no-op and the trip carries
+less. The `unload` leg delivers every cargo item (one `vehicle:haul_delivered` each) and completes
+the primary action. `pickupFragment` and `storageRoomKg` count in-transit mass, so concurrent
+haulers cannot oversubscribe storage. An interrupted or scrapped hauler returns all cargo to the
+ground. A destination targeting a depot resolves through the building-approach-cell lookup
 (`gameplay-navmesh`), never the building's raw coordinates.
 
 Storage capacity is what active Freight Warehouses provide: `INITIAL_STORAGE_CAPACITY_KG` is 0, so
@@ -290,7 +302,7 @@ does. The path-scoped `vehicles` rule names these invariants; this is where they
 | I5 | A vehicle's reservation names a live `PendingAction` whose holder is alive and is the vehicle's driver, is walking to board it, or holds the action as a queued reserve-ahead |
 | I6 | `e.itinerary !== null` implies `legs.length > 0` |
 | I7 | `leg.mode === 'drive'` implies the employee is mounted in `leg.vehicleId` |
-| I8 | `v.payload !== null` implies that fragment's logistics state is `in_transit` |
+| I8 | Every fragment in `v.cargo` has logistics state `in_transit` |
 | I9 | `e.taskTicksRemaining !== null` implies `e.itinerary === null` (arrived, no longer travelling) |
 
 Three lint checks keep the writers singular. `tests/unit/lint/SingleVehicleMover.test.ts`: only
