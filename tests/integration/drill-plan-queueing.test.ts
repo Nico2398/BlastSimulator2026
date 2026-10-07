@@ -813,7 +813,7 @@ describe('drill_plan clear/remove/grid restores NavGrid cell cost (#1360)', () =
     drill('x:15 z:15', 1);
     expect(cell(15, 15).type).toBe('drill_hole');
 
-    expect(run('drill_plan grid rows:1 cols:2 spacing:4 depth:8 start:22,22').success).toBe(true);
+    expect(run('drill_plan grid rows:1 cols:2 spacing:4 depth:8 start:22,22 confirm:true').success).toBe(true);
     expect(state.drillHoles).toHaveLength(0);
     expect(cell(15, 15)).toEqual(before);
     expect(cell(15, 15).type).not.toBe('drill_hole');
