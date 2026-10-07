@@ -22,7 +22,7 @@ import { subscribeNavGridToUpdates, buildingFootprintOccupants } from '../../../
 import { findBuildingApproachCell } from '../../../src/core/nav/BuildingApproach.js';
 import { rampFootprint } from '../../../src/core/mining/RampWidening.js';
 import type { RampDef } from '../../../src/core/mining/Ramp.js';
-import type { PlaceBuildingActionPayload } from '../../../src/console/commands/buildOrder.js';
+import type { PlaceBuildingActionPayload } from '../../../src/core/engine/PlaceBuildingAction.js';
 
 const SEED = 42;
 

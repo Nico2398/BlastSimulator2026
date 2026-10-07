@@ -13,6 +13,7 @@ import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS, ACTION_STARVATION_TICK_THRESHOLD, DEMOLITION_VEHICLE_TIER_SPEED } from '../config/balance.js';
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
+import { readDemolishPayload } from './DemolishPayload.js';
 import { computeRampSegmentDurationTicks, isRampCellPending } from '../mining/Ramp.js';
 import { computeLevelVolume } from '../mining/LevelGround.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
@@ -133,11 +134,12 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
   if (action.type === 'demolish_building') {
     // Reserved destroyer's tier scales a tier-1 baseline (#1392); the building
     // tier comes from the standing building, falling back to the persisted payload.
-    const cells = (action.payload['footprint'] as ReadonlyArray<unknown> | undefined)?.length ?? 1;
-    const target = state.buildings.buildings.find(b => b.id === action.payload['buildingId']);
+    const demolish = readDemolishPayload(action.payload);
+    const cells = demolish.footprint.length || 1;
+    const target = state.buildings.buildings.find(b => b.id === demolish.buildingId);
     const vehicleTier = (findVehicleReservedForAction(state.vehicles, action.id)?.tier ?? 1) as VehicleTier;
     if (target) return computeDemolitionDurationTicks(cells, target.tier, vehicleTier);
-    return Math.max(1, Math.ceil(((action.payload['durationTicks'] as number | undefined) ?? 1) / DEMOLITION_VEHICLE_TIER_SPEED[vehicleTier]));
+    return Math.max(1, Math.ceil(demolish.durationTicks / DEMOLITION_VEHICLE_TIER_SPEED[vehicleTier]));
   }
 
   const baseTicks = typeof action.payload['durationTicks'] === 'number'

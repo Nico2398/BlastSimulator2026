@@ -8,31 +8,14 @@ import { destroyBuilding, getBuildingDef, getDefSize } from '../entities/Buildin
 import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
 import { getSurfaceY } from '../entities/BuildingPlacement.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
-import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../config/balance.js';
+import { dispatchPlaceBuildingAction } from './PlaceBuildingAction.js';
+import type { DemolishBuildingActionPayload } from './DemolishPayload.js';
 import { dispatchPendingAction } from './TaskDispatch.js';
 import { releaseOccupantsOfRemovedBuildings } from './Mount.js';
 import { addIncome } from '../economy/Finance.js';
 import { refreshLogisticsCapacity, emitFootprintRegionChanged } from './BuildingTaskHelpers.js';
 
-/** Payload carried by a queued `place_building` PendingAction (#556). */
-export interface PlaceBuildingActionPayload {
-  buildingOrderId: number;
-  cost: number;
-  footprint: ReadonlyArray<readonly [number, number]>;
-  /** Base ticks; scaled by the worker's proficiency at claim time. */
-  durationTicks: number;
-}
-
-/** Payload of a pending 'demolish_building' action. */
-export interface DemolishBuildingActionPayload {
-  buildingId: number;
-  cost: number;
-  /** Ticks for a tier-1 destroyer; the live estimate rescales by the reserved vehicle's tier. */
-  durationTicks: number;
-  footprint: ReadonlyArray<readonly [number, number]>;
-  /** Place-building order to queue once the demolition finishes (upgrade/move), or null. */
-  rebuildOrderId: number | null;
-}
+export type { DemolishBuildingActionPayload };
 
 interface DemolitionOptions {
   cost: number;
@@ -83,22 +66,15 @@ function dispatchRebuild(state: GameState, grid: VoxelGrid | null, rebuildOrderI
   if (!order) return null;
   const def = getBuildingDef(order.type, order.tier);
   const approach = findBuildingApproachCell(state.navGrid, { x: order.x, z: order.z }, def, order.x, order.z);
-  dispatchPendingAction(state, {
-    id: order.actionId,
-    type: 'place_building',
-    requiredSkill: null,
-    requiredVehicleRole: null,
-    targetX: approach.x,
-    targetZ: approach.z,
+  dispatchPlaceBuildingAction(state, {
+    actionId: order.actionId,
+    buildingOrderId: order.id,
+    tier: order.tier,
+    cost: order.cost,
+    footprint: def.footprint,
+    approach,
     targetY: grid ? getSurfaceY(grid, approach.x, approach.z) : 0,
-    payload: {
-      buildingOrderId: order.id,
-      cost: order.cost,
-      footprint: def.footprint,
-      durationTicks: Math.ceil(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[order.tier]),
-    } satisfies PlaceBuildingActionPayload,
-    targetEmployeeId: null,
-  }, { skipQualificationCheck: true });
+  });
   return order.actionId;
 }
 

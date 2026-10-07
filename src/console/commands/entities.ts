@@ -13,6 +13,7 @@ import {
   isPlacementBlockedByResearch,
   checkFootprintPlacement,
   type BuildingType,
+  type Building,
   type BuildingTier,
   type FootprintOccupant,
 } from '../../core/entities/Building.js';
@@ -39,6 +40,13 @@ import { terrainReservations } from '../../core/entities/PlacementReservations.j
 export { employeeCommand } from './employees.js';
 
 // ── build command ──
+
+/** Where a Building Destroyer walks to demolish `building`: its approach-ring cell and that cell's surface height. */
+function demolitionSite(ctx: GameContext, building: Building): { approach: { x: number; z: number }; targetY: number } {
+  const def = getBuildingDef(building.type, building.tier);
+  const approach = findBuildingApproachCell(ctx.state!.navGrid, { x: building.x, z: building.z }, def, building.x, building.z);
+  return { approach, targetY: ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0 };
+}
 
 export function buildCommand(
   ctx: GameContext,
@@ -70,7 +78,6 @@ export function buildCommand(
       if (isDemolitionOrdered(state, id)) {
         return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
       }
-      const destroyDef = getBuildingDef(toDestroy.type, toDestroy.tier);
       const demolishCost = getDemolishCost(toDestroy);
       if (state.cash < demolishCost) {
         return {
@@ -81,15 +88,11 @@ export function buildCommand(
           }),
         };
       }
-      state.cash -= demolishCost;
-      addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       // The building stays standing and operating until a Building Destroyer
       // finishes the work (#1392); only the order is queued here.
-      const approach = findBuildingApproachCell(state.navGrid, { x: toDestroy.x, z: toDestroy.z }, destroyDef, toDestroy.x, toDestroy.z);
-      queueDemolition(state, toDestroy, {
-        cost: demolishCost, rebuildOrderId: null, approach,
-        targetY: ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0,
-      });
+      queueDemolition(state, toDestroy, { cost: demolishCost, rebuildOrderId: null, ...demolitionSite(ctx, toDestroy) });
+      state.cash -= demolishCost;
+      addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       const lostKg = toDestroy.type === 'explosive_warehouse' ? (toDestroy.storedExplosivesKg ?? 0) : 0;
       const destroyOutput = t('entities.build_destroy_ordered', { id, cost: demolishCost });
       return {
@@ -143,9 +146,6 @@ export function buildCommand(
         return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(upgradeCheck) }) };
       }
 
-      state.cash -= totalCost;
-      addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
-
       // Reserve the finished building under the SAME id: the planned site
       // blocks the larger footprint from now, and its place_building action
       // is dispatched when the demolition completes (#1392).
@@ -164,11 +164,9 @@ export function buildCommand(
         emitFootprintOccupancyChanged(ctx, x, z, maxX, maxZ);
         relocateFootprintOccupants(state, makeFootprintRegion(x, z, maxX, maxZ));
       }
-      const approach = findBuildingApproachCell(state.navGrid, { x, z }, oldDef, x, z);
-      queueDemolition(state, toUpgrade, {
-        cost: totalCost, rebuildOrderId, approach,
-        targetY: ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0,
-      });
+      queueDemolition(state, toUpgrade, { cost: totalCost, rebuildOrderId, ...demolitionSite(ctx, toUpgrade) });
+      state.cash -= totalCost;
+      addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
       return { success: true, output: t('entities.build_upgrade_ordered', { id }) };
     }
     case 'move': {

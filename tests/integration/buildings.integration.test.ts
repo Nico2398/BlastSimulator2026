@@ -8,7 +8,7 @@ import { buildCommand, employeeCommand } from '../../src/console/commands/entiti
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
-import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
+import type { PlaceBuildingActionPayload } from '../../src/core/engine/PlaceBuildingAction.js';
 import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
 import { equipDemolition, tickUntilDemolished } from '../helpers/demolition.js';
 import {

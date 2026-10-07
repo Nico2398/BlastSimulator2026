@@ -18,9 +18,7 @@ import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
-import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
-import type { PlaceBuildingActionPayload } from '../../core/engine/BuildingDemolition.js';
-import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../../core/config/balance.js';
+import { dispatchPlaceBuildingAction } from '../../core/engine/PlaceBuildingAction.js';
 import { terrainReservations } from '../../core/entities/PlacementReservations.js';
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
 import { findBuildingApproachCell, isApproachCellStranded, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
@@ -120,7 +118,6 @@ export function orderBuildingCommand(
   // player ids in an order they never chose (and make `build destroy 1`
   // name a different building each run).
   const buildingOrderId = state.nextPlannedBuildingId++;
-  const durationTicks = Math.ceil(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[tier]);
   const actionId = state.nextPendingActionId++;
   const plannedBuilding: PlannedBuilding = {
     id: buildingOrderId, buildingId: state.buildings.nextId++,
@@ -170,23 +167,10 @@ export function orderBuildingCommand(
   // action's target).
   const targetY = ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0;
 
-  // skipQualificationCheck (#556, mirrors dig_ramp_segment/drill_hole/
-  // charge_hole's #555/#553/#554 dispatch): a build order must queue
-  // silently even when the roster is empty — construction needs no skill
-  // and no vehicle (requiredSkill/requiredVehicleRole both null).
-  dispatchPendingAction(state, {
-    id: actionId,
-    type: 'place_building',
-    requiredSkill: null,
-    requiredVehicleRole: null,
-    targetX: approach.x,
-    targetZ: approach.z,
-    targetY,
-    payload: {
-      buildingOrderId, cost: def.constructionCost, footprint: def.footprint, durationTicks,
-    } satisfies PlaceBuildingActionPayload,
-    targetEmployeeId: null,
-  }, { skipQualificationCheck: true });
+  // A build order queues silently even when the roster is empty (#556).
+  dispatchPlaceBuildingAction(state, {
+    actionId, buildingOrderId, tier, cost: def.constructionCost, footprint: def.footprint, approach, targetY,
+  });
 
   return {
     success: true,

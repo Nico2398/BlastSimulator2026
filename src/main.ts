@@ -1,6 +1,5 @@
 // BlastSimulator2026 — Browser entry point
 // Initializes the 3D scene, UI, audio, save system, and exposes the console bridge.
-import { getMaxBuildingTier } from './core/entities/Building.js';
 import * as THREE from 'three';
 import { SceneManager } from './renderer/SceneManager.js';
 import { modelLibrary } from './renderer/models/ModelLibrary.js';
@@ -22,6 +21,7 @@ import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
+import { getMaxBuildingTier } from './core/entities/Building.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
 import { loadSettings } from './ui/userSettings.js';
