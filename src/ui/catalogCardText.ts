@@ -3,7 +3,7 @@ import { getFootprintSize, type BuildingDef, type BuildingType } from '../core/e
 import { t } from '../core/i18n/I18n.js';
 
 /** i18n key of the capacity unit shown for each building type (ui.build.unit.*). */
-const BUILDING_CAPACITY_UNIT_KEY: Record<BuildingType, string> = {
+export const BUILDING_CAPACITY_UNIT_KEY: Record<BuildingType, string> = {
   driving_center: 'ui.build.unit.seats',
   blasting_academy: 'ui.build.unit.seats',
   management_office: 'ui.build.unit.seats',

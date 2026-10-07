@@ -455,7 +455,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1335: -3 keys (removed contract-accept step text)
     // #1339: -2 keys (-8 train-driller/train-digger card+stage keys, +4 train-fragmenter, +2 rock_fragmenter course/skill)
     // #1375: +8 keys (operating cost/runway, vehicle_maintenance category), -1 (runway_growing): 3702.
-    expect(Object.keys(en).length).toBe(3702);
+    // #1377: +30 keys (build/fleet catalog card purpose lines, tooltips, per-hour format, capacity units): 3732.
+    expect(Object.keys(en).length).toBe(3732);
   });
 });
 
