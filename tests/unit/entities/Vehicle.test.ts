@@ -6,6 +6,8 @@ import {
   purchaseVehicle,
   destroyVehicle,
   getVehicleCostsPerTick,
+  getVehicleMaintenanceCostPerTick,
+  getVehicleFuelCostPerTick,
   getAllVehicleRoles,
   getVehicleDefByTier,
   computeScrapResidualValue,
@@ -1789,5 +1791,44 @@ describe('vehicleRequiredClearanceCells (#1154)', () => {
       const { vehicle } = purchaseVehicle(vs, role, 0, 0, 3);
       expect(vehicleRequiredClearanceCells(vehicle)).toBe(NAV_CLEARANCE_VEHICLE_CELLS);
     }
+  });
+});
+
+describe('getVehicleMaintenanceCostPerTick / getVehicleFuelCostPerTick (#1375)', () => {
+  it('are zero for an empty fleet', () => {
+    const state = createVehicleState();
+    expect(getVehicleMaintenanceCostPerTick(state)).toBe(0);
+    expect(getVehicleFuelCostPerTick(state)).toBe(0);
+  });
+
+  it('maintenance sums every vehicle regardless of reservation, tier-correct', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'debris_hauler');
+    purchaseVehicle(state, 'rock_digger', 0, 0, 2);
+    reserveVehicle(state, state.vehicles[0]!.id, 5);
+    const expected =
+      getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
+      getVehicleDefByTier('rock_digger', 2).maintenanceCostPerTick;
+    expect(getVehicleMaintenanceCostPerTick(state)).toBe(expected);
+  });
+
+  it('fuel counts only reserved vehicles', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'debris_hauler');
+    purchaseVehicle(state, 'rock_digger');
+    expect(getVehicleFuelCostPerTick(state)).toBe(0);
+    reserveVehicle(state, state.vehicles[1]!.id, 5);
+    expect(getVehicleFuelCostPerTick(state)).toBe(getVehicleDefByTier('rock_digger', 1).fuelCostPerTick);
+  });
+
+  it('getVehicleCostsPerTick is the sum of the two', () => {
+    const state = createVehicleState();
+    purchaseVehicle(state, 'debris_hauler');
+    purchaseVehicle(state, 'drill_rig', 0, 0, 3);
+    reserveVehicle(state, state.vehicles[1]!.id, 9);
+    expect(getVehicleCostsPerTick(state)).toBeCloseTo(
+      getVehicleMaintenanceCostPerTick(state) + getVehicleFuelCostPerTick(state), 8);
+    expect(getVehicleMaintenanceCostPerTick(state)).toBeGreaterThan(0);
+    expect(getVehicleFuelCostPerTick(state)).toBeGreaterThan(0);
   });
 });

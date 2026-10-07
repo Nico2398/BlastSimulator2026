@@ -524,12 +524,13 @@ describe('Economy', () => {
     // The drain must be booked as categorized expense transactions.
     const report = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount);
     const maintenanceCat = report.expensesByCategory.find(c => c.category === 'maintenance');
-    const fuelCat = report.expensesByCategory.find(c => c.category === 'fuel');
-    expect(maintenanceCat).toBeDefined();
-    expect(maintenanceCat!.total).toBeGreaterThan(0);
-    // Vehicle "fuel" expense category should also exist per issue #456's spec
-    // (getVehicleCostsPerTick routed through addExpense(..., 'fuel', ...)).
-    expect(fuelCat).toBeDefined();
+    const vehicleMaintenanceCat = report.expensesByCategory.find(c => c.category === 'vehicle_maintenance');
+    // #1375: vehicle upkeep is booked under its own 'vehicle_maintenance'
+    // category, separate from fuel. The idle hauler holds no reservation, so
+    // it burns no fuel and no fuel transaction is booked.
+    expect(vehicleMaintenanceCat).toBeDefined();
+    expect(vehicleMaintenanceCat!.total).toBeGreaterThan(0);
+    expect(report.expensesByCategory.find(c => c.category === 'fuel')).toBeUndefined();
   });
 
   // ── 12. No buildings/vehicles → no maintenance-category expenses ──────────

@@ -3,6 +3,9 @@ import { describe, it, expect } from 'vitest';
 import { FinancesPanel } from '../../../../src/ui/panels/FinancesPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
+import { hireEmployee, PAY_CYCLE_TICKS } from '../../../../src/core/entities/Employee.js';
+import { Random } from '../../../../src/core/math/Random.js';
+import { TICKS_PER_DAY } from '../../../../src/core/config/balance.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../../../src/core/campaign/Bankruptcy.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -44,23 +47,84 @@ describe('FinancesPanel', () => {
     expect(text).toContain('No transactions yet');
   });
 
-  it('shows a positive-trend "balance growing" note with no burn', () => {
+  it('shows a runway line for a mine with nothing running (sustainable)', () => {
     const { panel } = makePanel();
     panel.show();
     panel.update(makeState());
-    expect(panel.root.textContent).toContain('Balance growing');
+    expect(panel.root.textContent).toContain(t('ui.finances.runway_sustainable'));
+    expect(t('ui.finances.runway_sustainable')).not.toBe('ui.finances.runway_sustainable');
   });
 
-  it('computes runway days from the real trailing burn rate', () => {
+  it('reads sustainable when operating income covers operating cost', () => {
     const { panel } = makePanel();
     const state = makeState();
-    state.tickCount = 10;
-    state.cash = 2400; // at -$240/tick this is 10 ticks (0.417 days) of runway
-    state.finances.transactions.push({ tick: 9, type: 'expense', amount: 2400, category: 'fuel', description: 'x' });
+    hireEmployee(state.employees, 'driller', new Random(1));
+    state.finances.transactions.push({ tick: 99, type: 'income', amount: 100000, category: 'sales', description: 'x' });
     panel.show();
     panel.update(state);
-    // net = -2400 spread over min(24,10)=10 ticks = -240/tick; runway = 2400/240 = 10 ticks = 0.4 days
-    expect(panel.root.textContent).toContain('0.4d runway');
+    expect(panel.root.textContent).toContain(t('ui.finances.runway_sustainable'));
+    expect(panel.root.textContent).not.toContain('d runway');
+  });
+
+  it('computes runway days from operating cost, not from the ledger burn', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.cash = 2400;
+    hireEmployee(state.employees, 'manager', new Random(1));
+    const perHour = state.employees.employees[0]!.salary / PAY_CYCLE_TICKS;
+    // a huge one-off purchase must not move the runway
+    state.finances.transactions.push({ tick: 99, type: 'expense', amount: 35000, category: 'equipment', description: 'rig' });
+    panel.show();
+    panel.update(state);
+    const days = (2400 / perHour / TICKS_PER_DAY).toFixed(1);
+    expect(panel.root.textContent).toContain(`${days}d runway`);
+  });
+
+  it('shows an Operating cost / h row with the payroll breakdown', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    hireEmployee(state.employees, 'manager', new Random(1));
+    const perHour = Math.round(state.employees.employees[0]!.salary / PAY_CYCLE_TICKS);
+    panel.show();
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain(t('ui.finances.operating_cost'));
+    expect(text).toContain(t('ui.finances.operating_cost_payroll'));
+    expect(text).toContain(t('ui.finances.operating_cost_buildings'));
+    expect(text).toContain(t('ui.finances.operating_cost_vehicles'));
+    expect(text).toContain(t('ui.finances.operating_cost_fuel'));
+    expect(text).toContain(`$${perHour.toLocaleString('en-US')}`);
+    expect(text).not.toContain('ui.finances.operating_cost');
+  });
+
+  it('operating cost row is unchanged by a one-off vehicle purchase expense', () => {
+    const a = makePanel();
+    const b = makePanel();
+    const s1 = makeState();
+    const s2 = makeState();
+    hireEmployee(s1.employees, 'manager', new Random(1));
+    hireEmployee(s2.employees, 'manager', new Random(1));
+    s2.finances.transactions.push({ tick: 99, type: 'expense', amount: 35000, category: 'equipment', description: 'rig' });
+    a.panel.show(); a.panel.update(s1);
+    b.panel.show(); b.panel.update(s2);
+    const row = (p: FinancesPanel) => Array.from(p.root.querySelectorAll('div'))
+      .find(d => (d.textContent ?? '').includes(t('ui.finances.operating_cost_payroll')) && d.children.length <= 4)?.textContent;
+    expect(row(a.panel)).toBeDefined();
+    expect(row(b.panel)).toBe(row(a.panel));
+  });
+
+  it('labels vehicle maintenance under its own category', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.finances.transactions.push(
+      { tick: 3, type: 'expense', amount: 321, category: 'vehicle_maintenance', description: 'x' },
+    );
+    panel.show();
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain(t('ui.finances.category.vehicle_maintenance'));
+    expect(text).not.toContain('ui.finances.category.vehicle_maintenance');
+    expect(text).toContain('$321');
   });
 
   it('renders income and expense category bars from getFinancialReport, sorted by size', () => {
