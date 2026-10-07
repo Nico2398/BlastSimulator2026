@@ -12,7 +12,7 @@ import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
-import { STARTING_SITE_STAFFED_COMPOSITION } from '../../core/config/balance.js';
+import { resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { sanitizeFiniteOverride, parseOptionalStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -135,7 +135,7 @@ export function campaignStartCommand(
   }
 
   // Absent: the level's own site. true: the global staffed roster. false: bare.
-  const startingSite = flags.staffed === undefined ? target?.startingSite : flags.staffed ? STARTING_SITE_STAFFED_COMPOSITION : undefined;
+  const startingSite = resolveStartingSite(target?.startingSite, flags.staffed);
 
   const newState = createGameForLevel(campaign, levelId, flags.staffed);
   if (!newState) {

@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Level completion and transition
 // Handles profit threshold detection, level complete summary, and new-level setup.
 
+import { resolveStartingSite } from '../state/StartingBuildings.js';
 import { createGame, createWorldState, type GameConfig, type GameState } from '../state/GameState.js';
 import { getLevel } from './Level.js';
 import { recordProfit, recordStars, startLevel, type CampaignState } from './Campaign.js';
@@ -118,15 +119,14 @@ export function createGameForLevel(
   const level = getLevel(levelId);
   if (!level) return null;
 
+  const startingSite = resolveStartingSite(level.startingSite, staffed);
   const config: GameConfig = {
     seed: level.terrainSeed,
     mineType: level.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
-    ...(staffed === undefined
-      ? (level.startingSite ? { startingSite: level.startingSite } : {})
-      : (staffed ? { staffed: true } : {})),
+    ...(startingSite ? { startingSite } : {}),
   };
 
   const newState = createGame(config);

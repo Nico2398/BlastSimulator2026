@@ -1594,7 +1594,7 @@
       "command": "wait_until field:levelEnded equals:true max_ticks:6000",
       "role": "setup",
       "timeout": 1260,
-      "description": "Keep selling the blasted rock; the level ends on its own once operating profit reaches the $80,000 target.",
+      "description": "Wait for the level to end on its own once operating profit reaches the $80,000 target (contracts already delivered).",
       "interaction": [
         {
           "type": "waitUntil",

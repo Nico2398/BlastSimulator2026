@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { placeStartingBuildings } from '../../../src/core/state/StartingBuildings.js';
+import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite } from '../../../src/core/state/StartingBuildings.js';
 import { createBuildingState, getDefSize, getBuildingDef, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { StartingBuildingSlot } from '../../../src/core/config/balance.js';
+import { STARTING_BUILDING_STANDOFF_M, STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
 
 function solidVoxel(): VoxelData {
   return {
@@ -112,5 +113,42 @@ describe('placeStartingBuildings (#1363)', () => {
     }
     const buildings = createBuildingState();
     expect(placeStartingBuildings(buildings, grid, [WAREHOUSE], { x: 12, z: 12 })).toBe(0);
+  });
+});
+
+describe('startingBuildingAnchor (#1363)', () => {
+  const bounds = { minX: 0, maxX: 100, minZ: 0, maxZ: 100 };
+
+  it('stands off from the crew centroid toward the site centre by the standoff distance', () => {
+    const anchor = startingBuildingAnchor([{ x: 10, z: 50 }, { x: 20, z: 50 }], bounds);
+    expect(anchor.x).toBeCloseTo(15 + STARTING_BUILDING_STANDOFF_M);
+    expect(anchor.z).toBeCloseTo(50);
+  });
+
+  it('falls back to the origin centroid for an empty crew', () => {
+    const anchor = startingBuildingAnchor([], bounds);
+    const toCentre = Math.hypot(50, 50);
+    expect(anchor.x).toBeCloseTo((50 / toCentre) * STARTING_BUILDING_STANDOFF_M);
+    expect(anchor.z).toBeCloseTo((50 / toCentre) * STARTING_BUILDING_STANDOFF_M);
+  });
+
+  it('does not move a crew already at the centre', () => {
+    expect(startingBuildingAnchor([{ x: 50, z: 50 }], bounds)).toEqual({ x: 50, z: 50 });
+  });
+});
+
+describe('resolveStartingSite (#1363)', () => {
+  const levelSite = { employees: [], vehicles: [], buildings: [] };
+
+  it('keeps the level site when staffed is absent', () => {
+    expect(resolveStartingSite(levelSite, undefined)).toBe(levelSite);
+  });
+
+  it('uses the global staffed composition when staffed is true', () => {
+    expect(resolveStartingSite(levelSite, true)).toBe(STARTING_SITE_STAFFED_COMPOSITION);
+  });
+
+  it('yields a bare site when staffed is false', () => {
+    expect(resolveStartingSite(levelSite, false)).toBeUndefined();
   });
 });

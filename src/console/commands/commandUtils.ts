@@ -73,10 +73,8 @@ export function parseOptionalStaffedFlag(raw: string | undefined): { staffed: bo
  * callers can surface one unified message instead of duplicating the check.
  */
 export function parseStaffedFlag(raw: string | undefined): { staffed: boolean; error: null } | { staffed: false; error: string } {
-  const parsed = parseBooleanFlag(raw);
-  if (parsed === null) {
-    return { staffed: false, error: t('console.invalid_staffed_flag', { value: raw! }) };
-  }
-  return { staffed: parsed === true, error: null };
+  const parsed = parseOptionalStaffedFlag(raw);
+  if (parsed.error !== null) return { staffed: false, error: parsed.error };
+  return { staffed: parsed.staffed === true, error: null };
 }
 

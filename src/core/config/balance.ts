@@ -1178,17 +1178,30 @@ export interface StartingSiteVehicleSlot {
   readonly tier: VehicleTier;
 }
 
-/**
- * Composition of the opt-in staffed starting site (`new_game staffed:true` /
- * `sandbox start staffed:true`). Covers the licences and vehicle roles the
- * queued-work pipeline (#552-#556) requires, so scenarios can boot a
- * ready-to-work site instead of hiring/purchasing through the UI in every
- * unrelated scenario. See issue #551.
- */
 export interface StartingBuildingSlot {
   readonly type: BuildingType;
   readonly tier: BuildingTier;
 }
+
+/** Driller, blaster and truck driver: the crew every starting site opens with. */
+const BASE_STARTING_EMPLOYEES: readonly StartingSiteEmployeeSlot[] = [
+  { role: 'driller', qualifications: [
+    { category: 'blasting', proficiencyLevel: 1 },
+    { category: 'driving.drill_rig', proficiencyLevel: 1 },
+  ] },
+  { role: 'blaster', qualifications: [
+    { category: 'blasting', proficiencyLevel: 1 },
+  ] },
+  { role: 'driver', qualifications: [
+    { category: 'driving.truck', proficiencyLevel: 1 },
+  ] },
+];
+
+/** Drill rig and debris hauler: the fleet every starting site opens with. */
+const BASE_STARTING_VEHICLES: readonly StartingSiteVehicleSlot[] = [
+  { role: 'drill_rig', tier: 1 },
+  { role: 'debris_hauler', tier: 1 },
+];
 
 /** A starting site's pre-hired roster, pre-purchased fleet and pre-placed buildings. */
 export interface StartingSiteComposition {
@@ -1197,19 +1210,17 @@ export interface StartingSiteComposition {
   readonly buildings: readonly StartingBuildingSlot[];
 }
 
+/**
+ * Composition of the opt-in staffed starting site (`new_game staffed:true` /
+ * `sandbox start staffed:true`). Covers the licences and vehicle roles the
+ * queued-work pipeline (#552-#556) requires, so scenarios can boot a
+ * ready-to-work site instead of hiring/purchasing through the UI in every
+ * unrelated scenario. See issue #551.
+ */
 export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
   buildings: [],
   employees: [
-    { role: 'driller', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-      { category: 'driving.drill_rig', proficiencyLevel: 1 },
-    ] },
-    { role: 'blaster', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-    ] },
-    { role: 'driver', qualifications: [
-      { category: 'driving.truck', proficiencyLevel: 1 },
-    ] },
+    ...BASE_STARTING_EMPLOYEES,
     // Both excavator drivers also hold the rock fragmenter licence, so either
     // can crew the fragmenter (it has a licence of its own since #1339).
     { role: 'driver', qualifications: [
@@ -1222,8 +1233,7 @@ export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
     ] },
   ],
   vehicles: [
-    { role: 'drill_rig', tier: 1 },
-    { role: 'debris_hauler', tier: 1 },
+    ...BASE_STARTING_VEHICLES,
     { role: 'rock_digger', tier: 1 },
     { role: 'rock_fragmenter', tier: 1 },
   ],
@@ -1238,22 +1248,8 @@ export const STARTING_BUILDING_STANDOFF_M = 12;
 
 /** Dusty Hollow's own opening crew, fleet and warehouse (#1363). */
 export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
-  employees: [
-    { role: 'driller', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-      { category: 'driving.drill_rig', proficiencyLevel: 1 },
-    ] },
-    { role: 'blaster', qualifications: [
-      { category: 'blasting', proficiencyLevel: 1 },
-    ] },
-    { role: 'driver', qualifications: [
-      { category: 'driving.truck', proficiencyLevel: 1 },
-    ] },
-  ],
-  vehicles: [
-    { role: 'drill_rig', tier: 1 },
-    { role: 'debris_hauler', tier: 1 },
-  ],
+  employees: BASE_STARTING_EMPLOYEES,
+  vehicles: BASE_STARTING_VEHICLES,
   buildings: [{ type: 'freight_warehouse', tier: 1 }],
 };
 
@@ -1267,8 +1263,10 @@ export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
  * play styles: 2x2/2x3 patterns, boomite/pop_rock, with and without a Living
  * Quarters): at 5.0 every style ends in revolt or bankruptcy, 7.0 wins the
  * fast styles only, 8.0 wins all but the slowest style, 9.0 wins all five in
- * ~220-300 ticks. Above 10 one blast wins the level. 9.5 sits in the top of
- * that window, capped at 10 so a single blast stays a rare outcome.
+ * ~220-300 ticks. Lower values hit the worker-revolt wall (payroll ~$200/tick,
+ * morale capped at 70 without Living Quarters); above 10 the level is won
+ * trivially. 9.5 sits near the top of that window (one 2x2 blast already
+ * wins it, ~tick 200-300).
  */
 export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 9.5;
 

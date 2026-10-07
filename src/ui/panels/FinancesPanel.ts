@@ -25,7 +25,7 @@ import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeade
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatDollars } from '../../core/economy/formatMoney.js';
-import { getFinancialReport, type CategoryTotal } from '../../core/economy/Finance.js';
+import { getFinancialReport, getOperatingProfit, type CategoryTotal } from '../../core/economy/Finance.js';
 import type { OperatingCostBreakdown } from '../../core/economy/OperatingFinance.js';
 import { getOperatingSummary, getRunway } from '../../core/economy/OperatingFinance.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -149,7 +149,7 @@ export class FinancesPanel extends PanelBase {
     const levelId = state.campaign.activeLevelId;
     const target = levelId ? getLevel(levelId)?.unlockThreshold : undefined;
     if (target === undefined) return null;
-    const profit = getFinancialReport(state.finances, state.tickCount, 0).operatingProfit;
+    const profit = getOperatingProfit(state.finances);
     const r = el('div');
     r.style.cssText = 'display:flex;justify-content:space-between;font:600 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
     r.title = t('ui.finances.operating_profit_tip', { target: formatDollars(target) });

@@ -5,7 +5,7 @@ import { refreshOrderReachability } from '../../core/engine/OrderReachability.js
 import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
 import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
 import { placeStartingCrew } from '../../core/state/SpawnPlacement.js';
-import { placeStartingBuildings } from '../../core/state/StartingBuildings.js';
+import { placeStartingBuildings, startingBuildingAnchor } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
 import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
@@ -19,7 +19,7 @@ import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } fr
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE, STARTING_BUILDING_STANDOFF_M, type StartingBuildingSlot } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE, type StartingBuildingSlot } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -263,20 +263,8 @@ export function regenerateGrid(
   // A level's opening buildings go next to the crew, free of charge. Only
   // after the crew is placed, so the spiral starts from where they stand.
   if (params.startingCrew && params.startingBuildings && params.startingBuildings.length > 0) {
-    const agents = [...ctx.state.employees.employees, ...ctx.state.vehicles.vehicles];
-    const crew = agents.length === 0 ? { x: 0, z: 0 } : {
-      x: agents.reduce((sum, a) => sum + a.x, 0) / agents.length,
-      z: agents.reduce((sum, a) => sum + a.z, 0) / agents.length,
-    };
-    // Stand off from the crew toward the site centre: a footprint dropped on
-    // the crew's own cluster can wall the vehicles into a pocket (#1363).
-    const toCentreX = (ctx.grid.minX + ctx.grid.maxX) / 2 - crew.x;
-    const toCentreZ = (ctx.grid.minZ + ctx.grid.maxZ) / 2 - crew.z;
-    const toCentre = Math.hypot(toCentreX, toCentreZ) || 1;
-    const near = {
-      x: crew.x + (toCentreX / toCentre) * STARTING_BUILDING_STANDOFF_M,
-      z: crew.z + (toCentreZ / toCentre) * STARTING_BUILDING_STANDOFF_M,
-    };
+    const crew = [...ctx.state.employees.employees, ...ctx.state.vehicles.vehicles];
+    const near = startingBuildingAnchor(crew, ctx.grid);
     if (placeStartingBuildings(ctx.state.buildings, ctx.grid, params.startingBuildings, near) > 0) {
       refreshLogisticsCapacity(ctx.state);
       buildGameNavGrid(ctx.state, ctx.grid, buildingFootprintOccupants(ctx.state), ctx.state.drillHoles);
