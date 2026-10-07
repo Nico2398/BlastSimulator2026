@@ -84,7 +84,7 @@ describe('contract negotiate needs a manager (#1340)', () => {
     expect(r.output).not.toContain('economy.negotiation');
     expect(c.negotiationAttempts ?? 0).toBe(0);
     expect(terms(c)).toEqual(before);
-    expect(state.contracts.lastNegotiation).toBeUndefined();
+    expect(state.contracts.lastNegotiation).toBeNull();
   });
 
   it('no_manager message differs under fr', () => {
