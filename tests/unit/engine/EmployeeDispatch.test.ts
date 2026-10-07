@@ -996,6 +996,33 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
   });
 
+  // #1339: a rest and a vehicle-gated action both targeted at one idle
+  // employee are claimed in the same pass (rest first). The rest is promoted
+  // to active, then the vehicle-gated claim used to push onto taskQueue and
+  // reserve a vehicle nobody boards for the whole rest (I5).
+  it('an idle employee with a targeted rest and a targeted vehicle-gated action rests first and does not reserve the vehicle (#1339)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    const rest: PendingAction = {
+      id: 1, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: employee.x, targetZ: employee.z, targetY: 0, payload: {},
+      targetEmployeeId: employee.id, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    const drill = makeVehicleGatedAction({ id: 2, targetEmployeeId: employee.id });
+    state.pendingActions.push(rest, drill);
+
+    tickEmployees(state);
+
+    expect(employee.activeActionId).toBe(rest.id);
+    expect(employee.taskQueue).not.toContain(drill.id);
+    expect(state.pendingActions.find(a => a.id === drill.id)!.status).toBe('queued');
+    expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
+  });
+
   // Mirror case: an ordinary employee (not resting, not collapsing) is
   // unaffected by the #1110 guard and still claims a targeted vehicle-gated
   // action normally — already proven above by 'promotes a claimed
