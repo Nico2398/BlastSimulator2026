@@ -27,7 +27,7 @@ import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { canNegotiate } from '../../core/economy/Negotiation.js';
-import type { Contract, ContractType, NegotiationField } from '../../core/economy/Contract.js';
+import { isFillableSaleOffer, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -365,7 +365,7 @@ export class ContractsPanel extends PanelBase {
     // random (Contract.ts's generateContracts), so a scenario that must sell
     // what its own blast produced cannot name the material up front and stay
     // true across a re-timing that re-rolls the pool.
-    cardEl.dataset['contractFillable'] = String(stored >= c.quantityKg);
+    cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, state.logistics.storedMassKg));
     return cardEl;
   }
 

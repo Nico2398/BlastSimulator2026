@@ -145,7 +145,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     concept: 'panel_contracts',
     en: { canonical: 'Contracts', forbiddenSynonyms: ['Deals'] },
     fr: { canonical: 'Contrats', forbiddenSynonyms: [] },
-    relevantKeys: ['ui.contracts.title', 'shell.rail.contracts', 'tutorial.step12', 'tutorial.stage.open_contracts', 'shortcuts.contracts'],
+    relevantKeys: ['ui.contracts.title', 'shell.rail.contracts', 'tutorial.stage.open_contracts', 'shortcuts.contracts'],
     note: "fr.json already converges on 'Contrats' everywhere. en.json agrees everywhere except shell.rail.contracts='Deals' — a wholesale different word, not an abbreviation of 'Contracts', and not one of the two renames the redesign documented (ToolRail.ts's comment names only Crew and Fleet).",
   },
   {

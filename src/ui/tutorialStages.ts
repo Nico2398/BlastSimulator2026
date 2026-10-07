@@ -75,6 +75,10 @@ export interface TutorialStage {
 // signal for when to advance past "open the panel" / "press Run".
 const PICKER_CANVAS = 'body.bs-placement-armed #game-canvas';
 const PICKER_CONFIRM = '#bs-tile-select-confirm';
+// Only an ore offer the pit can fill in full: rubble, supply and unfillable
+// offers' Accept stays visible but outside the rails allow set (#1335).
+const FILLABLE_ORE_ACCEPT =
+  '#bs-contract-panel [data-contract-type="ore_sale"][data-contract-fillable="true"] .bs-contract-accept';
 
 /**
  * Pick a tile, then confirm — the shared tail of every placement step.
@@ -452,11 +456,6 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
 
   'hire-manager': hireStages('manager', 'tutorial.stage.hire_manager'),
 
-  'contract-accept': [
-    { target: TOOLBAR_TARGET.contracts, hintKey: 'tutorial.stage.open_contracts' },
-    { target: '#bs-contract-panel .bs-contract-accept', hintKey: 'tutorial.stage.contract_accept' },
-  ],
-
   'hire-driver': hireStages('driver', 'tutorial.stage.hire_driver'),
 
   // #921: dropped the third (assign-driver) stage — a vehicle's driver is
@@ -491,7 +490,8 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     },
   ],
 
-  // A single merged stage, not separate accept/deliver stages (#959): the
+  // Accepting happens here: the player takes an ore offer the pit can fill,
+  // then delivers it. A single merged stage, not separate accept/deliver stages (#959): the
   // step is repeatable across several accept/deliver rounds (2b), and
   // resolveStageIndex's "last reachable stage wins" would otherwise bounce
   // between an accept stage and a deliver stage every cycle as the panel's
@@ -501,7 +501,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'sell-ore': [
     { target: TOOLBAR_TARGET.contracts, hintKey: 'tutorial.stage.open_contracts' },
     {
-      target: '#bs-contract-panel .bs-contract-accept',
+      target: FILLABLE_ORE_ACCEPT,
       hintKey: 'tutorial.stage.sell_ore',
       also: ['#bs-contract-panel .bs-contract-deliver', '#bs-contract-panel .bs-contract-amount'],
       spentWhen: isSellOreWaiting,
