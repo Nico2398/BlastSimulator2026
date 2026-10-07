@@ -3,7 +3,7 @@
 // Each has cost, success probability, exposure risk.
 
 import type { Random } from '../math/Random.js';
-import type { EventSystemState } from './EventSystem.js';
+import { queueFollowUp, type EventSystemState } from './EventSystem.js';
 import type { CorruptionState } from '../economy/Corruption.js';
 import type { GameState } from '../state/GameState.js';
 import type { EmployeeState } from '../entities/Employee.js';
@@ -15,6 +15,10 @@ import {
   FRAMING_START_EXPOSURE,
   FRAMING_DETECTED_EXPOSURE,
   SMUGGLING_EXPOSURE_PER_TICK,
+  INVESTIGATION_EXPOSURE_JUMP,
+  INVESTIGATION_FOLLOWUP_EVENT_ID,
+  EXPOSURE_CLEAN_GRACE_TICKS,
+  EXPOSURE_DECAY_PER_TICK,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -90,6 +94,7 @@ export function arrangeAccident(
       outcomeKey: 'mafia.target_not_found', investigationTriggered: false };
   }
 
+  mafia.lastActivityTick = state.tickCount;
   const succeeded = rng.chance(ACCIDENT_SUCCESS_RATE);
 
   if (succeeded) {
@@ -133,6 +138,7 @@ export function startFraming(
     readyTick: currentTick + FRAME_EVIDENCE_TICKS,
   });
 
+  mafia.lastActivityTick = currentTick;
   const exposureIncrease = applyExposure(mafia, FRAMING_START_EXPOSURE);
 
   return {
@@ -162,6 +168,7 @@ export function completeFrame(
   }
 
   mafia.pendingFrames.splice(frameIdx, 1);
+  mafia.lastActivityTick = currentTick;
 
   if (rng.chance(FRAME_SUCCESS_RATE)) {
     fireEmployeeFromWorld(state, targetId, { force: true });
@@ -195,9 +202,11 @@ export function toggleSmuggling(mafia: MafiaState): { active: boolean; incomePer
 export function processSmuggling(
   mafia: MafiaState,
   rng: Random,
+  tick?: number,
 ): { income: number; exposed: boolean } {
   if (!mafia.smugglingActive) return { income: 0, exposed: false };
 
+  if (tick !== undefined) mafia.lastActivityTick = tick;
   applyExposure(mafia, SMUGGLING_EXPOSURE_PER_TICK);
   const exposed = rng.chance(SMUGGLE_EXPOSURE_RISK * mafia.exposureRisk);
 
@@ -214,12 +223,15 @@ export function isExposed(mafia: MafiaState, rng: Random): boolean {
 export { ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS, SMUGGLE_BASE_INCOME };
 
 /** Botched action triggers a police investigation: bumps exposure, queues follow-up event. Returns exposure added (#1411). */
-export function applyInvestigation(_mafia: MafiaState, _events: EventSystemState): number {
-  // TODO: implement
-  return 0;
+export function applyInvestigation(mafia: MafiaState, events: EventSystemState): number {
+  const added = applyExposure(mafia, INVESTIGATION_EXPOSURE_JUMP);
+  queueFollowUp(events, INVESTIGATION_FOLLOWUP_EVENT_ID);
+  return added;
 }
 
 /** Decay exposure risk after a clean grace period without activity (#1411). */
-export function decayExposure(_mafia: MafiaState, _tick: number): void {
-  // TODO: implement
+export function decayExposure(mafia: MafiaState, tick: number): void {
+  if (mafia.smugglingActive) return;
+  if (tick - (mafia.lastActivityTick ?? 0) < EXPOSURE_CLEAN_GRACE_TICKS) return;
+  mafia.exposureRisk = Math.max(0, mafia.exposureRisk - EXPOSURE_DECAY_PER_TICK);
 }

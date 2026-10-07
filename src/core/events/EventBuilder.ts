@@ -12,8 +12,9 @@ export function ev(
     weight: (s: ScoreState) => number;
     canFire?: (ctx: EventContext) => boolean;
     followUpOnly?: boolean;
+    repeatable?: boolean;
     options: Array<{ cashDelta?: number; scoreDelta?: Partial<Record<keyof ScoreState, number>>;
-      corruptionDelta?: number; followUp?: string; effectTag?: string;
+      corruptionDelta?: number; exposureDelta?: number; followUp?: string; effectTag?: string;
       probability?: number; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>; }>;
   },
 ): EventDef {
@@ -28,6 +29,7 @@ export function ev(
       if (o.cashDelta !== undefined) c.cashDelta = o.cashDelta;
       if (o.scoreDelta !== undefined) c.scoreDelta = o.scoreDelta;
       if (o.corruptionDelta !== undefined) c.corruptionDelta = o.corruptionDelta;
+      if (o.exposureDelta !== undefined) c.exposureDelta = o.exposureDelta;
       if (o.followUp !== undefined) c.followUpEventId = o.followUp;
       if (o.effectTag !== undefined) c.effectTag = o.effectTag;
       if (o.probability !== undefined) c.probability = o.probability;
@@ -37,6 +39,7 @@ export function ev(
     weightCoeff: opts.weight,
     canFire: opts.canFire ?? (() => true),
     ...(opts.followUpOnly ? { followUpOnly: true } : {}),
+    ...(opts.repeatable ? { repeatable: true } : {}),
   };
 }
 

@@ -12,6 +12,8 @@ import { getEventById } from '../../core/events/EventPool.js';
 import { runTick, type TickReport, type RunTickOptions, type FiredEventReport } from '../../core/engine/TickPipeline.js';
 import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { openMovementTrails } from '../../core/engine/Locomotion.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
+import { SMUGGLING_EXPOSED_FINE } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
 import { pushEventOptionLines } from './eventResolution.js';
 import { formatTaskCompletion } from './tickTaskCompletion.js';
@@ -60,11 +62,11 @@ export function tickCommand(
     }
 
     if (report.smuggling.exposed) {
-      lines.push(`[tick ${state.tickCount}] SMUGGLING EXPOSED! Investigation incoming.`);
+      lines.push(`[tick ${state.tickCount}] ${t('tick.smuggling_exposed', { fine: formatMoney(SMUGGLING_EXPOSED_FINE) })}`);
     }
 
     if (report.mafiaExposed) {
-      lines.push(`[tick ${state.tickCount}] MAFIA EXPOSURE! Criminal charges may follow.`);
+      lines.push(`[tick ${state.tickCount}] ${t('tick.mafia_exposed')}`);
     }
 
     for (const fe of report.needEvents) {

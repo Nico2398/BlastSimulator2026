@@ -47,8 +47,14 @@ import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { checkDeadlines, generateContracts } from '../economy/Contract.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
-import { CONTRACT_REFRESH_INTERVAL, SCORE_VIBRATION_WINDOW_TICKS, VILLAGE_VIBRATION_SCORE_GAIN } from '../config/balance.js';
-import { isExposed, processSmuggling } from '../events/MafiaActions.js';
+import {
+  CONTRACT_REFRESH_INTERVAL,
+  SCORE_VIBRATION_WINDOW_TICKS,
+  VILLAGE_VIBRATION_SCORE_GAIN,
+  SMUGGLING_EXPOSED_FINE,
+  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
+} from '../config/balance.js';
+import { isExposed, processSmuggling, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
 import { resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
@@ -186,14 +192,28 @@ export function runTick(
   }
 
   // 5. Smuggling income
-  const smugResult = processSmuggling(state.mafia, rng);
+  const smugResult = processSmuggling(state.mafia, rng, state.tickCount);
   if (smugResult.income > 0) {
     state.cash += smugResult.income;
     addIncome(state.finances, smugResult.income, 'smuggling', 'Smuggling', state.tickCount);
   }
+  if (smugResult.exposed) {
+    // Exposure costs a fine, raises exposure and ends the operation (#1411).
+    state.cash -= SMUGGLING_EXPOSED_FINE;
+    addExpense(state.finances, SMUGGLING_EXPOSED_FINE, 'fines', 'Smuggling exposed', state.tickCount);
+    state.mafia.exposureRisk = Math.min(1, state.mafia.exposureRisk + SMUGGLING_EXPOSED_EXPOSURE_JUMP);
+    state.mafia.smugglingActive = false;
+    state.mafia.smugglingIncome = 0;
+    emitter.emit('mafia:smuggling_exposed', { fine: SMUGGLING_EXPOSED_FINE });
+  }
 
   // 6. Mafia exposure check
   const mafiaExposed = state.mafia.exposureRisk > 0.3 && isExposed(state.mafia, rng);
+  if (mafiaExposed) {
+    applyInvestigation(state.mafia, state.events);
+    emitter.emit('mafia:exposed', {});
+  }
+  decayExposure(state.mafia, state.tickCount);
 
   // 7. Score updates — decay + building/morale/vibration effects
   const avgMorale = computeAverageMorale(state.employees.employees);

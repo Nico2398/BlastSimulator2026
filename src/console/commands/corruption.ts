@@ -5,6 +5,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
   attemptCorruption,
+  applyBribeFailure,
   getCorruptionLevel,
   getSuccessRate,
   TARGET_COSTS,
@@ -65,6 +66,13 @@ export function corruptCommand(
   ];
   if (result.scandalTriggered) {
     lines.push(t('corruption.scandal_erupted'));
+    const { fine } = applyBribeFailure(state.corruption, state.scores, result.cost);
+    if (fine > 0) {
+      state.cash -= fine;
+      addExpense(state.finances, fine, 'fines', `Scandal: ${target}`, state.tickCount);
+      lines.push(t('corruption.scandal_fine', { fine: formatMoney(fine) }));
+    }
+    ctx.emitter.emit('corruption:scandal', { target, fine });
   }
   if (result.mafiaJustUnlocked) {
     lines.push(t('corruption.mafia_unlocked'));

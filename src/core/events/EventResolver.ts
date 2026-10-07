@@ -85,6 +85,12 @@ export function resolveEvent(
     mergeOutcome(result, UNQUALIFIED_TASK_EFFECTS[tag]!(unqualifiedActionIds, world, tick));
   }
 
+  if (world && resolved.exposureDelta) {
+    const mafia = world.state.mafia;
+    mafia.exposureRisk = Math.min(1, Math.max(0, mafia.exposureRisk + resolved.exposureDelta));
+    result.effects.push(`Exposure ${resolved.exposureDelta > 0 ? '+' : ''}${Math.round(resolved.exposureDelta * 100)}%`);
+  }
+
   // Clear the pending event; record the outcome for the UI to read directly
   // instead of parsing this function's console-facing effects: string[].
   clearPendingEvent(eventSystem);

@@ -70,7 +70,7 @@ beforeEach(() => {
 
 describe('follow-up event definitions', () => {
   it('every FOLLOWUP_EVENTS entry is followUpOnly', () => {
-    expect(FOLLOWUP_EVENTS.length).toBe(8);
+    expect(FOLLOWUP_EVENTS.length).toBe(9);
     for (const e of FOLLOWUP_EVENTS) expect(e.followUpOnly, e.id).toBe(true);
   });
 

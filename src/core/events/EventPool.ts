@@ -40,6 +40,8 @@ export interface EventConsequence {
   followUpEventId?: string;
   /** Corruption change. */
   corruptionDelta?: number;
+  /** Additive change to mafia exposure risk (0-1); applied when the resolver is given the world (#1411). */
+  exposureDelta?: number;
   /** Custom effect tag for the resolver to interpret. */
   effectTag?: string;
   /** Probability this outcome occurs (1.0 = certain). */
@@ -69,6 +71,8 @@ export interface EventDef {
   canFire: (ctx: EventContext) => boolean;
   /** When true, category timers never pick this event; it fires only when queued as a follow-up. */
   followUpOnly?: boolean;
+  /** When true, may fire again after it has already fired this level (queued follow-ups only) (#1411). */
+  repeatable?: boolean;
 }
 
 /** Context passed to prerequisite checks. */
