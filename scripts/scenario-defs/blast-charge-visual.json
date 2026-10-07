@@ -1,6 +1,6 @@
 {
-  "name": "blast-charge-sequence-visual",
-  "description": "Visual verification of charge loading UI and detonation sequence: explosive selection, amount, stemming, tubing, auto/manual sequencing, and delay patterns. #554: charging now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly, so a Charge All order is followed by a wait_until proving the landed count only advances as the blaster works through the queue, with a mid-loading screenshot of the ordered/loaded mix.",
+  "name": "blast-charge-visual",
+  "description": "Visual verification of charge loading UI: explosive selection, amount, stemming and tubing. #554: charging now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly, so a Charge All order is followed by a wait_until proving the landed count only advances as the blaster works through the queue, with a mid-loading screenshot of the ordered/loaded mix.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
@@ -236,84 +236,6 @@
         },
         "note": "count is unchanged — Charge All had already loaded all 6; this proves one row can re-order one hole, and that the re-order doesn't land instantly either (#554)"
       }
-    },
-    {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 6
-        }
-      },
-      "description": "The [data-step=\"3\"] click is new and load-bearing: the per-hole charge step above disarms autoAdvance by clicking a tab, so the panel no longer walks itself to Sequence. delay_step:25 is the panel's own DEFAULT_DELAY_STEP_MS, so no delay-step stepper click is needed. Sequencing reads state.drillHoles directly and is unaffected by #554 — it does not care whether a hole's charge has landed yet."
-    },
-    {
-      "command": "sequence show",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence show"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "sequence set hole:H1 delay:0",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
-        }
-      ],
-      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. Auto Sequence left H1 at 25ms with a 25ms step (traced: step-04-sequence.json), so a single decrement lands exactly on the declared 0.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 6
-        },
-        "note": "H1 25ms -> 0"
-      }
-    },
-    {
-      "command": "sequence set hole:H2 delay:50",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"delay-inc\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"delay-inc\"]"
-        }
-      ],
-      "description": "H2 is Auto Sequence's row-1 lead hole, left at 0ms (traced: step-04-sequence.json), so 2 increments at the 25ms step reach the declared 50.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 6
-        },
-        "note": "H2 0ms -> 25 -> 50"
-      }
-    },
-    {
-      "command": "sequence show",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence show"
-        }
-      ],
-      "role": "observe"
     },
     {
       "command": "state full",

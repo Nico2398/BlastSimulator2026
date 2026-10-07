@@ -333,13 +333,12 @@ function setupSavedPlan() {
  * Empties the site of drilled holes and charges without firing, so the crater
  * and debris of a real blast cannot make the reloaded holes unreachable.
  */
-function clearHolesWithoutBlast(state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; chargesByHole: Record<string, unknown>; sequenceDelays: Record<string, unknown> }): void {
+function clearHolesWithoutBlast(state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; chargesByHole: Record<string, unknown> }): void {
   // Keep the mine solvent while the crew works (the first run spent the starting cash).
   state.cash = 5_000_000;
   state.finances.cash = 5_000_000;
   state.drillHoles.length = 0;
   for (const k of Object.keys(state.chargesByHole)) delete state.chargesByHole[k];
-  for (const k of Object.keys(state.sequenceDelays)) delete state.sequenceDelays[k];
 }
 
 /** Fires the loaded plan's blast so the site holds no holes, keeping the saved plan. */
@@ -353,7 +352,6 @@ function fireBlast(
   // The ore revenue is not what these tests are about; keep the mine solvent while the crew works.
   state.cash = 5_000_000;
   state.finances.cash = 5_000_000;
-  expect(run('sequence auto').success).toBe(true);
   expect(run('blast').success).toBe(true);
   expect(state.drillHoles).toHaveLength(0);
 }
@@ -529,21 +527,15 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(state.plannedDrillHoles.some(h => h.x === x && h.z === z)).toBe(false);
   });
 
-  it('re-keys state.sequenceDelays to the new hole ids, matching the saved delays by position', () => {
+  it('a saved plan carries no sequence delays, and loading one adds none to state', () => {
     const { run, state } = setupSavedPlan();
-    expect(run('sequence auto').success).toBe(true);
-    expect(run('blast_plan save').success).toBe(true);
-    const saved = state.savedPlans['default']!;
-    expect(Object.keys(saved.sequenceDelays).length).toBeGreaterThan(0);
+    const saved = state.savedPlans['default']! as unknown as Record<string, unknown>;
+    expect('sequenceDelays' in saved).toBe(false);
     clearHolesWithoutBlast(state);
 
     expect(run('blast_plan load').success).toBe(true);
 
-    expect(Object.keys(state.sequenceDelays)).toHaveLength(Object.keys(saved.sequenceDelays).length);
-    for (const old of saved.drillHoles) {
-      const fresh = state.plannedDrillHoles.find(h => h.x === old.x && h.z === old.z)!;
-      expect(state.sequenceDelays[fresh.id]).toBe(saved.sequenceDelays[old.id]);
-    }
+    expect('sequenceDelays' in (state as unknown as Record<string, unknown>)).toBe(false);
   });
 
   it('a saved charge that fails validation refuses the whole load with no mutation', () => {

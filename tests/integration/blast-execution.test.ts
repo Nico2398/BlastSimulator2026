@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
@@ -64,8 +63,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -85,8 +83,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 14, 1);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -106,8 +103,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'pop_rock', 2, 1);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -130,8 +126,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 1.5);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -160,8 +155,7 @@ describe('Blast execution — integration', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 5, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -177,7 +171,7 @@ describe('Blast execution — integration', () => {
     const grid = new VoxelGrid(20, 20);
     const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     // No charges → invalid
-    const plan = assembleBlastPlan(holes, {}, {});
+    const plan = assembleBlastPlan(holes, {});
     const result = executeBlast(plan, grid, []);
     expect(result).toBeNull();
   });
@@ -233,7 +227,6 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
     expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
     expect(Object.keys(state.chargesByHole).length).toBeGreaterThan(0);
 
-    expect(run('sequence auto delay_step:25').success).toBe(true);
 
     const result = run('blast');
 
@@ -264,7 +257,6 @@ describe('Blast execution — outstanding (not yet landed) charge orders are not
     expect(Object.keys(state.chargesByHole)).toHaveLength(0);
     expect(Object.keys(state.plannedChargesByHole).length).toBeGreaterThan(0);
 
-    expect(run('sequence auto delay_step:25').success).toBe(true);
     const result = run('blast');
 
     expect(result.success).toBe(false);
@@ -315,7 +307,6 @@ describe('Blast execution — #1346', () => {
     expect(state.pendingActions.some(a => a.type === 'drill_hole')).toBe(true);
     // Only the charged, drilled holes may be in the plan at fire time.
     for (const h of state.drillHoles) expect(state.chargesByHole[h.id]).toBeDefined();
-    expect(run('sequence auto delay_step:25').success).toBe(true);
 
     const result = run('blast');
 
@@ -327,7 +318,6 @@ describe('Blast execution — #1346', () => {
 
   it('no new hole is drilled after the blast, however long the crew keeps ticking', () => {
     const { run, state } = setupPartiallyDrilled();
-    expect(run('sequence auto delay_step:25').success).toBe(true);
     expect(run('blast').success).toBe(true);
     const drilledAfterBlast = state.drillHoles.length;
     for (let i = 0; i < 600; i++) run('tick 1');
@@ -384,7 +374,6 @@ describe('Blast execution — #1346', () => {
     for (let i = 0; i < 2000 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < 2000 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
-    expect(run('sequence auto delay_step:25').success).toBe(true);
 
     const result = run('blast');
 

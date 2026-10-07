@@ -151,25 +151,6 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 9
-        }
-      }
-    },
-    {
       "command": "preview energy",
       "interaction": [
         {
@@ -185,7 +166,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -214,7 +195,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -243,7 +224,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -272,7 +253,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",

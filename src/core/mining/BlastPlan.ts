@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Blast plan composition
-// Combines drill plan + charge plan + sequence into a complete blast definition.
+// Combines drill plan + charge plan into a complete blast definition.
 
 import type { DrillHole } from './DrillPlan.js';
 import type { HoleCharge } from './ChargePlan.js';
@@ -8,7 +8,6 @@ import { isBuildingFootprintCell, type FootprintOccupant } from '../entities/Bui
 export interface BlastPlan {
   holes: DrillHole[];
   charges: Record<string, HoleCharge>;
-  delays: Record<string, number>;
 }
 
 export interface ValidationError {
@@ -17,7 +16,7 @@ export interface ValidationError {
 }
 
 /**
- * Validate that a blast plan is complete (all holes charged and sequenced).
+ * Validate that a blast plan is complete (all holes charged).
  * `loadingHoleIds`, when given, is the set of holes whose charge order has
  * been placed but not yet loaded (#554) — a hole with no landed charge whose
  * id is in this set gets a distinct "still loading" issue instead of the
@@ -38,9 +37,6 @@ export function validateBlastPlan(
           : 'blast.validation.missing_charge',
       });
     }
-    if (plan.delays[hole.id] === undefined) {
-      errors.push({ holeId: hole.id, issue: 'blast.validation.missing_delay' });
-    }
   }
 
   return errors;
@@ -50,9 +46,8 @@ export function validateBlastPlan(
 export function assembleBlastPlan(
   holes: DrillHole[],
   charges: Record<string, HoleCharge>,
-  delays: Record<string, number>,
 ): BlastPlan {
-  return { holes, charges, delays };
+  return { holes, charges };
 }
 
 /**

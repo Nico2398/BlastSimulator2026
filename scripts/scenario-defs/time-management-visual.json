@@ -3,11 +3,11 @@
   "description": "Visual verification of time management controls: speed buttons (1x, 2x, 4x, 8x), pause/resume toggle, current speed indicator in HUD, tick count display, and auto-pause behavior during events. Originally console-only despite its own description promising real button clicks (issue #479 follow-up) -- pause/resume and every speed change now go through the real HUD controls.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",

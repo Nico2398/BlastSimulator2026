@@ -2991,40 +2991,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "blast"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 10
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
-      "expect": {
-        "equals": {
-          "sequencedCount": 49
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -3050,7 +3021,6 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "ecology": 0,
           "deathCount": 16
         },

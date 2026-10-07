@@ -16,7 +16,6 @@ import {
   type MiningContext,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   blastCommand,
   blastPlanCommand,
   previewCommand,
@@ -198,9 +197,6 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('charge', 'Set charges (hole:* explosive:X amount:Ykg stemming:Zm)', (args, named) =>
     chargeCommand(ctx, args, named),
-  );
-  runner.register('sequence', 'Detonation sequence (auto|set|show)', (args, named) =>
-    sequenceCommand(ctx, args, named),
   );
   runner.register('blast', 'Execute the current blast plan', (args, named) =>
     blastCommand(ctx, args, named),

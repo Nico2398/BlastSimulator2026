@@ -23,7 +23,7 @@ export function requireGame(ctx: MiningContext): string | null {
  * Shared preamble for every *Command function that requires an active
  * game and then dispatches on a subcommand (args[0]) — the no-game-loaded
  * guard and the subcommand extraction were duplicated identically across
- * drillPlanCommand, sequenceCommand, blastPlanCommand, tubingCommand, and
+ * drillPlanCommand, blastPlanCommand, tubingCommand, and
  * surveyCommand (#790). Returns the CommandResult to return immediately
  * on failure, or the extracted subcommand to continue with.
  */
@@ -41,7 +41,7 @@ export function requireGameWithSub(
  * id: the exact id if it already names a real hole, otherwise the legacy
  * `hole_N` fallback format. `includePlanned` controls whether an ordered-
  * but-not-yet-drilled hole counts as "real" for this purpose — drill_plan
- * remove and charge must see planned holes; sequence set and tubing install
+ * remove and charge must see planned holes; tubing install
  * must not, since they only ever act on an already-drilled hole (#634).
  */
 export function resolveHoleId(
@@ -73,13 +73,13 @@ export function cancelOutstandingChargeAction(state: GameState, holeId: string):
 }
 
 /**
- * Assemble the current drill/charge/sequence state into a BlastPlan —
+ * Assemble the current drill/charge state into a BlastPlan —
  * the same three GameState fields passed to assembleBlastPlan at every
  * call site (blastCommand, blastPlanCommand's validate, previewCommand,
  * blastPreviewCommand) (#790).
  */
 export function assembleCurrentBlastPlan(state: GameState): BlastPlan {
-  return assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
+  return assembleBlastPlan(state.drillHoles, state.chargesByHole);
 }
 
 /**
@@ -152,7 +152,7 @@ export function cancelOutstandingDrillActions(state: GameState): number {
 
 /**
  * Reset every plan-scoped record: drilled holes, tubing (inventory kept),
- * charges and sequence delays. Shared by `drill_plan clear` and the
+ * charges. Shared by `drill_plan clear` and the
  * post-blast cleanup so the two cannot drift apart (#1351).
  */
 export function resetPlanState(state: GameState): void {
@@ -160,7 +160,6 @@ export function resetPlanState(state: GameState): void {
   clearTubing(state.tubingState);
   state.chargesByHole = {};
   state.plannedChargesByHole = {};
-  state.sequenceDelays = {};
 }
 
 /**

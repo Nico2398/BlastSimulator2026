@@ -13,8 +13,8 @@ import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 28 entries (#1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(28);
+  it('has exactly 27 entries (#1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1344 removes the detonation-sequence step, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(27);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -121,7 +121,6 @@ describe('tutorialSteps', () => {
       // no dedicated lesson.
       'drill-plan',
       'charge',
-      'sequence',
       // #557: the blast zone must be evacuated before firing. Inserted right
       // before 'blast' so the rail cannot skip past it.
       'evacuate-zone',
@@ -345,7 +344,7 @@ describe('tutorialSteps', () => {
       'hire-surveyor', 'survey', 'toggle-survey-overlay', 'hire-driller',
       'build-driving-center', 'train-fragmenter', 'buy-drill-rig-assign',
       'buy-rock-digger-assign',
-      'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
+      'drill-plan', 'charge', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'sell-ore',
       'finances', 'box-cut', 'needs',
@@ -502,7 +501,7 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned directly after build-storage (index 22) and before finances', () => {
+    it('exists, positioned directly after build-storage (index 21) and before finances', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
       const haulIdx = ids.indexOf('haul-debris');
@@ -510,11 +509,11 @@ describe('tutorialSteps', () => {
       expect(haulIdx).toBeGreaterThan(-1);
       // #1335: contract-accept was removed; no step sits between them.
       expect(haulIdx).toBe(buildIdx + 1);
-      expect(haulIdx).toBe(22);
+      expect(haulIdx).toBe(21);
       // #1328: finances/needs sit between haul-debris and sell-ore now, so
       // the first sale is the last guided step.
       expect(ids[haulIdx + 1]).toBe('finances');
-      expect(ids.indexOf('finances')).toBe(23);
+      expect(ids.indexOf('finances')).toBe(22);
       expect(sellOreIdx).toBe(ids.indexOf('needs') + 1);
     });
 
@@ -751,11 +750,11 @@ describe('tutorialSteps', () => {
   describe('evacuate-zone step (#557)', () => {
     const step = TUTORIAL_STEPS.find((s) => s.id === 'evacuate-zone')!;
 
-    it('exists between sequence and blast', () => {
+    it('exists between charge and blast', () => {
       const ids = TUTORIAL_STEPS.map((s) => s.id);
       const idx = ids.indexOf('evacuate-zone');
       expect(idx).toBeGreaterThan(-1);
-      expect(ids[idx - 1]).toBe('sequence');
+      expect(ids[idx - 1]).toBe('charge');
       expect(ids[idx + 1]).toBe('blast');
     });
 
@@ -916,9 +915,9 @@ describe('tutorialSteps', () => {
       ]);
     });
 
-    it('sequence keeps its existing 25-tick delay step, unchanged by the retune', () => {
-      const step = TUTORIAL_STEPS.find((s) => s.id === 'sequence')!;
-      expect(step.commands).toEqual(['sequence auto delay_step:25']);
+    it('has no sequence step (detonation sequencing was removed, #1344)', () => {
+      expect(TUTORIAL_STEPS.find((s) => s.id === 'sequence')).toBeUndefined();
+      expect(TUTORIAL_STEPS.some((s) => s.commands?.some((c) => c.startsWith('sequence')))).toBe(false);
     });
   });
 });
@@ -1068,7 +1067,7 @@ describe('free-play step card (#1329/#1328) — honest about progress before the
     });
     it('reads profit as the financial report net profit', () => {
       const f = financesWithProfit(1200);
-      expect(victoryProgress(f, target).profit).toBe(getFinancialReport(f, 0).netProfit);
+      expect(victoryProgress(f, target).profit).toBe(getFinancialReport(f, 0).operatingProfit);
       expect(victoryProgress(f, target).remaining).toBe(target - 1200);
     });
     it('profit above target clamps remaining to 0', () => {

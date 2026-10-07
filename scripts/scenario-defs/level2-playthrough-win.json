@@ -1345,8 +1345,7 @@
           "surveyCount": 3,
           "orderedHoleCount": 24,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "#553: confirming the grid only orders the 24 holes -- they are ghosts until the 2 driller/drill_rig pairs drive out to each one, so holeCount is 0 here and the wait is the 3 tick steps below."
       }
@@ -1551,8 +1550,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 24,
-          "sequencedCount": 0
+          "holeCount": 24
         },
         "changedBy": {
           "tickCount": 0
@@ -1578,8 +1576,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 24,
-          "sequencedCount": 0
+          "holeCount": 24
         }
       }
     },
@@ -1612,45 +1609,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 25
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
-          "sequencedCount": 24
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -1680,8 +1644,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -1747,8 +1710,8 @@
           "surveyCount": 3,
           "wellBeing": 99.57583333333336,
           "safety": 50,
-          "ecology": 49.964892315689795,
-          "nuisance": 49.912230789224495
+          "ecology": 48.60524933152729,
+          "nuisance": 46.513123328818224
         },
         "changedBy": {
           "tickCount": 0
@@ -2111,8 +2074,7 @@
           "surveyCount": 3,
           "orderedHoleCount": 25,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -2264,8 +2226,7 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 25,
-          "sequencedCount": 0
+          "holeCount": 13
         },
         "changedBy": {
           "tickCount": 0
@@ -2302,45 +2263,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 20
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 13,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 25,
-          "chargedCount": 25,
-          "sequencedCount": 25
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -2370,8 +2298,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -2460,10 +2387,10 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
-          "safety": 20.600000000000122,
-          "ecology": 32.439885735375825,
-          "nuisance": 6.099714338439548
+          "wellBeing": 96.58111111111154,
+          "safety": 0,
+          "ecology": 42.68896304087921,
+          "nuisance": 31.722407602198018
         },
         "changedBy": {
           "tickCount": 0
@@ -2817,8 +2744,7 @@
           "surveyCount": 3,
           "orderedHoleCount": 30,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -2974,9 +2900,8 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "holeCount": 18,
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -3012,46 +2937,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 20
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 5,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
-          "sequencedCount": 24
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -3081,8 +2972,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -3354,8 +3244,8 @@
           "surveyCount": 3,
           "wellBeing": 99.77000000000028,
           "safety": 0,
-          "ecology": 42.540082140261376,
-          "nuisance": 16.848742817742483
+          "ecology": 41.52552443378042,
+          "nuisance": 28.331880581365084
         },
         "changedBy": {
           "tickCount": 0
@@ -3548,8 +3438,7 @@
           "surveyCount": 3,
           "orderedHoleCount": 48,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -3705,9 +3594,8 @@
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 28,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "holeCount": 22,
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -3743,46 +3631,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 20
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 17,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 28,
-          "chargedCount": 28,
-          "sequencedCount": 28
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -3812,8 +3666,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -4112,8 +3965,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 35.3055865500862,
-          "nuisance": 2.0520481304219342
+          "ecology": 38.68899072089543,
+          "nuisance": 21.74373066853227
         },
         "changedBy": {
           "tickCount": 0
@@ -4138,8 +3991,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 35.3055865500862,
-          "nuisance": 2.0520481304219342
+          "ecology": 38.68899072089543,
+          "nuisance": 21.74373066853227
         },
         "changedBy": {
           "tickCount": 0

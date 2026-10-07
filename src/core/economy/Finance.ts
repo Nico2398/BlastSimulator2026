@@ -84,7 +84,12 @@ export interface CategoryTotal {
   total: number;
 }
 
+/** Expense categories that buy assets rather than run the mine. */
+export const CAPITAL_EXPENSE_CATEGORIES: ReadonlySet<ExpenseCategory> = new Set<ExpenseCategory>(['equipment', 'construction']);
+
 export interface FinancialReport {
+  /** Income excluding refunds, minus expenses outside CAPITAL_EXPENSE_CATEGORIES. */
+  operatingProfit: number;
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
@@ -110,14 +115,17 @@ export function getFinancialReport(
   const expenseMap = new Map<string, number>();
   let totalIncome = 0;
   let totalExpenses = 0;
+  let operatingProfit = 0;
 
   for (const t of filtered) {
     if (t.type === 'income') {
       totalIncome += t.amount;
       incomeMap.set(t.category, (incomeMap.get(t.category) ?? 0) + t.amount);
+      if (t.category !== 'refund') operatingProfit += t.amount;
     } else {
       totalExpenses += t.amount;
       expenseMap.set(t.category, (expenseMap.get(t.category) ?? 0) + t.amount);
+      if (!CAPITAL_EXPENSE_CATEGORIES.has(t.category as ExpenseCategory)) operatingProfit -= t.amount;
     }
   }
 
@@ -125,8 +133,14 @@ export function getFinancialReport(
     totalIncome,
     totalExpenses,
     netProfit: totalIncome - totalExpenses,
+    operatingProfit,
     incomeByCategory: [...incomeMap.entries()].map(([category, total]) => ({ category, total })),
     expensesByCategory: [...expenseMap.entries()].map(([category, total]) => ({ category, total })),
     transactionCount: filtered.length,
   };
+}
+
+/** Operating profit over all transactions: income excluding 'refund' minus non-capital expenses. */
+export function getOperatingProfit(state: FinanceState): number {
+  return getFinancialReport(state, 0).operatingProfit;
 }

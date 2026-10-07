@@ -5,7 +5,7 @@ import {
   stemmingEfficiency,
   waterEffect,
   calculateVibrations,
-  groupChargesByDelay,
+  totalChargeKg,
   fragmentBoulder,
   isOversized,
   isFragmentOversized,
@@ -50,48 +50,70 @@ describe('BlastCalc — charge energy', () => {
   });
 });
 describe('BlastCalc — vibration', () => {
-  it('single-delay blast produces maximum vibration', () => {
-    // All charge in one delay
-    const single = calculateVibrations([30], 100, 1.0);
-    // Same charge spread across 3 delays
-    const spread = calculateVibrations([10, 10, 10], 100, 1.0);
-    // Single delay should be higher (30^0.7 > 3 * 10^0.7 due to concavity)
-    expect(single).toBeGreaterThan(spread);
+  it('vibration is charge^0.7 / distance^1.5 * groundFactor', () => {
+    expect(calculateVibrations(30, 100, 1.0)).toBeCloseTo(30 ** 0.7 / 100 ** 1.5, 12);
+    expect(calculateVibrations(10, 25, 2.5)).toBeCloseTo((10 ** 0.7 / 25 ** 1.5) * 2.5, 12);
   });
 
-  it('well-spread sequence produces lower vibration', () => {
-    const concentrated = calculateVibrations([20, 20], 100, 1.0);
-    const spread = calculateVibrations([5, 5, 5, 5, 5, 5, 5, 5], 100, 1.0);
-    expect(spread).toBeLessThan(concentrated);
+  it('doubling the total charge scales vibration by 2^0.7', () => {
+    const one = calculateVibrations(10, 100, 1.0);
+    const two = calculateVibrations(20, 100, 1.0);
+    expect(two / one).toBeCloseTo(2 ** 0.7, 10);
   });
 
   it('vibration decreases with distance', () => {
-    const near = calculateVibrations([10], 50, 1.0);
-    const far = calculateVibrations([10], 200, 1.0);
+    const near = calculateVibrations(10, 50, 1.0);
+    const far = calculateVibrations(10, 200, 1.0);
     expect(near).toBeGreaterThan(far);
   });
 
-  it('higher charge per delay → higher vibration', () => {
-    const low = calculateVibrations([5], 100, 1.0);
-    const high = calculateVibrations([20], 100, 1.0);
-    expect(high).toBeGreaterThan(low);
+  it('higher total charge gives higher vibration', () => {
+    expect(calculateVibrations(20, 100, 1.0)).toBeGreaterThan(calculateVibrations(5, 100, 1.0));
   });
 
-  it('groupChargesByDelay aggregates correctly', () => {
+  it('ground factor scales vibration linearly', () => {
+    expect(calculateVibrations(10, 100, 3.0) / calculateVibrations(10, 100, 1.0)).toBeCloseTo(3, 10);
+  });
+
+  it('zero or negative distance gives Infinity', () => {
+    expect(calculateVibrations(10, 0, 1.0)).toBe(Infinity);
+    expect(calculateVibrations(10, -5, 1.0)).toBe(Infinity);
+  });
+
+  it('zero or negative charge gives 0', () => {
+    expect(calculateVibrations(0, 100, 1.0)).toBe(0);
+    expect(calculateVibrations(-3, 100, 1.0)).toBe(0);
+  });
+
+  it('distance <= 0 takes precedence over charge <= 0', () => {
+    expect(calculateVibrations(0, 0, 1.0)).toBe(Infinity);
+  });
+});
+
+describe('BlastCalc — totalChargeKg', () => {
+  const kg = (amountKg: number): HoleCharge => ({ explosiveId: 'boomite', amountKg, stemmingM: 2 });
+
+  it('sums the charge of every charged hole', () => {
     const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 3, 3, 8, 0.15);
-    const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {
-      [holes[0]!.id]: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
-      [holes[1]!.id]: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
-      [holes[2]!.id]: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
-    };
-    const delays: Record<string, number> = {
-      [holes[0]!.id]: 0,
-      [holes[1]!.id]: 0,   // same delay as first
-      [holes[2]!.id]: 25,
-    };
-    const groups = groupChargesByDelay(holes, charges, delays);
-    expect(groups).toContain(10); // two holes at delay 0: 5+5=10
-    expect(groups).toContain(5);  // one hole at delay 25: 5
+    const charges = { [holes[0]!.id]: kg(5), [holes[1]!.id]: kg(5), [holes[2]!.id]: kg(2.5) };
+    expect(totalChargeKg(holes, charges)).toBeCloseTo(12.5, 10);
+  });
+
+  it('ignores holes with no charge', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 3, 3, 8, 0.15);
+    expect(totalChargeKg(holes, { [holes[1]!.id]: kg(4) })).toBe(4);
+  });
+
+  it('excludes orphan charges whose hole is not in the hole list', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const charges = { [holes[0]!.id]: kg(3), 'ghost-hole': kg(100) };
+    expect(totalChargeKg(holes, charges)).toBe(3);
+  });
+
+  it('is 0 with no charges or no holes', () => {
+    const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    expect(totalChargeKg(holes, {})).toBe(0);
+    expect(totalChargeKg([], { h: kg(5) })).toBe(0);
   });
 });
 

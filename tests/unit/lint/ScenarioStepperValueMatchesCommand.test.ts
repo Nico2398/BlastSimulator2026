@@ -19,7 +19,7 @@
 //      control's displayed value and clicks until it matches, so the JSON
 //      carries the figure, not a count that assumes a start.
 //   2. Where a step's own command declares the same parameter — `spacing:`,
-//      `depth:`, `amount:`, `stemming:`, `delay_step:` — the `setStepper`
+//      `depth:`, `amount:`, `stemming:` — the `setStepper`
 //      value equals it. That is the whole invariant in one comparison: the
 //      value command mode runs is the value interaction mode clicks to.
 //
@@ -35,17 +35,12 @@ import {
 
 const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
 
-/**
- * `[data-field="…"]` → the console parameter the same figure travels under.
- * `delay-step` is the Sequence panel's field; its command is
- * `sequence auto delay_step:N`.
- */
+/** `[data-field="…"]` → the console parameter the same figure travels under. */
 export const STEPPER_FIELD_TO_COMMAND_PARAM: Readonly<Record<string, string>> = {
   spacing: 'spacing',
   depth: 'depth',
   amount: 'amount',
   stemming: 'stemming',
-  'delay-step': 'delay_step',
   width: 'width',
 };
 
@@ -57,11 +52,11 @@ export function stepperField(selector: string): string | null {
 
 /**
  * The figure a command declares for `param`, unit suffix stripped: the
- * Charge panel emits `amount:5kg stemming:2.0m`, the Sequence panel
- * `delay_step:30ms`, and scenario authors write either form.
+ * Charge panel emits `amount:5kg stemming:2.0m`, and scenario authors
+ * write either form.
  */
 export function declaredParam(command: string, param: string): number | null {
-  const m = new RegExp(`\\b${param}:(-?\\d+(?:\\.\\d+)?)(?:kg|m|ms)?\\b`).exec(command);
+  const m = new RegExp(`\\b${param}:(-?\\d+(?:\\.\\d+)?)(?:kg|m)?\\b`).exec(command);
   return m ? Number(m[1]) : null;
 }
 

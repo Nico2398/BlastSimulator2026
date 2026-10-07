@@ -7,7 +7,6 @@ import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../../src/core/mining/BlastExecution.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -19,7 +18,7 @@ function makeHole(id: string, x: number, z: number, depth = 8): DrillHole {
 }
 
 function makePlan(holes: DrillHole[]): BlastPlan {
-  return { holes, charges: {}, delays: {} };
+  return { holes, charges: {} };
 }
 
 function makeSurvey(
@@ -232,7 +231,7 @@ describe('estimateBlastOreValue vs executeBlast (seed 42 reference pattern, #135
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'krackle', 8, 2);
-    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, charges);
 
     const estimate = estimateBlastOreValue(plan, [survey]);
     const result = executeBlast(plan, grid, []);

@@ -75,7 +75,7 @@ async function runScenarioCommand(
     console.log(`  ${paddedIdx} ${r.command}`);
     console.log(`    Output: ${r.commandOutput.substring(0, 120)}`);
     if (r.gameState) {
-      console.log(`    Holes: ${r.gameState.holeCount}, Charged: ${r.gameState.chargedCount}, Sequenced: ${r.gameState.sequencedCount}`);
+      console.log(`    Holes: ${r.gameState.holeCount}, Charged: ${r.gameState.chargedCount}`);
     }
     if (r.error) console.error(`    ERROR: ${r.error}`);
     console.log(`    State: ${r.statePath}`);

@@ -15,7 +15,7 @@ import {
 } from '../config/balance.js';
 import {
   calculateVibrations,
-  groupChargesByDelay,
+  totalChargeKg,
   stemmingFactor,
 } from './BlastCalc.js';
 import { buildPlanEnergyField, maxVillageVibration } from './BlastExecution.js';
@@ -313,7 +313,7 @@ export function previewVibrations(
 ): VibrationPreview | null {
   if (softwareTier < 4) return null;
 
-  const chargePerDelay = groupChargesByDelay(plan.holes, plan.charges, plan.delays);
+  const blastChargeKg = totalChargeKg(plan.holes, plan.charges);
   let cx = 0, cz = 0;
   for (const h of plan.holes) { cx += h.x; cz += h.z; }
   // No holes: no blast centre, so no vibration (avoids NaN distances).
@@ -329,7 +329,7 @@ export function previewVibrations(
     const distance = Math.max(1, Math.sqrt(dx * dx + dz * dz));
     return {
       villageId: v.id,
-      vibration: calculateVibrations(chargePerDelay, distance, groundFactor),
+      vibration: calculateVibrations(blastChargeKg, distance, groundFactor),
     };
   });
 

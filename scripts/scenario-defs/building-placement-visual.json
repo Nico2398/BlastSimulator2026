@@ -422,7 +422,9 @@
           "buildingCount": 4,
           "orderedBuildingCount": 1
         },
-        "increased": ["worldSizeX"]
+        "increased": [
+          "worldSizeX"
+        ]
       }
     },
     {

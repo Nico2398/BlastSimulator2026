@@ -148,17 +148,13 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // amount/stemming steppers for real (see blast-execution-visual.json for
   // the player-role version of this same charge).
   'charge hole:* explosive:boomite amount:8 stemming:0.5',
-  // blast-fire/preview/sequence-step-visual.json: the Charge step right
+  // blast-fire/preview-step-visual.json: the Charge step right
   // after each of these is the Blast panel's own designated first-open
   // (`#bs-toolbar [data-panel="blast"]` is a toggle) — giving the drill
   // step its own panel-open click would leave the panel open and then
   // CLOSE it when the charge step's click ran next.
   'drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6',
   'drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6',
-  // blast-preview-step-visual.json: an ABSOLUTE per-hole delay — the panel
-  // only exposes relative +/- steppers (Sequence.ts), so there is no click
-  // path to a specific value.
-  'sequence set hole:H1 delay:0ms',
   // rock-fragmenter-breaking.json: fragment #0 is oversized, so
   // `findReachableGroundFragment`'s eligibility cache excludes it outright
   // and `.bs-vehicle-haul-btn` never renders for it — no control exists to

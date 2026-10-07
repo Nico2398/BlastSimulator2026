@@ -23,11 +23,10 @@ function makeFooter(): { footer: BlastFooter; container: HTMLElement; fireReques
   return { footer, container, fireRequested };
 }
 
-function chargeAndSequence(state: ReturnType<typeof makeState>) {
+function chargeHole(state: ReturnType<typeof makeState>) {
   const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
   const chargeResult = createCharge('boomite', 5, 2, hole.depth);
   if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-  state.sequenceDelays[hole.id] = 0;
   return hole;
 }
 
@@ -91,10 +90,10 @@ describe('BlastFooter', () => {
     expect(footer.root.textContent).not.toContain('Missing charge');
   });
 
-  it('FIRE enables once every hole is charged and sequenced', () => {
+  it('FIRE enables once every hole is charged', () => {
     const { footer } = makeFooter();
     const state = makeState();
-    chargeAndSequence(state);
+    chargeHole(state);
 
     footer.update(state);
 
@@ -114,7 +113,7 @@ describe('BlastFooter', () => {
   it('clicking FIRE while enabled requests a preflight confirm, without dispatching blast itself', () => {
     const { footer, fireRequested } = makeFooter();
     const state = makeState();
-    chargeAndSequence(state);
+    chargeHole(state);
     footer.update(state);
 
     (footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement).click();
@@ -135,7 +134,7 @@ describe('BlastFooter', () => {
     it('disables FIRE with the zone-occupied reason when tutorialActive and the danger zone is occupied', () => {
       const { footer } = makeFooter();
       const state = makeState();
-      chargeAndSequence(state); // hole at (10, 10), fully charged + sequenced — otherwise fireable
+      chargeHole(state); // hole at (10, 10), fully charged — otherwise fireable
       hireEmployee(state.employees, 'driller', new Random(1), 10, 10); // standing right on the hole
 
       footer.update(state, true);
@@ -148,7 +147,7 @@ describe('BlastFooter', () => {
     it('keeps FIRE enabled outside the tutorial even with an occupied danger zone', () => {
       const { footer } = makeFooter();
       const state = makeState();
-      chargeAndSequence(state);
+      chargeHole(state);
       hireEmployee(state.employees, 'driller', new Random(1), 10, 10);
 
       footer.update(state, false);
@@ -161,7 +160,7 @@ describe('BlastFooter', () => {
     it('leaves FIRE enabled during the tutorial once the danger zone is clear', () => {
       const { footer } = makeFooter();
       const state = makeState();
-      chargeAndSequence(state);
+      chargeHole(state);
       hireEmployee(state.employees, 'driller', new Random(1), 200, 200); // well outside the zone
 
       footer.update(state, true);

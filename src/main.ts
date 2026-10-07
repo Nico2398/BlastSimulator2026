@@ -550,13 +550,13 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // the terrain:updated subscription above, fired from inside executeBlast).
   if (cmdName === 'blast' && result.success && ctx.state) {
     gameRenderer.onBlast(ctx);
-    audioHooks.onBlast(ctx.state.sequenceDelays);
+    audioHooks.onBlast();
   }
   // Show blast plan overlay during planning commands, and refresh it whenever
   // a preview command runs or software tier changes — otherwise the overlay's
   // softwareTier and preview data are frozen at whatever the last drill_plan/
-  // charge/sequence call baked in, and a purchased tier's overlay never appears.
-  if (['drill_plan', 'charge', 'sequence', 'preview', 'buy_software', 'blast_preview'].includes(cmdName)) {
+  // charge call baked in, and a purchased tier's overlay never appears.
+  if (['drill_plan', 'charge', 'preview', 'buy_software', 'blast_preview'].includes(cmdName)) {
     gameRenderer.showBlastPlanOverlay(ctx);
   }
   // UI click sound for any command
@@ -610,7 +610,6 @@ window.__gameState = () => {
     worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole,
-    sequenceDelays: s.sequenceDelays,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
     // Holes ordered but not yet drilled (state.plannedDrillHoles.length) --
@@ -641,7 +640,6 @@ window.__gameState = () => {
     // rationale as orderedHoleCount/orderedRampSegmentCount above (#556).
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
-    sequencedCount: Object.keys(s.sequenceDelays).length,
     // Research tasks queued at a Research Center, in progress or pending --
     // mirrors serializeGameState's own field (console-api.ts). Proves a
     // research task actually completed (reaches 0) rather than a `tick N`

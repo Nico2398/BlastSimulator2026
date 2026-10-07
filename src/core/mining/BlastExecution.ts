@@ -13,7 +13,7 @@ import type { BlastPlan } from './BlastPlan.js';
 import { validateBlastPlan } from './BlastPlan.js';
 import {
   calculateVibrations,
-  groupChargesByDelay,
+  totalChargeKg,
   effectiveHoleEnergy,
   computeInitialEnergy,
   stemmingFactor,
@@ -456,7 +456,7 @@ export function executeBlast(
   // Apply per-explosive vibrationMod: average across all charged holes weighted equally.
   const effectiveGroundFactor = groundFactor * averageVibrationMod(plan, wetHoleIds);
 
-  const chargePerDelay = groupChargesByDelay(plan.holes, plan.charges, plan.delays);
+  const blastChargeKg = totalChargeKg(plan.holes, plan.charges);
   const vibrationAtVillages: VillageVibration[] = villages.map(v => {
     const dx = v.position.x - blastCenter.x;
     const dz = v.position.z - blastCenter.z;
@@ -464,7 +464,7 @@ export function executeBlast(
     return {
       villageId: v.id,
       position: v.position,
-      vibration: calculateVibrations(chargePerDelay, Math.max(distance, 1), effectiveGroundFactor),
+      vibration: calculateVibrations(blastChargeKg, Math.max(distance, 1), effectiveGroundFactor),
     };
   });
 

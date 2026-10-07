@@ -9,7 +9,6 @@ import {
   blastCommand,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   type MiningContext,
 } from '../../../src/console/commands/mining.js';
 
@@ -612,7 +611,6 @@ describe('NavGrid patching — blast', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const result = blastCommand(ctx, [], {});
     expect(result.success).toBe(true);
@@ -663,7 +661,6 @@ describe('NavGrid patching — blast', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const before = solidCount(8, 8);
     expect(blastCommand(ctx, [], {}).success).toBe(true);
@@ -777,7 +774,6 @@ describe('NavGrid patching — event names (#1161)', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const events: string[] = [];
     ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));

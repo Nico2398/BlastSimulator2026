@@ -11,6 +11,7 @@ import { isStepClimbable, isCellOccupied, hasClearance } from './NavGrid.js';
 import { NEIGHBOUR_OFFSETS_8 } from './NeighbourOffsets.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../config/balance.js';
 import { isDiagonalCornerClear } from './Pathfinding.js';
+import type { Rect } from '../world/WorldGen.js';
 
 /** True when a cell exists, is in bounds, and has finite moveCost (walkable/ramp/drill_hole). */
 export function isTraversableCell(navGrid: NavGrid, x: number, z: number): boolean {
@@ -290,8 +291,9 @@ function snapshotFill(
   sources: ReadonlyArray<{ x: number; z: number }>,
   climbAware: boolean,
   requiredClearance: number,
+  overrides?: FillOverrides,
 ): ReachableSet {
-  const { width, height, count } = floodFillFromSources(navGrid, sources, climbAware, false, requiredClearance);
+  const { width, height, count } = floodFillFromSources(navGrid, sources, climbAware, false, requiredClearance, overrides);
   const { originX, originZ } = navGrid;
   // Independent snapshot: floodFillReachable's next call reuses the shared
   // scratch buffer, so a wrapper aliasing it directly would go stale (or
@@ -603,6 +605,11 @@ function isLegalStep(
   return hasClearance(to, requiredClearance);
 }
 
+/** True when (x, z) lies inside `r` (max edges exclusive); false for an undefined rect. */
+export function inRect(r: Rect | undefined, x: number, z: number): boolean {
+  return !!r && x >= r.minX && x < r.maxX && z >= r.minZ && z < r.maxZ;
+}
+
 /**
  * `floodFillReachable`'s body, seeded from several in-grid source cells at once
  * (#1306): one fill answers "reachable from ANY source" at a cost bounded by the
@@ -615,6 +622,7 @@ function floodFillFromSources(
   climbAware: boolean,
   avoidOccupancy: boolean,
   requiredClearance: number,
+  overrides?: FillOverrides,
 ): { width: number; height: number; count: number } {
   const width = navGrid.width;
   const height = navGrid.height;
@@ -646,7 +654,9 @@ function floodFillFromSources(
       const neighborIdx = (nz - navGrid.originZ) * width + (nx - navGrid.originX);
       if (visitedArr[neighborIdx]) continue;
       const neighbourCell = navGrid.cellAt(nx, nz);
-      if (!neighbourCell || neighbourCell.type === 'blocked' || neighbourCell.type === 'void') continue;
+      if (!neighbourCell || neighbourCell.type === 'void') continue;
+      if (overrides && inRect(overrides.block, nx, nz)) continue;
+      if (neighbourCell.type === 'blocked' && !(overrides && inRect(overrides.free, nx, nz))) continue;
       if (avoidOccupancy && isCellOccupied(neighbourCell)) continue;
       if (!isLegalStep(navGrid, x, z, cell, nx, nz, neighbourCell, climbAware, requiredClearance)) continue;
       visitedArr[neighborIdx] = 1;
@@ -677,6 +687,15 @@ export function reachSourceCellIndex(navGrid: NavGrid, x: number, z: number): nu
 }
 
 /**
+ * Hypothetical edits to the fill (#1391): `block` cells (min-inclusive,
+ * max-exclusive) count as impassable, `free` cells as passable.
+ */
+export interface FillOverrides {
+  block?: Rect;
+  free?: Rect;
+}
+
+/**
  * `computeClimbReachableSet` flooded from several sources at once (#1306): a cell
  * is in the set when it is climb-reachable from at least one source. Each source
  * is clamped into the grid like `computeClimbReachableSet`'s anchor, and a
@@ -686,13 +705,14 @@ export function computeClimbReachableSetFromSources(
   navGrid: NavGrid,
   sources: ReadonlyArray<{ x: number; z: number }>,
   requiredClearance: number = NAV_CLEARANCE_EMPLOYEE_CELLS,
+  overrides?: FillOverrides,
 ): ReachableSet {
   if (sources.length === 0) return EMPTY_REACHABLE_SET;
   const cells = sources.map(s => ({
     x: reachSourceCellX(navGrid, s.x),
     z: reachSourceCellZ(navGrid, s.z),
   }));
-  return snapshotFill(navGrid, cells, true, requiredClearance);
+  return snapshotFill(navGrid, cells, true, requiredClearance, overrides);
 }
 
 /** Climb-aware connected components of a nav grid for one clearance. */

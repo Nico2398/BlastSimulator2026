@@ -29,22 +29,21 @@ export interface DrillHoleActionPayload {
 }
 
 /**
- * Drop every per-hole charge/sequence record for `holeId` — called when a
+ * Drop every per-hole charge record for `holeId` — called when a
  * hole leaves the plan (drilled or still-ordered branch of drill_plan
- * remove) so no stale charge or delay survives under an id nothing
+ * remove) so no stale charge survives under an id nothing
  * references anymore (#634).
  */
 function clearHoleCharges(state: GameState, holeId: string): void {
   delete state.chargesByHole[holeId];
   delete state.plannedChargesByHole[holeId];
-  delete state.sequenceDelays[holeId];
   removeHoleTubing(state.tubingState, holeId);
 }
 
 /**
  * Cancel every outstanding `drill_hole` PendingAction (queued/assigned/
  * in_progress — anything not yet completed) and empty both hole pools
- * (`plannedDrillHoles` and `drillHoles`), plus any per-hole charge/sequence
+ * (`plannedDrillHoles` and `drillHoles`), plus any per-hole charge
  * state keyed by hole id (#553). Cancellation is routed through the shared
  * `cancelAction` (#548) so an in-flight employee/vehicle is released back to
  * idle and any order-time cost is refunded — `drill_hole` carries none, but an

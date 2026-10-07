@@ -384,7 +384,6 @@ describe('charge order cash cost (#1341)', () => {
     const holes = state.drillHoles.length;
     tickUntil(run, () => Object.keys(state.chargesByHole).length === holes, 600);
     expect(Object.keys(state.chargesByHole)).toHaveLength(holes);
-    expect(run('sequence auto').success).toBe(true);
     const expected = holes * 5 * 12;
     expect(explosivesTotal(state)).toBe(expected);
 

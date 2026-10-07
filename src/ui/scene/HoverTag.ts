@@ -130,8 +130,7 @@ export class HoverTag {
       case 'hole': {
         const hole = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
         if (!hole) return null;
-        const delay = state.sequenceDelays[hole.id];
-        return this.row('blast', hole.id, delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m`);
+        return this.row('blast', hole.id, `${hole.depth}m`);
       }
       case 'ramp': {
         const ramp = state.builtRamps.find(r => r.id === entity.id);

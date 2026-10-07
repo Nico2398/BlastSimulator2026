@@ -1,6 +1,6 @@
 {
   "name": "safety-projection-visual",
-  "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face/sequence, buildings/vehicles in projection path, and post-blast damage assessment.",
+  "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face, buildings/vehicles in projection path, and post-blast damage assessment.",
   "steps": [
     {
       "command": "new_game seed:42 cash:250000 staffed:true",
@@ -156,7 +156,7 @@
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing deliberately left at the default 3m rather than tightened like most other files' 9-16-hole grids -- a sandbox-measured trial at 2m produced a drastically more violent CATASTROPHIC blast (1259 affected voxels vs. 3m's much smaller footprint) that destroyed the freight_warehouse this file's own safety-zone premise depends on surviving. Cash bumped further ($250,000) to cover the longer drilling wait at the unmodified 3m spacing instead.",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing deliberately left at the default 3m rather than tightened like most other files' 9-16-hole grids -- a sandbox-measured trial at 2m produced a drastically more violent CATASTROPHIC blast (1259 affected voxels vs. 3m's much smaller footprint) that destroyed the freight_warehouse this file's own safety-zone premise depends on surviving. Cash bumped further ($250,000) to cover the longer drilling wait at the unmodified 3m spacing instead.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -306,7 +306,7 @@
     },
     {
       "command": "tick 50",
-      "description": "Sixth and final chunk — all 16 holes should have landed by now. Two further chunks (300->400 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 16 holes already landed by tick 300 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding pushed wellBeing's already-zero streak (pinned at 0 since ~tick 300, REVOLT_TICKS=120, WorkerRevolt.ts) past the revolt threshold during the charge-order wait_until step below, ending the level via worker_revolt before the auto-sequence click ever got a chance to run as real, clickable UI -- the interaction-mode `[data-step=\"3\"]` click that surfaced the real CI failure needs the sequence panel to still be reachable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/sequence/blast to run as genuine player interaction, same fix and same reasoning as core-loop-visual.json's identical dead-padding-before-revolt finding.",
+      "description": "Sixth and final chunk — all 16 holes should have landed by now. Two further chunks (300->400 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 16 holes already landed by tick 300 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding pushed wellBeing's already-zero streak (pinned at 0 since ~tick 300, REVOLT_TICKS=120, WorkerRevolt.ts) past the revolt threshold during the charge-order wait_until step below, ending the level via worker_revolt before the auto-sequence click ever got a chance to run as real, clickable UI -- the interaction-mode `[data-step=\"3\"]` click that surfaced the real CI failure needs the sequence panel to still be reachable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/blast to run as genuine player interaction, same fix and same reasoning as core-loop-visual.json's identical dead-padding-before-revolt finding.",
       "interaction": [
         {
           "type": "command",
@@ -411,37 +411,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"]",
-          "value": 10
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "Sequence's delay-step stepper now carries data-field=\"delay-step\" (Sequence.ts, matching the drill grid tool's ParamStrip.ts convention) so a click can target it unambiguously -- the Charge step's amount/stemming steppers use the same unscoped .bsx-stepper markup and stayed indistinguishable without it. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
-      "expect": {
-        "equals": {
-          "sequencedCount": 16
-        }
-      }
-    },
-    {
       "command": "zone clear x1:5 y1:5 x2:44 y2:44",
       "description": "#557: the real evacuation walkout. Employees #6/#7 (the two relief hires above, idle since well before this point) spawned at the map centre (32,32)/(34,32) — squarely inside computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)'s own live box for this exact 4x4 grid, which the file's own drill-plan step comment already works out as (5,5) to (44,44). The literal x1/y1/x2/y2 here matches that box exactly, so it's the same rectangle Sound the Horn computes and sends, not a player-typed guess (contrast the very first `zone clear` step in this file, which is deliberately pre-drill-plan and NOT click-equivalent — see its own note). clearZone no longer teleports (#557): this only sets a destination on anyone inside the box, so the zone is not clear yet the instant this command returns — the wait_until step below is what proves the walk actually finishes.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "waitForSelector",
@@ -540,7 +515,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "waitForSelector",
@@ -563,7 +538,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "waitForSelector",
@@ -586,7 +561,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "waitForSelector",
@@ -610,7 +585,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -620,10 +595,9 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 16,
-          "sequencedCount": 16
+          "chargedCount": 16
         },
-        "note": "a preview is read-only -- no cash or hole/charge/sequence count moves. #553-followup: switched the read-only proof from an exact cash figure to chargedCount/sequencedCount -- cash is real-time-tick-sensitive in interaction mode (see buy_software tier:3's own note above) and no longer has a single value both modes agree on, while charge/sequence counts don't decay with elapsed ticks the way cash does, so they hold in both modes regardless of host timing."
+        "note": "a preview is read-only -- no cash or hole/charge count moves. #553-followup: switched the read-only proof from an exact cash figure to chargedCount -- cash is real-time-tick-sensitive in interaction mode (see buy_software tier:3's own note above) and no longer has a single value both modes agree on, while charge counts don't decay with elapsed ticks the way cash does, so they hold in both modes regardless of host timing."
       }
     },
     {
@@ -654,6 +628,10 @@
       "interval": 50,
       "interaction": [
         {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
@@ -676,7 +654,6 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "buildingCount": 0,
           "deathCount": 0
         },

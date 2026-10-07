@@ -39,7 +39,7 @@ function makePlan(holes: number, charged = 0): SavedBlastPlan {
   const drillHoles = Array.from({ length: holes }, (_, i) => ({ id: `H${i + 1}`, x: i, z: 0, depth: 6, diameter: 0.089 }));
   const chargesByHole: SavedBlastPlan['chargesByHole'] = {};
   for (let i = 0; i < charged; i++) chargesByHole[`H${i + 1}`] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
-  return { drillHoles, chargesByHole, sequenceDelays: {} };
+  return { drillHoles, chargesByHole };
 }
 
 beforeEach(() => { holeCounter.nextHoleId = 1; });

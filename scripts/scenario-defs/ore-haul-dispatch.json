@@ -137,24 +137,13 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 9
-        }
-      }
-    },
-    {
       "command": "blast",
       "timeout": 30,
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -181,7 +170,6 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "collectedOreTotal": 0
         },
         "note": "a fired blast clears the plan back to zero -- nothing has been hauled anywhere yet, so collectedOreTotal is still 0 at this point"

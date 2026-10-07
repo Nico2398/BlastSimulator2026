@@ -4,7 +4,7 @@ import { expect } from 'vitest';
 import type { GameContext } from '../../../src/console/commands/world.js';
 import { campaignStartCommand, campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
-import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../../src/console/commands/mining.js';
+import { drillPlanCommand, chargeCommand, blastCommand } from '../../../src/console/commands/mining.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
@@ -41,9 +41,13 @@ function _unlockTreraniumDepths(campaign: any): void {
  * Automatically completes any prior levels needed to unlock the target.
  * Calls campaignStartCommand to initialise the level.
  * @param levelId The campaign level identifier (e.g. 'dusty_hollow').
+ * @param opts `levelDefaultStart` opens the level exactly as a player's
+ *   `campaign start` does. By default dusty_hollow is started `staffed:false`
+ *   (a bare site, #1363): the lose-condition tests were calibrated on one, and
+ *   only the win playthrough wants the level's own crew, fleet and warehouse.
  * @returns A fully initialised GameContext ready for test commands.
  */
-export function makeCampaignCtx(levelId: string): GameContext {
+export function makeCampaignCtx(levelId: string, opts: { levelDefaultStart?: boolean } = {}): GameContext {
   const ctx = createBaseContext();
   if (levelId === 'dusty_hollow') {
     _unlockDustyHollow(ctx.campaignProfile.campaign);
@@ -53,7 +57,8 @@ export function makeCampaignCtx(levelId: string): GameContext {
     _unlockTreraniumDepths(ctx.campaignProfile.campaign);
   }
   // tutorial_pit is unlocked by default — no unlock needed
-  campaignStartCommand(ctx, [], { level: levelId });
+  const bare = levelId === 'dusty_hollow' && !opts.levelDefaultStart;
+  campaignStartCommand(ctx, [], { level: levelId, ...(bare ? { staffed: 'false' } : {}) });
   return ctx;
 }
 
@@ -155,7 +160,7 @@ export function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300):
 }
 
 /**
- * Perform a standard blast cycle: drill grid, charge all, auto-sequence, blast.
+ * Perform a standard blast cycle: drill grid, charge all, blast.
  * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
  * @param ctx The game context (cast to MiningContext internally for command compatibility).
  * @param originX X-coordinate of the drill grid origin.
@@ -176,7 +181,6 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
     amount: '5kg',
     stemming: '2m',
   });
-  sequenceCommand(ctx as any, ['auto'], {});
   const result = blastCommand(ctx as any, [], {});
   return result.output;
 }

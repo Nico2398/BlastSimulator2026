@@ -1,6 +1,6 @@
 {
   "name": "blast-visual-full",
-  "description": "Comprehensive visual pipeline test covering all 7 blast system areas: drill plan, charge/sequence, software preview tiers, detonation execution, post-blast report, and voxel fragmentation with multi-angle screenshots at every stage",
+  "description": "Comprehensive visual pipeline test covering all 7 blast system areas: drill plan, charge, software preview tiers, detonation execution, post-blast report, and voxel fragmentation with multi-angle screenshots at every stage",
   "steps": [
     {
       "command": "new_game seed:42 cash:200000",
@@ -189,7 +189,7 @@
     },
     {
       "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:20,20",
-      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (20,20)-(35,30) rectangle computes the declared 4x3 instead of the default-spacing 6x4 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below.",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (20,20)-(35,30) rectangle computes the declared 4x3 instead of the default-spacing 6x4 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -383,10 +383,10 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) \u2014 the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session \u2014 asserted before each commit rather than assumed.",
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
       "role": "player",
       "expect": {
-        "note": "count is unchanged \u2014 every hole was already charged by Charge All; this step overrides H1 alone",
+        "note": "count is unchanged — every hole was already charged by Charge All; this step overrides H1 alone",
         "increased": [
           "orderedChargeCount"
         ]
@@ -473,90 +473,11 @@
       "timeout": 120
     },
     {
-      "command": "sequence auto delay_step:25",
-      "description": "#601-followup: leading `resolveEventIfPending` added -- the preceding charge-drain wait's own trailing resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\" (same race vibration-budget.json's own analogous sequence step found and fixed, see its note).",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 12
-        }
-      }
-    },
-    {
-      "command": "sequence set hole:H1 delay:0",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
-        }
-      ],
-      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. Auto Sequence left H1 at 50ms with a 25ms step (traced: step-08-sequence.json), so 2 decrements land exactly on the declared 0 (50 -> 25 -> 0); a third would be a no-op, since adjustHoleDelay floors the result at 0.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 12
-        },
-        "note": "H1 50ms -> 25 -> 0; no hole gains or loses a delay, only H1's value changes"
-      }
-    },
-    {
-      "command": "sequence set hole:H6 delay:100",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H6\"] [data-action=\"delay-inc\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-hole=\"H6\"] [data-action=\"delay-dec\"]"
-        }
-      ],
-      "description": "Auto Sequence already put H6 on exactly this step's declared 100ms (traced: step-08-sequence.json), so the arithmetic here is a net zero \u2014 one increment and one decrement (100 -> 125 -> 100) is the honest click expression of it, and it still exercises both stepper directions on a row other than H1. Command mode's version of this step was likewise a no-op: the step-08 and step-09 dumps are byte-identical.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 12
-        },
-        "note": "H6 ends on 100ms, the same value it started this step with"
-      }
-    },
-    {
-      "command": "sequence show",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence show"
-        }
-      ],
-      "role": "observe"
-    },
-    {
       "command": "blast_preview",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -570,7 +491,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -600,7 +521,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -630,7 +551,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -660,7 +581,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -690,7 +611,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
           "type": "clickSelector",
@@ -711,7 +632,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -738,8 +659,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero"
       }

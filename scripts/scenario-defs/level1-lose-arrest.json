@@ -3,11 +3,11 @@
   "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 21). #1313: the mine is frozen once the level has ended, so exposure stops accruing and the arrest never happens here; every tick after the win asserts the frozen state (cash and tickCount unchanged). The arrest outcome itself is proven in tests/integration/full-level/level1-lose-arrest.integration.test.ts, which pre-completes the level so the arrest can race alone.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:100000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:100000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:100000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:100000"
         }
       ],
       "role": "setup",

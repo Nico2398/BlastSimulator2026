@@ -17,7 +17,6 @@ function makeConfig(holes = 3, energyLevel = 0.5): BlastEffectConfig {
   return {
     holes: Array.from({ length: holes }, (_, i) => ({
       x: i * 5, y: 0, z: 0,
-      delaySeconds: i * 0.1,
     })),
     energyLevel,
     origin: new THREE.Vector3(10, 0, 0),
@@ -43,6 +42,16 @@ describe('BlastEffects', () => {
     be.trigger(makeConfig(4));
     const lights = scene.children.filter((c) => c instanceof THREE.PointLight);
     expect(lights.length).toBe(4);
+    be.dispose();
+  });
+
+  it('every hole flashes from the first frame (no per-hole stagger)', () => {
+    const { scene, be } = makeSetup();
+    be.trigger(makeConfig(4));
+    be.update(0.016);
+    const lights = scene.children.filter((c) => c instanceof THREE.PointLight) as THREE.PointLight[];
+    expect(lights.length).toBe(4);
+    for (const l of lights) expect(l.intensity).toBeGreaterThan(0);
     be.dispose();
   });
 

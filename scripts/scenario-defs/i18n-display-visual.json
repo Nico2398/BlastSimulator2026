@@ -3,11 +3,11 @@
   "description": "Visual verification of internationalization (i18n) system: English text displays correctly throughout UI including HUD, menus, contract panel, event dialogs, and score labels. All fictional names (rocks, explosives, buildings, vehicles) display without unresolved i18n keys.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",

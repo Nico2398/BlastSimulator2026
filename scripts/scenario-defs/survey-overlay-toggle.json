@@ -3,13 +3,13 @@
   "description": "Player-controlled survey confidence overlay visibility (#496): the header toggle hides only the overlay mesh, leaving survey results and panel cards intact, and a new survey arriving while hidden must not silently re-show it.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "timeout": 30,
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ]
     },

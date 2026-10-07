@@ -1,16 +1,15 @@
-// BlastSimulator2026 — Console commands for hole charging and blast sequencing
+// BlastSimulator2026 — Console commands for hole charging
 
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, findOutstandingChargeAction } from './shared.js';
+import { requireGame, resolveHoleId, cancelOutstandingChargeAction, findOutstandingChargeAction } from './shared.js';
 import { createCharge, batchCharge, computeChargeHoleDurationTicks, chargeOrderCost } from '../../../core/mining/ChargePlan.js';
 import { dispatchPendingAction } from '../../../core/engine/TaskDispatch.js';
 import { MIN_STEMMING_M } from '../../../core/config/balance.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import { setDelay, autoVPattern } from '../../../core/mining/Sequence.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { getLevel, isExplosiveAvailable, resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 
@@ -163,40 +162,6 @@ export function chargeCommand(
   if (broke) return broke;
   dispatchChargeAction(ctx, hole, explosiveId, amount, stemming);
   return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
-}
-
-export function sequenceCommand(
-  ctx: MiningContext,
-  args: string[],
-  named: Record<string, string>,
-): CommandResult {
-  const preamble = requireGameWithSub(ctx, args);
-  if (preamble.error) return preamble.error;
-  const sub = preamble.sub;
-
-  if (sub === 'auto') {
-    const step = parseFloat((named['delay_step'] ?? '25').replace('ms', ''));
-    ctx.state!.sequenceDelays = autoVPattern(ctx.state!.drillHoles, step);
-    return { success: true, output: `Auto V-pattern sequence, ${step}ms step, ${Object.keys(ctx.state!.sequenceDelays).length} holes` };
-  }
-
-  if (sub === 'set') {
-    const hole = named['hole'] ?? '';
-    const delay = parseFloat((named['delay'] ?? '0').replace('ms', ''));
-    const holeId = resolveHoleId(ctx.state!, hole, false);
-    setDelay(ctx.state!.sequenceDelays, holeId, delay);
-    return { success: true, output: `Set ${holeId} delay: ${delay}ms` };
-  }
-
-  if (sub === 'show') {
-    const entries = Object.entries(ctx.state!.sequenceDelays);
-    if (entries.length === 0) return { success: true, output: t('mining.sequence.none_set') };
-    const lines = entries.sort(([, a], [, b]) => a - b)
-      .map(([id, d]) => `  ${id}: ${d}ms`);
-    return { success: true, output: `Sequence:\n${lines.join('\n')}` };
-  }
-
-  return { success: false, output: t('mining.sequence.usage') };
 }
 
 /**

@@ -4,7 +4,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
@@ -48,6 +48,8 @@ export interface LevelDef {
   eventFreqMultiplier: number;
   /** Multiplier on contract prices (>1 = generous, <1 = tight market). */
   contractPriceMultiplier: number;
+  /** Pre-hired roster, fleet and buildings this level opens with (#1363). */
+  startingSite?: StartingSiteComposition;
   /** Per-tick score decay rate (higher = harder to maintain scores). */
   scoreDecayRate: number;
   /**
@@ -132,7 +134,7 @@ const LEVELS: readonly LevelDef[] = [
     // ────────────────────────────────────────────────────────
     // Level 1 — Dusty Hollow
     // Small desert quarry. Soft rocks. Basic explosives. Generous contracts.
-    // Tutorial-friendly. Real quarry: ~$2/ton profit → low threshold.
+    // Opens staffed and equipped (DUSTY_HOLLOW_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'dusty_hollow',
     nameKey: 'level.dusty_hollow.name',
@@ -145,10 +147,12 @@ const LEVELS: readonly LevelDef[] = [
     gridZ: 96,
     startingCash: 50000,
     availableExplosives: ['pop_rock', 'boomite', 'krackle'],
-    // Unlock threshold: $80k. Reachable in ~10 good blasts.
+    // Unlock threshold: $80k of operating profit (income minus running costs;
+    // capital purchases do not count).
     unlockThreshold: 80000,
     eventFreqMultiplier: 0.5,   // Rare events — forgiving tutorial
-    contractPriceMultiplier: 1.2, // Generous buyers (easy to profit)
+    startingSite: DUSTY_HOLLOW_STARTING_SITE, // Crew, rig, hauler and warehouse from tick 0
+    contractPriceMultiplier: DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, // Generous buyers; rationale beside the constant
     scoreDecayRate: 0.03,        // Slow score decay — hard to ruin yourself
     mixedRockHardness: false,
     difficultyTier: 1,

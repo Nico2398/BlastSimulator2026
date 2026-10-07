@@ -49,7 +49,7 @@ describe('contract offers are limited to the level ores (#1364)', () => {
   it('campaign start level:dusty_hollow offers only desert ores', () => {
     const { runner, ctx } = createRunner();
     runner.run('new_game seed:42');
-    expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
+    expect(runner.run('campaign start level:dusty_hollow staffed:false').success).toBe(true);
     for (const c of ctx.state!.contracts.available) {
       if (c.type !== 'rubble_disposal') expect(LEVEL1_ORES).toContain(c.materialId);
     }

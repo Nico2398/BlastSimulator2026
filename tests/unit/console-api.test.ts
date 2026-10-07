@@ -91,8 +91,8 @@ function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
 const SERIALIZED_FIELDS = [
   'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount',
-  'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
+  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount',
+  'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'rubbleDisposalOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
@@ -110,6 +110,15 @@ describe('console-api', () => {
   describe('createRunner', () => {
     it('exposes a context whose state starts empty', () => {
       expect(runner.ctx.state).toBeNull();
+    });
+
+    it('the removed `sequence` command is unknown and absent from help (#1344)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const result = runner.runner.run('sequence auto delay_step:25');
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('Unknown command');
+      const help = runner.runner.run('help');
+      expect(help.output).not.toMatch(/^\s*sequence\b/m);
     });
 
     it('executes a command against that context', () => {
@@ -191,7 +200,10 @@ describe('console-api', () => {
 
       expect(state.holeCount).toBe(0);
       expect(state.chargedCount).toBe(0);
-      expect(state.sequencedCount).toBe(0);
+      const raw = state as unknown as Record<string, unknown>;
+      expect('sequencedCount' in raw).toBe(false);
+      expect('sequenceDelays' in raw).toBe(false);
+      expect('sequenced' in raw).toBe(false);
       expect(state.levelEnded).toBe(false);
       expect(state.levelEndReason).toBeNull();
     });
@@ -363,7 +375,7 @@ describe('console-api', () => {
 
     it('counts an accepted contract as active (state.contracts.active)', () => {
       runner.runner.run('new_game seed:42');
-      runner.runner.run('campaign start level:dusty_hollow');
+      runner.runner.run('campaign start level:dusty_hollow staffed:false');
       runner.runner.run('contract accept id:1');
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
@@ -486,7 +498,6 @@ describe('console-api', () => {
         }
         runner.runner.run('tick 1');
       }
-      runner.runner.run('sequence auto delay_step:25');
       runner.runner.run('blast');
       const state = serializeGameState(runner.ctx as MiningContext)!;
 

@@ -420,18 +420,18 @@ describe('scope labels show which scopes a live run holds', () => {
 
   it('paints a held scope and every scope clashing with it, the rest free', async () => {
     const colors = await paint([{ number: 1283, labels: ['agent-task', 'in-progress', 'scope:nav', 'scope:engine'] }]);
-    expect(colors.nav).toBe('fbca04');
-    expect(colors.engine).toBe('fbca04');
+    expect(colors.nav).toBe('ebe0b8');
+    expect(colors.engine).toBe('ebe0b8');
     // Runs alone, so it cannot start beside anything live.
-    expect(colors.pipeline).toBe('fbca04');
-    expect(colors.global).toBe('fbca04');
+    expect(colors.pipeline).toBe('ebe0b8');
+    expect(colors.global).toBe('ebe0b8');
     expect(colors.ui).toBe('c5def5');
     expect(colors.scenarios).toBe('c5def5');
   });
 
   it('paints every scope held while an exclusive run is live', async () => {
     const colors = await paint([{ number: 1230, labels: ['in-progress', 'scope:pipeline'] }]);
-    expect(Object.values(colors)).toEqual(Object.keys(rules.SCOPES).map(() => 'fbca04'));
+    expect(Object.values(colors)).toEqual(Object.keys(rules.SCOPES).map(() => 'ebe0b8'));
   });
 
   it('frees every scope when nothing is live, and ignores pull requests', async () => {

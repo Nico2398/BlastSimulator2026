@@ -9,7 +9,6 @@ import {
 } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport, villagePositions, averageVibrationMod, type BlastResult } from '../../../src/core/mining/BlastExecution.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -57,8 +56,7 @@ describe('executeBlast — crater', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -88,7 +86,7 @@ describe('executeBlast — crater', () => {
     const holes = createGridPlan(holeCounter, { x: 15, z: 15 }, 1, 1, 4, 28, 0.15);
     const holeDepths: Record<string, number> = { [holes[0]!.id]: holes[0]!.depth };
     const { charges } = batchCharge([holes[0]!.id], holeDepths, 'boomite', 2, 2);
-    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -111,8 +109,7 @@ describe('executeBlast — crater', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -134,8 +131,7 @@ describe('executeBlast — crater', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -150,7 +146,7 @@ describe('executeBlast — crater', () => {
     const grid = new VoxelGrid(20, 20);
     const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
     fillRegion(grid, 'cruite', 0, 19, 0, 5, 0, 19);
-    const plan = assembleBlastPlan(holes, {}, {});
+    const plan = assembleBlastPlan(holes, {});
 
     const result = executeBlast(plan, grid, []);
     expect(result).toBeNull();
@@ -186,7 +182,7 @@ describe('executeBlast — fragment origin (#1355)', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'boomite', 8, 2);
-    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, charges);
     return executeBlast(plan, grid, [])!;
   }
 
@@ -252,8 +248,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    return { grid, plan: assembleBlastPlan(holes, charges, delays) };
+    return { grid, plan: assembleBlastPlan(holes, charges) };
   }
 
   it('leaves no dangling sub-threshold residue above a carved column\'s new top', () => {
@@ -321,8 +316,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 1, 0.5);
-    const delays = autoVPattern(holes, 25);
-    return { grid, plan: assembleBlastPlan(holes, charges, delays) };
+    return { grid, plan: assembleBlastPlan(holes, charges) };
   }
 
   it('regrades a stale, off-formula crossing exposed by the carve into the canonical band', () => {
@@ -355,8 +349,7 @@ describe('executeBlast — flooded holes (wetHoleIds, water-sensitive explosive)
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, holeDepths, explosiveId, 8, 2);
-    const delays = autoVPattern(holes, 25);
-    return { grid, holes, holeIds, plan: assembleBlastPlan(holes, charges, delays) };
+    return { grid, holes, holeIds, plan: assembleBlastPlan(holes, charges) };
   }
 
   it('a flooded hole charged with a water-sensitive explosive (boomite) clears fewer voxels than the same plan dry', () => {
@@ -407,8 +400,7 @@ describe('buildBlastReport', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
@@ -436,8 +428,7 @@ describe('buildBlastReport', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
     // Light stemming so the blast actually throws rock (traced throw > 0).
     const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 0.5);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
 
@@ -535,7 +526,7 @@ describe('averageVibrationMod', () => {
       const e = explosives[i];
       if (e) charges[h.id] = { explosiveId: e, amountKg: 5, stemmingM: 2 };
     });
-    return assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    return assembleBlastPlan(holes, charges);
   }
 
   it('returns the explosive vibrationMod when every hole holds the same explosive', () => {
@@ -572,7 +563,7 @@ describe('averageVibrationMod', () => {
       const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 1, 2, 4, 6, 0.15);
       const charges: Record<string, { explosiveId: string; amountKg: number; stemmingM: number }> = {};
       for (const h of holes) charges[h.id] = { explosiveId: explosive, amountKg: 4, stemmingM: 2 };
-      const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+      const plan = assembleBlastPlan(holes, charges);
       const result = executeBlast(plan, grid, [{ id: 'v', position: { x: 300, y: 0, z: 300 } }]);
       return { mod: averageVibrationMod(plan, new Set()), vib: result!.vibrationAtVillages[0]!.vibration };
     };

@@ -461,8 +461,42 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1382: +1 key (ui.crew.injured_back_in): 3739; the unused ui.crew.tag_injured dropped: 3738.
     // #1411: +24 keys (corruption/mafia consequence notifications, investigation event, tick lines, exposure outcome chip): 3762.
     // #1392: +4 keys (demolition/upgrade order notifications and rebuilding label), both locales: 3766.
-    // #1364: +1 key (ui.contracts.not_on_site, off-site contract badge), both locales: 3767; #1385: +9 keys (hiring candidate pools): 3776.
-    expect(Object.keys(en).length).toBe(3776);
+    // #1364: +1 key (ui.contracts.not_on_site, off-site contract badge), both locales: 3767.
+    // #1363: +2 keys (ui.finances.operating_profit, _tip), both locales: 3753 (after #1344's -16).
+    // #1344: -16 keys (detonation sequencing removed: blast.validation.missing_delay,
+    // blast.overlay.delay_ms, mining.sequence.*, ui.crew.action_set_sequence,
+    // ui.blast_workshop.step.sequence, ui.blast_workshop.sequence.*,
+    // tutorial.stage.open_sequence_tab, tutorial.stage.auto_sequence,
+    // tutorial.step7, tutorial.step7.title), both locales: 3751.
+    // #1391: +7 keys (ui.build.cutoff_* placement cutoff warning), both locales: 3758.
+    // #1363: +2 keys (ui.finances.operating_profit, _tip), both locales: 3760.
+    // #1385: +9 keys (hiring candidate pools), both locales: 3769.
+    expect(Object.keys(en).length).toBe(3769);
+  });
+
+  it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {
+    const removed = [
+      'blast.validation.missing_delay',
+      'blast.overlay.delay_ms',
+      'mining.sequence.usage',
+      'mining.sequence.none_set',
+      'ui.crew.action_set_sequence',
+      'ui.blast_workshop.step.sequence',
+      'ui.blast_workshop.sequence.section',
+      'ui.blast_workshop.sequence.auto',
+      'ui.blast_workshop.sequence.delay_step',
+      'ui.blast_workshop.sequence.callout',
+      'ui.blast_workshop.sequence.no_holes',
+      'ui.blast_workshop.sequence.row',
+      'tutorial.stage.open_sequence_tab',
+      'tutorial.stage.auto_sequence',
+      'tutorial.step7',
+      'tutorial.step7.title',
+    ];
+    for (const key of removed) {
+      expect(key in en, `en.json still has ${key}`).toBe(false);
+      expect(key in fr, `fr.json still has ${key}`).toBe(false);
+    }
   });
 });
 
