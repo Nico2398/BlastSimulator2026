@@ -2328,6 +2328,7 @@
   "ui.contracts.decline": "Refuser",
   "ui.contracts.qty": "Qté",
   "ui.contracts.price": "Prix",
+  "ui.contracts.not_on_site": "Introuvable sur ce site",
   "ui.contracts.none": "Aucun contrat disponible.",
   "ui.contracts.none_active": "Aucun contrat actif.",
   "ui.contracts.closed": "Clôturés",

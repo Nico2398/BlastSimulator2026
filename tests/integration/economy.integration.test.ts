@@ -37,6 +37,8 @@ import { negotiateContract } from '../../src/core/economy/Negotiation.js';
 import { Random } from '../../src/core/math/Random.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { ORE_PRICES as ALL_ORE_PRICES } from '../../src/core/config/balance.js';
+const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 
 // ── Contract fixture helpers ─────────────────────────────────────────────────
 
@@ -271,7 +273,7 @@ describe('Economy', () => {
     // Initially empty
     expect(cs.available).toHaveLength(0);
 
-    generateContracts(cs, rng, 0);
+    generateContracts(cs, rng, 0, 1, ALL_ORES);
     expect(cs.available.length).toBeGreaterThan(0);
     expect(cs.lastRefreshTick).toBe(0);
 
@@ -289,7 +291,7 @@ describe('Economy', () => {
 
     // Consecutive calls within refresh interval should not generate more
     const countBefore = cs.available.length;
-    generateContracts(cs, rng, 5); // tick 5, still within interval
+    generateContracts(cs, rng, 5, 1, ALL_ORES); // tick 5, still within interval
     expect(cs.available).toHaveLength(countBefore);
   });
 
@@ -626,7 +628,7 @@ describe('Economy', () => {
 
   it('contract accept by material: selector still finds a same-kind contract after the numeric id it started as has rotated out of the pool', () => {
     const rng = new Random(7);
-    generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount);
+    generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount, 1, ALL_ORES);
     const target = ctx.state!.contracts.available[0]!;
     const evictedId = target.id;
 
@@ -635,7 +637,7 @@ describe('Economy', () => {
     let tick = ctx.state!.tickCount;
     while (ctx.state!.contracts.available.some(c => c.id === evictedId)) {
       tick += 20;
-      generateContracts(ctx.state!.contracts, new Random(7 + tick), tick);
+      generateContracts(ctx.state!.contracts, new Random(7 + tick), tick, 1, ALL_ORES);
     }
     expect(contractCommand(ctx, ['accept', String(evictedId)], {}).success).toBe(false);
 

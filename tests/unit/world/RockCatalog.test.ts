@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getRock, getAllRocks } from '../../../src/core/world/RockCatalog.js';
+import { getRock, getAllRocks, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
+import { getAllOres } from '../../../src/core/world/OreCatalog.js';
 
 describe('RockCatalog', () => {
   it('getRock returns valid data for cruite', () => {
@@ -57,5 +58,42 @@ describe('RockCatalog', () => {
       expect(rock.contrast).toBeGreaterThanOrEqual(0);
       expect(rock.contrast).toBeLessThanOrEqual(0.6);
     }
+  });
+});
+
+describe('oresYieldedByRocks (#1364)', () => {
+  it('Dusty Hollow rocks yield dirtite, rustite, blingite in catalog order', () => {
+    expect(oresYieldedByRocks(['cruite', 'sandite', 'molite'])).toEqual(['dirtite', 'rustite', 'blingite']);
+  });
+
+  it('returns [] for an empty rock list', () => {
+    expect(oresYieldedByRocks([])).toEqual([]);
+  });
+
+  it('ignores unknown rock ids', () => {
+    expect(oresYieldedByRocks(['not_a_rock'])).toEqual([]);
+    expect(oresYieldedByRocks(['not_a_rock', 'cruite'])).toEqual(['dirtite', 'rustite']);
+  });
+
+  it('contains no duplicates when rocks share ores', () => {
+    const out = oresYieldedByRocks(['cruite', 'sandite', 'cruite']);
+    expect(new Set(out).size).toBe(out.length);
+    expect(out).toEqual(['dirtite', 'rustite']);
+  });
+
+  it('orders by ore catalog order regardless of rock order', () => {
+    expect(oresYieldedByRocks(['molite', 'cruite'])).toEqual(['dirtite', 'rustite', 'blingite']);
+    const catalogOrder = getAllOres().map(o => o.id);
+    const out = oresYieldedByRocks(getAllRocks().map(r => r.id));
+    expect(out).toEqual(catalogOrder.filter(id => out.includes(id)));
+  });
+
+  it('includes ores of a deep rock (titanite yields treranium)', () => {
+    expect(oresYieldedByRocks(['titanite'])).toEqual(['absurdium', 'treranium']);
+  });
+
+  it('with every rock, yields every ore any rock can host', () => {
+    const expected = new Set(getAllRocks().flatMap(r => Object.entries(r.oreProbabilities).filter(([, p]) => p > 0).map(([id]) => id)));
+    expect(new Set(oresYieldedByRocks(getAllRocks().map(r => r.id)))).toEqual(expected);
   });
 });

@@ -4,7 +4,11 @@
 
 import type { GameState } from '../state/GameState.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
+import { getBiome } from '../world/BiomeCatalog.js';
+import { siteRockIds } from '../world/Strata.js';
+import { resolveGeneratedBiome } from '../world/TerrainGen.js';
+import { oresYieldedByRocks } from '../world/RockCatalog.js';
 
 // ── Types ──
 
@@ -230,6 +234,29 @@ export function resolveContractPriceMultiplier(state: GameState): number {
   const levelId = state.campaign.activeLevelId;
   if (!levelId) return 1;
   return getLevel(levelId)?.contractPriceMultiplier ?? 1;
+}
+
+/**
+ * Ore ids the state's level rocks can yield; contract offers draw from these.
+ * Unknown biome falls back to every priced ore.
+ */
+export function resolveContractOres(state: GameState): readonly string[] {
+  const declared = getBiome(state.mineType);
+  if (!declared) return Object.keys(ORE_PRICES);
+  const world = state.world;
+  if (!world) return oresYieldedByRocks(siteRockIds(declared.dominantRocks, false));
+  // Terrain generation lands on the climate-weighted biome, which can differ
+  // from the declared one, and the console seeds it per entry point: campaign
+  // start generates from the level's own terrainSeed + climateBias, while
+  // new_game / sandbox start use state.seed + the declared biome's climate
+  // centre. Mirror whichever one built this grid, so offers never drift from
+  // what it holds.
+  const level = state.campaign.activeLevelId ? getLevel(state.campaign.activeLevelId) : undefined;
+  const [seed, climateBias] = level
+    ? [level.terrainSeed, level.climateBias] as const
+    : [state.seed, declared.climateCenter] as const;
+  const generated = resolveGeneratedBiome(seed, world.baseSizeX, world.baseSizeZ, climateBias);
+  return oresYieldedByRocks(siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false));
 }
 
 /**

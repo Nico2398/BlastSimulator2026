@@ -9,6 +9,7 @@ import {
   NEGOTIATION_EARLY_BONUS_RATE,
   ORE_PRICES,
   RUBBLE_DISPOSAL_PRICE_RANGE,
+  SUPPLY_COMMON_ORE_COUNT,
 } from '../config/balance.js';
 
 // ── Contract types ──
@@ -83,8 +84,6 @@ export function createContractState(): ContractState {
   };
 }
 
-// Ore IDs that can appear in contracts, in rarity order.
-const CONTRACT_ORES = Object.keys(ORE_PRICES);
 const ORE_BASE_PRICES: Record<string, number> = ORE_PRICES;
 
 // ── Generation ──
@@ -94,8 +93,10 @@ export function generateContracts(
   state: ContractState,
   rng: Random,
   currentTick: number,
-  /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`). Defaults to 1 so every caller that doesn't pass one reproduces today's pricing exactly. */
-  priceMultiplier: number = 1,
+  /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`); pass 1 for unscaled pricing. */
+  priceMultiplier: number,
+  /** Ore ids the level's rocks can yield (Level.ts's resolveContractOres). */
+  availableOres: readonly string[],
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
@@ -105,25 +106,34 @@ export function generateContracts(
   if (overflow > 0) state.available.splice(0, overflow);
 
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    state.available.push(generateOneContract(state, rng, priceMultiplier));
+    state.available.push(generateOneContract(state, rng, priceMultiplier, availableOres));
   }
   state.lastRefreshTick = currentTick;
 }
 
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number = 1): Contract {
+/** The cheapest SUPPLY_COMMON_ORE_COUNT of the given ores, by base price. */
+function commonOres(ores: readonly string[]): string[] {
+  return [...ores]
+    .sort((a, b) => (ORE_BASE_PRICES[a] ?? 10) - (ORE_BASE_PRICES[b] ?? 10))
+    .slice(0, SUPPLY_COMMON_ORE_COUNT);
+}
+
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[]): Contract {
   const typeRoll = rng.nextFloat(0, 1);
+  // A site whose rocks yield no ore has nothing to sell or supply: rubble only.
+  const rubbleOnly = availableOres.length === 0;
   let type: ContractType;
   let materialId: string;
   let pricePerKg: number;
   let description: string;
 
-  if (typeRoll < 0.5) {
+  if (!rubbleOnly && typeRoll < 0.5) {
     // Ore sale contract
     type = 'ore_sale';
-    materialId = rng.pick(CONTRACT_ORES);
+    materialId = rng.pick(availableOres);
     pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
     description = `Deliver ${materialId} ore`;
-  } else if (typeRoll < 0.8) {
+  } else if (rubbleOnly || typeRoll < 0.8) {
     // Rubble disposal
     type = 'rubble_disposal';
     materialId = '';
@@ -132,7 +142,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   } else {
     // Supply contract (recurring, higher quantity, lower price)
     type = 'supply';
-    materialId = rng.pick(CONTRACT_ORES.slice(0, 4)); // Only common ores for supply
+    materialId = rng.pick(commonOres(availableOres)); // Only the site's cheapest ores for supply
     pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
     description = `Supply ${materialId} (bulk)`;
   }

@@ -19,6 +19,7 @@ import { formatDollars } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
+import { resolveContractOres } from '../../core/campaign/Level.js';
 
 // ── finances command ──
 
@@ -134,7 +135,7 @@ export function contractCommand(
 
   switch (sub) {
     case 'list': {
-      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state));
+      generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
       if (state.contracts.available.length === 0) {
         return { success: true, output: t('ui.contracts.none') };
       }
