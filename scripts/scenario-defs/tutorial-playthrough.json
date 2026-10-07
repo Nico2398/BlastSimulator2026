@@ -735,6 +735,22 @@
       "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time -- nothing between the two accept steps consumes a tick); #635 drops the numeric id entirely for the stable `type:ore_sale material:rustite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
     },
     {
+      "command": "contract hold type:ore_sale material:rustite",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract hold type:ore_sale material:rustite"
+        }
+      ],
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held: it keeps counting as active and still expires on its deadline, but takes no stock. First contract of the pair.",
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "contract deliver type:ore_sale material:rustite amount:5000",
       "interaction": [
         {
@@ -951,6 +967,22 @@
         }
       },
       "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:dirtite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
+    },
+    {
+      "command": "contract hold type:ore_sale material:dirtite",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract hold type:ore_sale material:dirtite"
+        }
+      ],
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason.",
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
     },
     {
       "command": "contract deliver type:ore_sale material:dirtite amount:5000",

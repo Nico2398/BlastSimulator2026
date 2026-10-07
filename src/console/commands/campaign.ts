@@ -91,8 +91,12 @@ export function campaignCompleteCommand(
   const level = getLevel(levelId);
   if (!level) return { success: false, output: t('campaign.complete_unknown_level', { levelId }) };
 
-  const shortfall = level.unlockThreshold - getOperatingProfit(ctx.state.finances);
-  if (shortfall > 0) {
+  // The ledger sums sequentially in floating point, so one grant can land a few
+  // ulps under the threshold (249999.99999999977 vs 250000) and read as "not
+  // met". Top up the residual until the sum reaches the threshold.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const shortfall = level.unlockThreshold - getOperatingProfit(ctx.state.finances);
+    if (shortfall <= 0) break;
     addIncome(ctx.state.finances, shortfall, 'contracts', 'debug:force_complete', ctx.state.tickCount);
   }
   ctx.state.cash = ctx.state.finances.cash;
