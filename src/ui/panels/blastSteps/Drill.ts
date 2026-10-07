@@ -21,7 +21,8 @@ import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/B
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
-import { buildReplacePatternConfirm, replacePatternLoss } from '../../replacePatternConfirm.js';
+import { planReplacementLoss } from '../../../core/mining/ChargeOrder.js';
+import { buildReplacePatternConfirm } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
 } from '../../../core/config/balance.js';
@@ -376,12 +377,7 @@ export class DrillStep {
       const run = (command: string): void => this.afterConfirm(overlay, command, () => { this.lastGridPattern = { rows, cols }; });
       // Replacing a drilled/charged pattern asks first (#1345).
       const st = this.lastState;
-      const loss = st && this.onConfirmRequestCb
-        ? replacePatternLoss(
-          st.drillHoles.length,
-          Object.keys(st.chargesByHole).length + Object.keys(st.plannedChargesByHole).length,
-        )
-        : null;
+      const loss = st && this.onConfirmRequestCb ? planReplacementLoss(st) : null;
       if (loss) {
         this.onConfirmRequestCb?.(buildReplacePatternConfirm(loss, () => run(`${cmd} confirm:true`)));
         return;

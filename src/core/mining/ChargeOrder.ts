@@ -100,11 +100,34 @@ export function isHoleChargeCovered(state: GameState, holeId: string): boolean {
   return state.chargesByHole[holeId] !== undefined || findOutstandingChargeAction(state, holeId) !== undefined;
 }
 
+/** Ids of holes with an outstanding charge order, built in one pass over the queue. */
+function outstandingChargeHoleIds(state: GameState): Set<string> {
+  const ids = new Set<string>();
+  for (const a of state.pendingActions) {
+    if (a.type === 'charge_hole') ids.add(a.payload['holeId'] as string);
+  }
+  return ids;
+}
+
 /**
- * The pattern charge, or null when none is set. A pattern whose explosive the
- * level no longer offers is cleared (with its waiting list) rather than ordered.
+ * What replacing the drill plan would lose: drilled holes and charges (loaded or
+ * planned). Null when the plan holds only ordered-not-yet-drilled holes, i.e.
+ * nothing worth confirming (#1345).
  */
-function activePattern(state: GameState): HoleCharge | null {
+export function planReplacementLoss(
+  state: Pick<GameState, 'drillHoles' | 'chargesByHole' | 'plannedChargesByHole'>,
+): { drilled: number; charged: number } | null {
+  const drilled = state.drillHoles.length;
+  const charged = Object.keys(state.chargesByHole).length + Object.keys(state.plannedChargesByHole).length;
+  return drilled > 0 || charged > 0 ? { drilled, charged } : null;
+}
+
+/**
+ * The pattern charge, or null when none is set. Side effect: a pattern whose
+ * explosive the level no longer offers is cleared (with its waiting list)
+ * rather than returned.
+ */
+function takePatternOrClearIfUnavailable(state: GameState): HoleCharge | null {
   const pattern = state.patternCharge;
   if (pattern == null) return null;
   if (!isExplosiveAvailable(state.campaign.activeLevelId, pattern.explosiveId)) {
@@ -115,7 +138,8 @@ function activePattern(state: GameState): HoleCharge | null {
   return pattern;
 }
 
-function removeAwaiting(state: GameState, holeId: string): void {
+/** Drop a hole from the awaiting-funds list. No-op when the list is absent. */
+export function removeAwaiting(state: GameState, holeId: string): void {
   if (state.chargeAwaitingFunds == null) return;
   state.chargeAwaitingFunds = state.chargeAwaitingFunds.filter(id => id !== holeId);
 }
@@ -147,7 +171,7 @@ function orderPatternCharge(state: GameState, hole: DrillHole, pattern: HoleChar
 
 /** Apply the pattern charge to a freshly drilled hole. Never throws. */
 export function autoChargeHole(state: GameState, hole: DrillHole): AutoChargeOutcome {
-  const pattern = activePattern(state);
+  const pattern = takePatternOrClearIfUnavailable(state);
   if (pattern == null || isHoleChargeCovered(state, hole.id)) return 'skipped';
   const outcome = orderPatternCharge(state, hole, pattern);
   return typeof outcome === 'string' ? outcome : 'invalid';
@@ -160,7 +184,7 @@ export function autoChargeHole(state: GameState, hole: DrillHole): AutoChargeOut
 export function settleAwaitingFundsCharges(state: GameState): void {
   const waiting = state.chargeAwaitingFunds;
   if (waiting == null || waiting.length === 0) return;
-  const pattern = activePattern(state);
+  const pattern = takePatternOrClearIfUnavailable(state);
   if (pattern == null) { state.chargeAwaitingFunds = []; return; }
   for (const id of [...waiting].sort()) {
     const hole = state.drillHoles.find(h => h.id === id);
@@ -175,12 +199,9 @@ export function chargePatternHoles(
   holes: ReadonlyArray<DrillHole>,
 ): { ordered: string[]; awaiting: string[]; invalid: ChargeError[] } {
   const result = { ordered: [] as string[], awaiting: [] as string[], invalid: [] as ChargeError[] };
-  const pattern = activePattern(state);
+  const pattern = takePatternOrClearIfUnavailable(state);
   if (pattern == null) return result;
-  const outstanding = new Set<string>();
-  for (const a of state.pendingActions) {
-    if (a.type === 'charge_hole') outstanding.add(a.payload['holeId'] as string);
-  }
+  const outstanding = outstandingChargeHoleIds(state);
   for (const hole of holes) {
     if (state.chargesByHole[hole.id] !== undefined || outstanding.has(hole.id)) continue;
     const outcome = orderPatternCharge(state, hole, pattern);

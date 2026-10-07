@@ -3,14 +3,6 @@
 import { t } from '../core/i18n/I18n.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 
-/** What a new grid would wipe, or null when the plan holds nothing worth confirming. */
-export function replacePatternLoss(
-  drilledCount: number,
-  chargeCount: number,
-): { drilled: number; charged: number } | null {
-  return drilledCount > 0 || chargeCount > 0 ? { drilled: drilledCount, charged: chargeCount } : null;
-}
-
 /** Build the confirm-modal config for replacing a drilled/charged pattern; `onConfirm` runs the grid command. */
 export function buildReplacePatternConfirm(
   loss: { drilled: number; charged: number },
