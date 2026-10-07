@@ -485,14 +485,14 @@ describe('charge order cash cost (#1341)', () => {
   });
 
   it('hole:* checks funds hole by hole: 2 of 3 affordable holes are ordered and paid, the third waits unpaid, the call succeeds (#1345)', () => {
-    // 3 holes x $60 = $180 needed, only $119 on hand.
-    const { run, state } = setupDrilled(1, 3, 119);
+    // 3 holes x $60 = $180 needed, only $120 on hand.
+    const { run, state } = setupDrilled(1, 3, 120);
     expect(state.drillHoles).toHaveLength(3);
 
     const result = run('charge hole:* explosive:boomite amount:5 stemming:2');
 
     expect(result.success).toBe(true);
-    expect(state.cash).toBe(119 - 120 + 1);
+    expect(state.cash).toBe(0);
     expect(state.pendingActions.filter(a => a.type === 'charge_hole').map(a => a.payload['holeId'])).toEqual(['H1', 'H2']);
     expect(Object.keys(state.plannedChargesByHole)).toEqual(['H1', 'H2']);
     expect(state.chargeAwaitingFunds).toEqual(['H3']);
@@ -780,8 +780,9 @@ describe('funds are checked hole by hole for pattern charges (#1345)', () => {
     expect(chargeActionsOf(state)).toHaveLength(2);
     expect(state.chargeAwaitingFunds).toEqual(['H3', 'H4']);
 
-    state.cash = 60;
-    state.finances.cash = 60;
+    // Per-tick upkeep trims cash below $60, so top up to just under two holes' worth.
+    state.cash = 100;
+    state.finances.cash = 100;
     run('tick 1');
 
     const orderedIds = Object.keys(state.plannedChargesByHole).concat(Object.keys(state.chargesByHole));
@@ -872,7 +873,7 @@ describe('drill_plan grid over a drilled or charged plan needs confirm:true (#13
     const result = run(GRID);
 
     expect(result.success).toBe(false);
-    expect(result.output).toBe(t('mining.drill_plan.confirm_replace'));
+    expect(result.output).toBe(t('mining.drill_plan.confirm_replace', { drilled: 2, charged: 0 }));
     expect(state.drillHoles).toEqual(holes);
   });
 

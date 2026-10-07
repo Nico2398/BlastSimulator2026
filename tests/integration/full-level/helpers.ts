@@ -6,6 +6,7 @@ import { campaignStartCommand, campaignCompleteCommand } from '../../../src/cons
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, chargeCommand, blastCommand } from '../../../src/console/commands/mining.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
+import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
@@ -155,6 +156,22 @@ export function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300):
 }
 
 /**
+ * Give the site a drill rig and license its first driller for it, so ordered
+ * holes actually land (#1345: FIRE refuses a site with no charged drilled hole).
+ * A no-op when the caller already bought a rig or hired no driller.
+ */
+export function ensureDrillRigCrew(ctx: GameContext): void {
+  const state = ctx.state!;
+  if (!state.vehicles.vehicles.some(v => v.type === 'drill_rig')) {
+    vehicleCommand(ctx as any, ['buy', 'drill_rig'], {});
+  }
+  const driller = state.employees.employees.find(e => e.role === 'driller');
+  if (driller) {
+    employeeCommand(ctx as any, ['assign_skill', String(driller.id)], { skill: 'driving.drill_rig', level: '1' });
+  }
+}
+
+/**
  * Perform a standard blast cycle: drill grid, charge all, blast.
  * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
  * @param ctx The game context (cast to MiningContext internally for command compatibility).
@@ -163,6 +180,7 @@ export function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300):
  * @returns The blast command output text.
  */
 export function performBlast(ctx: GameContext, originX: number, originZ: number): string {
+  ensureDrillRigCrew(ctx);
   drillPlanCommand(ctx as any, ['grid'], {
     origin: `${originX},${originZ}`,
     rows: '2',
@@ -170,12 +188,15 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
     spacing: '4',
     depth: '8',
   });
+  // Holes must be drilled and charged before FIRE has anything to blast (#1345).
+  driveDrillPlanToCompletion(ctx);
   chargeCommand(ctx as any, [], {
     hole: '*',
     explosive: 'boomite',
     amount: '5kg',
     stemming: '2m',
   });
+  driveChargePlanToCompletion(ctx);
   const result = blastCommand(ctx as any, [], {});
   return result.output;
 }

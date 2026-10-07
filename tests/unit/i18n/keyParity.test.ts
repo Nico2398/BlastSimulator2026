@@ -467,7 +467,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // ui.blast_workshop.step.sequence, ui.blast_workshop.sequence.*,
     // tutorial.stage.open_sequence_tab, tutorial.stage.auto_sequence,
     // tutorial.step7, tutorial.step7.title), both locales: 3751.
-    expect(Object.keys(en).length).toBe(3751);
+    expect(Object.keys(en).length).toBe(3765);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

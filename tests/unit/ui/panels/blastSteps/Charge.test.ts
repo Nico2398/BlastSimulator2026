@@ -84,7 +84,9 @@ describe('ChargeStep', () => {
 
   it('Charge All dispatches the selected explosive, amount, and stemming for every hole', () => {
     const { step, gameConsole } = makeStep();
-    step.update(makeState(), 'sunny');
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state, 'sunny');
     card(step, 'krackle').click();
 
     const chargeAllBtn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
@@ -389,11 +391,14 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
     expect(step.root.querySelectorAll('.bsx-reason')).toHaveLength(0);
   });
 
-  it('shows no overflow reason when there are no holes', () => {
+  it('shows no overflow reason, only the no-holes reason, when there are no holes (#1345)', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
 
-    expect(step.root.querySelectorAll('.bsx-reason')).toHaveLength(0);
+    expect(chargeAll(step).disabled).toBe(true);
+    const reasons = step.root.querySelectorAll('.bsx-reason');
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]!.textContent).toBe(t('ui.blast_workshop.charge.no_holes_reason'));
   });
 
   it('a disabled Charge All dispatches no command when clicked', () => {

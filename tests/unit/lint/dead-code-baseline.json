@@ -99,7 +99,6 @@
     "src/core/mining/BlastCalc.ts:PROJECTION_SPEED_THRESHOLD",
     "src/core/mining/BlastCalc.ts:parseKey",
     "src/core/mining/BlastResolve.ts:ResolveResult",
-    "src/core/mining/ChargePlan.ts:ChargeError",
     "src/core/mining/EnergyPropagation.ts:computeDistanceToAir",
     "src/core/mining/EnergyPropagation.ts:confinementFactor",
     "src/core/mining/FragmentGeneration.ts:FragmentGenerationResult",

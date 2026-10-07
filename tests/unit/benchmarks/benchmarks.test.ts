@@ -580,18 +580,22 @@ describe('Performance Benchmarks', () => {
 
   describe('Blast on level 4 (treranium_depths, 160×64×160) (#458 T6.2/D14)', () => {
     it('completes drill → charge → blast within the benchmark budget', async () => {
-      const { makeCampaignCtx } = await import('../../integration/full-level/helpers.js');
+      const { makeCampaignCtx, ensureDrillRigCrew, driveDrillPlanToCompletion, driveChargePlanToCompletion } = await import('../../integration/full-level/helpers.js');
       const { employeeCommand } = await import('../../../src/console/commands/entities.js');
       const { drillPlanCommand, chargeCommand, blastCommand } = await import('../../../src/console/commands/mining.js');
 
       const ctx = makeCampaignCtx('treranium_depths');
       employeeCommand(ctx, ['hire'], { role: 'driller' });
       employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '3' });
+      ensureDrillRigCrew(ctx);
 
       const start = performance.now();
 
+      // FIRE needs drilled, charged holes (#1345), so the crew works the plan first.
       drillPlanCommand(ctx as any, ['grid'], { origin: '80,80', rows: '3', cols: '3', spacing: '5', depth: '8' });
+      driveDrillPlanToCompletion(ctx);
       chargeCommand(ctx as any, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+      driveChargePlanToCompletion(ctx);
       const result = blastCommand(ctx as any, [], {});
 
       const elapsed = performance.now() - start;

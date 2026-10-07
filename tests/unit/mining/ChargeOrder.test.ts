@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import {
-  dispatchChargeAction, findOutstandingChargeAction, cancelOutstandingChargeAction,
+  dispatchChargeAction, cancelOutstandingChargeAction,
   chargeFundsFailureAmount, isHoleChargeCovered, autoChargeHole, settleAwaitingFundsCharges,
   chargePatternHoles,
 } from '../../../src/core/mining/ChargeOrder.js';
@@ -50,12 +50,12 @@ describe('dispatchChargeAction', () => {
   });
 });
 
-describe('findOutstandingChargeAction / cancelOutstandingChargeAction', () => {
-  it('finds the order of a hole and nothing for an unordered hole', () => {
+describe('cancelOutstandingChargeAction', () => {
+  it('covers the ordered hole and no other hole', () => {
     const state = makeState();
     dispatchChargeAction(state, hole(1), BOOMITE_5KG);
-    expect(findOutstandingChargeAction(state, 'H1')).toBeDefined();
-    expect(findOutstandingChargeAction(state, 'H2')).toBeUndefined();
+    expect(isHoleChargeCovered(state, 'H1')).toBe(true);
+    expect(isHoleChargeCovered(state, 'H2')).toBe(false);
   });
 
   it('cancel refunds the order cost and drops the planned charge', () => {
@@ -164,7 +164,7 @@ describe('settleAwaitingFundsCharges', () => {
   it('orders waiting holes in id order once cash allows, leaving the rest waiting', () => {
     const state = makeState(0);
     state.patternCharge = { ...BOOMITE_5KG };
-    for (const n of [1, 2, 3]) autoChargeHole(state, hole(n));
+    for (const n of [1, 2, 3]) { state.drillHoles.push(hole(n)); autoChargeHole(state, hole(n)); }
     expect(state.chargeAwaitingFunds).toEqual(['H1', 'H2', 'H3']);
 
     state.cash = 2 * COST_5KG;
@@ -179,6 +179,7 @@ describe('settleAwaitingFundsCharges', () => {
   it('cash exactly equal to one hole cost orders that hole', () => {
     const state = makeState(0);
     state.patternCharge = { ...BOOMITE_5KG };
+    state.drillHoles.push(hole(1));
     autoChargeHole(state, hole(1));
     state.cash = COST_5KG;
     settleAwaitingFundsCharges(state);
@@ -189,6 +190,7 @@ describe('settleAwaitingFundsCharges', () => {
   it('does nothing while still broke', () => {
     const state = makeState(0);
     state.patternCharge = { ...BOOMITE_5KG };
+    state.drillHoles.push(hole(1));
     autoChargeHole(state, hole(1));
     settleAwaitingFundsCharges(state);
     expect(state.chargeAwaitingFunds).toEqual(['H1']);
@@ -198,6 +200,7 @@ describe('settleAwaitingFundsCharges', () => {
   it('drops waiting holes whose pattern charge was cleared', () => {
     const state = makeState(0);
     state.patternCharge = { ...BOOMITE_5KG };
+    state.drillHoles.push(hole(1));
     autoChargeHole(state, hole(1));
     state.patternCharge = null;
     state.cash = 1000;

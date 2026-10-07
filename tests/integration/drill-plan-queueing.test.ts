@@ -330,11 +330,13 @@ function setupSavedPlan() {
  * Empties the site of drilled holes and charges without firing, so the crater
  * and debris of a real blast cannot make the reloaded holes unreachable.
  */
-function clearHolesWithoutBlast(state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; chargesByHole: Record<string, unknown> }): void {
+function clearHolesWithoutBlast(state: { cash: number; finances: { cash: number }; drillHoles: unknown[]; chargesByHole: Record<string, unknown>; patternCharge?: unknown }): void {
   // Keep the mine solvent while the crew works (the first run spent the starting cash).
   state.cash = 5_000_000;
   state.finances.cash = 5_000_000;
   state.drillHoles.length = 0;
+  // The pattern charge of the saved run would auto-charge the hole drilled next (#1345).
+  state.patternCharge = null;
   for (const k of Object.keys(state.chargesByHole)) delete state.chargesByHole[k];
 }
 
@@ -578,10 +580,11 @@ describe('blast_plan load — orders the saved plan instead of writing finished 
     expect(run('blast_plan load').success).toBe(true);
     expect(state.plannedDrillHoles).toHaveLength(4);
     expect(state.drillHoles).toHaveLength(0);
-    // Nothing is drilled, so firing clears no rock (the old instant load let it fire again).
-    const report = run('blast') as { success: boolean; output?: string };
+    // Nothing is drilled, so firing is refused and clears no rock (the old instant load let it fire again).
+    const report = run('blast');
+    expect(report.success).toBe(false);
+    expect(report.output).toBe(t('mining.blast.no_charged_holes'));
     expect(state.drillHoles).toHaveLength(0);
-    expect(report.output ?? '').toContain('Cleared voxels: 0');
   });
 
   it('drill_plan remove on a loaded planned hole cancels its charge order and refunds the cost', () => {
