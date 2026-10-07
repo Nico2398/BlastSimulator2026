@@ -34,7 +34,7 @@ The open-pr step passes `--draft` to `gh pr create` when evaluation is `draft`.
 
 ## READY TO MERGE
 
-The line goes into the body the PR is **created with** — the last line of `gh pr create --body` at the open-pr step, written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that hands a PR to the merge gate: `agentic-auto-merge` reads it, releases any workflow run parked as `action_required` on the PR head, and merges the PR once every channel is green on a head that contains `main`'s tip — merging `main` into a green head that is behind, and handing a conflict back to an agent. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
+The line goes into the body the PR is **created with** — the last line of the body file `gh pr create --body-file` takes at the open-pr step (`.github/PULL_REQUEST_TEMPLATE/pipeline.md` ends on it), written in the same command that opens the PR. It is never a later edit, and there is no step after open-pr that adds it. `READY TO MERGE` sits on its own line with nothing else on it. That line is the only thing that hands a PR to the merge gate: `agentic-auto-merge` reads it, releases any workflow run parked as `action_required` on the PR head, and merges the PR once every channel is green on a head that contains `main`'s tip — merging `main` into a green head that is behind, and handing a conflict back to an agent. The account that opened the PR is never consulted — see `agentic-autonomous-pipeline`.
 
 This is the **default**, skipped only in the three draft cases above. When skipping, post a comment naming the channel or blocker and the remedy — never a summary of how much work the run took:
 
@@ -77,7 +77,7 @@ A run that stops on a dependency it filed leaves its finished work on a draft PR
 |---|---|
 | Status | `--draft`, no `READY TO MERGE` |
 | Label | `paused` — **required** |
-| Body | `Closes #<issue>`, then Done / Remaining / What the blocker changes / Resuming. Format in `agentic-decision-autonomy` |
+| Body | `.github/PULL_REQUEST_TEMPLATE/paused.md`: `Closes #<issue>`, then Done / Remaining / What the blocker changes / Resuming. Procedure in `agentic-decision-autonomy` |
 | Issue | back to `ready` + `paused`, with the blocker as its `Blocked by` |
 
 **The label is load-bearing, not decoration.** `assignability.cjs` refuses any issue with an open deliverable PR — a second run would collide with the branch that PR is built on — and `paused` is the one exemption. Without it the issue is unassignable to everyone, forever: it sits `ready` behind a PR nobody is coming back to. With it, the next run is handed the PR number and its branch and told to continue there.
