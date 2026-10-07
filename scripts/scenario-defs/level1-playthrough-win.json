@@ -69,6 +69,14 @@
           "value": 6
         },
         {
+          "type": "focusTile",
+          "x": 18,
+          "z": 17,
+          "distance": 30,
+          "yaw": 180,
+          "pitch": 70
+        },
+        {
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
