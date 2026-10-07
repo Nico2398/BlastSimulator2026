@@ -78,7 +78,8 @@ function runBlastAndExpansion(ctx: GameContext): void {
   const holeIds = holes.map(h => h.id);
   const holeDepths: Record<string, number> = {};
   for (const h of holes) holeDepths[h.id] = h.depth;
-  const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+  // treranium_depths is tier 3 rock: a tier-matched explosive avoids the shortfall penalty (#1358).
+  const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 8, 2);
   const delays = autoVPattern(holes, 25);
   const plan = assembleBlastPlan(holes, charges, delays);
 

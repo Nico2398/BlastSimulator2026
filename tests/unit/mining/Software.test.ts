@@ -160,7 +160,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   it('previewEnergy retains less total energy over a smaller footprint when holes are wet (water-sensitive explosive)', () => {
     // Per-voxel energy saturates at the rock's absorption threshold, so max/min can
     // coincide; the total retained and the number of energised voxels do not.
-    const { grid, plan } = planWith('boomite');
+    const { grid, plan } = planWith('big_bada_boom');
     const dry = previewEnergy(plan, grid, 1)!;
     const wet = previewEnergy(plan, grid, 1, allWet(plan))!;
     const total = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
@@ -170,14 +170,14 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('previewFragments reports fewer fractured voxels wet than dry', () => {
-    const { grid, plan } = planWith('boomite');
+    const { grid, plan } = planWith('big_bada_boom');
     const dry = previewFragments(plan, grid, 2)!;
     const wet = previewFragments(plan, grid, 2, allWet(plan))!;
     expect(wet.fracturedCount).toBeLessThan(dry.fracturedCount);
   });
 
   it('previewFragments wet cracked count matches executeBlast with the same wet set, and both drop vs dry', () => {
-    const { grid, plan } = planWith('boomite');
+    const { grid, plan } = planWith('big_bada_boom');
     const wetIds = allWet(plan);
     const dry = previewFragments(plan, grid, 2)!;
     const preview = previewFragments(plan, grid, 2, wetIds)!;
@@ -193,7 +193,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('previewProjections differs wet vs dry for a water-sensitive explosive', () => {
-    const { grid, plan } = planWith('boomite');
+    const { grid, plan } = planWith('big_bada_boom');
     const dry = previewProjections(plan, grid, 3)!;
     const wet = previewProjections(plan, grid, 3, allWet(plan))!;
     expect(wet.projectionZoneCount).not.toBe(dry.projectionZoneCount);
@@ -238,7 +238,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
 
   describe('omitted wetHoleIds', () => {
     it('equals an explicit empty set, and differs from an all-wet set', () => {
-      const { grid, plan } = planWith('boomite');
+      const { grid, plan } = planWith('big_bada_boom');
       const empty = new Set<string>();
       expect(previewEnergy(plan, grid, 1)).toEqual(previewEnergy(plan, grid, 1, empty));
       expect(previewFragments(plan, grid, 2)).toEqual(previewFragments(plan, grid, 2, empty));
@@ -250,7 +250,7 @@ describe('Software — wet-hole modelling (#1347)', () => {
   });
 
   it('an id that is not in the plan changes nothing', () => {
-    const { grid, plan } = planWith('boomite');
+    const { grid, plan } = planWith('big_bada_boom');
     expect(previewFragments(plan, grid, 2, new Set(['no-such-hole'])))
       .toEqual(previewFragments(plan, grid, 2));
   });

@@ -127,7 +127,7 @@ Each has: ore probability, procedural texture, hardness, porosity, density.
 Examples: Cruite (soft), Grumpite (medium), Obstiite (hard), endgame rocks.
 
 ### Explosives (fictional, humorous names)
-Each has: energy yield, cost, water sensitivity, charge limits, rock tier requirement, blast radius modifier, vibration profile.
+Each has: energy yield, cost, water sensitivity, charge limits, minimum rock tier (rock harder than that breaks only at a steep energy penalty, never refused), vibration profile.
 Examples: Pop-Rock (starter), Big Bada Boom (mid), Dynatomics (endgame).
 Cost: costPerKg x kg is charged when the charge order is placed (finance category `explosives`) and refunded in full if the order is cancelled; firing the blast charges nothing.
 
