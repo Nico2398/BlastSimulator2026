@@ -12,7 +12,7 @@ import { SurveyConfidenceOverlay } from '../../../src/renderer/SurveyConfidenceO
 import type {
   SurveyConfidencePoint,
 } from '../../../src/renderer/SurveyConfidenceOverlay.js';
-import { isSurveyStale } from '../../../src/core/mining/SurveyCalc.js';
+import { isSurveyStale, markSurveysStaleByBlast } from '../../../src/core/mining/SurveyCalc.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -109,6 +109,10 @@ describe('survey-stale-handling scenario definition', () => {
       'fragments', 'preview', 'blast_preview', 'install_tubing',
       'build_ramp', 'set_policy', 'terrain_info', 'help',
       'blast_plan', 'needs',
+      // wait_until (#590/#554): a descriptive-only pseudo-command, never
+      // executed as one -- the real spec lives in the step's own
+      // `interaction` array.
+      'wait_until',
     ];
     const scenario = loadScenario();
     for (let i = 0; i < scenario.steps.length; i++) {
@@ -124,27 +128,34 @@ describe('survey-stale-handling scenario definition', () => {
 
 // ── Stale handling pipeline validation ─────────────────────────────────────
 
-describe('survey-stale-handling — stale detection', () => {
-  it('survey completed at tick 0 is fresh at tick 100', () => {
+describe('survey-stale-handling — stale detection (#1356, blast-driven)', () => {
+  it('survey completed at tick 0 is fresh at any tick without a blast', () => {
     const survey = makeSurvey(0);
-    expect(isSurveyStale(survey, 100)).toBe(false);
+    expect(isSurveyStale(survey)).toBe(false);
+    const sameSurvey: SurveyResult = { ...survey, completedTick: 0 };
+    expect(isSurveyStale(sameSurvey)).toBe(false);
   });
 
-  it('survey completed at tick 0 is stale at tick 101', () => {
+  it('survey is stale once a blast clears a column in its disc', () => {
     const survey = makeSurvey(0);
-    expect(isSurveyStale(survey, 101)).toBe(true);
+    expect(markSurveysStaleByBlast([survey], ['20,20'])).toBe(1);
+    expect(isSurveyStale(survey)).toBe(true);
+  });
+
+  it('a blast far outside the disc leaves the survey fresh', () => {
+    const survey = makeSurvey(0);
+    expect(markSurveysStaleByBlast([survey], ['200,200'])).toBe(0);
+    expect(isSurveyStale(survey)).toBe(false);
   });
 
   it('fresh survey has fresh=true in confidence points', () => {
     const survey = makeSurvey(50);
-    const fresh = !isSurveyStale(survey, 100);
-    expect(fresh).toBe(true);
+    expect(!isSurveyStale(survey)).toBe(true);
   });
 
   it('stale survey has fresh=false in confidence points', () => {
-    const survey = makeSurvey(0);
-    const fresh = !isSurveyStale(survey, 200);
-    expect(fresh).toBe(false);
+    const survey = { ...makeSurvey(0), stale: true };
+    expect(!isSurveyStale(survey)).toBe(false);
   });
 });
 
@@ -244,12 +255,13 @@ describe('survey-stale-handling — stale visual rendering', () => {
 // ── Stale handling scenario flow ───────────────────────────────────────────
 
 describe('survey-stale-handling — scenario flow', () => {
-  it('scenario runs initial survey and waits for stale expiry', () => {
+  it('scenario blasts over the initial survey to make it stale (no tick-waiting)', () => {
     const scenario = loadScenario();
     const commands = scenario.steps.map(getCommand);
-    const tickCount = commands.filter(c => c.startsWith('tick')).length;
-    // Must tick past 100 ticks to make survey stale
-    expect(tickCount).toBeGreaterThanOrEqual(8);
+    const surveyIdx = commands.findIndex(c => /^survey (seismic|core_sample|aerial)/.test(c));
+    const blastIdx = commands.findIndex(c => c === 'blast');
+    expect(surveyIdx).toBeGreaterThanOrEqual(0);
+    expect(blastIdx).toBeGreaterThan(surveyIdx);
   });
 
   it('scenario runs a second survey after staleness to refresh', () => {

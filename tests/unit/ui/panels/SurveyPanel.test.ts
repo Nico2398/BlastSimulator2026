@@ -5,7 +5,6 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { SurveyResult } from '../../../../src/core/mining/SurveyCalc.js';
-import { SURVEY_STALE_TICKS } from '../../../../src/core/config/balance.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -152,9 +151,9 @@ describe('SurveyPanel', () => {
     expect(text.indexOf('Sparkium')).toBeLessThan(text.indexOf('Rustite'));
   });
 
-  it('flags a survey older than SURVEY_STALE_TICKS as stale, and a fresh one as not', () => {
+  it('flags a survey carrying the stale flag as stale, and an unflagged one as not (#1356)', () => {
     const { panel: stalePanel } = makePanel();
-    const staleState = makeState({ tickCount: SURVEY_STALE_TICKS + 1, surveyResults: [makeSurveyResult({ completedTick: 0 })] });
+    const staleState = makeState({ tickCount: 5, surveyResults: [makeSurveyResult({ completedTick: 0, stale: true })] });
     stalePanel.update(staleState);
     expect(stalePanel.root.textContent).toContain('Stale');
 
@@ -162,6 +161,13 @@ describe('SurveyPanel', () => {
     const freshState = makeState({ tickCount: 5, surveyResults: [makeSurveyResult({ completedTick: 0 })] });
     freshPanel.update(freshState);
     expect(freshPanel.root.textContent).not.toContain('Stale');
+  });
+
+  it('an old survey with no blast stays fresh however many ticks passed (#1356)', () => {
+    const { panel } = makePanel();
+    const state = makeState({ tickCount: 1_000_000, surveyResults: [makeSurveyResult({ completedTick: 0 })] });
+    panel.update(state);
+    expect(panel.root.textContent).not.toContain('Stale');
   });
 
   it('locate button calls window.__cameraFocus with the real survey coordinates', () => {

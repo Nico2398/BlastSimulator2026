@@ -1,6 +1,6 @@
 {
   "name": "survey-overlay-lifecycle",
-  "description": "Survey confidence overlay lifecycle: fresh survey rendering → tick past stale threshold → new survey refreshes overlay → blast terrain remesh preserves overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
+  "description": "Survey confidence overlay lifecycle: fresh survey rendering → new survey refreshes overlay → blast over the surveyed area marks those surveys stale (grey) and the terrain remesh preserves the overlay. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext().",
   "shots": [
     {
       "name": "overview",
@@ -409,7 +409,7 @@
     },
     {
       "command": "survey aerial x:20 z:20",
-      "description": "Round 2: a stale-vs-fresh comparison against the round-1 surveys.",
+      "description": "Round 2: a second, fresh survey at the same spot; the round-1 surveys turn stale only once the blast below fires.",
       "interaction": [
         {
           "type": "clickSelector",

@@ -10,6 +10,12 @@ export function surveyColumnKey(x: number, z: number): string {
   return `${Math.floor(x)},${Math.floor(z)}`;
 }
 
+/** Inverse of `surveyColumnKey`: the `{ x, z }` column coordinates of a `"x,z"` key. */
+export function parseColumnKey(key: string): { x: number; z: number } {
+  const [x, z] = key.split(',');
+  return { x: Number(x), z: Number(z) };
+}
+
 /**
  * Most recently completed survey with an estimate for the column containing
  * `(x, z)`, or `undefined` when none covers it.

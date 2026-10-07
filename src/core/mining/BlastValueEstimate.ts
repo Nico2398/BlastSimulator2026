@@ -5,6 +5,7 @@
 
 import type { BlastPlan } from './BlastPlan.js';
 import type { SurveyResult } from './SurveyCalc.js';
+import { freshSurveys } from './SurveyStaleness.js';
 import { findSurveyForColumn } from './SurveyColumn.js';
 import { getOre } from '../world/OreCatalog.js';
 import {
@@ -49,7 +50,7 @@ function coveredColumns(
  * A hole breaks more than its own column: every column within
  * `BLAST_ESTIMATE_BREAK_RADIUS_M` of a hole is assumed to break to
  * `BLAST_ESTIMATE_BROKEN_DEPTH_FACTOR` × the deepest covering hole's depth.
- * Each such column is valued from the most recent survey covering it:
+ * Each such column is valued from the most recent fresh (non-stale) survey covering it:
  * `volume × density × ORE_DENSITY_KG_M3 × ore.valuePerKg × confidence`
  * (a low-confidence aerial pass counts for less than a core sample).
  * Columns with no covering survey, no ore, or an unknown ore id contribute 0.
@@ -59,11 +60,12 @@ export function estimateBlastOreValue(
   surveyResults: readonly SurveyResult[],
 ): number {
   let value = 0;
+  const surveys = freshSurveys(surveyResults);
   const columnArea = VoxelGrid.CELL_SIZE * VoxelGrid.CELL_SIZE;
 
   for (const [colKey, maxDepth] of coveredColumns(plan.holes, BLAST_ESTIMATE_BREAK_RADIUS_M)) {
     const [colX, colZ] = colKey.split(',');
-    const survey = findSurveyForColumn(surveyResults, Number(colX), Number(colZ));
+    const survey = findSurveyForColumn(surveys, Number(colX), Number(colZ));
     const colEstimates = survey?.estimates[colKey];
     if (!survey || !colEstimates) continue;
 
