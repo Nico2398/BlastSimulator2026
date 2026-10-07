@@ -7,6 +7,7 @@ import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, 
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
+import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
 
@@ -89,6 +90,28 @@ export interface TerrainContext {
   oreVeins: OreVeinSampler;
 }
 
+/** Dominant climate-weighted biome at the playable centre — what terrain generation lands on. */
+function centerBiome(
+  fields: WorldNoiseFields, sizeX: number, sizeZ: number, climateBias: readonly [number, number],
+): BiomeDef {
+  return dominantBiome(
+    selectBiomeWeights(fields.temperature(sizeX / 2, sizeZ / 2), fields.humidity(sizeX / 2, sizeZ / 2), climateBias, 1.0),
+  );
+}
+
+/**
+ * The biome terrain generation actually lands on for these params. It can
+ * differ from a level's declared biome, so anything asking "which rocks does
+ * this site contain" (contract ores, #1364) must ask here rather than the
+ * declared one. Shares centerBiome with buildTerrainContext. Cheap (two noise
+ * samples), so deliberately uncached.
+ */
+export function resolveGeneratedBiome(
+  seed: number, sizeX: number, sizeZ: number, climateBias: readonly [number, number],
+): BiomeDef {
+  return centerBiome(new WorldNoiseFields(seed), sizeX, sizeZ, climateBias);
+}
+
 /**
  * Builds everything generateTerrain needs from one config: the world height
  * sampler, the grid's single dominant biome, and its strata/ore samplers.
@@ -107,13 +130,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
     return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
   });
 
-  const centerBiomeWeights = selectBiomeWeights(
-    worldGen.fields.temperature(sizeX / 2, sizeZ / 2),
-    worldGen.fields.humidity(sizeX / 2, sizeZ / 2),
-    climateBias,
-    1.0,
-  );
-  const biome = dominantBiome(centerBiomeWeights);
+  const biome = centerBiome(worldGen.fields, sizeX, sizeZ, climateBias);
 
   const profile = mixedRockHardness
     ? buildMixedHardnessStrata(biome.dominantRocks)

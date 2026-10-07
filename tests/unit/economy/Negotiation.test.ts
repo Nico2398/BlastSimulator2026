@@ -15,11 +15,13 @@ import {
   type NegotiationResult,
 } from '../../../src/core/economy/Negotiation.js';
 import { NEGOTIATION_EARLY_BONUS_RATE, NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL } from '../../../src/core/config/balance.js';
+import { ORE_PRICES as ALL_ORE_PRICES } from '../../../src/core/config/balance.js';
+const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 
 function setupContracts(seed: number) {
   const state = createContractState();
   const rng = new Random(seed);
-  generateContracts(state, rng, 0);
+  generateContracts(state, rng, 0, 1, ALL_ORES);
   return { state, rng };
 }
 
@@ -192,7 +194,7 @@ describe('earlyBonus follows price (#1366)', () => {
   it('matches generated offers', () => {
     for (const mult of [1, 4]) {
       const state = createContractState();
-      generateContracts(state, new Random(21), 0, mult);
+      generateContracts(state, new Random(21), 0, mult, ALL_ORES);
       for (const c of state.available) {
         expect(c.earlyBonus).toBe(computeEarlyBonus(c.quantityKg, c.pricePerKg));
       }

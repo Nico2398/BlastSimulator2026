@@ -11,6 +11,7 @@ import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
+import { resolveContractOres } from '../../core/campaign/Level.js';
 import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -176,7 +177,7 @@ export function campaignStartCommand(
 
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier);
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state));
 
   // Report the cash actually in hand, not the level default — an override that
   // took effect but printed the default would be indistinguishable from one
