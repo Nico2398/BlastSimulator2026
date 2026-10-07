@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DrillStep } from '../../../../../src/ui/panels/blastSteps/Drill.js';
+import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { installTubing, buyTubing } from '../../../../../src/core/mining/Tubing.js';
@@ -88,17 +89,18 @@ describe('DrillStep', () => {
     expect(step.root.textContent).not.toContain('TUBED');
   });
 
-  it('shows WET for an untubed hole while it is raining', () => {
+  it('shows WET for a hole that holds water', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
 
-    step.update(state, 'heavy_rain');
+    wetAllHoles(state);
+    step.update(state, 'sunny');
 
     expect(step.root.textContent).toContain('WET');
   });
 
-  it('shows TUBED even while raining, once tubing is installed', () => {
+  it('shows TUBED for a dry tubed hole even while raining, once tubing is installed', () => {
     const { step } = makeStep();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);

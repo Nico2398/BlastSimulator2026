@@ -6,6 +6,7 @@ import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { getExplosive, getAllExplosives } from '../../../../../src/core/world/ExplosiveCatalog.js';
 import type { DrillHole } from '../../../../../src/core/mining/DrillPlan.js';
 import type { ColumnRock } from '../../../../../src/core/mining/ExplosiveRockFit.js';
+import { wetAllHoles, setHoleWater } from '../../../../helpers/holeWater.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
 import { CHARGE_DEFAULT_AMOUNT_KG, CHARGE_DEFAULT_STEMMING_M } from '../../../../../src/core/config/balance.js';
@@ -68,7 +69,8 @@ describe('ChargeStep', () => {
     const waterSensitiveId = ['pop_rock', 'krackle', 'shatternite', 'obliviax'].find(id => getExplosive(id)?.waterSensitive)!;
     expect(card(step, waterSensitiveId).textContent).not.toContain('WATER-SENSITIVE');
 
-    step.update(state, 'heavy_rain'); // raining, hole untubed → wet
+    wetAllHoles(state); // the hole holds water now, whatever the weather
+    step.update(state, 'heavy_rain');
     expect(card(step, waterSensitiveId).textContent).toContain('WATER-SENSITIVE');
   });
 
@@ -76,6 +78,7 @@ describe('ChargeStep', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
     const dryId = ['boomite', 'big_bada_boom', 'rumblox', 'dynatomics'].find(id => getExplosive(id)?.waterSensitive === false)!;
@@ -231,15 +234,56 @@ describe('ChargeStep', () => {
     expect(stemmingValue.textContent).toBe('0.5 m');
   });
 
-  it('shows the tubing "settled" card when no hole is wet', () => {
+  it('shows the tubing "settled" card when every hole is dry and tubed', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    state.tubingState.installedHoles.add(hole.id);
 
     step.update(state, 'sunny');
 
     expect(step.root.textContent).toContain('dry or tubed');
     expect(step.root.querySelector('[data-action="tubing-install"]')).toBeNull();
+  });
+
+  it('shows the tubing card with buy and install in dry weather, so holes can be tubed ahead of rain (#1350)', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    state.tubingState.inventory = 5;
+
+    step.update(state, 'sunny');
+
+    const buyBtn = step.root.querySelector('[data-action="tubing-buy"]') as HTMLButtonElement;
+    const installBtn = step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement;
+    expect(buyBtn).not.toBeNull();
+    expect(installBtn).not.toBeNull();
+    expect(installBtn.disabled).toBe(false);
+    expect(t('ui.blast_workshop.charge.tubing_ahead', { count: 2 })).not.toBe('ui.blast_workshop.charge.tubing_ahead');
+    expect(step.root.textContent).not.toContain('holes are taking on water');
+
+    installBtn.click();
+    expect(gameConsole).toHaveBeenCalledWith(`install_tubing hole:${h1.id}`);
+    expect(gameConsole).toHaveBeenCalledWith(`install_tubing hole:${h2.id}`);
+
+    buyBtn.click();
+    expect(gameConsole).toHaveBeenCalledWith('buy amount:10');
+  });
+
+  it('dry-weather tubing install skips holes that are already tubed', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    state.tubingState.installedHoles.add(h1.id);
+    state.tubingState.inventory = 5;
+
+    step.update(state, 'sunny');
+    (step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole).toHaveBeenCalledWith(`install_tubing hole:${h2.id}`);
   });
 
   it('shows the tubing "needed" card with the wet count once it starts raining', () => {
@@ -248,6 +292,7 @@ describe('ChargeStep', () => {
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
 
+    wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
     expect(step.root.textContent).toContain('2 holes are taking on water');
@@ -260,6 +305,7 @@ describe('ChargeStep', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
     (step.root.querySelector('[data-action="tubing-buy"]') as HTMLButtonElement).click();
@@ -271,6 +317,7 @@ describe('ChargeStep', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
     const buyBtn = step.root.querySelector('[data-action="tubing-buy"]') as HTMLButtonElement;
@@ -283,6 +330,7 @@ describe('ChargeStep', () => {
     const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     state.tubingState.inventory = 5;
+    wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
     (step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement).click();
@@ -298,6 +346,7 @@ describe('ChargeStep', () => {
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
     state.tubingState.inventory = 1; // 2 holes wet, only 1 tube in stock
+    wetAllHoles(state);
     step.update(state, 'heavy_rain');
 
     const installBtn = step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement;
@@ -306,6 +355,83 @@ describe('ChargeStep', () => {
 
     installBtn.click();
     expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  describe('draining (#1350)', () => {
+    const drainAll = (step: ChargeStep) => step.root.querySelector('[data-action="drain-holes"]') as HTMLButtonElement;
+
+    it('Drain button is disabled with a visible localized reason when no hole is wet', () => {
+      const { step, gameConsole } = makeStep();
+      const state = makeState();
+      addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+
+      step.update(state, 'sunny');
+
+      expect(drainAll(step)).not.toBeNull();
+      expect(drainAll(step).disabled).toBe(true);
+      expect(step.root.textContent).toContain(t('ui.blast_workshop.charge.drain_none_reason'));
+      drainAll(step).click();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('Drain button is enabled for a wet untubed tight-rock hole and drains every hole', () => {
+      const { step, gameConsole } = makeStep();
+      const state = makeState();
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      setHoleWater(state, [h1.id], 0.9, 0.03);
+
+      step.update(state, 'sunny');
+
+      expect(drainAll(step).disabled).toBe(false);
+      expect(step.root.textContent).not.toContain(t('ui.blast_workshop.charge.drain_none_reason'));
+      drainAll(step).click();
+      expect(gameConsole).toHaveBeenCalledWith('drain_hole hole:*');
+    });
+
+    it('Drain button is disabled with the porous reason when every wet hole is untubed porous rock', () => {
+      const { step, gameConsole } = makeStep();
+      const state = makeState();
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      setHoleWater(state, [h1.id], 0.9, 0.35);
+
+      step.update(state, 'heavy_rain');
+
+      expect(drainAll(step).disabled).toBe(true);
+      expect(step.root.textContent).toContain(t('ui.blast_workshop.charge.drain_porous_reason'));
+      drainAll(step).click();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('Drain button is enabled once the porous wet hole is tubed', () => {
+      const { step } = makeStep();
+      const state = makeState();
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      setHoleWater(state, [h1.id], 0.9, 0.35);
+      state.tubingState.installedHoles.add(h1.id);
+
+      step.update(state, 'sunny');
+
+      expect(drainAll(step).disabled).toBe(false);
+    });
+
+    it('each wet hole row has its own drain button dispatching drain_hole for that hole', () => {
+      const { step, gameConsole } = makeStep();
+      const state = makeState();
+      const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+      const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+      setHoleWater(state, [h2.id], 0.9, 0.03);
+
+      step.update(state, 'sunny');
+
+      const btn = step.root.querySelector(`[data-hole="${h2.id}"] [data-action="drain-hole"]`) as HTMLButtonElement;
+      expect(btn).not.toBeNull();
+      expect(btn.disabled).toBe(false);
+      btn.click();
+      expect(gameConsole).toHaveBeenCalledWith(`drain_hole hole:${h2.id}`);
+
+      const dryBtn = step.root.querySelector(`[data-hole="${h1.id}"] [data-action="drain-hole"]`) as HTMLButtonElement | null;
+      expect(dryBtn === null || dryBtn.disabled).toBe(true);
+    });
   });
 
   it('dispose() removes the step from the DOM', () => {

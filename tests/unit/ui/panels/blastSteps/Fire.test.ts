@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
+import { wetAllHoles } from '../../../../helpers/holeWater.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { purchaseVehicle } from '../../../../../src/core/entities/Vehicle.js';
@@ -186,14 +187,16 @@ describe('FireStep', () => {
     expect(gameConsole).not.toHaveBeenCalled();
   });
 
-  it('pre-flight checklist warns about wet holes while raining, and clears once dry', () => {
+  it('pre-flight checklist warns about holes holding water, and clears once they are dry', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
 
+    wetAllHoles(state);
     step.update(state, 'heavy_rain');
     expect(step.root.textContent).toContain('holes are full of water');
 
+    state.holeWater = {};
     step.update(state, 'sunny');
     expect(step.root.textContent).toContain('dry or tubed');
   });
