@@ -3,6 +3,7 @@
 // Each has cost, success probability, exposure risk.
 
 import type { Random } from '../math/Random.js';
+import type { EventSystemState } from './EventSystem.js';
 import type { CorruptionState } from '../economy/Corruption.js';
 import type { GameState } from '../state/GameState.js';
 import type { EmployeeState } from '../entities/Employee.js';
@@ -33,6 +34,8 @@ export interface MafiaState {
   smugglingActive: boolean;
   smugglingIncome: number;
   pendingFrames: PendingFrame[];
+  /** Tick of the last mafia action or smuggling activity; drives exposure decay (#1411). */
+  lastActivityTick: number;
 }
 
 export interface PendingFrame {
@@ -47,6 +50,7 @@ export function createMafiaState(): MafiaState {
     smugglingActive: false,
     smugglingIncome: 0,
     pendingFrames: [],
+    lastActivityTick: 0,
   };
 }
 
@@ -208,3 +212,14 @@ export function isExposed(mafia: MafiaState, rng: Random): boolean {
 }
 
 export { ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS, SMUGGLE_BASE_INCOME };
+
+/** Botched action triggers a police investigation: bumps exposure, queues follow-up event. Returns exposure added (#1411). */
+export function applyInvestigation(_mafia: MafiaState, _events: EventSystemState): number {
+  // TODO: implement
+  return 0;
+}
+
+/** Decay exposure risk after a clean grace period without activity (#1411). */
+export function decayExposure(_mafia: MafiaState, _tick: number): void {
+  // TODO: implement
+}

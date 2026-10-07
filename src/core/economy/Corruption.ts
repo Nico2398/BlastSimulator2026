@@ -3,6 +3,7 @@
 // More corruption → higher failure risk → mafia events unlock.
 
 import type { Random } from '../math/Random.js';
+import type { ScoreState } from '../scores/ScoreManager.js';
 import { BRIBERY_BASE_SUCCESS, BRIBERY_HISTORY_PENALTY, MAFIA_UNLOCK_THRESHOLD } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
@@ -118,3 +119,19 @@ export function getSuccessRate(state: CorruptionState): number {
 }
 
 export { BASE_SUCCESS_RATE, HISTORY_PENALTY, TARGET_COSTS };
+
+/** Fine levied on a failed bribe of the given cost (#1411). */
+export function bribeFailureFine(_cost: number): number {
+  // TODO: implement
+  return 0;
+}
+
+/** Apply failed-bribe consequences: corruption level, nuisance hit; returns the fine to charge (#1411). */
+export function applyBribeFailure(
+  _state: CorruptionState,
+  _scores: ScoreState,
+  _cost: number,
+): { fine: number } {
+  // TODO: implement
+  return { fine: 0 };
+}

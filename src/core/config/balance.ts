@@ -1751,3 +1751,30 @@ export const INJURY_ON_FOOT_RECOVERY_RATE = 1;
 
 /** Recovery progress per tick by living-quarters tier (#1382). */
 export const INJURY_RECOVERY_RATE_BY_LQ_TIER: Record<1 | 2 | 3, number> = { 1: 2, 2: 3, 3: 4 };
+
+/** Fraction of the bribe cost levied as a fine when a bribe fails (#1411). */
+export const BRIBERY_FAILURE_FINE_FRACTION = 0.5;
+
+/** Nuisance score hit on a failed bribe (#1411). */
+export const BRIBERY_FAILURE_NUISANCE_HIT = 8;
+
+/** Corruption level change on a failed bribe (#1411). */
+export const BRIBERY_FAILURE_CORRUPTION_DELTA = 2;
+
+/** Exposure risk added when a botched mafia action triggers an investigation (#1411). */
+export const INVESTIGATION_EXPOSURE_JUMP = 0.2;
+
+/** Event id queued as follow-up to a police investigation (#1411). */
+export const INVESTIGATION_FOLLOWUP_EVENT_ID = 'mafia_police_investigation';
+
+/** Ticks without mafia activity before exposure risk starts decaying (#1411). */
+export const EXPOSURE_CLEAN_GRACE_TICKS = 30;
+
+/** Exposure risk lost per tick once the clean grace period has passed (#1411). */
+export const EXPOSURE_DECAY_PER_TICK = 0.004;
+
+/** Fine levied when smuggling is exposed (#1411). */
+export const SMUGGLING_EXPOSED_FINE = 25000;
+
+/** Exposure risk added when smuggling is exposed (#1411). */
+export const SMUGGLING_EXPOSED_EXPOSURE_JUMP = 0.1;
