@@ -575,6 +575,17 @@
       "role": "observe"
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "The blast's own tick span can raise an event whose modal covers the toolbar; resolve it through its own buttons before the survey panel is opened.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "survey core_sample x:30 z:30",
       "interaction": [
         {
