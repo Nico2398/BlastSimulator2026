@@ -206,10 +206,11 @@ jobs:
             const repo = context.repo.repo;
             const rules = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/assignability.cjs`);
             const names = (labels) => (labels || []).map((l) => (typeof l === 'string' ? l : l.name));
-            // Free is the colour these labels always had; held is the colour of
-            // `in-progress`, the label on the issue that holds them.
+            // Free is the colour these labels always had; held is a pale,
+            // desaturated yellow — kin to `in-progress`, the label on the issue
+            // that holds them, but distinct from it in the label list.
             const FREE = 'c5def5';
-            const HELD = 'fbca04';
+            const HELD = 'ebe0b8';
 
             const live = (await github.paginate(github.rest.issues.listForRepo, {
               owner, repo, labels: rules.IN_PROGRESS, state: 'open', per_page: 100,
