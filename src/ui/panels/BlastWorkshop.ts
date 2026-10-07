@@ -18,6 +18,8 @@ import type { GameConsoleFn } from '../gameConsole.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { BlastFooter } from './blastFooter.js';
 import { DrillStep } from './blastSteps/Drill.js';
+import type { DrillHole } from '../../core/mining/DrillPlan.js';
+import type { ColumnRock } from '../../core/mining/ExplosiveRockFit.js';
 import { ChargeStep } from './blastSteps/Charge.js';
 import { SequenceStep } from './blastSteps/Sequence.js';
 import { PreviewStep } from './blastSteps/Preview.js';
@@ -120,6 +122,11 @@ export class BlastWorkshop extends PanelBase {
     this.sequenceStep.setGameConsole(fn);
     this.previewStep.setGameConsole(fn);
     this.fireStep.setGameConsole(fn);
+  }
+
+  /** Passes the dominant-rock-under-a-hole sampler to the Charge step (#1358). */
+  setHoleRockSampler(fn: (hole: DrillHole) => ColumnRock | null): void {
+    this.chargeStep.setHoleRockSampler(fn);
   }
 
   setPlacementKit(kit: PlacementKit): void {

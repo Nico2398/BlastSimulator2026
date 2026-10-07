@@ -18,19 +18,16 @@
 // Only the active level's explosives are offered (resolveAvailableExplosives);
 // the water-sensitivity badge still surfaces (that data is real and per-hole
 // derivable via wetHoles()).
-//
-// Also omitted vs. the mock: locking a product by "site rock tier" — the
-// mock's single site-wide rock tier has no real-data equivalent (rock is
-// per-voxel; holes can sit over different rock), so gating would need new
-// plumbing (grid access no panel currently has) for a comparison the design
-// doc doesn't specify how to make.
 
+import type { DrillHole } from '../../../core/mining/DrillPlan.js';
+import type { ColumnRock } from '../../../core/mining/ExplosiveRockFit.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
-import { chargeOrderCost, chargeFitsHole, maxFittingChargeKg } from '../../../core/mining/ChargePlan.js';
+import { chargeOrderCost, chargeFitsHole, maxFittingChargeKg, weakHoleSummary, type WeakHoleSummary } from '../../../core/mining/ChargePlan.js';
+import { getRock } from '../../../core/world/RockCatalog.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
@@ -55,10 +52,12 @@ export class ChargeStep {
   private readonly chargeAllBtn: HTMLButtonElement;
   private readonly chargeLineEl: HTMLElement;
   private readonly fitLineEl: HTMLElement;
+  private readonly weakLineEl: HTMLElement;
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
 
   private gameConsole?: GameConsoleFn;
+  private holeRockSampler?: (hole: DrillHole) => ColumnRock | null;
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
   private allowedIds: readonly string[] = resolveAvailableExplosives(null);
   private amountKg = CHARGE_DEFAULT_AMOUNT_KG;
@@ -118,13 +117,14 @@ export class ChargeStep {
     this.chargeAllBtn.addEventListener('click', () => this.chargeAll());
 
     this.fitLineEl = el('div');
+    this.weakLineEl = el('div');
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId));
 
     const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
     this.tubingCardEl = el('div');
 
     this.el.append(
-      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl,
+      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.weakLineEl,
       this.holeList.root, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -133,6 +133,9 @@ export class ChargeStep {
   get root(): HTMLElement { return this.el; }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+
+  /** Hands the panel the dominant rock under a hole (main.ts owns the grid); without it no weak-explosive warning shows. */
+  setHoleRockSampler(fn: (hole: DrillHole) => ColumnRock | null): void { this.holeRockSampler = fn; }
 
   refreshLocale(): void {
     this.locale.refresh();
@@ -151,7 +154,9 @@ export class ChargeStep {
       this.clampAmount();
     }
 
+    const columns = holes.map(h => this.holeRockSampler?.(h) ?? null);
     const signature = JSON.stringify({
+      rocks: columns.map(c => c?.rockId ?? null),
       level: state.campaign.activeLevelId,
       selected: this.selectedExplosiveId, amt: this.amountKg, stem: this.stemmingM,
       // Hole ids *and* their charges, not just a count: a per-hole charge
@@ -169,6 +174,7 @@ export class ChargeStep {
     this.renderProductList(wet.length > 0);
     this.updateChargeLine(holes.length);
     this.updateFitLine(shallowest);
+    this.updateWeakLine(weakHoleSummary(this.selectedExplosiveId, columns));
     this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole);
     this.renderTubingCard(wet, state.tubingState.inventory);
   }
@@ -247,6 +253,21 @@ export class ChargeStep {
     }
     const max = maxFittingChargeKg(shallowest, this.stemmingM);
     this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.too_much_for_hole', { depth: shallowest, max })));
+  }
+
+  // Advisory only: Charge All stays enabled, the blast just breaks less rock.
+  private updateWeakLine(summary: WeakHoleSummary): void {
+    const explosive = getExplosive(this.selectedExplosiveId);
+    const rock = summary.rockId ? getRock(summary.rockId) : undefined;
+    if (summary.weakCount === 0 || !explosive || !rock) {
+      this.weakLineEl.replaceChildren();
+      return;
+    }
+    const line = reasonLine(t('ui.blast_workshop.charge.too_weak_for_rock', {
+      explosive: t(explosive.nameKey), rock: t(rock.nameKey), count: summary.weakCount, total: summary.total,
+    }));
+    line.dataset['warning'] = 'weak-explosive';
+    this.weakLineEl.replaceChildren(line);
   }
 
   private renderTubingCard(wetIds: string[], inventory: number): void {

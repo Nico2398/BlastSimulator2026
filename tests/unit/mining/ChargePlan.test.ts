@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks, chargeOrderCost,
-  chargeColumnM, maxChargeKgForHole,
+  chargeColumnM, maxChargeKgForHole, weakHoleSummary,
 } from '../../../src/core/mining/ChargePlan.js';
 import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
 import { MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG, CHARGE_KG_PER_METRE } from '../../../src/core/config/balance.js';
@@ -290,5 +290,54 @@ describe('createCharge — column must fit the hole (#1361)', () => {
     expect(Object.keys(charges)).toEqual(['H1']);
     expect(errors).toHaveLength(1);
     expect(errors[0]!.holeId).toBe('H2');
+  });
+});
+
+describe('weakHoleSummary (#1358)', () => {
+  const col = (rockId: string, tier: number) => ({ rockId, tier });
+
+  it('counts columns whose tier exceeds the explosive minRockTier', () => {
+    // pop_rock minRockTier 1
+    const summary = weakHoleSummary('pop_rock', [col('cruite', 1), col('molite', 2), col('obstiite', 4)]);
+    expect(summary.weakCount).toBe(2);
+    expect(summary.total).toBe(3);
+  });
+
+  it('reports the highest-tier offending rock', () => {
+    const summary = weakHoleSummary('pop_rock', [col('molite', 2), col('obstiite', 4), col('molite', 2)]);
+    expect(summary.rockId).toBe('obstiite');
+  });
+
+  it('reports the most common offending rock when tiers tie', () => {
+    const summary = weakHoleSummary('pop_rock', [
+      col('obstiite', 4), col('gnarlite', 4), col('gnarlite', 4), col('cruite', 1),
+    ]);
+    expect(summary.rockId).toBe('gnarlite');
+    expect(summary.weakCount).toBe(3);
+  });
+
+  it('is 0 weak with a null rock when the explosive suffices everywhere', () => {
+    // obliviax minRockTier 4
+    const summary = weakHoleSummary('obliviax', [col('obstiite', 4), col('cruite', 1)]);
+    expect(summary).toEqual({ weakCount: 0, total: 2, rockId: null });
+  });
+
+  it('counts only non-null columns in total, and skips null columns', () => {
+    const summary = weakHoleSummary('pop_rock', [null, col('obstiite', 4), null]);
+    expect(summary).toEqual({ weakCount: 1, total: 1, rockId: 'obstiite' });
+  });
+
+  it('is all zero for an empty column list', () => {
+    expect(weakHoleSummary('pop_rock', [])).toEqual({ weakCount: 0, total: 0, rockId: null });
+  });
+
+  it('is all zero when every column is null', () => {
+    expect(weakHoleSummary('pop_rock', [null, null])).toEqual({ weakCount: 0, total: 0, rockId: null });
+  });
+
+  it('is all zero for an unknown explosive', () => {
+    const summary = weakHoleSummary('no_such_explosive', [col('obstiite', 4)]);
+    expect(summary.weakCount).toBe(0);
+    expect(summary.rockId).toBeNull();
   });
 });

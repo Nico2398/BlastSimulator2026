@@ -92,8 +92,9 @@ describe('Blast balance — more explosive does more', () => {
 
 describe('Blast balance — stemming decides whether rock is thrown', () => {
   it('a minimally stemmed hole throws rock further than a stemmed one', () => {
-    expect(fire({ stemming: 0.5 }).maxThrowDistance)
-      .toBeGreaterThan(fire({ stemming: 3 }).maxThrowDistance);
+    // cruite is tier 1, matching boomite: no tier-shortfall penalty (#1358).
+    expect(fire({ rock: 'cruite', stemming: 0.5 }).maxThrowDistance)
+      .toBeGreaterThan(fire({ rock: 'cruite', stemming: 3 }).maxThrowDistance);
   });
 
   it('a properly stemmed shot produces no dangerous projections', () => {
@@ -126,8 +127,8 @@ describe('Blast balance — the rock fights back', () => {
   });
 
   it('harder rock leaves coarser muck for the same charge', () => {
-    expect(meanFragmentSize(fire({ rock: 'titanite' })))
-      .toBeGreaterThanOrEqual(meanFragmentSize(fire({ rock: 'cruite' })));
+    expect(meanFragmentSize(fire({ rock: 'titanite', explosive: 'dynatomics' })))
+      .toBeGreaterThanOrEqual(meanFragmentSize(fire({ rock: 'cruite', explosive: 'dynatomics' })));
   });
 });
 
@@ -143,7 +144,8 @@ describe('Blast balance — pattern geometry', () => {
 
   it('holes spaced tighter leave fewer oversized boulders', () => {
     const share = (r: BlastResult): number => r.oversizedFragments / Math.max(1, r.fragmentCount);
-    expect(share(fire({ spacing: 2 }))).toBeLessThan(share(fire({ spacing: 6 })));
+    // cruite is tier 1, matching boomite: no tier-shortfall penalty (#1358).
+    expect(share(fire({ rock: 'cruite', spacing: 2 }))).toBeLessThan(share(fire({ rock: 'cruite', spacing: 6 })));
   });
 
   it('holes spread too thin throw rock instead of breaking it', () => {
