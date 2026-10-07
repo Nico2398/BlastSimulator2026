@@ -22,7 +22,7 @@ function setup(tier: 1 | 2 | 3 = 1): { ctx: GameContext; building: Building } {
   return { ctx, building: res.building! };
 }
 
-const OPTS = { cost: 1234, rebuildOrderId: null, approach: { x: 8, z: 14 }, targetY: 3 };
+const OPTS = { cost: 1234, rebuildOrderId: null as number | null, approach: { x: 8, z: 14 }, targetY: 3 };
 
 function payloadOf(ctx: GameContext, actionId: number): DemolishBuildingActionPayload {
   return ctx.state!.pendingActions.find(a => a.id === actionId)!.payload as unknown as DemolishBuildingActionPayload;

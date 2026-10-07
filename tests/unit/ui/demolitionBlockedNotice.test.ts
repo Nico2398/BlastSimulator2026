@@ -6,7 +6,7 @@ import { buildBlockedOrderMessage } from '../../../src/ui/notify/NotificationCen
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 
-function demolishAction(blockedReason: PendingAction['blockedReason']): PendingAction {
+function demolishAction(blockedReason: NonNullable<PendingAction['blockedReason']>): PendingAction {
   return {
     id: 1, type: 'demolish_building', requiredSkill: null, requiredVehicleRole: 'building_destroyer',
     targetX: 3, targetZ: 3, targetY: 0, payload: {}, targetEmployeeId: null,
