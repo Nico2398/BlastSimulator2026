@@ -116,4 +116,19 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
       { cashDelta: -70000, scoreDelta: { nuisance: -15, safety: 10 }, effectTag: 'blast_shields' },
     ],
   }),
+
+  // Follow-up to a botched mafia action or an exposed mafia (#1411). Repeatable: every botch queues one.
+  ev('mafia_police_investigation', 'mafia', {
+    weight: () => 2,
+    repeatable: true,
+    options: [
+      // Pay off the detective: quiet, expensive, adds corruption
+      { cashDelta: -30000, corruptionDelta: 10, effectTag: 'pay_off_detective' },
+      // Hire a lawyer: cheaper, but may lose and pay a larger fine
+      { cashDelta: -20000, effectTag: 'hire_lawyer',
+        probability: 0.6, alt: { cashDelta: -60000, exposureDelta: 0.1 } },
+      // Stonewall: free now, investigators dig deeper
+      { exposureDelta: 0.15, effectTag: 'stonewall_police' },
+    ],
+  }),
 ];

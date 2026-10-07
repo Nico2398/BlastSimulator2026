@@ -60,6 +60,18 @@ export function addExpense(
   state.transactions.push({ tick, amount, type: 'expense', category, description });
 }
 
+/** Charge a fine: debits the flat `cash` and logs a 'fines' expense. No-op for amounts <= 0. */
+export function chargeFine(
+  state: { cash: number; finances: FinanceState },
+  amount: number,
+  description: string,
+  tick: number,
+): void {
+  if (amount <= 0) return;
+  state.cash -= amount;
+  addExpense(state.finances, amount, 'fines', description, tick);
+}
+
 /** Get current balance. */
 export function getBalance(state: FinanceState): number {
   return state.cash;

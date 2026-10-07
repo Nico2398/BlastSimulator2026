@@ -38,6 +38,14 @@ export interface GameEventMap {
   'research:completed': { targetType: BuildingType; targetTier: 2 | 3 };
   /** Fired when a research task is cancelled (Research Center lost); `refund` is the cost returned. */
   'research:cancelled': { targetType: BuildingType; targetTier: 2 | 3; refund: number };
+  /** Failed bribe: target and fine charged (#1411). */
+  'corruption:scandal': { target: string; fine: number };
+  /** Botched mafia action led to a police investigation (#1411). */
+  'mafia:investigation': { outcomeKey: string };
+  /** Smuggling was exposed; `fine` charged (#1411). */
+  'mafia:smuggling_exposed': { fine: number };
+  /** Mafia exposure crossed the exposed threshold (#1411). */
+  'mafia:exposed': Record<string, never>;
   'employee:need_warning': { employeeId: number; needKey: string };
   'employee:collapsed': { employeeId: number; needKey: string };
   'employee:shift_change': { employeeId: number };

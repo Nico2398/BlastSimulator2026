@@ -145,13 +145,14 @@ export function tickEventSystem(
   // Follow-up queue: drop stale entries (already fired, unknown, or not follow-up-only),
   // then count down once per tick. While counting, timers run as with an empty queue.
   state.followUpQueue = state.followUpQueue.filter(id =>
-    !state.firedEventIds.includes(id) && getEventById(id)?.followUpOnly === true);
+    getEventById(id)?.followUpOnly === true
+    && (getEventById(id)?.repeatable === true || !state.firedEventIds.includes(id)));
   if (state.followUpQueue.length > 0) {
     state.followUpDelayTicks--;
     if (state.followUpDelayTicks <= 0) {
       const eventId = state.followUpQueue.shift()!;
       state.followUpDelayTicks = FOLLOWUP_DELAY_TICKS;
-      state.firedEventIds.push(eventId);
+      if (!state.firedEventIds.includes(eventId)) state.firedEventIds.push(eventId);
       state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
       state.lastEventTick = ctx.tickCount;
       state.actionCountSinceEvent = 0;

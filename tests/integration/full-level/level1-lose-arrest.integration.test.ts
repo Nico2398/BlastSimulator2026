@@ -11,6 +11,7 @@ import {
   makeCampaignCtx,
   tickWithEvents,
 } from './helpers.js';
+import { bribeFailureFine } from '../../../src/core/economy/Corruption.js';
 import { corruptCommand, mafiaCommand } from '../../../src/console/commands/events.js';
 
 describe('Level 1 — Lose — Criminal Arrest', () => {
@@ -28,18 +29,15 @@ describe('Level 1 — Lose — Criminal Arrest', () => {
   });
 
   it('can bribe officials to unlock mafia access', () => {
-    // Bribe an inspector (costs $8,000 each)
-    const result1 = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result1.success).toBe(true);
-    expect(ctx.state!.cash).toBe(42000); // 50000 - 8000
-
-    const result2 = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result2.success).toBe(true);
-    expect(ctx.state!.cash).toBe(34000); // 42000 - 8000
-
-    const result3 = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result3.success).toBe(true);
-    expect(ctx.state!.cash).toBe(26000); // 34000 - 8000
+    // Bribe an inspector (costs $8,000 each); a failed attempt also draws a scandal fine.
+    let expected = ctx.state!.cash;
+    for (let i = 0; i < 3; i++) {
+      const result = corruptCommand(ctx, [], { target: 'inspector' });
+      expect(result.success).toBe(true);
+      const attempt = ctx.state!.corruption.attempts[i]!;
+      expected -= attempt.cost + (attempt.success ? 0 : bribeFailureFine(attempt.cost));
+      expect(ctx.state!.cash).toBe(expected);
+    }
 
     // After 3 bribes, mafia should be unlocked
     expect(ctx.state!.corruption.mafiaUnlocked).toBe(true);
