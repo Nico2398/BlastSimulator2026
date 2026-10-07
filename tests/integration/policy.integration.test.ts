@@ -9,6 +9,7 @@ import type { GameContext } from '../../src/console/commands/world.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import { employeeCommand } from '../../src/console/commands/entities.js';
+import { refreshHiringPool } from '../../src/core/entities/HiringPool.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 import { makeGameContext } from '../helpers/gameContext.js';
@@ -107,6 +108,8 @@ describe('the default site policy is in force without any set_policy call (#1379
     const state = ctx.state!;
     state.cash = 10_000_000;
     for (let i = 0; i < 4; i++) {
+      // A role offers only HIRING_POOL_SIZE (3) candidates until the pool refreshes (#1385).
+      if (i === 3) refreshHiringPool(state.hiringPool, 42, state.tickCount);
       const hired = employeeCommand(ctx, ['hire'], { role: 'driller' });
       if (!hired.success) throw new Error(`Setup: hire failed — ${hired.output}`);
     }

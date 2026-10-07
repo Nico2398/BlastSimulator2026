@@ -1693,6 +1693,48 @@
       "role": "bootstrap"
     },
     {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds 3 candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: the previous tick 24 was cut short by a pending random event, so the pool had not refreshed yet; wait the rest of the interval."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {
@@ -1877,6 +1919,27 @@
         }
       ],
       "role": "bootstrap"
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds 3 candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "employee hire role:driller",
@@ -2129,15 +2192,11 @@
           "employeeCount": 1
         }
       },
-      "description": "#682: first of 56 charge-only relief hires -- deliberately never assigned driving.drill_rig or any vehicle, so TaskDispatch can never route them to a drill_hole action (which requires a drill_rig). Every driller role starts with 'blasting' at Rookie (ROLE_STARTING_QUALIFICATION), which is all charge_hole requires (requiredVehicleRole: null, dispatchChargeAction/mining.ts) -- these 24 exist purely to parallelize loading the ~61 holes the 8 working drillers above landed. Direct trace (issue #682): charging that many 8kg holes with only the 8 working drillers (who by this point are also blasting-qualified and free once their own drilling plateaus, per the tick-150 steps above) took long enough under set_policy's own forced-rest interruptions that wellBeing's zero-streak still crossed REVOLT_TICKS during the charge-drain wait below. 24 more (cheap, $1000 each, no vehicle purchase) cut that phase from 300+ ticks to well under 120 -- sandbox-confirmed: charging finishes at ticksAtZero=41, comfortably under the 120-tick threshold, where 8-only and even 16-with-vehicles crews (both tried and rejected, see git history) still crossed it. Hired AFTER the drilling wait above (not before) so none of them can accidentally have driving.drill_rig assigned to them by a later step meant for a working driller, and so they add no drilling-side congestion to the already-plateaued 8x8 grid. #1379 margin fix: 32 more relief hires (56 in total, steps directly below) because under the always-on default policy the 24-relief crew left grid 4's charge tail with a thin margin -- wellbeing fell from ~40 at tick 775 to 0 at tick ~1000 (command-mode probe), and the interaction-mode run, which paces slower, reached worker_revolt at tick ~1038 with the last straggler charge still pending. With 56 relief hires the same tail holds wellbeing at 53-56 throughout (probe, ticks 800-1100): each hire shares less of the charge workload, so rest rounds interleave instead of draining the whole crew together. Nothing is loosened: the same drain waits and chargedCount checks apply, hires cost $1000 each, and the roster is still destroyed by the blast. The later `employee assign_skill` id moved 37 -> 69 to match the 32 extra hires."
+      "description": "#682: first of 24 charge-only relief hires (#1385: the hiring pool offers 3 candidates per role per 24-tick interval, so they arrive as 3 drillers + 3 blasters per wave over 4 waves instead of 56 drillers at once; blasters also start with blasting) -- deliberately never assigned driving.drill_rig or any vehicle, so TaskDispatch can never route them to a drill_hole action (which requires a drill_rig). Every driller role starts with 'blasting' at Rookie (ROLE_STARTING_QUALIFICATION), which is all charge_hole requires (requiredVehicleRole: null, dispatchChargeAction/mining.ts) -- these 24 exist purely to parallelize loading the ~61 holes the 8 working drillers above landed. Direct trace (issue #682): charging that many 8kg holes with only the 8 working drillers (who by this point are also blasting-qualified and free once their own drilling plateaus, per the tick-150 steps above) took long enough under set_policy's own forced-rest interruptions that wellBeing's zero-streak still crossed REVOLT_TICKS during the charge-drain wait below. 24 more (cheap, $1000 each, no vehicle purchase) cut that phase from 300+ ticks to well under 120 -- sandbox-confirmed: charging finishes at ticksAtZero=41, comfortably under the 120-tick threshold, where 8-only and even 16-with-vehicles crews (both tried and rejected, see git history) still crossed it. Hired AFTER the drilling wait above (not before) so none of them can accidentally have driving.drill_rig assigned to them by a later step meant for a working driller, and so they add no drilling-side congestion to the already-plateaued 8x8 grid. #1379 margin fix: 32 more relief hires (56 in total, steps directly below) because under the always-on default policy the 24-relief crew left grid 4's charge tail with a thin margin -- wellbeing fell from ~40 at tick 775 to 0 at tick ~1000 (command-mode probe), and the interaction-mode run, which paces slower, reached worker_revolt at tick ~1038 with the last straggler charge still pending. With 56 relief hires the same tail holds wellbeing at 53-56 throughout (probe, ticks 800-1100): each hire shares less of the charge workload, so rest rounds interleave instead of draining the whole crew together. Nothing is loosened: the same drain waits and chargedCount checks apply, hires cost $1000 each, and the roster is still destroyed by the blast. The later `employee assign_skill` id moved 37 -> 69 to match the 32 extra hires."
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -2161,10 +2220,6 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
@@ -2184,19 +2239,15 @@
       }
     },
     {
-      "command": "employee hire role:driller",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
@@ -2210,19 +2261,15 @@
       }
     },
     {
-      "command": "employee hire role:driller",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
@@ -2236,1319 +2283,15 @@
       }
     },
     {
-      "command": "employee hire role:driller",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "employees"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
@@ -3601,6 +2344,498 @@
           "orderedChargeCount"
         ],
         "note": "#586 CI: not pinned to 64 -- see the tick-150 step above's own note. Charge All charges every hole actually drilled by then, not necessarily the full 64-hole grid; command mode and interaction mode reach a different count here (49 vs 64, both sandbox-confirmed, real and reproducible -- command mode's raw `tick 150` and interaction mode's real click-driven dispatch settle drilling assignment order differently), so this checks real progress rather than pinning to whichever mode happened to finish more of the grid. Either count is still far more than enough to exceed MAX_ACTIVE_PROJECTILES (256) once heavily overcharged below."
+      }
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds 3 candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds 3 candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: the previous tick 24 was cut short by a pending random event, so the pool had not refreshed yet; wait the rest of the interval."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds 3 candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
       }
     },
     {
@@ -3814,12 +3049,12 @@
       }
     },
     {
-      "command": "employee assign_skill 69 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #947 CI-fix: employee id renumbered 36 -> 37 -- cycle 2's own extra charge-relief hire shifts every employee id from that point on by one (see that cycle's own hire step).",
+      "command": "employee assign_skill 37 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #947 CI-fix: employee id renumbered 36 -> 37 -- cycle 2's own extra charge-relief hire shifts every employee id from that point on by one (see that cycle's own hire step). #1385: employee id 69 -> 37 -- the relief crew is now 24 hires (hiring pool, 3 per role per interval) instead of 56, so every later id shifts down by 32.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 69 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 37 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"

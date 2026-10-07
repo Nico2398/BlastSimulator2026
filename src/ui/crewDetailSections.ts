@@ -13,7 +13,8 @@ import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining, isSchoolFull, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
-import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, PAY_CYCLE_TICKS } from '../core/config/balance.js';
+import { perHour } from '../core/economy/formatMoney.js';
+import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
 
 /** Quick-raise amounts offered in the PAY block — flat $ presets, not derived from any per-role scale. */
@@ -235,10 +236,7 @@ export function makeSkillsSection(e: Employee): HTMLElement {
 
 // ── PAY ──
 
-/** Stored salary is per pay cycle; 1 tick = 1 game-hour, so the hourly rate is salary / PAY_CYCLE_TICKS (1 decimal, no trailing .0). */
-function perHour(perCycle: number): number {
-  return Math.round((perCycle / PAY_CYCLE_TICKS) * 10) / 10;
-}
+export { perHour };
 
 /**
  * A raise costs nothing upfront — giveRaise only raises the ongoing salary

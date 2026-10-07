@@ -45,6 +45,7 @@ import {
 } from './GameLoop.js';
 import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
+import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, generateContracts } from '../economy/Contract.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
 import {
@@ -188,6 +189,11 @@ export function runTick(
   // 4. Auto-refresh available contracts on schedule
   if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
     generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
+  }
+
+  // 4b. Rotate the hiring candidate pool on its interval
+  if (isHiringPoolDue(state.hiringPool, state.tickCount)) {
+    refreshHiringPool(state.hiringPool, state.seed, state.tickCount);
   }
 
   // 5. Smuggling income

@@ -115,6 +115,10 @@ A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` 
 
 **Task progress rendering:** For every employee whose `computeEmployeeActivity` reads `kind: 'working'`, `TaskProgressBar` (`src/renderer/TaskProgressBar.ts`) billboards a fill bar above the character, parented under its `CharacterMesh.getGroup(id)` transform so it tracks position without per-frame copying. Fill fraction comes from `taskProgressFraction`, shared with the Crew panel's own progress line so the two never disagree. Removed when the task ends.
 
+## Hiring Candidate Pools (#1385)
+
+Each role offers `HIRING_POOL_SIZE` (3) candidates (`src/core/entities/HiringPool.ts`, `GameState.hiringPool`, saved since v31). A candidate shows name, salary per hour, starting skill and union status; hiring picks one candidate and the hire gets exactly those values (`hireEmployee(..., candidate)`). The role's fee (`HIRING_COSTS`) stays visible and is charged once. Candidates start at the role's `ROLE_STARTING_QUALIFICATIONS`, with `CANDIDATE_SKILL_BONUS_CHANCE` of +1 level (up to `CANDIDATE_SKILL_BONUS_MAX`, cap 5) on the primary qualification; `CANDIDATE_UNION_CHANCE` of being unionized. Pool rotates every `HIRING_POOL_REFRESH_INTERVAL` ticks from a seeded RNG. Console: `employee candidates [role:X]`, `employee hire role:X [candidate:ID]` (no id = first candidate; unknown id or empty pool refuses with no charge).
+
 ## Salary Calculation
 
 Salary = base + qualification bonus (sum of level bonuses) + raises. Raises are permanent, stored in `Employee.raises`, and survive every recompute (level-up, training, skill assignment). Legacy saves backfill `raises = max(0, salary - base - bonus)`. Multi-skilled employee costs more than single-skill specialist.

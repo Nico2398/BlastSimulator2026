@@ -9,6 +9,10 @@ import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
 import type { Building } from '../../../../src/core/entities/Building.js';
+import { perHour } from '../../../../src/ui/crewDetailSections.js';
+import { hiringSignature } from '../../../../src/ui/panels/CrewHiring.js';
+import { candidatesForRole, takeCandidate, type HireCandidate } from '../../../../src/core/entities/HiringPool.js';
+import { HIRING_COSTS } from '../../../../src/core/entities/Employee.js';
 import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
@@ -355,7 +359,9 @@ describe('CrewPanel', () => {
     panel.update(makeState([]));
     const hireBtns = [...panel.root.querySelectorAll('button')].filter(b => b.textContent === 'Hire');
     hireBtns[0]!.click();
-    expect(calls).toContain('employee hire role:driller');
+    const state = panel.root.querySelector('button[data-role="driller"][data-candidate-id]') as HTMLButtonElement;
+    expect(state).not.toBeNull();
+    expect(calls).toEqual([`employee hire role:driller candidate:${state.dataset['candidateId']}`]);
   });
 
   it('hire button is disabled when the role is unaffordable', () => {
@@ -535,9 +541,129 @@ describe('CrewPanel manager effect (#1340)', () => {
   it('the manager hiring row explains what a manager does', () => {
     const { panel } = makePanel();
     panel.update(makeState([]));
-    const row = panel.root.querySelector('[data-role="manager"]')!.parentElement!;
+    const row = panel.root.querySelector('[data-hiring-role="manager"]')!;
     expect(row.textContent).toContain(t('ui.crew.manager_effect_hint'));
-    const other = panel.root.querySelector('[data-role="driller"]')!.parentElement!;
+    const other = panel.root.querySelector('[data-hiring-role="driller"]')!;
     expect(other.textContent).not.toContain(t('ui.crew.manager_effect_hint'));
+  });
+});
+
+
+describe('CrewPanel — hiring candidates (#1385)', () => {
+  const ROLES = ['driller', 'blaster', 'driver', 'surveyor', 'manager'] as const;
+
+  function hireBtnsFor(panel: CrewPanel, role: string): HTMLButtonElement[] {
+    return [...panel.root.querySelectorAll<HTMLButtonElement>(`button[data-role="${role}"][data-candidate-id]`)];
+  }
+
+  /** Smallest ancestor of the button that also contains the candidate's name: the candidate card. */
+  function cardOf(btn: HTMLElement, c: HireCandidate): HTMLElement {
+    let node: HTMLElement | null = btn;
+    while (node && !(node.textContent ?? '').includes(c.name)) node = node.parentElement;
+    if (!node) throw new Error(`no card containing ${c.name}`);
+    return node;
+  }
+
+  it('renders 3 Hire buttons per role, each carrying data-role and data-candidate-id', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    panel.update(state);
+    for (const role of ROLES) {
+      const btns = hireBtnsFor(panel, role);
+      expect(btns.map(b => b.dataset['candidateId'])).toEqual(
+        candidatesForRole(state.hiringPool, role).map(c => String(c.id)),
+      );
+      expect(btns).toHaveLength(3);
+    }
+  });
+
+  it('each candidate card shows name, $X/h salary, skill, union status and the hire fee', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    panel.update(state);
+    for (const role of ROLES) {
+      for (const c of candidatesForRole(state.hiringPool, role)) {
+        const btn = panel.root.querySelector(`button[data-candidate-id="${c.id}"]`) as HTMLButtonElement;
+        const text = cardOf(btn, c).textContent!;
+        expect(text).toContain(c.name);
+        expect(text).toContain(`$${perHour(c.salary)}/h`);
+        expect(text).toContain(t(c.unionized ? 'ui.crew.candidate_union' : 'ui.crew.candidate_non_union'));
+        expect(text).toContain(`$${HIRING_COSTS[role]}`);
+        const catLabelHint = t(`skill.${c.qualifications[0]!.category}`);
+        if (catLabelHint !== `skill.${c.qualifications[0]!.category}`) expect(text).toContain(catLabelHint);
+      }
+    }
+  });
+
+  it('clicking a candidate Hire sends employee hire role:R candidate:ID', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    const state = makeState([]);
+    panel.update(state);
+    const second = candidatesForRole(state.hiringPool, 'blaster')[1]!;
+    (panel.root.querySelector(`button[data-candidate-id="${second.id}"]`) as HTMLButtonElement).click();
+    expect(calls).toEqual([`employee hire role:blaster candidate:${second.id}`]);
+  });
+
+  it('Hire buttons are disabled when the role fee is unaffordable, enabled otherwise', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    state.cash = HIRING_COSTS.manager - 1;
+    panel.update(state);
+    expect(hireBtnsFor(panel, 'manager').every(b => b.disabled)).toBe(true);
+    state.cash = HIRING_COSTS.manager;
+    panel.update(state);
+    expect(hireBtnsFor(panel, 'manager').every(b => !b.disabled)).toBe(true);
+  });
+
+  it('an empty role shows the no_candidates text and no Hire button', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    for (let i = 0; i < 3; i++) takeCandidate(state.hiringPool, 'surveyor');
+    panel.update(state);
+    expect(hireBtnsFor(panel, 'surveyor')).toHaveLength(0);
+    expect(hireBtnsFor(panel, 'driller')).toHaveLength(3);
+    expect(panel.root.textContent).toContain(t('ui.crew.no_candidates'));
+  });
+
+  it('re-renders when a candidate is removed from the pool', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    panel.update(state);
+    takeCandidate(state.hiringPool, 'driver');
+    panel.update(state);
+    expect(hireBtnsFor(panel, 'driver')).toHaveLength(2);
+  });
+});
+
+describe('hiringSignature (#1385)', () => {
+  it('is stable for an unchanged state', () => {
+    const state = makeState([]);
+    expect(hiringSignature(state)).toBe(hiringSignature(state));
+    expect(hiringSignature(state)).not.toBe('');
+  });
+
+  it('changes when candidate ids change', () => {
+    const state = makeState([]);
+    const before = hiringSignature(state);
+    takeCandidate(state.hiringPool, 'driller');
+    expect(hiringSignature(state)).not.toBe(before);
+  });
+
+  it('changes when affordability of a role flips', () => {
+    const state = makeState([]);
+    state.cash = HIRING_COSTS.driller;
+    const afford = hiringSignature(state);
+    state.cash = HIRING_COSTS.driller - 1;
+    expect(hiringSignature(state)).not.toBe(afford);
+  });
+
+  it('does not change on raw cash changes that keep every role affordability', () => {
+    const state = makeState([]);
+    state.cash = 1_000_000;
+    const a = hiringSignature(state);
+    state.cash = 1_000_123;
+    expect(hiringSignature(state)).toBe(a);
   });
 });

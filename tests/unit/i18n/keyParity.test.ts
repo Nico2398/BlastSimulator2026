@@ -470,8 +470,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial.step7, tutorial.step7.title), both locales: 3751.
     // #1391: +7 keys (ui.build.cutoff_* placement cutoff warning), both locales: 3758.
     // #1363: +2 keys (ui.finances.operating_profit, _tip), both locales: 3760.
-    // #1345: +14 keys (pattern-level charge settings), both locales: 3774.
-    expect(Object.keys(en).length).toBe(3774);
+    // #1385: +9 keys (hiring candidate pools), both locales: 3769.
+    // #1345: +14 keys (pattern-level charge settings), both locales: 3783.
+    expect(Object.keys(en).length).toBe(3783);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {
