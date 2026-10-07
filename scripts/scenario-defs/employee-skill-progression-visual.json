@@ -74,7 +74,7 @@
     },
     {
       "command": "employee assign_skill 1 skill:blasting level:1",
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATIONS in balance.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "interaction": [
         {
           "type": "command",
@@ -100,7 +100,7 @@
           "command": "employee assign_skill 2 skill:driving.truck level:1"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATIONS in balance.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "changedBy": {
           "cash": 0

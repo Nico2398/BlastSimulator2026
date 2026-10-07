@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Employee training
 //
 // Training is the only way to obtain a qualification a role is not hired with,
-// and the only way to raise proficiency: `driving.excavator` and
-// `driving.drill_rig` belong to no hiring role, so without a reachable course
-// they cannot be held by anyone.
+// and the only way to raise proficiency. Roles arrive holding their own
+// licences (ROLE_STARTING_QUALIFICATIONS); `driving.rock_fragmenter` belongs to
+// no hiring role, so without a reachable course nobody could hold it.
 
 import type { Employee, EmployeeState, SkillCategory, TrainingState } from './Employee.js';
 import { calculateSalary } from './Employee.js';

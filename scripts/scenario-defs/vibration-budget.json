@@ -164,7 +164,7 @@
     },
     {
       "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "description": "Left unmarked: hiring already grants a driller blasting and driving.drill_rig at Rookie (ROLE_STARTING_QUALIFICATIONS in balance.ts), so a level-1 assignment is a same-level no-op kept only to pin the licence the drill_rig just bought needs. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
       "interaction": [
         {
           "type": "command",
@@ -572,7 +572,7 @@
     },
     {
       "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #557 (fixed): this step used to be a documented, deterministic KNOWN BREAK -- Damage.ts's processProjections attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only), and employee #2, idle and resting near the file's old living_quarters at (16,15) (~6.4m from grid 1's holes), was reliably killed by blast 1's rumblox overcharge before ever reaching this step, cascading into every step through the file's end failing. Fixed not by repositioning that one employee's rest spot but by the two steps this file now runs before blast 1 fires (see the `employee dispatch 2` step's own note, several steps up) plus moving living_quarters' own construction to after blast 1 (see that step's own note) -- employee #2 survives deterministically now, confirmed by direct probe, and this assign_skill succeeds.",
+      "description": "Left unmarked: hiring already grants a driller blasting and driving.drill_rig at Rookie (ROLE_STARTING_QUALIFICATIONS in balance.ts), so a level-1 assignment is a same-level no-op kept only to pin the licence the drill_rig just bought needs. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #557 (fixed): this step used to be a documented, deterministic KNOWN BREAK -- Damage.ts's processProjections attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only), and employee #2, idle and resting near the file's old living_quarters at (16,15) (~6.4m from grid 1's holes), was reliably killed by blast 1's rumblox overcharge before ever reaching this step, cascading into every step through the file's end failing. Fixed not by repositioning that one employee's rest spot but by the two steps this file now runs before blast 1 fires (see the `employee dispatch 2` step's own note, several steps up) plus moving living_quarters' own construction to after blast 1 (see that step's own note) -- employee #2 survives deterministically now, confirmed by direct probe, and this assign_skill succeeds.",
       "interaction": [
         {
           "type": "command",
@@ -899,7 +899,7 @@
     },
     {
       "command": "employee assign_skill 3 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "description": "Left unmarked: hiring already grants a driller blasting and driving.drill_rig at Rookie (ROLE_STARTING_QUALIFICATIONS in balance.ts), so a level-1 assignment is a same-level no-op kept only to pin the licence the drill_rig just bought needs. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
       "interaction": [
         {
           "type": "command",

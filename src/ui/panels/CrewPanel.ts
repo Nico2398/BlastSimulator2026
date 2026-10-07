@@ -37,6 +37,11 @@ import type { GameConsoleFn } from '../gameConsole.js';
 
 const ROLES: EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
 
+/** "Skill ★level" list of what a hire of `role` arrives qualified for. */
+function startingQualificationLabel(role: EmployeeRole): string {
+  return ROLE_STARTING_QUALIFICATIONS[role].map(q => `${t(`skill.${q.category}`)} ★${q.proficiencyLevel}`).join(', ');
+}
+
 export class CrewPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
   private gameConsole?: GameConsoleFn;
@@ -204,7 +209,7 @@ export class CrewPanel extends PanelBase {
       info.append(
         el('span', { text: t(`role.${role}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', {
-          text: t('ui.crew.hire_starts_with', { qual: ROLE_STARTING_QUALIFICATIONS[role].map(q => `${t(`skill.${q.category}`)} ★${q.proficiencyLevel}`).join(', '), count }),
+          text: t('ui.crew.hire_starts_with', { qual: startingQualificationLabel(role), count }),
           attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
         }),
       );

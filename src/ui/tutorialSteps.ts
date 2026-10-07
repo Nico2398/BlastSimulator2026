@@ -156,7 +156,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // box-cut and the later hauling need no course.
   createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
 
-  // ── Step 3d: buy-drill-rig-assign ──
+  // ── Step 3c: buy-drill-rig-assign ──
   // Driver assignment is automatic now (VehicleReservation/ArrivalGate, #921)
   // — completion is purchase alone, the same synchronous "value increased"
   // shape as the other instant steps (tickBudget: 1, no waitsOnWork: buying a
@@ -171,7 +171,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     { tickBudget: 1 },
   ),
 
-  // ── Step 3f: buy-rock-digger-assign ──
+  // ── Step 3d: buy-rock-digger-assign ──
   // Same purchase-completes-alone shape as buy-drill-rig-assign above (#921).
   createComparisonStep(
     'buy-rock-digger-assign',

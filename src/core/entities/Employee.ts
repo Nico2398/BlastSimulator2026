@@ -62,6 +62,11 @@ export interface SkillQualification {
   xp: number;
 }
 
+/** A qualification at `level`, with the XP that level starts at. */
+export function qualificationAtLevel(category: SkillCategory, level: SkillQualification['proficiencyLevel']): SkillQualification {
+  return { category, proficiencyLevel: level, xp: XP_THRESHOLDS[level] };
+}
+
 export interface TrainingState {
   buildingId: number;
   skill: SkillCategory;
@@ -299,13 +304,13 @@ export function hireEmployee(
     alive: true,
     hiredAtTick: tickCount,
     x, z,
-    // A hire arrives qualified for the job they were hired to do, at Rookie
-    // level. Hiring used to grant nothing, which made every role interchangeable
+    // A hire arrives qualified for the job they were hired to do, at the role's
+    // starting level (Rookie for most roles). Hiring used to grant nothing, which made every role interchangeable
     // and every skill-gated action unreachable: a surveyor could not survey and
     // a driver could not drive, because the only way to grant a qualification
     // was the `employee assign_skill` console command. Training raises
     // proficiency from here.
-    qualifications: ROLE_STARTING_QUALIFICATIONS[role].map(q => ({ ...q, xp: XP_THRESHOLDS[q.proficiencyLevel] })),
+    qualifications: ROLE_STARTING_QUALIFICATIONS[role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel)),
     trainingState: null,
     pendingTrainingState: null,
     activeActionId: null,
