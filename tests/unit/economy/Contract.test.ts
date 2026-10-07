@@ -13,6 +13,8 @@ import {
   hasRubbleDisposalOffer,
   setContractHeld,
   undeliveredShare,
+  remainingKg,
+  outstandingPenalty,
   sortByDeadline,
   contractShortOfStock,
 } from '../../../src/core/economy/Contract.js';
@@ -785,5 +787,29 @@ describe('checkDeadlines — reduced penalty and delivery record (#1367)', () =>
     const state = expiring({ deliveredKg: 40 });
     expect(checkDeadlines(state, 10)).toEqual([]);
     expect(state.active).toHaveLength(1);
+  });
+});
+
+describe('remainingKg', () => {
+  it('is the quantity still to deliver', () => {
+    expect(remainingKg({ quantityKg: 100, deliveredKg: 40 })).toBe(60);
+  });
+  it('is zero when fully delivered', () => {
+    expect(remainingKg({ quantityKg: 100, deliveredKg: 100 })).toBe(0);
+  });
+  it('goes negative when over-delivered (callers clamp)', () => {
+    expect(remainingKg({ quantityKg: 100, deliveredKg: 110 })).toBe(-10);
+  });
+});
+
+describe('outstandingPenalty', () => {
+  it('is the full penalty when nothing was delivered', () => {
+    expect(outstandingPenalty({ quantityKg: 100, deliveredKg: 0, penaltyAmount: 500 })).toBe(500);
+  });
+  it('scales by the undelivered share, rounded', () => {
+    expect(outstandingPenalty({ quantityKg: 3, deliveredKg: 1, penaltyAmount: 100 })).toBe(67);
+  });
+  it('is zero when fully delivered', () => {
+    expect(outstandingPenalty({ quantityKg: 100, deliveredKg: 100, penaltyAmount: 500 })).toBe(0);
   });
 });
