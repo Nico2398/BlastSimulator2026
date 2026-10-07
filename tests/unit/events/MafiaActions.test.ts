@@ -8,6 +8,7 @@ import {
   toggleSmuggling,
   processSmuggling,
   applyInvestigation,
+  applySmugglingExposure,
   FRAME_EVIDENCE_TICKS as FRAME_TICKS,
   decayExposure,
 } from '../../../src/core/events/MafiaActions.js';
@@ -18,6 +19,8 @@ import {
   ACCIDENT_EXPOSURE,
   ACCIDENT_FAILURE_EXPOSURE_EXTRA,
   INVESTIGATION_EXPOSURE_JUMP,
+  SMUGGLING_EXPOSED_FINE,
+  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
   INVESTIGATION_FOLLOWUP_EVENT_ID,
   EXPOSURE_CLEAN_GRACE_TICKS,
   EXPOSURE_DECAY_PER_TICK,
@@ -116,7 +119,7 @@ describe('Mafia gameplay mechanics', () => {
     expect(incomePerTick).toBeGreaterThan(0);
 
     const initialExposure = mafia.exposureRisk;
-    const result = processSmuggling(mafia, new Random(42));
+    const result = processSmuggling(mafia, new Random(42), 5);
     expect(result.income).toBeGreaterThan(0);
     expect(mafia.exposureRisk).toBeGreaterThan(initialExposure);
   });
@@ -130,7 +133,7 @@ describe('Mafia gameplay mechanics', () => {
     // With high exposure, should eventually trigger
     let triggered = false;
     for (let seed = 0; seed < 200; seed++) {
-      const result = processSmuggling(mafia, new Random(seed));
+      const result = processSmuggling(mafia, new Random(seed), 5);
       // isExposed just checks if risk * 0.05 triggers, but processSmuggling checks exposure too
       if (result.exposed) {
         triggered = true;
@@ -262,6 +265,33 @@ describe('Mafia investigation (#1411)', () => {
     const events = createEventSystemState();
     applyInvestigation(createMafiaState(), events);
     expect(events.followUpQueue).toContain(INVESTIGATION_FOLLOWUP_EVENT_ID);
+  });
+
+  it('applyInvestigation does not queue the follow-up twice but still raises exposure', () => {
+    const mafia = createMafiaState();
+    const events = createEventSystemState();
+    applyInvestigation(mafia, events);
+    const after1 = mafia.exposureRisk;
+    applyInvestigation(mafia, events);
+    expect(events.followUpQueue.filter(id => id === INVESTIGATION_FOLLOWUP_EVENT_ID)).toHaveLength(1);
+    expect(mafia.exposureRisk).toBeGreaterThan(after1);
+  });
+
+  it('applyInvestigation stamps lastActivityTick when a tick is given', () => {
+    const mafia = createMafiaState();
+    applyInvestigation(mafia, createEventSystemState(), 77);
+    expect(mafia.lastActivityTick).toBe(77);
+  });
+
+  it('applySmugglingExposure jumps exposure, stops smuggling and returns the fine', () => {
+    const mafia = createMafiaState();
+    toggleSmuggling(mafia);
+    const { fine } = applySmugglingExposure(mafia, 9);
+    expect(fine).toBe(SMUGGLING_EXPOSED_FINE);
+    expect(mafia.exposureRisk).toBeCloseTo(SMUGGLING_EXPOSED_EXPOSURE_JUMP, 10);
+    expect(mafia.smugglingActive).toBe(false);
+    expect(mafia.smugglingIncome).toBe(0);
+    expect(mafia.lastActivityTick).toBe(9);
   });
 
   it('applyInvestigation caps exposure at 1 and returns the applied delta', () => {

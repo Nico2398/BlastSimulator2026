@@ -22,7 +22,7 @@ import { requireGame } from './commandUtils.js';
 /** A botched action draws police: exposure jump, follow-up event, toast event. */
 function raiseInvestigation(ctx: GameContext, result: MafiaActionResult): void {
   if (!result.investigationTriggered) return;
-  applyInvestigation(ctx.state!.mafia, ctx.state!.events);
+  applyInvestigation(ctx.state!.mafia, ctx.state!.events, ctx.state!.tickCount);
   ctx.emitter.emit('mafia:investigation', { outcomeKey: result.outcomeKey });
 }
 

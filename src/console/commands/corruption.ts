@@ -11,7 +11,7 @@ import {
   TARGET_COSTS,
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
-import { addExpense } from '../../core/economy/Finance.js';
+import { addExpense, chargeFine } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
@@ -60,21 +60,23 @@ export function corruptCommand(
   addExpense(state.finances, result.cost, 'corruption', `Bribe: ${target}`, state.tickCount);
   state.cash -= result.cost;
 
+  let mafiaUnlocked = result.mafiaJustUnlocked;
   const lines = [
     result.success ? t('corruption.success') : t('corruption.failed_scandal'),
     `Cost: $${result.cost}`,
   ];
   if (result.scandalTriggered) {
     lines.push(t('corruption.scandal_erupted'));
-    const { fine } = applyBribeFailure(state.corruption, state.scores, result.cost);
+    const failure = applyBribeFailure(state.corruption, state.scores, result.cost);
+    const { fine } = failure;
+    mafiaUnlocked ||= failure.mafiaJustUnlocked;
     if (fine > 0) {
-      state.cash -= fine;
-      addExpense(state.finances, fine, 'fines', `Scandal: ${target}`, state.tickCount);
+      chargeFine(state, fine, `Scandal: ${target}`, state.tickCount);
       lines.push(t('corruption.scandal_fine', { fine: formatMoney(fine) }));
     }
     ctx.emitter.emit('corruption:scandal', { target, fine });
   }
-  if (result.mafiaJustUnlocked) {
+  if (mafiaUnlocked) {
     lines.push(t('corruption.mafia_unlocked'));
   }
 

@@ -19,6 +19,8 @@ import {
   INVESTIGATION_FOLLOWUP_EVENT_ID,
   EXPOSURE_CLEAN_GRACE_TICKS,
   EXPOSURE_DECAY_PER_TICK,
+  SMUGGLING_EXPOSED_FINE,
+  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -69,10 +71,10 @@ export interface MafiaActionResult {
   investigationTriggered: boolean;
 }
 
-/** Add exposure (capped at 1) and return the delta actually applied. */
-function applyExposure(mafia: MafiaState, nominal: number): number {
+/** Add (or, if negative, remove) exposure, clamped to 0-1; returns the delta actually applied. */
+export function applyExposure(mafia: MafiaState, nominal: number): number {
   const before = mafia.exposureRisk;
-  mafia.exposureRisk = Math.min(1, before + nominal);
+  mafia.exposureRisk = Math.min(1, Math.max(0, before + nominal));
   return mafia.exposureRisk - before;
 }
 
@@ -202,15 +204,27 @@ export function toggleSmuggling(mafia: MafiaState): { active: boolean; incomePer
 export function processSmuggling(
   mafia: MafiaState,
   rng: Random,
-  tick?: number,
+  tick: number,
 ): { income: number; exposed: boolean } {
   if (!mafia.smugglingActive) return { income: 0, exposed: false };
 
-  if (tick !== undefined) mafia.lastActivityTick = tick;
+  mafia.lastActivityTick = tick;
   applyExposure(mafia, SMUGGLING_EXPOSURE_PER_TICK);
   const exposed = rng.chance(SMUGGLE_EXPOSURE_RISK * mafia.exposureRisk);
 
   return { income: mafia.smugglingIncome, exposed };
+}
+
+/**
+ * Smuggling got caught (#1411): exposure jumps, the operation ends and activity is stamped
+ * so decay does not start right after the spike. Returns the fine the caller must charge.
+ */
+export function applySmugglingExposure(mafia: MafiaState, tick: number): { fine: number } {
+  applyExposure(mafia, SMUGGLING_EXPOSED_EXPOSURE_JUMP);
+  mafia.smugglingActive = false;
+  mafia.smugglingIncome = 0;
+  mafia.lastActivityTick = tick;
+  return { fine: SMUGGLING_EXPOSED_FINE };
 }
 
 /**
@@ -223,9 +237,13 @@ export function isExposed(mafia: MafiaState, rng: Random): boolean {
 export { ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS, SMUGGLE_BASE_INCOME };
 
 /** Botched action triggers a police investigation: bumps exposure, queues follow-up event. Returns exposure added (#1411). */
-export function applyInvestigation(mafia: MafiaState, events: EventSystemState): number {
+export function applyInvestigation(mafia: MafiaState, events: EventSystemState, tick?: number): number {
   const added = applyExposure(mafia, INVESTIGATION_EXPOSURE_JUMP);
-  queueFollowUp(events, INVESTIGATION_FOLLOWUP_EVENT_ID);
+  if (tick !== undefined) mafia.lastActivityTick = tick;
+  // One pending investigation is enough: repeated botches still raise exposure, not the queue.
+  if (!events.followUpQueue.includes(INVESTIGATION_FOLLOWUP_EVENT_ID)) {
+    queueFollowUp(events, INVESTIGATION_FOLLOWUP_EVENT_ID);
+  }
   return added;
 }
 

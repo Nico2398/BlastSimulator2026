@@ -20,7 +20,7 @@ import type { ArrivalGateResult } from './ArrivalGate.js';
 import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { ExpenseCategory } from '../economy/Finance.js';
-import { addExpense, addIncome } from '../economy/Finance.js';
+import { addExpense, addIncome, chargeFine } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
 import { buildTickEventContext } from './TickEventContext.js';
@@ -51,10 +51,8 @@ import {
   CONTRACT_REFRESH_INTERVAL,
   SCORE_VIBRATION_WINDOW_TICKS,
   VILLAGE_VIBRATION_SCORE_GAIN,
-  SMUGGLING_EXPOSED_FINE,
-  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
 } from '../config/balance.js';
-import { isExposed, processSmuggling, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
+import { isExposed, processSmuggling, applySmugglingExposure, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
 import { resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
@@ -199,18 +197,15 @@ export function runTick(
   }
   if (smugResult.exposed) {
     // Exposure costs a fine, raises exposure and ends the operation (#1411).
-    state.cash -= SMUGGLING_EXPOSED_FINE;
-    addExpense(state.finances, SMUGGLING_EXPOSED_FINE, 'fines', 'Smuggling exposed', state.tickCount);
-    state.mafia.exposureRisk = Math.min(1, state.mafia.exposureRisk + SMUGGLING_EXPOSED_EXPOSURE_JUMP);
-    state.mafia.smugglingActive = false;
-    state.mafia.smugglingIncome = 0;
-    emitter.emit('mafia:smuggling_exposed', { fine: SMUGGLING_EXPOSED_FINE });
+    const { fine } = applySmugglingExposure(state.mafia, state.tickCount);
+    chargeFine(state, fine, 'Smuggling exposed', state.tickCount);
+    emitter.emit('mafia:smuggling_exposed', { fine });
   }
 
   // 6. Mafia exposure check
   const mafiaExposed = state.mafia.exposureRisk > 0.3 && isExposed(state.mafia, rng);
   if (mafiaExposed) {
-    applyInvestigation(state.mafia, state.events);
+    applyInvestigation(state.mafia, state.events, state.tickCount);
     emitter.emit('mafia:exposed', {});
   }
   decayExposure(state.mafia, state.tickCount);

@@ -5,6 +5,7 @@ import type { Random } from '../math/Random.js';
 import { clampScore, type ScoreState } from '../scores/ScoreManager.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { addIncome, addExpense } from '../economy/Finance.js';
+import { applyExposure } from './MafiaActions.js';
 import type { EventConsequence } from './EventPool.js';
 import { getEventById } from './EventPool.js';
 import type { EventSystemState, EventEffect, EventOutcome } from './EventSystem.js';
@@ -29,6 +30,8 @@ export interface ResolutionResult {
   scoreChanges: Partial<Record<keyof ScoreState, number>>;
   corruptionChange: number;
   followUpQueued: string | null;
+  /** Mafia exposure actually applied (fraction 0-1, signed) when the option carried an exposure delta. */
+  exposureChange?: number;
 }
 
 /**
@@ -87,7 +90,9 @@ export function resolveEvent(
 
   if (world && resolved.exposureDelta) {
     const mafia = world.state.mafia;
-    mafia.exposureRisk = Math.min(1, Math.max(0, mafia.exposureRisk + resolved.exposureDelta));
+    const before = mafia.exposureRisk;
+    applyExposure(mafia, resolved.exposureDelta);
+    result.exposureChange = mafia.exposureRisk - before;
     result.effects.push(`Exposure ${resolved.exposureDelta > 0 ? '+' : ''}${Math.round(resolved.exposureDelta * 100)}%`);
   }
 
@@ -128,6 +133,10 @@ function buildEventOutcome(result: ResolutionResult): EventOutcome {
   }
   if (result.corruptionChange !== 0) {
     effects.push({ kind: 'other', key: 'corruption', delta: result.corruptionChange });
+  }
+  if (result.exposureChange) {
+    // Shown in percentage points, like the console line.
+    effects.push({ kind: 'other', key: 'exposure', delta: Math.round(result.exposureChange * 100) });
   }
   if (result.followUpQueued) {
     effects.push({ kind: 'other', key: 'followUp', delta: 0, textKey: 'ui.event.follow_up_developing' });

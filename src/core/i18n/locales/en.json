@@ -2619,6 +2619,7 @@
   "ui.event.choose": "Choose your response:",
   "ui.event.dismiss": "Dismiss",
   "ui.event.outcome": "Outcome:",
+  "ui.event.effect_exposure": "% exposure",
   "ui.event.follow_up_developing": "A follow-up situation is developing…",
   "ui.event.category.union": "Union",
   "ui.event.category.politics": "Politics",

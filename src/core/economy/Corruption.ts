@@ -133,13 +133,13 @@ export function bribeFailureFine(cost: number): number {
   return Math.round(cost * BRIBERY_FAILURE_FINE_FRACTION);
 }
 
-/** Apply failed-bribe consequences: corruption level, nuisance hit; returns the fine to charge (#1411). */
+/** Apply failed-bribe consequences: corruption level, nuisance hit; returns the fine to charge and whether this unlocked the mafia (#1411). */
 export function applyBribeFailure(
   state: CorruptionState,
   scores: ScoreState,
   cost: number,
-): { fine: number } {
+): { fine: number; mafiaJustUnlocked: boolean } {
   scores.nuisance = clampScore(scores.nuisance - BRIBERY_FAILURE_NUISANCE_HIT);
-  applyCorruptionDelta(state, BRIBERY_FAILURE_CORRUPTION_DELTA);
-  return { fine: bribeFailureFine(cost) };
+  const { mafiaJustUnlocked } = applyCorruptionDelta(state, BRIBERY_FAILURE_CORRUPTION_DELTA);
+  return { fine: bribeFailureFine(cost), mafiaJustUnlocked };
 }

@@ -1023,20 +1023,17 @@ describe('failed bribe and botched mafia consequences (#1411)', () => {
     expect.unreachable('no botched accident in 200 seeds');
   });
 
-  it('choosing an investigation option that stonewalls raises mafia exposure', () => {
-    const base = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+  it('choosing the stonewall option raises mafia exposure by exactly its delta', () => {
     const def = getEventById('mafia_police_investigation');
     expect(def).toBeDefined();
-    let raised = 0;
-    for (let i = 0; i < def!.options.length; i++) {
-      const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
-      ctx.state!.mafia.exposureRisk = 0.3;
-      ctx.state!.events.pendingEvent = { eventId: 'mafia_police_investigation', firedAtTick: ctx.state!.tickCount };
-      const r = eventCommand(ctx, ['choose', String(i)], {});
-      expect(r.success).toBe(true);
-      if (ctx.state!.mafia.exposureRisk > 0.3) raised++;
-    }
-    expect(base.state).not.toBeNull();
-    expect(raised).toBeGreaterThanOrEqual(1);
+    const idx = def!.consequences.findIndex(c => c.effectTag === 'stonewall_police');
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
+    ctx.state!.mafia.exposureRisk = 0.3;
+    ctx.state!.events.pendingEvent = { eventId: 'mafia_police_investigation', firedAtTick: ctx.state!.tickCount };
+    const r = eventCommand(ctx, ['choose', String(idx)], {});
+    expect(r.success).toBe(true);
+    expect(ctx.state!.mafia.exposureRisk).toBeCloseTo(0.3 + def!.consequences[idx]!.exposureDelta!, 10);
+    expect(ctx.state!.events.lastOutcome!.effects).toContainEqual({ kind: 'other', key: 'exposure', delta: 15 });
   });
 });
