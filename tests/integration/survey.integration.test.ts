@@ -11,6 +11,7 @@ import { makeGameContext } from '../helpers/gameContext.js';
 import {
   estimateSurveyResult,
   isSurveyStale,
+  markSurveysStaleByBlast,
   runSurvey,
   SURVEY_METHODS,
   type EstimateSurveyParams,
@@ -22,7 +23,7 @@ import { cancelAction } from '../../src/core/engine/TaskDispatch.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
-import { SURVEY_STALE_TICKS, SURVEY_COSTS, SURVEY_DURATION_TICKS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
+import { SURVEY_COSTS, SURVEY_DURATION_TICKS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
 import { hireEmployee, assignSkill, injureEmployee } from '../../src/core/entities/Employee.js';
 import { executeBlast, type FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
@@ -167,18 +168,19 @@ describe('Survey system', () => {
 
   // ── 5. Stale boundary test ───────────────────────────────────────────────
 
-  it('survey becomes stale after SURVEY_STALE_TICKS interval', () => {
+  it('a survey stays fresh however many ticks pass without a blast (#1356)', () => {
     const grid = makeOreGrid(30);
     const survey = runSurveyOnGrid(grid, 'core_sample', 10, 10, 1, 99, 1, 0);
+    expect(isSurveyStale(survey)).toBe(false);
+    ctx.state!.tickCount = 100_000;
+    expect(isSurveyStale(survey)).toBe(false);
+  });
 
-    // Exactly SURVEY_STALE_TICKS ticks later — still fresh (boundary inclusive)
-    expect(isSurveyStale(survey, SURVEY_STALE_TICKS)).toBe(false);
-
-    // One tick past the threshold — stale
-    expect(isSurveyStale(survey, SURVEY_STALE_TICKS + 1)).toBe(true);
-
-    // Long past threshold — also stale
-    expect(isSurveyStale(survey, SURVEY_STALE_TICKS + 100)).toBe(true);
+  it('a survey becomes stale once a blast clears a column in its disc (#1356)', () => {
+    const grid = makeOreGrid(30);
+    const survey = runSurveyOnGrid(grid, 'core_sample', 10, 10, 1, 99, 1, 0);
+    expect(markSurveysStaleByBlast([survey], ['10,10'])).toBe(1);
+    expect(isSurveyStale(survey)).toBe(true);
   });
 
   // ── 6. Survey command with employee queues pending action ─────────────────

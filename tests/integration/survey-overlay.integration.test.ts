@@ -26,9 +26,8 @@ import {
   type SurveyMethod,
   type EstimateSurveyParams,
 } from '../../src/core/mining/SurveyCalc.js';
-import { isSurveyStale } from '../../src/core/mining/SurveyCalc.js';
+import { isSurveyStale, markSurveysStaleByBlast } from '../../src/core/mining/SurveyCalc.js';
 
-import { SURVEY_STALE_TICKS } from '../../src/core/config/balance.js';
 import { syncSurveyOverlay, buildSurveyOverlayOptions } from '../../src/renderer/GameRendererSync.js';
 import { createSurveyOverlayToggleStep, isSurveyOverlayToggleOn } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
@@ -138,7 +137,7 @@ function runSurveyOnGrid(
 function surveyResultsToConfidencePoints(
   surveys: SurveyResult[],
   grid: VoxelGrid,
-  currentTick: number,
+  _currentTick: number, // unused: staleness is blast-driven, not time-driven (#1356)
   // Height-free VoxelGrid always reports sizeY=4096 (#1192) — every caller
   // that built its own fixed-height fixture grid passes that grid's own
   // known height here; a caller passing a generator-built terrain grid
@@ -149,7 +148,7 @@ function surveyResultsToConfidencePoints(
   const points: SurveyConfidencePoint[] = [];
 
   for (const survey of surveys) {
-    const fresh = !isSurveyStale(survey, currentTick);
+    const fresh = !isSurveyStale(survey);
 
     for (const colKey of Object.keys(survey.estimates)) {
       const parts = colKey.split(',').map(Number);
@@ -347,44 +346,37 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
 
   // ── 3. Stale survey → fresh=false ─────────────────────────────────────────
 
-  it('survey completed at tick 0 is still fresh at tick SURVEY_STALE_TICKS (boundary)', () => {
+  it('survey completed at tick 0 stays fresh at any tick without a blast (#1356)', () => {
     const grid = makeOreGrid();
     const survey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 1, 0);
 
-    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS, ORE_GRID_HEIGHT);
-
-    // Exactly SURVEY_STALE_TICKS ticks elapsed → still fresh
-    for (const p of points) {
-      expect(p.fresh).toBe(true);
+    for (const tick of [100, 101, 100_000]) {
+      const points = surveyResultsToConfidencePoints([survey], grid, tick, ORE_GRID_HEIGHT);
+      expect(points.length).toBeGreaterThan(0);
+      for (const p of points) expect(p.fresh).toBe(true);
     }
   });
 
-  it('survey completed at tick 0 is stale at tick SURVEY_STALE_TICKS + 1', () => {
+  it('survey flagged stale by a blast overlapping its disc is not fresh (#1356)', () => {
     const grid = makeOreGrid();
     const survey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 1, 0);
+    expect(markSurveysStaleByBlast([survey], ['5,5'])).toBe(1);
 
-    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS + 1, ORE_GRID_HEIGHT);
-
-    // More than SURVEY_STALE_TICKS ticks elapsed → stale
-    for (const p of points) {
-      expect(p.fresh).toBe(false);
-    }
+    const points = surveyResultsToConfidencePoints([survey], grid, 1, ORE_GRID_HEIGHT);
+    expect(points.length).toBeGreaterThan(0);
+    for (const p of points) expect(p.fresh).toBe(false);
   });
 
   it('fresh survey and stale survey produce different fresh flags for overlay rendering', () => {
     const grid = makeOreGrid();
 
-    // Survey 1: completed at tick 0 (old)
-    const oldSurvey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 1, 0);
-    // Survey 2: completed at tick 200 (recent if current=250)
+    const staleSurvey = { ...runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 1, 0), stale: true };
     const newSurvey = runSurveyOnGrid(grid, 'seismic', 5, 5, 1, 99, 2, 200);
 
-    const points = surveyResultsToConfidencePoints([oldSurvey, newSurvey], grid, 250, ORE_GRID_HEIGHT);
+    const points = surveyResultsToConfidencePoints([staleSurvey, newSurvey], grid, 250, ORE_GRID_HEIGHT);
 
-    const hasFresh = points.some(p => p.fresh);
-    const hasStale = points.some(p => !p.fresh);
-    expect(hasFresh).toBe(true);
-    expect(hasStale).toBe(true);
+    expect(points.some(p => p.fresh)).toBe(true);
+    expect(points.some(p => !p.fresh)).toBe(true);
   });
 
   // ── 4. Multiple surveys accumulate ────────────────────────────────────────
@@ -574,9 +566,8 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     const scene = makeScene();
 
     // Survey completed at tick 0
-    const survey = runSurveyOnGrid(grid, 'core_sample', 5, 5, 3, 99, 1, 0);
-    // Current tick is past stale threshold
-    const points = surveyResultsToConfidencePoints([survey], grid, SURVEY_STALE_TICKS + 10, ORE_GRID_HEIGHT);
+    const survey = { ...runSurveyOnGrid(grid, 'core_sample', 5, 5, 3, 99, 1, 0), stale: true };
+    const points = surveyResultsToConfidencePoints([survey], grid, 10, ORE_GRID_HEIGHT);
 
     // All points must be stale
     for (const p of points) {
@@ -690,7 +681,7 @@ describe('Survey Confidence Overlay — integration (4.11)', () => {
     // Fresh survey at (5,5) with high confidence
     const freshSurvey = runSurveyOnGrid(grid, 'core_sample', 5, 5, 5, 99, 1, 200);
     // Stale survey at (3,3) with medium confidence
-    const staleSurvey = runSurveyOnGrid(grid, 'core_sample', 3, 3, 2, 99, 2, 0);
+    const staleSurvey = { ...runSurveyOnGrid(grid, 'core_sample', 3, 3, 2, 99, 2, 200), stale: true };
 
     const points = surveyResultsToConfidencePoints([freshSurvey, staleSurvey], grid, 250, ORE_GRID_HEIGHT);
 
@@ -1018,7 +1009,7 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     const tm = new TerrainMesh(scene, grid);
     const overlay = tm.getSurveyOverlay();
 
-    // At tick 50 — still fresh
+    // At tick 50, no blast yet — still fresh
     const freshPoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 50, ORE_GRID_HEIGHT);
     overlay.show({ points: freshPoints, opacity: 0.5 });
 
@@ -1027,8 +1018,9 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
       expect(p.fresh).toBe(true);
     }
 
-    // At tick 200 — stale
-    const stalePoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 200, ORE_GRID_HEIGHT);
+    // A blast clears the surveyed column — stale, at the very same tick
+    expect(markSurveysStaleByBlast(state.surveyResults, ['5,5'])).toBe(1);
+    const stalePoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 50, ORE_GRID_HEIGHT);
     overlay.show({ points: stalePoints, opacity: 0.5 });
 
     for (const p of stalePoints) {

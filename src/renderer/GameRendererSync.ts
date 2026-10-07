@@ -22,7 +22,7 @@ import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { TerrainMesh } from './TerrainMesh.js';
 import { syncEntitySets, buildingFootprintSurfaceY } from './EntitySync.js';
-import { isSurveyStale } from '../core/mining/SurveyCalc.js';
+import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 
 /**
@@ -238,11 +238,10 @@ export function buildSurveyOverlayOptions(
 ): SurveyConfidenceOverlayOptions | null {
   if (state.surveyResults.length === 0 || !grid) return null;
 
-  const currentTick = state.tickCount;
   const points: SurveyConfidencePoint[] = [];
 
   for (const survey of state.surveyResults) {
-    const fresh = !isSurveyStale(survey, currentTick);
+    const fresh = !isSurveyStale(survey);
 
     for (const colKey of Object.keys(survey.estimates)) {
       const parts = colKey.split(',').map(Number);

@@ -28,7 +28,7 @@ import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost } from '../entities/Building.js';
-import { getVehicleCostsPerTick } from '../entities/Vehicle.js';
+import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../entities/EmployeeNeeds.js';
 import {
   tickCollapse,
@@ -169,8 +169,8 @@ export function runTick(
   // 2b. Building and vehicle maintenance — unconditional per-tick upkeep.
   const buildingUpkeep = getTotalOperatingCost(state.buildings);
   deductExpense(state, buildingUpkeep, 'maintenance', 'Building upkeep');
-  const vehicleUpkeep = getVehicleCostsPerTick(state.vehicles);
-  deductExpense(state, vehicleUpkeep, 'fuel', 'Vehicle maintenance & fuel');
+  deductExpense(state, getVehicleMaintenanceCostPerTick(state.vehicles), 'vehicle_maintenance', 'Vehicle maintenance');
+  deductExpense(state, getVehicleFuelCostPerTick(state.vehicles), 'fuel', 'Vehicle fuel');
 
   // 3. Contract deadlines — expire overdue contracts and apply penalties
   const expired = checkDeadlines(state.contracts, state.tickCount);

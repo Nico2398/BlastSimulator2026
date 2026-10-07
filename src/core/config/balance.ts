@@ -1596,9 +1596,6 @@ export const SURVEY_SEISMIC_GROUP_SIZE = 3;
 /** Ore estimate quantisation step: estimates are rounded to the nearest 0.05 band. */
 export const SURVEY_ESTIMATE_STEP = 0.05;
 
-/** Number of ticks after which a survey result is considered stale. */
-export const SURVEY_STALE_TICKS = 100;
-
 /** Survey cost ($) for each method. */
 export const SURVEY_COSTS = {
   seismic:     3000,
@@ -1730,3 +1727,9 @@ export const ORDER_REACH_CACHE_MAX_KEYS = 64;
  * change does not make the tutorial unwinnable (or trivially won) again.
  */
 export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 52.0;
+
+/** Trailing window (ticks) over which operating income per hour is averaged (#1375). */
+export const OPERATING_INCOME_WINDOW_TICKS = 72;
+
+/** Income categories that count as operating income (#1375). */
+export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;

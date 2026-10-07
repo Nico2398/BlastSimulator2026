@@ -190,7 +190,7 @@ describe('HoverTag', () => {
     expect(root.textContent).toContain('65%');
   });
 
-  it('shows FRESH for a survey within the staleness window', () => {
+  it('shows FRESH for a survey with no stale flag', () => {
     const { tag, root } = makeTag();
     const state = makeState();
     state.surveyResults.push({
@@ -204,7 +204,7 @@ describe('HoverTag', () => {
     expect(root.textContent).toContain('FRESH');
   });
 
-  it('shows STALE for a survey past the staleness window', () => {
+  it('shows FRESH for an old survey no blast has touched, at any tick (#1356)', () => {
     const { tag, root } = makeTag();
     const state = makeState();
     state.surveyResults.push({
@@ -212,7 +212,22 @@ describe('HoverTag', () => {
       surveyorId: 1, confidence: 0.8,
       estimates: { '12,8': { grumpite: 0.65 } },
     });
-    state.tickCount = 100000; // far past SURVEY_STALE_TICKS
+    state.tickCount = 100000;
+    const hover: PickResult = { entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } };
+
+    tag.update(hover, state);
+    expect(root.textContent).toContain('FRESH');
+    expect(root.textContent).not.toContain('STALE');
+  });
+
+  it('shows STALE for a survey carrying the stale flag (#1356)', () => {
+    const { tag, root } = makeTag();
+    const state = makeState();
+    state.surveyResults.push({
+      id: 1, method: 'seismic', centerX: 12, centerZ: 8, completedTick: state.tickCount,
+      surveyorId: 1, confidence: 0.8, stale: true,
+      estimates: { '12,8': { grumpite: 0.65 } },
+    });
     const hover: PickResult = { entity: null, terrain: { point: new THREE.Vector3(), tileX: 12, tileZ: 8, distance: 1 } };
 
     tag.update(hover, state);
