@@ -8,7 +8,6 @@ import {
   SURVEY_SKILL_BONUS_PER_LEVEL,
   SURVEY_SEISMIC_GROUP_SIZE,
   SURVEY_ESTIMATE_STEP,
-  SURVEY_STALE_TICKS,
   SURVEY_COSTS,
   SURVEY_DURATION_TICKS,
   SURVEY_DEPTH_BELOW_SURFACE,
@@ -16,6 +15,7 @@ import {
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
 import { surveyColumnKey } from './SurveyColumn.js';
+import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
 /** The three supported methods for surveying a mining site. */
@@ -49,6 +49,8 @@ export interface SurveyResult {
   estimates: Record<string, Record<string, number>>;
   /** Confidence in the estimates, clamped to [0, 1]. */
   confidence: number;
+  /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
+  stale?: boolean;
 }
 
 /** Parameters required to compute a noisy survey estimate from a VoxelGrid. */
@@ -154,9 +156,7 @@ export function estimateSurveyResult(
     for (let z = zMin; z <= zMax; z++) {
       if (!grid.containsColumn(x, z)) continue;
 
-      const dx = x - centerX;
-      const dz = z - centerZ;
-      if (Math.sqrt(dx * dx + dz * dz) > radius) continue;
+      if (!isColumnInSurveyDisc({ method, centerX, centerZ }, x, z)) continue;
 
       // Determine which Y levels to sample
       let yLevels: number[];
@@ -205,14 +205,12 @@ export function estimateSurveyResult(
   return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
 }
 
-/**
- * Returns `true` when the elapsed ticks since survey completion exceed `SURVEY_STALE_TICKS`.
- * A result aged by exactly `SURVEY_STALE_TICKS` ticks is still considered fresh.
- */
-export function isSurveyStale(result: SurveyResult, currentTick: number): boolean {
-  return currentTick - result.completedTick > SURVEY_STALE_TICKS;
-}
-
+export {
+  isSurveyStale,
+  isColumnInSurveyDisc,
+  freshSurveys,
+  markSurveysStaleByBlast,
+} from './SurveyStaleness.js';
 export { applySeismicSurveyDamage } from './SeismicSurveyDamage.js';
 
 /** Input parameters for {@link runSurvey}. */

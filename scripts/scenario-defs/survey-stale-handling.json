@@ -1,6 +1,6 @@
 {
   "name": "survey-stale-handling",
-  "description": "Validates stale survey handling: run a survey, wait for it to expire (tick past stale threshold), then verify the overlay shows stale markers in grey. Running a new survey at the same position should refresh the marker to fresh colour. Requires the survey overlay to be wired into syncFromContext().",
+  "description": "Validates blast-driven stale survey handling: run a survey, fire a real blast over its coverage disc, then verify the survey is flagged stale (overlay grey, dropped from the estimate). Time alone never stales a survey. Running a new survey outside the crater afterwards adds a fresh marker beside the grey one (the blasted spot itself is no longer reachable for a surveyor). Requires the survey overlay to be wired into syncFromContext().",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
@@ -31,7 +31,19 @@
         "increased": [
           "worldSizeX"
         ]
-      }
+      },
+      "description": "#1261/#1207: this campaign start used to opt into agent occupancy explicitly; occupancy is unconditional since #1207, so the wait_until conversions below now genuinely exercise it. Latent occupancy-contention risk worth flagging: both surveyors hired above are never fired and both surveyed tile (20,20), which the drill grid below reuses as its own `start:20,20` -- three separate crew members converging on the same tile/cluster is exactly the shape of contention this batch's own other files (blast-execution-visual.json, vibration-budget.json) found genuinely stalls a charge_hole action under occupancy (see issue #1278)."
+    },
+    {
+      "command": "set_policy mode:continuous fatigue:0",
+      "description": "Neutralise the default site policy (shift_8h, rest at fatigue 60), which is in force from tick 0 (#1379): this scenario is not about shifts or rest, so staffed crews must not be force-rested mid-task. Continuous mode with threshold 0 never forces rest.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "set_policy mode:continuous fatigue:0"
+        }
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "time resume",
@@ -283,14 +295,139 @@
       "role": "observe"
     },
     {
-      "command": "tick 10",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed a driller at all) now needs one. campaign start has no staffed:true equivalent, so this is a manual hire + purchase, same pattern as survey-then-blast.json. Employee #3 -- #1 and #2 are the two surveyors hired above.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
+      "description": "Corrected spacing from 4 to 3 to match the drag (#1072): no stepper click precedes the drag, so the grid tool's spacing stays at its default 3m (DRILL_GRID_DEFAULT_SPACING_M, balance.ts). The (20,20)-(24,24) rectangle (4x4) computes round(4/3)+1=2 per axis, matching the declared 2x2. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 24,
+          "z2": 24
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:4 max_ticks:400",
+      "description": "#1261: collapsed the 3-chunk fixed `tick 50`/`tick 50`/`tick 30` drilling pad into a single wait_until on holeCount. Structurally verified only (occupancy is not actually active yet in command mode -- see the campaign start step's own note).",
+      "timeout": 100,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 4,
+          "maxTicks": 400,
+          "timeoutMs": 100000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -299,19 +436,54 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player",
       "commandOutcome": "either"
     },
     {
-      "command": "tick 10",
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:4 max_ticks:300",
+      "description": "#1261: collapsed the 4-chunk fixed `tick 15` charging pad into a single wait_until on chargedCount, same reasoning as the drilling wait above.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 4,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -320,51 +492,61 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player",
       "commandOutcome": "either"
     },
     {
-      "command": "tick 10",
+      "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player",
-      "commandOutcome": "either"
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
-      "command": "tick 10",
+      "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player",
-      "commandOutcome": "either"
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      }
     },
     {
       "command": "survey show",
@@ -379,7 +561,7 @@
         "equals": {
           "surveyCount": 1
         },
-        "note": "staleness-wait round — no new survey queued, ceiling stays at 1"
+        "note": "post-blast observation — the blasted survey is flagged stale, count unchanged"
       }
     },
     {
@@ -393,8 +575,23 @@
       "role": "observe"
     },
     {
-      "command": "survey core_sample x:20 z:20",
+      "command": "event choose 0",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "The blast's own tick span can raise an event whose modal covers the toolbar; resolve it through its own buttons before the survey panel is opened.",
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "survey core_sample x:30 z:30",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
@@ -409,8 +606,8 @@
         },
         {
           "type": "pickTile",
-          "x": 20,
-          "z": 20
+          "x": 30,
+          "z": 30
         },
         {
           "type": "screenshot"
@@ -457,16 +654,6 @@
       "role": "observe"
     },
     {
-      "command": "tick 23",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 23"
-        }
-      ],
-      "role": "setup"
-    },
-    {
       "command": "event choose 0",
       "interaction": [
         {
@@ -478,56 +665,24 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 8",
+      "command": "wait_until field:surveyCount equals:2 max_ticks:400",
+      "description": "Wait for the re-survey to complete; the surveyor needs a few ticks to walk there and work.",
+      "timeout": 90,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 8"
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 90000
         }
       ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "surveyCount": 2
         }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 8"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 8"
-        }
-      ],
-      "role": "setup"
+      }
     },
     {
       "command": "event choose 0",
