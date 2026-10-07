@@ -76,11 +76,19 @@ describe('build destroy as a queued order', () => {
     tick(ctx, 2);
     expect(ctx.state!.buildings.buildings.some(b => b.id === id)).toBe(true);
 
-    tickUntilDemolished(ctx);
+    const ticks = 2 + tickUntilDemolished(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.id === id)).toBe(false);
     expect(demolishAction(ctx)).toBeUndefined();
-    // Running costs (fuel, wages) may move cash; no second demolish fee may.
-    expect(cashAfterOrder - ctx.state!.cash).toBeLessThan(getBuildingDef('living_quarters', 1).demolishCost);
+    // Wages and fuel drain cash every tick whatever happens; compare against an
+    // identical site that never placed the order, so only a second demolish fee shows.
+    const control = staffedCtx();
+    constructBuilding(control);
+    equipDemolition(control);
+    const controlBefore = control.state!.cash;
+    tick(control, ticks);
+    const runningCosts = controlBefore - control.state!.cash;
+    const extra = (cashAfterOrder - ctx.state!.cash) - runningCosts;
+    expect(extra).toBeLessThan(getBuildingDef('living_quarters', 1).demolishCost);
   });
 
   it('frees the nav footprint once the building is gone', () => {

@@ -16,6 +16,7 @@ import { makeGameContext } from '../../helpers/gameContext.js';
 function setup(tier: 1 | 2 | 3 = 1): { ctx: GameContext; building: Building } {
   const ctx = makeGameContext({ mineType: 'desert', seed: 42, size: 32, staffed: true });
   const state = ctx.state!;
+  state.buildings.unlockedTiers.living_quarters = tier;
   const res = placeBuilding(state.buildings, 'living_quarters', 9, 14, 32, 32, tier, 0, 0);
   if (!res.success) throw new Error(`setup: ${res.error}`);
   return { ctx, building: res.building! };

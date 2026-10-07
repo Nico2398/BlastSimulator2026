@@ -47,8 +47,8 @@ Research task shape:
 `tickResearch` emits `research:completed` (tier unlocked) and `research:cancelled` (with refund); `wireResearchNotifications` raises the toasts. The Build Menu research button shows cost and duration (`ui.build.queue_research_cost`); once queued it is replaced by live progress (`getResearchProgress`, `.bs-build-research-progress`).
 
 Higher tiers: larger capacity, better performance, larger physical footprint.
-Upgrading: demolish old building → construct new tier on same/adjacent cleared ground.
-Both construction and demolition carry a cost.
+Upgrading: demolish old building → construct new tier on the same ground (#1392). Both construction and demolition carry a cost.
+`build destroy <id>` / `build upgrade <id>` are queued orders, not instant: cost is charged at order time (full refund on cancel), a Building Destroyer with a licensed driver carries the demolition out (`gameplay-vehicle-fleet`), and the building stays standing and operating until it finishes. A second order on a building already being demolished is refused. An upgrade reserves a `PlannedBuilding` keeping the SAME id (next tier, same x/z, footprint blocked from order time); when the demolition completes the old building is removed, occupants put out, and the reserved `place_building` action is dispatched with normal construction time. While rebuilding the id is absent from `state.buildings`; selecting it shows the site as "Rebuilding…" with actions disabled. `maxBuildingTier` in serialized state is the highest standing tier (0 when none).
 Demolish is confirmed (#1399) from the Build menu row and the selection bar via `ConfirmModal`: it names the building, the cost, that nothing is refunded and it cannot be undone, plus the kg of stored explosives lost when any.
 
 ## Training Buildings
@@ -121,7 +121,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 
 ## Destruction Effects
 
-- Building destroyed → removed from grid immediately
+- Building destroyed by a blast → removed from grid immediately; a player demolition is removed when its Building Destroyer finishes (#1392)
 - Employees inside → put out on its ring (any removal: destruction, demolition, an upgrade's
   replace); a projection that destroys it injures them first
 - Stored contents lost. An Explosive Warehouse destroyed by a blast or flying rock **with stock**

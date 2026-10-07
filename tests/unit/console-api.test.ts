@@ -92,7 +92,7 @@ const SERIALIZED_FIELDS = [
   'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount',
-  'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
+  'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'rubbleDisposalOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',

@@ -124,7 +124,7 @@ const tick = (site: Site, n = 1) => {
   for (let i = 0; i < n; i++) {
     site.state().events.pendingEvent = null;
     const r = runCommand(site.engine, 'tick 1');
-    expect(r.output).toMatch(/Advanced|EVENT/);
+    expect(r.output).toMatch(/Advanced|EVENT|NEED:/);
   }
 };
 
