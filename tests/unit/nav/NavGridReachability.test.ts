@@ -167,3 +167,83 @@ describe('computeClimbComponents (#1306)', () => {
     expect(components.canReach(3, 3, W, 3)).toBe(false);
   });
 });
+
+describe('computeClimbReachableSetFromSources fill overrides (#1391)', () => {
+  const rect = (minX: number, minZ: number, maxX: number, maxZ: number) => ({ minX, minZ, maxX, maxZ });
+  /** Wall at x=10 with one open cell at z=5. */
+  const gap = (x: number, z: number): Partial<NavCell> | null => (x === 10 && z !== 5 ? BLOCKED : null);
+  const src = [{ x: 3, z: 3 }];
+
+  it('no overrides behaves as before', () => {
+    const grid = makeGrid(gap);
+    const plain = computeClimbReachableSetFromSources(grid, src);
+    const empty = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, {});
+    expect(empty.size).toBe(plain.size);
+    expect(plain.has(25, 5)).toBe(true);
+  });
+
+  it('block makes cells impassable: blocking the gap seals the far side', () => {
+    const grid = makeGrid(gap);
+    const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, { block: rect(10, 5, 11, 6) });
+    expect(set.has(10, 5)).toBe(false);
+    expect(set.has(25, 5)).toBe(false);
+    expect(set.has(3, 5)).toBe(true);
+  });
+
+  it('block is min-inclusive, max-exclusive', () => {
+    const grid = makeGrid();
+    const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, { block: rect(5, 5, 7, 6) });
+    expect(set.has(5, 5)).toBe(false);
+    expect(set.has(6, 5)).toBe(false);
+    expect(set.has(7, 5)).toBe(true);
+    expect(set.has(5, 6)).toBe(true);
+    expect(set.has(5, 4)).toBe(true);
+  });
+
+  it('block shrinks the set by exactly the covered reachable cells on open ground', () => {
+    const grid = makeGrid();
+    const plain = computeClimbReachableSetFromSources(grid, src).size;
+    const blocked = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, { block: rect(12, 2, 15, 4) });
+    expect(blocked.size).toBe(plain - 6);
+  });
+
+  it('free makes blocked cells passable: freeing the wall gap opens the far side', () => {
+    const grid = makeGrid((x, z) => (x === 10 ? BLOCKED : null));
+    expect(computeClimbReachableSetFromSources(grid, src).has(25, 5)).toBe(false);
+    const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, { free: rect(10, 5, 11, 6) });
+    expect(set.has(10, 5)).toBe(true);
+    expect(set.has(25, 5)).toBe(true);
+    expect(set.has(10, 4)).toBe(false);
+  });
+
+  it('block wins over free where they overlap', () => {
+    const grid = makeGrid((x, z) => (x === 10 ? BLOCKED : null));
+    const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, {
+      free: rect(10, 5, 11, 6),
+      block: rect(10, 5, 11, 6),
+    });
+    expect(set.has(10, 5)).toBe(false);
+    expect(set.has(25, 5)).toBe(false);
+  });
+
+  it('block and free together: move the plug from one gap to another', () => {
+    const grid = makeGrid((x, z) => (x === 10 && z !== 8 ? BLOCKED : null));
+    const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, {
+      free: rect(10, 5, 11, 6),
+      block: rect(10, 8, 11, 9),
+    });
+    expect(set.has(25, 5)).toBe(true);
+    expect(set.has(10, 8)).toBe(false);
+  });
+
+  it('does not mutate the grid', () => {
+    const grid = makeGrid(gap);
+    computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, {
+      block: rect(10, 5, 11, 6),
+      free: rect(10, 0, 11, 2),
+    });
+    expect(grid.cellAt(10, 5)!.type).toBe('walkable');
+    expect(grid.cellAt(10, 0)!.type).toBe('blocked');
+    expect(computeClimbReachableSetFromSources(grid, src).has(25, 5)).toBe(true);
+  });
+});
