@@ -374,6 +374,18 @@ export interface ScenarioStepDef {
    */
   interactionOnly?: boolean;
   /**
+   * Interaction mode skips this step (success, current state, `expect` not
+   * evaluated) once the level has already ended on its own; command mode runs
+   * it normally and still checks `expect`.
+   *
+   * The mirror of `interactionOnly`, for surplus beats: the browser's clock
+   * ticks between clicks, so its trajectory can reach the goal sooner than the
+   * console's, and a step count the console needs is then too long for it —
+   * the mine is frozen and there is no control left to click. The terminal
+   * step still proves the outcome in both modes.
+   */
+  skipWhenLevelEnded?: boolean;
+  /**
    * Run this step's command (command mode) or full `interaction` array
    * (interaction mode) `repeat` times in immediate succession before
    * `expect` is evaluated, instead of writing `repeat` byte-identical step

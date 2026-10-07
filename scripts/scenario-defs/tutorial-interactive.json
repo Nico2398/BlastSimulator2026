@@ -2189,7 +2189,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -2218,7 +2219,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2247,7 +2249,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -2267,7 +2270,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -2296,7 +2300,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2325,7 +2330,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -2345,7 +2351,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -2374,7 +2381,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2403,7 +2411,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -2423,7 +2432,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -2452,7 +2462,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2481,7 +2492,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -2501,7 +2513,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -2530,7 +2543,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2559,7 +2573,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:levelEnded equals:true max_ticks:6000",
