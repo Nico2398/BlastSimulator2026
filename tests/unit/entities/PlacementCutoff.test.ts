@@ -94,7 +94,9 @@ describe('computePlacementCutoff (#1391)', () => {
 
   it('rect is min-inclusive, max-exclusive: ending at the corridor cell leaves it open', () => {
     const grid = makeGrid(corridor);
-    expect(computePlacementCutoff(grid, CREW, rect(8, 4, 10, 6), undefined, NO_TARGETS)).toBeNull();
+    // Rect ends at x=10 (exclusive) and stays off the corridor row, so (9,5) -> (10,5) stays walkable.
+    // (A rect covering (9,5) would seal the corridor mouth: diagonal corner-cutting is illegal.)
+    expect(computePlacementCutoff(grid, CREW, rect(8, 2, 10, 4), undefined, NO_TARGETS)).toBeNull();
     expect(computePlacementCutoff(grid, CREW, rect(10, 5, 11, 6), undefined, NO_TARGETS)).not.toBeNull();
   });
 
