@@ -22,7 +22,7 @@ import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, scr
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { Vehicle, VehicleDef, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
 import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
@@ -241,15 +241,15 @@ export class FleetPanel extends PanelBase {
     btn.dataset['stats'] = vehicleCardTooltip(def);
     const cost = el('span', { text: formatDollars(def.purchaseCost), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
     btn.append(info, cost);
-    this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def);
+    this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def.purchaseCost);
     btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
     return btn;
   }
 
-  private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean, def: VehicleDef): void {
+  private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean, purchaseCost: number): void {
     btn.disabled = !affordable;
     const stats = btn.dataset['stats'] ?? '';
-    btn.title = affordable ? stats : `${stats}\n${t('ui.fleet.tip.cannot_afford', { cost: formatMoney(def.purchaseCost) })}`;
+    btn.title = affordable ? stats : `${stats}\n${t('ui.fleet.tip.cannot_afford', { cost: formatMoney(purchaseCost) })}`;
     // Rewrite the whole attribute: mutating btn.style piecemeal can drop the var() colour in some CSSOM implementations.
     btn.setAttribute('style', `${TIER_BTN_BASE_STYLE};opacity:${affordable ? '1' : '.45'};cursor:${affordable ? 'pointer' : 'not-allowed'}`);
   }
@@ -259,7 +259,7 @@ export class FleetPanel extends PanelBase {
       const role = btn.dataset['role'] as VehicleRole;
       const tier = Number(btn.dataset['tier']) as VehicleTier;
       const def = getVehicleDefByTier(role, tier);
-      this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def);
+      this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def.purchaseCost);
     });
   }
 
