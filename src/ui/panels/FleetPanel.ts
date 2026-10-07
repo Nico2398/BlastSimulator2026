@@ -26,9 +26,9 @@ import type { Vehicle, VehicleDef, VehicleRole, VehicleTier } from '../../core/e
 import type { Employee } from '../../core/entities/Employee.js';
 import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
+import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
-import { formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -238,7 +238,8 @@ export class FleetPanel extends PanelBase {
         attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
       }),
     );
-    const cost = el('span', { text: `$${def.purchaseCost.toLocaleString('en-US')}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
+    btn.dataset['stats'] = vehicleCardTooltip(def);
+    const cost = el('span', { text: formatDollars(def.purchaseCost), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
     btn.append(info, cost);
     this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def);
     btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
@@ -247,8 +248,8 @@ export class FleetPanel extends PanelBase {
 
   private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean, def: VehicleDef): void {
     btn.disabled = !affordable;
-    const stats = vehicleCardTooltip(def);
-    btn.title = affordable ? stats : `${stats}\n${t('ui.fleet.tip.cannot_afford', { cost: def.purchaseCost.toLocaleString('en-US') })}`;
+    const stats = btn.dataset['stats'] ?? '';
+    btn.title = affordable ? stats : `${stats}\n${t('ui.fleet.tip.cannot_afford', { cost: formatMoney(def.purchaseCost) })}`;
     // Rewrite the whole attribute: mutating btn.style piecemeal can drop the var() colour in some CSSOM implementations.
     btn.setAttribute('style', `${TIER_BTN_BASE_STYLE};opacity:${affordable ? '1' : '.45'};cursor:${affordable ? 'pointer' : 'not-allowed'}`);
   }

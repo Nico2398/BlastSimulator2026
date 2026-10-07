@@ -1297,8 +1297,15 @@ describe('BuildMenu — catalog card text and tooltip (#1377)', () => {
     }
   });
 
-  it('tier 1 and tier 3 cards differ in line or tooltip for a type whose upkeep or capacity scales', () => {
-    expect(buildingCardTooltip(getBuildingDef('living_quarters', 1)))
-      .not.toBe(buildingCardTooltip(getBuildingDef('living_quarters', 3)));
+  it('tier 1 and tier 3 rows render different tooltips for a type whose upkeep or capacity scales', () => {
+    const row = container.querySelector<HTMLElement>('[data-build-type="living_quarters"]')!;
+    const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    const titles: string[] = [];
+    for (const tier of [1, 3]) {
+      tierSel.value = String(tier);
+      tierSel.dispatchEvent(new Event('change'));
+      titles.push(row.title);
+    }
+    expect(titles[0]).not.toBe(titles[1]);
   });
 });
