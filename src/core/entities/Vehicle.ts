@@ -287,17 +287,10 @@ export function computeScrapResidualValue(vehicleType: VehicleRole, vehicleTier:
 }
 
 /**
- * Calculate total maintenance + fuel costs for all vehicles per tick. Billed
+ * Summed per-tick upkeep of every vehicle, regardless of use (#1375). Billed
  * off the vehicle's OWN tier (#1092): a tier-3 rig costs
- * `VEHICLE_TIER_MULTIPLIERS[3].maintenanceCostPerTick` times a tier-1's
- * upkeep, and the same for fuel — upkeep that ignored `tier` made the elite
- * tiers strictly better than their price implied.
+ * `VEHICLE_TIER_MULTIPLIERS[3].maintenanceCostPerTick` times a tier-1's upkeep.
  */
-export function getVehicleCostsPerTick(state: VehicleState): number {
-  return getVehicleMaintenanceCostPerTick(state) + getVehicleFuelCostPerTick(state);
-}
-
-/** Summed per-tick upkeep of every vehicle, regardless of use (#1375). */
 export function getVehicleMaintenanceCostPerTick(state: VehicleState): number {
   let total = 0;
   for (const v of state.vehicles) {

@@ -21,6 +21,15 @@ export interface OperatingCostBreakdown {
   total: number;
 }
 
+/** Cost, income and net, all $/hour, from one read of the state. */
+interface OperatingSummary {
+  cost: OperatingCostBreakdown;
+  income: number;
+  net: number;
+}
+
+const OPERATING_INCOME_CATEGORY_SET: ReadonlySet<string> = new Set(OPERATING_INCOME_CATEGORIES);
+
 type Runway = { kind: 'sustainable' } | { kind: 'days'; days: number };
 
 /** Recurring cost per hour (1 tick = 1 hour): payroll amortised over the pay cycle, upkeep, maintenance, fuel. */
@@ -49,20 +58,30 @@ export function getOperatingIncomePerHour(
   for (let i = f.transactions.length - 1; i >= 0; i--) {
     const t = f.transactions[i]!;
     if (t.tick <= from) break;
-    if (t.type === 'income' && (OPERATING_INCOME_CATEGORIES as readonly string[]).includes(t.category)) {
+    if (t.type === 'income' && OPERATING_INCOME_CATEGORY_SET.has(t.category)) {
       sum += t.amount;
     }
   }
   return sum / Math.max(1, Math.min(windowTicks, nowTick));
 }
 
-export function getOperatingNetPerHour(income: number, cost: number): number {
-  return income - cost;
+/** Operating cost breakdown, trailing income and their difference, shared by every surface that shows the trend. */
+export function getOperatingSummary(s: {
+  employees: EmployeeState;
+  buildings: BuildingState;
+  vehicles: VehicleState;
+  finances: FinanceState;
+  tickCount: number;
+}): OperatingSummary {
+  const cost = getOperatingCostPerHour(s);
+  const income = getOperatingIncomePerHour(s.finances, s.tickCount);
+  return { cost, income, net: income - cost.total };
 }
 
+/** Income covering cost is sustainable whatever the cash; otherwise days of cash left at the net burn. */
 export function getRunway(cash: number, costPerHour: number, incomePerHour: number): Runway {
-  if (cash <= 0) return { kind: 'days', days: 0 };
   const burn = costPerHour - incomePerHour;
   if (burn <= 0) return { kind: 'sustainable' };
+  if (cash <= 0) return { kind: 'days', days: 0 };
   return { kind: 'days', days: cash / burn / TICKS_PER_DAY };
 }

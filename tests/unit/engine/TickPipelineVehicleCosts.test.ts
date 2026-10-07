@@ -5,7 +5,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { runTick } from '../../../src/core/engine/TickPipeline.js';
 import { clearEvents } from '../../../src/core/events/EventPool.js';
-import { purchaseVehicle, getVehicleDefByTier, getVehicleCostsPerTick } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, getVehicleDefByTier, getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 
 function tick(state: ReturnType<typeof createGame>) {
@@ -33,7 +33,7 @@ describe('runTick vehicle cost booking (#1375)', () => {
     const state = createGame({ seed: 42 });
     const v = purchaseVehicle(state.vehicles, 'debris_hauler').vehicle;
     reserveVehicle(state.vehicles, v.id, 77);
-    const total = getVehicleCostsPerTick(state.vehicles);
+    const total = getVehicleMaintenanceCostPerTick(state.vehicles) + getVehicleFuelCostPerTick(state.vehicles);
     const def = getVehicleDefByTier('debris_hauler', 1);
     tick(state);
     expect(sum(state, 'vehicle_maintenance')).toBeCloseTo(def.maintenanceCostPerTick, 8);

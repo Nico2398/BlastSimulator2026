@@ -19,7 +19,7 @@
 // the row instead.
 
 import { PanelBase } from './PanelBase.js';
-import { t } from '../../core/i18n/I18n.js';
+import { t, getLocale } from '../../core/i18n/I18n.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
@@ -27,7 +27,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatDollars } from '../../core/economy/formatMoney.js';
 import { getFinancialReport, type CategoryTotal } from '../../core/economy/Finance.js';
 import type { OperatingCostBreakdown } from '../../core/economy/OperatingFinance.js';
-import { getOperatingCostPerHour, getOperatingIncomePerHour, getOperatingNetPerHour, getRunway } from '../../core/economy/OperatingFinance.js';
+import { getOperatingSummary, getRunway } from '../../core/economy/OperatingFinance.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../core/campaign/Bankruptcy.js';
 
@@ -57,7 +57,7 @@ export class FinancesPanel extends PanelBase {
 
 
   update(state: GameState): void {
-    const cost = getOperatingCostPerHour(state);
+    const { cost } = getOperatingSummary(state);
     const signature = JSON.stringify({
       cash: Math.round(state.cash),
       cost,
@@ -100,9 +100,7 @@ export class FinancesPanel extends PanelBase {
       attrs: { style: `font:600 28px/1 var(--bsx-font-mono);letter-spacing:-.02em;color:${state.cash < 0 ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)'}` },
     });
 
-    const cost = getOperatingCostPerHour(state);
-    const income = getOperatingIncomePerHour(state.finances, state.tickCount);
-    const net = getOperatingNetPerHour(income, cost.total);
+    const { cost, income, net } = getOperatingSummary(state);
     const runway = getRunway(state.cash, cost.total, income);
     const positive = net >= 0;
     const trendRow = el('div');
@@ -113,7 +111,7 @@ export class FinancesPanel extends PanelBase {
       el('span', { text: `${positive ? '+' : '-'}$${formatMoney(Math.abs(net))}/h` }),
       el('span', { text: '·', attrs: { style: 'color:var(--bsx-text-micro)' } }),
       el('span', {
-        text: runway.kind === 'sustainable' ? t('ui.finances.runway_sustainable') : t('ui.finances.runway_days', { days: runway.days.toFixed(1) }),
+        text: runway.kind === 'sustainable' ? t('ui.finances.runway_sustainable') : t('ui.finances.runway_days', { days: runway.days.toLocaleString(getLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }),
         attrs: { style: 'color:var(--bsx-text-secondary)' },
       }),
     );

@@ -6,7 +6,10 @@ import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { hireEmployee, PAY_CYCLE_TICKS } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { TICKS_PER_DAY } from '../../../../src/core/config/balance.js';
-import { t } from '../../../../src/core/i18n/I18n.js';
+import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
+import { getOperatingSummary } from '../../../../src/core/economy/OperatingFinance.js';
+import { purchaseVehicle, getVehicleDefByTier } from '../../../../src/core/entities/Vehicle.js';
+import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../../../src/core/campaign/Bankruptcy.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 
@@ -80,6 +83,23 @@ describe('FinancesPanel', () => {
     expect(panel.root.textContent).toContain(`${days}d runway`);
   });
 
+  it('formats runway days with the locale decimal separator', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.cash = 2400;
+    hireEmployee(state.employees, 'manager', new Random(1));
+    const perHour = state.employees.employees[0]!.salary / PAY_CYCLE_TICKS;
+    const days = (2400 / perHour / TICKS_PER_DAY).toFixed(1);
+    setLocale('fr');
+    try {
+      panel.show();
+      panel.update(state);
+      expect(panel.root.textContent).toContain(days.replace('.', ','));
+    } finally {
+      setLocale('en');
+    }
+  });
+
   it('shows an Operating cost / h row with the payroll breakdown', () => {
     const { panel } = makePanel();
     const state = makeState();
@@ -97,20 +117,23 @@ describe('FinancesPanel', () => {
     expect(text).not.toContain('ui.finances.operating_cost');
   });
 
-  it('operating cost row is unchanged by a one-off vehicle purchase expense', () => {
-    const a = makePanel();
-    const b = makePanel();
-    const s1 = makeState();
-    const s2 = makeState();
-    hireEmployee(s1.employees, 'manager', new Random(1));
-    hireEmployee(s2.employees, 'manager', new Random(1));
-    s2.finances.transactions.push({ tick: 99, type: 'expense', amount: 35000, category: 'equipment', description: 'rig' });
-    a.panel.show(); a.panel.update(s1);
-    b.panel.show(); b.panel.update(s2);
-    const row = (p: FinancesPanel) => Array.from(p.root.querySelectorAll('div'))
-      .find(d => (d.textContent ?? '').includes(t('ui.finances.operating_cost_payroll')) && d.children.length <= 4)?.textContent;
-    expect(row(a.panel)).toBeDefined();
-    expect(row(b.panel)).toBe(row(a.panel));
+  it('a one-off vehicle purchase expense leaves operating cost alone; owning the vehicle adds exactly its maintenance', () => {
+    const state = makeState();
+    hireEmployee(state.employees, 'manager', new Random(1));
+    const before = getOperatingSummary(state).cost;
+    state.finances.transactions.push({ tick: 99, type: 'expense', amount: 35000, category: 'equipment', description: 'rig' });
+    expect(getOperatingSummary(state).cost.total).toBe(before.total);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    const maintenance = getVehicleDefByTier(vehicle.type, vehicle.tier).maintenanceCostPerTick;
+    const after = getOperatingSummary(state).cost;
+    expect(after.total - before.total).toBeCloseTo(maintenance, 8);
+    expect(after.vehicleMaintenance - before.vehicleMaintenance).toBeCloseTo(maintenance, 8);
+
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain(`$${formatMoney(after.total)}/h`);
   });
 
   it('labels vehicle maintenance under its own category', () => {

@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   type VehicleRole,
   type VehicleTier,
+  type VehicleState,
   createVehicleState,
   purchaseVehicle,
   destroyVehicle,
-  getVehicleCostsPerTick,
   getVehicleMaintenanceCostPerTick,
   getVehicleFuelCostPerTick,
   getAllVehicleRoles,
@@ -178,13 +178,18 @@ describe('purchaseVehicle', () => {
 // reservation for the whole itinerary (VehicleReservation.ts) — so the tests
 // below pin billing to reservation state instead of raw occupancy.
 
-describe('getVehicleCostsPerTick', () => {
+/** Maintenance plus fuel per tick: the total a fleet bills. */
+function vehicleCosts(state: VehicleState): number {
+  return getVehicleMaintenanceCostPerTick(state) + getVehicleFuelCostPerTick(state);
+}
+
+describe('vehicle maintenance + fuel billing', () => {
   it('idle vehicles incur only maintenance cost (no fuel)', () => {
     const state = createVehicleState();
     purchaseVehicle(state, 'debris_hauler');
     purchaseVehicle(state, 'rock_digger');
 
-    const idleCost = getVehicleCostsPerTick(state);
+    const idleCost = vehicleCosts(state);
     const expected =
       getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
       getVehicleDefByTier('rock_digger', 1).maintenanceCostPerTick;
@@ -197,7 +202,7 @@ describe('getVehicleCostsPerTick', () => {
     const { vehicle } = purchaseVehicle(state, 'debris_hauler');
     vehicle.occupantIds = [1]; // driver boarded, nothing assigned to do
 
-    const cost = getVehicleCostsPerTick(state);
+    const cost = vehicleCosts(state);
     expect(cost).toBe(getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick);
   });
 
@@ -212,17 +217,17 @@ describe('getVehicleCostsPerTick', () => {
 
     reserveVehicle(state, state.vehicles[0]!.id, 42);
 
-    const activeCost = getVehicleCostsPerTick(state);
+    const activeCost = vehicleCosts(state);
     expect(activeCost).toBe(baseCost + getVehicleDefByTier('debris_hauler', 1).fuelCostPerTick);
   });
 
   it('empty fleet has zero cost per tick', () => {
     const state = createVehicleState();
-    expect(getVehicleCostsPerTick(state)).toBe(0);
+    expect(vehicleCosts(state)).toBe(0);
   });
 
   // ── Tier-correct billing (#1092) ──────────────────────────────────────────
-  // getVehicleCostsPerTick used to read the untiered getVehicleDef(v.type),
+  // Billing used to read the untiered getVehicleDef(v.type),
   // always billing tier-1 rates regardless of the vehicle's own tier. A
   // tier-2/tier-3 vehicle's maintenance and fuel must scale by the same
   // VEHICLE_TIER_MULTIPLIERS the rest of the catalog (speed, capacity, ...)
@@ -232,7 +237,7 @@ describe('getVehicleCostsPerTick', () => {
     const state = createVehicleState();
     purchaseVehicle(state, 'rock_digger', 0, 0, 2);
 
-    const cost = getVehicleCostsPerTick(state);
+    const cost = vehicleCosts(state);
     const tier1Maintenance = getVehicleDefByTier('rock_digger', 1).maintenanceCostPerTick;
     const expected = tier1Maintenance * VEHICLE_TIER_MULTIPLIERS[2].maintenanceCostPerTick;
 
@@ -245,7 +250,7 @@ describe('getVehicleCostsPerTick', () => {
     const state = createVehicleState();
     purchaseVehicle(state, 'drill_rig', 0, 0, 3);
 
-    const cost = getVehicleCostsPerTick(state);
+    const cost = vehicleCosts(state);
     const tier1Maintenance = getVehicleDefByTier('drill_rig', 1).maintenanceCostPerTick;
     const expected = tier1Maintenance * VEHICLE_TIER_MULTIPLIERS[3].maintenanceCostPerTick;
 
@@ -259,7 +264,7 @@ describe('getVehicleCostsPerTick', () => {
     purchaseVehicle(state, 'debris_hauler', 0, 0, 2);
     reserveVehicle(state, state.vehicles[0]!.id, 1);
 
-    const cost = getVehicleCostsPerTick(state);
+    const cost = vehicleCosts(state);
     const def2 = getVehicleDefByTier('debris_hauler', 2);
     const def1 = getVehicleDefByTier('debris_hauler', 1);
     const expected = def2.maintenanceCostPerTick + def2.fuelCostPerTick;
@@ -273,7 +278,7 @@ describe('getVehicleCostsPerTick', () => {
     purchaseVehicle(state, 'building_destroyer', 0, 0, 3);
     reserveVehicle(state, state.vehicles[0]!.id, 1);
 
-    const cost = getVehicleCostsPerTick(state);
+    const cost = vehicleCosts(state);
     const def3 = getVehicleDefByTier('building_destroyer', 3);
     const def1 = getVehicleDefByTier('building_destroyer', 1);
     const expected = def3.maintenanceCostPerTick + def3.fuelCostPerTick;
@@ -290,7 +295,7 @@ describe('getVehicleCostsPerTick', () => {
     // Activate the tier-3 drill rig so both maintenance and fuel are exercised.
     reserveVehicle(state, state.vehicles[2]!.id, 1);
 
-    const cost = getVehicleCostsPerTick(state);
+    const cost = vehicleCosts(state);
     const expected =
       getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
       getVehicleDefByTier('rock_digger', 2).maintenanceCostPerTick +
@@ -1821,13 +1826,15 @@ describe('getVehicleMaintenanceCostPerTick / getVehicleFuelCostPerTick (#1375)',
     expect(getVehicleFuelCostPerTick(state)).toBe(getVehicleDefByTier('rock_digger', 1).fuelCostPerTick);
   });
 
-  it('getVehicleCostsPerTick is the sum of the two', () => {
+  it('maintenance and fuel are billed independently and both contribute', () => {
     const state = createVehicleState();
     purchaseVehicle(state, 'debris_hauler');
     purchaseVehicle(state, 'drill_rig', 0, 0, 3);
     reserveVehicle(state, state.vehicles[1]!.id, 9);
-    expect(getVehicleCostsPerTick(state)).toBeCloseTo(
-      getVehicleMaintenanceCostPerTick(state) + getVehicleFuelCostPerTick(state), 8);
+    expect(vehicleCosts(state)).toBeCloseTo(
+      getVehicleDefByTier('debris_hauler', 1).maintenanceCostPerTick +
+      getVehicleDefByTier('drill_rig', 3).maintenanceCostPerTick +
+      getVehicleDefByTier('drill_rig', 3).fuelCostPerTick, 8);
     expect(getVehicleMaintenanceCostPerTick(state)).toBeGreaterThan(0);
     expect(getVehicleFuelCostPerTick(state)).toBeGreaterThan(0);
   });

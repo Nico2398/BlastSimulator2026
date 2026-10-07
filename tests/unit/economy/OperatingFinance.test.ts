@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getOperatingCostPerHour,
   getOperatingIncomePerHour,
-  getOperatingNetPerHour,
+  getOperatingSummary,
   getRunway,
 } from '../../../src/core/economy/OperatingFinance.js';
 import { createFinanceState, addIncome, addExpense } from '../../../src/core/economy/Finance.js';
@@ -152,11 +152,17 @@ describe('getOperatingIncomePerHour', () => {
   });
 });
 
-describe('getOperatingNetPerHour', () => {
-  it('is income minus cost', () => {
-    expect(getOperatingNetPerHour(30, 50)).toBe(-20);
-    expect(getOperatingNetPerHour(50, 30)).toBe(20);
-    expect(getOperatingNetPerHour(0, 0)).toBe(0);
+describe('getOperatingSummary', () => {
+  it('bundles cost, trailing income and net', () => {
+    const site = { ...emptySite(), finances: createFinanceState(0), tickCount: 100 };
+    hireEmployee(site.employees, 'manager', new Random(1));
+    addIncome(site.finances, 100, 'sales', 's', 99);
+    const cost = getOperatingCostPerHour(site);
+    const income = getOperatingIncomePerHour(site.finances, 100);
+    const summary = getOperatingSummary(site);
+    expect(summary.cost).toEqual(cost);
+    expect(summary.income).toBe(income);
+    expect(summary.net).toBeCloseTo(income - cost.total, 8);
   });
 });
 
@@ -165,8 +171,12 @@ describe('getRunway', () => {
     expect(getRunway(0, 10, 0)).toEqual({ kind: 'days', days: 0 });
   });
 
-  it('is zero days with negative cash even when income covers cost', () => {
-    expect(getRunway(-50, 10, 100)).toEqual({ kind: 'days', days: 0 });
+  it('is zero days with negative cash while burning', () => {
+    expect(getRunway(-50, 100, 10)).toEqual({ kind: 'days', days: 0 });
+  });
+
+  it('is sustainable with negative cash when income covers cost', () => {
+    expect(getRunway(-50, 10, 100)).toEqual({ kind: 'sustainable' });
   });
 
   it('is sustainable when income covers cost', () => {

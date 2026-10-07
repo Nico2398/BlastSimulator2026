@@ -13,7 +13,7 @@ import { forecast, rainIntensity, type WeatherState } from '../../core/weather/W
 import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather/WeatherAdvisory.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
-import { getOperatingCostPerHour, getOperatingIncomePerHour, getOperatingNetPerHour } from '../../core/economy/OperatingFinance.js';
+import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
@@ -261,8 +261,7 @@ export class TopBar {
     // Balance + trend
     this.balanceValue.textContent = formatBalance(state.cash);
     this.balanceValue.style.color = state.cash < 0 ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
-    const cost = getOperatingCostPerHour(state);
-    const net = getOperatingNetPerHour(getOperatingIncomePerHour(state.finances, state.tickCount), cost.total);
+    const { cost, net } = getOperatingSummary(state);
     this.trendRow.title = t('ui.finances.operating_cost_tip', { cost: formatDollars(Math.round(cost.total)) });
     const positive = net >= 0;
     this.trendValue.textContent = `${positive ? '+' : '-'}$${Math.round(Math.abs(net)).toLocaleString('en-US')}/h`;

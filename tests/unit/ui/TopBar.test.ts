@@ -7,6 +7,7 @@ import { createWeatherCycle, setWeather, type WeatherCycleState } from '../../..
 import { hireEmployee, PAY_CYCLE_TICKS } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
+import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
 
@@ -391,7 +392,7 @@ describe('TopBar (redesign P1)', () => {
       const salaryPerHour = Math.round(state.employees.employees[0]!.salary / PAY_CYCLE_TICKS);
       const { container, topBar } = mount(state);
       const titles = Array.from(container.querySelectorAll('[title]')).map(e => e.getAttribute('title') ?? '');
-      expect(titles.some(x => x.includes(salaryPerHour.toLocaleString('en-US')) && !x.includes('ui.finances'))).toBe(true);
+      expect(titles).toContain(t('ui.finances.operating_cost_tip', { cost: formatDollars(salaryPerHour) }));
       topBar.dispose();
     });
   });
