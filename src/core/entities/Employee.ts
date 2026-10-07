@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Employee system
 // Workers with roles, morale, union status, and injury tracking.
 
+import type { HireCandidate } from './HiringPool.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import type { MovementTrail } from './MovementTrail.js';
 import { Random } from '../math/Random.js';
@@ -293,6 +294,7 @@ export function hireEmployee(
   x: number = 0,
   z: number = 0,
   tickCount: number = 0,
+  _candidate?: Pick<HireCandidate, 'name' | 'unionized' | 'qualifications'>,
 ): HireResult {
   const employee: Employee = {
     id: state.nextId++,

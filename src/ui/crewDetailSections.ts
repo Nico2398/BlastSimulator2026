@@ -237,7 +237,7 @@ export function makeSkillsSection(e: Employee): HTMLElement {
 // ── PAY ──
 
 /** Stored salary is per pay cycle; 1 tick = 1 game-hour, so the hourly rate is salary / PAY_CYCLE_TICKS (1 decimal, no trailing .0). */
-function perHour(perCycle: number): number {
+export function perHour(perCycle: number): number {
   return Math.round((perCycle / PAY_CYCLE_TICKS) * 10) / 10;
 }
 

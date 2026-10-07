@@ -59,6 +59,7 @@ import type { RevoltState } from '../campaign/WorkerRevolt.js';
 import { createRevoltState } from '../campaign/WorkerRevolt.js';
 import type { LevelStats } from '../campaign/SuccessTracker.js';
 import { createLevelStats } from '../campaign/SuccessTracker.js';
+import type { HiringPoolState } from '../entities/HiringPool.js';
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
@@ -451,6 +452,8 @@ export interface GameState {
   levelStats: LevelStats;
   /** Site policy governing shift scheduling and rest thresholds. */
   sitePolicy: SitePolicy;
+  /** Candidate pool offered by the hiring UI. */
+  hiringPool: HiringPoolState;
   /** Whether the current level has ended (any game-over or completion). */
   levelEnded: boolean;
   /** Reason the level ended, or null if still active. */
@@ -594,6 +597,7 @@ export function createGame(config: GameConfig): GameState {
     revolt: createRevoltState(),
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
+    hiringPool: { candidates: [], nextCandidateId: 1, lastRefreshTick: 0 }, // TODO: createHiringPool
     levelEnded: false,
     levelEndReason: null,
     pendingActions: [],
