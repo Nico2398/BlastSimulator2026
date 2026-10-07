@@ -243,3 +243,47 @@ describe('estimateBlastOreValue vs executeBlast (seed 42 reference pattern, #135
     expect(estimate).toBeLessThanOrEqual(2 * result!.totalOreValue);
   });
 });
+
+describe('estimateBlastOreValue — stale surveys (#1356)', () => {
+  const plan = makePlan([makeHole('H1', 20, 20, 8)]);
+
+  it('returns 0 for columns covered only by a stale survey', () => {
+    const stale = { ...makeUniformSurvey(0, 40, { blingite: 0.2 }), stale: true };
+    expect(estimateBlastOreValue(plan, [stale])).toBe(0);
+  });
+
+  it('the same survey, once fresh, yields a positive value', () => {
+    const fresh = makeUniformSurvey(0, 40, { blingite: 0.2 });
+    expect(estimateBlastOreValue(plan, [fresh])).toBeGreaterThan(0);
+  });
+
+  it('stale:false counts as fresh', () => {
+    const survey = { ...makeUniformSurvey(0, 40, { blingite: 0.2 }), stale: false };
+    expect(estimateBlastOreValue(plan, [survey])).toBeGreaterThan(0);
+  });
+
+  it('falls back to an older fresh survey when the newest covering survey is stale', () => {
+    const older = makeUniformSurvey(0, 40, { blingite: 0.2 }, 1.0, 10);
+    const newerStale = { ...makeUniformSurvey(0, 40, { blingite: 0.9 }, 1.0, 50), stale: true };
+    expect(estimateBlastOreValue(plan, [older, newerStale]))
+      .toBeCloseTo(estimateBlastOreValue(plan, [older]), 6);
+    expect(estimateBlastOreValue(plan, [newerStale, older]))
+      .toBeCloseTo(estimateBlastOreValue(plan, [older]), 6);
+  });
+
+  it('a newer fresh survey still wins over an older fresh one', () => {
+    const older = makeUniformSurvey(0, 40, { blingite: 0.2 }, 1.0, 10);
+    const newer = makeUniformSurvey(0, 40, { blingite: 0.4 }, 1.0, 50);
+    expect(estimateBlastOreValue(plan, [older, newer]))
+      .toBeCloseTo(estimateBlastOreValue(plan, [newer]), 6);
+    expect(estimateBlastOreValue(plan, [newer])).toBeGreaterThan(estimateBlastOreValue(plan, [older]));
+  });
+
+  it('stale survey only silences the columns it covers; fresh survey elsewhere still counts', () => {
+    const staleHere = { ...makeSurvey({ '20,20': { blingite: 0.5 } }), stale: true };
+    const freshElsewhere = makeSurvey({ '21,20': { blingite: 0.2 } });
+    const onlyFresh = estimateBlastOreValue(plan, [freshElsewhere]);
+    expect(onlyFresh).toBeGreaterThan(0);
+    expect(estimateBlastOreValue(plan, [staleHere, freshElsewhere])).toBeCloseTo(onlyFresh, 6);
+  });
+});

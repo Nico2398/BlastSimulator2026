@@ -258,13 +258,14 @@ describe('GameRenderer — survey results to confidence points conversion (issue
     expect(centerPoint!.confidence).toBeCloseTo(0.85, 2);
   });
 
-  it('syncSurveyOverlay options mark stale surveys as not fresh', () => {
+  it('syncSurveyOverlay options mark stale-flagged surveys as not fresh', () => {
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
 
     const ctx = makeCtx({ tick: 200 });
-    // Survey at tick 0 — will be stale at current tick 200
+    // Survey flagged stale by a blast (#1356) — age alone no longer matters
     ctx.state!.surveyResults.push({
+      stale: true,
       id: 1,
       method: 'seismic',
       centerX: 10,
@@ -288,5 +289,30 @@ describe('GameRenderer — survey results to confidence points conversion (issue
     );
     expect(centerPoint).toBeDefined();
     expect(centerPoint!.fresh).toBe(false);
+  });
+
+  it('syncSurveyOverlay options keep an old unflagged survey fresh (#1356)', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+
+    const ctx = makeCtx({ tick: 5000 });
+    ctx.state!.surveyResults.push({
+      id: 1,
+      method: 'seismic',
+      centerX: 10,
+      centerZ: 10,
+      completedTick: 0,
+      surveyorId: 1,
+      estimates: { '10,10': { gold: 0.8 } },
+      confidence: 0.85,
+    });
+
+    const spy = vi.spyOn(renderer, 'syncSurveyOverlay');
+    renderer.syncFromContext(ctx);
+
+    const options = spy.mock.calls[0]?.[0] as SurveyConfidenceOverlayOptions | undefined;
+    const centerPoint = options!.points.find((p) => p.x === 10 && p.z === 10);
+    expect(centerPoint).toBeDefined();
+    expect(centerPoint!.fresh).toBe(true);
   });
 });

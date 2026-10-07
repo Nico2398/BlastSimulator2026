@@ -12,7 +12,7 @@ import { SurveyConfidenceOverlay } from '../../../src/renderer/SurveyConfidenceO
 import type {
   SurveyConfidencePoint,
 } from '../../../src/renderer/SurveyConfidenceOverlay.js';
-import { isSurveyStale } from '../../../src/core/mining/SurveyCalc.js';
+import { isSurveyStale, markSurveysStaleByBlast } from '../../../src/core/mining/SurveyCalc.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -124,27 +124,33 @@ describe('survey-stale-handling scenario definition', () => {
 
 // ── Stale handling pipeline validation ─────────────────────────────────────
 
-describe('survey-stale-handling — stale detection', () => {
-  it('survey completed at tick 0 is fresh at tick 100', () => {
+describe('survey-stale-handling — stale detection (#1356, blast-driven)', () => {
+  it('survey completed at tick 0 is fresh at any tick without a blast', () => {
     const survey = makeSurvey(0);
     expect(isSurveyStale(survey)).toBe(false);
+    expect(isSurveyStale({ ...survey, completedTick: 0 })).toBe(false);
   });
 
-  it('survey completed at tick 0 is stale at tick 101', () => {
+  it('survey is stale once a blast clears a column in its disc', () => {
     const survey = makeSurvey(0);
+    expect(markSurveysStaleByBlast([survey], ['20,20'])).toBe(1);
     expect(isSurveyStale(survey)).toBe(true);
+  });
+
+  it('a blast far outside the disc leaves the survey fresh', () => {
+    const survey = makeSurvey(0);
+    expect(markSurveysStaleByBlast([survey], ['200,200'])).toBe(0);
+    expect(isSurveyStale(survey)).toBe(false);
   });
 
   it('fresh survey has fresh=true in confidence points', () => {
     const survey = makeSurvey(50);
-    const fresh = !isSurveyStale(survey);
-    expect(fresh).toBe(true);
+    expect(!isSurveyStale(survey)).toBe(true);
   });
 
   it('stale survey has fresh=false in confidence points', () => {
-    const survey = makeSurvey(0);
-    const fresh = !isSurveyStale(survey);
-    expect(fresh).toBe(false);
+    const survey = { ...makeSurvey(0), stale: true };
+    expect(!isSurveyStale(survey)).toBe(false);
   });
 });
 

@@ -5,7 +5,7 @@ import type { SurveyMethod, SurveyResult } from '../../../src/core/mining/Survey
 // ── Task 4.2 additions ────────────────────────────────────────────────────────
 import { estimateSurveyResult, type EstimateSurveyParams } from '../../../src/core/mining/SurveyCalc.js';
 // ── Task 4.3 additions ────────────────────────────────────────────────────────
-import { isSurveyStale } from '../../../src/core/mining/SurveyCalc.js';
+import { isSurveyStale, isColumnInSurveyDisc, freshSurveys, markSurveysStaleByBlast } from '../../../src/core/mining/SurveyCalc.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
@@ -581,62 +581,159 @@ describe('SurveyCalc — estimateSurveyResult', () => {
   });
 });
 
-// ── 4.3: isSurveyStale ────────────────────────────────────────────────────────
+// ── 4.3: blast-driven staleness (#1356) ───────────────────────────────────────
 
-describe('SurveyCalc — isSurveyStale (4.3)', () => {
-  // ── Fixture helpers ──────────────────────────────────────────────────────────
-  // Build a minimal SurveyResult with a given completedTick. All other fields
-  // are taken from BASE_RESULT so the shape always satisfies the interface.
-  function makeResult(completedTick: number): SurveyResult {
-    return { ...BASE_RESULT, completedTick };
-  }
-
-  // ── Boundary: still fresh ────────────────────────────────────────────────────
-
-  it('returns false when 0 ticks have elapsed (currentTick === completedTick)', () => {
-    // elapsed = 100 - 100 = 0  →  0 ≤ 100  →  fresh
-    const result = makeResult(100);
-    expect(isSurveyStale(result)).toBe(false);
+describe('SurveyCalc — isSurveyStale (#1356)', () => {
+  it('a survey with no stale field is fresh', () => {
+    expect(isSurveyStale(BASE_RESULT)).toBe(false);
   });
 
-  it('returns false when 99 ticks have elapsed (design-doc "fresh" example)', () => {
-    // elapsed = 199 - 100 = 99  →  99 ≤ 100  →  fresh
-    const result = makeResult(100);
-    expect(isSurveyStale(result)).toBe(false);
+  it('a survey with stale:false is fresh', () => {
+    expect(isSurveyStale({ ...BASE_RESULT, stale: false })).toBe(false);
   });
 
-  it('returns false when exactly 100 ticks have elapsed (inclusive boundary)', () => {
-    // elapsed = 200 - 100 = 100  →  100 ≤ 100  →  still fresh, not yet stale
-    const result = makeResult(100);
-    expect(isSurveyStale(result)).toBe(false);
+  it('a survey with stale:true is stale', () => {
+    expect(isSurveyStale({ ...BASE_RESULT, stale: true })).toBe(true);
   });
 
-  // ── Boundary: now stale ──────────────────────────────────────────────────────
-
-  it('returns true when 101 ticks have elapsed (design-doc "stale" example)', () => {
-    // elapsed = 201 - 100 = 101  →  101 > 100  →  stale
-    const result = makeResult(100);
-    expect(isSurveyStale(result)).toBe(true);
+  it('completedTick has no bearing on staleness (no time-driven expiry)', () => {
+    expect(isSurveyStale({ ...BASE_RESULT, completedTick: 0 })).toBe(false);
+    expect(isSurveyStale({ ...BASE_RESULT, completedTick: 1_000_000 })).toBe(false);
   });
 
-  it('returns true when many ticks have elapsed (1000 ticks)', () => {
-    // elapsed = 1100 - 100 = 1000  →  1000 > 100  →  stale
-    const result = makeResult(100);
-    expect(isSurveyStale(result)).toBe(true);
+  it('does not export the removed time-based threshold from balance', async () => {
+    const balance = (await import('../../../src/core/config/balance.js')) as Record<string, unknown>;
+    expect(balance['SURVEY_STALE_TICKS']).toBeUndefined();
+  });
+});
+
+describe('SurveyCalc — isColumnInSurveyDisc (#1356)', () => {
+  it('seismic disc (radius 20) includes the centre', () => {
+    expect(isColumnInSurveyDisc({ method: 'seismic', centerX: 10, centerZ: 20 }, 10, 20)).toBe(true);
   });
 
-  // ── Edge: completedTick = 0 ───────────────────────────────────────────────────
-
-  it('returns false when completedTick is 0 and currentTick is 100 (exactly 100 elapsed)', () => {
-    // elapsed = 100 - 0 = 100  →  100 ≤ 100  →  fresh
-    const result = makeResult(0);
-    expect(isSurveyStale(result)).toBe(false);
+  it('seismic disc boundary is inclusive', () => {
+    expect(isColumnInSurveyDisc({ method: 'seismic', centerX: 10, centerZ: 20 }, 30, 20)).toBe(true);
+    expect(isColumnInSurveyDisc({ method: 'seismic', centerX: 10, centerZ: 20 }, 10, 0)).toBe(true);
   });
 
-  it('returns true when completedTick is 0 and currentTick is 101 (101 elapsed)', () => {
-    // elapsed = 101 - 0 = 101  →  101 > 100  →  stale
-    const result = makeResult(0);
-    expect(isSurveyStale(result)).toBe(true);
+  it('seismic disc excludes a column just past the radius', () => {
+    expect(isColumnInSurveyDisc({ method: 'seismic', centerX: 10, centerZ: 20 }, 31, 20)).toBe(false);
+  });
+
+  it('disc is circular, not square (corner of bounding box is outside)', () => {
+    expect(isColumnInSurveyDisc({ method: 'seismic', centerX: 0, centerZ: 0 }, 15, 15)).toBe(false);
+    expect(isColumnInSurveyDisc({ method: 'seismic', centerX: 0, centerZ: 0 }, 14, 14)).toBe(true);
+  });
+
+  it('aerial disc (radius 30) reaches farther than seismic', () => {
+    const aerial = { method: 'aerial' as const, centerX: 0, centerZ: 0 };
+    const seismic = { method: 'seismic' as const, centerX: 0, centerZ: 0 };
+    expect(isColumnInSurveyDisc(aerial, 25, 0)).toBe(true);
+    expect(isColumnInSurveyDisc(seismic, 25, 0)).toBe(false);
+    expect(isColumnInSurveyDisc(aerial, 31, 0)).toBe(false);
+  });
+
+  it('core sample (radius 0) covers only its own column', () => {
+    const core = { method: 'core_sample' as const, centerX: 5, centerZ: 5 };
+    expect(isColumnInSurveyDisc(core, 5, 5)).toBe(true);
+    expect(isColumnInSurveyDisc(core, 6, 5)).toBe(false);
+    expect(isColumnInSurveyDisc(core, 5, 4)).toBe(false);
+  });
+
+  it('handles negative coordinates', () => {
+    const core = { method: 'core_sample' as const, centerX: -5, centerZ: 5 };
+    expect(isColumnInSurveyDisc(core, -5, 5)).toBe(true);
+    expect(isColumnInSurveyDisc(core, 5, 5)).toBe(false);
+  });
+});
+
+describe('SurveyCalc — freshSurveys (#1356)', () => {
+  it('returns only surveys not marked stale', () => {
+    const a = { ...BASE_RESULT, id: 1 };
+    const b = { ...BASE_RESULT, id: 2, stale: true };
+    const c = { ...BASE_RESULT, id: 3, stale: false };
+    expect(freshSurveys([a, b, c]).map(s => s.id)).toEqual([1, 3]);
+  });
+
+  it('returns an empty array for no surveys', () => {
+    expect(freshSurveys([])).toEqual([]);
+  });
+
+  it('returns an empty array when every survey is stale', () => {
+    expect(freshSurveys([{ ...BASE_RESULT, stale: true }])).toEqual([]);
+  });
+
+  it('does not mutate its input', () => {
+    const input = [{ ...BASE_RESULT, stale: true }];
+    freshSurveys(input);
+    expect(input).toHaveLength(1);
+  });
+});
+
+describe('SurveyCalc — markSurveysStaleByBlast (#1356)', () => {
+  const seismicAt = (id: number, x: number, z: number): SurveyResult =>
+    ({ ...BASE_RESULT, id, method: 'seismic', centerX: x, centerZ: z });
+  const coreAt = (id: number, x: number, z: number): SurveyResult =>
+    ({ ...BASE_RESULT, id, method: 'core_sample', centerX: x, centerZ: z });
+
+  it('stales a survey whose disc contains a cleared column', () => {
+    const surveys = [seismicAt(1, 10, 10)];
+    expect(markSurveysStaleByBlast(surveys, ['12,12'])).toBe(1);
+    expect(surveys[0]!.stale).toBe(true);
+    expect(isSurveyStale(surveys[0]!)).toBe(true);
+  });
+
+  it('leaves a survey fresh when every cleared column is outside its disc', () => {
+    const surveys = [seismicAt(1, 0, 0)];
+    expect(markSurveysStaleByBlast(surveys, ['50,50', '-40,0'])).toBe(0);
+    expect(isSurveyStale(surveys[0]!)).toBe(false);
+  });
+
+  it('boundary column (exactly at radius) stales the survey', () => {
+    const surveys = [seismicAt(1, 0, 0)];
+    expect(markSurveysStaleByBlast(surveys, ['20,0'])).toBe(1);
+  });
+
+  it('is idempotent: a second call over the same columns counts nothing', () => {
+    const surveys = [seismicAt(1, 10, 10), coreAt(2, 11, 11)];
+    expect(markSurveysStaleByBlast(surveys, ['11,11'])).toBe(2);
+    expect(markSurveysStaleByBlast(surveys, ['11,11'])).toBe(0);
+    expect(surveys.every(s => s.stale === true)).toBe(true);
+  });
+
+  it('counts only newly staled surveys, skipping already-stale ones', () => {
+    const already = { ...seismicAt(1, 10, 10), stale: true };
+    const surveys = [already, seismicAt(2, 10, 10)];
+    expect(markSurveysStaleByBlast(surveys, ['10,10'])).toBe(1);
+  });
+
+  it('stales only the surveys that overlap, not all of them', () => {
+    const near = seismicAt(1, 0, 0);
+    const far = seismicAt(2, 100, 100);
+    expect(markSurveysStaleByBlast([near, far], ['3,3'])).toBe(1);
+    expect(near.stale).toBe(true);
+    expect(far.stale).toBeFalsy();
+  });
+
+  it('a core sample stales only when its own column is cleared', () => {
+    const own = coreAt(1, 5, 5);
+    const neighbour = coreAt(2, 5, 5);
+    expect(markSurveysStaleByBlast([own], ['6,5', '5,6'])).toBe(0);
+    expect(markSurveysStaleByBlast([neighbour], ['5,5'])).toBe(1);
+    expect(own.stale).toBeFalsy();
+  });
+
+  it('empty cleared list or empty surveys returns 0', () => {
+    const surveys = [seismicAt(1, 0, 0)];
+    expect(markSurveysStaleByBlast(surveys, [])).toBe(0);
+    expect(surveys[0]!.stale).toBeFalsy();
+    expect(markSurveysStaleByBlast([], ['0,0'])).toBe(0);
+  });
+
+  it('parses negative-coordinate keys', () => {
+    const surveys = [coreAt(1, -5, -7)];
+    expect(markSurveysStaleByBlast(surveys, ['-5,-7'])).toBe(1);
   });
 });
 
@@ -1028,5 +1125,41 @@ describe('SurveyCalc — computeBlastOreReport (4.7)', () => {
     const sumOfOreYields = Object.values(report.oreYields).reduce((s, v) => s + v, 0);
     expect(report.totalYieldKg).toBeCloseTo(sumOfOreYields, 5);
     expect(report.totalYieldKg).toBeCloseTo(1250, 5);
+  });
+});
+
+// ── #1356: stale surveys feed no post-blast estimate ──────────────────────────
+
+describe('SurveyCalc — computeBlastOreReport with stale surveys (#1356)', () => {
+  function frag(): FragmentData {
+    const position = vec3(12.5, 4, 8.5);
+    return {
+      id: 1, position, volume: 2.0, mass: 1000, rockId: 'granite',
+      oreDensities: { grumpite: 0.5 }, initialVelocity: vec3(0, 0, 0),
+      isProjection: false, halfExtents: vec3(0.25, 0.25, 0.25), shapeSeed: 0, origin: position,
+    };
+  }
+  function survey(ore: number, completedTick: number, stale?: boolean): SurveyResult {
+    return {
+      id: completedTick, method: 'seismic', centerX: 12, centerZ: 8, completedTick, surveyorId: 1,
+      estimates: { '12,8': { grumpite: ore } }, confidence: 0.8, ...(stale === undefined ? {} : { stale }),
+    };
+  }
+
+  it('stale-only coverage gives estimatedYieldKg 0 and yieldRatio 1.0', () => {
+    const report = computeBlastOreReport([frag()], [survey(0.4, 10, true)]);
+    expect(report.estimatedYieldKg).toBe(0);
+    expect(report.yieldRatio).toBe(1.0);
+    expect(report.totalYieldKg).toBeGreaterThan(0);
+  });
+
+  it('fresh coverage still estimates', () => {
+    const report = computeBlastOreReport([frag()], [survey(0.4, 10)]);
+    expect(report.estimatedYieldKg).toBeCloseTo(2.0 * 0.4 * ORE_DENSITY_KG_M3, 6);
+  });
+
+  it('falls back to an older fresh survey when the newest is stale', () => {
+    const report = computeBlastOreReport([frag()], [survey(0.4, 10), survey(0.9, 50, true)]);
+    expect(report.estimatedYieldKg).toBeCloseTo(2.0 * 0.4 * ORE_DENSITY_KG_M3, 6);
   });
 });
