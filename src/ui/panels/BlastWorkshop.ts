@@ -154,17 +154,17 @@ export class BlastWorkshop extends PanelBase {
    */
   get currentStep(): StepId { return this.activeStep; }
 
-  update(state: GameState, weather?: WeatherState, tutorialActive: boolean = false): void {
+  update(state: GameState, _weather?: WeatherState, tutorialActive: boolean = false): void {
     if (this.autoAdvance) {
       const suggested = suggestStep(state);
       if (suggested !== this.activeStep) this.setActiveStep(suggested, false);
     }
 
     this.renderTabs(state);
-    this.drillStep.update(state, weather);
-    this.chargeStep.update(state, weather);
+    this.drillStep.update(state);
+    this.chargeStep.update(state);
     this.previewStep.update(state);
-    this.fireStep.update(state, weather);
+    this.fireStep.update(state);
     this.footer.update(state, tutorialActive);
   }
 

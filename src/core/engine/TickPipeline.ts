@@ -23,6 +23,9 @@ import type { ExpenseCategory } from '../economy/Finance.js';
 import { addExpense, addIncome, chargeFine } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
+import { tickHoleWater } from '../mining/WetHoles.js';
+import { dominantRockUnderHole } from '../mining/ExplosiveRockFit.js';
+import { getRock } from '../world/RockCatalog.js';
 import { buildTickEventContext } from './TickEventContext.js';
 import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
@@ -164,6 +167,10 @@ export function runTick(
 
   // 0. Weather — own persisted rng stream, advanced before events read it
   tickWeather(state.weather);
+  tickHoleWater(state, state.weather.current, hole => {
+    const rock = grid ? dominantRockUnderHole(grid, hole) : null;
+    return rock ? (getRock(rock.rockId)?.porosity ?? 0) : 0;
+  });
 
   // 1. Event system
   const evCtx = buildTickEventContext(state);

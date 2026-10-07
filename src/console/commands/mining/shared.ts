@@ -142,6 +142,7 @@ export function cancelOutstandingDrillActions(state: GameState): number {
  */
 export function resetPlanState(state: GameState): void {
   state.drillHoles = [];
+  state.holeWater = {};
   clearTubing(state.tubingState);
   state.chargesByHole = {};
   state.plannedChargesByHole = {};

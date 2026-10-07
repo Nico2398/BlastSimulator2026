@@ -92,7 +92,8 @@ describe('DrillStep', () => {
   it('shows WET for a hole that holds water', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 10, 20, 8, 0.15);
+    state.holeWater[hole.id] = { level: 0.8, porosity: 0.03 };
 
     wetAllHoles(state);
     step.update(state, 'sunny');

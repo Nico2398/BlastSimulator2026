@@ -190,7 +190,8 @@ describe('FireStep', () => {
   it('pre-flight checklist warns about holes holding water, and clears once they are dry', () => {
     const { step } = makeStep();
     const state = makeState();
-    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    const hole = addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
+    state.holeWater[hole.id] = { level: 0.8, porosity: 0.03 };
 
     wetAllHoles(state);
     step.update(state, 'heavy_rain');

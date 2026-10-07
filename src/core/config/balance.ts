@@ -1863,23 +1863,30 @@ export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
 /** Water level (fraction of hole depth) above which a hole counts as wet. */
 export const HOLE_WET_THRESHOLD = 0.3;
 
-/** Level fraction a bare hole gains per tick per unit of rain intensity. */
-export const HOLE_RAIN_FILL_RATE = 0.2;
+/**
+ * Level fraction a bare hole gains per tick per unit of rain intensity. Storm (1.0) fills a bare
+ * hole in 2 ticks, light rain (0.3) in ~7, so rain is felt within the first ticks of a downpour.
+ */
+export const HOLE_RAIN_FILL_RATE = 0.5;
 
-/** Level fraction per tick seeping in from wet ground, per unit of ground wetness. */
-export const HOLE_SEEP_RATE = 0.02;
+/**
+ * Level fraction per tick seeping in from wet ground, per unit of ground wetness and porosity.
+ * Tight rock (0.03) seeps less than it fades and never floods; porous rock (0.35) at full wetness
+ * out-seeps its slowed fade and crosses the wet threshold in ~70 ticks.
+ */
+export const HOLE_SEEP_RATE = 0.1;
 
-/** Level fraction lost per tick when no water is arriving, in tight rock. */
-export const HOLE_WATER_FADE_RATE = 0.05;
+/** Level fraction lost per tick when it is not raining, in tight rock: ~17 ticks from full. */
+export const HOLE_WATER_FADE_RATE = 0.06;
 
-/** How strongly porosity slows fading (fade divisor = 1 + porosity * this). */
-export const HOLE_FADE_POROSITY_SLOWDOWN = 2;
+/** How strongly porosity slows fading (fade = rate * (1 - porosity * this)): 0.35 porosity fades ~2x slower than 0.03. */
+export const HOLE_FADE_POROSITY_SLOWDOWN = 1.4;
 
-/** Ground wetness gained per tick per unit of rain intensity. */
-export const GROUND_WETNESS_RISE_RATE = 0.1;
+/** Ground wetness gained per tick per unit of rain intensity (storm saturates in 4 ticks). */
+export const GROUND_WETNESS_RISE_RATE = 0.25;
 
-/** Ground wetness lost per tick when it is not raining. */
-export const GROUND_WETNESS_DECAY_RATE = 0.02;
+/** Ground wetness lost per tick when it is not raining: saturated ground lingers ~5 ticks. */
+export const GROUND_WETNESS_DECAY_RATE = 0.2;
 
 /** Cash to drain one wet hole. */
 export const HOLE_DRAIN_COST_PER_HOLE = 20;

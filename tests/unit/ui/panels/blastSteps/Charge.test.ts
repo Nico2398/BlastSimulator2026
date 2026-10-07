@@ -30,6 +30,11 @@ function card(step: ChargeStep, explosiveId: string): HTMLButtonElement {
   return step.root.querySelector(`[data-explosive="${explosiveId}"]`) as HTMLButtonElement;
 }
 
+/** Put every hole under water (tight rock unless a porosity is given), as a storm would have. */
+function soak(state: ReturnType<typeof makeState>, porosity = 0.03): void {
+  for (const h of state.drillHoles) state.holeWater[h.id] = { level: 0.9, porosity };
+}
+
 beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('ChargeStep', () => {
@@ -240,7 +245,7 @@ describe('ChargeStep', () => {
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     state.tubingState.installedHoles.add(hole.id);
 
-    step.update(state, 'sunny');
+    step.update(state);
 
     expect(step.root.textContent).toContain('dry or tubed');
     expect(step.root.querySelector('[data-action="tubing-install"]')).toBeNull();
@@ -291,6 +296,7 @@ describe('ChargeStep', () => {
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    soak(state);
 
     wetAllHoles(state);
     step.update(state, 'heavy_rain');
@@ -324,11 +330,13 @@ describe('ChargeStep', () => {
     expect(buyBtn.textContent).toContain(`$${10 * TUBING_COST}`);
   });
 
-  it('Install Tubing dispatches one install_tubing per wet hole', () => {
+  it('Install Tubing dispatches one install_tubing per untubed hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     const h1 = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
     const h2 = addHole(holeCounter, state.drillHoles, 13, 10, 8, 0.15);
+    const h3 = addHole(holeCounter, state.drillHoles, 16, 10, 8, 0.15);
+    state.tubingState.installedHoles.add(h3.id);
     state.tubingState.inventory = 5;
     wetAllHoles(state);
     step.update(state, 'heavy_rain');
@@ -351,7 +359,7 @@ describe('ChargeStep', () => {
 
     const installBtn = step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement;
     expect(installBtn.disabled).toBe(true);
-    expect(step.root.textContent).toContain('Only 1 tubes in stock, 2 wet holes need one');
+    expect(step.root.textContent).toContain('Only 1 tubes in stock, 2 holes need one');
 
     installBtn.click();
     expect(gameConsole).not.toHaveBeenCalled();
@@ -529,7 +537,9 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
     step.update(state, 'sunny');
 
     expect(chargeAll(step).disabled).toBe(false);
-    expect(step.root.querySelectorAll('.bsx-reason')).toHaveLength(0);
+    // Only the fit line is under test: the drain and tubing blocks carry their own reasons.
+    expect(chargeAll(step).nextElementSibling?.querySelectorAll('.bsx-reason') ?? []).toHaveLength(0);
+    expect(chargeAll(step).nextElementSibling?.textContent ?? '').toBe('');
   });
 
   it('shows no overflow reason, only the no-holes reason, when there are no holes (#1345)', () => {
@@ -681,5 +691,71 @@ describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', 
     gameConsole.mockReturnValue({ success: true, output: 'Charged.' });
     chargeAll.click();
     expect(step.root.textContent).not.toContain('Not enough cash.');
+  });
+});
+
+describe('ChargeStep — draining (#1350)', () => {
+  const drainAll = (step: ChargeStep) => step.root.querySelector('[data-action="drain-holes"]') as HTMLButtonElement;
+  const drainRow = (step: ChargeStep, id: string) =>
+    step.root.querySelector(`[data-hole="${id}"] [data-action="drain-hole"]`) as HTMLButtonElement;
+
+  it('disables Drain with a visible reason when no hole is wet', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state);
+
+    expect(drainAll(step).disabled).toBe(true);
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.charge.drain_none_reason'));
+    drainAll(step).click();
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('Drain all sends drain_hole hole:* when a wet hole can be drained', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    state.cash = 1000;
+    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    soak(state);
+    step.update(state);
+
+    expect(drainAll(step).disabled).toBe(false);
+    drainAll(step).click();
+    expect(gameConsole).toHaveBeenCalledWith('drain_hole hole:*');
+    expect(drainRow(step, h.id).disabled).toBe(false);
+    drainRow(step, h.id).click();
+    expect(gameConsole).toHaveBeenCalledWith(`drain_hole hole:${h.id}`);
+  });
+
+  it('blocks an untubed wet hole in porous rock with the porous reason, until it is tubed', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.cash = 1000;
+    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    soak(state, 0.35);
+    step.update(state);
+
+    expect(drainAll(step).disabled).toBe(true);
+    expect(drainRow(step, h.id).disabled).toBe(true);
+    expect(step.root.textContent).toContain(t('ui.blast_workshop.charge.drain_porous_reason'));
+
+    state.tubingState.installedHoles.add(h.id);
+    step.update(state);
+    expect(drainAll(step).disabled).toBe(false);
+    expect(drainRow(step, h.id).disabled).toBe(false);
+  });
+
+  it('repaints when the water level changes', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.cash = 1000;
+    const h = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    soak(state);
+    step.update(state);
+    expect(drainAll(step).disabled).toBe(false);
+
+    state.holeWater[h.id]!.level = 0;
+    step.update(state);
+    expect(drainAll(step).disabled).toBe(true);
   });
 });

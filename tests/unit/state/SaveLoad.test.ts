@@ -2078,3 +2078,26 @@ describe('backfillRaises (#1383)', () => {
     expect(loaded.employees.employees.find(e => e.id === employee.id)!.raises).toBe(250);
   });
 });
+
+// SAVE_VERSION bumped 31→32 for GameState.holeWater / groundWetness (#1350).
+describe('v31 → v32 migration (hole water)', () => {
+  it('backfills empty hole water and dry ground on an older save', () => {
+    const raw = JSON.parse(serialize(createGame({ seed: 7 }))) as Record<string, unknown>;
+    delete raw['holeWater'];
+    delete raw['groundWetness'];
+    raw['version'] = 31;
+    const loaded = deserialize(JSON.stringify(raw));
+    expect(loaded.holeWater).toEqual({});
+    expect(loaded.groundWetness).toBe(0);
+    expect(loaded.version).toBe(SAVE_VERSION);
+  });
+
+  it('round-trips hole water and ground wetness', () => {
+    const state = createGame({ seed: 7 });
+    state.holeWater = { H1: { level: 0.5, porosity: 0.2 } };
+    state.groundWetness = 0.4;
+    const loaded = deserialize(serialize(state));
+    expect(loaded.holeWater).toEqual(state.holeWater);
+    expect(loaded.groundWetness).toBe(0.4);
+  });
+});

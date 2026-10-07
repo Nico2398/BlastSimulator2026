@@ -6,6 +6,7 @@ import { createRunner, type RunnerWithContext } from './console/createRunner.js'
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
+import { wetHoles } from './core/mining/WetHoles.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
@@ -40,6 +41,8 @@ export interface SerializableGameState {
   finances: { cash: number };
   holeCount: number;
   /** Holes ordered but not yet drilled (state.plannedDrillHoles.length) — proves a drill plan queues work instead of writing holes into state instantly (#553). */
+  /** Drill holes whose water level is past the wet threshold (wetHoles, #1350). */
+  wetHoleCount: number;
   orderedHoleCount: number;
   /** Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length) — proves a charge order queues work instead of writing charges into state instantly (#554). */
   orderedChargeCount: number;
@@ -172,6 +175,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     chargesByHole: s.chargesByHole as Record<string, unknown>,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
+    wetHoleCount: wetHoles(s).length,
     orderedHoleCount: s.plannedDrillHoles.length,
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
     orderedRampSegmentCount: s.plannedRamps.reduce(

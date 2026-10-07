@@ -2937,6 +2937,17 @@
       }
     },
     {
+      "command": "weather set cloudy",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set cloudy"
+        }
+      ],
+      "description": "Third blast: the weather is already cloudy, but the holes still hold water from the earlier storm (#1350) and would weaken the water-sensitive boomite. Re-assert the dry weather, which also clears the standing water.",
+      "role": "bootstrap"
+    },
+    {
       "command": "blast",
       "interaction": [
         {

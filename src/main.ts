@@ -60,6 +60,7 @@ import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
 import { dominantRockUnderHole } from './core/mining/ExplosiveRockFit.js';
+import { wetHoles } from './core/mining/WetHoles.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
 // --- 3D Scene ---
@@ -621,6 +622,7 @@ window.__gameState = () => {
     // Charges ordered but not yet loaded (state.plannedChargesByHole) --
     // mirrors serializeGameState's own field (console-api.ts), same
     // rationale as orderedHoleCount above (#554).
+    wetHoleCount: wetHoles(s).length,
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
     // Remaining not-yet-`done` segments across every in-flight
     // state.plannedRamps entry -- mirrors serializeGameState's own field

@@ -94,6 +94,8 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
   // Weather ticks with the game (#1403); rain fizzles boomite. These tests are
   // about flyrock, so pin dry weather for the blast that follows.
   ctx.state!.weather.current = 'sunny';
+  // Water outlives the rain that filled it (#1350): empty the holes too.
+  ctx.state!.holeWater = {};
   for (const emp of ctx.state!.employees.employees) {
     if (emp.id === 1 || emp.id === 2) {
       emp.x = 44;

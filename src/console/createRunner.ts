@@ -26,6 +26,7 @@ import {
   levelGroundCommand,
   weatherCommand,
   tubingCommand,
+  drainHoleCommand,
   surveyCommand,
 } from './commands/mining.js';
 import {
@@ -227,6 +228,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('buy', 'Buy items (tubing amount:10)', (_args, named) =>
     tubingCommand(ctx, ['buy'], named),
+  );
+  runner.register('drain_hole', 'Drain water from a hole (hole:3 or hole:*)', (args, named) =>
+    drainHoleCommand(ctx, args, named),
   );
   runner.register('install_tubing', 'Install tubing on a hole (hole:3)', (_args, named) =>
     tubingCommand(ctx, ['install'], named),

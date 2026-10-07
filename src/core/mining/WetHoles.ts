@@ -1,29 +1,47 @@
 // BlastSimulator2026 — Wet hole derivation
-// No per-tick water-level state is tracked per hole (see WeatherEffects.ts's
-// unused HoleFloodState for that heavier model). Per the redesign spec, "rain
-// fills uncovered holes": a hole reads as wet exactly when it's currently
-// raining and has no tubing installed — stateless, recomputed on demand.
+// Each drill hole carries a water level (GameState.holeWater) advanced per tick from the
+// weather and ground wetness. A hole is wet while its stored level is past the wet threshold;
+// tubing keeps water out but never masks water already in (#1350).
 
 import type { HoleCharge } from './ChargePlan.js';
 import type { GameState } from '../state/GameState.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { waterEffect } from './BlastCalc.js';
 import type { DrillHole } from './DrillPlan.js';
-import type { WeatherState } from '../weather/WeatherCycle.js';
+import { hasTubing } from './Tubing.js';
+import { rainIntensity, type WeatherState } from '../weather/WeatherCycle.js';
+import { advanceGroundWetness, advanceHoleWater, isHoleFlooded } from '../weather/WeatherEffects.js';
 
-/** Advance every hole's water one tick from the current weather; `porosityOf` supplies rock porosity per hole. */
+/** Advance every hole's water one tick from the current weather; `porosityOf` supplies rock porosity per hole (sampled once, when the hole first appears). */
 export function tickHoleWater(
-  _state: GameState,
-  _weather: WeatherState,
-  _porosityOf: (hole: DrillHole) => number,
+  state: GameState,
+  weather: WeatherState,
+  porosityOf: (hole: DrillHole) => number,
 ): void {
-  // TODO: implement
+  const rain = rainIntensity(weather);
+  const live = new Set<string>();
+  for (const hole of state.drillHoles) {
+    live.add(hole.id);
+    const hw = state.holeWater[hole.id] ?? { level: 0, porosity: porosityOf(hole) };
+    state.holeWater[hole.id] = advanceHoleWater(hw, rain, state.groundWetness, hasTubing(state.tubingState, hole.id));
+  }
+  for (const id of Object.keys(state.holeWater)) {
+    if (!live.has(id)) delete state.holeWater[id];
+  }
+  state.groundWetness = advanceGroundWetness(state.groundWetness, rain);
+}
+
+/** Console override for forced dry weather: no standing water in any hole, ground bone dry. */
+export function clearStandingWater(state: GameState): void {
+  state.holeWater = {};
+  state.groundWetness = 0;
 }
 
 /** IDs of drill holes whose water level is past the wet threshold. */
-export function wetHoles(_state: GameState): string[] {
-  // TODO: implement
-  return [];
+export function wetHoles(state: GameState): string[] {
+  return state.drillHoles
+    .filter(hole => isHoleFlooded(state.holeWater[hole.id]?.level ?? 0))
+    .map(hole => hole.id);
 }
 
 /** Ids of wet holes as a set, for callers that test membership (previews, execution). */

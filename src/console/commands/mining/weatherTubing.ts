@@ -8,10 +8,15 @@ import {
   forceAdvanceInState,
   setWeather,
   ALL_WEATHER_STATES,
+  rainIntensity,
   type WeatherState,
 } from '../../../core/weather/WeatherCycle.js';
 import { buyTubing, installTubing } from '../../../core/mining/Tubing.js';
 import { addExpense } from '../../../core/economy/Finance.js';
+import { formatMoney } from '../../../core/economy/formatMoney.js';
+import { drainHoles, type DrainBlock } from '../../../core/mining/HoleDrain.js';
+import { clearStandingWater, wetHoles } from '../../../core/mining/WetHoles.js';
+import { HOLE_DRAIN_COST_PER_HOLE } from '../../../core/config/balance.js';
 
 export function weatherCommand(
   ctx: MiningContext,
@@ -37,6 +42,8 @@ export function weatherCommand(
       };
     }
     setWeather(weather, target);
+    // Forcing dry weather is the console's "make conditions dry" override: it clears standing water too.
+    if (rainIntensity(target) === 0) clearStandingWater(ctx.state!);
     return { success: true, output: `Weather: ${weather.current}` };
   }
 
@@ -70,4 +77,45 @@ export function tubingCommand(
   }
 
   return { success: true, output: `Tubing inventory: ${ctx.state!.tubingState.inventory}, installed: ${ctx.state!.tubingState.installedHoles.size} holes` };
+}
+
+const DRAIN_BLOCK_KEY: Record<DrainBlock, string> = {
+  dry: 'mining.drain.dry',
+  porous_untubed: 'mining.drain.porous',
+  unknown_hole: 'mining.drain.unknown_hole',
+  insufficient_funds: 'mining.drain.insufficient_funds',
+};
+
+/** `drain_hole hole:<id|*>` — `*` drains every wet hole; blocked ones are named, the rest still drain. */
+export function drainHoleCommand(
+  ctx: MiningContext,
+  _args: string[],
+  named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  const state = ctx.state!;
+  const spec = named['hole'] ?? '';
+  if (!spec) return { success: false, output: t('mining.drain.usage') };
+
+  const batch = spec === '*';
+  const ids = batch ? wetHoles(state) : [resolveHoleId(state, spec, false)];
+  if (batch && ids.length === 0) return { success: false, output: t('mining.drain.nothing') };
+
+  const result = drainHoles(state, ids);
+  const blocked = Object.entries(result.refused);
+  if (!batch && blocked.length > 0) {
+    const [hole, block] = blocked[0]!;
+    return { success: false, output: t(DRAIN_BLOCK_KEY[block], { hole, cost: `$${formatMoney(HOLE_DRAIN_COST_PER_HOLE)}` }) };
+  }
+  const summary = {
+    count: result.drained.length,
+    cost: `$${formatMoney(result.cost)}`,
+    holes: result.drained.join(', '),
+    blocked: blocked.map(([id]) => id).join(', '),
+  };
+  if (blocked.length > 0) {
+    return { success: result.drained.length > 0, output: t('mining.drain.batch_blocked', summary) };
+  }
+  return { success: true, output: t('mining.drain.success', summary) };
 }
