@@ -74,16 +74,6 @@ describe('Contract system', () => {
       }
     });
 
-    it('a multiplier of 1 (the default) reproduces the unmultiplied baseline exactly', () => {
-      const baseline = createContractState();
-      generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
-
-      const explicit = createContractState();
-      generateContracts(explicit, new Random(42), 0, 1, ALL_ORES);
-
-      expect(explicit.available).toEqual(baseline.available);
-    });
-
     it('leaves the missed-deadline penalty on the unmultiplied base price, while the early-delivery bonus scales (#959)', () => {
       const baseline = createContractState();
       generateContracts(baseline, new Random(42), 0, 1, ALL_ORES);
@@ -546,15 +536,6 @@ describe('contract offers draw only from the available ores (#1364)', () => {
     }
     return all;
   }
-
-  it('every ore_sale and supply materialId is in the available list over 200 seeds', () => {
-    const offers = offersFor(LEVEL_ORES);
-    expect(offers.length).toBe(200 * CONTRACTS_PER_REFRESH);
-    for (const c of offers) {
-      if (c.type === 'rubble_disposal') continue;
-      expect(LEVEL_ORES).toContain(c.materialId);
-    }
-  });
 
   it('never offers an ore outside the list (no sparkium, treranium, ...)', () => {
     const ids = new Set(offersFor(LEVEL_ORES).map(c => c.materialId));

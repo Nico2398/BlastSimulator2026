@@ -234,6 +234,27 @@ describe('ContractsPanel', () => {
     expect(container.contains(panel.root)).toBe(false);
   });
 
+  it('flags an offer for an ore the site cannot yield, and not one it can or rubble (#1364)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(
+      makeContract({ id: 21, materialId: 'dirtite' }),
+      makeContract({ id: 22, materialId: 'sparkium' }),
+      makeContract({ id: 23, type: 'rubble_disposal', materialId: '' }),
+    );
+    panel.show();
+    panel.update(state);
+
+    const card = (id: number) => panel.root.querySelector<HTMLElement>(`[data-contract-id="${id}"]`)!;
+    const badge = t('ui.contracts.not_on_site');
+    expect(card(21).textContent).not.toContain(badge);
+    expect(card(21).dataset['contractOnsite']).toBe('true');
+    expect(card(22).textContent).toContain(badge);
+    expect(card(22).dataset['contractOnsite']).toBe('false');
+    expect(card(23).textContent).not.toContain(badge);
+    expect(card(23).dataset['contractOnsite']).toBe('true');
+  });
+
   // ── #513: cards must carry data-contract-id so per-card action selectors scope correctly ──
 
   it('offered card carries data-contract-id matching its contract', () => {

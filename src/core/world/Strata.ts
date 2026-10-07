@@ -79,16 +79,22 @@ export function buildStrataProfile(dominantRockIds: readonly string[]): StratumD
   });
 }
 
+/** Softest and hardest resolvable rock of the ids, or null when none resolve. */
+function softestAndHardest(dominantRockIds: readonly string[]): [RockType, RockType] | null {
+  const rocks = resolveSortedRocks(dominantRockIds);
+  if (rocks.length === 0) return null;
+  return [rocks[0]!, rocks[rocks.length - 1]!];
+}
+
 /**
  * `mixedRockHardness: true` variant (#458 D4/A11): alternates the biome's
  * softest and hardest dominant rock in ~5 m bands instead of a soft-to-hard
  * gradient, so projections keep flipping between easy and hard rock.
  */
 export function buildMixedHardnessStrata(dominantRockIds: readonly string[]): StratumDef[] {
-  const rocks = resolveSortedRocks(dominantRockIds);
-  if (rocks.length === 0) return [];
-  const soft = rocks[0]!;
-  const hard = rocks[rocks.length - 1]!;
+  const extremes = softestAndHardest(dominantRockIds);
+  if (!extremes) return [];
+  const [soft, hard] = extremes;
   const layers: StratumDef[] = [];
   for (let i = 0; i < MIXED_LAYER_COUNT; i++) {
     layers.push({
@@ -106,11 +112,10 @@ export function buildMixedHardnessStrata(dominantRockIds: readonly string[]): St
  * resolvable dominant rock (buildStrataProfile's rock set).
  */
 export function siteRockIds(dominantRockIds: readonly string[], mixedRockHardness: boolean): string[] {
-  const rocks = resolveSortedRocks(dominantRockIds);
-  if (rocks.length === 0) return [];
-  if (!mixedRockHardness) return rocks.map(r => r.id);
-  const soft = rocks[0]!;
-  const hard = rocks[rocks.length - 1]!;
+  if (!mixedRockHardness) return resolveSortedRocks(dominantRockIds).map(r => r.id);
+  const extremes = softestAndHardest(dominantRockIds);
+  if (!extremes) return [];
+  const [soft, hard] = extremes;
   return soft.id === hard.id ? [soft.id] : [soft.id, hard.id];
 }
 

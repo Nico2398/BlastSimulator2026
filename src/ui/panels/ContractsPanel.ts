@@ -118,6 +118,7 @@ export class ContractsPanel extends PanelBase {
 
   private render(state: GameState): void {
     const managerLevel = bestAvailableManagerLevel(state.employees.employees);
+    const siteOres = resolveContractOres(state);
     const sections: HTMLElement[] = [
       this.makeStorageStrip(state),
       sectionHeader(t('ui.contracts.active')),
@@ -131,7 +132,7 @@ export class ContractsPanel extends PanelBase {
       sectionHeader(t('ui.contracts.available')),
       scrollBoundedSection(
         state.contracts.available.length > 0
-          ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel))
+          ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel, siteOres))
           : [emptyState(t('ui.contracts.none'))],
         200,
         { gap: 10 },
@@ -281,7 +282,7 @@ export class ContractsPanel extends PanelBase {
 
   // ── Offered ──
 
-  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null): HTMLElement {
+  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null, siteOres: readonly string[]): HTMLElement {
     const stored = this.storedOf(c.materialId, state);
     const havePct = c.quantityKg > 0 ? Math.min(100, Math.round((stored / c.quantityKg) * 100)) : 0;
     const haveColor = stored >= c.quantityKg ? 'var(--bsx-positive)' : 'var(--bsx-amber)';
@@ -355,7 +356,7 @@ export class ContractsPanel extends PanelBase {
     btnRow.style.cssText = 'display:flex;gap:6px';
     btnRow.append(acceptBtn, negotiateBtn, declineBtn);
 
-    const offSiteBadge = c.materialId === '' || resolveContractOres(state).includes(c.materialId)
+    const offSiteBadge = c.materialId === '' || siteOres.includes(c.materialId)
       ? null
       : el('span', { text: t('ui.contracts.not_on_site'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);color:var(--bsx-critical-text)' } });
 

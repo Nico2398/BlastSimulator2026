@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { getLevel, getAllLevels, resolveContractOres, type LevelDef, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { createGame, createWorldState, type GameState } from '../../../src/core/state/GameState.js';
-import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
+import { generateTerrain, resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
@@ -226,10 +226,10 @@ describe('resolveContractOres (#1364)', () => {
   }
 
   /** Ore ids actually present (density > 0 voxel with ore density > 0) in a strided sample of the level's grid. */
-  function oresInGrid(level: LevelDef): Set<string> {
+  function oresInGrid(level: LevelDef, seed: number = level.terrainSeed, climateBias: readonly [number, number] = level.climateBias): Set<string> {
     const grid = generateTerrain({
       sizeX: level.gridX, datum: level.datum, sizeZ: level.gridZ,
-      seed: level.terrainSeed, climateBias: level.climateBias,
+      seed, climateBias,
       mixedRockHardness: level.mixedRockHardness,
     });
     const found = new Set<string>();
@@ -285,7 +285,7 @@ describe('resolveContractOres (#1364)', () => {
     expect([...resolveContractOres(stateFor(level, level.id))]).toEqual(expected);
   });
 
-  it('mixed hardness narrows the ores relative to the same biome unmixed', () => {
+  it('mixed hardness never widens the ores relative to the same biome unmixed', () => {
     const level = getLevel('treranium_depths')!;
     const unmixed = stateFor({ ...level, mixedRockHardness: false }, level.id);
     const mixed = stateFor(level, level.id);
@@ -298,6 +298,29 @@ describe('resolveContractOres (#1364)', () => {
     const state = createGame({ seed: 1, mineType: 'no_such_biome' });
     state.campaign.activeLevelId = null;
     expect([...resolveContractOres(state)]).toEqual(ALL_ORE_IDS);
+  });
+
+  it('without a world, falls back to the declared biome rocks', () => {
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.world = null;
+    state.campaign.activeLevelId = null;
+    expect([...resolveContractOres(state)]).toEqual(oresYieldedByRocks(getBiome('desert')!.dominantRocks));
+  });
+
+  describe('new_game path (state.seed differs from any level terrainSeed)', () => {
+    for (const biome of getAllBiomes()) {
+      it(`biome ${biome.id}: offered covers the grid and is yieldable by the generated biome`, () => {
+        const level = sandboxLevelDef({ biome: biome.id, difficulty: 'normal', seed: 12345 });
+        expect(level.terrainSeed).not.toBe(getLevel('tutorial_pit')!.terrainSeed);
+        const state = stateFor(level, null);
+        state.seed = 12345;
+        const offered = new Set(resolveContractOres(state));
+        for (const ore of oresInGrid(level, 12345, biome.climateCenter)) expect(offered.has(ore)).toBe(true);
+        const generated = resolveGeneratedBiome(12345, level.gridX, level.gridZ, biome.climateCenter);
+        const yieldable = new Set(oresYieldedByRocks(generated.dominantRocks));
+        for (const ore of offered) expect(yieldable.has(ore)).toBe(true);
+      });
+    }
   });
 
   describe('drift lock: result is a superset of ores generated into the grid', () => {

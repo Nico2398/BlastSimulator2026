@@ -93,8 +93,8 @@ export function generateContracts(
   state: ContractState,
   rng: Random,
   currentTick: number,
-  /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`). Defaults to 1 so every caller that doesn't pass one reproduces today's pricing exactly. */
-  priceMultiplier: number = 1,
+  /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`); pass 1 for unscaled pricing. */
+  priceMultiplier: number,
   /** Ore ids the level's rocks can yield (Level.ts's resolveContractOres). */
   availableOres: readonly string[],
 ): void {
@@ -118,22 +118,22 @@ function commonOres(ores: readonly string[]): string[] {
     .slice(0, SUPPLY_COMMON_ORE_COUNT);
 }
 
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number = 1, availableOres: readonly string[]): Contract {
-  let typeRoll = rng.nextFloat(0, 1);
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[]): Contract {
+  const typeRoll = rng.nextFloat(0, 1);
   // A site whose rocks yield no ore has nothing to sell or supply: rubble only.
-  if (availableOres.length === 0) typeRoll = 0.5;
+  const rubbleOnly = availableOres.length === 0;
   let type: ContractType;
   let materialId: string;
   let pricePerKg: number;
   let description: string;
 
-  if (typeRoll < 0.5) {
+  if (!rubbleOnly && typeRoll < 0.5) {
     // Ore sale contract
     type = 'ore_sale';
     materialId = rng.pick(availableOres);
     pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
     description = `Deliver ${materialId} ore`;
-  } else if (typeRoll < 0.8) {
+  } else if (rubbleOnly || typeRoll < 0.8) {
     // Rubble disposal
     type = 'rubble_disposal';
     materialId = '';

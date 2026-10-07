@@ -243,22 +243,20 @@ export function resolveContractPriceMultiplier(state: GameState): number {
 export function resolveContractOres(state: GameState): readonly string[] {
   const declared = getBiome(state.mineType);
   if (!declared) return Object.keys(ORE_PRICES);
-  // Terrain generation lands on the climate-weighted biome, which can differ
-  // from the declared one, and the console seeds it differently per entry point
-  // (new_game: state.seed + biome climate centre; campaign start: the level's
-  // own terrainSeed + climateBias). Offer the union of every biome those
-  // paths can generate, so offers never drift from what the grid holds.
   const world = state.world;
   if (!world) return oresYieldedByRocks(siteRockIds(declared.dominantRocks, false));
+  // Terrain generation lands on the climate-weighted biome, which can differ
+  // from the declared one, and the console seeds it per entry point: campaign
+  // start generates from the level's own terrainSeed + climateBias, while
+  // new_game / sandbox start use state.seed + the declared biome's climate
+  // centre. Mirror whichever one built this grid, so offers never drift from
+  // what it holds.
   const level = state.campaign.activeLevelId ? getLevel(state.campaign.activeLevelId) : undefined;
-  const paths: Array<readonly [number, readonly [number, number]]> = [[state.seed, declared.climateCenter]];
-  if (level) paths.push([level.terrainSeed, level.climateBias]);
-  const rockIds = new Set<string>();
-  for (const [seed, bias] of paths) {
-    const generated = resolveGeneratedBiome(seed, world.baseSizeX, world.baseSizeZ, bias);
-    for (const id of siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false)) rockIds.add(id);
-  }
-  return oresYieldedByRocks([...rockIds]);
+  const [seed, climateBias] = level
+    ? [level.terrainSeed, level.climateBias] as const
+    : [state.seed, declared.climateCenter] as const;
+  const generated = resolveGeneratedBiome(seed, world.baseSizeX, world.baseSizeZ, climateBias);
+  return oresYieldedByRocks(siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false));
 }
 
 /**

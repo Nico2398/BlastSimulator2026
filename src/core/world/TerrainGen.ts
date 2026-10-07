@@ -90,27 +90,26 @@ export interface TerrainContext {
   oreVeins: OreVeinSampler;
 }
 
-const generatedBiomeCache = new Map<string, BiomeDef>();
+/** Dominant climate-weighted biome at the playable centre — what terrain generation lands on. */
+function centerBiome(
+  fields: WorldNoiseFields, sizeX: number, sizeZ: number, climateBias: readonly [number, number],
+): BiomeDef {
+  return dominantBiome(
+    selectBiomeWeights(fields.temperature(sizeX / 2, sizeZ / 2), fields.humidity(sizeX / 2, sizeZ / 2), climateBias, 1.0),
+  );
+}
 
 /**
- * The biome terrain generation actually lands on for these params: the
- * dominant climate-weighted biome at the playable centre. It can differ from
- * a level's declared biome, so anything asking "which rocks does this site
- * contain" (contract ores, #1364) must ask here rather than the declared one.
- * Cheap (two noise samples) and memoized.
+ * The biome terrain generation actually lands on for these params. It can
+ * differ from a level's declared biome, so anything asking "which rocks does
+ * this site contain" (contract ores, #1364) must ask here rather than the
+ * declared one. Shares centerBiome with buildTerrainContext. Cheap (two noise
+ * samples), so deliberately uncached.
  */
 export function resolveGeneratedBiome(
   seed: number, sizeX: number, sizeZ: number, climateBias: readonly [number, number],
 ): BiomeDef {
-  const key = `${seed}|${sizeX}|${sizeZ}|${climateBias[0]}|${climateBias[1]}`;
-  const hit = generatedBiomeCache.get(key);
-  if (hit) return hit;
-  const fields = new WorldNoiseFields(seed);
-  const biome = dominantBiome(
-    selectBiomeWeights(fields.temperature(sizeX / 2, sizeZ / 2), fields.humidity(sizeX / 2, sizeZ / 2), climateBias, 1.0),
-  );
-  generatedBiomeCache.set(key, biome);
-  return biome;
+  return centerBiome(new WorldNoiseFields(seed), sizeX, sizeZ, climateBias);
 }
 
 /**
@@ -131,13 +130,7 @@ export function buildTerrainContext(config: TerrainConfig): TerrainContext {
     return weights.map(w => ({ shaping: biomeShaping(w.biome), weight: w.weight }));
   });
 
-  const centerBiomeWeights = selectBiomeWeights(
-    worldGen.fields.temperature(sizeX / 2, sizeZ / 2),
-    worldGen.fields.humidity(sizeX / 2, sizeZ / 2),
-    climateBias,
-    1.0,
-  );
-  const biome = dominantBiome(centerBiomeWeights);
+  const biome = centerBiome(worldGen.fields, sizeX, sizeZ, climateBias);
 
   const profile = mixedRockHardness
     ? buildMixedHardnessStrata(biome.dominantRocks)
