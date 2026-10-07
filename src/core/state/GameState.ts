@@ -400,6 +400,12 @@ export interface GameState {
   /** Charges ordered but not yet loaded — each queues one `charge_hole` action and lands in `chargesByHole` on completion (#554). */
   plannedChargesByHole: Record<string, PlannedCharge>;
 
+  /** Charge applied automatically to each newly drilled hole; null = none (#1345). */
+  patternCharge?: HoleCharge | null;
+
+  /** Hole ids whose auto-charge is waiting for funds (#1345). */
+  chargeAwaitingFunds?: string[];
+
   /** Named saved blast plans. */
   savedPlans: Record<string, SavedBlastPlan>;
 
@@ -567,6 +573,8 @@ export function createGame(config: GameConfig): GameState {
     plannedDrillHoles: [],
     chargesByHole: {},
     plannedChargesByHole: {},
+    patternCharge: null,
+    chargeAwaitingFunds: [],
     savedPlans: {},
     finances: createFinanceState(config.startingCash ?? STARTING_CASH),
     contracts: createContractState(),
