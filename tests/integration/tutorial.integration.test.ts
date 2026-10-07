@@ -153,14 +153,17 @@ describe('Tutorial flow', () => {
 // separately in tutorial-pause.integration.test.ts.
 
 describe('haul-debris step (#552): self-dispatching, no manual command', () => {
-  it('is the 24th of 29 tutorial steps (0-based index 23), directly after build-storage', () => {
+  it('sits directly after build-storage and before finances/needs/sell-ore', () => {
     // #1335 removes contract-accept: the player accepts the one fillable ore
     // offer inside sell-ore instead, so haul-debris follows build-storage
     // directly (24 -> 23). Earlier shifts (#553/#555/#557/#681/#905/#923/
     // #1015/#1328) are all upstream of this step and unchanged.
     const ids = TUTORIAL_STEPS.map(s => s.id);
+    // #1339: the two workaround licence courses are gone and one fragmenter
+    // course is added after the blast, so this step's absolute index is not
+    // pinned here — only its neighbours.
     const idx = ids.indexOf('haul-debris');
-    expect(idx).toBe(23);
+    expect(idx).toBeGreaterThan(0);
     expect(ids[idx - 1]).toBe('build-storage');
     expect(ids).not.toContain('contract-accept');
     // #1328: finances and needs now sit between haul-debris and sell-ore, so
@@ -345,48 +348,148 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
   });
 });
 
-// ── train-driller/train-digger (#903): booked training must not deadlock ──
+// ── Tutorial training (#1339): one real need, the rock fragmenter ──
 //
-// Bug 1 of #903: `employee train <id> skill:...` sets the employee's
-// trainingState, but hasOutstandingWork (tutorialGuide.ts) only ever reads
-// activeActionId/pendingDriverVehicleId/destinationX — none of which a
-// trainee carries. Once train-driller/train-digger's own 25-tick tickBudget
-// is spent (typically while the player is still navigating panels, before
-// the course is even booked — an entirely legitimate hold, waiting on the
-// player), TutorialRails.updateClock never sees the booked course as
-// outstanding work and never lifts it again. In the real app, main.ts's own
-// render loop refuses to call `tick` at all while isPaused (`if
-// (ctx.state && !ctx.state.isPaused && autoTickEnabled) { ... tick ... }`),
-// so tickTraining (EmployeeTraining.ts) never runs another tick and the
-// course can never finish — the tutorial deadlocks at stage 2/3 forever.
-//
-// These tests drive the real engine (createRunner, real ticks, real
-// TutorialRails) and — critically — gate every tick on `!state.isPaused`,
-// exactly like main.ts's own loop, rather than ticking unconditionally: a
-// loop that ticks regardless of pause state would force the course to
-// finish through sheer test-harness brute force and never observe the
-// deadlock a real player hits.
+// Every role now arrives able to do its own job (a driller drills, a driver
+// hauls and digs), so the two per-employee licence courses the tutorial used to
+// spend ~$250k on (train-driller / train-digger, hard-coded employees 1 and 2)
+// are gone. ONE Driving Center course remains, with a real need: after the
+// first blast leaves oversized boulders, somebody must learn the rock
+// fragmenter. #903's deadlock guard (a booked course must not freeze the clock)
+// carries over to that step.
 
-function makeDrillingCenterReady(
-  run: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']>,
-  ctx: ReturnType<typeof createRunner>['ctx'],
-): void {
-  expect(run('new_game seed:42 size:32').success).toBe(true);
-  // Fixed employee-id convention the tutorial itself relies on (see
-  // tutorialSteps.ts's own train-driller/train-digger comments): the
-  // surveyor hired first is employee #1, the driller hired next is #2.
-  expect(run('employee hire role:surveyor').success).toBe(true);
-  expect(run('employee hire role:driller').success).toBe(true);
-  expect(run('build driving_center at:6,7').success).toBe(true);
+describe('tutorial training steps (#1339)', () => {
+  const ids = TUTORIAL_STEPS.map(s => s.id);
 
-  for (let i = 0; i < 400 && countBuildingsOfType(ctx.state!, 'driving_center') === 0; i++) {
-    for (const emp of ctx.state!.employees.employees) {
-      emp.fatigue = 100;
+  it('has no train-driller or train-digger step', () => {
+    expect(ids).not.toContain('train-driller');
+    expect(ids).not.toContain('train-digger');
+  });
+
+  it('has exactly one training step, train-fragmenter', () => {
+    const trainingIds = ids.filter(id => id.startsWith('train-'));
+    expect(trainingIds).toEqual(['train-fragmenter']);
+  });
+
+  it('orders train-fragmenter after blast', () => {
+    expect(ids.indexOf('train-fragmenter')).toBeGreaterThan(ids.indexOf('blast'));
+  });
+
+  it('builds the driving center after the first blast (it is no longer a pre-blast detour)', () => {
+    expect(ids.indexOf('build-driving-center')).toBeGreaterThan(ids.indexOf('blast'));
+  });
+
+  it('builds the driving center before the fragmenter course that needs it', () => {
+    expect(ids.indexOf('build-driving-center')).toBeLessThan(ids.indexOf('train-fragmenter'));
+  });
+
+  it('hires the driver before the box-cut (a driver arrives able to dig the ramp)', () => {
+    expect(ids.indexOf('hire-driver')).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf('hire-driver')).toBeLessThan(ids.indexOf('box-cut'));
+  });
+
+  it('keeps the vehicle-purchase steps that crew the rig and digger', () => {
+    expect(ids).toContain('buy-drill-rig-assign');
+    expect(ids).toContain('buy-rock-digger-assign');
+    expect(ids.indexOf('buy-rock-digger-assign')).toBeLessThan(ids.indexOf('box-cut'));
+    expect(ids.indexOf('buy-drill-rig-assign')).toBeLessThan(ids.indexOf('drill-plan'));
+  });
+
+  it('no step command hard-codes an employee id for training', () => {
+    for (const step of TUTORIAL_STEPS) {
+      for (const cmd of step.commands ?? []) {
+        expect(cmd, step.id).not.toMatch(/^employee train \d+/);
+      }
     }
-    run('tick 1');
-  }
-  expect(countBuildingsOfType(ctx.state!, 'driving_center')).toBeGreaterThan(0);
-}
+  });
+
+  describe('train-fragmenter completion', () => {
+    it('is incomplete on a fresh game and complete once ANY employee holds driving.rock_fragmenter', () => {
+      const { runner, ctx } = createRunner();
+      const run = (cmd: string) => runner.run(cmd);
+      expect(run('new_game seed:42 size:32').success).toBe(true);
+      const step = TUTORIAL_STEPS.find(s => s.id === 'train-fragmenter')!;
+      expect(step).toBeDefined();
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(ctx.state!) : {};
+      expect(step.isComplete(ctx.state!, snapshot)).toBe(false);
+
+      // A driver holds truck + excavator on hire — neither is the fragmenter.
+      expect(run('employee hire role:driver').success).toBe(true);
+      expect(step.isComplete(ctx.state!, snapshot)).toBe(false);
+
+      // Not the first employee, not any fixed id: whoever holds the licence.
+      expect(run('employee hire role:surveyor').success).toBe(true);
+      const last = ctx.state!.employees.employees[ctx.state!.employees.employees.length - 1]!;
+      expect(run(`employee assign_skill ${last.id} skill:driving.rock_fragmenter level:1`).success).toBe(true);
+      expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
+    });
+
+    it('does not complete on the excavator licence alone', () => {
+      const { runner, ctx } = createRunner();
+      const run = (cmd: string) => runner.run(cmd);
+      expect(run('new_game seed:42 size:32').success).toBe(true);
+      expect(run('employee hire role:surveyor').success).toBe(true);
+      const emp = ctx.state!.employees.employees[0]!;
+      expect(run(`employee assign_skill ${emp.id} skill:driving.excavator level:1`).success).toBe(true);
+      const step = TUTORIAL_STEPS.find(s => s.id === 'train-fragmenter')!;
+      expect(step.isComplete(ctx.state!, step.captureSnapshot ? step.captureSnapshot(ctx.state!) : {})).toBe(false);
+    });
+  });
+
+  describe('train-fragmenter (#903 carried over): a booked course must not deadlock the tutorial clock', () => {
+    it('the fragmenter course finishes with no further player input once booked', () => {
+      const { runner, ctx } = createRunner();
+      const run = (cmd: string) => runner.run(cmd);
+      expect(run('new_game seed:42 size:32').success).toBe(true);
+      expect(run('employee hire role:driver').success).toBe(true);
+      expect(run('build driving_center at:6,7').success).toBe(true);
+      for (let i = 0; i < 400 && countBuildingsOfType(ctx.state!, 'driving_center') === 0; i++) {
+        for (const emp of ctx.state!.employees.employees) emp.fatigue = 100;
+        run('tick 1');
+      }
+      expect(countBuildingsOfType(ctx.state!, 'driving_center')).toBeGreaterThan(0);
+
+      const step = TUTORIAL_STEPS.find(s => s.id === 'train-fragmenter')!;
+      expect(step.waitsOnWork).toBe(true);
+      const budget = step.tickBudget ?? 25;
+
+      const rails = new TutorialRails();
+      rails.beginStep(
+        {
+          id: step.id,
+          ...(step.highlightTarget !== undefined ? { highlightTarget: step.highlightTarget } : {}),
+          ...(step.tickBudget !== undefined ? { tickBudget: step.tickBudget } : {}),
+          ...(step.waitsOnWork !== undefined ? { waitsOnWork: step.waitsOnWork } : {}),
+        },
+        ctx.state,
+      );
+
+      // Click time before the course is booked: the clock legitimately holds.
+      for (let i = 0; i < budget + 5; i++) {
+        tickIfUnpaused(run, ctx.state!);
+        rails.updateClock(ctx.state);
+      }
+      expect(ctx.state!.isPaused, 'the clock should hold while waiting on the player to click Train').toBe(true);
+
+      // Whoever the player picks: look the driver up by role, never by id.
+      const trainee = ctx.state!.employees.employees.find(e => e.role === 'driver')!;
+      const trainResult = run(`employee train ${trainee.id} skill:driving.rock_fragmenter`);
+      expect(trainResult.success, trainResult.output).toBe(true);
+
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(ctx.state!) : {};
+      let everTicked = false;
+      for (let i = 0; i < 400 && !step.isComplete(ctx.state!, snapshot); i++) {
+        if (tickIfUnpaused(run, ctx.state!)) everTicked = true;
+        rails.updateClock(ctx.state);
+      }
+
+      expect(everTicked, 'the clock never lifted once the course was booked').toBe(true);
+      expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
+      expect(ctx.state!.isPaused).toBe(false);
+      expect(trainee.qualifications.some(q => q.category === 'driving.rock_fragmenter')).toBe(true);
+    });
+  });
+});
 
 /**
  * Advances the game the way main.ts's real render loop does: a tick only
@@ -404,118 +507,6 @@ function tickIfUnpaused(
   run('tick 1');
   return true;
 }
-
-describe('train-driller (#903): a booked course must not deadlock the tutorial clock', () => {
-  it('the driver rig course finishes and the tutorial advances to buy-drill-rig-assign with no further player input', () => {
-    const { runner, ctx } = createRunner();
-    const run = (cmd: string) => runner.run(cmd);
-    makeDrillingCenterReady(run, ctx);
-
-    const step = TUTORIAL_STEPS.find(s => s.id === 'train-driller')!;
-    expect(step.waitsOnWork).toBe(true);
-    expect(step.tickBudget).toBe(25);
-
-    const rails = new TutorialRails();
-    rails.beginStep(
-      {
-        id: step.id,
-        ...(step.highlightTarget !== undefined ? { highlightTarget: step.highlightTarget } : {}),
-        ...(step.tickBudget !== undefined ? { tickBudget: step.tickBudget } : {}),
-        ...(step.waitsOnWork !== undefined ? { waitsOnWork: step.waitsOnWork } : {}),
-      },
-      ctx.state,
-    );
-
-    // Simulate the click/panel-navigation time before the player actually
-    // books the course: nothing is outstanding yet, so the budget
-    // legitimately runs out and the clock correctly holds, waiting on the
-    // player — true with or without the fix.
-    for (let i = 0; i < step.tickBudget! + 5; i++) {
-      tickIfUnpaused(run, ctx.state!);
-      rails.updateClock(ctx.state);
-    }
-    expect(ctx.state!.isPaused, 'the clock should have legitimately held while waiting on the player to click Train').toBe(true);
-
-    const trainResult = run('employee train 2 skill:driving.drill_rig');
-    expect(trainResult.success, trainResult.output).toBe(true);
-
-    const snapshot = step.captureSnapshot ? step.captureSnapshot(ctx.state!) : {};
-    let everTicked = false;
-
-    // From here on, exactly like main.ts, a tick only happens while
-    // !isPaused — so if updateClock never lifts the hold, no further tick
-    // ever runs and the course can never finish.
-    for (let i = 0; i < 400 && !step.isComplete(ctx.state!, snapshot); i++) {
-      if (tickIfUnpaused(run, ctx.state!)) everTicked = true;
-      rails.updateClock(ctx.state);
-    }
-
-    expect(everTicked, 'the clock never lifted once the course was booked — a real player would be stuck at stage 2/3 forever').toBe(true);
-    expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
-    expect(ctx.state!.isPaused).toBe(false);
-
-    const driller = ctx.state!.employees.employees.find(e => e.id === 2)!;
-    expect(driller.qualifications.some(q => q.category === 'driving.drill_rig')).toBe(true);
-
-    // No further player input beyond booking the course and ticking: the
-    // step's own completion is what the tutorial uses to advance, and the
-    // very next step in the canonical order is buy-drill-rig-assign.
-    const idx = TUTORIAL_STEPS.findIndex(s => s.id === 'train-driller');
-    expect(TUTORIAL_STEPS[idx + 1]!.id).toBe('buy-drill-rig-assign');
-  });
-});
-
-describe('train-digger (#903): a booked course must not deadlock the tutorial clock', () => {
-  it('the excavator course finishes and the tutorial advances to buy-rock-digger-assign with no further player input', () => {
-    const { runner, ctx } = createRunner();
-    const run = (cmd: string) => runner.run(cmd);
-    makeDrillingCenterReady(run, ctx);
-
-    const step = TUTORIAL_STEPS.find(s => s.id === 'train-digger')!;
-    expect(step.waitsOnWork).toBe(true);
-    expect(step.tickBudget).toBe(25);
-
-    const rails = new TutorialRails();
-    rails.beginStep(
-      {
-        id: step.id,
-        ...(step.highlightTarget !== undefined ? { highlightTarget: step.highlightTarget } : {}),
-        ...(step.tickBudget !== undefined ? { tickBudget: step.tickBudget } : {}),
-        ...(step.waitsOnWork !== undefined ? { waitsOnWork: step.waitsOnWork } : {}),
-      },
-      ctx.state,
-    );
-
-    for (let i = 0; i < step.tickBudget! + 5; i++) {
-      tickIfUnpaused(run, ctx.state!);
-      rails.updateClock(ctx.state);
-    }
-    expect(ctx.state!.isPaused, 'the clock should have legitimately held while waiting on the player to click Train').toBe(true);
-
-    // The surveyor hired first (employee #1) trains here — idle since their
-    // one-off survey job, matching train-digger's own comment convention.
-    const trainResult = run('employee train 1 skill:driving.excavator');
-    expect(trainResult.success, trainResult.output).toBe(true);
-
-    const snapshot = step.captureSnapshot ? step.captureSnapshot(ctx.state!) : {};
-    let everTicked = false;
-
-    for (let i = 0; i < 400 && !step.isComplete(ctx.state!, snapshot); i++) {
-      if (tickIfUnpaused(run, ctx.state!)) everTicked = true;
-      rails.updateClock(ctx.state);
-    }
-
-    expect(everTicked, 'the clock never lifted once the course was booked — a real player would be stuck at stage 2/3 forever').toBe(true);
-    expect(step.isComplete(ctx.state!, snapshot)).toBe(true);
-    expect(ctx.state!.isPaused).toBe(false);
-
-    const surveyor = ctx.state!.employees.employees.find(e => e.id === 1)!;
-    expect(surveyor.qualifications.some(q => q.category === 'driving.excavator')).toBe(true);
-
-    const idx = TUTORIAL_STEPS.findIndex(s => s.id === 'train-digger');
-    expect(TUTORIAL_STEPS[idx + 1]!.id).toBe('buy-rock-digger-assign');
-  });
-});
 
 // ── charge → sequence (#926): the step and the panel must never disagree ──
 //

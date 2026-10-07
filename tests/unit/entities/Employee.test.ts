@@ -30,10 +30,11 @@ import {
   checkCollapse,
   type SkillQualification,
   type SkillCategory,
-  ROLE_STARTING_QUALIFICATION,
 } from '../../../src/core/entities/Employee.js';
 import {
   XP_THRESHOLDS,
+  ROLE_STARTING_QUALIFICATIONS,
+  ROLE_BLASTER_START_LEVEL,
   QUALIFICATION_SALARY_BONUS,
   // ── 3.10: need-meter balance constants ──
   NEED_DRAIN_RATES,
@@ -139,26 +140,84 @@ describe('Employee system', () => {
 describe('Employee — skill qualification fields (3.1)', () => {
   const rng = new Random(1);
 
-  it('newly hired employee arrives qualified for the role, at Rookie level', () => {
-    // Hiring used to grant nothing, which made every skill-gated action
-    // unreachable for a player: the only way to get a qualification was the
-    // `employee assign_skill` console command.
+  it('a hired driller arrives able to drill: blasting + driving.drill_rig at Rookie level (#1339)', () => {
     const state = createEmployeeState();
     const { employee } = hireEmployee(state, 'driller', rng);
 
-    expect(Array.isArray(employee.qualifications)).toBe(true);
-    expect(employee.qualifications).toHaveLength(1);
-    expect(employee.qualifications[0]!.category).toBe(ROLE_STARTING_QUALIFICATION.driller);
-    expect(employee.qualifications[0]!.proficiencyLevel).toBe(1);
-    expect(employee.qualifications[0]!.xp).toBe(0);
+    expect(employee.qualifications.map(q => q.category).sort()).toEqual(['blasting', 'driving.drill_rig']);
+    for (const q of employee.qualifications) {
+      expect(q.proficiencyLevel).toBe(1);
+      expect(q.xp).toBe(XP_THRESHOLDS[1]);
+    }
   });
 
-  it('every role arrives with its own defining qualification', () => {
+  it('ROLE_BLASTER_START_LEVEL is 2 (#1339)', () => {
+    expect(ROLE_BLASTER_START_LEVEL).toBe(2);
+  });
+
+  it('a hired blaster arrives with blasting at ROLE_BLASTER_START_LEVEL, xp at that level threshold, and nothing else (#1339)', () => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'blaster', rng);
+
+    expect(employee.qualifications).toHaveLength(1);
+    const q = employee.qualifications[0]!;
+    expect(q.category).toBe('blasting');
+    expect(q.proficiencyLevel).toBe(ROLE_BLASTER_START_LEVEL);
+    expect(q.xp).toBe(XP_THRESHOLDS[2]);
+  });
+
+  it('a hired blaster is a better blaster than a hired driller (the higher price buys skill) (#1339)', () => {
+    const state = createEmployeeState();
+    const { employee: blaster } = hireEmployee(state, 'blaster', rng);
+    const { employee: driller } = hireEmployee(state, 'driller', rng);
+    const level = (e: typeof blaster) => e.qualifications.find(q => q.category === 'blasting')!.proficiencyLevel;
+    expect(level(blaster)).toBeGreaterThan(level(driller));
+  });
+
+  it('a hired driver arrives able to haul and dig: driving.truck + driving.excavator, no fragmenter or rig licence (#1339)', () => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'driver', rng);
+
+    expect(employee.qualifications.map(q => q.category).sort()).toEqual(['driving.excavator', 'driving.truck']);
+    for (const q of employee.qualifications) expect(q.proficiencyLevel).toBe(1);
+  });
+
+  it('surveyor and manager arrive unchanged: one Rookie qualification each (#1339)', () => {
+    const state = createEmployeeState();
+    const { employee: surveyor } = hireEmployee(state, 'surveyor', rng);
+    const { employee: manager } = hireEmployee(state, 'manager', rng);
+    expect(surveyor.qualifications.map(q => [q.category, q.proficiencyLevel])).toEqual([['geology', 1]]);
+    expect(manager.qualifications.map(q => [q.category, q.proficiencyLevel])).toEqual([['management', 1]]);
+  });
+
+  it('nobody is hired holding the rock fragmenter licence: it is trained, never hired (#1339)', () => {
+    for (const role of ['surveyor', 'driller', 'blaster', 'driver', 'manager'] as const) {
+      const { employee } = hireEmployee(createEmployeeState(), role, new Random(7));
+      expect(employee.qualifications.some(q => q.category === 'driving.rock_fragmenter'), role).toBe(false);
+    }
+  });
+
+  it('every role arrives with exactly the qualifications of ROLE_STARTING_QUALIFICATIONS (#1339)', () => {
     for (const role of ['surveyor', 'driller', 'blaster', 'driver', 'manager'] as const) {
       const state = createEmployeeState();
       const { employee } = hireEmployee(state, role, new Random(7));
-      expect(employee.qualifications.map(q => q.category))
-        .toEqual([ROLE_STARTING_QUALIFICATION[role]]);
+      expect(employee.qualifications.map(q => q.category).sort(), role)
+        .toEqual(ROLE_STARTING_QUALIFICATIONS[role].map(q => q.category).sort());
+    }
+  });
+
+  it('the stored salary equals calculateSalary right after hire, for every role (#1339)', () => {
+    for (const role of ['surveyor', 'driller', 'blaster', 'driver', 'manager'] as const) {
+      const state = createEmployeeState();
+      const { employee } = hireEmployee(state, role, new Random(7));
+      expect(employee.salary, role).toBe(calculateSalary(employee));
+    }
+  });
+
+  it('a hired driller and driver cost more per cycle than the bare base salary, since their licences carry a bonus (#1339)', () => {
+    for (const role of ['driller', 'driver'] as const) {
+      const { employee } = hireEmployee(createEmployeeState(), role, new Random(7));
+      expect(employee.salary, role).toBeGreaterThan(BASE_SALARIES[role]);
     }
   });
 

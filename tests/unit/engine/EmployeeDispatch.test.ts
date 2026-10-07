@@ -1144,8 +1144,9 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
   it('flags no_dual_qualified_employee (no modal) when the skill and the licence sit on different employees, then clears once one employee holds both (#1386)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    // driller starts with 'blasting' (ROLE_STARTING_QUALIFICATION), no drill_rig licence.
-    const { employee: driller } = hireEmployee(state.employees, 'driller', rng);
+    // #1339: a driller now arrives WITH the drill_rig licence, so the skill-only
+    // holder here is a blaster ('blasting', no drill_rig licence).
+    const { employee: driller } = hireEmployee(state.employees, 'blaster', rng);
     const { employee: driver } = hireEmployee(state.employees, 'driver', rng);
     assignSkill(state.employees, driver.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
     purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
