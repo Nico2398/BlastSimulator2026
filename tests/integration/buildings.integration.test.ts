@@ -10,6 +10,7 @@ import { tickCommand } from '../../src/console/commands/events.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
 import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../helpers/gameContext.js';
+import { equipDemolition, tickUntilDemolished } from '../helpers/demolition.js';
 import {
   createBuildingState,
   placeBuilding,
@@ -193,10 +194,14 @@ describe('Buildings lifecycle', () => {
     tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
 
-    // Destroy it via console command
+    // Destroy it via console command: an order a Building Destroyer carries
+    // out (#1392), so the building stands until the work completes.
+    equipDemolition(ctx);
     const destroyResult = buildCommand(ctx, ['destroy', '1'], {});
     expect(destroyResult.success).toBe(true);
-    expect(destroyResult.output).toContain('demolished');
+    expect(destroyResult.output).toContain('ordered');
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    tickUntilDemolished(ctx);
 
     // State should be empty
     expect(ctx.state!.buildings.buildings).toHaveLength(0);
@@ -253,13 +258,17 @@ describe('Buildings lifecycle', () => {
     const placed = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
     expect(placed.tier).toBe(1);
 
+    equipDemolition(ctx);
     const upgradeResult = buildCommand(ctx, ['upgrade', String(placed.id)], {});
     expect(upgradeResult.success).toBe(true);
-    expect(upgradeResult.output).toContain('T2');
+    expect(upgradeResult.output).toContain('ordered');
+    expect(ctx.state!.buildings.buildings.find(b => b.id === placed.id)!.tier).toBe(1);
+    tickUntilDemolished(ctx);
 
-    // The building is now tier 2
+    // The building is now tier 2 — same id (#1392)
     const upgraded = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
     expect(upgraded.tier).toBe(2);
+    expect(upgraded.id).toBe(placed.id);
     expect(upgraded.type).toBe('living_quarters');
 
     // getBuildingDef returns the tier-2 definition
@@ -1090,8 +1099,11 @@ describe('construction levels the ground under the footprint (#1008)', () => {
     expect(new Set(footprintHeights(ctx, 'management_office', 1, 20, 2)).size).toBe(1);
     expect(new Set(footprintHeights(ctx, 'management_office', 2, 20, 2)).size).toBe(2);
 
+    equipDemolition(ctx);
     const upgrade = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(upgrade.success, upgrade.output).toBe(true);
+    tickUntilDemolished(ctx);
+    expect(ctx.state!.buildings.buildings.find(b => b.id === id)!.tier).toBe(2);
 
     expect(new Set(footprintHeights(ctx, 'management_office', 2, 20, 2)).size).toBe(1);
   });

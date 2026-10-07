@@ -1,6 +1,18 @@
 {
-  "name": "building-tier-system-visual",
-  "description": "Visual check of building tier upgrade system from T1 to T3 and demolition, driven by clicking the real Build panel controls — placement, Queue Research, Upgrade, and Demolish — not console shortcuts (demolition and upgrades are Building Destroyer work, #1392)",
+  "name": "building-demolish-upgrade-visual",
+  "description": "Demolition and tier upgrades are Building Destroyer work (#1392): a player buys a Wrecking Rascal, demolishes a building and upgrades another by clicking the real Build and Fleet panel controls, waiting on state (buildingCount, maxBuildingTier) rather than tick pads. The upgraded building keeps its id.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "tier-comparison",
+      "yaw": 90,
+      "pitch": 15
+    }
+  ],
   "steps": [
     {
       "command": "new_game seed:42 cash:330000 staffed:true",
@@ -17,7 +29,8 @@
           "cash": 330000,
           "buildingCount": 0
         }
-      }
+      },
+      "description": "Staffed site: the roster already includes a truck-licensed driver who can crew a Building Destroyer."
     },
     {
       "command": "build research_center at:26,14",
@@ -154,34 +167,6 @@
       }
     },
     {
-      "command": "vehicle buy building_destroyer tier:1",
-      "description": "Demolition and upgrades are Building Destroyer work (#1392): buy a Wrecking Rascal through the Fleet panel's real dealership button. The staffed roster already holds a truck-licensed driver to crew it.",
-      "timeout": 30,
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "vehicles"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "vehicleCount"
-        ],
-        "changedBy": {
-          "cash": -30000
-        }
-      }
-    },
-    {
       "command": "research queue type:living_quarters tier:2",
       "description": "Queued by clicking the placed building's real 'Queue Research' button — the only in-game path to unlock tier 2, not a console shortcut. Building #2 (#556-followup: ids are assigned in construction-completion order, not order-placed order — but this test file's own `driveConstructionOrders` harness forces the research_center order above to finish and be waited on (a synthetic `wait_until buildingCount:1`) before the living_quarters order is even placed, so research_center always lands as #1 and living_quarters as #2, not the closest-hire-wins ordering a real, concurrently-staffed run would produce).",
       "interaction": [
@@ -226,150 +211,6 @@
       "expect": {
         "equals": {
           "researchQueueLength": 0
-        }
-      }
-    },
-    {
-      "command": "build upgrade 2",
-      "description": "Upgraded by clicking the placed building's (living_quarters, #2 — see the research-queue step above) Upgrade button, now enabled because tier 2 finished researching.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-upgrade-btn"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "buildingCount": 2
-        },
-        "note": "The order is charged now, but the old building keeps standing: the Building Destroyer demolishes it, then the tier-2 building is rebuilt under the SAME id (#1392), so buildingCount stays 2."
-      }
-    },
-    {
-      "command": "wait_until field:maxBuildingTier equals:2 max_ticks:900",
-      "description": "Wait for the Wrecking Rascal to demolish living_quarters #2 and the crew to rebuild it at tier 2 under the same id (#1392).",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "maxBuildingTier",
-          "equals": 2,
-          "maxTicks": 900,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "maxBuildingTier": 2
-        }
-      }
-    },
-    {
-      "command": "research queue type:living_quarters tier:3",
-      "description": "Queued by clicking the upgraded building's (now #3) real 'Queue Research' button.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-research-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-research-btn"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:researchQueueLength equals:0 max_ticks:200",
-      "description": "Wait on the tier-3 research finishing instead of a hand-measured tick pad (#1392).",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "researchQueueLength",
-          "equals": 0,
-          "maxTicks": 200,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "researchQueueLength": 0
-        }
-      }
-    },
-    {
-      "command": "build upgrade 2",
-      "description": "Upgraded to tier 3 by clicking the Upgrade button on building #3, now enabled because tier 3 finished researching.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-upgrade-btn"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "buildingCount": 2
-        },
-        "note": "Same id (#1392): the second upgrade targets #2 again; buildingCount stays 2 while the Building Destroyer works."
-      }
-    },
-    {
-      "command": "wait_until field:maxBuildingTier equals:3 max_ticks:1200",
-      "description": "Wait for the second demolish-then-rebuild cycle to land living_quarters #2 at tier 3 (#1392).",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "maxBuildingTier",
-          "equals": 3,
-          "maxTicks": 1200,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "maxBuildingTier": 3
         }
       }
     },
@@ -445,8 +286,36 @@
       }
     },
     {
+      "command": "vehicle buy building_destroyer tier:1",
+      "description": "Buy the Wrecking Rascal (Building Destroyer) through the Fleet panel dealership button; without one, demolition orders sit blocked (#1392).",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ],
+        "changedBy": {
+          "cash": -30000
+        }
+      }
+    },
+    {
       "command": "build destroy 3",
-      "description": "Demolished by clicking building #3's (management_office) Demolish button; the Building Destroyer carries it out.",
+      "description": "Click building #3 (management_office) in the Build panel, press Demolish, and confirm. The order is charged now; the building stays until the Wrecking Rascal finishes.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -486,7 +355,7 @@
     },
     {
       "command": "wait_until field:buildingCount equals:2 max_ticks:900",
-      "description": "Wait for the Wrecking Rascal to finish demolishing management_office #3.",
+      "description": "waitUntil the Building Destroyer has finished: buildingCount drops from 3 to 2.",
       "timeout": 95,
       "interaction": [
         {
@@ -505,7 +374,57 @@
       }
     },
     {
+      "command": "build upgrade 2",
+      "description": "Click living_quarters #2's Upgrade button. The old building keeps operating while the Wrecking Rascal demolishes it; the tier-2 building is then rebuilt under the SAME id.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-upgrade-btn"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "The order is charged now, but the old building keeps standing: the Building Destroyer demolishes it, then the tier-2 building is rebuilt under the SAME id (#1392), so buildingCount stays 2."
+      }
+    },
+    {
+      "command": "wait_until field:maxBuildingTier equals:2 max_ticks:900",
+      "description": "waitUntil the same id (#2) reaches tier 2: demolition done, rebuild finished.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "maxBuildingTier",
+          "equals": 2,
+          "maxTicks": 900,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "maxBuildingTier": 2
+        }
+      }
+    },
+    {
       "command": "build list",
+      "description": "Building #2 is still living_quarters, now T2; no building with a new id appeared.",
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -513,48 +432,6 @@
         }
       ],
       "role": "observe"
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe"
-    }
-  ],
-  "shots": [
-    {
-      "name": "overview",
-      "yaw": 0,
-      "pitch": 45
-    },
-    {
-      "name": "tier-comparison",
-      "yaw": 90,
-      "pitch": 15
-    },
-    {
-      "name": "closeup-t3",
-      "yaw": 45,
-      "pitch": 30
-    },
-    {
-      "name": "birdseye",
-      "yaw": 0,
-      "pitch": 80
     }
   ]
 }

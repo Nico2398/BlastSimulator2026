@@ -8,6 +8,7 @@ import { createRunner, serializeGameState } from '../../src/console-api.js';
 import type { MiningContext } from '../../src/console-api.js';
 import { killEmployee } from '../../src/core/entities/Employee.js';
 import type { Contract } from '../../src/core/economy/Contract.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
 
 /** A minimal offered ore_sale contract — only the fields fillableOreSaleOffered reads carry meaning. */
 function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
@@ -322,13 +323,35 @@ describe('console-api', () => {
       const stuckState = serializeGameState(runner.ctx as MiningContext)!;
       expect(stuckState.stuckEmployeeCount).toBe(1);
 
-      runner.runner.run('build destroy 1');
-      runner.runner.run('build destroy 2');
-      runner.runner.run('build destroy 3');
-      runner.runner.run('tick 15');
+      // Demolition is Building Destroyer work now (#1392): fleet it, crew it,
+      // order all three, and tick until the demolitions have finished.
+      runner.ctx.state!.cash += 500_000;
+      expect(runner.runner.run('vehicle buy building_destroyer').success).toBe(true);
+      expect(runner.runner.run('employee hire role:driver').success).toBe(true);
+      expect(runner.runner.run('build destroy 1').success).toBe(true);
+      expect(runner.runner.run('build destroy 2').success).toBe(true);
+      expect(runner.runner.run('build destroy 3').success).toBe(true);
+      for (let i = 0; i < 1500 && runner.ctx.state!.buildings.buildings.length > 0; i++) {
+        holdWellBeing();
+        for (const e of runner.ctx.state!.employees.employees) e.fatigue = 100;
+        runner.runner.run('tick 1');
+      }
+      expect(runner.ctx.state!.buildings.buildings).toHaveLength(0);
 
       const freedState = serializeGameState(runner.ctx as MiningContext)!;
       expect(freedState.stuckEmployeeCount).toBe(0);
+    });
+
+    it('reports maxBuildingTier: 0 with no buildings, then the highest standing tier (#1392)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      expect(serializeGameState(runner.ctx as MiningContext)!.maxBuildingTier).toBe(0);
+
+      const state = runner.ctx.state!;
+      state.buildings.unlockedTiers.management_office = 3;
+      placeBuilding(state.buildings, 'management_office', 2, 0, 32, 32, 1, 0, 0);
+      expect(serializeGameState(runner.ctx as MiningContext)!.maxBuildingTier).toBe(1);
+      placeBuilding(state.buildings, 'management_office', 10, 10, 32, 32, 2, 0, 0);
+      expect(serializeGameState(runner.ctx as MiningContext)!.maxBuildingTier).toBe(2);
     });
 
     it('reports zero activeContractCount for a fresh game with no contracts accepted', () => {

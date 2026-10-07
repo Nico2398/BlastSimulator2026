@@ -23,7 +23,7 @@ export function equipDemolition(ctx: GameContext, vehicleTier: VehicleTier = 1):
   if (!buy.success) throw new Error(`equipDemolition: buy failed: ${buy.output}`);
   const licensed = state.employees.employees.some(e => e.alive && isLicensedForRole(e, 'building_destroyer'));
   if (!licensed) {
-    const hire = employeeCommand(ctx, ['hire', 'driver'], {});
+    const hire = employeeCommand(ctx, ['hire'], { role: 'driver' });
     if (!hire.success) throw new Error(`equipDemolition: hire failed: ${hire.output}`);
   }
 }

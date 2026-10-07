@@ -3,17 +3,17 @@
   "description": "Tests path following and stuck state with building obstacles",
   "steps": [
     {
-      "command": "new_game seed:42 cash:80000",
+      "command": "new_game seed:42 cash:120000",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:80000"
+          "command": "new_game seed:42 cash:120000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 80000,
+          "cash": 120000,
           "stuckEmployeeCount": 0
         }
       }
@@ -155,6 +155,10 @@
       "description": "Walls the pocket off from the south: covers (0,10)-(1,11), blocking both cells directly south of the pocket.",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
         },
@@ -189,6 +193,10 @@
       "command": "build management_office at:1,8",
       "description": "Closes the pocket's only remaining side: covers (1,8)-(2,9), blocking the two cells east of it. With the west side sealed by the x=0 world edge, the pocket (0,8)-(0,9) is now enclosed on all 8 directions -- Pathfinding.ts admits a diagonal step with no corner rule, so every diagonal out of the pocket ((1,7) and (1,10)) has to be blocked too, which the north and south walls already cover.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
@@ -345,8 +353,67 @@
       "commandOutcome": "either"
     },
     {
+      "command": "employee hire role:driver",
+      "description": "Demolition needs a truck-licensed driver for the Building Destroyer (#1392); hire one through the Crew panel.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "employeeCount"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "vehicle buy building_destroyer tier:1",
+      "description": "Demolition and upgrades are Building Destroyer work (#1392): buy a Wrecking Rascal through the Fleet panel's real dealership button. The staffed roster already holds a truck-licensed driver to crew it.",
+      "timeout": 30,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ],
+        "changedBy": {
+          "cash": -30000
+        }
+      }
+    },
+    {
       "command": "build destroy 1",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
         {
           "type": "waitForSelector",
           "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn"
@@ -370,14 +437,19 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 2
-        }
+          "buildingCount": 3
+        },
+        "note": "Order only (#1392): the walls stand until the Building Destroyer has demolished them."
       }
     },
     {
       "command": "build destroy 2",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-build-panel [data-building-id=\"2\"] .bs-build-demolish-btn"
         },
@@ -400,8 +472,9 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
-        }
+          "buildingCount": 3
+        },
+        "note": "Order only (#1392): the walls stand until the Building Destroyer has demolished them."
       }
     },
     {
@@ -409,6 +482,10 @@
       "description": "Demolish all three walls -- the previously stuck agent should be able to reach (0,8) once the pocket is open again.",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "build"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-build-panel [data-building-id=\"3\"] .bs-build-demolish-btn"
         },
@@ -431,27 +508,33 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 0
-        }
+          "buildingCount": 3
+        },
+        "note": "Order only (#1392): the walls stand until the Building Destroyer has demolished them."
       }
     },
     {
-      "command": "tick 15",
-      "description": "Advance ticks after demolition — the stuck agent should resume moving toward its destination.",
+      "command": "wait_until field:buildingCount equals:0 max_ticks:1500",
+      "description": "Wait for the Building Destroyer to demolish all three walls (#1392) instead of padding ticks; the stuck agent should then be able to move again.",
+      "timeout": 95,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 15"
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 90000
         }
       ],
       "role": "setup",
       "expect": {
+        "equals": {
+          "buildingCount": 0,
+          "stuckEmployeeCount": 0
+        },
         "decreased": [
           "cash"
-        ],
-        "equals": {
-          "stuckEmployeeCount": 0
-        }
+        ]
       }
     },
     {
@@ -477,12 +560,12 @@
           "cash": -1000
         },
         "equals": {
-          "employeeCount": 4
+          "employeeCount": 5
         }
       }
     },
     {
-      "command": "employee dispatch 4 x:10 z:0",
+      "command": "employee dispatch 5 x:10 z:0",
       "description": "#1038 regression beat: dispatches driller #4 across seed 42's natural x:0..10, z:0 downslope (getSurfaceY probed column-by-column at game start: 37,36,35,34,33,33,32,32,32,31,30 -- a real, continuous ~7-unit drop over these 10 cells, no ramp construction needed) via the SelectionBar's own dispatch_here action -- same real click path as nav-ramp-routing-visual.json's vehicle move_here (clickEntity -> cameraFocus -> mousemove -> click), aimed at an employee instead of a vehicle. dispatch_here (src/main.ts) fires the exact `employee dispatch <id> x:<tileX> z:<tileZ>` command named above, read from the live cursor-terrain hit under the focused camera. The cameraFocus offset (+0.5 x, +1.5 z past the nominal target) reuses the offset nav-ramp-routing-visual.json measured live for this same default orbit/distance -- worth reconfirming in a real browser run if the hover lands on a different tile than (10,0).",
       "interaction": [
         {

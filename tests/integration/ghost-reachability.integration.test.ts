@@ -392,7 +392,7 @@ describe('navmesh changes', () => {
     expect(isRed(site, survey)).toBe(true);
   });
 
-  it('demolishing the building that sealed the bridge reconnects the target (red -> blue)', () => {
+  it('demolishing the building that sealed the bridge reconnects the target once the Building Destroyer is done (red -> blue)', () => {
     const site = makeSite({ moat: 'bridged', paused: false });
     const emp = hire(site, 'driver', { x: 5, z: 5 }, { parked: false });
     expect(runCommand(site.engine, `build management_office at:${MOAT_X0},${BRIDGE_Z[0]}`).success).toBe(true);
@@ -404,10 +404,19 @@ describe('navmesh changes', () => {
     tick(site);
     expect(isRed(site, survey)).toBe(true);
 
-    runCommand(site.engine, 'time pause');
+    // Demolition is Building Destroyer work now (#1392): fleet and crew it on
+    // the near side, order it, and the bridge stays sealed until it is done.
+    expect(runCommand(site.engine, 'vehicle buy building_destroyer').success).toBe(true);
+    hire(site, 'driver', { x: 5, z: 5 }, { parked: false });
     const building = site.state().buildings.buildings[0]!;
     expect(runCommand(site.engine, `build destroy ${building.id}`).success).toBe(true);
-    expect(isRed(site, survey)).toBe(false); // no tick since the demolition
+    expect(site.state().buildings.buildings).toHaveLength(1);
+    expect(isRed(site, survey)).toBe(true);
+
+    tickUntil(cmd => runCommand(site.engine, cmd), () => site.state().buildings.buildings.length === 0, 1500);
+    expect(site.state().buildings.buildings).toHaveLength(0);
+    tick(site);
+    expect(isRed(site, survey)).toBe(false);
   });
 
   it('expanding the site brings an order outside the old grid into reach while paused (red -> blue)', () => {

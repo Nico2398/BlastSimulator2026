@@ -20,6 +20,7 @@ import { makeGameContext, GENERATED_TERRAIN_GRID_SIZE_Y } from '../../helpers/ga
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
 import { isOnBuildingRing } from '../../../src/core/nav/BuildingApproach.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -196,9 +197,13 @@ describe('NavGrid patching — building demolition', () => {
 
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
 
-    // Demolish
+    // Demolish: a Building Destroyer does the work (#1392), so the footprint
+    // stays blocked until it has finished.
+    equipDemolition(ctx);
     const demolishResult = buildCommand(ctx, ['destroy', String(buildingId)], {});
     expect(demolishResult.success).toBe(true);
+    expect(nav.cells[0]![2]!.type).toBe('blocked');
+    tickUntilDemolished(ctx);
 
     // After demolition, footprint cells revert to passable natural terrain
     expectPassable(nav.cells[0]![2]!);
@@ -252,9 +257,11 @@ describe('NavGrid patching — building upgrade', () => {
     // #410: upgrade is research-gated — unlock tier 2 first.
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
 
-    // Upgrade T1 → T2
+    // Upgrade T1 → T2: demolition, then construction of the new tier (#1392)
+    equipDemolition(ctx);
     const upgradeResult = buildCommand(ctx, ['upgrade', String(buildingId)], {});
     expect(upgradeResult.success).toBe(true);
+    tickUntilDemolished(ctx);
 
     // After upgrade, the new T2 footprint cells are blocked
     expect(nav.cells[0]![2]!.type).toBe('blocked');
@@ -463,9 +470,14 @@ describe('NavGrid patching — footprint blocking at order time (#1200)', () => 
     employee.destinationZ = null;
     expect(ctx.state!.navGrid!.cellAt(2, 2)!.type).not.toBe('blocked');
 
+    equipDemolition(ctx);
+    employee.x = 2;
+    employee.z = 2;
     const result = buildCommand(ctx, ['upgrade', String(buildingId)], {});
     expect(result.success).toBe(true);
 
+    // The upgraded site is reserved at order time, so whoever stands on its
+    // larger footprint is moved off it right away (#1392), as for a new order.
     expect(employee.x === 2 && employee.z === 2).toBe(false);
     const cell = ctx.state!.navGrid!.cellAt(Math.round(employee.x), Math.round(employee.z));
     expect(cell).toBeTruthy();
@@ -701,12 +713,16 @@ describe('NavGrid patching — event names (#1161)', () => {
     ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));
     ctx.emitter.on('nav:occupancy_changed', () => events.push('nav:occupancy_changed'));
 
+    equipDemolition(ctx);
+    events.length = 0;
     const result = buildCommand(ctx, ['destroy', String(buildingId)], {});
     expect(result.success).toBe(true);
+    tickUntilDemolished(ctx);
 
-    // Destroy carves zero voxels — was always occupancy-only, so it must
-    // emit exactly one nav:occupancy_changed and zero terrain:updated.
-    expect(events).toEqual(['nav:occupancy_changed']);
+    // Destroy carves zero voxels — occupancy-only, so the freed footprint is
+    // announced with nav:occupancy_changed and never with terrain:updated.
+    expect(events).toContain('nav:occupancy_changed');
+    expect(events).not.toContain('terrain:updated');
   });
 
   it('upgrade emits nav:occupancy_changed as the final (wrapping) footprint-occupancy patch', () => {
@@ -720,8 +736,11 @@ describe('NavGrid patching — event names (#1161)', () => {
     ctx.emitter.on('terrain:updated', () => events.push('terrain:updated'));
     ctx.emitter.on('nav:occupancy_changed', () => events.push('nav:occupancy_changed'));
 
+    equipDemolition(ctx);
+    events.length = 0;
     const result = buildCommand(ctx, ['upgrade', String(buildingId)], {});
     expect(result.success).toBe(true);
+    tickUntilDemolished(ctx);
 
     // levelBuildingFootprint's own internal carve (if it fired at all, real
     // rock removed) emits terrain:updated and always runs BEFORE the

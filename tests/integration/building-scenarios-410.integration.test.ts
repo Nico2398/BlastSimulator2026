@@ -22,7 +22,7 @@ import { createGameEngine, runSteps } from '../../scripts/shared/command-runner.
 import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
 import type { ScenarioStepDef, StepResult } from '../../scripts/shared/scenario-types.js';
 
-/** `build <type> at:x,z [tier:N]` — the default-case order command, as opposed to build's list/destroy/upgrade/move/types subcommands (which stay synchronous even under #556). */
+/** `build <type> at:x,z [tier:N]` — the default-case order command, as opposed to build's list/destroy/upgrade/move/types subcommands (destroy/upgrade queue Building Destroyer work since #1392). */
 function isPlacementOrderCommand(command: string): boolean {
   const [top, sub] = command.trim().split(/\s+/);
   const knownSubcommands = new Set(['list', 'destroy', 'upgrade', 'move', 'types']);
@@ -281,18 +281,23 @@ describe('building-destruction-visual — scenario-runner (#410)', () => {
 });
 
 describe('building-tier-system-visual — scenario-runner (#410)', () => {
-  it('the tier-2 upgrade succeeds after research completes', () => {
+  it('the tier-2 upgrade is accepted after research completes, and lands at tier 2 under the same id (#1392)', () => {
     const { results } = runScenarioSteps('building-tier-system-visual');
     const firstUpgrade = stepForNth(results, 'build upgrade', 0);
     expect(firstUpgrade.error).toBeUndefined();
-    expect(firstUpgrade.commandOutput).toMatch(/T2/);
+    expect(firstUpgrade.commandOutput).toMatch(/ordered/i);
+    const landed = stepForNth(results, 'wait_until field:maxBuildingTier equals:2', 0);
+    expect(landed.error).toBeUndefined();
   });
 
-  it('the tier-3 upgrade succeeds after its own research completes', () => {
-    const { results } = runScenarioSteps('building-tier-system-visual');
+  it('the tier-3 upgrade is accepted after its own research completes, and ends at tier 3 under the same id (#1392)', () => {
+    const { engine, results } = runScenarioSteps('building-tier-system-visual');
     const secondUpgrade = stepForNth(results, 'build upgrade', 1);
     expect(secondUpgrade.error).toBeUndefined();
-    expect(secondUpgrade.commandOutput).toMatch(/T3/);
+    expect(secondUpgrade.commandOutput).toMatch(/ordered/i);
+    const quarters = engine.ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters');
+    expect(quarters?.tier).toBe(3);
+    expect(quarters?.id).toBe(2);
   });
 });
 
