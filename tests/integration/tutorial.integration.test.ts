@@ -27,6 +27,7 @@ import { countBuildingsOfType } from '../../src/ui/tutorialStepHelpers.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
+import { isFillableSaleOffer } from '../../src/core/economy/Contract.js';
 import { computeDangerZone } from '../../src/core/entities/Zone.js';
 import {
   BLAST_DANGER_MARGIN_M,
@@ -152,37 +153,16 @@ describe('Tutorial flow', () => {
 // separately in tutorial-pause.integration.test.ts.
 
 describe('haul-debris step (#552): self-dispatching, no manual command', () => {
-  it('is the 25th of 30 tutorial steps (0-based index 24), between contract-accept and finances', () => {
-    // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
-    // right after hire-driller, shifting every later step (including this
-    // one) up by 3 from their pre-#553 positions. #555 inserts
-    // train-digger/buy-rock-digger-assign right after that trio, shifting
-    // this step up 2 more (19 -> 21). #681 inserts
-    // build-living-quarters/set-early-policy right after hire-driller too,
-    // shifting this step up 2 more again (21 -> 23). #556/#817 then moved
-    // contract-accept from above build-storage to below it — the count is
-    // unchanged (still index 23), but the step immediately before this one is
-    // now contract-accept rather than build-storage: a contract's deadline
-    // starts at acceptance, and ordering the warehouse is real queued work
-    // now, so accepting first spent that deadline watching a construction
-    // site while contract-deliver waited on a delivery that could no longer
-    // complete. #557 inserts evacuate-zone between 'sequence' and 'blast' —
-    // both well before this step — shifting it up 1 more (23 -> 24). #905
-    // inserts toggle-survey-overlay right after 'survey' — also well before
-    // this step — shifting it up 1 more (24 -> 25). #923 removed the
-    // standalone 'time-speed' step (was right after hire-surveyor) and added
-    // speed-up-for-dig/speed-normal-after-dig right after box-cut instead —
-    // both well before this step — net +1, shifting it up 1 more (25 -> 26).
-    // #1015 removes that pair again — the speed bar needs no dedicated lesson
-    // any more — net -2, shifting it back down (26 -> 24). #959 renames the
-    // step right after this one from 'contract-deliver' to 'sell-ore' (the
-    // tutorial never actually hauled and sold blasted ore for money) — the
-    // count and this step's own index are unchanged by that rename.
+  it('is the 24th of 29 tutorial steps (0-based index 23), directly after build-storage', () => {
+    // #1335 removes contract-accept: the player accepts the one fillable ore
+    // offer inside sell-ore instead, so haul-debris follows build-storage
+    // directly (24 -> 23). Earlier shifts (#553/#555/#557/#681/#905/#923/
+    // #1015/#1328) are all upstream of this step and unchanged.
     const ids = TUTORIAL_STEPS.map(s => s.id);
     const idx = ids.indexOf('haul-debris');
-    expect(idx).toBe(24);
-    expect(ids[idx - 1]).toBe('contract-accept');
-    expect(ids[idx - 2]).toBe('build-storage');
+    expect(idx).toBe(23);
+    expect(ids[idx - 1]).toBe('build-storage');
+    expect(ids).not.toContain('contract-accept');
     // #1328: finances and needs now sit between haul-debris and sell-ore, so
     // the first sale is the last guided step (it is followed by 'free-play').
     expect(ids[idx + 1]).toBe('finances');
@@ -857,6 +837,7 @@ describe('full tutorial playthrough ends WON by following the cards then playing
 
   /** Play the guided steps (everything before 'free-play') via each step's own commands. */
   function playGuidedPhase(run: Run, state: GameState): void {
+    const acceptedInSellOre: string[] = [];
     for (const step of TUTORIAL_STEPS) {
       if (step.id === 'free-play') return;
       const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
@@ -877,18 +858,6 @@ describe('full tutorial playthrough ends WON by following the cards then playing
         // Carve-out (#1334): these cards complete only on a DOM action (hover/click
         // the scores HUD, open the Finances/Crew panel) with no console equivalent;
         // this headless run has no DOM, so the interaction-mode scenarios drive them.
-        continue;
-      }
-
-      if (step.id === 'contract-accept') {
-        // The hint's `contract accept 1` goes stale once the pool rotates; a
-        // player accepts a real offer. Smallest offer: deliverable by one
-        // tier-1 hauler, so no penalty strands the run.
-        const offer = [...state.contracts.available].sort((a, b) => a.quantityKg - b.quantityKg)[0];
-        expect(offer, 'no contract available to accept at all').toBeDefined();
-        expect(run(`contract accept ${offer!.id}`).success).toBe(true);
-        tickUntil(run, state, maxTicks, complete);
-        expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
         continue;
       }
 
@@ -917,11 +886,26 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       for (const cmd of step.commands ?? []) run(cmd);
 
       if (step.id === 'sell-ore') {
-        // The step is "sell ore to a contract": accept and deliver, tick on.
+        // #1335: the step is "accept the one fillable ore offer, deliver it".
+        // Accept is only legal on a fillable ore_sale offer (what the rails
+        // let a player click); rubble/supply/unfillable offers stay untouched.
         for (let i = 0; i < maxTicks && !complete(); i++) {
-          playContracts(run, state);
+          for (const active of [...state.contracts.active]) {
+            if (active.type !== 'ore_sale') continue;
+            const amount = Math.min(active.quantityKg - active.deliveredKg, state.collectedOre[active.materialId] ?? 0);
+            if (amount > 0) run(`contract deliver ${active.id} amount:${amount}`);
+          }
+          const offer = state.contracts.available.find(
+            (c) => isFillableSaleOffer(c, state.collectedOre, 0) && c.type === 'ore_sale',
+          );
+          if (offer) {
+            expect(run(`contract accept ${offer.id}`).success).toBe(true);
+            acceptedInSellOre.push(offer.type);
+          }
           playTick(run, state);
         }
+        expect(acceptedInSellOre.length, 'sell-ore never accepted a fillable ore offer').toBeGreaterThan(0);
+        expect(acceptedInSellOre.every((t) => t === 'ore_sale')).toBe(true);
       } else {
         tickUntil(run, state, maxTicks, complete);
       }

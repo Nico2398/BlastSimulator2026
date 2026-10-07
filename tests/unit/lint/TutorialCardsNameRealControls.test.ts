@@ -45,7 +45,6 @@ const CARD_CONTROLS: Record<string, string[]> = {
   ],
   'stage.auto_sequence': ['ui.blast_workshop.sequence.auto'],
   'stage.execute': ['ui.blast_workshop.footer.fire'],
-  'stage.contract_accept': ['ui.contracts.accept'],
   'stage.contract_deliver': ['ui.contracts.deliver'],
   'stage.build_warehouse': ['ui.build.place'],
   'stage.build_living_quarters': ['ui.build.place'],

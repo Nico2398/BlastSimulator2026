@@ -311,10 +311,10 @@ describe('tutorial-interactive.json — outer step timeout covers every inner wa
 //
 // Two independent interaction-mode browser runs both timed out
 // deterministically at the "hire-manager" step (`employee hire
-// role:manager`, then `waitForTutorialStep(stepId:"contract-accept")`),
+// role:manager`, then `waitForTutorialStep(stepId:"hire-driver")`),
 // which sits right after the blast sequence (steps 24-31: drill, charge,
 // sequence, fire) and the consultant event-resolve step (32). Both real
-// actions (hire manager, tutorial advance to "contract-accept") actually
+// actions (hire manager, tutorial advance to "hire-driver") actually
 // succeeded in-browser before the outer deadline fired — this is not a
 // logic bug, it's a timeout-budget bug: `effectiveStepTimeoutMs` computes
 // exactly `max(30000, 30000 + TIMEOUT_MARGIN_MS) = 35000ms` for this step
@@ -333,7 +333,7 @@ describe('tutorial-interactive.json — outer step timeout covers every inner wa
 // #758/#740 aimed for — comfortably absorbing render-frame jitter in the
 // tick immediately following a blast without being a placeholder that
 // passes trivially. Locates the step by its actual shape (hires a manager,
-// then waits for the "contract-accept" tutorial step) rather than a bare
+// then waits for the "hire-driver" tutorial step) rather than a bare
 // index, so it keeps finding the right step if earlier steps are ever
 // inserted/removed.
 // ──────────────────────────────────────────────
@@ -349,19 +349,26 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
   // Located via the shared `forEachActionOfType` scaffold rather than a
   // hand-rolled `findIndex`/type-guard/cast (#776 review finding) — filters
   // down to the one step whose command hires a manager and whose
-  // waitForTutorialStep action targets "contract-accept", skipping every
+  // waitForTutorialStep action targets "hire-driver", skipping every
   // other waitForTutorialStep invocation in the scenario.
   let matchedStepIndex = -1;
   let matchedStepObj: ScenarioStepDef | undefined;
   forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
     const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
     if (stepObj.command !== 'employee hire role:manager') return;
-    // 'hire-driver', not 'contract-accept' (#556/#817): contract-accept moved
-    // below build-storage in tutorialSteps.ts's canonical order, so the card
-    // this beat waits for is the one after it. Same step, same #776 budget.
+    // 'hire-driver' (#556/#817, #1335): the card after the manager hire. Same
+    // step, same #776 budget.
     if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('hire-driver')) return;
     matchedStepIndex = stepIndex;
     matchedStepObj = stepObj;
+  });
+
+  it('tutorial-interactive.json has no rubble_disposal accept step any more (#1335): sell-ore accepts the fillable ore offer', () => {
+    const accepts = scenario.steps.filter(
+      st => typeof st !== 'string' && (st as ScenarioStepDef).command === 'contract accept type:rubble_disposal',
+    );
+    expect(accepts).toEqual([]);
+    expect(JSON.stringify(scenario)).not.toContain('"tutorialStep":"contract-accept"');
   });
 
   it('step hiring the manager and waiting for tutorial step "hire-driver" has effectiveStepTimeoutMs >= 60000ms', () => {
@@ -382,34 +389,22 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
     ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
   });
 
-  // Step 35's beat (issue #776 follow-up): two fresh independent
-  // interaction-mode runs both cleared the "contract-accept" beat above
-  // cleanly, then timed out identically at the very next
-  // waitForTutorialStep beat — accepting the rubble_disposal contract and
-  // waiting for the tutorial to advance to "hire-driver". Same shape as
-  // the manager/contract-accept case above: the click succeeds in-browser
-  // (state dump shows activeContractCount: 1 and the tutorial card visibly
-  // reads "Hire Driver — 21/31") but the harness's poll times out first,
-  // because this step's declared "timeout": 30 in the JSON produces the
-  // same too-tight ~35000ms effectiveStepTimeoutMs budget. Located via the
-  // same forEachActionOfType scaffold, not a hand-rolled locator.
-  let driverStepIndex = -1;
-  let driverStepObj: ScenarioStepDef | undefined;
-  forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
-    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
-    if (stepObj.command !== 'contract accept type:rubble_disposal') return;
-    // 'haul-debris', not 'hire-driver' (#556/#817): see the note on the
-    // manager beat above — the accept now sits after build-storage, so the
-    // card it waits for is haul-debris.
-    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('haul-debris')) return;
-    driverStepIndex = stepIndex;
-    driverStepObj = stepObj;
-  });
+  // Step 35's beat (issue #776 follow-up), retargeted by #1335: the tutorial's
+  // accept-contract card was removed, so the rubble_disposal accept step that
+  // used to wait for "haul-debris" is gone. The beat that now lands on
+  // "haul-debris" is the build-storage completion step (it waits on
+  // orderedBuildingCount returning to 0), which carries the same post-blast
+  // wall-clock risk. Located by the card it must land on, not by an index.
+  const driverStepIndex = scenario.steps.findIndex(
+    st => typeof st !== 'string' && (st as ScenarioStepDef).expect?.tutorialStep === 'haul-debris',
+  );
+  const driverStepObj: ScenarioStepDef | undefined = driverStepIndex >= 0
+    ? (scenario.steps[driverStepIndex] as ScenarioStepDef) : undefined;
 
-  it('step accepting the rubble_disposal contract and waiting for tutorial step "haul-debris" has effectiveStepTimeoutMs >= 60000ms', () => {
+  it('step landing the tutorial on "haul-debris" (build-storage complete) has effectiveStepTimeoutMs >= 60000ms', () => {
     expect(
       driverStepIndex,
-      'expected to find a step with command "contract accept type:rubble_disposal" whose interaction array waits for tutorial step "haul-debris" — tutorial-interactive.json may have changed shape',
+      'expected to find a step whose expect.tutorialStep is "haul-debris" — tutorial-interactive.json may have changed shape',
     ).toBeGreaterThanOrEqual(0);
 
     const stepObj = driverStepObj as ScenarioStepDef;

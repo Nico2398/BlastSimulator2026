@@ -168,12 +168,34 @@ describe('tutorial stage table', () => {
     for (const stepId of [
       // haul-debris (#552) is deliberately excluded: hauling self-dispatches
       // now, so the step is a single watch-only stage, not a click sequence.
-      'hire-surveyor', 'survey', 'drill-plan', 'blast', 'contract-accept',
+      'hire-surveyor', 'survey', 'drill-plan', 'blast',
       'vehicle-buy-assign', 'build-storage', 'box-cut',
     ]) {
       expect(TUTORIAL_STAGES[stepId]!.length, `${stepId} should be multi-stage`)
         .toBeGreaterThan(1);
     }
+  });
+});
+
+describe('sell-ore stage list (#1335 — accept scoped to the fillable ore offer)', () => {
+  it('has no contract-accept stage list any more', () => {
+    expect(TUTORIAL_STAGES['contract-accept']).toBeUndefined();
+  });
+
+  it('scopes the Accept target to fillable ore_sale offers only', () => {
+    const accept = TUTORIAL_STAGES['sell-ore']!
+      .find(s => s.target.includes('.bs-contract-accept'))!;
+    expect(accept).toBeDefined();
+    expect(accept.target).toContain('[data-contract-type="ore_sale"]');
+    expect(accept.target).toContain('[data-contract-fillable="true"]');
+    expect(accept.target).toContain('.bs-contract-accept');
+  });
+
+  it('keeps Deliver and the amount box as also-allowed controls', () => {
+    const accept = TUTORIAL_STAGES['sell-ore']!
+      .find(s => s.target.includes('.bs-contract-accept'))!;
+    expect((accept.also ?? []).some(a => a.includes('.bs-contract-deliver'))).toBe(true);
+    expect((accept.also ?? []).some(a => a.includes('.bs-contract-amount'))).toBe(true);
   });
 });
 
@@ -513,7 +535,7 @@ describe('spentWhen / waitingKey wiring (#1014)', () => {
 
   it('no step outside the named list above carries a spentWhen stage', () => {
     // Guards against `spentWhen` creeping onto a step the plan never asked
-    // for (hire-*, blast, contract-accept, set-policy, event-fire-resolve,
+    // for (hire-*, blast, set-policy, event-fire-resolve,
     // vehicle-buy-assign, etc.) — those steps are genuinely one-shot clicks
     // and must keep re-highlighting nothing once used, not silently gain a
     // waiting state nobody asked for.

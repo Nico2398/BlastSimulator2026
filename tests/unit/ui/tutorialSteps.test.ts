@@ -13,8 +13,8 @@ import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 30 entries (#1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(30);
+  it('has exactly 29 entries (#1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(29);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -132,13 +132,8 @@ describe('tutorialSteps', () => {
       'hire-driver',
       'vehicle-buy-assign',
       'build-storage',
-      // #556/#817: contract-accept sits AFTER build-storage. A contract's
-      // deadline starts at acceptance and ordering the warehouse is real
-      // queued work now, so accepting first spent that deadline watching a
-      // construction site — and contract-deliver only advances on a genuinely
-      // completed delivery, which left the tutorial card stuck with no way
-      // forward.
-      'contract-accept',
+      // #1335: contract-accept is gone; haul-debris follows build-storage
+      // directly. The player accepts the one fillable ore offer in sell-ore.
       'haul-debris',
       'finances',
       'needs',
@@ -333,6 +328,13 @@ describe('tutorialSteps', () => {
     }
   });
 
+  // ── #1335 ────────────────────────────────────────────────────────────────
+  it('has no contract-accept step (#1335): sell-ore accepts the fillable offer itself', () => {
+    expect(TUTORIAL_STEPS.find((s) => s.id === 'contract-accept')).toBeUndefined();
+    expect(TUTORIAL_STEPS.some((s) => s.titleKey === 'tutorial.step12.title')).toBe(false);
+    expect(TUTORIAL_STEPS.some((s) => s.textKey === 'tutorial.step12')).toBe(false);
+  });
+
   // ── 17 ───────────────────────────────────────────────────────────────────
   it('steps with meaningful UI target have a highlightTarget defined', () => {
     // Steps that should definitely have highlight targets
@@ -342,7 +344,7 @@ describe('tutorialSteps', () => {
       'train-digger', 'buy-rock-digger-assign',
       'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
-      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-accept', 'haul-debris', 'sell-ore',
+      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'sell-ore',
       'finances', 'box-cut', 'needs',
     ]);
     for (const step of TUTORIAL_STEPS) {
@@ -497,22 +499,19 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned after build-storage/contract-accept and before finances', () => {
+    it('exists, positioned directly after build-storage (index 23) and before finances', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
-      const acceptIdx = ids.indexOf('contract-accept');
       const haulIdx = ids.indexOf('haul-debris');
       const sellOreIdx = ids.indexOf('sell-ore');
       expect(haulIdx).toBeGreaterThan(-1);
-      // #556/#817: contract-accept sits between build-storage and this step
-      // now — a contract's deadline starts at acceptance, and ordering the
-      // warehouse is real queued work, so accepting before it spent that
-      // deadline watching a construction site.
-      expect(acceptIdx).toBe(buildIdx + 1);
-      expect(haulIdx).toBe(acceptIdx + 1);
+      // #1335: contract-accept was removed; no step sits between them.
+      expect(haulIdx).toBe(buildIdx + 1);
+      expect(haulIdx).toBe(23);
       // #1328: finances/needs sit between haul-debris and sell-ore now, so
       // the first sale is the last guided step.
       expect(ids[haulIdx + 1]).toBe('finances');
+      expect(ids.indexOf('finances')).toBe(24);
       expect(sellOreIdx).toBe(ids.indexOf('needs') + 1);
     });
 

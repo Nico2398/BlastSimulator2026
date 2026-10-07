@@ -596,8 +596,8 @@ describe('resolveWaitStatus — steps that must never enter waiting (#1014)', ()
     expect(resolveWaitStatus(stages, maximallySpentState())).toEqual({ waiting: false, waitingKey: null });
   });
 
-  it('a genuinely one-click step (contract-accept) never reports waiting either', () => {
-    expect(resolveWaitStatus(TUTORIAL_STAGES['contract-accept']!, maximallySpentState()))
+  it('a genuinely one-click step (vehicle-buy-assign) never reports waiting either', () => {
+    expect(resolveWaitStatus(TUTORIAL_STAGES['vehicle-buy-assign']!, maximallySpentState()))
       .toEqual({ waiting: false, waitingKey: null });
   });
 });
@@ -816,6 +816,49 @@ describe('applyRails', () => {
       applyRails({ target: '#a', hintKey: 'k' }, document, [], false);
       expect(document.querySelector('#a')!.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
     });
+  });
+});
+
+describe('applyRails — sell-ore accepts only the fillable ore offer (#1335)', () => {
+  function card(id: string, type: string, fillable: boolean): HTMLButtonElement {
+    const panel = document.getElementById('bs-contract-panel') ?? (() => {
+      const p = document.createElement('div');
+      p.id = 'bs-contract-panel';
+      document.body.appendChild(p);
+      return p;
+    })();
+    const c = document.createElement('div');
+    c.dataset.contractId = id;
+    c.dataset.contractType = type;
+    c.dataset.contractFillable = String(fillable);
+    const b = document.createElement('button');
+    b.className = 'bs-contract-accept';
+    c.appendChild(b);
+    panel.appendChild(c);
+    return b;
+  }
+
+  it('allows and highlights the fillable ore_sale Accept, leaves the rest inert', () => {
+    const fillable = card('1', 'ore_sale', true);
+    const unfillable = card('2', 'ore_sale', false);
+    const rubble = card('3', 'rubble_disposal', true);
+    const supply = card('4', 'supply', true);
+    const stage = TUTORIAL_STAGES['sell-ore']!.find(s => s.target.includes('.bs-contract-accept'))!;
+    applyRails(stage);
+    expect(fillable.classList.contains(ALLOWED_CLASS)).toBe(true);
+    expect(fillable.classList.contains(HIGHLIGHT_CLASS)).toBe(true);
+    for (const inert of [unfillable, rubble, supply]) {
+      expect(inert.classList.contains(ALLOWED_CLASS)).toBe(false);
+      expect(inert.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
+    }
+  });
+
+  it('allows nothing when no offer is fillable', () => {
+    const a = card('1', 'ore_sale', false);
+    const stage = TUTORIAL_STAGES['sell-ore']!.find(s => s.target.includes('.bs-contract-accept'))!;
+    applyRails(stage);
+    expect(a.classList.contains(ALLOWED_CLASS)).toBe(false);
+    expect(a.classList.contains(HIGHLIGHT_CLASS)).toBe(false);
   });
 });
 
