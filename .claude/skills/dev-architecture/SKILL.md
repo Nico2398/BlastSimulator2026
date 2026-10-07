@@ -84,7 +84,7 @@ src/
 │   ├── nav/                # NavGrid, Pathfinding, AgentMovement, BuildingApproach
 │   ├── campaign/           # Level definitions, Campaign progression
 │   ├── world/              # VoxelGrid, PlayableArea, TerrainGen, RockCatalog, OreCatalog, MineType
-│   ├── mining/             # Survey, DrillPlan, ChargePlan, Sequence, BlastPlan, BlastCalc
+│   ├── mining/             # Survey, DrillPlan, ChargePlan, BlastPlan, BlastCalc
 │   ├── economy/            # Finance, Contract, Market, Corruption, HaulingTask
 │   ├── entities/           # Employee, Vehicle, Building, Fragment
 │   ├── scores/             # ScoreManager, WellBeing, Safety, Ecology, Nuisance

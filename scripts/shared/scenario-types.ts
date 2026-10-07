@@ -231,8 +231,9 @@ export type InteractionStepAction =
    * `N` 1-4 for Drill/Charge/Preview/Fire) — but only if it is not
    * already the active tab. The panel's own `autoAdvance` (`suggestStep`,
    * `BlastWorkshop.ts`) moves the active tab on its own the instant a
-   * drilled hole goes uncharged, out from under a scenario that assumed a step tab a preceding step had
-   * left active was still active — the exact root cause behind two of PR #616's
+   * drilled hole goes uncharged, out from
+   * under a scenario that assumed a step tab a preceding step had left
+   * active was still active — the exact root cause behind two of PR #616's
    * fixes (`level1-playthrough-win.json`'s 12 remove-hole clicks, and the
    * `[data-step="2"]` re-clicks documented on `blast-execution-visual.json`'s
    * per-hole charge steps). `ensureStep` reads

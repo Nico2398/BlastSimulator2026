@@ -120,7 +120,6 @@ async function capture(page: Page, shot: Shot, group: string): Promise<Record<st
 const PATTERN = (kg: string, stem: string, rows = 4, cols = 4, spacing = 3): string[] => [
   `drill_plan grid rows:${rows} cols:${cols} spacing:${spacing} depth:8 start:${SITE.x - 4},${SITE.z - 4}`,
   `charge hole:* explosive:dynatomics amount:${kg} stemming:${stem}`,
-  'sequence auto delay_step:25',
 ];
 
 async function main(): Promise<void> {

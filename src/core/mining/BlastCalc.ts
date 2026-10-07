@@ -79,24 +79,11 @@ export function effectiveHoleEnergy(
 // § 7: Vibration
 // --------------------------------------------------------
 
-export function calculateVibrations(chargePerDelay: number[], distance: number, groundFactor: number): number {
+/** Every charge fires together, so vibration scales with the whole blast's charge. */
+export function calculateVibrations(totalChargeKg: number, distance: number, groundFactor: number): number {
   if (distance <= 0) return Infinity;
-  if (chargePerDelay.length === 0) return 0;
-  return Math.pow(Math.max(...chargePerDelay), 0.7) / Math.pow(distance, 1.5) * groundFactor;
-}
-
-export function groupChargesByDelay(
-  holes: readonly DrillHole[], charges: Record<string, HoleCharge>, delays: Record<string, number>,
-): number[] {
-  const delayGroups = new Map<number, number>();
-  for (const hole of holes) {
-    const charge = charges[hole.id];
-    const delay = delays[hole.id];
-    if (charge !== undefined && delay !== undefined) {
-      delayGroups.set(delay, (delayGroups.get(delay) ?? 0) + charge.amountKg);
-    }
-  }
-  return [...delayGroups.values()];
+  if (totalChargeKg <= 0) return 0;
+  return Math.pow(totalChargeKg, 0.7) / Math.pow(distance, 1.5) * groundFactor;
 }
 
 // --------------------------------------------------------
@@ -105,9 +92,9 @@ export function groupChargesByDelay(
 
 /** Sum of amountKg over charged holes present in `holes`; 0 if none. */
 export function totalChargeKg(holes: readonly DrillHole[], charges: Record<string, HoleCharge>): number {
-  void holes; void charges;
-  // TODO: implement
-  return 0;
+  let total = 0;
+  for (const hole of holes) total += charges[hole.id]?.amountKg ?? 0;
+  return total;
 }
 
 export function parseKey(key: string): [number, number, number] | null {

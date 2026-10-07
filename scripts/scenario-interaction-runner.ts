@@ -158,7 +158,7 @@ async function captureStepEvidence(ctx: StepCaptureContext): Promise<void> {
 
   if (interactionResult.gameState) {
     const gs = interactionResult.gameState as Record<string, unknown>;
-    console.log(`  Holes: ${gs.holeCount ?? 0}, Charged: ${gs.chargedCount ?? 0}, Sequenced: ${gs.sequencedCount ?? 0}`);
+    console.log(`  Holes: ${gs.holeCount ?? 0}, Charged: ${gs.chargedCount ?? 0}`);
   }
 
   ctx.results.push({

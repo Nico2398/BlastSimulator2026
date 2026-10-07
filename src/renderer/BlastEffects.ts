@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Blast Visual Effects
 // Explosion flash → dust cloud → flying fragments → screen shake.
-// Synchronized with the detonation sequence: each hole fires at its delay time.
+// Every hole fires together at blast start.
 //
 // Effects:
 //   1. Per-hole flash: brief bright point light at hole position
@@ -34,8 +34,6 @@ const SHAKE_AMP_MAX = 2.5;         // maximum shake amplitude
 export interface HoleDetonation {
   /** Hole grid position. */
   x: number; y: number; z: number;
-  /** Time relative to blast start when this hole fires (seconds). */
-  delaySeconds: number;
 }
 
 export interface BlastEffectConfig {
@@ -99,7 +97,7 @@ export class BlastEffects {
       this.scene.add(light);
       this.flashes.push({
         light,
-        triggerTime: this.startTime + hole.delaySeconds,
+        triggerTime: this.startTime,
         remaining: -1, // not yet triggered
       });
     }

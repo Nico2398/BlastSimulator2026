@@ -111,7 +111,7 @@ export class PreflightModal {
   update(state: GameState, weather: WeatherState | undefined): void {
     if (!this.open) return;
 
-    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
+    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = plannedChargesCost(state.chargesByHole);
     const chargeKg = Object.values(state.chargesByHole).reduce((sum, c) => sum + c.amountKg, 0);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);

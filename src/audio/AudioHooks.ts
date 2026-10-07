@@ -5,6 +5,7 @@
 import { AudioManager } from './AudioManager.js';
 import { SoundLibrary } from './Placeholder.js';
 import type { SoundHandle } from './AudioManager.js';
+import { BLAST_RUMBLE_OFFSET_MS } from '../core/config/balance.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
 
 export class AudioHooks {
@@ -27,22 +28,11 @@ export class AudioHooks {
     });
   }
 
-  /** Call when a blast is executed. Staggers boom sounds by sequence delays. */
-  onBlast(sequenceDelays: Record<string, number>): void {
+  /** Call when a blast is executed. Every charge fires together: one boom, then the rumble. */
+  onBlast(): void {
     this.audio.resume().then(() => {
-      // Play a boom per hole at the correct delay, up to 8 holes (cap for sanity)
-      const entries = Object.entries(sequenceDelays).slice(0, 8);
-      if (entries.length === 0) {
-        // No sequence: single boom immediately
-        this.audio.playBuffer(this.lib.get('boom'), 'effects');
-      } else {
-        for (const [, delayMs] of entries) {
-          this.audio.playBuffer(this.lib.get('boom'), 'effects', delayMs);
-        }
-      }
-      // Post-blast rumble at the end of the sequence
-      const maxDelay = entries.reduce((m, [, d]) => Math.max(m, d), 0);
-      this.audio.playBuffer(this.lib.get('rumble'), 'effects', maxDelay + 800);
+      this.audio.playBuffer(this.lib.get('boom'), 'effects', 0);
+      this.audio.playBuffer(this.lib.get('rumble'), 'effects', BLAST_RUMBLE_OFFSET_MS);
     });
   }
 

@@ -17,7 +17,7 @@ description: >
 
 1. **Survey** terrain to identify ore veins
 2. **Plan** access (build ramps, clear surface)
-3. **Design blast plans** (drill holes, load explosives, define detonation sequence)
+3. **Design blast plans** (drill holes, load explosives, preview, fire)
 4. **Execute blasts** — physics simulation determines fragments, projections, damage
 5. **Recover rubble** with vehicles (excavators, trucks)
 6. **Sell or store** materials via contracts
@@ -36,7 +36,7 @@ description: >
 ### Blast Plan Design
 **Drill Pattern:** Grid of holes with positions, depth, diameter, spacing, burden
 **Charge Loading:** Per hole: explosive type, amount (kg), stemming height, optional tubing
-**Detonation Sequence:** Order and delay (ms) per hole; affects fragmentation, vibrations, free face
+**Detonation:** All charges fire together; no per-hole order or delay. Vibration uses the total charge of every hole
 
 ### Blast Preview / Software Upgrades
 Tier 0 (none) → Tier 1 (energy heatmap) → Tier 2 (fragment prediction) → Tier 3 (projection risk) → Tier 4 (vibration model)
@@ -149,7 +149,7 @@ Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing
 ## Safety & Projection Profiles
 
 - Safety zone evacuation required before each blast
-- Projection trajectories based on overcharge, stemming, free face, sequence
+- Projection trajectories based on overcharge, stemming, free face
 - Buildings, vehicles, and people in path take damage/die
 
 ## Campaign & World Map

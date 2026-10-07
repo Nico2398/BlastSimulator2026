@@ -234,7 +234,7 @@ budget is ~300 ms.
 
 ## Loading a saved plan (#1342)
 
-`blast_plan load name:X` queues orders; it never writes finished holes. Each saved hole becomes a planned hole (fresh unique id, `addHole` skips ids live in `drillHoles`/`plannedDrillHoles`) with one `drill_hole` order; each saved charge becomes one `charge_hole` order (cost deducted, `plannedChargesByHole` filled), sequence delays are re-keyed to the new ids. Saved holes at an x,z already drilled or planned are skipped; orphan charges are skipped. Pre-checks (claim, `createCharge`, funds) are all-or-nothing. Charge-after-drill gate: `isChargeHoleClaimable` (ActionSelection.ts) keeps a `charge_hole` unclaimable while its hole is still in `plannedDrillHoles`, applied in targeted, pool and starvation claim paths. Removing the planned hole cancels and refunds its charge order.
+`blast_plan load name:X` queues orders; it never writes finished holes. Each saved hole becomes a planned hole (fresh unique id, `addHole` skips ids live in `drillHoles`/`plannedDrillHoles`) with one `drill_hole` order; each saved charge becomes one `charge_hole` order (cost deducted, `plannedChargesByHole` filled), Saved holes at an x,z already drilled or planned are skipped; orphan charges are skipped. Pre-checks (claim, `createCharge`, funds) are all-or-nothing. Charge-after-drill gate: `isChargeHoleClaimable` (ActionSelection.ts) keeps a `charge_hole` unclaimable while its hole is still in `plannedDrillHoles`, applied in targeted, pool and starvation claim paths. Removing the planned hole cancels and refunds its charge order.
 
 Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration backfills it) except `drill_plan grid`, which replaces the plan and restarts at H1; removing a hole never reuses an id (#1352).
 
@@ -256,11 +256,16 @@ Previews run the **same** propagation the blast does (`buildPlanEnergyField`) an
 and velocity maths. A preview that models the rock differently from the game is worse than no
 preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in rained-on untubed holes are predicted weakened.
 
+### Detonation and Workshop steps
+
+No detonation sequence exists: every charge fires together at blast start (no per-hole order or delay). The Blast Workshop has 4 steps: Drill, Charge, Preview, Fire. A save carrying a stray `sequenceDelays` key ignores it.
+
 ### Village vibration (#1343)
 
 Villages come from the level's structure set (`PlayableArea.villages()`, the same set the renderer
 draws; ids `village-<i>`, ground level). Both `executeBlast` and `previewVibrations` measure from the
-mean hole position (distance clamped to 1 m) with ground factor = base x `averageVibrationMod`
+mean hole position (distance clamped to 1 m); every charge fires together, so vibration is
+`totalChargeKg(holes, charges)^0.7 / distance^1.5 x groundFactor` (scalar over all charged holes) with ground factor = base x `averageVibrationMod`
 (charged holes, equal weight, wet holes included), so preview equals blast; callers pass the factor.
 The blast report carries `maxVibration`; `blast` costs nuisance `maxVibration x
 VILLAGE_VIBRATION_SCORE_GAIN` via `recordVibration`, separate from the projection term

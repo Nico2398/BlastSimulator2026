@@ -33,7 +33,6 @@ export function blastPlanCommand(
     ctx.state!.savedPlans[name] = {
       drillHoles: [...ctx.state!.drillHoles],
       chargesByHole: { ...ctx.state!.chargesByHole },
-      sequenceDelays: { ...ctx.state!.sequenceDelays },
     };
     return { success: true, output: `Plan saved as "${name}"` };
   }

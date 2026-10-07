@@ -9,7 +9,7 @@ export type { MiningContext } from './mining/types.js';
 export type { DrillHoleActionPayload } from './mining/drillPlan.js';
 export { clearDrillPlan, drillPlanCommand } from './mining/drillPlan.js';
 export type { ChargeHoleActionPayload } from './mining/charge.js';
-export { chargeCommand, sequenceCommand } from './mining/charge.js';
+export { chargeCommand } from './mining/charge.js';
 export { blastCommand } from './mining/blast.js';
 export { blastPlanCommand, previewCommand, blastPreviewCommand, buySoftwareCommand } from './mining/blastPlan.js';
 export type { RampSegmentActionPayload } from './mining/ramp.js';

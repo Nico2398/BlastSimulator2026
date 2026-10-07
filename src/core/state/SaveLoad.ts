@@ -560,7 +560,6 @@ function migrateV28ToV29(obj: Record<string, unknown>): Record<string, unknown> 
   addIds(obj['plannedDrillHoles']);
   addKeys(obj['chargesByHole']);
   addKeys(obj['plannedChargesByHole']);
-  addKeys(obj['sequenceDelays']);
   const installed = (obj['tubingState'] as { installedHoles?: unknown } | undefined)?.installedHoles;
   if (Array.isArray(installed) || installed instanceof Set) ids.push(...(installed as Iterable<string>));
   const next = 1 + maxHoleNumericId(ids);
