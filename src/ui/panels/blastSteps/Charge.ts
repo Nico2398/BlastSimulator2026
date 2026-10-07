@@ -130,8 +130,9 @@ export class ChargeStep {
     const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
     this.tubingCardEl = el('div');
 
+    // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.fitLineEl, this.weakLineEl,
+      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.weakLineEl,
       this.holeList.root, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);

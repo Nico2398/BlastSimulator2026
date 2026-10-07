@@ -102,6 +102,21 @@ describe('ChargeStep', () => {
     expect(cmd).toContain('stemming:2.5m');
   });
 
+  it('keeps the overflow reason line as the Charge All button next sibling (#1361 scenario selector)', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 6, 0.15);
+    step.update(state, 'sunny');
+    card(step, 'krackle').click();
+    const chargeAllBtn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
+    const stepper = step.root.querySelector('[data-field="amount"]') as HTMLElement;
+    const plus = Array.from(stepper.querySelectorAll('button')).pop() as HTMLButtonElement;
+    for (let i = 0; i < 10; i++) plus.click();
+    step.update(state, 'sunny');
+    expect(chargeAllBtn.disabled).toBe(true);
+    expect(chargeAllBtn.nextElementSibling?.textContent ?? '').toContain('Shallowest hole is 6 m');
+  });
+
   it('renders one per-hole row per drill hole, keyed by data-hole, each with its own charge button', () => {
     const { step } = makeStep();
     const state = makeState();
