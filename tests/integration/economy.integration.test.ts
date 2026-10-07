@@ -456,7 +456,7 @@ describe('Economy', () => {
     const originalPenalty = c.penaltyAmount;
 
     // Negotiate with very high reputation (ensures >95% success rate)
-    const outcome = negotiateContract(cs, c.id, 100, rng);
+    const outcome = negotiateContract(cs, c.id, 100, rng, 1);
 
     expect(outcome).not.toBeNull();
     if (!outcome || 'refused' in outcome) throw new Error('negotiation was not performed');
@@ -487,7 +487,7 @@ describe('Economy', () => {
     }
 
     // Non-existent contract returns null
-    const missing = negotiateContract(cs, 999, 100, rng);
+    const missing = negotiateContract(cs, 999, 100, rng, 1);
     expect(missing).toBeNull();
   });
 

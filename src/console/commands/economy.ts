@@ -221,7 +221,7 @@ export function contractCommand(
       const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
       const id = resolved.id;
-      const result = negotiateContractAtTick(state.contracts, id, 0, state.seed, state.tickCount);
+      const result = negotiateContractAtTick(state.contracts, id, 0, state.seed, state.tickCount, 1);
       if ('refused' in result && result.refused === 'not_found') return { success: false, output: t('economy.negotiation.not_found', { id }) };
       if ('refused' in result) return { success: false, output: t('economy.negotiation.already_negotiated', { id }) };
       state.contracts.lastNegotiation = { contractId: id, success: result.success, changes: result.changes };

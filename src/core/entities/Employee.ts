@@ -454,6 +454,12 @@ export function isEligibleForWork(
  * `employees` (only `fireEmployee` does), so a corpse's frozen fields stay
  * in the array forever unless the reader excludes them explicitly.
  */
+/** Highest management proficiency among eligible managers; null when none (#1340). */
+export function bestAvailableManagerLevel(_employees: readonly Employee[]): number | null {
+  // TODO: implement
+  return null;
+}
+
 export function getLivingEmployees(employees: readonly Employee[]): Employee[] {
   return employees.filter(e => e.alive);
 }

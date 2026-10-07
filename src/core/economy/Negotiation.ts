@@ -28,7 +28,7 @@ export interface NegotiationResult {
   contract: Contract;
 }
 
-export type NegotiationRefusal = 'not_found' | 'already_negotiated';
+export type NegotiationRefusal = 'not_found' | 'already_negotiated' | 'no_manager';
 
 /** Seed of the RNG stream for one negotiation attempt on one offer. */
 export function negotiationStreamSeed(
@@ -47,6 +47,21 @@ export function canNegotiate(contract: Contract): boolean {
   return (contract.negotiationAttempts ?? 0) < NEGOTIATION_MAX_ATTEMPTS_PER_OFFER;
 }
 
+/** Why a manager-run negotiation is refused up front, or null when allowed (#1340). */
+export function negotiationRefusalReason(
+  _contract: Contract,
+  _managerLevel: number | null,
+): 'no_manager' | 'already_negotiated' | null {
+  // TODO: implement
+  return null;
+}
+
+/** Success-rate bonus shown to the player for a manager level, in percent (#1340). */
+export function managerNegotiationBonusPct(_level: number): number {
+  // TODO: implement
+  return 0;
+}
+
 /** Negotiate using a per-attempt RNG stream derived from seed, tick, id and attempt. */
 export function negotiateContractAtTick(
   state: ContractState,
@@ -54,10 +69,11 @@ export function negotiateContractAtTick(
   reputation: number,
   seed: number,
   tick: number,
+  managerLevel: number,
 ): NegotiationResult | { refused: NegotiationRefusal } {
   const attempt = state.available.find(c => c.id === contractId)?.negotiationAttempts ?? 0;
   const rng = new Random(negotiationStreamSeed(seed, tick, contractId, attempt));
-  return negotiateContract(state, contractId, reputation, rng) ?? { refused: 'not_found' };
+  return negotiateContract(state, contractId, reputation, rng, managerLevel) ?? { refused: 'not_found' };
 }
 
 /**
@@ -71,6 +87,7 @@ export function negotiateContract(
   contractId: number,
   reputation: number,
   rng: Random,
+  _managerLevel: number,
 ): NegotiationResult | { refused: 'already_negotiated' } | null {
   const contract = state.available.find(c => c.id === contractId);
   if (!contract) return null;
