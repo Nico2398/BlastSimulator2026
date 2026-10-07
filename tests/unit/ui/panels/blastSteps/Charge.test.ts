@@ -84,7 +84,9 @@ describe('ChargeStep', () => {
 
   it('Charge All dispatches the selected explosive, amount, and stemming for every hole', () => {
     const { step, gameConsole } = makeStep();
-    step.update(makeState(), 'sunny');
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state, 'sunny');
     card(step, 'krackle').click();
 
     const chargeAllBtn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
@@ -98,6 +100,21 @@ describe('ChargeStep', () => {
     // #1330: the retuned panel defaults, spelled out
     expect(cmd).toContain('amount:4kg');
     expect(cmd).toContain('stemming:2.5m');
+  });
+
+  it('keeps the overflow reason line as the Charge All button next sibling (#1361 scenario selector)', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 6, 0.15);
+    step.update(state, 'sunny');
+    card(step, 'krackle').click();
+    const chargeAllBtn = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
+    const stepper = step.root.querySelector('[data-field="amount"]') as HTMLElement;
+    const plus = Array.from(stepper.querySelectorAll('button')).pop() as HTMLButtonElement;
+    for (let i = 0; i < 10; i++) plus.click();
+    step.update(state, 'sunny');
+    expect(chargeAllBtn.disabled).toBe(true);
+    expect(chargeAllBtn.nextElementSibling?.textContent ?? '').toContain('Shallowest hole is 6 m');
   });
 
   it('renders one per-hole row per drill hole, keyed by data-hole, each with its own charge button', () => {
@@ -389,11 +406,14 @@ describe('ChargeStep — column overflow guard (#1361)', () => {
     expect(step.root.querySelectorAll('.bsx-reason')).toHaveLength(0);
   });
 
-  it('shows no overflow reason when there are no holes', () => {
+  it('shows no overflow reason, only the no-holes reason, when there are no holes (#1345)', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
 
-    expect(step.root.querySelectorAll('.bsx-reason')).toHaveLength(0);
+    expect(chargeAll(step).disabled).toBe(true);
+    const reasons = step.root.querySelectorAll('.bsx-reason');
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]!.textContent).toBe(t('ui.blast_workshop.charge.no_holes_reason'));
   });
 
   it('a disabled Charge All dispatches no command when clicked', () => {
@@ -483,5 +503,57 @@ describe('ChargeStep — explosive too weak for the rock warning (#1358)', () =>
     expect(chargeAll(step).disabled).toBe(false);
     chargeAll(step).click();
     expect(gameConsole).toHaveBeenCalled();
+  });
+});
+
+describe('ChargeStep — pattern line, awaiting funds, refusal notice (#1345)', () => {
+  it('shows the pattern line only while a pattern charge is set', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state, 'sunny');
+    expect(step.root.querySelector('[data-info="pattern-charge"]')).toBeNull();
+
+    state.patternCharge = { explosiveId: 'boomite', amountKg: 4, stemmingM: 2 };
+    step.update(state, 'sunny');
+    const line = step.root.querySelector('[data-info="pattern-charge"]')!;
+    expect(line.textContent).toBe(t('ui.blast_workshop.charge.pattern_line', {
+      explosive: t(getExplosive('boomite')!.nameKey), amount: 4, stemming: 2,
+    }));
+
+    state.patternCharge = null;
+    step.update(state, 'sunny');
+    expect(step.root.querySelector('[data-info="pattern-charge"]')).toBeNull();
+  });
+
+  it('shows the awaiting-funds reason listing the waiting holes, and clears it when empty', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    addHole(holeCounter, state.drillHoles, 14, 10, 8, 0.15);
+    state.chargeAwaitingFunds = ['H1', 'H2'];
+    step.update(state, 'sunny');
+    const warning = step.root.querySelector('[data-warning="awaiting-funds"]')!;
+    expect(warning.textContent).toContain(t('ui.blast_workshop.charge.awaiting_funds_reason', { count: 2, holes: 'H1, H2' }));
+
+    state.chargeAwaitingFunds = [];
+    step.update(state, 'sunny');
+    expect(step.root.querySelector('[data-warning="awaiting-funds"]')).toBeNull();
+  });
+
+  it('shows a refused command output as a notice and hides it after a successful one', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state, 'sunny');
+    const chargeAll = step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement;
+
+    gameConsole.mockReturnValue({ success: false, output: 'Not enough cash.' });
+    chargeAll.click();
+    expect(step.root.textContent).toContain('Not enough cash.');
+
+    gameConsole.mockReturnValue({ success: true, output: 'Charged.' });
+    chargeAll.click();
+    expect(step.root.textContent).not.toContain('Not enough cash.');
   });
 });

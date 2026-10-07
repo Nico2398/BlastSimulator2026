@@ -4,6 +4,7 @@
 // resulting NavGrid cell types directly (NOT via events).
 
 import { describe, it, expect } from 'vitest';
+import { t } from '../../../src/core/i18n/I18n.js';
 import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 import {
   blastCommand,
@@ -679,7 +680,7 @@ describe('NavGrid patching — blast', () => {
 
     const result = blastCommand(ctx, [], {});
     expect(result.success).toBe(false);
-    expect(result.output).toContain('Missing charge');
+    expect(result.output).toBe(t('mining.blast.no_charged_holes'));
 
     // NavGrid unchanged
     expect(nav.cells[0]![0]!.type).toBe(prevType);

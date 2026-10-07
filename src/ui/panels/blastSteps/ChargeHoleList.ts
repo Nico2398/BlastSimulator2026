@@ -15,7 +15,7 @@
 // gesture as "select, then charge them all".
 
 import { t } from '../../../core/i18n/I18n.js';
-import { el, emptyState, scrollBoundedSection } from '../../dom.js';
+import { el, chip, emptyState, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
@@ -65,17 +65,19 @@ export class ChargeHoleList {
     charges: Record<string, HoleCharge>,
     /** Charges ordered but not yet loaded — the ordered/loading row state (#554). */
     plannedCharges?: Record<string, HoleCharge>,
+    /** Holes whose pattern auto-charge waits for cash (#1345). */
+    awaitingFunds: ReadonlySet<string> = new Set(),
   ): void {
     if (holes.length === 0) {
       this.listEl.replaceChildren(emptyState(t('ui.blast_workshop.charge.no_holes')));
       return;
     }
-    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id], plannedCharges?.[h.id])));
+    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id], plannedCharges?.[h.id], awaitingFunds.has(h.id))));
   }
 
   refreshLocale(): void { this.locale.refresh(); }
 
-  private makeRow(hole: DrillHole, charge: HoleCharge | undefined, planned: HoleCharge | undefined): HTMLElement {
+  private makeRow(hole: DrillHole, charge: HoleCharge | undefined, planned: HoleCharge | undefined, awaiting: boolean): HTMLElement {
     const charged = charge !== undefined;
     const ordered = !charged && planned !== undefined;
     const row = el('div');
@@ -93,6 +95,7 @@ export class ChargeHoleList {
     // scenario) can read.
     row.dataset['charged'] = String(charged);
     row.dataset['ordered'] = String(ordered);
+    row.dataset['awaitingFunds'] = String(awaiting);
 
     const tag = el('span', { text: hole.id, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-ore);width:24px' } });
 
@@ -115,6 +118,7 @@ export class ChargeHoleList {
     chargeBtn.addEventListener('click', () => this.onCharge(hole.id));
 
     row.append(tag, status);
+    if (awaiting && !charged && !ordered) row.appendChild(chip(t('ui.blast_workshop.charge.awaiting_funds'), 'warn'));
     if (charged) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-positive);display:flex' }, children: [iconEl('check', 11)] }));
     else if (ordered) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-amber);display:flex' }, children: [iconEl('clock', 11)] }));
     row.appendChild(chargeBtn);

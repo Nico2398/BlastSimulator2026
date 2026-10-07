@@ -48,6 +48,13 @@ export function blastCommand(
     }
   }
 
+  // Nothing loaded or loading: refuse before anything mutates (#1345). A hole
+  // whose charge is still loading falls through to validation, which names it.
+  const planned = ctx.state!.plannedChargesByHole;
+  if (!ctx.state!.drillHoles.some(h => ctx.state!.chargesByHole[h.id] !== undefined || planned[h.id] !== undefined)) {
+    return { success: false, output: t('mining.blast.no_charged_holes') };
+  }
+
   const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.invalid_plan_header'));
   if (assembled.error) return assembled.error;
   const plan = assembled.plan;

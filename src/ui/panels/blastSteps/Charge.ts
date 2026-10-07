@@ -53,6 +53,9 @@ export class ChargeStep {
   private readonly chargeLineEl: HTMLElement;
   private readonly fitLineEl: HTMLElement;
   private readonly weakLineEl: HTMLElement;
+  private readonly patternLineEl: HTMLElement;
+  private readonly awaitingLineEl: HTMLElement;
+  private readonly noticeEl: HTMLElement;
   private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
 
@@ -118,13 +121,18 @@ export class ChargeStep {
 
     this.fitLineEl = el('div');
     this.weakLineEl = el('div');
+    this.patternLineEl = el('div');
+    this.awaitingLineEl = el('div');
+    this.noticeEl = el('div');
+    this.noticeEl.style.display = 'none';
     this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId));
 
     const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
     this.tubingCardEl = el('div');
 
+    // fitLineEl must stay the button's next sibling: the #1361 scenario reads it via `charge-all + div`.
     this.el.append(
-      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.weakLineEl,
+      productHeader, this.productListEl, stepperRow, this.chargeAllBtn, this.fitLineEl, this.noticeEl, this.patternLineEl, this.awaitingLineEl, this.weakLineEl,
       this.holeList.root, tubingHeader, this.tubingCardEl,
     );
     container.appendChild(this.el);
@@ -166,6 +174,9 @@ export class ChargeStep {
       charges: holes.map(h => holeChargeSignature(state.chargesByHole[h.id])),
       planned: holes.map(h => holeChargeSignature(state.plannedChargesByHole[h.id])),
       shallowest,
+      planned_holes: state.plannedDrillHoles.length,
+      pattern: state.patternCharge ? holeChargeSignature(state.patternCharge) + state.patternCharge.explosiveId : null,
+      awaiting: state.chargeAwaitingFunds ?? [],
       wet, tub: state.tubingState.inventory,
     });
     if (signature === this.lastSignature) return;
@@ -173,9 +184,10 @@ export class ChargeStep {
 
     this.renderProductList(wet.length > 0);
     this.updateChargeLine(holes.length);
-    this.updateFitLine(shallowest);
+    this.updateFitLine(shallowest, holes.length + state.plannedDrillHoles.length === 0);
+    this.updatePatternLines(state);
     this.updateWeakLine(weakHoleSummary(this.selectedExplosiveId, columns));
-    this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole);
+    this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole, new Set(state.chargeAwaitingFunds ?? []));
     this.renderTubingCard(wet, state.tubingState.inventory);
   }
 
@@ -243,16 +255,44 @@ export class ChargeStep {
 
   // Charge column + stemming overflowing the shallowest hole: say why and block
   // Charge All. The stepper is left alone so the player sees what they asked for.
-  private updateFitLine(shallowest: number | null): void {
+  private updateFitLine(shallowest: number | null, noHoles: boolean): void {
     const overflows = shallowest !== null
       && !chargeFitsHole(this.amountKg, this.stemmingM, shallowest);
-    this.chargeAllBtn.disabled = overflows;
+    this.chargeAllBtn.disabled = overflows || noHoles;
+    if (noHoles) {
+      this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.no_holes_reason')));
+      return;
+    }
     if (!overflows || shallowest === null) {
       this.fitLineEl.replaceChildren();
       return;
     }
     const max = maxFittingChargeKg(shallowest, this.stemmingM);
     this.fitLineEl.replaceChildren(reasonLine(t('ui.blast_workshop.charge.too_much_for_hole', { depth: shallowest, max })));
+  }
+
+  // Pattern settings (#1345) and, when set, why some holes are waiting for cash.
+  private updatePatternLines(state: GameState): void {
+    const pattern = state.patternCharge;
+    if (pattern == null) {
+      this.patternLineEl.replaceChildren();
+    } else {
+      const explosive = getExplosive(pattern.explosiveId);
+      const line = el('div', { text: t('ui.blast_workshop.charge.pattern_line', {
+        explosive: explosive ? t(explosive.nameKey) : pattern.explosiveId,
+        amount: pattern.amountKg, stemming: pattern.stemmingM,
+      }), attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } });
+      line.dataset['info'] = 'pattern-charge';
+      this.patternLineEl.replaceChildren(line);
+    }
+    const waiting = state.chargeAwaitingFunds ?? [];
+    if (waiting.length === 0) {
+      this.awaitingLineEl.replaceChildren();
+      return;
+    }
+    const reason = reasonLine(t('ui.blast_workshop.charge.awaiting_funds_reason', { count: waiting.length, holes: waiting.join(', ') }));
+    reason.dataset['warning'] = 'awaiting-funds';
+    this.awaitingLineEl.replaceChildren(reason);
   }
 
   // Advisory only: Charge All stays enabled, the blast just breaks less rock.
@@ -363,7 +403,16 @@ export class ChargeStep {
   }
 
   private chargeAll(): void {
-    this.gameConsole?.(`charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m`);
+    this.runAndNotify(`charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m`);
+  }
+
+  /** Run a command and show its output on refusal, so a refusal is never silent (#1345). */
+  private runAndNotify(cmd: string): void {
+    const res = this.gameConsole?.(cmd);
+    const refused = res !== undefined && !res.success && res.output !== '';
+    this.noticeEl.replaceChildren(...(refused ? [reasonLine(res.output)] : []));
+    this.noticeEl.style.display = refused ? 'block' : 'none';
+    this.lastSignature = '';
   }
 
   // Same three panel values Charge All reads, one hole instead of `*`. The

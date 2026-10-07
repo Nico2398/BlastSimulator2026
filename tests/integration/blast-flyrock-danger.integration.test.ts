@@ -103,7 +103,7 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
 }
 
 /** Fire a 3×3 pattern at (15,15) with the given stemming. */
-function blastAt(ctx: MiningContext, stemming: string): void {
+function blastAt(ctx: MiningContext, stemming: string): string {
   drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
   driveDrillPlanToCompletion(ctx);
   // Charging bills explosives at order time (#1341); these tests are about
@@ -114,6 +114,7 @@ function blastAt(ctx: MiningContext, stemming: string): void {
   driveChargePlanToCompletion(ctx);
   const result = blastCommand(ctx, [], {});
   expect(result.success, result.output).toBe(true);
+  return result.output;
 }
 
 /**
@@ -234,16 +235,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('reports how far the rock was thrown, and rates the blast on it', () => {
     const reckless = makeCtx();
-    blastAt(reckless, '0.5');
-    const careful = makeCtx();
-    blastAt(careful, '2');
-
-    // Both reports exist; the reckless one threw rock further and rates worse.
-    drillPlanCommand(reckless, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', start: '30,30' });
-    driveDrillPlanToCompletion(reckless);
-    chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
-    driveChargePlanToCompletion(reckless);
-    const output = blastCommand(reckless, [], {}).output;
+    const output = blastAt(reckless, '0.5');
 
     expect(output).toMatch(/Furthest throw: \d+\.\d m/);
   });

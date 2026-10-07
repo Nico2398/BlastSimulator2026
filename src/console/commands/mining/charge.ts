@@ -3,96 +3,30 @@
 import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGame, resolveHoleId, cancelOutstandingChargeAction, findOutstandingChargeAction } from './shared.js';
-import { createCharge, batchCharge, computeChargeHoleDurationTicks, chargeOrderCost } from '../../../core/mining/ChargePlan.js';
-import { dispatchPendingAction } from '../../../core/engine/TaskDispatch.js';
+import { requireGame, resolveHoleId } from './shared.js';
+import { createCharge, batchCharge } from '../../../core/mining/ChargePlan.js';
+import {
+  dispatchChargeAction, chargeFundsFailureAmount, chargePatternHoles, isHoleChargeCovered,
+} from '../../../core/mining/ChargeOrder.js';
 import { MIN_STEMMING_M } from '../../../core/config/balance.js';
-import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { getLevel, isExplosiveAvailable, resolveAvailableExplosives } from '../../../core/campaign/Level.js';
 
-/** Payload carried by a queued `charge_hole` PendingAction (#554). */
-export interface ChargeHoleActionPayload {
-  holeId: string;
-  explosiveId: string;
-  amountKg: number;
-  stemmingM: number;
-  /** Base ticks; scaled by the worker's proficiency at claim time. */
-  durationTicks: number;
-  /** Cash charged at order time (costPerKg x kg); refunded on cancel (#1341). */
-  orderCost: number;
-}
-
 /**
- * Queue a `charge_hole` PendingAction for `hole` with the given (already
- * validated) charge, cancelling any outstanding order for the same hole
- * first so a re-charge replaces rather than stacks (#554, mirrors drillPlan
- * grid/add's drill_hole dispatch). Charges the explosives cost now (the
- * caller has already verified funds via `chargeFundsFailure`).
- *
- * Re-charging a hole whose earlier charge already landed pays the new order
- * in full and does not refund the loaded charge (that explosive is consumed)
- * — intentional default.
- */
-export function dispatchChargeAction(
-  ctx: MiningContext,
-  hole: { id: string; x: number; z: number },
-  explosiveId: string,
-  amountKg: number,
-  stemmingM: number,
-): void {
-  const state = ctx.state!;
-  cancelOutstandingChargeAction(state, hole.id);
-
-  const durationTicks = computeChargeHoleDurationTicks(amountKg);
-  const orderCost = chargeOrderCost(explosiveId, amountKg);
-  const actionId = state.nextPendingActionId++;
-  // skipQualificationCheck (#554, mirrors drill_hole's #553 dispatch): a
-  // charge order must queue silently even when nobody on the roster
-  // currently holds 'blasting' yet.
-  dispatchPendingAction(state, {
-    id: actionId,
-    type: 'charge_hole',
-    requiredSkill: 'blasting',
-    requiredVehicleRole: null,
-    targetX: hole.x,
-    targetZ: hole.z,
-    targetY: 0,
-    payload: {
-      holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks, orderCost,
-    } satisfies ChargeHoleActionPayload,
-    targetEmployeeId: null,
-  }, { skipQualificationCheck: true });
-
-  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
-
-  state.cash -= orderCost;
-  addExpense(state.finances, orderCost, 'explosives', `Charge ${hole.id}: ${explosiveId} ${amountKg}kg`, state.tickCount);
-}
-
-/**
- * Funds check for a set of charge orders, run before any mutation. Each
- * order's cost is net of the refund its hole's outstanding order will give
- * back when replaced. Equal cash is allowed. Null when affordable.
+ * Funds check for a set of charge orders, run before any mutation. Null when
+ * affordable (#1345: the arithmetic lives in core's ChargeOrder).
  */
 export function chargeFundsFailure(
   state: GameState,
   orders: ReadonlyArray<{ holeId: string; explosiveId: string; amountKg: number }>,
 ): CommandResult | null {
-  let need = 0;
-  for (const o of orders) {
-    const outstanding = findOutstandingChargeAction(state, o.holeId);
-    const refund = outstanding ? ((outstanding.payload['orderCost'] as number) ?? 0) : 0;
-    need += chargeOrderCost(o.explosiveId, o.amountKg) - refund;
-  }
-  // A replacement costing no more than the refunded order needs no new cash,
-  // even when the balance is negative. Sub-cent residue is float noise.
-  if (need < 0.005 || need <= state.cash) return null;
+  const short = chargeFundsFailureAmount(state, orders);
+  if (!short) return null;
   return {
     success: false,
-    output: t('console.insufficient_funds', { need: formatMoney(need), have: formatMoney(state.cash) }),
+    output: t('console.insufficient_funds', { need: formatMoney(short.need), have: formatMoney(state.cash) }),
   };
 }
 
@@ -107,14 +41,23 @@ export function chargeCommand(
   if (_args[0] === 'show') {
     const orderedEntries = Object.entries(ctx.state!.plannedChargesByHole);
     const loadedEntries = Object.entries(ctx.state!.chargesByHole);
-    if (orderedEntries.length === 0 && loadedEntries.length === 0) return { success: true, output: t('mining.charge.none_set') };
+    const pattern = ctx.state!.patternCharge;
+    const patternLine = pattern ? t('mining.charge.pattern_set', {
+      explosive: explosiveName(pattern.explosiveId), amount: pattern.amountKg, stemming: pattern.stemmingM,
+    }) : null;
+    if (orderedEntries.length === 0 && loadedEntries.length === 0) {
+      return { success: true, output: patternLine ?? t('mining.charge.none_set') };
+    }
     const orderedLines = orderedEntries.map(([id, c]) =>
       `  ${id}: ${c.explosiveId} ${c.amountKg}kg, stemming ${c.stemmingM}m [ORDERED]`,
     );
     const loadedLines = loadedEntries.map(([id, c]) =>
       `  ${id}: ${c.explosiveId} ${c.amountKg}kg, stemming ${c.stemmingM}m`,
     );
-    return { success: true, output: `Charges:\n${[...orderedLines, ...loadedLines].join('\n')}` };
+    const waiting = ctx.state!.chargeAwaitingFunds ?? [];
+    const waitingLine = waiting.length > 0 ? t('mining.charge.awaiting_funds', { count: waiting.length, holes: waiting.join(', ') }) : null;
+    const body = `Charges:\n${[...orderedLines, ...loadedLines].join('\n')}`;
+    return { success: true, output: [patternLine, waitingLine, body].filter(Boolean).join('\n') };
   }
 
   const holeSpec = named['hole'] ?? '';
@@ -126,25 +69,7 @@ export function chargeCommand(
   const notOffered = levelExplosiveFailure(ctx.state!.campaign.activeLevelId, explosiveId);
   if (notOffered) return notOffered;
 
-  if (holeSpec === '*') {
-    const holeIds = ctx.state!.drillHoles.map(h => h.id);
-    const depths: Record<string, number> = {};
-    for (const h of ctx.state!.drillHoles) depths[h.id] = h.depth;
-    const result = batchCharge(holeIds, depths, explosiveId, amount, stemming);
-    if (result.errors.length > 0) {
-      return { success: false, output: `Errors:\n${result.errors.map(e => `  ${e.holeId}: ${e.message}`).join('\n')}` };
-    }
-    const targets = ctx.state!.drillHoles.filter(h => result.charges[h.id]);
-    const broke = chargeFundsFailure(ctx.state!, targets.map(h => ({
-      holeId: h.id, explosiveId: result.charges[h.id]!.explosiveId, amountKg: result.charges[h.id]!.amountKg,
-    })));
-    if (broke) return broke;
-    for (const h of targets) {
-      const charge = result.charges[h.id]!;
-      dispatchChargeAction(ctx, h, charge.explosiveId, charge.amountKg, charge.stemmingM);
-    }
-    return { success: true, output: `Ordered charges for ${holeIds.length} holes with ${explosiveId} ${amount}kg` };
-  }
+  if (holeSpec === '*') return chargePattern(ctx.state!, explosiveId, amount, stemming);
 
   // Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format
   const holeId = resolveHoleId(ctx.state!, holeSpec);
@@ -160,7 +85,7 @@ export function chargeCommand(
 
   const broke = chargeFundsFailure(ctx.state!, [{ holeId: hole.id, explosiveId, amountKg: amount }]);
   if (broke) return broke;
-  dispatchChargeAction(ctx, hole, explosiveId, amount, stemming);
+  dispatchChargeAction(ctx.state!, hole, result.charge);
   return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
 }
 
@@ -185,4 +110,44 @@ export function levelExplosiveFailure(levelId: string | null, explosiveId: strin
       available: resolveAvailableExplosives(levelId).map(nameOf).join(', '),
     }),
   };
+}
+
+function explosiveName(id: string): string {
+  const e = getExplosive(id);
+  return e ? t(e.nameKey) : id;
+}
+
+/**
+ * `charge hole:*` — store the pattern charge and order every uncovered drilled
+ * hole; holes drilled later are charged on landing (#1345). Funds are checked
+ * per hole, an unaffordable one waits instead of failing the batch.
+ */
+function chargePattern(state: GameState, explosiveId: string, amount: number, stemming: number): CommandResult {
+  const drilled = state.drillHoles;
+  const uncovered = drilled.filter(h => !isHoleChargeCovered(state, h.id));
+  const skippedCount = drilled.length - uncovered.length;
+  if (uncovered.length === 0 && state.plannedDrillHoles.length === 0) {
+    return { success: false, output: t('mining.charge.nothing_to_charge') };
+  }
+
+  const depths: Record<string, number> = {};
+  for (const h of [...uncovered, ...state.plannedDrillHoles]) depths[h.id] = h.depth;
+  const check = batchCharge(Object.keys(depths), depths, explosiveId, amount, stemming);
+  if (check.errors.length > 0) {
+    return { success: false, output: `Errors:\n${check.errors.map(e => `  ${e.holeId}: ${e.message}`).join('\n')}` };
+  }
+
+  state.patternCharge = { explosiveId, amountKg: amount, stemmingM: stemming };
+  const result = chargePatternHoles(state, uncovered);
+  const lines: string[] = [];
+  if (drilled.length > 0) {
+    lines.push(t('mining.charge.ordered_summary', {
+      ordered: result.ordered.length, skipped: skippedCount, waiting: result.awaiting.length,
+    }));
+  }
+  lines.push(t('mining.charge.pattern_set', { explosive: explosiveName(explosiveId), amount, stemming }));
+  if (result.invalid.length > 0) {
+    lines.push(...result.invalid.map(e => `  ${e.holeId}: ${e.message}`));
+  }
+  return { success: true, output: lines.join('\n') };
 }

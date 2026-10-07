@@ -92,6 +92,8 @@ export class NotificationCenter {
   private readonly warnedContracts = new Set<number>();
   /** PendingAction ids already warned about being blocked, keyed to the reason last warned (#1061), so a re-classification to a different reason re-toasts but the same one doesn't repeat every frame. */
   private readonly warnedBlockedOrders = new Map<number, BlockedOrderReason>();
+  /** True while a charge-awaiting-funds episode has already been toasted (#1345). */
+  private chargeFundsWarned = false;
   /** Haul reasons already toasted; one toast per reason while it persists, not per haul action (#1369). */
   private readonly warnedHaulReasons = new Set<BlockedOrderReason>();
 
@@ -268,6 +270,20 @@ export class NotificationCenter {
         tone: 'warn',
         tip: t('notification.pip.blocked_orders_tip', { count: blockedActions.length }),
       });
+    }
+
+    // One warn toast per awaiting-funds episode (#1345): re-arms once the list empties.
+    const awaiting = state.chargeAwaitingFunds?.length ?? 0;
+    if (awaiting > 0 && !this.chargeFundsWarned) {
+      this.chargeFundsWarned = true;
+      this.notify({
+        severity: 'warn',
+        icon: 'warn',
+        title: t('notification.title.order_blocked'),
+        body: t('notification.charge_awaiting_funds', { count: awaiting }),
+      });
+    } else if (awaiting === 0) {
+      this.chargeFundsWarned = false;
     }
 
     return pips;
