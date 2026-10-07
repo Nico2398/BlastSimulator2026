@@ -5,14 +5,15 @@ import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
 import { getLevelProgress, createCampaignState, isCampaignDone, isCampaignLevel } from '../../core/campaign/Campaign.js';
-import { addIncome, getFinancialReport } from '../../core/economy/Finance.js';
+import { addIncome, getOperatingProfit } from '../../core/economy/Finance.js';
 import { createGameForLevel, settleLevelResult } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
-import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
+import { STARTING_SITE_STAFFED_COMPOSITION } from '../../core/config/balance.js';
+import { sanitizeFiniteOverride, parseOptionalStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile } from '../../persistence/CampaignProfile.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -90,7 +91,7 @@ export function campaignCompleteCommand(
   const level = getLevel(levelId);
   if (!level) return { success: false, output: t('campaign.complete_unknown_level', { levelId }) };
 
-  const shortfall = level.unlockThreshold - getFinancialReport(ctx.state.finances, 0).netProfit;
+  const shortfall = level.unlockThreshold - getOperatingProfit(ctx.state.finances);
   if (shortfall > 0) {
     addIncome(ctx.state.finances, shortfall, 'contracts', 'debug:force_complete', ctx.state.tickCount);
   }
@@ -128,10 +129,13 @@ export function campaignStartCommand(
   // pre-hired roster and pre-purchased fleet, so a scenario that only needs
   // an ordinary staffed opening does not have to hire/license/buy/assign it
   // by hand on every campaign level.
-  const flags = parseStaffedFlag(named['staffed']);
+  const flags = parseOptionalStaffedFlag(named['staffed']);
   if (flags.error) {
     return { success: false, output: flags.error };
   }
+
+  // Absent: the level's own site. true: the global staffed roster. false: bare.
+  const startingSite = flags.staffed === undefined ? target?.startingSite : flags.staffed ? STARTING_SITE_STAFFED_COMPOSITION : undefined;
 
   const newState = createGameForLevel(campaign, levelId, flags.staffed);
   if (!newState) {
@@ -173,6 +177,7 @@ export function campaignStartCommand(
     sizeZ: level.gridZ,
     mixedRockHardness: level.mixedRockHardness,
     startingCrew: true,
+    ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   });
 
   // Generate initial contracts so they're available immediately
@@ -189,7 +194,7 @@ export function campaignStartCommand(
       gridX: level.gridX,
       gridZ: level.gridZ,
       cash: ctx.state.cash.toLocaleString('en-US'),
-      staffedSuffix: staffedSuffix(flags.staffed),
+      staffedSuffix: staffedSuffix(startingSite !== undefined),
     }),
   };
 }

@@ -58,6 +58,8 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // The operating-profit capital/running split is the unit-tested contract of Finance (#1363); production reads it only inside getFinancialReport.
+  'src/core/economy/Finance.ts:CAPITAL_EXPENSE_CATEGORIES',
   // Unit-tested contract of the capacity unit table (#1377); production reads it only inside the tooltip builder.
   'src/ui/catalogCardText.ts:BUILDING_CAPACITY_UNIT_KEY',
   // Unit-tested contract of the $/h card format (#1377); production reaches it only through the card-line helpers.

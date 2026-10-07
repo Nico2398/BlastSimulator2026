@@ -461,8 +461,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1382: +1 key (ui.crew.injured_back_in): 3739; the unused ui.crew.tag_injured dropped: 3738.
     // #1411: +24 keys (corruption/mafia consequence notifications, investigation event, tick lines, exposure outcome chip): 3762.
     // #1392: +4 keys (demolition/upgrade order notifications and rebuilding label), both locales: 3766.
-    // #1364: +1 key (ui.contracts.not_on_site, off-site contract badge), both locales: 3767.
-    expect(Object.keys(en).length).toBe(3767);
+    // #1364: +1 key (ui.contracts.not_on_site); #1363: +2 keys (ui.finances.operating_profit, _tip), both locales: 3769.
+    expect(Object.keys(en).length).toBe(3769);
   });
 });
 

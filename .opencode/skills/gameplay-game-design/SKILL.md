@@ -160,6 +160,13 @@ Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing
 2. **"Grumpstone Ridge"** — Mountain, mixed rocks, mid-tier explosives, nearby village, moderate events
 3. **"Treranium Depths"** — Tropical, endgame rocks + Treranium, demanding contracts, multiple villages, volatile weather
 
+**Dusty Hollow opens staffed (#1363):** `LevelDef.startingSite` (`DUSTY_HOLLOW_STARTING_SITE`) hires a driller, a blaster and a driver, buys a drill rig and a debris hauler, and places a Tier 1 Freight Warehouse for free, so the crew can work from tick 0 with storage already synced (`regenerateGrid` → `placeStartingBuildings`, which spirals out from `STARTING_BUILDING_STANDOFF_M` from the crew toward the site centre so a footprint cannot wall a vehicle in). `createGameForLevel`/`campaign start` take a tri-state `staffed`: absent = the level's own site, `true` = the global `STARTING_SITE_STAFFED_COMPOSITION`, `false` = a bare site. Dusty Hollow's `contractPriceMultiplier` is `DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER` (bisect window in `balance.ts`).
+
+**Decisions (#1363):**
+- Hiring and training fees (`salaries` category) count as running costs; only `equipment` and `construction` are capital.
+- `refund` income is excluded: selling or demolishing back must not inflate the target.
+- Payroll (~$200/tick for the opening crew) makes the level a race: wellbeing collapses (no rest above `NEED_REST_NO_BUILDING_CAP` restores morale) into a revolt around tick 450-630, so prices are tuned for a win within a few blasts rather than a long grind. Starting cash stays $50,000: a 2x2 pattern lands its first sale by ~tick 130, well before bankruptcy.
+
 ### Progression
 Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-3) for replayability.
 
@@ -169,7 +176,7 @@ Level 1 unlocked at start → profit threshold unlocks next → star ratings (1-
 - **Lose:** Bankruptcy, arrest (corruption), ecology=0, well-being=0
 - **Arrest:** mafia exposure >= `ARREST_EXPOSURE_THRESHOLD` (0.9) arrests immediately. `ARREST_WARNING_EXPOSURE` (0.75) fires one `arrest:warning` event (toast) and shows an exposure pip (warn, critical from 0.9); the warning re-arms when exposure drops under 0.75. A jump past 0.9 skips the warning.
 - **Revolt:** well-being at 0 for `REVOLT_TICKS` (120) revolts; `REVOLT_WARNING_TICKS` (40) fires `revolt:warning`. A well-being pip shows below `WELL_BEING_ALERT_THRESHOLD` (20, warn), and at 0 becomes a critical revolt countdown (`revoltTicksRemaining`).
-- **Win:** Reach profit threshold → next level unlocked
+- **Win:** Reach the profit threshold → next level unlocked. The figure is **operating profit** (#1363): income excluding `refund`, minus every expense outside `CAPITAL_EXPENSE_CATEGORIES` (`equipment`, `construction`) — `getOperatingProfit` / `FinancialReport.operatingProfit` (`Finance.ts`). One-off purchases of vehicles and buildings never count against the target. Everything that shows or checks progress reads it: `checkLevelComplete`, `snapshotStats` (`totalWealth`), `campaign complete`, the `finances` command, the goal chip, the Finances panel row and `console-api` `profit`.
 - **Campaign complete:** All 3 campaign levels (tier > 0; the tutorial level is excluded) completed. The final level's victory screen announces it.
 - **Site Map and the live game (#1314):** a *live game* is a state that exists and whose level has not ended. While one is live: the main menu shows RESUME (`#bs-menu-resume`) above CONTINUE; the Site Map opened from the top bar shows BACK TO SITE (`#bs-world-map-back-to-site`) and Esc does the same (a confirm closes first); Start on a level card asks for confirmation first, since it restarts that level from scratch. The map's Site Map entry from the level-end screen offers no way back. Both returns change no game state.
 

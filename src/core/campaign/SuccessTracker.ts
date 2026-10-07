@@ -65,7 +65,7 @@ export function createLevelStats(): LevelStats {
  */
 export function snapshotStats(stats: LevelStats, state: GameState): void {
   const report = getFinancialReport(state.finances, 0);
-  stats.totalWealth = report.netProfit;
+  stats.totalWealth = report.operatingProfit;
   stats.casualties = state.damage.deathCount;
   stats.blastsPerformed = state.damage.blastCount;
 

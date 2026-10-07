@@ -618,8 +618,10 @@ export function createGame(config: GameConfig): GameState {
     weather: createWeatherCycle(config.seed),
   };
 
-  if (config.staffed) {
-    applyStaffedComposition(state);
+  if (config.startingSite) {
+    applyStaffedComposition(state, config.startingSite);
+  } else if (config.staffed) {
+    applyStaffedComposition(state, STARTING_SITE_STAFFED_COMPOSITION);
   }
 
   return state;
@@ -632,7 +634,7 @@ export function createGame(config: GameConfig): GameState {
  * is truthy; the roster and fleet composition are defined in
  * `STARTING_SITE_STAFFED_COMPOSITION` (src/core/config/balance.ts).
  */
-function applyStaffedComposition(state: GameState, composition: StartingSiteComposition = STARTING_SITE_STAFFED_COMPOSITION): void {
+function applyStaffedComposition(state: GameState, composition: StartingSiteComposition): void {
   const rng = new Random(state.seed);
 
   // Small deterministic offsets near the site origin — no navGrid exists yet

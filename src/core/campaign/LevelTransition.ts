@@ -76,7 +76,7 @@ export function checkLevelComplete(
   if (!level) return { triggered: false, summary: null };
 
   const report = getFinancialReport(state.finances, 0);
-  const profit = report.netProfit;
+  const profit = report.operatingProfit;
   if (profit < level.unlockThreshold) return { triggered: false, summary: null };
 
   // Threshold reached — close the session (guards repeat triggers), record, build summary
@@ -124,7 +124,9 @@ export function createGameForLevel(
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
     scoreDecayRate: level.scoreDecayRate,
-    ...(staffed ? { staffed: true } : {}),
+    ...(staffed === undefined
+      ? (level.startingSite ? { startingSite: level.startingSite } : {})
+      : (staffed ? { staffed: true } : {})),
   };
 
   const newState = createGame(config);
