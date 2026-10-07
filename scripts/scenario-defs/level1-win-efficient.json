@@ -1456,15 +1456,15 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 15.48750000000001,
+          "wellBeing": 17.38749999999999,
           "safety": 50,
-          "ecology": 52.93626354005779,
-          "nuisance": 41.1656588501446
+          "ecology": 52.946263540057785,
+          "nuisance": 41.265658850144604
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50. ecology re-measured 46.41 -> 52.79 (union_eco_committee option 0: +8 ecology)."
+        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50. ecology re-measured 46.41 -> 52.79 (union_eco_committee option 0: +8 ecology). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -1483,15 +1483,15 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "wellBeing": 15.48750000000001,
+          "wellBeing": 17.38749999999999,
           "safety": 50,
-          "ecology": 52.93626354005779,
-          "nuisance": 41.1656588501446
+          "ecology": 52.946263540057785,
+          "nuisance": 41.265658850144604
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50."
+        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50. #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2727,8 +2727,9 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 48.308294250723314
-        }
+          "nuisance": 48.46829425072332
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2750,8 +2751,9 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 48.308294250723314
-        }
+          "nuisance": 48.46829425072332
+        },
+        "note": " #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2773,14 +2775,14 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 48.308294250723314,
+          "nuisance": 48.46829425072332,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "holeCount": 25,
           "orderedHoleCount": 0
         },
-        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; safety re-measured 10.52 -> 0 (no safety-granting event lands; the post-death floor is not lifted)."
+        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; safety re-measured 10.52 -> 0 (no safety-granting event lands; the post-death floor is not lifted). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     }
   ]

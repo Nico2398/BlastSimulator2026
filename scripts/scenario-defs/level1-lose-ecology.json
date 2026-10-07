@@ -243,6 +243,10 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
@@ -1127,7 +1131,7 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:driller",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1135,11 +1139,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
@@ -1151,18 +1155,18 @@
           "employeeCount"
         ]
       },
-      "description": "#554 recalibration: moved here (right after drilling, instead of before it) so the filler cushion's own idle-decay clock starts when drilling actually ends, not tick 0 -- see this file's own top-level description for why: with only the original 4-crew drilling first (no filler dilution at all), wellBeing already crashes to 0 by tick ~130 and sits there through the rest of drilling, but a FRESH 15-employee cushion hired the instant drilling ends climbs back out of that hole instead of continuing to decay from a roster that had already been idling since tick 0 -- exactly the margin needed against REVOLT_TICKS=120 once real charging time (#554) pushes blast hundreds of ticks later than the old instant-charge design ever had to survive. #1189 pushed drilling's own end from tick 230 to tick 290 (see the state-full step just above); the cushion's clock now starts there instead, and every downstream tick this file's prose quotes (peak wellBeing, blast landing, shutdown firing) shifts by the same flat 60 ticks -- confirmed by direct probe that nothing besides the two explicit `tickCount` checkpoints needed updating."
+      "description": "#1385 (hiring pool): hiring draws from 3 candidates per role, refreshed every 24 ticks. The 15-employee cushion is now 3 each of the 5 roles, hired at once, and every later wave adds another 15 (3 per role) to keep wellBeing up while charging runs (it must be instant: it is what lifts wellBeing off 0 before worker_revolt trips). Charging is ordered right away and the temporary blasters (3 per interval, 12 in four waves, instead of 31 at once) join while it is under way. #554 recalibration: moved here (right after drilling, instead of before it) so the filler cushion's own idle-decay clock starts when drilling actually ends, not tick 0 -- see this file's own top-level description for why: with only the original 4-crew drilling first (no filler dilution at all), wellBeing already crashes to 0 by tick ~130 and sits there through the rest of drilling, but a FRESH 15-employee cushion hired the instant drilling ends climbs back out of that hole instead of continuing to decay from a roster that had already been idling since tick 0 -- exactly the margin needed against REVOLT_TICKS=120 once real charging time (#554) pushes blast hundreds of ticks later than the old instant-charge design ever had to survive. #1189 pushed drilling's own end from tick 230 to tick 290 (see the state-full step just above); the cushion's clock now starts there instead, and every downstream tick this file's prose quotes (peak wellBeing, blast landing, shutdown firing) shifts by the same flat 60 ticks -- confirmed by direct probe that nothing besides the two explicit `tickCount` checkpoints needed updating."
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:driller",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
@@ -1176,15 +1180,15 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:driller",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
@@ -1198,15 +1202,15 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
@@ -1220,15 +1224,15 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
@@ -1242,103 +1246,15 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
@@ -1418,15 +1334,15 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
@@ -1440,15 +1356,15 @@
       }
     },
     {
-      "command": "employee hire role:driver",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
@@ -1462,38 +1378,15 @@
       }
     },
     {
-      "command": "employee hire role:blaster",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      },
-      "description": "Temporary charging crew (30x 'blaster' role -- ROLE_STARTING_QUALIFICATION grants 'blasting' immediately, no drill_rig/vehicle needed since charge_hole's requiredVehicleRole is null): with only the original 4 driller crew able to charge, landing all 49 queued charge_hole orders took ~305 ticks serially/4-wide, long enough that even the fresh filler cushion above crashes and resolves worker_revolt before the delayed blast ever starts ecological_shutdown's own countdown. 30 more parallel charging hands land the same 49 holes in ~120 ticks instead. They are never fired -- they charge, then stand exactly where the blast needs everyone to stand for the catastrophe this file is testing, and die alongside the original 4 crew (deathCount 34) rather than surviving to dilute (or being routed through a firing dance that trips on random unionization, #554 finding). Once they're gone, only the still-fresh filler cushion remains to carry wellBeing through the post-blast countdown."
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
@@ -1507,15 +1400,15 @@
       }
     },
     {
-      "command": "employee hire role:blaster",
+      "command": "employee hire role:manager",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
@@ -1529,15 +1422,15 @@
       }
     },
     {
-      "command": "employee hire role:blaster",
+      "command": "employee hire role:manager",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
@@ -1551,587 +1444,15 @@
       }
     },
     {
-      "command": "employee hire role:blaster",
+      "command": "employee hire role:manager",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
@@ -2198,15 +1519,15 @@
       }
     },
     {
-      "command": "tick 1",
+      "command": "tick 24",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 1"
+          "command": "tick 24"
         }
       ],
       "role": "setup",
-      "description": "#554/#590 finding: charging 48 holes with a 35-strong temporary blaster crew (4 original driller/charger crew + 31 temporary 'blaster' hires, #680 recalibration) is real, worker-performed work that takes long enough (122 ticks) for a spontaneous event to plausibly fire mid-wait -- a single long `waitUntil` has no way to resolve one in interaction mode (its real, isPaused-gated clock halts exactly as it would for a real player, per interaction-executor.ts's own waitUntil doc comment), so the drain stalls forever at whatever count was ordered when the event hit. Command mode's own waitUntil auto-resolves silently and never showed this. Chunked here into the same tick-N/event-choose-0 pattern already used for this file's own drilling wait above, which does resolve mid-wait events in both modes. Sized to exactly 122 ticks total (re-measured by direct probe after #680's tri-state needs-drain fix changed forced-rest timing during charge_hole work -- the pre-#680 figure was 118 ticks with a 34-strong crew; #680 alone would have stretched that same 34-strong crew to 167 ticks, late enough that worker_revolt's own independent wellBeing clock wins the race instead of ecological_shutdown, so one more temporary blaster hire was added above to bring the crew to 35 and the charging phase back down to a safe margin -- see this file's own top-level description) -- this file's blast-to-shutdown timing race is exact-tick-sensitive (see this file's own top-level description and the final step's tickCount:502 assertion), so no padding is added here: an extra tick would shift every absolute tick number after it."
+      "description": "#1385: wait one HIRING_POOL_REFRESH_INTERVAL (24 ticks) so the pool offers fresh blaster candidates."
     },
     {
       "command": "event choose 0",
@@ -2216,18 +1537,18 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
       "commandOutcome": "either"
     },
     {
-      "command": "tick 1",
+      "command": "tick 24",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 1"
+          "command": "tick 24"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "description": "#1385: the previous tick 24 was cut short by a pending random event (Trade War), so the pool had not refreshed yet; wait the rest of the interval."
     },
     {
       "command": "event choose 0",
@@ -2237,1950 +1558,352 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
       "commandOutcome": "either"
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 1",
-      "interaction": [
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "tick 24",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 1"
+          "command": "tick 24"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "description": "#1385: wait one HIRING_POOL_REFRESH_INTERVAL (24 ticks) so the pool offers fresh blaster candidates."
     },
     {
       "command": "event choose 0",
@@ -4190,186 +1913,352 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
       "commandOutcome": "either"
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "tick 24",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 1"
+          "command": "tick 24"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "description": "#1385: wait one HIRING_POOL_REFRESH_INTERVAL (24 ticks) so the pool offers fresh blaster candidates."
     },
     {
       "command": "event choose 0",
@@ -4379,186 +2268,352 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
       "commandOutcome": "either"
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "tick 24",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 1"
+          "command": "tick 24"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "description": "#1385: wait one HIRING_POOL_REFRESH_INTERVAL (24 ticks) so the pool offers fresh blaster candidates."
     },
     {
       "command": "event choose 0",
@@ -4568,185 +2623,350 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
       "commandOutcome": "either"
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "tick 1",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 1"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "setup"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "event choose 0",
+      "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
-      "commandOutcome": "either"
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
     },
     {
-      "command": "wait_until field:chargedCount equals:49 max_ticks:60",
+      "command": "wait_until field:chargedCount equals:49 max_ticks:400",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 49,
-          "maxTicks": 60,
+          "maxTicks": 400,
           "timeoutMs": 60000
         }
       ],
@@ -4757,7 +2977,7 @@
           "orderedChargeCount": 0
         }
       },
-      "description": "#1339: roles arrive able to do their own job, so the blaster's charge queue drains on its own clock; wait on the last charge landing instead of pinning a tick count."
+      "description": "#1339: roles arrive able to do their own job, so the blaster's charge queue drains on its own clock; wait on the last charge landing instead of pinning a tick count. #1385: the 120-tick `tick 1` loop that used to cover the charging phase is gone -- the staggered hiring waves above already spend that time, and keeping it pushed the blast out far enough for worker_revolt to beat ecological_shutdown. Wait on the last charge instead (max 400)."
     },
     {
       "command": "event choose 0",
@@ -4773,6 +2993,10 @@
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
@@ -4828,8 +3052,9 @@
           "chargedCount": 0,
           "sequencedCount": 0,
           "ecology": 0,
-          "deathCount": 35
-        }
+          "deathCount": 16
+        },
+        "note": " #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false)."
       }
     },
     {
@@ -5185,13 +3410,13 @@
       "expect": {
         "equals": {
           "ecology": 0,
-          "tickCount": 567,
+          "tickCount": 622,
           "ecologicalShutdown": true,
           "levelEnded": true,
           "levelEndReason": "ecological_shutdown",
           "revolted": false
         },
-        "note": "Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 562 (blast now lands at tick 412: #1189 pushed drilling's own end from tick 230 to tick 290 -- see the state-full and hiring step descriptions above -- and landing all 49 drilled charge_hole orders with the 31-strong temporary blaster crew above (#680 recalibration, up from #554's original 30) still takes ~122 ticks, unaffected by the drilling-phase shift). worker_revolt's own, independently-running wellBeing streak crosses zero around tick 502 (the fresh 15-employee filler cushion, hired right after drilling instead of before it, climbs back toward positive wellBeing once the temporary blaster crew dies and stops dragging the average down, then decays back to 0 on its own clock) -- REVOLT_TICKS=120 after that is ~622, well after shutdown already claims levelEndReason at 562, confirmed by direct probe. Every one of these numbers is the pre-#1189 value plus the same flat 60-tick shift drilling absorbed; nothing else about the race changed. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself. #1339: roles arrive able to do their own job, so the charge queue's last hole lands 5 ticks later than before (the blast now fires at tick 417 and shutdown at 567); the step before waits on chargedCount instead of pinning a tick."
+        "note": "Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 562 (blast now lands at tick 412: #1189 pushed drilling's own end from tick 230 to tick 290 -- see the state-full and hiring step descriptions above -- and landing all 49 drilled charge_hole orders with the 31-strong temporary blaster crew above (#680 recalibration, up from #554's original 30) still takes ~122 ticks, unaffected by the drilling-phase shift). worker_revolt's own, independently-running wellBeing streak crosses zero around tick 502 (the fresh 15-employee filler cushion, hired right after drilling instead of before it, climbs back toward positive wellBeing once the temporary blaster crew dies and stops dragging the average down, then decays back to 0 on its own clock) -- REVOLT_TICKS=120 after that is ~622, well after shutdown already claims levelEndReason at 562, confirmed by direct probe. Every one of these numbers is the pre-#1189 value plus the same flat 60-tick shift drilling absorbed; nothing else about the race changed. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself. #1339: roles arrive able to do their own job, so the charge queue's last hole lands 5 ticks later than before (the blast now fires at tick 417 and shutdown at 567); the step before waits on chargedCount instead of pinning a tick. #1385 (hiring pool): with 12 temporary blasters (not 31) the blast kills 13 (the 4 original crew plus the temp blasters) and the sequence ends later; deathCount and tickCount were re-measured, the level still ends in ecological_shutdown. #1385 (hiring pool): the staged hiring waves (each also adds 3 fresh drivers, surveyors and managers to hold wellBeing up) change the death toll to 16 and the shutdown tick to 622; the level still ends in ecological_shutdown (revolted:false)."
       }
     }
   ]

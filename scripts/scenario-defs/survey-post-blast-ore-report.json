@@ -570,6 +570,17 @@
       }
     },
     {
+      "command": "tick 24",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 24"
+        }
+      ],
+      "role": "setup",
+      "description": "#1385: hiring pool holds HIRING_POOL_SIZE (3) candidates per role and refreshes every HIRING_POOL_REFRESH_INTERVAL (24) ticks; wait one interval so the next batch of hires has candidates."
+    },
+    {
       "command": "employee hire role:driller",
       "description": "#553 crew-walkout fix, same rationale as above -- Employee #5, also left idle for the rest of the file. #553-followup: no toolbar click here either -- same reason as Employee #4 above, the panel is still open from Employee #3's own opening click.",
       "interaction": [
