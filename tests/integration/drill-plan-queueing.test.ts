@@ -17,6 +17,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath } from '../../src/core/nav/Pathfinding.js';
 import { tickUntil } from './helpers.js';
+import { refreshHiringPool } from '../../src/core/entities/HiringPool.js';
 import { getFinancialReport } from '../../src/core/economy/Finance.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { checkProtectedPositions } from '../../src/core/mining/BlastPlan.js';
@@ -267,6 +268,8 @@ describe('drill_plan grid — dense 1m-spacing grid under agent occupancy conver
     // contends with itself.
     for (let i = 0; i < 7; i++) {
       const beforeCount = state.employees.employees.length;
+      // A role offers only HIRING_POOL_SIZE (3) candidates per refresh (#1385).
+      if (i > 0 && i % 3 === 0) refreshHiringPool(state.hiringPool, 42, state.tickCount + i);
       expect(run('employee hire role:driller').success).toBe(true);
       const hired = state.employees.employees[beforeCount]!;
       expect(run(`employee assign_skill ${hired.id} skill:driving.drill_rig level:1`).success).toBe(true);

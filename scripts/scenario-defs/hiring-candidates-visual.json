@@ -73,7 +73,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"]"
+          "selector": "#bs-employee-panel [data-employee-role=\"driller\"]"
         },
         {
           "type": "screenshot"
@@ -95,7 +95,7 @@
       "interaction": [
         {
           "type": "command",
-          "command": "employee candidates role:driller"
+          "command": "state"
         },
         {
           "type": "waitForSelector",

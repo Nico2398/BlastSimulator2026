@@ -5,7 +5,8 @@ import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { drillPlanCommand, type MiningContext } from '../../src/console/commands/mining.js';
-import { killEmployee } from '../../src/core/entities/Employee.js';
+import { killEmployee, type EmployeeRole } from '../../src/core/entities/Employee.js';
+import { candidatesForRole } from '../../src/core/entities/HiringPool.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
@@ -676,7 +677,12 @@ describe('Console — employee hire — spawn is on the grid\'s main climb-conne
 
 function hireNamed(ctx: GameContext, role: string): number {
   const before = new Set(ctx.state!.employees.employees.map(e => e.id));
-  const result = employeeCommand(ctx, ['hire'], { role });
+  // Prefer a non-union candidate (#1385): unionized hires cannot be fired.
+  const pick = candidatesForRole(ctx.state!.hiringPool, role as EmployeeRole).find(c => !c.unionized);
+  const named: Record<string, string> = { role };
+  if (pick) named['candidate'] = String(pick.id);
+  
+  const result = employeeCommand(ctx, ['hire'], named);
   if (!result.success) throw new Error(`Setup: hire failed — ${result.output}`);
   return ctx.state!.employees.employees.find(e => !before.has(e.id))!.id;
 }

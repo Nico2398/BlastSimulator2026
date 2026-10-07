@@ -541,9 +541,9 @@ describe('CrewPanel manager effect (#1340)', () => {
   it('the manager hiring row explains what a manager does', () => {
     const { panel } = makePanel();
     panel.update(makeState([]));
-    const row = panel.root.querySelector('[data-role="manager"]')!.parentElement!;
+    const row = panel.root.querySelector('[data-hiring-role="manager"]')!;
     expect(row.textContent).toContain(t('ui.crew.manager_effect_hint'));
-    const other = panel.root.querySelector('[data-role="driller"]')!.parentElement!;
+    const other = panel.root.querySelector('[data-hiring-role="driller"]')!;
     expect(other.textContent).not.toContain(t('ui.crew.manager_effect_hint'));
   });
 });

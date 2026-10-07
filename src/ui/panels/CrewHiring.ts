@@ -39,7 +39,8 @@ function makeCandidateCard(
   });
   btn.disabled = state.cash < HIRING_COSTS[c.role];
   btn.addEventListener('click', () => onHire(c.role, c.id));
-  card.append(info, btn);
+  const fee = el('span', { text: t('ui.crew.hire_fee', { fee: HIRING_COSTS[c.role] }), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
+  card.append(info, fee, btn);
   return card;
 }
 
@@ -62,10 +63,7 @@ export function makeHiringSection(state: GameState, onHire: (role: EmployeeRole,
         attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
       }));
     }
-    head.append(
-      info,
-      el('span', { text: t('ui.crew.hire_fee', { fee: HIRING_COSTS[role] }), className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } }),
-    );
+    head.append(info);
     group.append(head);
     const candidates = candidatesForRole(state.hiringPool, role);
     if (candidates.length === 0) {
