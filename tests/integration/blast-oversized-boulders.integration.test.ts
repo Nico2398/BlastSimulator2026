@@ -97,7 +97,7 @@ function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
 }
 
 /**
- * Drill+charge+sequence+blast an undercharged, wide-spacing pattern at
+ * Drill+charge+blast an undercharged, wide-spacing pattern at
  * (18,19) — same origin as economy.integration.test.ts's full-loop case: it
  * sits on the same flat NavGrid bench as the vehicle spawn and warehouse, so
  * fragments land somewhere a vehicle can actually reach. Mirrors

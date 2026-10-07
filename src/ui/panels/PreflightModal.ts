@@ -18,6 +18,7 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
+import { totalChargeKg } from '../../core/mining/BlastCalc.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
@@ -113,7 +114,7 @@ export class PreflightModal {
 
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = plannedChargesCost(state.chargesByHole);
-    const chargeKg = Object.values(state.chargesByHole).reduce((sum, c) => sum + c.amountKg, 0);
+    const chargeKg = totalChargeKg(plan.holes, plan.charges);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
 
     const wet = weather ? wetHoles(state, weather) : [];

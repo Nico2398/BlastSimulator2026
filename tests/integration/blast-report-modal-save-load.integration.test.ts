@@ -32,7 +32,7 @@ import type { BlastReport } from '../../src/core/mining/BlastExecution.js';
 
 /**
  * Fires one real blast through the console command layer — drill, charge,
- * sequence, blast — draining the queued PendingActions between each planning
+ * blast — draining the queued PendingActions between each planning
  * command the same way tests/integration/tutorial-pause.integration.test.ts's
  * haul-debris test does (#552/#554: drilling and charging are real,
  * worker-gated work, not instant). Needs are topped up every tick so a solo

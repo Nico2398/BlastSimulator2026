@@ -164,7 +164,6 @@ export function chargeCommand(
   return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
 }
 
-
 /**
  * Failure when `explosiveId` is a catalog explosive the active level does not
  * offer. Null when allowed or when the id is not in the catalog (unknown ids

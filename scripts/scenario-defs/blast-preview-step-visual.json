@@ -17,7 +17,7 @@
     {
       "command": "new_game seed:42 size:32 staffed:true",
       "timeout": 30,
-      "description": "Setup: a fresh site, charged and sequenced so the plan is valid. Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Setup: a fresh site, charged so the plan is valid. Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",

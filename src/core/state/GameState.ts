@@ -400,7 +400,6 @@ export interface GameState {
   /** Charges ordered but not yet loaded — each queues one `charge_hole` action and lands in `chargesByHole` on completion (#554). */
   plannedChargesByHole: Record<string, PlannedCharge>;
 
-
   /** Named saved blast plans. */
   savedPlans: Record<string, SavedBlastPlan>;
 

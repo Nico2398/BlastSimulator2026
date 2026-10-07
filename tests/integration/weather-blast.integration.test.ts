@@ -40,7 +40,7 @@ function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, ma
 
 // Weather ticks with the game (#1403), so a weather set before the long drill
 // and charge drives has drifted by blast time. Pin it right before the blast.
-function drillChargeSequenceBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string, weather = 'sunny') {
+function drillChargeBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string, weather = 'sunny') {
   runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
   driveDrillPlanToCompletion(runner, ctx);
   runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
@@ -53,13 +53,13 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
   it('a water-sensitive explosive (boomite) clears fewer voxels blasted in heavy rain than the same plan in default (sunny) weather, with no tubing installed', () => {
     const dry = createRunner();
     dry.runner.run('new_game seed:42 staffed:true');
-    const dryBlast = drillChargeSequenceBlast(dry.runner, dry.ctx, 'boomite');
+    const dryBlast = drillChargeBlast(dry.runner, dry.ctx, 'boomite');
     expect(dryBlast.success).toBe(true);
 
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    const wetBlast = drillChargeSequenceBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
+    const wetBlast = drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
     expect(wetBlast.success).toBe(true);
 
     const dryReport = dry.ctx.state!.lastBlastReport!;
@@ -71,13 +71,13 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
   it('a water-resistant explosive (krackle) clears the same whether blasted in heavy rain or sunny weather', () => {
     const dry = createRunner();
     dry.runner.run('new_game seed:42 staffed:true');
-    const dryBlast = drillChargeSequenceBlast(dry.runner, dry.ctx, 'krackle');
+    const dryBlast = drillChargeBlast(dry.runner, dry.ctx, 'krackle');
     expect(dryBlast.success).toBe(true);
 
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    const wetBlast = drillChargeSequenceBlast(wet.runner, wet.ctx, 'krackle', 'heavy_rain');
+    const wetBlast = drillChargeBlast(wet.runner, wet.ctx, 'krackle', 'heavy_rain');
     expect(wetBlast.success).toBe(true);
 
     expect(wet.ctx.state!.lastBlastReport!.clearedVoxels)
@@ -104,7 +104,7 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
 
     const dry = createRunner();
     dry.runner.run('new_game seed:42 staffed:true');
-    const dryBlast = drillChargeSequenceBlast(dry.runner, dry.ctx, 'boomite');
+    const dryBlast = drillChargeBlast(dry.runner, dry.ctx, 'boomite');
     expect(dryBlast.success).toBe(true);
 
     // Tubing fully protects a hole (wetHoles() excludes tubed holes outright,
@@ -119,7 +119,7 @@ describe('console blast output reports wet holes (#1348)', () => {
     const wet = createRunner();
     wet.runner.run('new_game seed:42 staffed:true');
     wet.runner.run('weather set heavy_rain');
-    const result = drillChargeSequenceBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
+    const result = drillChargeBlast(wet.runner, wet.ctx, 'boomite', 'heavy_rain');
     expect(result.success).toBe(true);
     expect(result.output).toMatch(/Wet holes: 6 \(6 fizzled\)/);
   });
@@ -127,7 +127,7 @@ describe('console blast output reports wet holes (#1348)', () => {
   it('a dry blast prints no wet-holes line', () => {
     const dry = createRunner();
     dry.runner.run('new_game seed:42 staffed:true');
-    const result = drillChargeSequenceBlast(dry.runner, dry.ctx, 'boomite');
+    const result = drillChargeBlast(dry.runner, dry.ctx, 'boomite');
     expect(result.success).toBe(true);
     expect(result.output).not.toMatch(/Wet holes/);
   });

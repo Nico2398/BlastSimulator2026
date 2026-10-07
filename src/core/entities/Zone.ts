@@ -311,7 +311,7 @@ function boundsOverlap(a: ZoneBounds, b: ZoneBounds): boolean {
  * That occupancy-only question is the wrong one for a "safe to return"
  * decision: it reads true the INSTANT an evacuation succeeds — the whole
  * point of ordering one — which is exactly the moment the zone is still MOST
- * dangerous (holes charged and sequenced, nobody has fired yet), not the
+ * dangerous (holes charged, nobody has fired yet), not the
  * moment it is actually safe to walk back in. Confirmed live via
  * tutorial-interactive.json (#557 follow-up) at two independent call sites
  * that had each been built against occupancy alone:

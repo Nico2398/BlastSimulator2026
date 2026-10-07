@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Console commands for mining operations
-// drill_plan, charge, sequence, blast, preview, build, weather, tubing, survey
+// drill_plan, charge, blast, preview, build, weather, tubing, survey
 //
 // Implementation split into command-family modules under ./mining/ (#787).
 // This file is a thin re-export barrel — every external import keeps using

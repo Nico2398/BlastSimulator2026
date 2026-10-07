@@ -80,10 +80,10 @@ export function effectiveHoleEnergy(
 // --------------------------------------------------------
 
 /** Every charge fires together, so vibration scales with the whole blast's charge. */
-export function calculateVibrations(totalChargeKg: number, distance: number, groundFactor: number): number {
+export function calculateVibrations(blastChargeKg: number, distance: number, groundFactor: number): number {
   if (distance <= 0) return Infinity;
-  if (totalChargeKg <= 0) return 0;
-  return Math.pow(totalChargeKg, 0.7) / Math.pow(distance, 1.5) * groundFactor;
+  if (blastChargeKg <= 0) return 0;
+  return Math.pow(blastChargeKg, 0.7) / Math.pow(distance, 1.5) * groundFactor;
 }
 
 // --------------------------------------------------------

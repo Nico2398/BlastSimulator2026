@@ -44,7 +44,7 @@ describe('BlastPlan', () => {
     expect(Object.keys(plan).sort()).toEqual(['charges', 'holes']);
   });
 
-  it('a missing charge is the only error kind a plan can produce', () => {
+  it('a plan only produces charge errors (missing or loading), never a delay error', () => {
     const holes = createGridPlan(holeCounter, { x: 0, z: 0 }, 2, 2, 3, 8, 0.15);
     const errors = validateBlastPlan(assembleBlastPlan(holes, {}), new Set([holes[0]!.id]));
     expect(errors.map(e => e.issue).every(i => i === 'blast.validation.missing_charge' || i === 'blast.validation.charge_loading')).toBe(true);

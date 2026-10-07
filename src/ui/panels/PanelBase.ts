@@ -8,7 +8,7 @@
 //
 // Deliberately narrow: only what every panel shares. A panel that dispatches
 // console commands keeps its own `gameConsole` field, because two of them
-// (BlastWorkshop forwards to its five steps, FinancesPanel needs none) do not
+// (BlastWorkshop forwards to its four steps, FinancesPanel needs none) do not
 // want the plain setter, and an inherited API that two subclasses have to
 // work around is worse than one line repeated.
 

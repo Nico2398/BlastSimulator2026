@@ -31,7 +31,7 @@ export class AudioHooks {
   /** Call when a blast is executed. Every charge fires together: one boom, then the rumble. */
   onBlast(): void {
     this.audio.resume().then(() => {
-      this.audio.playBuffer(this.lib.get('boom'), 'effects', 0);
+      this.audio.playBuffer(this.lib.get('boom'), 'effects');
       this.audio.playBuffer(this.lib.get('rumble'), 'effects', BLAST_RUMBLE_OFFSET_MS);
     });
   }
