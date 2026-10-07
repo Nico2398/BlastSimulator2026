@@ -738,12 +738,20 @@
       "command": "contract hold type:ore_sale material:rustite",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract hold type:ore_sale material:rustite"
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] [data-action=\"hold-toggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] [data-action=\"hold-toggle\"]"
         }
       ],
-      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held: it keeps counting as active and still expires on its deadline, but takes no stock. First contract of the pair.",
-      "role": "setup",
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. First contract of the pair.",
+      "role": "player",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -972,12 +980,20 @@
       "command": "contract hold type:ore_sale material:dirtite",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract hold type:ore_sale material:dirtite"
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
         }
       ],
-      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason.",
-      "role": "setup",
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason.",
+      "role": "player",
       "expect": {
         "changedBy": {
           "cash": 0
