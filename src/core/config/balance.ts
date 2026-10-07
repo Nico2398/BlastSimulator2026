@@ -1784,3 +1784,6 @@ export const SMUGGLING_EXPOSED_FINE = 25000;
 
 /** Exposure risk added when smuggling is exposed (#1411). */
 export const SMUGGLING_EXPOSED_EXPOSURE_JUMP = 0.1;
+
+/** Fewest stranded cells that make a placement report a cutoff (#1391). */
+export const PLACEMENT_CUTOFF_MIN_CELLS = 1;

@@ -1,0 +1,155 @@
+{
+  "name": "building-placement-cutoff-visual",
+  "description": "#1391: on seed 42 a living quarters at (1,26) seals the only strip of ground along the west edge (rows 24-28) from the crew. The ghost turns red and the strip's instruction line reads 'Cuts off N bench(es)' while Confirm stays usable. Clicking Confirm opens a 'Place anyway?' modal; Cancel orders nothing and leaves the tool armed; Confirm again then 'Place anyway' performs the placement. Every click is a real player step (BuildMenu catalog, tile picker, ConfirmModal).",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "description": "Staffed opening (#551) so the first building has a roster to build it.",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "description": "Arm living quarters through the real catalog and pick (1,26): its footprint seals the west-edge strip. Ghost is red and the strip's instruction line carries the cutoff warning (see screenshot), yet Confirm is usable. Nothing ordered yet. Interaction only: the console's build command would order it outright.",
+      "timeout": 90,
+      "interactionOnly": true,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 1,
+          "z": 26,
+          "distance": 25,
+          "pitch": 85
+        },
+        {
+          "type": "pickTile",
+          "x": 1,
+          "z": 26
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-tile-select-confirm",
+        "equals": {
+          "orderedBuildingCount": 0
+        },
+        "note": "#1391 -- cutoff leaves Confirm enabled; the warning is a ghost + strip line, not a refusal."
+      }
+    },
+    {
+      "command": "state",
+      "description": "Click Confirm: the 'Place anyway?' modal opens instead of ordering. Screenshot the modal, then Cancel: nothing ordered, cash unchanged. Interaction only (console has no modal).",
+      "timeout": 60,
+      "interactionOnly": true,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-cancel\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-cancel\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "orderedBuildingCount": 0
+        },
+        "note": "#1391 -- cancelling the modal does not place the building."
+      }
+    },
+    {
+      "command": "build living_quarters at:1,26",
+      "description": "Same still-armed tool: Confirm again, accept 'Place anyway' in the modal. The building is ordered and paid for.",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
+        "equals": {
+          "orderedBuildingCount": 1
+        },
+        "note": "#1391 -- accepting the modal performs the placement."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "placement-area",
+      "yaw": 0,
+      "pitch": 60
+    }
+  ]
+}
