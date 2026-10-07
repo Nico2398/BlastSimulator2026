@@ -2908,6 +2908,10 @@
       "interval": 50,
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
