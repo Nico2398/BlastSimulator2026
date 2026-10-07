@@ -404,7 +404,6 @@ export class GameRenderer {
     this.taskProgress?.update(dt);
     this.pictograms?.update(dt);
     this.buildingOccupancyLabels?.update(dt);
-    this.blastOverlay?.update(cam);
 
     if (this.vehicles && this.lastState) {
       this.vehicles.update(
@@ -419,8 +418,8 @@ export class GameRenderer {
   }
 
   /**
-   * Show blast plan overlay from current drill/charge/sequence state.
-   * Call from main.ts after drill_plan, charge, or sequence commands.
+   * Show blast plan overlay from current drill/charge state.
+   * Call from main.ts after drill_plan or charge commands.
    */
   showBlastPlanOverlay(ctx: MiningContext): void {
     showBlastPlanOverlay(this.blastVisualsDeps(), ctx);

@@ -108,7 +108,6 @@ export const LOADING_TIPS: readonly string[] = [
   'Training a proficiency to the next level shows up in task duration, not just the number.',
   'The union notices skipped breaks long before it notices skipped raises.',
   'A warehouse tier caps how much ore you can stockpile before a sale.',
-  'Sequencing charges in the right order controls where the muck pile ends up.',
   'Corruption buys speed today and an inspector tomorrow.',
   'Mixed rock hardness sites hide soft pockets next to hard ones — surveys still lie less than guessing.',
   'A vehicle needs a qualified driver before it needs fuel.',

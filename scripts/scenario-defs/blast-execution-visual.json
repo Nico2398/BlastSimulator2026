@@ -160,7 +160,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20",
-      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click lowers it to 2 before dragging, so the (20,20)-(22,22) rectangle (2x2) computes the declared 2x2 at spacing:2 (issue #479 follow-up, Finding #4). Spacing stays at 2 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it (grid 4/4 decrements it further, down to 1). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper click and drag rectangle below now match this declared shape.",
+      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click lowers it to 2 before dragging, so the (20,20)-(22,22) rectangle (2x2) computes the declared 2x2 at spacing:2 (issue #479 follow-up, Finding #4). Spacing stays at 2 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it (grid 4/4 decrements it further, down to 1). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper click and drag rectangle below now match this declared shape.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -435,25 +435,6 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "timeout": 70,
       "frames": 6,
@@ -461,7 +442,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -485,8 +466,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero"
       }
@@ -886,25 +866,6 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "timeout": 70,
       "frames": 6,
@@ -912,7 +873,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -936,8 +897,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero"
       }
@@ -1393,25 +1353,6 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "weather set sunny",
       "interaction": [
         {
@@ -1431,7 +1372,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -1475,8 +1416,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "blocked": "[data-action=\"report-close\"]",
         "note": "#950: a fired blast clears the plan back to zero — CATASTROPHIC rating with real projections confirms this grid's overcharge/understemmed premise actually holds at the UI-reachable stemming floor, not just at the command's old unreachable stemming:0. The report modal must still be closed at t=3200ms (past the old fixed 3000ms floor, per the assert above) while this real collapse is still playing, only opening once the awaitUsable step above proves it genuinely did, and closed again (this `blocked` goal) by the real CLOSE click at the end of this step's own interaction array."
@@ -2140,7 +2080,7 @@
     },
     {
       "command": "tick 150",
-      "description": "#586 CI real root cause (live-state confirmed, not the stuck-report-modal theory): grid 4's tick-150 wait used to run 7 rounds here so a SINGLE driller could door-to-door drill all 64 holes -- that ~1000-tick uninterrupted stretch is what crashed state.scores.wellBeing (ScoreManager.ts) to 0 and held it there past REVOLT_TICKS (120), ending the level for real via WorkerRevolt.ts (levelEndReason:'worker_revolt') before this file's own charge/sequence/blast steps ever ran -- confirmed live via window.__gameState()/__uiState() at the failing step: the toolbar was covered by #bs-level-end-screen, not any blast-report overlay. Sandbox-tested (both pure command-mode and live interaction-mode): every driller headcount and vehicle tier tried still lets the SAME crash reach revolt by tick ~571 measured from new_game -- more drillers/faster rigs raise the drilled-hole count somewhat by this point but never reach all 64 before that deadline, and a living_quarters (which would let employees recover) sends them on round trips that stall drilling even worse than the crash does. Reduced from 7 rounds to 2 (this is the last one) so the wait stops here, at tick ~421, a comfortable ~150 ticks before the revolt threshold, and the charge/sequence/blast steps below run against however many of the 64 holes 8 parallel Tier-3-rig drillers manage to finish by then (was 64/64 with the single-driller design; is well over half now, still far more than enough to exceed MAX_ACTIVE_PROJECTILES (256, balance.ts) once heavily overcharged) rather than gambling the run on finishing literally all 64 before wellbeing running out.",
+      "description": "#586 CI real root cause (live-state confirmed, not the stuck-report-modal theory): grid 4's tick-150 wait used to run 7 rounds here so a SINGLE driller could door-to-door drill all 64 holes -- that ~1000-tick uninterrupted stretch is what crashed state.scores.wellBeing (ScoreManager.ts) to 0 and held it there past REVOLT_TICKS (120), ending the level for real via WorkerRevolt.ts (levelEndReason:'worker_revolt') before this file's own charge/blast steps ever ran -- confirmed live via window.__gameState()/__uiState() at the failing step: the toolbar was covered by #bs-level-end-screen, not any blast-report overlay. Sandbox-tested (both pure command-mode and live interaction-mode): every driller headcount and vehicle tier tried still lets the SAME crash reach revolt by tick ~571 measured from new_game -- more drillers/faster rigs raise the drilled-hole count somewhat by this point but never reach all 64 before that deadline, and a living_quarters (which would let employees recover) sends them on round trips that stall drilling even worse than the crash does. Reduced from 7 rounds to 2 (this is the last one) so the wait stops here, at tick ~421, a comfortable ~150 ticks before the revolt threshold, and the charge/blast steps below run against however many of the 64 holes 8 parallel Tier-3-rig drillers manage to finish by then (was 64/64 with the single-driller design; is well over half now, still far more than enough to exceed MAX_ACTIVE_PROJECTILES (256, balance.ts) once heavily overcharged) rather than gambling the run on finishing literally all 64 before wellbeing running out.",
       "interaction": [
         {
           "type": "command",
@@ -4365,26 +4305,6 @@
       "timeout": 90
     },
     {
-      "command": "sequence auto delay_step:25",
-      "description": "#1278 migration: the three wildcard `charge hole:*` resweeps that used to sit here (#953/#1201/#1252, each pairing a wholesale re-order with its own drain wait) are removed -- direct-traced (command mode, replaying this file's own exact command sequence under agent occupancy): the named 34-hole straggler list plus its widened drain wait (see that step's own note) already reaches chargedCount:64/orderedChargeCount:0 on its own, before any of the three resweeps would fire. Removing them isn't just tidying: `charge hole:*` re-dispatches a charge_hole action for every ALREADY-charged hole too (no already-loaded guard, mining.ts) -- with 33 employees congesting this same 8x8/1m-spacing grid under real occupancy wait/relocate behavior, a wholesale re-order of 64 holes (most already done) cost roughly 1200 further ticks and ~$2.3M more payroll across the three resweeps in a direct A/B trace, which is what pushed cycle 4 into a real `worker_revolt` (and, before the cash bump on this file's own `new_game` step, bankruptcy) that the named-list-only trajectory never reaches. Left in place: the named per-hole list and its own H8 retry immediately above, which the same trace confirms are still genuinely needed (a real, if smaller, per-hole straggler set persists under occupancy) -- per issue #1278's own task framing, only proven-unnecessary insurance comes out; the rest stays.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "increased": [
-          "sequencedCount"
-        ]
-      }
-    },
-    {
       "command": "blast",
       "timeout": 80,
       "frames": 8,
@@ -4392,7 +4312,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -4416,8 +4336,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero. #553: shrunk from the original 64-hole grid — see this cycle's own drill_plan step for why; the PHYSICS_FRAGMENT_CAP overflow this note used to speculate about was never a hard assertion here"
       }
@@ -4680,25 +4599,6 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "timeout": 70,
       "frames": 6,
@@ -4707,7 +4607,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -4731,8 +4631,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero"
       }
@@ -4761,7 +4660,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#945 follow-up (driver-relief selection fix): re-pinned from levelEnded:true/'worker_revolt' (#928). That pinning documented a real, narrow revolt window during cycle 4's fresh 8-driller hiring burst (tick ~500) which this file's living_quarters mitigation reduced but did not fully clear. TaskCancellation.ts's interruptActiveAction now pins a vehicle-gated action's mid-drive interruption back to the same driver instead of releasing it to the open pool unpinned (isMidVehicleGatedWork, extending the existing #556/#867 walk-only pin) -- a forced-rest driller resumes their own drill_rig once rested rather than a farther-away one taking over for a handoff too short to survive its own drive and needing yet another rest cycle soon after. Less wasted dismount/reboard churn means less aggregate fatigue drain across the roster, and direct-traced against this exact file/seed: levelEnded stays false through tick ~1221 (every state-full snapshot across the whole run, not just this one) -- the revolt this file previously accepted as unavoidable no longer happens at all under the fixed dispatch. Every cycle's drill/charge/sequence/blast still completes correctly regardless (unchanged from #928's own note), so this is a straightforward re-pin to the new, better reality, not a loosening of what the step actually proves."
+        "note": "#945 follow-up (driver-relief selection fix): re-pinned from levelEnded:true/'worker_revolt' (#928). That pinning documented a real, narrow revolt window during cycle 4's fresh 8-driller hiring burst (tick ~500) which this file's living_quarters mitigation reduced but did not fully clear. TaskCancellation.ts's interruptActiveAction now pins a vehicle-gated action's mid-drive interruption back to the same driver instead of releasing it to the open pool unpinned (isMidVehicleGatedWork, extending the existing #556/#867 walk-only pin) -- a forced-rest driller resumes their own drill_rig once rested rather than a farther-away one taking over for a handoff too short to survive its own drive and needing yet another rest cycle soon after. Less wasted dismount/reboard churn means less aggregate fatigue drain across the roster, and direct-traced against this exact file/seed: levelEnded stays false through tick ~1221 (every state-full snapshot across the whole run, not just this one) -- the revolt this file previously accepted as unavoidable no longer happens at all under the fixed dispatch. Every cycle's drill/charge/blast still completes correctly regardless (unchanged from #928's own note), so this is a straightforward re-pin to the new, better reality, not a loosening of what the step actually proves."
       }
     },
     {

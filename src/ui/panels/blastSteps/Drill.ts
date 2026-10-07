@@ -234,7 +234,7 @@ export class DrillStep {
   /**
    * Row for a hole still in `state.plannedDrillHoles` — ordered but not yet
    * drilled (#553). No wet/tubed/dry status applies to a hole that hasn't
-   * been drilled, so it always shows the ORDERED chip; no charge/sequence
+   * been drilled, so it always shows the ORDERED chip; no charge
    * affordance either, since neither exists yet for it — only the remove
    * button (which cancels its queued `drill_hole` action).
    */

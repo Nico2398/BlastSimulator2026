@@ -244,7 +244,7 @@
     {
       "command": "build living_quarters at:8,15",
       "timeout": 30,
-      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge/sequence stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (8,18) -- this step's own `command`/`pickTile` fields already target (8,15); the bound is now checked against real pathfinding route cost, renamed `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` (balance.ts) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
+      "description": "#681: build-living-quarters, click half -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee. #556: ordering a building queues a construction site instead of placing it instantly -- this step only confirms the order landed (orderedBuildingCount increases); the wait step right below drives the site to completion the same way drill-plan/charge below it wait for holeCount/chargedCount. #1008 follow-up: moved off (18,18), whose footprint included (20,20) -- the exact grid cell a fatigue-interrupted employee near the drill grid can freeze at (clampToGrid, Pathfinding.ts), permanently stranding them once a building occupied it. #1008-followup (PR #1023): (12,15), while flat, still deadlocked this exact step in real interaction-mode CI -- its footprint sat only 2-4 tiles from the vehicle spawn point (16,16) and the box-cut corridor (x:16, z:19-31), the same freeze radius as (18,18)/(20,20) above, just measured against different danger points. Moved to (6,16) -- flat, 10 tiles clear of every hazard -- but a second real interaction-mode run showed (6,16) deadlocks box-cut too, a fatigue/rest round-trip livelock rather than a stranding: the round trip is so long the excavator's fatigue crosses back over the rest threshold before a single ramp segment carves. (29,12) cleared every hazard by >=5 tiles while roughly halving the round trip -- see tutorialStages.ts's own REGION.livingQuarters comment for the full trace. #1040: moved again to (29,11), alongside driving_center (29,14) and freight_warehouse (25,12), so the three pins form one stated, checkable compact cluster (TUTORIAL_SITE_CLUSTER_MAX_SPAN_TILES/TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_TILES, balance.ts) instead of each being justified by its own one-off stranding postmortem. #1170 follow-up: the slope-based navmesh (#1151) made a real walking route far longer than the straight-line tile bound the cluster used to be measured against, so the whole cluster moved west of the box-cut corridor to living_quarters (8,15), driving_center (6,15), freight_warehouse (8,18) -- this step's own `command`/`pickTile` fields already target (8,15); the bound is now checked against real pathfinding route cost, renamed `TUTORIAL_SITE_DIG_ROUND_TRIP_MAX_ROUTE_COST` (balance.ts) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
       "role": "player",
       "interaction": [
         {
@@ -591,7 +591,7 @@
       ],
       "role": "player",
       "expect": {
-        "tutorialStep": "sequence",
+        "tutorialStep": "evacuate-zone",
         "equals": {
           "chargedCount": 9
         }
@@ -609,33 +609,15 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto",
-      "timeout": 30,
-      "description": "sequence complete: Auto Sequence clicked, delay labels appear on every hole. #557: the tutorial now advances to 'evacuate-zone' next, not straight to 'blast' -- the new step between them.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "evacuate-zone"
-        }
-      ],
-      "expect": {
-        "tutorialStep": "evacuate-zone",
-        "increased": [
-          "sequencedCount"
-        ]
-      }
-    },
-    {
       "command": "zone clear x1:7 y1:5 x2:45 y2:43",
       "timeout": 180,
       "description": "#557: evacuate-zone. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this file's now-retuned (#949) 3x3/spacing:4/depth:8 grid at (22,20) pads out to (7,5)-(45,43) -- holes span x:22-30, z:20-28, padded by the 15m margin; the box moved from the old (5,5)-(41,41) computed for the old 3x3/spacing:3/(20,20) grid. On tutorial_pit's 32x32 map this still covers nearly the whole site, so the driller (parked at the pattern they just finished charging) and the surveyor (idle since the survey step) are both still inside it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed -- no tab click needed before Sound the Horn is reachable. Sound the Horn sends the same box this command declares (Fire.ts's soundHorn(), computed live). clearZone no longer teleports (#557): this only sets a destination for whoever is inside, so the wait_until step right after is what proves the walkout actually finished, not this click itself. #947: both vehicles were re-boarded by the two bootstrap steps above, so clearZone can actually order them out instead of reporting them stranded. NOTE (#1042 test-writer): the three bootstrap steps that used to sit here (`vehicle driver 1 2`, `vehicle driver 2 1`, a padding `tick 15`) were removed -- they existed only to re-board both vehicles by hand before Sound the Horn, working around the exact bug #1042 fixes (clearZone stranding every driverless vehicle regardless of a qualified nearby employee). Once the real fix lands, an in-zone qualified employee should board and drive each vehicle clear on their own. Downstream tick-count-dependent steps (cash balances, later tick N targets) may need re-tuning once the real implementation changes how many ticks the walkout actually takes -- left for the implementer/finalization phase to verify against, not hand-computed here.",
       "role": "player",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "waitForSelector",
           "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
@@ -677,6 +659,10 @@
       "role": "player",
       "interaction": [
         {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
@@ -711,10 +697,9 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
-        "note": "Close dismisses BlastReportModal, which auto-opens with the real report right after DETONATE; scores card waits for a player action (#1334), so the next beat inspects the scores HUD (mirrors tutorial.json's own choice not to assert it here). holeCount/chargedCount/sequencedCount resetting to 0 is checkable in both modes and goes beyond what the DOM-only playtest reference could prove."
+        "note": "Close dismisses BlastReportModal, which auto-opens with the real report right after DETONATE; scores card waits for a player action (#1334), so the next beat inspects the scores HUD (mirrors tutorial.json's own choice not to assert it here). holeCount/chargedCount resetting to 0 is checkable in both modes and goes beyond what the DOM-only playtest reference could prove."
       }
     },
     {
@@ -1253,7 +1238,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1282,7 +1268,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1311,7 +1298,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1331,7 +1319,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1360,7 +1349,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1389,7 +1379,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1409,7 +1400,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1438,7 +1430,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1467,7 +1460,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1487,7 +1481,8 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1516,7 +1511,8 @@
         "increased": [
           "activeContractCount"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1545,7 +1541,8 @@
         "increased": [
           "cash"
         ]
-      }
+      },
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1566,7 +1563,8 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1596,7 +1594,8 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1626,7 +1625,8 @@
           "cash"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1647,7 +1647,8 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1677,7 +1678,8 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1707,7 +1709,8 @@
           "cash"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1728,7 +1731,8 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1758,7 +1762,8 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1788,7 +1793,8 @@
           "cash"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1809,7 +1815,8 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1839,7 +1846,8 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1869,7 +1877,8 @@
           "cash"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1890,7 +1899,8 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -1920,7 +1930,8 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1950,7 +1961,8 @@
           "cash"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1971,7 +1983,8 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
@@ -2001,7 +2014,8 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2031,7 +2045,8 @@
           "cash"
         ]
       },
-      "interactionOnly": true
+      "interactionOnly": true,
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:levelEnded equals:true max_ticks:6000",

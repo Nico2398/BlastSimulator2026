@@ -20,7 +20,6 @@ import {
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import { addHole } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import {
   assembleBlastPlan,
   checkProtectedPositions,
@@ -35,7 +34,6 @@ import {
   blastCommand,
   chargeCommand,
   drillPlanCommand,
-  sequenceCommand,
 } from '../../../src/console/commands/mining.js';
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
@@ -74,7 +72,7 @@ function fillRegion(
 }
 
 /**
- * Build a fully-charged, sequenced BlastPlan from a set of DrillHoles.
+ * Build a fully-charged BlastPlan from a set of DrillHoles.
  * Uses dynatomics (1300 energy/kg × 5 kg = 6500 raw energy) — more than
  * enough to fracture cruite (energyAbsorption 200) anywhere in the blast zone.
  */
@@ -83,8 +81,7 @@ function makeBlastPlan(holes: DrillHole[]) {
   const holeDepths: Record<string, number> = {};
   for (const h of holes) holeDepths[h.id] = h.depth;
   const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 5, 1);
-  const delays = autoVPattern(holes, 25);
-  return assembleBlastPlan(holes, charges, delays);
+  return assembleBlastPlan(holes, charges);
 }
 
 /**
@@ -526,7 +523,6 @@ function makeBlastContextWithWarehouse(kg: number) {
     for (const e of state.employees.employees) e.fatigue = 100;
     tickCommand(ctx, ['1'], {});
   }
-  sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   const hole = state.drillHoles[0]!;
   placeBuilding(state.buildings, 'explosive_warehouse', Math.floor(hole.x), Math.floor(hole.z), 32, 32);
   const wh = state.buildings.buildings.find(b => b.type === 'explosive_warehouse')!;

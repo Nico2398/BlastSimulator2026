@@ -59,11 +59,9 @@ interface FinalGameState {
   mineType?: string;
   drillHoles?: number;
   chargesByHole?: Record<string, unknown>;
-  sequenceDelays?: Record<string, unknown>;
   finances?: { cash: number };
   holeCount?: number;
   chargedCount?: number;
-  sequencedCount?: number;
   buildingCount?: number;
   vehicleCount?: number;
   employeeCount?: number;

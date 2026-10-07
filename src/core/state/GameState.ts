@@ -174,7 +174,6 @@ export type ActionType =
   | 'charge_hole'
   | 'dig_ramp_segment'
   | 'level_ground'
-  | 'set_sequence'
   | 'place_building'
   | 'demolish_building'
   | 'survey'
@@ -404,9 +403,6 @@ export interface GameState {
   /** Charges ordered but not yet loaded — each queues one `charge_hole` action and lands in `chargesByHole` on completion (#554). */
   plannedChargesByHole: Record<string, PlannedCharge>;
 
-  /** Detonation sequence: hole ID → delay in ms. */
-  sequenceDelays: Record<string, number>;
-
   /** Named saved blast plans. */
   savedPlans: Record<string, SavedBlastPlan>;
 
@@ -541,7 +537,6 @@ export interface WorldState {
 export interface SavedBlastPlan {
   drillHoles: DrillHole[];
   chargesByHole: Record<string, HoleCharge>;
-  sequenceDelays: Record<string, number>;
 }
 
 /** A world state for a site that starts as the square `sizeX × sizeZ` at the origin, before any expansion (#473). */
@@ -575,7 +570,6 @@ export function createGame(config: GameConfig): GameState {
     plannedDrillHoles: [],
     chargesByHole: {},
     plannedChargesByHole: {},
-    sequenceDelays: {},
     savedPlans: {},
     finances: createFinanceState(config.startingCash ?? STARTING_CASH),
     contracts: createContractState(),

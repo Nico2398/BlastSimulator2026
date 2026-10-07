@@ -226,8 +226,7 @@ export class SelectionBar {
       case 'hole': {
         const hole = state.drillHoles.find(h => holeNumericId(h.id) === entity.id);
         if (!hole) return null;
-        const delay = state.sequenceDelays[hole.id];
-        return { title: hole.id, sub: delay !== undefined ? `${hole.depth}m · +${delay}ms` : `${hole.depth}m` };
+        return { title: hole.id, sub: `${hole.depth}m` };
       }
       case 'ramp': {
         const ramp = state.builtRamps.find(r => r.id === entity.id);

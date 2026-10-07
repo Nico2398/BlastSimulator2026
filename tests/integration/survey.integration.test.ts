@@ -28,7 +28,6 @@ import { hireEmployee, assignSkill, injureEmployee } from '../../src/core/entiti
 import { executeBlast, type FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { ORE_DENSITY_KG_M3 } from '../../src/core/config/balance.js';
 
@@ -547,7 +546,7 @@ describe('Survey system', () => {
     const depths: Record<string, number> = {};
     for (const h of holes) depths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, depths, 'boomite', 8, 2);
-    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, charges);
     const result = executeBlast(plan, grid, []);
     expect(result).not.toBeNull();
     const fragments = result!.fragments;

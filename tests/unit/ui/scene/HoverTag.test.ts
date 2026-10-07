@@ -142,15 +142,15 @@ describe('HoverTag', () => {
     expect(root.textContent).toContain('8m');
   });
 
-  it('shows the sequence delay for a hovered hole once it has one', () => {
+  it('shows only the depth for a hovered hole, with no delay suffix', () => {
     const { tag, root } = makeTag();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    state.sequenceDelays[hole.id] = 50;
     const hover: PickResult = { entity: { kind: 'hole', id: holeNumericId(hole.id), point: new THREE.Vector3(), distance: 1 }, terrain: null };
 
     tag.update(hover, state);
-    expect(root.textContent).toContain('+50ms');
+    expect(root.textContent).toContain('8m');
+    expect(root.textContent).not.toContain('ms');
   });
 
   it('hides when the hovered hole no longer exists in state', () => {

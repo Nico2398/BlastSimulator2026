@@ -81,7 +81,7 @@ describe('survey-ore-vein-visibility scenario definition', () => {
     const knownCommands = [
       'new_game', 'campaign', 'time', 'scores', 'finances',
       'employee', 'state', 'survey', 'tick', 'event',
-      'drill_plan', 'charge', 'sequence', 'blast', 'contract',
+      'drill_plan', 'charge', 'blast', 'contract',
       'build', 'vehicle', 'stats', 'inspect', 'zone',
       'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
       'fragments', 'preview', 'blast_preview', 'install_tubing',
@@ -158,11 +158,10 @@ describe('survey-ore-vein-visibility — survey pipeline', () => {
     expect(hasCharge).toBe(true);
   });
 
-  it('includes sequence command before blast', () => {
+  it('uses no sequence command (detonation sequencing was removed)', () => {
     const scenario = loadScenario();
     const commands = scenario.steps.map(getCommand);
-    const hasSequence = commands.some(c => c.startsWith('sequence'));
-    expect(hasSequence).toBe(true);
+    expect(commands.some(c => c.startsWith('sequence'))).toBe(false);
   });
 
   it('calls survey show after blast to verify ore vein updates', () => {

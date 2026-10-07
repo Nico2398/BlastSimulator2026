@@ -37,7 +37,6 @@ export interface SerializableGameState {
   worldMinZ: number | null;
   drillHoles: unknown[];
   chargesByHole: Record<string, unknown>;
-  sequenceDelays: Record<string, unknown>;
   finances: { cash: number };
   holeCount: number;
   /** Holes ordered but not yet drilled (state.plannedDrillHoles.length) — proves a drill plan queues work instead of writing holes into state instantly (#553). */
@@ -53,7 +52,6 @@ export interface SerializableGameState {
   /** Buildings ordered but not yet built (state.plannedBuildings.length) — proves a build order queues work instead of creating the building instantly (#556). */
   orderedBuildingCount: number;
   chargedCount: number;
-  sequencedCount: number;
   /** Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length) — proves a research task actually completed (reaches 0) rather than a `tick N` pad merely running, which a spontaneous mid-window event can silently cut short (tickCommand auto-pauses and refuses further ticks the instant one fires). */
   researchQueueLength: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
@@ -172,7 +170,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole as Record<string, unknown>,
-    sequenceDelays: s.sequenceDelays as Record<string, unknown>,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
     orderedHoleCount: s.plannedDrillHoles.length,
@@ -184,7 +181,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     builtRampWidth: s.builtRamps[0]?.width ?? 0,
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
-    sequencedCount: Object.keys(s.sequenceDelays).length,
     researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,

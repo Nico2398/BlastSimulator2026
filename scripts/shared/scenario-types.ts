@@ -228,10 +228,10 @@ export type InteractionStepAction =
   | { type: 'ensurePanel'; panel: string; timeout?: number }
   /**
    * Select a Blast Workshop step tab (`#bs-blast-panel [data-step="N"]`,
-   * `N` 1-5 for Drill/Charge/Sequence/Preview/Fire) — but only if it is not
+   * `N` 1-4 for Drill/Charge/Preview/Fire) — but only if it is not
    * already the active tab. The panel's own `autoAdvance` (`suggestStep`,
    * `BlastWorkshop.ts`) moves the active tab on its own the instant a
-   * drilled hole goes uncharged or a charged hole goes unsequenced, out from
+   * drilled hole goes uncharged, out from
    * under a scenario that assumed a step tab a preceding step had left
    * active was still active — the exact root cause behind two of PR #616's
    * fixes (`level1-playthrough-win.json`'s 12 remove-hole clicks, and the
@@ -242,7 +242,7 @@ export type InteractionStepAction =
    * already active, the same idempotent-by-construction shape as
    * `ensurePanel`.
    */
-  | { type: 'ensureStep'; step: 1 | 2 | 3 | 4 | 5; timeout?: number };
+  | { type: 'ensureStep'; step: 1 | 2 | 3 | 4; timeout?: number };
 
 /**
  * Whether a step's `interaction` models something the player must do by

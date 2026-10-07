@@ -24,7 +24,6 @@ vi.mock('../../../src/core/world/ExplosiveCatalog.js', async (importOriginal) =>
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge, type HoleCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast, buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
 import { identifyFragmentedVoxels } from '../../../src/core/mining/VoxelFragmentation.js';
@@ -57,7 +56,7 @@ function twoHolePlan(explosiveA: string, explosiveB: string) {
     [holes[0]!.id]: chargeOf(explosiveA, 8, explosiveA === 'pop_rock' ? 3 : 4),
     [holes[1]!.id]: chargeOf(explosiveB, 8, explosiveB === 'pop_rock' ? 3 : 4),
   };
-  return assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+  return assembleBlastPlan(holes, charges);
 }
 
 function singleExplosivePlan(explosiveId: string, kg: number) {
@@ -65,7 +64,7 @@ function singleExplosivePlan(explosiveId: string, kg: number) {
   const depths: Record<string, number> = {};
   for (const h of holes) depths[h.id] = h.depth;
   const { charges } = batchCharge(holes.map(h => h.id), depths, explosiveId, kg, 2);
-  return assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+  return assembleBlastPlan(holes, charges);
 }
 
 describe('blast energy field — explosive tier gating (#1358)', () => {
@@ -119,7 +118,7 @@ describe('blast energy field — explosive tier gating (#1358)', () => {
     const good = chargeOf('boomite', 8, 4);
     const bogus: HoleCharge = { ...good, explosiveId: 'no_such_explosive' };
     const build = (second: HoleCharge) => buildPlanEnergyField(assembleBlastPlan(
-      holes, { [holes[0]!.id]: good, [holes[1]!.id]: second }, autoVPattern(holes, 25)), hardGrid())!;
+      holes, { [holes[0]!.id]: good, [holes[1]!.id]: second }), hardGrid())!;
     const withBogus = build(bogus);
     const withGood = build(good);
     // Bogus hole at x=30 contributes no gating: its column uses the adequate boomite hole's tier.
@@ -129,11 +128,11 @@ describe('blast energy field — explosive tier gating (#1358)', () => {
   it('does no tier gating when no hole is charged', () => {
     tierOverrides.map = { boomite: 1 };
     const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
-    const uncharged = buildPlanEnergyField(assembleBlastPlan(holes, {}, autoVPattern(holes, 25)), hardGrid())!;
+    const uncharged = buildPlanEnergyField(assembleBlastPlan(holes, {}), hardGrid())!;
     holeCounter.nextHoleId = 1;
     tierOverrides.map = { boomite: 4 };
     const holes2 = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
-    const reference = buildPlanEnergyField(assembleBlastPlan(holes2, {}, autoVPattern(holes2, 25)), hardGrid())!;
+    const reference = buildPlanEnergyField(assembleBlastPlan(holes2, {}), hardGrid())!;
     expect(Array.from(uncharged.threshold)).toEqual(Array.from(reference.threshold));
   });
 
@@ -141,12 +140,12 @@ describe('blast energy field — explosive tier gating (#1358)', () => {
     tierOverrides.map = { pop_rock: 1 };
     const holes = createGridPlan(holeCounter, { x: 9, z: 20 }, 1, 2, 21, 8, 0.15);
     // Only the far hole (x=30) is charged; every column, including those beside the uncharged hole, takes its tier.
-    const plan = assembleBlastPlan(holes, { [holes[1]!.id]: chargeOf('pop_rock', 8, 3) }, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, { [holes[1]!.id]: chargeOf('pop_rock', 8, 3) });
     const field = buildPlanEnergyField(plan, hardGrid())!;
     holeCounter.nextHoleId = 1;
     tierOverrides.map = { pop_rock: 4 };
     const holes2 = createGridPlan(holeCounter, { x: 9, z: 20 }, 1, 2, 21, 8, 0.15);
-    const plan2 = assembleBlastPlan(holes2, { [holes2[1]!.id]: chargeOf('pop_rock', 8, 3) }, autoVPattern(holes2, 25));
+    const plan2 = assembleBlastPlan(holes2, { [holes2[1]!.id]: chargeOf('pop_rock', 8, 3) });
     const adequate = buildPlanEnergyField(plan2, hardGrid())!;
     expect(thresholdAt(field, 9, 5, 20) / thresholdAt(adequate, 9, 5, 20))
       .toBeCloseTo(TIER_SHORTFALL_THRESHOLD_FACTOR ** 3, 3);

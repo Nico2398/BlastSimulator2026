@@ -1,6 +1,6 @@
 {
   "name": "survey-then-blast",
-  "description": "Seismic survey \u2192 confidence overlay \u2192 blast \u2192 ore report. Validates survey confidence overlay rendering before and after detonation. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext(), so the overlay never appears in screenshots.",
+  "description": "Seismic survey → confidence overlay → blast → ore report. Validates survey confidence overlay rendering before and after detonation. FAILS until GameRenderer wires getSurveyOverlay().show() in syncFromContext(), so the overlay never appears in screenshots.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -166,7 +166,7 @@
         "equals": {
           "surveyCount": 0
         },
-        "note": "arrival-gated (#437) \u2014 queued and paid for, not yet completed"
+        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
       }
     },
     {
@@ -329,7 +329,7 @@
         "equals": {
           "surveyCount": 1
         },
-        "note": "arrival-gated (#437) \u2014 queued and paid for, not yet completed"
+        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
       }
     },
     {
@@ -631,7 +631,7 @@
           "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs working it in parallel. #554-followup (issue #586 CI, real failure): shrunk further from 9 holes (3x3) to 4 (2x2) -- real interaction-mode CI proved this file's own wellBeing (pinned at 0 with no living_quarters anywhere in the file, ScoreManager.ts's applyDecay deliberately keeps a score at exactly 0 there until direct intervention, per level1-lose-revolt.integration.test.ts's own documented design) crosses REVOLT_TICKS (120 consecutive ticks at 0, WorkerRevolt.ts) before the file's own player-facing sequence/blast steps can run once charging (#554: real, queued work, not instant) is added on top of drilling's own already-tight ~300-tick budget -- command mode's identical trace revolts too (sandbox-confirmed via direct state inspection: `revolted:true` by tick ~305-310 in both modes), it just never surfaced there because command mode has no DOM for the revolt's level-end overlay to block. Not a timing/chunking bug like the sibling fixes elsewhere this session -- the crew's own wellbeing budget was already spent by the time #554's charging needed it. 9 holes with 2 parallel drillers left ~40 real ticks of charging work needed past a ~305-tick deadline; 4 holes cuts both drilling and charging time roughly in half, landing comfortably inside the deadline instead of gambling the margin closer."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs working it in parallel. #554-followup (issue #586 CI, real failure): shrunk further from 9 holes (3x3) to 4 (2x2) -- real interaction-mode CI proved this file's own wellBeing (pinned at 0 with no living_quarters anywhere in the file, ScoreManager.ts's applyDecay deliberately keeps a score at exactly 0 there until direct intervention, per level1-lose-revolt.integration.test.ts's own documented design) crosses REVOLT_TICKS (120 consecutive ticks at 0, WorkerRevolt.ts) before the file's own player-facing sequence/blast steps can run once charging (#554: real, queued work, not instant) is added on top of drilling's own already-tight ~300-tick budget -- command mode's identical trace revolts too (sandbox-confirmed via direct state inspection: `revolted:true` by tick ~305-310 in both modes), it just never surfaced there because command mode has no DOM for the revolt's level-end overlay to block. Not a timing/chunking bug like the sibling fixes elsewhere this session -- the crew's own wellbeing budget was already spent by the time #554's charging needed it. 9 holes with 2 parallel drillers left ~40 real ticks of charging work needed past a ~305-tick deadline; 4 holes cuts both drilling and charging time roughly in half, landing comfortably inside the deadline instead of gambling the margin closer."
     },
     {
       "command": "wait_until field:holeCount equals:4 max_ticks:400",
@@ -721,27 +721,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -767,8 +752,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },

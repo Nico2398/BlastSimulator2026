@@ -209,8 +209,8 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 28" at step 0 and has progress bar fill', () => {
-      // Total comes from TUTORIAL_STEPS (28 today); update the literal when a step is added or removed.
+    it('shows step counter "1 / 27" at step 0 and has progress bar fill', () => {
+      // Total comes from TUTORIAL_STEPS (27 today); update the literal when a step is added or removed.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -218,7 +218,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*28/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*27/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -567,7 +567,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (index 17/18 in the current 29-length array: #553's tutorial fix
+      // (index 16/17 in the current 27-length array: #1344 removed the sequence step; #553's tutorial fix
       // added three drill-rig-licensing steps, #555 added two more
       // rock-digger-licensing steps, #681 added
       // build-living-quarters/set-early-policy earlier in the sequence, #557
@@ -576,10 +576,10 @@ describe('TutorialOverlay (12.4)', () => {
       // speed-up-for-dig/speed-normal-after-dig inside the box-cut wait, and
       // #1015 removed that pair again — the speed bar needs no step of its
       // own any more).
-      tut.stepIndex = 17;
+      tut.stepIndex = 16;
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(18);
+      expect(tut.stepIndex).toBe(17);
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -592,7 +592,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createGame() defaults events.pendingEvent to null
-      tut.stepIndex = 17;
+      tut.stepIndex = 16;
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
@@ -640,8 +640,8 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (last step, index 27 of 28).
-      tut.stepIndex = 27;
+      // Directly set to congratulations step (last step, index 26 of 27).
+      tut.stepIndex = 26;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;

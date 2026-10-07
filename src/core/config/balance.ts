@@ -1683,14 +1683,8 @@ export const FRAGMENT_HORIZONTAL_OVERLAP_TOLERANCE = 0.5;
 /** Maximum vertical gap (metres) between two fragments' AABB extents for stacking. */
 export const FRAGMENT_SUPPORT_VERTICAL_GAP = 0.1;
 
-/** Width (ms) of one colour bucket for blast-plan overlay hole delay labels. */
-export const BLAST_DELAY_LABEL_COLOR_BUCKET_MS = 100;
-
-/**
- * Delay-label colours by bucket, slowest bucket last (clamped to the last
- * entry): white, cyan, yellow, orange, red.
- */
-export const BLAST_DELAY_LABEL_COLORS: readonly number[] = [0xffffff, 0x44ffff, 0xffff44, 0xff8844, 0xff4444];
+/** Delay (ms) between the blast boom and the post-blast rumble sound. */
+export const BLAST_RUMBLE_OFFSET_MS = 800;
 
 /**
  * Default volume (0–1) per audio channel, before any stored player setting applies.

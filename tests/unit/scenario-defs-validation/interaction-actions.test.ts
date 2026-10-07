@@ -313,7 +313,7 @@ describe('tutorial-interactive.json — outer step timeout covers every inner wa
 // deterministically at the "hire-manager" step (`employee hire
 // role:manager`, then `waitForTutorialStep(stepId:"hire-driver")`),
 // which sits right after the blast sequence (steps 24-31: drill, charge,
-// sequence, fire) and the consultant event-resolve step (32). Both real
+// zone clear, fire) and the consultant event-resolve step (32). Both real
 // actions (hire manager, tutorial advance to "hire-driver") actually
 // succeeded in-browser before the outer deadline fired — this is not a
 // logic bug, it's a timeout-budget bug: `effectiveStepTimeoutMs` computes
@@ -533,7 +533,7 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     15: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
     16: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089', // #949
     25: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
-    29: 'sequence auto',
+    29: 'zone clear x1:7 y1:5 x2:45 y2:43',
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {

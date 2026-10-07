@@ -155,21 +155,6 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "sequencedCount": 6
-        }
-      }
-    },
-    {
       "command": "zone clear x1:-1 y1:-1 x2:40 y2:40",
       "role": "player",
       "timeout": 90,
@@ -230,8 +215,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },

@@ -64,7 +64,7 @@ Interaction mode executes Puppeteer actions (click, type, waitForSelector, scrol
 ### Custom (command mode)
 ```bash
 npm run scenario -- --name my-test \
-  --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; sequence auto; blast"
+  --commands "new_game seed:42; drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15; charge hole:* explosive:boomite amount:5 stemming:2; blast"
 ```
 
 ### Single Screenshots
