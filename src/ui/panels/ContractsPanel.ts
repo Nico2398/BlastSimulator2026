@@ -94,7 +94,7 @@ export class ContractsPanel extends PanelBase {
     const signature = JSON.stringify({
       stored: Math.round(state.logistics.storedMassKg), storedTenths: deliverableAmountKg(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
       ore: state.collectedOre, oreTenths: Object.values(state.collectedOre).map(deliverableAmountKg),
-      active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}`),
+      active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}:${c.held ? 1 : 0}`),
       available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
@@ -225,6 +225,7 @@ export class ContractsPanel extends PanelBase {
       iconEl(TYPE_ICON[c.type], 14),
       el('span', { text: this.materialLabel(c.materialId), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui)' } }),
       el('span', { text: `#${c.id}`, attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
+      ...(c.held ? [el('span', { text: t('ui.contracts.held_badge'), attrs: { class: 'bs-contract-held', style: 'font:700 9px/1 var(--bsx-font-ui);letter-spacing:.1em;padding:3px 5px;border-radius:3px;background:rgba(255,255,255,.08);color:var(--bsx-amber)' } })] : []),
       el('span', {
         text: t('ui.contracts.time_left', { hours: remainingTicks }),
         attrs: { style: `margin-left:auto;display:flex;align-items:center;gap:4px;font:700 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:${color}` },
@@ -266,6 +267,13 @@ export class ContractsPanel extends PanelBase {
     const deliverRow = el('div');
     deliverRow.style.cssText = 'display:flex;align-items:center;gap:7px';
     deliverRow.append(amountInput, maxBtn, deliverBtn);
+
+    const holdBtn = button('ghost', t(c.held ? 'ui.contracts.resume' : 'ui.contracts.hold'), {
+      dataAction: 'hold-toggle',
+      onClick: () => this.gameConsole?.(`contract ${c.held ? 'release' : 'hold'} ${c.id}`),
+    });
+    holdBtn.style.cssText = 'height:30px;padding:0 10px;font-size:10px';
+    deliverRow.append(holdBtn);
 
     const storedNote = el('span', {
       text: t('ui.contracts.stored_note', { kg: Math.round(stored).toLocaleString('en-US'), material: this.materialLabel(c.materialId) }),
@@ -414,14 +422,17 @@ export class ContractsPanel extends PanelBase {
     const color = ok ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
     const outcome = ok
       ? `+$${formatMoney(c.deliveredKg * c.pricePerKg)}`
-      : `-$${formatMoney(c.penaltyAmount)}`;
+      : `-$${formatMoney(c.penaltyCharged ?? c.penaltyAmount)}`;
+    // An expired contract may still have paid for what was delivered before the deadline.
+    const paid = c.paidTotal ?? 0;
+    const detail = !ok && paid > 0 ? ` · ${t('ui.contracts.history_paid', { amount: formatMoney(paid) })}` : '';
     const row = el('div');
     row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:4px;background:var(--bsx-well)';
     const col = el('div');
     col.style.cssText = 'display:flex;flex-direction:column;gap:2px';
     col.append(
       el('span', { text: this.materialLabel(c.materialId), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-      el('span', { text: t(ok ? 'ui.contracts.history_completed' : 'ui.contracts.history_expired'), attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+      el('span', { text: t(ok ? 'ui.contracts.history_completed' : 'ui.contracts.history_expired') + detail, attrs: { style: 'font:400 11px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
     );
     row.append(
       el('span', { text: `#${c.id}`, attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),

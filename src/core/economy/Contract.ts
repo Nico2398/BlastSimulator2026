@@ -363,7 +363,48 @@ export function findContract(
   ) ?? null;
 }
 
-/** Check and expire overdue contracts. Returns penalty amounts. */
+/** Share of a contract's quantity still undelivered, clamped to [0, 1]. A contract asking for nothing counts as fully undelivered. */
+export function undeliveredShare(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
+  if (c.quantityKg <= 0) return 1;
+  return Math.min(1, Math.max(0, (c.quantityKg - c.deliveredKg) / c.quantityKg));
+}
+
+/** Active contracts ordered by soonest deadline first (ties: lowest id), without mutating the input. */
+export function sortByDeadline(active: readonly Contract[]): Contract[] {
+  const deadline = (c: Contract) => c.acceptedAtTick + c.deadlineTicks;
+  return [...active].sort((a, b) => deadline(a) - deadline(b) || a.id - b.id);
+}
+
+/** Hold or release an active contract for automatic delivery. Returns false when the contract is not active. */
+export function setContractHeld(state: ContractState, contractId: number, held: boolean): boolean {
+  const contract = state.active.find(c => c.id === contractId);
+  if (!contract) return false;
+  contract.held = held;
+  return true;
+}
+
+/** Stored kilograms that can fill the contract: raw stored mass for rubble, the ore ledger entry otherwise. */
+export function storedStockKg(
+  c: Pick<Contract, 'type' | 'materialId'>,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): number {
+  return c.type === 'rubble_disposal' ? storedMassKg : (collectedOre[c.materialId] ?? 0);
+}
+
+/** True when stored stock of the contract's material cannot cover what it still needs (held contracts included). */
+export function contractShortOfStock(
+  c: Contract,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): boolean {
+  return storedStockKg(c, collectedOre, storedMassKg) < c.quantityKg - c.deliveredKg;
+}
+
+/**
+ * Check and expire overdue contracts. Returns the penalty charged, scaled by
+ * the share still undelivered, with what was delivered and paid before expiry.
+ */
 export function checkDeadlines(
   state: ContractState,
   currentTick: number,
@@ -377,36 +418,13 @@ export function checkDeadlines(
     const elapsed = currentTick - c.acceptedAtTick;
     if (elapsed > c.deadlineTicks) {
       c.expired = true;
-      penalties.push({ contractId: c.id, penalty: c.penaltyAmount, deliveredKg: 0, paid: 0 }); // TODO: implement deliveredKg/paid
+      const penalty = Math.round(c.penaltyAmount * undeliveredShare(c));
+      c.penaltyCharged = penalty;
+      penalties.push({ contractId: c.id, penalty, deliveredKg: c.deliveredKg, paid: c.paidTotal ?? 0 });
       state.active.splice(i, 1);
       state.completedHistory.push(c);
     }
   }
 
   return penalties;
-}
-
-
-/** Hold or release an active contract for automatic delivery. Returns false when the contract is not active. */
-export function setContractHeld(_state: ContractState, _contractId: number, _held: boolean): boolean {
-  return false; // TODO: implement
-}
-
-/** Kilograms of a contract still to be delivered. */
-export function undeliveredShare(_c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
-  return 0; // TODO: implement
-}
-
-/** Active contracts ordered by soonest deadline first, without mutating the input. */
-export function sortByDeadline(_active: readonly Contract[]): Contract[] {
-  return []; // TODO: implement
-}
-
-/** True when stored stock cannot cover what the contract still needs. */
-export function contractShortOfStock(
-  _c: Contract,
-  _collectedOre: Readonly<Record<string, number>>,
-  _storedMassKg: number,
-): boolean {
-  return false; // TODO: implement
 }

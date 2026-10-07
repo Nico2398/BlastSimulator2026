@@ -19,6 +19,11 @@ import { pushEventOptionLines } from './eventResolution.js';
 import { formatTaskCompletion } from './tickTaskCompletion.js';
 import { formatGameOver } from './tickGameOver.js';
 
+/** Kilograms for a console line: whole numbers stay whole, fractions get one decimal. */
+function formatKg(kg: number): string {
+  return Number.isInteger(kg) ? String(kg) : kg.toFixed(1);
+}
+
 export function tickCommand(
   ctx: GameContext,
   args: string[],
@@ -57,8 +62,18 @@ export function tickCommand(
     const report: TickReport = runTick(state, ctx.grid ?? null, rng, emitter, options);
     ticksAdvanced++;
 
-    for (const { penalty } of report.contractsExpired) {
-      lines.push(`[tick ${state.tickCount}] Contract expired! Penalty: $${penalty}`);
+    for (const d of report.contractsDelivered) {
+      const key = !d.completed ? 'tick.contract_delivered' : d.bonus > 0 ? 'tick.contract_completed_bonus' : 'tick.contract_completed';
+      lines.push(`[tick ${state.tickCount}] ${t(key, {
+        id: d.contractId, kg: formatKg(d.kg), payment: d.payment.toFixed(2), bonus: d.bonus.toFixed(2),
+      })}`);
+    }
+
+    for (const e of report.contractsExpired) {
+      const line = e.deliveredKg > 0
+        ? t('tick.contract_expired_partial', { id: e.contractId, penalty: e.penalty, kg: formatKg(e.deliveredKg), paid: e.paid.toFixed(2) })
+        : t('tick.contract_expired_full', { penalty: e.penalty });
+      lines.push(`[tick ${state.tickCount}] ${line}`);
     }
 
     if (report.smuggling.exposed) {

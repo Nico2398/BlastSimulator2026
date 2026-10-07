@@ -1,12 +1,15 @@
-// BlastSimulator2026 — Automatic delivery of stored ore to active contracts.
+// BlastSimulator2026 — Delivery of stored ore to active contracts, by hand or automatically.
 
-import type { ContractState } from './Contract.js';
-import type { LogisticsState } from './Logistics.js';
+import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
+import { t } from '../i18n/I18n.js';
+import { deliverMaterials, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
+import { addIncome, type FinanceState } from './Finance.js';
+import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 
-export type DeliveryResult<T> = { success: true; data: T } | { success: false; error: string };
+type DeliveryResult<T> = { success: true; data: T } | { success: false; error: string };
 
 /** What one delivery to one contract produced. */
-export interface DeliveryOutcome {
+interface DeliveryOutcome {
   kg: number;
   payment: number;
   bonus: number;
@@ -14,28 +17,79 @@ export interface DeliveryOutcome {
 }
 
 /** One automatic delivery, tagged with its contract. */
-export interface AutoDelivery extends DeliveryOutcome {
+interface AutoDelivery extends DeliveryOutcome {
   contractId: number;
 }
 
-/** Deliver up to `requestedKg` of stored ore to one active contract, drawing it down from storage. */
+/**
+ * Deliver up to `requestedKg` of stored ore to one active contract, drawing it
+ * down from storage. The request is capped at what the contract still needs.
+ */
 export function deliverStoredOre(
-  _contracts: ContractState,
-  _logistics: LogisticsState,
-  _collectedOre: Record<string, number>,
-  _contractId: number,
-  _requestedKg: number,
-  _tick: number,
+  contracts: ContractState,
+  logistics: LogisticsState,
+  collectedOre: Record<string, number>,
+  contractId: number,
+  requestedKg: number,
+  tick: number,
 ): DeliveryResult<DeliveryOutcome> {
-  return { success: false, error: 'not implemented' }; // TODO: implement
+  const contract = contracts.active.find(c => c.id === contractId);
+  if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
+
+  const request = Math.min(requestedKg, contract.quantityKg - contract.deliveredKg);
+  if (!(request > 0)) return { success: false, error: t('economy.contract.deliver_fulfilled', { id: contractId }) };
+
+  const consumption = consumeStoredOre(logistics, collectedOre, contract.materialId, request);
+  if (!consumption.success) {
+    return {
+      success: false,
+      error: consumption.error ?? t('economy.contract.deliver_insufficient', { material: contract.materialId || 'material' }),
+    };
+  }
+  // Float dust left by splitting fragments must not strand a contract epsilon short of complete.
+  const consumed = Math.min(consumption.consumedKg, request);
+  const kg = request - consumed <= FRAGMENT_SPLIT_EPSILON_KG ? request : consumed;
+
+  const result = deliverMaterials(contracts, contractId, kg, tick);
+  contract.paidTotal = (contract.paidTotal ?? 0) + result.payment;
+  return { success: true, data: { kg, ...result } };
 }
 
-/** Deliver stored ore to every eligible active contract, soonest deadline first. */
+/**
+ * Deliver stored ore to every eligible (active, not held) contract, soonest
+ * deadline first. Each contract takes min(stock, remaining); stock is re-read
+ * after every delivery, since contracts share one warehouse. Walks the active
+ * contracts once.
+ */
 export function autoDeliverContracts(
-  _contracts: ContractState,
-  _logistics: LogisticsState,
-  _collectedOre: Record<string, number>,
-  _tick: number,
+  contracts: ContractState,
+  logistics: LogisticsState,
+  collectedOre: Record<string, number>,
+  tick: number,
 ): AutoDelivery[] {
-  return []; // TODO: implement
+  const deliveries: AutoDelivery[] = [];
+  // Sorted copy: completing a contract splices it out of contracts.active.
+  for (const contract of sortByDeadline(contracts.active)) {
+    if (contract.held || contract.completed || contract.expired) continue;
+    const stock = storedStockKg(contract, collectedOre, logistics.storedMassKg);
+    if (stock <= FRAGMENT_SPLIT_EPSILON_KG) continue;
+    const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, Math.min(stock, contract.quantityKg - contract.deliveredKg), tick);
+    if (result.success && result.data.kg > 0) deliveries.push({ contractId: contract.id, ...result.data });
+  }
+  return deliveries;
+}
+
+/** Credit a delivery's payment (and early bonus) to cash and the books. */
+export function bookDeliveryIncome(
+  account: { cash: number; finances: FinanceState },
+  contractId: number,
+  outcome: Pick<DeliveryOutcome, 'payment' | 'bonus'>,
+  tick: number,
+): void {
+  account.cash += outcome.payment;
+  addIncome(account.finances, outcome.payment, 'contracts', `Contract #${contractId} delivery`, tick);
+  if (outcome.bonus > 0) {
+    account.cash += outcome.bonus;
+    addIncome(account.finances, outcome.bonus, 'bonus', `Contract #${contractId} early bonus`, tick);
+  }
 }

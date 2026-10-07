@@ -15,9 +15,10 @@ import type { GameState, PendingAction, BlockedOrderReason } from '../../core/st
 import { BANKRUPTCY_THRESHOLD } from '../../core/campaign/Bankruptcy.js';
 import { ARREST_EXPOSURE_THRESHOLD, ARREST_WARNING_EXPOSURE } from '../../core/campaign/CriminalArrest.js';
 import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
-import { WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
+import { CONTRACT_EXPIRY_WARNING_TICKS, WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { contractShortOfStock, undeliveredShare } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
@@ -177,7 +178,8 @@ export class NotificationCenter {
     }
     const urgentContract = state.contracts.active.find(c => {
       const remaining = c.acceptedAtTick + c.deadlineTicks - state.tickCount;
-      return remaining <= 10 && remaining > 0;
+      return remaining <= CONTRACT_EXPIRY_WARNING_TICKS && remaining > 0
+        && contractShortOfStock(c, state.collectedOre, state.logistics.storedMassKg);
     });
     if (urgentContract) {
       const remaining = urgentContract.acceptedAtTick + urgentContract.deadlineTicks - state.tickCount;
@@ -189,7 +191,7 @@ export class NotificationCenter {
           severity: 'warn',
           icon: 'clock',
           title: t('notification.contract_expiring_title', { id: urgentContract.id }),
-          body: t('notification.contract_expiring_body', { duration, penalty: formatMoney(urgentContract.penaltyAmount) }),
+          body: t('notification.contract_expiring_body', { duration, penalty: formatMoney(Math.round(urgentContract.penaltyAmount * undeliveredShare(urgentContract))) }),
         });
       }
     }
