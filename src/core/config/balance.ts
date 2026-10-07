@@ -60,6 +60,8 @@ export const BASE_SALARIES = {
 export const CONTRACT_REFRESH_INTERVAL = 20;
 /** New contracts generated per refresh. */
 export const CONTRACTS_PER_REFRESH = 3;
+/** Number of most-common level ores that supply contracts may still ask for. */
+export const SUPPLY_COMMON_ORE_COUNT = 4;
 /** Max contracts available at once. */
 export const MAX_AVAILABLE_CONTRACTS = 8;
 

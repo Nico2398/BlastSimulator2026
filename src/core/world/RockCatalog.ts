@@ -280,6 +280,15 @@ export function getAllRocks(): readonly RockType[] {
 }
 
 /**
+ * Ore ids any of the given rocks can host (oreProbabilities > 0), in
+ * getAllOres() catalog order, no duplicates. Unknown rock ids are ignored.
+ */
+export function oresYieldedByRocks(rockIds: readonly string[]): string[] {
+  void rockIds;
+  return []; // TODO: implement
+}
+
+/**
  * Stable index of a rock id into getAllRocks()'s fixed order — shader rock-
  * uniform-array index (aRockA/aRockB attributes, #458 T3.1/A18) and the
  * landscape mesher's equivalent (T3.2). -1 for an unknown id (air).

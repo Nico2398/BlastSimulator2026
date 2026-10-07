@@ -53,7 +53,7 @@ import {
   VILLAGE_VIBRATION_SCORE_GAIN,
 } from '../config/balance.js';
 import { isExposed, processSmuggling, applySmugglingExposure, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
-import { resolveContractPriceMultiplier } from '../campaign/Level.js';
+import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
@@ -186,7 +186,7 @@ export function runTick(
 
   // 4. Auto-refresh available contracts on schedule
   if (state.tickCount % CONTRACT_REFRESH_INTERVAL === 0) {
-    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state));
+    generateContracts(state.contracts, rng, state.tickCount, resolveContractPriceMultiplier(state), resolveContractOres(state));
   }
 
   // 5. Smuggling income

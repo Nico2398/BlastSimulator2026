@@ -96,6 +96,8 @@ export function generateContracts(
   currentTick: number,
   /** Scales every generated contract's `pricePerKg` (Level.ts's `contractPriceMultiplier`). Defaults to 1 so every caller that doesn't pass one reproduces today's pricing exactly. */
   priceMultiplier: number = 1,
+  /** Ore ids the level's rocks can yield (Level.ts's resolveContractOres). */
+  availableOres: readonly string[],
 ): void {
   // Only refresh if enough time has passed
   if (currentTick - state.lastRefreshTick < CONTRACT_REFRESH_INTERVAL && state.available.length > 0) return;
@@ -105,12 +107,13 @@ export function generateContracts(
   if (overflow > 0) state.available.splice(0, overflow);
 
   for (let i = 0; i < CONTRACTS_PER_REFRESH; i++) {
-    state.available.push(generateOneContract(state, rng, priceMultiplier));
+    state.available.push(generateOneContract(state, rng, priceMultiplier, availableOres));
   }
   state.lastRefreshTick = currentTick;
 }
 
-function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number = 1): Contract {
+function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number = 1, availableOres: readonly string[]): Contract {
+  void availableOres;
   const typeRoll = rng.nextFloat(0, 1);
   let type: ContractType;
   let materialId: string;

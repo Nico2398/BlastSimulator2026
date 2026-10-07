@@ -233,6 +233,15 @@ export function resolveContractPriceMultiplier(state: GameState): number {
 }
 
 /**
+ * Ore ids the state's level rocks can yield; contract offers draw from these.
+ * Unknown biome falls back to every priced ore.
+ */
+export function resolveContractOres(state: GameState): readonly string[] {
+  void state;
+  return []; // TODO: implement
+}
+
+/**
  * Explosive ids purchasable/usable at the given level. Null or unknown level
  * id (sandbox) yields the full catalog; a known level yields its
  * `availableExplosives` filtered by catalog membership.
