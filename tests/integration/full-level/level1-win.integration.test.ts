@@ -88,7 +88,7 @@ const LEVEL1_PLAYTHROUGH_TICK_CAP = 6000;
 const LEVEL1_TARGET = getLevel('dusty_hollow')!.unlockThreshold;
 
 /** Every command verb the playthrough may use: what a player can do with controls enabled. */
-const ALLOWED_VERB = /^(campaign start|tick|drill_plan|charge|sequence|blast|contract accept|contract deliver|event choose)\b/;
+const ALLOWED_VERB = /^(campaign start|time resume|tick|drill_plan|charge|sequence|blast|zone clear|zone status|contract accept|contract deliver|event choose)\b/;
 
 interface PlayStyle {
   rows: number;
@@ -98,6 +98,20 @@ interface PlayStyle {
   /** Where the first shot goes, relative to the drill rig, and how far each next shot steps. */
   offset: { x: number; z: number };
   step: { x: number; z: number };
+}
+
+/** Safety margin, in tiles, a careful player clears around a charged pattern before firing. */
+const BLAST_ZONE_MARGIN = 15;
+
+/** Order everyone out of the blast radius and wait until the zone reads clear, as the Blast panel's evacuate control does. */
+function clearBlastZone(run: Run, state: GameState): void {
+  const xs = state.drillHoles.map((h) => h.x);
+  const zs = state.drillHoles.map((h) => h.z);
+  if (xs.length === 0) return;
+  const m = BLAST_ZONE_MARGIN + 1;
+  run(`zone clear x1:${Math.min(...xs) - m} y1:${Math.min(...zs) - m} x2:${Math.max(...xs) + m} y2:${Math.max(...zs) + m}`);
+  const isClear = () => { const z = run('zone status').output; return z.includes('CLEAR') && !z.includes('NOT'); };
+  for (let i = 0; i < 80 && !isClear(); i++) playTick(run, state);
 }
 
 /** Ordinary mining: order a grid near the rig, wait for it, charge it, sequence it, fire it, sell what comes out. */
@@ -123,6 +137,7 @@ function playLevel1(run: Run, state: GameState, style: PlayStyle): void {
     tickUntil(run, state, 600, () => done() || Object.keys(state.plannedChargesByHole).length === 0);
     if (done()) return;
     run('sequence auto');
+    clearBlastZone(run, state);
     run('blast');
     // Let the haulers clear the rock and sell it as it arrives.
     for (let i = 0; i < 150 && !done(); i++) {
@@ -134,8 +149,8 @@ function playLevel1(run: Run, state: GameState, style: PlayStyle): void {
 
 describe('Level 1 — real playthrough wins with no campaign complete (#1363)', () => {
   const STYLES: ReadonlyArray<{ label: string; style: PlayStyle }> = [
-    { label: 'seed 1138, 3x3 grids stepping south', style: { rows: 3, cols: 3, spacing: 4, depth: 8, offset: { x: 6, z: 6 }, step: { x: 0, z: 8 } } },
-    { label: 'seed 1138, 2x3 grids stepping east', style: { rows: 2, cols: 3, spacing: 3, depth: 6, offset: { x: 8, z: 4 }, step: { x: 8, z: 0 } } },
+    { label: 'seed 1138, 2x2 grids stepping south', style: { rows: 2, cols: 2, spacing: 3, depth: 6, offset: { x: 14, z: 13 }, step: { x: 0, z: 10 } } },
+    { label: 'seed 1138, 2x3 grids stepping east', style: { rows: 2, cols: 3, spacing: 3, depth: 6, offset: { x: 14, z: 13 }, step: { x: 10, z: 0 } } },
   ];
 
   it.each(STYLES)('wins within the tick cap and solvent — $label', ({ style }) => {
@@ -148,6 +163,7 @@ describe('Level 1 — real playthrough wins with no campaign complete (#1363)', 
     recordProfit(ctx.campaignProfile.campaign, 'tutorial_pit', 5000);
     expect(run('campaign start level:dusty_hollow').success).toBe(true);
     const state = ctx.state!;
+    run('time resume');
     expect(state.employees.employees.length, 'the level opens staffed').toBeGreaterThan(0);
 
     playLevel1(run, state, style);
