@@ -89,7 +89,8 @@
           "holeCount": 6
         },
         "note": "All 6 holes have landed — none lost, none left ordered forever."
-      }
+      },
+      "timeout": 125
     },
     {
       "command": "time speed 8",
