@@ -32,6 +32,21 @@ export const HIRING_COSTS = {
   manager: 2000,
 } as const;
 
+/** Qualifications each role arrives with at hire. */
+export const ROLE_STARTING_QUALIFICATIONS: Record<
+  EmployeeRole,
+  readonly { category: SkillCategory; proficiencyLevel: 1 | 2 | 3 | 4 | 5 }[]
+> = {
+  driller: [{ category: 'blasting', proficiencyLevel: 1 }],
+  blaster: [{ category: 'blasting', proficiencyLevel: 1 }],
+  driver: [{ category: 'driving.truck', proficiencyLevel: 1 }],
+  surveyor: [{ category: 'geology', proficiencyLevel: 1 }],
+  manager: [{ category: 'management', proficiencyLevel: 1 }],
+};
+
+/** Proficiency level a hired blaster should start at. */
+export const ROLE_BLASTER_START_LEVEL = 1;
+
 /** Base salary per pay cycle by role ($). Real miners: $25–80k/year; scaled per tick. */
 export const BASE_SALARIES = {
   driller: 500,

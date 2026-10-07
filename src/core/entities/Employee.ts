@@ -51,6 +51,7 @@ export type SkillCategory =
   | 'driving.truck'
   | 'driving.excavator'
   | 'driving.drill_rig'
+  | 'driving.rock_fragmenter'
   | 'blasting'
   | 'management'
   | 'geology';
