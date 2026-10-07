@@ -1045,7 +1045,9 @@ describe('blastCommand — ore report event wiring', () => {
     const ctx = makeMiningContext();
 
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
 
     const mockedReport = {
       oreYields: { dirtite: 1300 },
@@ -1079,7 +1081,9 @@ describe('blastCommand — ore report event wiring', () => {
     const ctx = makeMiningContext();
 
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
 
     const mockedReport = {
       oreYields: { dirtite: 1300 },

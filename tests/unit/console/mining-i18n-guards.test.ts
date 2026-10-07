@@ -83,9 +83,13 @@ describe('mining.ts requireGame guard', () => {
 // ── formatBlastPlanErrors headers ────────────────────────────────────────
 
 describe('formatBlastPlanErrors — "Invalid plan" header (blastCommand)', () => {
+  // A blast with no loaded charge at all is refused earlier (#1345), so the
+  // invalid-plan path needs one charged hole beside an uncharged one.
   function makeUnchargedPlan(ctx: MiningContext): void {
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
   }
 
   it('starts the output with "Invalid plan:" in English', () => {
@@ -112,9 +116,13 @@ describe('formatBlastPlanErrors — "Invalid plan" header (blastCommand)', () =>
 });
 
 describe('formatBlastPlanErrors — "Validation issues" header (blastPlanCommand validate)', () => {
+  // A blast with no loaded charge at all is refused earlier (#1345), so the
+  // invalid-plan path needs one charged hole beside an uncharged one.
   function makeUnchargedPlan(ctx: MiningContext): void {
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
   }
 
   it('starts the output with "Validation issues:" in English', () => {

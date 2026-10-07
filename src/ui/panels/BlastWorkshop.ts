@@ -17,6 +17,7 @@ import type { PlacementKit } from '../scene/PlacementKit.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { BlastFooter } from './blastFooter.js';
+import type { ConfirmModalConfig } from './ConfirmModal.js';
 import { DrillStep } from './blastSteps/Drill.js';
 import type { DrillHole } from '../../core/mining/DrillPlan.js';
 import type { ColumnRock } from '../../core/mining/ExplosiveRockFit.js';
@@ -117,6 +118,11 @@ export class BlastWorkshop extends PanelBase {
     this.chargeStep.setGameConsole(fn);
     this.previewStep.setGameConsole(fn);
     this.fireStep.setGameConsole(fn);
+  }
+
+  /** Routes the Drill step's replace-pattern confirmation to the shared ConfirmModal (#1345). */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void {
+    this.drillStep.setConfirmHandler(cb);
   }
 
   /** Passes the dominant-rock-under-a-hole sampler to the Charge step (#1358). */

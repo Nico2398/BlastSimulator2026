@@ -115,6 +115,7 @@ export class UIManager {
     // Shared confirm-before-destructive-action overlay — no owner panel of
     // its own; CrewPanel/FleetPanel (P6) will reach it once they exist.
     this.confirmModal = new ConfirmModal(container);
+    this.blastUI.setConfirmHandler(config => this.confirmModal.show(config));
     this.contractsPanel = new ContractsPanel(leftCol);
     this.contractsPanel.setCloseHandler(() => this.hideAllPanels());
     this.contractsPanel.setNavigateHandler((panel) => this.showPanel(panel));
