@@ -57,6 +57,18 @@ export function releasePlannedOrderForCancelledAction(
     return { x: order!.x, z: order!.z, sizeX, sizeZ };
   }
 
+  // A cancelled upgrade demolition drops the PlannedBuilding it reserved; the
+  // standing building is untouched. The freed footprint is the new tier's (#1392).
+  if (action.type === 'demolish_building') {
+    const rebuildOrderId = action.payload['rebuildOrderId'];
+    if (typeof rebuildOrderId !== 'number') return null;
+    const idx = state.plannedBuildings.findIndex(pb => pb.id === rebuildOrderId);
+    if (idx === -1) return null;
+    const [order] = state.plannedBuildings.splice(idx, 1);
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(order!.type, order!.tier));
+    return { x: order!.x, z: order!.z, sizeX, sizeZ };
+  }
+
   const holeId = action.payload['holeId'];
   if (typeof holeId !== 'string') return null;
 

@@ -19,6 +19,7 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
+import type { PlaceBuildingActionPayload } from '../../core/engine/BuildingDemolition.js';
 import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../../core/config/balance.js';
 import { terrainReservations } from '../../core/entities/PlacementReservations.js';
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
@@ -28,15 +29,6 @@ import { refusalText } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { siteBounds, emitFootprintOccupancyChanged, relocateFootprintOccupants, makeFootprintRegion } from './buildingHelpers.js';
-
-/** Payload carried by a queued `place_building` PendingAction (#556). */
-export interface PlaceBuildingActionPayload {
-  buildingOrderId: number;
-  cost: number;
-  footprint: ReadonlyArray<readonly [number, number]>;
-  /** Base ticks; scaled by the worker's proficiency at claim time. */
-  durationTicks: number;
-}
 
 /**
  * Re-point every other still-approaching `place_building` order's target at

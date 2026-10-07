@@ -3,8 +3,6 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import {
-  placeBuilding,
-  destroyBuilding,
   moveBuilding,
   getAllBuildingTypes,
   getBuildingDef,
@@ -22,7 +20,9 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
 import { evacuateZone } from '../../core/engine/Evacuation.js';
-import { releaseOccupantsOfRemovedBuildings } from '../../core/engine/Mount.js';
+import { queueDemolition, isDemolitionOrdered } from '../../core/engine/BuildingDemolition.js';
+import { findBuildingApproachCell } from '../../core/nav/BuildingApproach.js';
+import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 
 import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
@@ -67,6 +67,9 @@ export function buildCommand(
       if (isNaN(id)) return { success: false, output: t('entities.build_destroy_usage') };
       const toDestroy = state.buildings.buildings.find(b => b.id === id);
       if (!toDestroy) return { success: false, output: t('entities.building_not_found', { id }) };
+      if (isDemolitionOrdered(state, id)) {
+        return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
+      }
       const destroyDef = getBuildingDef(toDestroy.type, toDestroy.tier);
       const demolishCost = getDemolishCost(toDestroy);
       if (state.cash < demolishCost) {
@@ -80,14 +83,15 @@ export function buildCommand(
       }
       state.cash -= demolishCost;
       addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
-      destroyBuilding(state.buildings, id);
-      releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
-      refreshLogisticsCapacity(state);
-      // Notify NavGridSync via nav:occupancy_changed of the removed building's footprint
-      const { sizeX: destroySizeX, sizeZ: destroySizeZ } = getDefSize(destroyDef);
-      emitFootprintOccupancyChanged(ctx, toDestroy.x, toDestroy.z, destroySizeX, destroySizeZ);
+      // The building stays standing and operating until a Building Destroyer
+      // finishes the work (#1392); only the order is queued here.
+      const approach = findBuildingApproachCell(state.navGrid, { x: toDestroy.x, z: toDestroy.z }, destroyDef, toDestroy.x, toDestroy.z);
+      queueDemolition(state, toDestroy, {
+        cost: demolishCost, rebuildOrderId: null, approach,
+        targetY: ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0,
+      });
       const lostKg = toDestroy.type === 'explosive_warehouse' ? (toDestroy.storedExplosivesKg ?? 0) : 0;
-      const destroyOutput = t('entities.build_destroy_success', { id, cost: demolishCost });
+      const destroyOutput = t('entities.build_destroy_ordered', { id, cost: demolishCost });
       return {
         success: true,
         output: lostKg > 0 ? `${destroyOutput}\n${t('entities.build_destroy_lost_explosives', { kg: lostKg })}` : destroyOutput,
@@ -99,6 +103,9 @@ export function buildCommand(
       const toUpgrade = state.buildings.buildings.find(b => b.id === id);
       if (!toUpgrade) return { success: false, output: t('entities.building_not_found', { id }) };
       if (toUpgrade.tier >= 3) return { success: false, output: t('entities.build_upgrade_max_tier', { id }) };
+      if (isDemolitionOrdered(state, id)) {
+        return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
+      }
       const nextTier = (toUpgrade.tier + 1) as BuildingTier;
       if (isPlacementBlockedByResearch(state.buildings, toUpgrade.type, nextTier)) {
         return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: toUpgrade.type }) };
@@ -117,15 +124,11 @@ export function buildCommand(
       }
       const { x, z, type: upgradeType } = toUpgrade;
 
-      // Check the NEW tier's footprint before demolishing the old building,
-      // not after. placeBuilding below can refuse — the larger tier's
-      // footprint can run past the site bounds, overlap a neighbour, or (since
-      // #1008) cover ground too uneven to build on — and the demolition is not
-      // undone when it does, so validating second left the player with no
-      // building, no replacement and no refund. Occupants exclude this
-      // building itself, which is what the demolish-first order was standing
-      // in for; every other live building and every reserved construction site
-      // still counts.
+      // Validate the NEW tier's footprint at order time: the larger tier can
+      // run past the site bounds, overlap a neighbour or cover uneven ground
+      // (#1008). Occupants exclude this building itself, which the
+      // demolition clears before the rebuild; every other live building and
+      // reserved construction site still counts.
       const upBounds = siteBounds(ctx);
       const upgradeOccupants: FootprintOccupant[] = [
         ...state.buildings.buildings.filter(b => b.id !== id).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
@@ -140,45 +143,33 @@ export function buildCommand(
         return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(upgradeCheck) }) };
       }
 
-      destroyBuilding(state.buildings, id);
-      const upgradeResult = placeBuilding(
-        state.buildings, upgradeType, x, z,
-        upBounds.width, upBounds.depth, nextTier, upBounds.originX, upBounds.originZ,
-        undefined, ctx.grid ?? undefined,
-      );
-      if (!upgradeResult.success) {
-        return { success: false, output: t('entities.build_upgrade_failed', { error: refusalText(upgradeResult) }) };
-      }
       state.cash -= totalCost;
       addExpense(state.finances, totalCost, 'construction', `Upgrade ${upgradeType} to T${nextTier}`, state.tickCount);
-      // The upgraded tier is a new building: whoever was inside the old one
-      // is put back out on its ring (#1202).
-      releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
-      refreshLogisticsCapacity(state);
-      // Notify NavGridSync via nav:occupancy_changed, covering both old and new footprint (size may change between tiers)
+
+      // Reserve the finished building under the SAME id: the planned site
+      // blocks the larger footprint from now, and its place_building action
+      // is dispatched when the demolition completes (#1392).
+      const { sizeX: newSizeX, sizeZ: newSizeZ } = getDefSize(newDef);
+      const { sizeX: oldSizeX, sizeZ: oldSizeZ } = getDefSize(oldDef);
+      const rebuildOrderId = state.nextPlannedBuildingId++;
+      state.plannedBuildings.push({
+        id: rebuildOrderId, buildingId: id, type: upgradeType, tier: nextTier, x, z,
+        actionId: state.nextPendingActionId++, cost: newDef.constructionCost,
+      });
+      // Anyone standing on the larger new footprint is put off it now, as the
+      // old instant upgrade did.
       if (ctx.grid) {
-        const maxX = Math.max(getDefSize(oldDef).sizeX, getDefSize(newDef).sizeX);
-        const maxZ = Math.max(getDefSize(oldDef).sizeZ, getDefSize(newDef).sizeZ);
-        // The upgraded tier's footprint is the one that has to stand level, and
-        // it can be bigger than the tier it replaces — so it reaches onto ground
-        // the original construction never levelled. Cut it flat here, the same
-        // way finishing a build does (#1008 refinement, tickTaskCompletion.ts).
-        // levelBuildingFootprint (BuildingTaskHelpers.ts) carves and derives the
-        // target height from the same true footprint — the building's mesh is
-        // centred on it exactly (#1198), so there is no skirt beyond it to
-        // widen the carve into or guard against a neighbour.
-        levelBuildingFootprint(
-          ctx.grid, x, z, getDefSize(newDef).sizeX, getDefSize(newDef).sizeZ, ctx.emitter,
-        );
+        const maxX = Math.max(oldSizeX, newSizeX);
+        const maxZ = Math.max(oldSizeZ, newSizeZ);
         emitFootprintOccupancyChanged(ctx, x, z, maxX, maxZ);
         relocateFootprintOccupants(state, makeFootprintRegion(x, z, maxX, maxZ));
       }
-      return {
-        success: true,
-        output: t('entities.build_upgrade_success', {
-          type: upgradeType, id, tier: nextTier, newId: upgradeResult.building!.id, cost: totalCost,
-        }),
-      };
+      const approach = findBuildingApproachCell(state.navGrid, { x, z }, oldDef, x, z);
+      queueDemolition(state, toUpgrade, {
+        cost: totalCost, rebuildOrderId, approach,
+        targetY: ctx.grid ? getSurfaceY(ctx.grid, approach.x, approach.z) : 0,
+      });
+      return { success: true, output: t('entities.build_upgrade_ordered', { id }) };
     }
     case 'move': {
       const id = parseInt(args[1] ?? '', 10);

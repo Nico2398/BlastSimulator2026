@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Public Node.js API for external consumers (scenario tests, CI tooling)
 // Exports the game engine's pure logic without browser dependencies.
 
+import { getMaxBuildingTier } from './core/entities/Building.js';
 import { createRunner, type RunnerWithContext } from './console/createRunner.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
@@ -62,6 +63,8 @@ export interface SerializableGameState {
   /** Ghost previews drawn red because no actor able to perform their action can reach them (#1306). */
   unreachableGhostCount: number;
   buildingCount: number;
+  /** Highest tier among standing buildings, 0 when none (#1392). */
+  maxBuildingTier: number;
   vehicleCount: number;
   /** Active traffic jams at chokepoints, silencing ignored (findTrafficJams, #1208). */
   trafficJamCount: number;
@@ -187,6 +190,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
     buildingCount: s.buildings.buildings.length,
+    maxBuildingTier: getMaxBuildingTier(s.buildings),
     vehicleCount: s.vehicles.vehicles.length,
     trafficJamCount: jams.length,
     trafficJams: jams.map(j => ({ kind: j.kind, rampId: j.rampId })),

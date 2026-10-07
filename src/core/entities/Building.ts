@@ -446,6 +446,11 @@ export function getTotalOperatingCost(state: BuildingState): number {
   return total;
 }
 
+/** Highest tier among standing buildings; 0 when none (#1392). */
+export function getMaxBuildingTier(state: BuildingState): number {
+  return state.buildings.reduce((max, b) => Math.max(max, b.tier), 0);
+}
+
 /** Get total ore storage capacity from freight warehouses. */
 export function getStorageCapacity(state: BuildingState): number {
   let total = 0;

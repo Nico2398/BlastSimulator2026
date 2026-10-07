@@ -4,18 +4,37 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Building } from '../entities/Building.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { destroyBuilding, getBuildingDef, getDefSize } from '../entities/Building.js';
+import { computeDemolitionDurationTicks } from '../entities/DemolitionDuration.js';
+import { getSurfaceY } from '../entities/BuildingPlacement.js';
+import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
+import { BUILDING_CONSTRUCTION_BASE_DURATION_TICKS, BUILDING_CONSTRUCTION_TIER_MULTIPLIER } from '../config/balance.js';
+import { dispatchPendingAction } from './TaskDispatch.js';
+import { releaseOccupantsOfRemovedBuildings } from './Mount.js';
+import { addIncome } from '../economy/Finance.js';
+import { refreshLogisticsCapacity, emitFootprintRegionChanged } from './BuildingTaskHelpers.js';
+
+/** Payload carried by a queued `place_building` PendingAction (#556). */
+export interface PlaceBuildingActionPayload {
+  buildingOrderId: number;
+  cost: number;
+  footprint: ReadonlyArray<readonly [number, number]>;
+  /** Base ticks; scaled by the worker's proficiency at claim time. */
+  durationTicks: number;
+}
 
 /** Payload of a pending 'demolish_building' action. */
 export interface DemolishBuildingActionPayload {
   buildingId: number;
   cost: number;
+  /** Ticks for a tier-1 destroyer; the live estimate rescales by the reserved vehicle's tier. */
   durationTicks: number;
   footprint: ReadonlyArray<readonly [number, number]>;
   /** Place-building order to queue once the demolition finishes (upgrade/move), or null. */
   rebuildOrderId: number | null;
 }
 
-export interface DemolitionOptions {
+interface DemolitionOptions {
   cost: number;
   rebuildOrderId: number | null;
   approach: { x: number; z: number };
@@ -23,31 +42,91 @@ export interface DemolitionOptions {
 }
 
 /** Result of a finished demolition. */
-export interface DemolitionOutcome {
+interface DemolitionOutcome {
   buildingId: number;
   /** Id of the queued rebuild action, when a rebuild order was attached. */
   rebuildActionId: number | null;
 }
 
 /** Queue a demolish_building pending action for `building`; returns the action id. */
-export function queueDemolition(_state: GameState, _building: Building, _opts: DemolitionOptions): number {
-  // TODO: implement
-  return undefined as unknown as number;
+export function queueDemolition(state: GameState, building: Building, opts: DemolitionOptions): number {
+  const def = getBuildingDef(building.type, building.tier);
+  const actionId = state.nextPendingActionId++;
+  dispatchPendingAction(state, {
+    id: actionId,
+    type: 'demolish_building',
+    requiredSkill: null,
+    requiredVehicleRole: 'building_destroyer',
+    targetX: opts.approach.x,
+    targetZ: opts.approach.z,
+    targetY: opts.targetY,
+    payload: {
+      buildingId: building.id,
+      cost: opts.cost,
+      durationTicks: computeDemolitionDurationTicks(def.footprint.length, building.tier, 1),
+      footprint: def.footprint,
+      rebuildOrderId: opts.rebuildOrderId,
+    } satisfies DemolishBuildingActionPayload,
+    targetEmployeeId: null,
+  }, { skipQualificationCheck: true });
+  return actionId;
 }
 
 /** True when a demolish_building action for `buildingId` is already pending or in progress. */
-export function isDemolitionOrdered(_state: GameState, _buildingId: number): boolean {
-  // TODO: implement
-  return undefined as unknown as boolean;
+export function isDemolitionOrdered(state: GameState, buildingId: number): boolean {
+  return state.pendingActions.some(a => a.type === 'demolish_building' && a.payload['buildingId'] === buildingId);
 }
 
-/** Remove the building, release occupants, refresh logistics, emit occupancy, queue any rebuild. */
+/** Dispatch the place_building action reserved by an upgrade order, keeping its pre-claimed action id. */
+function dispatchRebuild(state: GameState, grid: VoxelGrid | null, rebuildOrderId: number): number | null {
+  const order = state.plannedBuildings.find(pb => pb.id === rebuildOrderId);
+  if (!order) return null;
+  const def = getBuildingDef(order.type, order.tier);
+  const approach = findBuildingApproachCell(state.navGrid, { x: order.x, z: order.z }, def, order.x, order.z);
+  dispatchPendingAction(state, {
+    id: order.actionId,
+    type: 'place_building',
+    requiredSkill: null,
+    requiredVehicleRole: null,
+    targetX: approach.x,
+    targetZ: approach.z,
+    targetY: grid ? getSurfaceY(grid, approach.x, approach.z) : 0,
+    payload: {
+      buildingOrderId: order.id,
+      cost: order.cost,
+      footprint: def.footprint,
+      durationTicks: Math.ceil(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[order.tier]),
+    } satisfies PlaceBuildingActionPayload,
+    targetEmployeeId: null,
+  }, { skipQualificationCheck: true });
+  return order.actionId;
+}
+
+/**
+ * Remove the building, release occupants, refresh logistics, emit occupancy, queue any rebuild.
+ * A building already gone is a no-op: the order cost is refunded and nothing throws.
+ */
 export function completeDemolition(
-  _state: GameState,
-  _grid: VoxelGrid,
-  _emitter: EventEmitter,
-  _payload: DemolishBuildingActionPayload,
+  state: GameState,
+  grid: VoxelGrid | null,
+  emitter: EventEmitter,
+  payload: DemolishBuildingActionPayload,
 ): DemolitionOutcome {
-  // TODO: implement
-  return undefined as unknown as DemolitionOutcome;
+  const building = state.buildings.buildings.find(b => b.id === payload.buildingId);
+  if (!building) {
+    state.cash += payload.cost;
+    addIncome(state.finances, payload.cost, 'refund', `Demolition cancelled: building #${payload.buildingId} is gone`, state.tickCount);
+    if (payload.rebuildOrderId !== null) {
+      const idx = state.plannedBuildings.findIndex(pb => pb.id === payload.rebuildOrderId);
+      if (idx !== -1) state.plannedBuildings.splice(idx, 1);
+    }
+    return { buildingId: payload.buildingId, rebuildActionId: null };
+  }
+  const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
+  destroyBuilding(state.buildings, building.id);
+  releaseOccupantsOfRemovedBuildings(state, emitter);
+  refreshLogisticsCapacity(state);
+  if (grid) emitFootprintRegionChanged(emitter, grid, building.x, building.z, sizeX, sizeZ);
+  const rebuildActionId = payload.rebuildOrderId !== null ? dispatchRebuild(state, grid, payload.rebuildOrderId) : null;
+  return { buildingId: building.id, rebuildActionId };
 }

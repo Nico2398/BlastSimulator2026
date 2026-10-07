@@ -912,7 +912,8 @@ export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
 /**
  * Ticks a queued, unclaimed action with requiredVehicleRole === null (any
  * on-foot action class open to whoever is free — place_building, survey,
- * general_work, demolish_building) may sit waiting before it must win the
+ * general_work; demolish_building is not one of them since it requires a
+ * building_destroyer, #1392) may sit waiting before it must win the
  * next vehicle-gated completion's dispatch decision, overriding
  * tryContinueVehicleGatedAction's same-role continuity fast path
  * (VehicleContinuity.ts) regardless of cost ranking (#1000).
