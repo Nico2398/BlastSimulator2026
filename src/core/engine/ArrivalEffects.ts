@@ -105,7 +105,7 @@ export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: Even
     Math.round(tracked.fragment.position.x),
     Math.round(tracked.fragment.position.z),
   );
-  vehicle.payload = { fragmentId, massKg: tracked.fragment.mass };
+  vehicle.cargo = [{ fragmentId, massKg: tracked.fragment.mass }];
   emitter?.emit('vehicle:haul_loaded', { vehicleId: vehicle.id, fragmentId });
   return true;
 }
@@ -121,9 +121,9 @@ export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: Even
  * the haul_debris action this vehicle is reserved for.
  */
 export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): boolean {
-  if (vehicle.payload === null) return false;
+  if (vehicle.cargo.length === 0) return false;
 
-  const { fragmentId } = vehicle.payload;
+  const fragmentId = vehicle.cargo[0]!.fragmentId;
   // deliverToDepot's own success/failure must be honored (#1091 fix): it
   // returns false without mutating anything when the named fragment isn't
   // actually tracked 'in_transit' any more (a stale payload, or a fragment
@@ -133,7 +133,7 @@ export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: Ev
   const delivered = deliverToDepot(state.logistics, fragmentId, state.collectedOre);
   if (!delivered) return false;
 
-  vehicle.payload = null;
+  vehicle.cargo = [];
   emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
   completeFragmentGatedAction(state, vehicle);
   return true;

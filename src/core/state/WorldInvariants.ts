@@ -307,10 +307,10 @@ function checkI7DriveLegWithoutMount(state: GameState): Violation[] {
 function checkI8PayloadNotInTransit(state: GameState): Violation[] {
   const violations: Violation[] = [];
   for (const v of state.vehicles.vehicles) {
-    if (v.payload === null) continue;
-    const tracked = findInTransitFragment(state.logistics, v.payload.fragmentId);
-    if (!tracked) {
-      violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id, fragmentId: v.payload.fragmentId });
+    for (const item of v.cargo) {
+      if (!findInTransitFragment(state.logistics, item.fragmentId)) {
+        violations.push({ kind: 'I8_payload_not_in_transit', vehicleId: v.id, fragmentId: item.fragmentId });
+      }
     }
   }
   return violations;

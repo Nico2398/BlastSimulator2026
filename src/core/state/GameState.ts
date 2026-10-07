@@ -105,6 +105,7 @@ import type { RampWidth } from '../config/balance.js';
 // side). A pre-v19 save only has `driverId` — occupantIds defaults to
 // `[driverId]` (or `[]` when unset) and locomotion is derived from whichever
 // vehicle's driverId names the employee. See SaveLoad.ts's migrateV18ToV19.
+// v31 -> v32: Vehicle.payload becomes Vehicle.cargo[] (#1370). See SaveLoad.ts's migrateV31ToV32.
 // v19 -> v20: Vehicle.payload replaces the haul/break phase fields (#1091).
 // See SaveLoad.ts's migrateV19ToV20.
 // v20 -> v21: Vehicle lost `driverId` (a mirror of `occupantIds[0]` since
@@ -147,7 +148,7 @@ import type { RampWidth } from '../config/balance.js';
 // save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
 // v28 -> v29: nextHoleId (#1352)
 // v29 -> v30: weather (#1403). See SaveLoad.ts's migrateV29ToV30.
-export const SAVE_VERSION = 31;
+export const SAVE_VERSION = 32;
 
 export interface GameConfig {
   seed: number;

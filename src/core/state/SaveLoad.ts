@@ -529,6 +529,11 @@ export function backfillRaises(obj: Record<string, unknown>): void {
  * v30 -> v31 (#1385): backfill `hiringPool`; a missing or malformed one is
  * rebuilt from the saved seed and tick. Idempotent. Mutates `obj` in place.
  */
+/** v31 -> v32 (#1370): Vehicle.payload (item or null) becomes Vehicle.cargo[]. */
+function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> {
+  return obj; // TODO: implement
+}
+
 function migrateV30ToV31(obj: Record<string, unknown>): Record<string, unknown> {
   const p = obj['hiringPool'];
   const c = (typeof p === 'object' && p !== null ? p : {}) as
@@ -865,6 +870,7 @@ export function deserialize(json: string): GameState {
   migrateV28ToV29(obj);
   migrateV29ToV30(obj);
   migrateV30ToV31(obj);
+  migrateV31ToV32(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);

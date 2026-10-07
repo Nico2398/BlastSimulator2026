@@ -238,7 +238,7 @@ function isUnreachableBetweenInPlaceRests(state: GameState, employee: Employee):
  * finish the drive uninterrupted.
  */
 function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
-  return state.vehicles.vehicles.some(v => vehicleDriverId(v) === employee.id && v.payload !== null);
+  return state.vehicles.vehicles.some(v => vehicleDriverId(v) === employee.id && v.cargo.length > 0);
 }
 
 /**

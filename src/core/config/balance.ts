@@ -1857,5 +1857,11 @@ export const CANDIDATE_SKILL_BONUS_CHANCE = 0.35;
 /** Maximum bonus levels a candidate may have. */
 export const CANDIDATE_SKILL_BONUS_MAX = 1;
 
+/** Radius (cells) around the primary fragment within which a haul batch gathers extras (#1370). */
+export const HAUL_BATCH_RADIUS_CELLS = 8;
+
+/** Most fragments one haul trip carries (#1370). */
+export const HAUL_BATCH_MAX_ITEMS = 6;
+
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;

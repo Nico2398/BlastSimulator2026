@@ -73,7 +73,7 @@ export function makeHpGauge(v: Vehicle): HTMLElement {
 export function makeLoadGauge(v: Vehicle): HTMLElement | null {
   if (v.type !== 'debris_hauler') return null;
   const capacity = getVehicleDefByTier(v.type, v.tier).capacity;
-  const massKg = v.payload?.massKg ?? 0;
+  const massKg = v.cargo[0]?.massKg ?? 0;
   // Clamped (#1092): an over-capacity load (a fragment heavier than the
   // tier's own capacity, which loading does not refuse) would otherwise draw
   // a gauge past its own track.

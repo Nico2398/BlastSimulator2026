@@ -515,7 +515,7 @@ function planFragmentTaskItinerary(
   // earlier policy-driven interruption/pause left the reservation (and the
   // cargo) intact rather than releasing it (isCommittedToOwnCargo,
   // VehicleReservation.ts). Only the depot leg is left to plan.
-  if (action.type === 'haul_debris' && vehicle.payload !== null && vehicle.payload.fragmentId === fragmentId) {
+  if (action.type === 'haul_debris' && vehicle.cargo.some(c => c.fragmentId === fragmentId)) {
     const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ);
     if (depotApproach === null) return null;
 

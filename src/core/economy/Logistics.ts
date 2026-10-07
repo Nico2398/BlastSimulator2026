@@ -416,3 +416,8 @@ export function returnFragmentToGround(
 
   return true;
 }
+
+/** Total mass (kg) of fragments currently in transit (#1370). */
+export function inTransitMassKg(_state: LogisticsState): number {
+  return 0; // TODO: implement
+}

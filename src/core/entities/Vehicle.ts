@@ -123,6 +123,17 @@ export function vehicleRequiredClearanceCells(vehicle: Vehicle): number {
 
 // ── Vehicle instance ──
 
+/** One fragment aboard a hauler (#1370). */
+export interface HaulCargoItem {
+  fragmentId: number;
+  massKg: number;
+}
+
+/** Total mass (kg) aboard a vehicle. */
+export function vehicleCargoMassKg(_v: Pick<Vehicle, 'cargo'>): number {
+  return 0; // TODO: implement
+}
+
 export interface Vehicle {
   id: number;
   type: VehicleRole;
@@ -137,7 +148,7 @@ export interface Vehicle {
    * mass and fragment identity travel together as one loaded/unloaded unit
    * rather than two fields that could disagree.
    */
-  payload: { fragmentId: number; massKg: number } | null;
+  cargo: HaulCargoItem[];
   /**
    * IDs of employees currently mounted in this vehicle (driver included).
    * Must agree with each occupant's `Locomotion` in both directions — see
@@ -258,7 +269,7 @@ export function purchaseVehicle(
     tier,
     x, z,
     hp: def.maxHp,
-    payload: null,
+    cargo: [],
     occupantIds: [],
   };
   state.vehicles.push(vehicle);
@@ -340,7 +351,7 @@ export function canReleaseDriver(
 ): { success: boolean; error?: string } & RefusalKey {
   const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found', errorKey: 'vehicle.not_found', errorParams: { id: vehicleId } };
-  if (vehicle.payload !== null) return { success: false, error: 'Vehicle is mid-haul', errorKey: 'vehicle.mid_haul', errorParams: { id: vehicleId } };
+  if (vehicle.cargo.length > 0) return { success: false, error: 'Vehicle is mid-haul', errorKey: 'vehicle.mid_haul', errorParams: { id: vehicleId } };
 
   return { success: true };
 }

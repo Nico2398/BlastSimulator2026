@@ -17,7 +17,7 @@ export type ArrivalStep =
   // #1202: go inside the building — the itinerary's last step, taken from a
   // cell on the building's ring (Mount.enterBuilding).
   | { kind: 'enter_building'; buildingId: number }
-  | { kind: 'effect'; effectId: ArrivalEffectId };
+  | { kind: 'effect'; effectId: ArrivalEffectId; targetId?: number };
 
 /** One foot or drive segment of an itinerary. */
 export interface Leg {

@@ -161,7 +161,7 @@ export function isHaulOrFragmentActionClaimable(
 
   if (tracked.state === 'in_transit') {
     return state.vehicles.vehicles.some(
-      v => getVehicleReservation(state.vehicles, v.id) === action.id && v.payload?.fragmentId === tracked.fragment.id,
+      v => getVehicleReservation(state.vehicles, v.id) === action.id && v.cargo[0]?.fragmentId === tracked.fragment.id,
     );
   }
 

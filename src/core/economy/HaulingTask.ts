@@ -59,7 +59,7 @@ export function requestHaulFragment(
   if (!found.success) return found;
   const vehicle = found.vehicle;
   if (vehicleDriverId(vehicle) === null) return vehicleNoDriver();
-  if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.payload !== null) {
+  if (getVehicleReservation(state.vehicles, vehicle.id) !== null || vehicle.cargo.length > 0) {
     return { success: false, error: 'Vehicle is already hauling', errorKey: 'vehicle.already_hauling' };
   }
 

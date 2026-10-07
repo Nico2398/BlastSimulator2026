@@ -267,7 +267,7 @@ export function isCommittedToOwnCargo(state: GameState, action: PendingAction): 
   const fragmentId = action.payload['fragmentId'];
   if (typeof fragmentId !== 'number') return false;
   const vehicle = findVehicleReservedForAction(state.vehicles, action.id);
-  return !!vehicle && vehicle.payload !== null && vehicle.payload.fragmentId === fragmentId;
+  return !!vehicle && vehicle.cargo.some(c => c.fragmentId === fragmentId);
 }
 
 /**
@@ -388,9 +388,10 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
  * isCommittedToOwnCargo-gated release (TaskCancellation.ts, VehicleReservation.ts).
  */
 function returnVehicleCargoToGround(state: GameState, vehicle: Vehicle): void {
-  if (vehicle.payload === null) return;
-  returnFragmentToGround(state.logistics, vehicle.payload.fragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
-  vehicle.payload = null;
+  for (const item of vehicle.cargo) {
+    returnFragmentToGround(state.logistics, item.fragmentId, state.navGrid, { x: vehicle.x, y: 0, z: vehicle.z });
+  }
+  vehicle.cargo = [];
 }
 
 /**
