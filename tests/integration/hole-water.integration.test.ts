@@ -16,6 +16,12 @@ import {
   HOLE_DRAIN_POROSITY_LIMIT,
   HOLE_WET_THRESHOLD,
 } from '../../src/core/config/balance.js';
+import { firstEmptyLayerAboveGround } from '../../src/core/world/VoxelGrid.js';
+import { getRock } from '../../src/core/world/RockCatalog.js';
+import { createGame } from '../../src/core/state/GameState.js';
+import { runTick } from '../../src/core/engine/TickPipeline.js';
+import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { Random } from '../../src/core/math/Random.js';
 import { TUBING_COST } from '../../src/core/mining/Tubing.js';
 
 const GRID = 'drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12';
@@ -421,5 +427,59 @@ describe('hole water persistence (#1350)', () => {
     runner.run('new_game seed:42');
     expect(ctx.state!.holeWater).toEqual({});
     expect(ctx.state!.groundWetness).toBe(0);
+  });
+});
+
+describe('hole water porosity from the rock under the hole (#1350)', () => {
+  /** Replace every solid voxel in the hole's column with pure `rockId`. */
+  function setRockUnderHole(game: ReturnType<typeof drilledGame>, holeId: string, rockId: string): void {
+    const grid = game.ctx.grid!;
+    const hole = game.ctx.state!.drillHoles.find(h => h.id === holeId)!;
+    const x = Math.floor(hole.x);
+    const z = Math.floor(hole.z);
+    const top = firstEmptyLayerAboveGround(grid, x, z);
+    for (let y = top - hole.depth; y < top; y++) {
+      const v = grid.getVoxel(x, y, z);
+      if (!v || v.density === 0) continue;
+      grid.setVoxel(x, y, z, { ...v, composition: { rocks: [{ rockId, coefficient: 1 }] } });
+    }
+  }
+
+  const POROUS_ROCK = 'cruite';
+  const TIGHT_ROCK = 'absurdite';
+
+  it('the chosen rocks straddle the drain porosity limit', () => {
+    expect(getRock(POROUS_ROCK)!.porosity).toBeGreaterThanOrEqual(HOLE_DRAIN_POROSITY_LIMIT);
+    expect(getRock(TIGHT_ROCK)!.porosity).toBeLessThan(HOLE_DRAIN_POROSITY_LIMIT);
+  });
+
+  it('holes read the porosity of their rock, stay wet longer when porous, and tubed ones stay put', () => {
+    const game = drilledGame();
+    const [porous, tight, tubedPorous] = holeIds(game) as [string, string, string];
+    setRockUnderHole(game, porous, POROUS_ROCK);
+    setRockUnderHole(game, tubedPorous, POROUS_ROCK);
+    setRockUnderHole(game, tight, TIGHT_ROCK);
+
+    weatherTicks(game, 'storm', 4);
+    const state = game.ctx.state!;
+    expect(state.holeWater[porous]!.porosity).toBe(getRock(POROUS_ROCK)!.porosity);
+    expect(state.holeWater[tight]!.porosity).toBe(getRock(TIGHT_ROCK)!.porosity);
+
+    game.runner.run('buy amount:1');
+    expect(game.runner.run(`install_tubing hole:${tubedPorous}`).success).toBe(true);
+    const tubedLevel = state.holeWater[tubedPorous]!.level;
+
+    weatherTicks(game, 'sunny', 6);
+
+    expect(state.holeWater[porous]!.level).toBeGreaterThan(state.holeWater[tight]!.level);
+    expect(state.holeWater[tubedPorous]!.level).toBe(tubedLevel);
+  });
+
+  it('without a grid the porosity falls back to 0', () => {
+    const state = createGame({ seed: 7 });
+    state.events.eventFreqMultiplier = 0;
+    state.drillHoles.push({ id: 'h1', x: 12, z: 12, depth: 8, diameter: 0.089 });
+    runTick(state, null, new Random(7), new EventEmitter(), { checkInvariants: false });
+    expect(state.holeWater['h1']!.porosity).toBe(0);
   });
 });

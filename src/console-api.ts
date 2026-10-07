@@ -41,11 +41,11 @@ export interface SerializableGameState {
   finances: { cash: number };
   holeCount: number;
   /** Holes ordered but not yet drilled (state.plannedDrillHoles.length) — proves a drill plan queues work instead of writing holes into state instantly (#553). */
-  /** Drill holes whose water level is past the wet threshold (wetHoles, #1350). */
-  wetHoleCount: number;
   orderedHoleCount: number;
   /** Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length) — proves a charge order queues work instead of writing charges into state instantly (#554). */
   orderedChargeCount: number;
+  /** Drill holes whose water level is past the wet threshold (wetHoles, #1350). */
+  wetHoleCount: number;
   /** Remaining not-yet-`done` segments across every in-flight `state.plannedRamps` entry — proves a ramp order queues progressive excavation work instead of carving the whole corridor instantly (#555). A ramp is spliced out of `plannedRamps` entirely once its last segment lands, so this reaches 0 exactly when every ordered ramp has finished, not merely when the field would otherwise read 0 on an empty ramp. */
   orderedRampSegmentCount: number;
   /** Finished ramps (state.builtRamps.length, #1298). */
@@ -175,9 +175,9 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     chargesByHole: s.chargesByHole as Record<string, unknown>,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
-    wetHoleCount: wetHoles(s).length,
     orderedHoleCount: s.plannedDrillHoles.length,
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    wetHoleCount: wetHoles(s).length,
     orderedRampSegmentCount: s.plannedRamps.reduce(
       (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
     ),

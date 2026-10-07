@@ -30,7 +30,7 @@ export function advanceHoleWater(
   let level = hw.level;
   level += rain * HOLE_RAIN_FILL_RATE;
   level += groundWetness * hw.porosity * HOLE_SEEP_RATE;
-  if (rain <= 0) level -= HOLE_WATER_FADE_RATE * (1 - hw.porosity * HOLE_FADE_POROSITY_SLOWDOWN);
+  if (rain <= 0) level -= HOLE_WATER_FADE_RATE * Math.max(0, 1 - hw.porosity * HOLE_FADE_POROSITY_SLOWDOWN);
   return { ...hw, level: Math.min(1, Math.max(0, level)) };
 }
 

@@ -622,8 +622,8 @@ window.__gameState = () => {
     // Charges ordered but not yet loaded (state.plannedChargesByHole) --
     // mirrors serializeGameState's own field (console-api.ts), same
     // rationale as orderedHoleCount above (#554).
-    wetHoleCount: wetHoles(s).length,
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    wetHoleCount: wetHoles(s).length,
     // Remaining not-yet-`done` segments across every in-flight
     // state.plannedRamps entry -- mirrors serializeGameState's own field
     // (console-api.ts), same rationale as orderedHoleCount/orderedChargeCount
