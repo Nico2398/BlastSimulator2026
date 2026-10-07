@@ -104,6 +104,17 @@ Auto-insert a rest task at the soft threshold — don't wait for the hard thresh
 
 **Soft-threshold contract:** hitting it never interrupts — the employee finishes the action already in progress. The queued rest then wins priority over any other action once the employee next goes idle, or when actions are claimed in the same dispatch batch (`EmployeeDispatchSteps.ts`).
 
+## Injury and Recovery
+
+Injury (#1382) is a timed state, not a permanent one. `injureEmployee` sets `injured`, starts `injuryTicksRemaining = INJURY_RECOVERY_TICKS` (48) and costs `INJURY_MORALE_PENALTY` (20) morale once; injuring an already-injured employee is a no-op. `healEmployee` clears the timer; `killEmployee` clears it too. `injuryHoursRemaining` (`Employee.ts`) is the UI read: `ceil(remaining)`, `null` when healthy; Crew panel tag tip and detail card show it (`ui.crew.injured_back_in`).
+
+- **Recovery tick:** `tickInjuryRecovery` (`engine/InjuryRecovery.ts`) runs once per tick after `tickCollapse`, before `autoInsertNeedTasks`. It drops the active non-rest action (`interruptActiveAction`), then counts the timer down. A missing counter (legacy save) is backfilled lazily.
+- **Bed routing:** an injured employee on foot with no itinerary walks to the nearest free-bed `living_quarters` (`findNearestBuildingOfType`, `moveTo` with `allowUnreachable`). Mounted employees recover in place at the on-foot rate. No living quarters: recover where they stand.
+- **Speed-up:** progress per tick is `INJURY_ON_FOOT_RECOVERY_RATE` (1) anywhere, or `INJURY_RECOVERY_RATE_BY_LQ_TIER` (1: 2, 2: 3, 3: 4) while inside a living quarters of that tier. At <= 0 the employee heals and leaves the building.
+- **Frozen needs:** `tickNeedGauges` returns early for injured employees (no fatigue drain) and `needsMoraleEffect` returns 0 (morale held). They stay in `computeAverageMorale`.
+- **Work:** injured employees are not dispatched; queued non-rest work returns to the pool (`releaseInjuredEmployeesQueues`, #1381).
+- **Tunables** (`balance.ts`): `INJURY_RECOVERY_TICKS`, `INJURY_MORALE_PENALTY`, `INJURY_ON_FOOT_RECOVERY_RATE`, `INJURY_RECOVERY_RATE_BY_LQ_TIER`.
+
 ## Cost of Needs
 
 Flat per-visit cost, not tier-scaled (`NEED_REST_COSTS` in `src/core/config/balance.ts`):
@@ -114,7 +125,7 @@ Flat per-visit cost, not tier-scaled (`NEED_REST_COSTS` in `src/core/config/bala
 
 ## Shift System
 
-A single policy path runs, always in force (#1379): `processShiftCycle` (`ShiftCycle.ts`) calls `forceShiftRestIfNeededByPolicy` (`ForceShiftRest.ts`) for every alive, non-injured employee, regardless of building tier or whether the player ever applied a policy. A new game's default policy (`shift_8h`, threshold 60, `revision` 0) is therefore live from tick 0. A Tier 1 Living Quarters, or no building at all (rest in place), is a valid rest destination. `state.sitePolicy.revision` counts explicit player applications only (`set_policy`, Operations panel) and never gates the engine. `shouldForceRest` (`src/core/entities/SitePolicy.ts`) trips on either of two conditions, evaluated per shift mode (`shift_8h`, `shift_12h`, `continuous`, `custom`): the timed modes force rest once `ticksWorked` reaches the shift duration (8 or 12 ticks — `SHIFT_DURATIONS_TICKS`); every mode also force-rests once fatigue falls to or below the policy's threshold, default 60 (`SITE_POLICY_DEFAULT_THRESHOLD`), overridable per-employee in `custom` mode (`customThresholds`). The old fixed-duration Tier 2+ path (`forceShiftRestIfNeeded`, `WORK_DURATION_TICKS`) is no longer called by the engine.
+A single policy path runs, always in force (#1379): `processShiftCycle` (`ShiftCycle.ts`) calls `forceShiftRestIfNeededByPolicy` (`ForceShiftRest.ts`) for every alive, non-injured employee (injured ones are recovering, see Injury and Recovery), regardless of building tier or whether the player ever applied a policy. A new game's default policy (`shift_8h`, threshold 60, `revision` 0) is therefore live from tick 0. A Tier 1 Living Quarters, or no building at all (rest in place), is a valid rest destination. `state.sitePolicy.revision` counts explicit player applications only (`set_policy`, Operations panel) and never gates the engine. `shouldForceRest` (`src/core/entities/SitePolicy.ts`) trips on either of two conditions, evaluated per shift mode (`shift_8h`, `shift_12h`, `continuous`, `custom`): the timed modes force rest once `ticksWorked` reaches the shift duration (8 or 12 ticks — `SHIFT_DURATIONS_TICKS`); every mode also force-rests once fatigue falls to or below the policy's threshold, default 60 (`SITE_POLICY_DEFAULT_THRESHOLD`), overridable per-employee in `custom` mode (`customThresholds`). The old fixed-duration Tier 2+ path (`forceShiftRestIfNeeded`, `WORK_DURATION_TICKS`) is no longer called by the engine.
 
 ### Walk-survival guard (#928)
 
