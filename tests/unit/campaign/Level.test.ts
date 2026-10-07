@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { getLevel, getAllLevels, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels, resolveContractOres, type LevelDef, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
-import { createGame } from '../../../src/core/state/GameState.js';
+import { createGame, createWorldState, type GameState } from '../../../src/core/state/GameState.js';
+import { generateTerrain } from '../../../src/core/world/TerrainGen.js';
+import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
+import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
+import { getAllOres } from '../../../src/core/world/OreCatalog.js';
+import { sandboxLevelDef, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
 import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../../../src/core/config/balance.js';
 
 describe('Level definition system (7.1)', () => {
@@ -205,5 +210,113 @@ describe('level explosive availability (#1357)', () => {
 describe('tutorial_pit contract price multiplier (#1328)', () => {
   it('Level.ts uses the balance.ts constant rather than a duplicate literal', () => {
     expect(getLevel('tutorial_pit')!.contractPriceMultiplier).toBe(TUTORIAL_CONTRACT_PRICE_MULTIPLIER);
+  });
+});
+
+
+describe('resolveContractOres (#1364)', () => {
+  const ALL_ORE_IDS = getAllOres().map(o => o.id);
+
+  function stateFor(level: LevelDef, activeLevelId: string | null): GameState {
+    const state = createGame({ seed: level.terrainSeed, mineType: level.biome });
+    state.world = createWorldState(level.gridX, level.datum, level.gridZ, false);
+    state.world.mixedRockHardness = level.mixedRockHardness;
+    state.campaign.activeLevelId = activeLevelId;
+    return state;
+  }
+
+  /** Ore ids actually present (density > 0 voxel with ore density > 0) in a strided sample of the level's grid. */
+  function oresInGrid(level: LevelDef): Set<string> {
+    const grid = generateTerrain({
+      sizeX: level.gridX, datum: level.datum, sizeZ: level.gridZ,
+      seed: level.terrainSeed, climateBias: level.climateBias,
+      mixedRockHardness: level.mixedRockHardness,
+    });
+    const found = new Set<string>();
+    for (let x = grid.minX; x < grid.maxX; x += 3) {
+      for (let z = grid.minZ; z < grid.maxZ; z += 3) {
+        for (let y = level.datum - 40; y <= level.datum + 5; y += 2) {
+          const v = grid.getVoxel(x, y, z);
+          if (!v || v.density <= 0) continue;
+          for (const [ore, d] of Object.entries(v.oreDensities)) if (d > 0) found.add(ore);
+        }
+      }
+    }
+    return found;
+  }
+
+  it('tutorial_pit offers only dirtite, rustite, blingite', () => {
+    const level = getLevel('tutorial_pit')!;
+    expect([...resolveContractOres(stateFor(level, level.id))].sort()).toEqual(['blingite', 'dirtite', 'rustite']);
+  });
+
+  it('dusty_hollow offers only dirtite, rustite, blingite', () => {
+    const level = getLevel('dusty_hollow')!;
+    expect([...resolveContractOres(stateFor(level, level.id))].sort()).toEqual(['blingite', 'dirtite', 'rustite']);
+  });
+
+  it('never includes sparkium or deeper ores on the desert levels', () => {
+    for (const id of ['tutorial_pit', 'dusty_hollow']) {
+      const level = getLevel(id)!;
+      const ores = resolveContractOres(stateFor(level, id));
+      for (const deep of ['gloomium', 'sparkium', 'craktonite', 'absurdium', 'treranium']) {
+        expect(ores).not.toContain(deep);
+      }
+    }
+  });
+
+  it('returns only known ore ids, no duplicates, in ore catalog order', () => {
+    for (const level of getAllLevels()) {
+      const ores = resolveContractOres(stateFor(level, level.id));
+      expect(ores.length).toBeGreaterThan(0);
+      expect(new Set(ores).size).toBe(ores.length);
+      expect(ores.every(o => ALL_ORE_IDS.includes(o))).toBe(true);
+      expect([...ores]).toEqual(ALL_ORE_IDS.filter(o => ores.includes(o)));
+    }
+  });
+
+  it('level 3 (mixed hardness) uses only its softest and hardest dominant rock', () => {
+    const level = getLevel('treranium_depths')!;
+    expect(level.mixedRockHardness).toBe(true);
+    const rocks = getBiome(level.biome)!.dominantRocks
+      .map(id => getRock(id)!)
+      .sort((a, b) => a.hardnessTier - b.hardnessTier);
+    const expected = oresYieldedByRocks([rocks[0]!.id, rocks[rocks.length - 1]!.id]);
+    expect([...resolveContractOres(stateFor(level, level.id))]).toEqual(expected);
+  });
+
+  it('mixed hardness narrows the ores relative to the same biome unmixed', () => {
+    const level = getLevel('treranium_depths')!;
+    const unmixed = stateFor({ ...level, mixedRockHardness: false }, level.id);
+    const mixed = stateFor(level, level.id);
+    const all = getBiome(level.biome)!.dominantRocks;
+    expect([...resolveContractOres(unmixed)]).toEqual(oresYieldedByRocks(all));
+    expect(resolveContractOres(mixed).length).toBeLessThanOrEqual(resolveContractOres(unmixed).length);
+  });
+
+  it('unknown biome falls back to every priced ore', () => {
+    const state = createGame({ seed: 1, mineType: 'no_such_biome' });
+    state.campaign.activeLevelId = null;
+    expect([...resolveContractOres(state)]).toEqual(ALL_ORE_IDS);
+  });
+
+  describe('drift lock: result is a superset of ores generated into the grid', () => {
+    for (const level of getAllLevels()) {
+      it(`campaign level ${level.id}`, () => {
+        const offered = new Set(resolveContractOres(stateFor(level, level.id)));
+        const inGrid = oresInGrid(level);
+        expect(inGrid.size).toBeGreaterThan(0);
+        for (const ore of inGrid) expect(offered.has(ore)).toBe(true);
+      });
+    }
+
+    for (const biome of getAllBiomes()) {
+      it(`sandbox biome ${biome.id}`, () => {
+        const level = sandboxLevelDef({ biome: biome.id, difficulty: 'normal', seed: 7 });
+        const offered = new Set(resolveContractOres(stateFor(level, SANDBOX_LEVEL_ID)));
+        const inGrid = oresInGrid(level);
+        for (const ore of inGrid) expect(offered.has(ore)).toBe(true);
+      });
+    }
   });
 });

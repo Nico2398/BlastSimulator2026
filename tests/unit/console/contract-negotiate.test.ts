@@ -7,6 +7,8 @@ import { Random } from '../../../src/core/math/Random.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { ORE_PRICES as ALL_ORE_PRICES } from '../../../src/core/config/balance.js';
+const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 
 afterEach(() => setLocale('en'));
 
@@ -14,7 +16,7 @@ function setup(opts: { manager?: boolean } = {}) {
   const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
   const state = ctx.state!;
   if (opts.manager !== false) hireEmployee(state.employees, 'manager', new Random(3), 0, 0, 0);
-  generateContracts(state.contracts, new Random(5), state.tickCount);
+  generateContracts(state.contracts, new Random(5), state.tickCount, 1, ALL_ORES);
   return { ctx, state };
 }
 
