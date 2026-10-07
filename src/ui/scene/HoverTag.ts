@@ -158,7 +158,7 @@ export class HoverTag {
       return wrap;
     }
 
-    const stale = isSurveyStale(survey, state.tickCount);
+    const stale = isSurveyStale(survey);
     const ranked = Object.entries(colEstimates).sort((a, b) => b[1] - a[1]).slice(0, 3);
     for (const [oreId, density] of ranked) {
       const row = el('div');

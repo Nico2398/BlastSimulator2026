@@ -127,23 +127,23 @@ describe('survey-stale-handling scenario definition', () => {
 describe('survey-stale-handling — stale detection', () => {
   it('survey completed at tick 0 is fresh at tick 100', () => {
     const survey = makeSurvey(0);
-    expect(isSurveyStale(survey, 100)).toBe(false);
+    expect(isSurveyStale(survey)).toBe(false);
   });
 
   it('survey completed at tick 0 is stale at tick 101', () => {
     const survey = makeSurvey(0);
-    expect(isSurveyStale(survey, 101)).toBe(true);
+    expect(isSurveyStale(survey)).toBe(true);
   });
 
   it('fresh survey has fresh=true in confidence points', () => {
     const survey = makeSurvey(50);
-    const fresh = !isSurveyStale(survey, 100);
+    const fresh = !isSurveyStale(survey);
     expect(fresh).toBe(true);
   });
 
   it('stale survey has fresh=false in confidence points', () => {
     const survey = makeSurvey(0);
-    const fresh = !isSurveyStale(survey, 200);
+    const fresh = !isSurveyStale(survey);
     expect(fresh).toBe(false);
   });
 });

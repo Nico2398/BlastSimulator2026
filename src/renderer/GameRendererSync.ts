@@ -238,11 +238,10 @@ export function buildSurveyOverlayOptions(
 ): SurveyConfidenceOverlayOptions | null {
   if (state.surveyResults.length === 0 || !grid) return null;
 
-  const currentTick = state.tickCount;
   const points: SurveyConfidencePoint[] = [];
 
   for (const survey of state.surveyResults) {
-    const fresh = !isSurveyStale(survey, currentTick);
+    const fresh = !isSurveyStale(survey);
 
     for (const colKey of Object.keys(survey.estimates)) {
       const parts = colKey.split(',').map(Number);

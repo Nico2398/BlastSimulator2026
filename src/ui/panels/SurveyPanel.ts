@@ -348,7 +348,7 @@ export class SurveyPanel extends PanelBase {
   }
 
   private makeResultCard(survey: SurveyResult, currentTick: number): HTMLElement {
-    const stale = isSurveyStale(survey, currentTick);
+    const stale = isSurveyStale(survey);
     const age = currentTick - survey.completedTick;
 
     const head = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });

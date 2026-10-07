@@ -149,7 +149,7 @@ function surveyResultsToConfidencePoints(
   const points: SurveyConfidencePoint[] = [];
 
   for (const survey of surveys) {
-    const fresh = !isSurveyStale(survey, currentTick);
+    const fresh = !isSurveyStale(survey);
 
     for (const colKey of Object.keys(survey.estimates)) {
       const parts = colKey.split(',').map(Number);

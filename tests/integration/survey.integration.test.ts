@@ -172,13 +172,13 @@ describe('Survey system', () => {
     const survey = runSurveyOnGrid(grid, 'core_sample', 10, 10, 1, 99, 1, 0);
 
     // Exactly SURVEY_STALE_TICKS ticks later — still fresh (boundary inclusive)
-    expect(isSurveyStale(survey, SURVEY_STALE_TICKS)).toBe(false);
+    expect(isSurveyStale(survey)).toBe(false);
 
     // One tick past the threshold — stale
-    expect(isSurveyStale(survey, SURVEY_STALE_TICKS + 1)).toBe(true);
+    expect(isSurveyStale(survey)).toBe(true);
 
     // Long past threshold — also stale
-    expect(isSurveyStale(survey, SURVEY_STALE_TICKS + 100)).toBe(true);
+    expect(isSurveyStale(survey)).toBe(true);
   });
 
   // ── 6. Survey command with employee queues pending action ─────────────────

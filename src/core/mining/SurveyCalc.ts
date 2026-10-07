@@ -8,7 +8,6 @@ import {
   SURVEY_SKILL_BONUS_PER_LEVEL,
   SURVEY_SEISMIC_GROUP_SIZE,
   SURVEY_ESTIMATE_STEP,
-  SURVEY_STALE_TICKS,
   SURVEY_COSTS,
   SURVEY_DURATION_TICKS,
   SURVEY_DEPTH_BELOW_SURFACE,
@@ -49,6 +48,8 @@ export interface SurveyResult {
   estimates: Record<string, Record<string, number>>;
   /** Confidence in the estimates, clamped to [0, 1]. */
   confidence: number;
+  /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
+  stale?: boolean;
 }
 
 /** Parameters required to compute a noisy survey estimate from a VoxelGrid. */
@@ -205,12 +206,38 @@ export function estimateSurveyResult(
   return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
 }
 
+/** True once a blast has cleared a column inside the survey's disc. */
+export function isSurveyStale(_result: Pick<SurveyResult, 'stale'>): boolean {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/** True when column (x, z) lies inside the survey's disc. */
+export function isColumnInSurveyDisc(
+  _survey: Pick<SurveyResult, 'method' | 'centerX' | 'centerZ'>,
+  _x: number,
+  _z: number,
+): boolean {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/** Surveys not yet marked stale. */
+export function freshSurveys(_surveys: readonly SurveyResult[]): SurveyResult[] {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
 /**
- * Returns `true` when the elapsed ticks since survey completion exceed `SURVEY_STALE_TICKS`.
- * A result aged by exactly `SURVEY_STALE_TICKS` ticks is still considered fresh.
+ * Marks every survey whose disc contains a cleared column as stale.
+ * `clearedColumns` are `"x,z"` keys. Returns the number of surveys newly marked.
  */
-export function isSurveyStale(result: SurveyResult, currentTick: number): boolean {
-  return currentTick - result.completedTick > SURVEY_STALE_TICKS;
+export function markSurveysStaleByBlast(
+  _surveys: SurveyResult[],
+  _clearedColumns: readonly string[],
+): number {
+  // TODO: implement
+  throw new Error('not implemented');
 }
 
 export { applySeismicSurveyDamage } from './SeismicSurveyDamage.js';
