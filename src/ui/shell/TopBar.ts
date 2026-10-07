@@ -13,6 +13,7 @@ import { forecast, rainIntensity, type WeatherState } from '../../core/weather/W
 import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather/WeatherAdvisory.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
+import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
@@ -41,8 +42,6 @@ const WEATHER_ICON: Record<WeatherState, string> = {
 };
 
 const SPEED_STEPS = [1, 2, 4, 8] as const;
-/** Window (ticks) the balance trend averages over — long enough to smooth a single payroll tick. */
-const TREND_WINDOW_TICKS = 24;
 
 const ALERT_ROUTE: Partial<Record<AlertPip['kind'], PanelName>> = {
   contract: 'contracts',
@@ -62,18 +61,6 @@ export function formatBalance(cash: number): string {
   return formatDollars(cash);
 }
 
-/** Net income/expense per tick over the trailing window, from raw transactions. */
-export function netPerTick(state: GameState, windowTicks = TREND_WINDOW_TICKS): number {
-  const since = state.tickCount - windowTicks;
-  let net = 0;
-  for (const tx of state.finances.transactions) {
-    if (tx.tick < since) continue;
-    net += tx.type === 'income' ? tx.amount : -tx.amount;
-  }
-  const spanTicks = Math.min(windowTicks, Math.max(1, state.tickCount));
-  return net / spanTicks;
-}
-
 /** Full-width strip pinned to the top edge, TOPBAR_HEIGHT_PX tall (tokens.ts's TOPBAR_HEIGHT_PX / --bsx-topbar-height, #955/#956). */
 function topBarBounds(viewport: Viewport): Rect {
   return { x: 0, y: 0, width: viewport.width, height: TOPBAR_HEIGHT_PX };
@@ -84,6 +71,7 @@ export class TopBar {
   private readonly balanceWrap: HTMLButtonElement;
   private readonly balanceValue: HTMLElement;
   private readonly trendValue: HTMLElement;
+  private readonly trendRow: HTMLElement;
   private readonly trendIcon: HTMLElement;
   private readonly dayValue: HTMLElement;
   private readonly clockValue: HTMLElement;
@@ -145,6 +133,7 @@ export class TopBar {
     this.trendValue = el('span', { className: 'bsx-mono' });
     this.trendValue.style.fontSize = '10px';
     trendRow.append(this.trendIcon, this.trendValue);
+    this.trendRow = trendRow;
     balCol.append(this.balanceValue, trendRow);
     this.balanceWrap.appendChild(balCol);
 
@@ -272,7 +261,8 @@ export class TopBar {
     // Balance + trend
     this.balanceValue.textContent = formatBalance(state.cash);
     this.balanceValue.style.color = state.cash < 0 ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
-    const net = netPerTick(state);
+    const { cost, net } = getOperatingSummary(state);
+    this.trendRow.title = t('ui.finances.operating_cost_tip', { cost: formatDollars(Math.round(cost.total)) });
     const positive = net >= 0;
     this.trendValue.textContent = `${positive ? '+' : '-'}$${Math.round(Math.abs(net)).toLocaleString('en-US')}/h`;
     this.trendValue.style.color = positive ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';

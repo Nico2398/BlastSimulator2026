@@ -1724,3 +1724,9 @@ export const ORDER_REACH_CACHE_MAX_KEYS = 64;
  * change does not make the tutorial unwinnable (or trivially won) again.
  */
 export const TUTORIAL_CONTRACT_PRICE_MULTIPLIER = 52.0;
+
+/** Trailing window (ticks) over which operating income per hour is averaged (#1375). */
+export const OPERATING_INCOME_WINDOW_TICKS = 72;
+
+/** Income categories that count as operating income (#1375). */
+export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
