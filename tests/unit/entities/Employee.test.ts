@@ -11,6 +11,8 @@ import {
   processPayCycle,
   getEffectiveness,
   injureEmployee,
+  healEmployee,
+  injuryHoursRemaining,
   assignSkill,
   gainXp,
   calculateSalary,
@@ -38,6 +40,8 @@ import {
   QUALIFICATION_SALARY_BONUS,
   // ── 3.10: need-meter balance constants ──
   NEED_DRAIN_RATES,
+  INJURY_RECOVERY_TICKS,
+  INJURY_MORALE_PENALTY,
   NEED_PRODUCTIVITY_MULTIPLIERS,
   NEED_MORALE_DRAIN_MULTIPLIERS,
   // ── 7.4: needsMoraleEffect balance constants ──
@@ -1556,5 +1560,109 @@ describe('raises field and salary (#1383)', () => {
       giveRaise(state, emp.id, 250);
       expect(emp.morale).toBeLessThanOrEqual(100);
     });
+  });
+});
+
+
+// ── #1382: injury recovery model ──
+describe('Employee - injury recovery (#1382)', () => {
+  function oneEmployee(morale = 80) {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'driller', new Random(1));
+    employee.morale = morale;
+    return { state, employee };
+  }
+
+  it('injureEmployee sets the recovery timer and morale penalty', () => {
+    const { state, employee } = oneEmployee(80);
+    expect(injureEmployee(state, employee.id)).toBe(true);
+    expect(employee.injured).toBe(true);
+    expect(employee.injuryTicksRemaining).toBe(INJURY_RECOVERY_TICKS);
+    expect(employee.morale).toBe(80 - INJURY_MORALE_PENALTY);
+  });
+
+  it('injureEmployee floors morale at 0', () => {
+    const { state, employee } = oneEmployee(5);
+    injureEmployee(state, employee.id);
+    expect(employee.morale).toBe(0);
+  });
+
+  it('a second injureEmployee on an injured employee changes nothing', () => {
+    const { state, employee } = oneEmployee(80);
+    injureEmployee(state, employee.id);
+    employee.injuryTicksRemaining = 10;
+    injureEmployee(state, employee.id);
+    expect(employee.morale).toBe(80 - INJURY_MORALE_PENALTY);
+    expect(employee.injuryTicksRemaining).toBe(10);
+  });
+
+  it('healEmployee clears the injury timer', () => {
+    const { state, employee } = oneEmployee();
+    injureEmployee(state, employee.id);
+    expect(healEmployee(state, employee.id)).toBe(true);
+    expect(employee.injured).toBe(false);
+    expect(employee.injuryTicksRemaining).toBeUndefined();
+  });
+
+  it('healEmployee returns false for a non-injured employee', () => {
+    const { state, employee } = oneEmployee();
+    expect(healEmployee(state, employee.id)).toBe(false);
+  });
+
+  it('killEmployee clears the injury timer', () => {
+    const { state, employee } = oneEmployee();
+    injureEmployee(state, employee.id);
+    killEmployee(state, employee.id);
+    expect(employee.injuryTicksRemaining).toBeUndefined();
+    expect(employee.injured).toBe(false);
+  });
+
+  it('injuryHoursRemaining is null when healthy and the ceil of the remainder when injured', () => {
+    const { state, employee } = oneEmployee();
+    expect(injuryHoursRemaining(employee)).toBeNull();
+    injureEmployee(state, employee.id);
+    expect(injuryHoursRemaining(employee)).toBe(Math.ceil(INJURY_RECOVERY_TICKS));
+    employee.injuryTicksRemaining = 2.2;
+    expect(injuryHoursRemaining(employee)).toBe(3);
+  });
+
+  it('tickNeedGauges does not drain fatigue while injured', () => {
+    const { state, employee } = oneEmployee();
+    injureEmployee(state, employee.id);
+    const before = employee.fatigue;
+    tickNeedGauges(employee, 'working');
+    expect(employee.fatigue).toBe(before);
+  });
+
+  it('tickNeedGauges drains again after healing', () => {
+    const { state, employee } = oneEmployee();
+    injureEmployee(state, employee.id);
+    healEmployee(state, employee.id);
+    const before = employee.fatigue;
+    tickNeedGauges(employee, 'working');
+    expect(employee.fatigue).toBeLessThan(before);
+  });
+
+  it('needsMoraleEffect is 0 while injured, whatever the gauges', () => {
+    const { state, employee } = oneEmployee();
+    employee.fatigue = 0;
+    expect(needsMoraleEffect(employee)).not.toBe(0);
+    injureEmployee(state, employee.id);
+    expect(needsMoraleEffect(employee)).toBe(0);
+  });
+
+  it('needsMoraleEffect resumes after heal', () => {
+    const { state, employee } = oneEmployee();
+    employee.fatigue = 0;
+    const normal = needsMoraleEffect(employee);
+    injureEmployee(state, employee.id);
+    healEmployee(state, employee.id);
+    expect(needsMoraleEffect(employee)).toBe(normal);
+  });
+
+  it('computeAverageMorale still counts an injured employee at their held morale', () => {
+    const { state, employee } = oneEmployee(80);
+    injureEmployee(state, employee.id);
+    expect(computeAverageMorale(state.employees)).toBe(80 - INJURY_MORALE_PENALTY);
   });
 });

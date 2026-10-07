@@ -44,9 +44,13 @@ export function getNeedMultiplier(employee: Employee): number {
  * This function does NOT mutate employee.morale — it returns a delta that the
  * caller must apply each tick.
  *
+ * Injured employees return 0: their morale is held while they recover (#1382).
+ *
  * @returns The morale delta for this tick.
  */
 export function needsMoraleEffect(employee: Employee): number {
+  // Injured: morale is held (the injury penalty was applied once, #1382).
+  if (employee.injured) return 0;
   let delta = 0;
 
   // Derived from NEED_HARD_THRESHOLDS' own keys rather than a hardcoded
@@ -148,6 +152,8 @@ export function checkCollapse(employee: Employee): NeedKey | null {
  *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting' | 'traveling'.
  */
 export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState): void {
+  // Injured employees' gauges are frozen while they recover (#1382).
+  if (employee.injured) return;
   const multiplier = getMoraleDrainMultiplier(employee.morale);
 
   // Derived from NEED_HARD_THRESHOLDS' own keys rather than a hardcoded

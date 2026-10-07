@@ -24,6 +24,7 @@ import { addExpense, addIncome } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
 import { buildTickEventContext } from './TickEventContext.js';
+import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
@@ -217,6 +218,9 @@ export function runTick(
   // mirrors processShiftCycle's own complete-then-create ordering.
   const restCompletion = tickGeneralRestCompletion(state);
   tickCollapse(state, firedEvents, emitter);
+  // Injury recovery (#1382): routes injured employees to a bed and counts the timer down.
+  // Runs before 8d's releaseInjuredEmployeesQueues, which only touches queued entries.
+  tickInjuryRecovery(state);
   // #593: an employee whose rest just completed above gets first refusal
   // on resuming their own interrupted work (via tickEmployees, later this
   // tick) before autoInsertNeedTasks can proactively route them right back

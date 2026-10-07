@@ -7,7 +7,7 @@
 import { t } from '../core/i18n/I18n.js';
 import { el, gauge, button, reasonLine } from './dom.js';
 import type { Employee, EmployeeRole, SkillCategory } from '../core/entities/Employee.js';
-import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf } from '../core/entities/Employee.js';
+import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf, injuryHoursRemaining } from '../core/entities/Employee.js';
 import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
@@ -171,6 +171,8 @@ export function makeCurrentTaskSection(e: Employee, state: GameState): HTMLEleme
     children.push(track);
   }
   wrap.appendChild(well(children));
+  const injuryHours = injuryHoursRemaining(e);
+  if (injuryHours !== null) wrap.appendChild(reasonLine(t('ui.crew.injured_back_in', { hours: injuryHours }), true));
   return wrap;
 }
 

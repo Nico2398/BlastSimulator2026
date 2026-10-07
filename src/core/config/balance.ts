@@ -1739,3 +1739,15 @@ export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
  * (rock tier above the explosive's minRockTier): threshold x FACTOR ** shortfall (#1358).
  */
 export const TIER_SHORTFALL_THRESHOLD_FACTOR = 4;
+
+/** Recovery progress an injured employee must accumulate before returning to work (#1382). */
+export const INJURY_RECOVERY_TICKS = 48;
+
+/** Morale lost on injury (#1382). */
+export const INJURY_MORALE_PENALTY = 20;
+
+/** Recovery progress per tick when no living quarters are available (#1382). */
+export const INJURY_ON_FOOT_RECOVERY_RATE = 1;
+
+/** Recovery progress per tick by living-quarters tier (#1382). */
+export const INJURY_RECOVERY_RATE_BY_LQ_TIER: Record<1 | 2 | 3, number> = { 1: 2, 2: 3, 3: 4 };

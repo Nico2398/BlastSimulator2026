@@ -80,7 +80,6 @@
     "src/core/entities/Employee.ts:TrainingPlan",
     "src/core/entities/Employee.ts:computeXpPerTick",
     "src/core/entities/Employee.ts:enrolInTraining",
-    "src/core/entities/Employee.ts:healEmployee",
     "src/core/entities/Employee.ts:isEnrolledInTraining",
     "src/core/entities/Employee.ts:isSchoolFull",
     "src/core/entities/Employee.ts:isTrainingBuilding",

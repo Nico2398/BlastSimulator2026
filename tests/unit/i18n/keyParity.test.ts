@@ -458,6 +458,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1377: +31 keys (build/fleet catalog card purpose lines, tooltips, per-hour format, capacity units): 3733.
     // #1358: +1 key (weak-explosive charge warning): 3734.
     // #1340: +4 keys (economy.negotiation.no_manager, ui.contracts.negotiate_no_manager, ui.crew.manager_effect, ui.crew.manager_effect_hint), both locales: 3738.
+    // #1382: +1 key (ui.crew.injured_back_in): 3739; the unused ui.crew.tag_injured dropped: 3738.
     expect(Object.keys(en).length).toBe(3738);
   });
 });
