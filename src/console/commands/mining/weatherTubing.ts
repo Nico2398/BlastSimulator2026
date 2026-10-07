@@ -8,14 +8,13 @@ import {
   forceAdvanceInState,
   setWeather,
   ALL_WEATHER_STATES,
-  rainIntensity,
   type WeatherState,
 } from '../../../core/weather/WeatherCycle.js';
 import { buyTubing, installTubing } from '../../../core/mining/Tubing.js';
 import { addExpense } from '../../../core/economy/Finance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { drainHoles, type DrainBlock } from '../../../core/mining/HoleDrain.js';
-import { clearStandingWater, wetHoles } from '../../../core/mining/WetHoles.js';
+import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { HOLE_DRAIN_COST_PER_HOLE } from '../../../core/config/balance.js';
 
 export function weatherCommand(
@@ -42,8 +41,6 @@ export function weatherCommand(
       };
     }
     setWeather(weather, target);
-    // Forcing dry weather is the console's "make conditions dry" override: it clears standing water too.
-    if (rainIntensity(target) === 0) clearStandingWater(ctx.state!);
     return { success: true, output: `Weather: ${weather.current}` };
   }
 

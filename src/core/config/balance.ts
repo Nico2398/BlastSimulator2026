@@ -1871,10 +1871,10 @@ export const HOLE_RAIN_FILL_RATE = 0.5;
 
 /**
  * Level fraction per tick seeping in from wet ground, per unit of ground wetness and porosity.
- * Tight rock (0.03) seeps less than it fades and never floods; porous rock (0.35) at full wetness
- * out-seeps its slowed fade and crosses the wet threshold in ~70 ticks.
+ * Tight rock (0.03) seeps less than it fades and never refills; porous rock (0.35) on saturated
+ * ground out-seeps its slowed fade (0.105 vs 0.03 per tick) and refills for the few ticks the ground stays wet.
  */
-export const HOLE_SEEP_RATE = 0.1;
+export const HOLE_SEEP_RATE = 0.3;
 
 /** Level fraction lost per tick when it is not raining, in tight rock: ~17 ticks from full. */
 export const HOLE_WATER_FADE_RATE = 0.06;

@@ -331,6 +331,9 @@ describe('hole water in the blast (#1350)', () => {
     const game = drilledGame();
     game.runner.run(`charge hole:* explosive:${explosive} amount:8 stemming:2`);
     drive(game.runner, game.ctx, () => Object.keys(game.ctx.state!.plannedChargesByHole).length === 0);
+    // Weather drifts while the crew charges: start the blast from dry holes.
+    game.ctx.state!.holeWater = {};
+    game.ctx.state!.groundWetness = 0;
     return game;
   }
 

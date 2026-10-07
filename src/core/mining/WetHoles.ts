@@ -31,12 +31,6 @@ export function tickHoleWater(
   state.groundWetness = advanceGroundWetness(state.groundWetness, rain);
 }
 
-/** Console override for forced dry weather: no standing water in any hole, ground bone dry. */
-export function clearStandingWater(state: GameState): void {
-  state.holeWater = {};
-  state.groundWetness = 0;
-}
-
 /** IDs of drill holes whose water level is past the wet threshold. */
 export function wetHoles(state: GameState): string[] {
   return state.drillHoles

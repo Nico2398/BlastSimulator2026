@@ -71,7 +71,7 @@ describe('wetHoleIdsFor', () => {
 
     const ids = wetHoleIdsFor(state);
     expect(ids).toBeInstanceOf(Set);
-    expect([...ids]).toEqual(['H1']);
+    expect([...ids]).toEqual(['H1', 'H3']);
   });
 
   it('is empty when no hole holds water', () => {
