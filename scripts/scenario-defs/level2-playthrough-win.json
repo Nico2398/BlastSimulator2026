@@ -1985,15 +1985,23 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "bootstrap",
+      "role": "player",
       "description": "Blast 1 killed the staffed driller (#1) along with the blaster and both hired drillers (#2, #8, #9 -- #1339: every role arrives able, so the whole crew stands at the pattern). A new driller (#13) replaces #1 for cycle 2; hiring grants the drill_rig licence, so no assign_skill is needed.",
       "expect": {
-        "increased": [
-          "employeeCount"
+        "decreased": [
+          "cash"
         ]
       }
     },

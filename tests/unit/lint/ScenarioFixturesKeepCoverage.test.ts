@@ -11,7 +11,8 @@ import { SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 
 const MIN_STEPS: Record<string, number> = {
   'skill-progression': 72,
-  'level2-playthrough-win': 188,
+  // #1339: 32 fixed tick-pad/event pairs became condition waits (roles arrive able, so pad pacing no longer holds); every cycle, blast and contract step stays.
+  'level2-playthrough-win': 156,
   'level3-playthrough-win': 78,
   'level1-playthrough-revolt': 92,
 };
