@@ -24,9 +24,10 @@ import { formatGameDuration } from '../formatGameDuration.js';
 import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeader, panelBody, scrollBoundedSection } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
-import { formatMoney } from '../../core/economy/formatMoney.js';
+import { formatMoney, formatDollars } from '../../core/economy/formatMoney.js';
 import { getFinancialReport, type CategoryTotal } from '../../core/economy/Finance.js';
-import { formatBalance, netPerTick } from '../shell/TopBar.js';
+import type { OperatingCostBreakdown } from '../../core/economy/OperatingFinance.js';
+import { getOperatingCostPerHour, getOperatingIncomePerHour, getOperatingNetPerHour, getRunway } from '../../core/economy/OperatingFinance.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../core/campaign/Bankruptcy.js';
 
@@ -56,8 +57,10 @@ export class FinancesPanel extends PanelBase {
 
 
   update(state: GameState): void {
+    const cost = getOperatingCostPerHour(state);
     const signature = JSON.stringify({
       cash: Math.round(state.cash),
+      cost,
       txCount: state.finances.transactions.length,
       belowThreshold: state.bankruptcy.ticksBelowThreshold,
       bankrupt: state.bankruptcy.bankrupt,
@@ -93,25 +96,29 @@ export class FinancesPanel extends PanelBase {
   private makeBalanceCard(state: GameState): HTMLElement {
     const label = el('span', { text: t('ui.finances.balance'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-micro)' } });
     const value = el('span', {
-      text: formatBalance(state.cash),
+      text: formatDollars(state.cash),
       attrs: { style: `font:600 28px/1 var(--bsx-font-mono);letter-spacing:-.02em;color:${state.cash < 0 ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)'}` },
     });
 
-    const net = netPerTick(state);
+    const cost = getOperatingCostPerHour(state);
+    const income = getOperatingIncomePerHour(state.finances, state.tickCount);
+    const net = getOperatingNetPerHour(income, cost.total);
+    const runway = getRunway(state.cash, cost.total, income);
     const positive = net >= 0;
     const trendRow = el('div');
     trendRow.style.cssText = `display:flex;align-items:center;gap:5px;font:500 11px/1 var(--bsx-font-mono);color:${positive ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)'}`;
+    trendRow.title = t('ui.finances.operating_cost_tip', { cost: formatDollars(Math.round(cost.total)) });
     trendRow.append(
       iconEl(positive ? 'up' : 'down', 9),
       el('span', { text: `${positive ? '+' : '-'}$${formatMoney(Math.abs(net))}/h` }),
       el('span', { text: '·', attrs: { style: 'color:var(--bsx-text-micro)' } }),
       el('span', {
-        text: positive ? t('ui.finances.runway_growing') : t('ui.finances.runway_days', { days: Math.max(0, state.cash / -net / 24).toFixed(1) }),
+        text: runway.kind === 'sustainable' ? t('ui.finances.runway_sustainable') : t('ui.finances.runway_days', { days: runway.days.toFixed(1) }),
         attrs: { style: 'color:var(--bsx-text-secondary)' },
       }),
     );
 
-    const children: (HTMLElement | null)[] = [label, value, trendRow];
+    const children: (HTMLElement | null)[] = [label, value, trendRow, ...this.makeOperatingCostRows(cost)];
     if (state.bankruptcy.bankrupt) {
       children.push(this.makeBankruptcyBanner(t('campaign.bankrupt'), true));
     } else if (state.bankruptcy.ticksBelowThreshold > 0) {
@@ -120,6 +127,22 @@ export class FinancesPanel extends PanelBase {
     }
 
     return card(children);
+  }
+
+  private makeOperatingCostRows(cost: OperatingCostBreakdown): HTMLElement[] {
+    const row = (key: string, amount: number, strong: boolean): HTMLElement => {
+      const r = el('div');
+      r.style.cssText = `display:flex;justify-content:space-between;font:${strong ? 600 : 400} 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary)`;
+      r.append(el('span', { text: t(key) }), el('span', { text: `$${formatMoney(amount)}/h`, attrs: { style: 'font-family:var(--bsx-font-mono)' } }));
+      return r;
+    };
+    return [
+      row('ui.finances.operating_cost', cost.total, true),
+      row('ui.finances.operating_cost_payroll', cost.payroll, false),
+      row('ui.finances.operating_cost_buildings', cost.buildings, false),
+      row('ui.finances.operating_cost_vehicles', cost.vehicleMaintenance, false),
+      row('ui.finances.operating_cost_fuel', cost.fuel, false),
+    ];
   }
 
   private makeBankruptcyBanner(text: string, critical: boolean): HTMLElement {
