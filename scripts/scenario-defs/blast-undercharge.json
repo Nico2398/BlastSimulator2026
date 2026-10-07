@@ -155,6 +155,26 @@
       "role": "bootstrap"
     },
     {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until no hole holds standing water (#1350): wet holes weaken water-sensitive charges, and natural weather may have wetted them while the crew worked. Costs no ticks when the holes are already dry.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
       "command": "blast",
       "interaction": [
         {

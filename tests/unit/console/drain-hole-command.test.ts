@@ -68,12 +68,15 @@ describe('drain_hole', () => {
 });
 
 describe('weather set and standing water', () => {
-  it('forcing dry weather clears standing water; forcing rain keeps it', () => {
+  it('forcing weather changes the weather but never wipes standing water or ground wetness', () => {
     const ctx = ctxWithHoles();
+    ctx.state!.groundWetness = 0.8;
     weatherCommand(ctx, ['set', 'storm'], {});
     expect(ctx.state!.holeWater['hole_1']!.level).toBe(0.9);
     weatherCommand(ctx, ['set', 'sunny'], {});
-    expect(ctx.state!.holeWater).toEqual({});
-    expect(ctx.state!.groundWetness).toBe(0);
+    expect(ctx.state!.weather.current).toBe('sunny');
+    expect(ctx.state!.holeWater['hole_1']!.level).toBe(0.9);
+    expect(ctx.state!.holeWater['hole_2']!.level).toBe(0.9);
+    expect(ctx.state!.groundWetness).toBe(0.8);
   });
 });

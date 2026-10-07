@@ -71,7 +71,7 @@
     },
     {
       "command": "tick 90",
-      "description": "Drain the ordered plan: the staffed driller/drill_rig lands the hole.",
+      "description": "Drain the ordered plan: the staffed driller/drill_rig lands the hole. Natural weather may already have wetted it; the wait below lets it dry out.",
       "interaction": [
         {
           "type": "command",
@@ -82,8 +82,7 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 1,
-          "wetHoleCount": 0
+          "holeCount": 1
         }
       }
     },
@@ -98,18 +97,38 @@
       "commandOutcome": "either"
     },
     {
-      "command": "weather set cloudy",
-      "description": "Dry weather: no rain, no ground wetness. #1350 lets tubing be bought and installed ahead of rain.",
+      "command": "weather set sunny",
+      "description": "Dry weather: no rain. #1350 lets tubing be bought and installed ahead of rain.",
       "interaction": [
         {
           "type": "command",
-          "command": "weather set cloudy"
+          "command": "weather set sunny"
         }
       ],
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "weather": "cloudy"
+          "weather": "sunny"
+        }
+      }
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until the hole holds no standing water: natural weather may have wetted it during the drilling ticks (#1350), and the storm below must be the only water source.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
         }
       }
     },
