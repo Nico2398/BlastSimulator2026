@@ -8,7 +8,7 @@ import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
 import type { Itinerary } from '../engine/Itinerary.js';
-import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS } from '../config/balance.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY } from '../config/balance.js';
 
 // ── Roles ──
 
@@ -506,9 +506,8 @@ export function getEffectiveness(employee: Employee): number {
 export function injuryHoursRemaining(
   emp: Pick<Employee, 'injured' | 'injuryTicksRemaining'>,
 ): number | null {
-  void emp;
-  // TODO: implement
-  return null;
+  if (!emp.injured) return null;
+  return Math.ceil(emp.injuryTicksRemaining ?? INJURY_RECOVERY_TICKS);
 }
 
 /**
@@ -519,16 +518,19 @@ export function injuryHoursRemaining(
 export function injureEmployee(state: EmployeeState, employeeId: number): boolean {
   const emp = state.employees.find(e => e.id === employeeId);
   if (!emp || !emp.alive) return false;
+  if (emp.injured) return true;
   emp.injured = true;
-  emp.morale = Math.max(0, emp.morale - 20);
+  emp.injuryTicksRemaining = INJURY_RECOVERY_TICKS;
+  emp.morale = Math.max(0, emp.morale - INJURY_MORALE_PENALTY);
   return true;
 }
 
 /** Heal an employee. */
 export function healEmployee(state: EmployeeState, employeeId: number): boolean {
   const emp = state.employees.find(e => e.id === employeeId);
-  if (!emp || !emp.alive) return false;
+  if (!emp || !emp.alive || !emp.injured) return false;
   emp.injured = false;
+  delete emp.injuryTicksRemaining;
   return true;
 }
 
@@ -538,6 +540,7 @@ export function killEmployee(state: EmployeeState, employeeId: number): boolean 
   if (!emp || !emp.alive) return false;
   emp.alive = false;
   emp.injured = false;
+  delete emp.injuryTicksRemaining;
   return true;
 }
 

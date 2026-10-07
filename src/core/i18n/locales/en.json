@@ -2516,6 +2516,7 @@
   "ui.crew.skill_effect": "×{mult} task duration",
   "ui.crew.tag_union": "Unionised — cannot be fired",
   "ui.crew.tag_injured": "Injured — cannot train",
+  "ui.crew.injured_back_in": "Injured — back in ~{hours} h",
   "ui.crew.tag_collapsed": "Collapsed from fatigue",
   "ui.crew.tag_training": "In training",
   "ui.crew.tag_driving": "Driving a vehicle",
