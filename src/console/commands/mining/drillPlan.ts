@@ -4,7 +4,7 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
-import { requireGameWithSub, resolveHoleId, cancelOutstandingChargeAction, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
+import { requireGameWithSub, resolveHoleId, cancelOutstandingDrillActions, cancelPendingActionsOfType, resetPlanState, emitHoleCellsChanged } from './shared.js';
 import {
   gridCellPositions, createHolesAt, addHole, removeHole,
   computeDrillHoleDurationTicks,
@@ -15,6 +15,7 @@ import { MAX_DRILL_GRID_HOLES, DRILL_HOLE_DEFAULT_DIAMETER_M } from '../../../co
 import { removeHoleTubing } from '../../../core/mining/Tubing.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
+import { cancelOutstandingChargeAction } from '../../../core/mining/ChargeOrder.js';
 import { claimForAction } from '../siteExpansion.js';
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -37,6 +38,7 @@ export interface DrillHoleActionPayload {
 function clearHoleCharges(state: GameState, holeId: string): void {
   delete state.chargesByHole[holeId];
   delete state.plannedChargesByHole[holeId];
+  if (state.chargeAwaitingFunds != null) state.chargeAwaitingFunds = state.chargeAwaitingFunds.filter(id => id !== holeId);
   removeHoleTubing(state.tubingState, holeId);
 }
 
@@ -142,6 +144,21 @@ export function drillPlanCommand(
     const { clear, skipped } = partitionByFootprint(cells, buildingFootprintOccupants(ctx.state!));
     if (clear.length === 0) {
       return { success: false, output: t('mining.drill_plan.grid_all_blocked') };
+    }
+
+    // Replacing a plan with drilled or charged holes needs `confirm:true` (#1345);
+    // a plan of only ordered-not-yet-drilled holes does not. Nothing is mutated on refusal.
+    const state = ctx.state!;
+    const chargedCount = Object.keys(state.chargesByHole).length;
+    const plannedChargeCount = Object.keys(state.plannedChargesByHole).length;
+    if (named['confirm'] !== 'true'
+      && (state.drillHoles.length > 0 || chargedCount > 0 || plannedChargeCount > 0)) {
+      return {
+        success: false,
+        output: t('mining.drill_plan.confirm_replace', {
+          drilled: state.drillHoles.length, charged: chargedCount + plannedChargeCount,
+        }),
+      };
     }
 
     // A grid replaces the whole plan (#553): drop every hole (ordered or

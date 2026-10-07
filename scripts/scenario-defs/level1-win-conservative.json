@@ -729,18 +729,10 @@
         {
           "type": "command",
           "command": "blast"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "role": "guard",
-      "description": "#553: unlike the charge controls, the Fire button IS gated on real drilled holes -- BlastFooter.ts computes `fireOk = hasHoles && errors.length === 0` off `state.drillHoles` (not the ordered ghosts) and disables the button whenever hasHoles is false. With 0 real holes, no player can click DETONATE here at all; this is the rejection-path counterpart to the first pattern's full click-through blast above, not a weaker version of it. Command mode still runs the bare `blast` command, which returns a real, non-throwing BAD/$0 report (0 cleared voxels) -- the same zero-hole outcome, proven the way each mode actually reaches it. #586 CI: this bare-command `blast` still sets `state.lastBlastReport`, which BlastReportModal.update() reacts to unconditionally (UIManager.ts) by opening a real report modal regardless of which mode fired the command -- and UIManager.update() deliberately defers `eventModal` while that modal is visible (\"Deferred while BlastReportModal is up\"). Nothing in this step's own interaction array used to close it, so it stayed open for the rest of the run and permanently blocked every later `resolveEventIfPending` from ever seeing `#bs-event-dialog` mount -- not a rendering-speed problem, root-caused via a direct screenshot at the first failing event step showing this exact Blast Report modal still on screen. The report-close click above is the real fix; the timeoutMs/step-timeout bumps elsewhere in this file are a harmless margin, not what was actually wrong.",
+      "description": "#553: unlike the charge controls, the Fire button IS gated on real drilled holes -- BlastFooter.ts computes `fireOk = hasHoles && errors.length === 0` off `state.drillHoles` (not the ordered ghosts) and disables the button whenever hasHoles is false. With 0 real holes, no player can click DETONATE here at all; this is the rejection-path counterpart to the first pattern's full click-through blast above, not a weaker version of it. Command mode still runs the bare `blast` command, which returns a real, non-throwing BAD/$0 report (0 cleared voxels) -- the same zero-hole outcome, proven the way each mode actually reaches it. #586 CI: this bare-command `blast` still sets `state.lastBlastReport`, which BlastReportModal.update() reacts to unconditionally (UIManager.ts) by opening a real report modal regardless of which mode fired the command -- and UIManager.update() deliberately defers `eventModal` while that modal is visible (\"Deferred while BlastReportModal is up\"). Nothing in this step's own interaction array used to close it, so it stayed open for the rest of the run and permanently blocked every later `resolveEventIfPending` from ever seeing `#bs-event-dialog` mount -- not a rendering-speed problem, root-caused via a direct screenshot at the first failing event step showing this exact Blast Report modal still on screen. The report-close click above is the real fix; the timeoutMs/step-timeout bumps elsewhere in this file are a harmless margin, not what was actually wrong. #1345: `blast` with no loaded charge is now refused (mining.blast.no_charged_holes) instead of producing a hollow report, so the step expects refusal; nothing mutates.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -754,7 +746,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -1098,18 +1091,10 @@
         {
           "type": "command",
           "command": "blast"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "role": "guard",
-      "description": "#553: same guard as the second pattern's blast above -- 0 real holes means BlastFooter.ts's fireOk is false and DETONATE is disabled. No player can fire this third \"blast\" at all. #586 CI: report-close click added -- the bare command still opens a real Blast Report modal (BlastReportModal.update() reacts to state.lastBlastReport regardless of mode) which UIManager.ts then uses to defer eventModal indefinitely; see the second pattern's blast step above for the full root-cause writeup.",
+      "description": "#553: same guard as the second pattern's blast above -- 0 real holes means BlastFooter.ts's fireOk is false and DETONATE is disabled. No player can fire this third \"blast\" at all. #586 CI: report-close click added -- the bare command still opens a real Blast Report modal (BlastReportModal.update() reacts to state.lastBlastReport regardless of mode) which UIManager.ts then uses to defer eventModal indefinitely; see the second pattern's blast step above for the full root-cause writeup. #1345: `blast` with no loaded charge is now refused (mining.blast.no_charged_holes) instead of producing a hollow report, so the step expects refusal; nothing mutates.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1123,7 +1108,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -1425,18 +1411,10 @@
         {
           "type": "command",
           "command": "blast"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
         }
       ],
       "role": "guard",
-      "description": "#553: same guard as the second and third patterns' blasts above -- 0 real holes, DETONATE disabled, no player can fire this fourth \"blast\" either. This file's title still counts 4 blasts (the drill/charge/blast cycle runs 4 times, matching its own description) even though only the first one is ever real. #586 CI: report-close click added -- same root cause as the second pattern's blast step above (a bare-command blast still opens a real Blast Report modal that UIManager.ts uses to defer eventModal indefinitely until closed).",
+      "description": "#553: same guard as the second and third patterns' blasts above -- 0 real holes, DETONATE disabled, no player can fire this fourth \"blast\" either. This file's title still counts 4 blasts (the drill/charge/blast cycle runs 4 times, matching its own description) even though only the first one is ever real. #586 CI: report-close click added -- same root cause as the second pattern's blast step above (a bare-command blast still opens a real Blast Report modal that UIManager.ts uses to defer eventModal indefinitely until closed). #1345: `blast` with no loaded charge is now refused (mining.blast.no_charged_holes) instead of producing a hollow report, so the step expects refusal; nothing mutates.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1450,7 +1428,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",

@@ -20,6 +20,8 @@ import { hoverRefusal, type PlacementKit } from '../../scene/PlacementKit.js';
 import { coveredByFootprint, partitionByFootprint } from '../../../core/mining/BlastPlan.js';
 import { buildingFootprintOccupants } from '../../../core/nav/NavGridSync.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
+import type { ConfirmModalConfig } from '../ConfirmModal.js';
+import { buildReplacePatternConfirm, replacePatternLoss } from '../../replacePatternConfirm.js';
 import {
   DRILL_HOLE_DEFAULT_DIAMETER_M, DRILL_GRID_DEFAULT_SPACING_M, MAX_DRILL_GRID_HOLES, DRILL_GRID_DEFAULT_DEPTH_M,
 } from '../../../core/config/balance.js';
@@ -45,6 +47,7 @@ export class DrillStep {
 
   private gameConsole?: GameConsoleFn;
   private placementKit: PlacementKit | null = null;
+  private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
 
   private gridSpacing = DEFAULT_SPACING_M;
   private gridDepth = DEFAULT_DEPTH_M;
@@ -267,6 +270,9 @@ export class DrillStep {
     return { label: t('ui.blast_workshop.drill.status_dry'), tone: 'neutral' };
   }
 
+  /** UIManager wires this to its shared ConfirmModal's show(). */
+  setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
+
   /** Run a console command and show its output, so a refusal is never silent. */
   private runAndNotify(cmd: string): void {
     const res = this.gameConsole?.(cmd);
@@ -366,11 +372,21 @@ export class DrillStep {
     }, (sel, overlay) => {
       const cols = Math.max(1, Math.round((sel.x2 - sel.x1) / this.gridSpacing) + 1);
       const rows = Math.max(1, Math.round((sel.z2 - sel.z1) / this.gridSpacing) + 1);
-      this.afterConfirm(
-        overlay,
-        `drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`,
-        () => { this.lastGridPattern = { rows, cols }; },
-      );
+      const cmd = `drill_plan grid rows:${rows} cols:${cols} spacing:${this.gridSpacing} depth:${this.gridDepth} diameter:${this.gridDiameter} start:${sel.x1},${sel.z1}`;
+      const run = (command: string): void => this.afterConfirm(overlay, command, () => { this.lastGridPattern = { rows, cols }; });
+      // Replacing a drilled/charged pattern asks first (#1345).
+      const st = this.lastState;
+      const loss = st && this.onConfirmRequestCb
+        ? replacePatternLoss(
+          st.drillHoles.length,
+          Object.keys(st.chargesByHole).length + Object.keys(st.plannedChargesByHole).length,
+        )
+        : null;
+      if (loss) {
+        this.onConfirmRequestCb?.(buildReplacePatternConfirm(loss, () => run(`${cmd} confirm:true`)));
+        return;
+      }
+      run(cmd);
     });
   }
 

@@ -9,7 +9,8 @@ import { formatMoney } from '../../../core/economy/formatMoney.js';
 import { claimForAction } from '../siteExpansion.js';
 import type { MiningContext } from './types.js';
 import { dispatchDrillHoleAction } from './drillPlan.js';
-import { dispatchChargeAction, chargeFundsFailure, levelExplosiveFailure } from './charge.js';
+import { chargeFundsFailure, levelExplosiveFailure } from './charge.js';
+import { dispatchChargeAction } from '../../../core/mining/ChargeOrder.js';
 
 /**
  * Queue the saved plan's holes as drill_hole orders and its charges as
@@ -56,7 +57,7 @@ export function queueSavedBlastPlan(ctx: MiningContext, saved: SavedBlastPlan, n
   for (const o of chargeOrders) {
     const newId = idMap.get(o.oldHoleId)!;
     const hole = state.plannedDrillHoles.find(h => h.id === newId)!;
-    dispatchChargeAction(ctx, hole, o.explosiveId, o.amountKg, o.stemmingM);
+    dispatchChargeAction(state, hole, { explosiveId: o.explosiveId, amountKg: o.amountKg, stemmingM: o.stemmingM });
     cost += chargeOrderCost(o.explosiveId, o.amountKg);
   }
 

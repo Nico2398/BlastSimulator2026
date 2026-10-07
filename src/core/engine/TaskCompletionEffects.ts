@@ -6,6 +6,7 @@
 // building, resolve a survey, ...) and reports what happened structurally,
 // rather than pushing console-formatted strings.
 
+import { autoChargeHole } from '../mining/ChargeOrder.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { Employee } from '../entities/Employee.js';
@@ -164,6 +165,7 @@ export function applyTaskCompletion(
         const [planned] = state.plannedDrillHoles.splice(plannedIdx, 1);
         const drilled = landDrilledHole(planned!);
         state.drillHoles.push(drilled);
+        autoChargeHole(state, drilled);
         if (state.navGrid && grid) {
           const cx = Math.floor(drilled.x);
           const cz = Math.floor(drilled.z);

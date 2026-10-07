@@ -1448,12 +1448,12 @@
           "command": "blast"
         }
       ],
-      "description": "Left as a command: #1346 -- the hollow blast also cancels the 20 undrilled drill orders (orderedHoleCount 20 -> 0). With nothing drilled, charged or sequenced there is no Fire step to reach, let alone execute. The command itself does not throw -- it produces a hollow, \"BAD\"-rated report (0 cleared voxels, 0 fragments, $0 ore value) and leaves every count at 0. No employee is anywhere near a blast that never really happens: deathCount and ecology are unchanged from the real blast above.",
+      "description": "#1345: `blast` with no loaded charge is refused (mining.blast.no_charged_holes) and mutates nothing: the 20 undrilled drill orders stay queued (orderedHoleCount 20), no blast is counted, and no blast report is shown. With nothing drilled or charged there is no Fire step to reach.",
       "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "orderedHoleCount": 0,
+          "orderedHoleCount": 20,
           "chargedCount": 0,
           "deathCount": 11,
           "employeeCount": 12,
@@ -1465,7 +1465,8 @@
           "tickCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
-      }
+      },
+      "commandOutcome": "refused"
     },
     {
       "command": "state full",
@@ -1531,7 +1532,7 @@
         "equals": {
           "tickCount": 316,
           "holeCount": 0,
-          "orderedHoleCount": 0,
+          "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1557,12 +1558,12 @@
         "equals": {
           "tickCount": 316,
           "holeCount": 0,
-          "orderedHoleCount": 0,
+          "orderedHoleCount": 20,
           "deathCount": 11,
           "employeeCount": 12,
           "wellBeing": 25.701333333333626,
           "safety": 0,
-          "ecology": 30.20448199523199,
+          "ecology": 28.326891971391863,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1607,7 +1608,7 @@
           "employeeCount": 12,
           "wellBeing": 25.701333333333626,
           "safety": 0,
-          "ecology": 30.20448199523199,
+          "ecology": 28.326891971391863,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1631,7 +1632,7 @@
           "employeeCount": 12,
           "wellBeing": 25.701333333333626,
           "safety": 0,
-          "ecology": 30.20448199523199,
+          "ecology": 28.326891971391863,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null,
