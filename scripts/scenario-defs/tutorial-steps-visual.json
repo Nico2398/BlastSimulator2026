@@ -1651,8 +1651,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1681,8 +1680,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1711,8 +1709,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1732,8 +1729,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1762,8 +1758,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1792,8 +1787,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1813,8 +1807,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1843,8 +1836,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1873,8 +1865,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1894,8 +1885,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1924,8 +1914,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1954,8 +1943,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1975,8 +1963,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -2005,8 +1992,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -2035,8 +2021,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -2056,13 +2041,169 @@
         "equals": {
           "fillableSaleOffered": true
         }
+      }
+    },
+    {
+      "command": "contract accept fillable:true",
+      "timeout": 120,
+      "description": "Free play sale 7: click Accept on an offer the site can fill in full (ore or rubble).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "activeContractCount"
+        ]
+      }
+    },
+    {
+      "command": "contract deliver fillable:true amount:100000",
+      "timeout": 120,
+      "description": "Free play sale 7: click Deliver; payment lands.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
+      "timeout": 650,
+      "role": "player",
+      "description": "Free play sale 8: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableSaleOffered",
+          "equals": true,
+          "maxTicks": 6000,
+          "timeoutMs": 600000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "fillableSaleOffered": true
+        }
+      }
+    },
+    {
+      "command": "contract accept fillable:true",
+      "timeout": 120,
+      "description": "Free play sale 8: click Accept on an offer the site can fill in full (ore or rubble).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "activeContractCount"
+        ]
+      }
+    },
+    {
+      "command": "contract deliver fillable:true amount:100000",
+      "timeout": 120,
+      "description": "Free play sale 8: click Deliver; payment lands.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
+      "timeout": 650,
+      "role": "player",
+      "description": "Free play sale 9: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableSaleOffered",
+          "equals": true,
+          "maxTicks": 6000,
+          "timeoutMs": 600000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "fillableSaleOffered": true
+        }
       },
       "interactionOnly": true
     },
     {
       "command": "contract accept fillable:true",
       "timeout": 120,
-      "description": "Free play sale 7: click Accept on an offer the site can fill in full (ore or rubble).",
+      "description": "Free play sale 9: click Accept on an offer the site can fill in full (ore or rubble).",
       "role": "player",
       "interaction": [
         {
@@ -2092,7 +2233,7 @@
     {
       "command": "contract deliver fillable:true amount:100000",
       "timeout": 120,
-      "description": "Free play sale 7: click Deliver; payment lands.",
+      "description": "Free play sale 9: click Deliver; payment lands.",
       "role": "player",
       "interaction": [
         {
@@ -2123,7 +2264,7 @@
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
       "timeout": 650,
       "role": "player",
-      "description": "Free play sale 8: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "description": "Free play sale 10: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
       "interaction": [
         {
           "type": "waitUntil",
@@ -2143,7 +2284,7 @@
     {
       "command": "contract accept fillable:true",
       "timeout": 120,
-      "description": "Free play sale 8: click Accept on an offer the site can fill in full (ore or rubble).",
+      "description": "Free play sale 10: click Accept on an offer the site can fill in full (ore or rubble).",
       "role": "player",
       "interaction": [
         {
@@ -2173,7 +2314,169 @@
     {
       "command": "contract deliver fillable:true amount:100000",
       "timeout": 120,
-      "description": "Free play sale 8: click Deliver; payment lands.",
+      "description": "Free play sale 10: click Deliver; payment lands.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      },
+      "interactionOnly": true
+    },
+    {
+      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
+      "timeout": 650,
+      "role": "player",
+      "description": "Free play sale 11: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableSaleOffered",
+          "equals": true,
+          "maxTicks": 6000,
+          "timeoutMs": 600000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "fillableSaleOffered": true
+        }
+      },
+      "interactionOnly": true
+    },
+    {
+      "command": "contract accept fillable:true",
+      "timeout": 120,
+      "description": "Free play sale 11: click Accept on an offer the site can fill in full (ore or rubble).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "activeContractCount"
+        ]
+      },
+      "interactionOnly": true
+    },
+    {
+      "command": "contract deliver fillable:true amount:100000",
+      "timeout": 120,
+      "description": "Free play sale 11: click Deliver; payment lands.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "cash"
+        ]
+      },
+      "interactionOnly": true
+    },
+    {
+      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
+      "timeout": 650,
+      "role": "player",
+      "description": "Free play sale 12: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "fillableSaleOffered",
+          "equals": true,
+          "maxTicks": 6000,
+          "timeoutMs": 600000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "fillableSaleOffered": true
+        }
+      },
+      "interactionOnly": true
+    },
+    {
+      "command": "contract accept fillable:true",
+      "timeout": 120,
+      "description": "Free play sale 12: click Accept on an offer the site can fill in full (ore or rubble).",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "activeContractCount"
+        ]
+      },
+      "interactionOnly": true
+    },
+    {
+      "command": "contract deliver fillable:true amount:100000",
+      "timeout": 120,
+      "description": "Free play sale 12: click Deliver; payment lands.",
       "role": "player",
       "interaction": [
         {

@@ -1605,8 +1605,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1635,8 +1634,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1665,8 +1663,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1686,8 +1683,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1716,8 +1712,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1746,8 +1741,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1767,8 +1761,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1797,8 +1790,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1827,8 +1819,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
