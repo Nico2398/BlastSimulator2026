@@ -199,7 +199,46 @@ describe('sell-ore stage list (#1335 — accept scoped to the fillable ore offer
   });
 });
 
-describe('haul-debris stage list (#552 — self-dispatching, no manual Haul button)', () => {
+describe('sell-ore doneTarget (#1335 — active card Deliver keeps the stage resolved)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function mountCard(kind: 'active' | 'offered'): void {
+    const panel = document.createElement('div');
+    panel.id = 'bs-contract-panel';
+    document.body.appendChild(panel);
+    const card = document.createElement('div');
+    card.dataset['contractType'] = 'ore_sale';
+    panel.appendChild(card);
+    // Mirrors ContractsPanel: only active cards carry Deliver; offered cards carry Accept.
+    if (kind === 'active') {
+      const deliver = makeButton({}, card);
+      deliver.classList.add('bs-contract-deliver');
+    } else {
+      const accept = makeButton({}, card);
+      accept.classList.add('bs-contract-accept');
+    }
+  }
+
+  it('resolves to the sell-ore stage, not stage 0, with only an active ore card Deliver present', () => {
+    mountCard('active');
+    const stages = TUTORIAL_STAGES['sell-ore']!;
+    const index = resolveStageIndex(stages);
+    expect(index).not.toBe(0);
+    expect(stages[index]!.hintKey).toBe('tutorial.stage.sell_ore');
+  });
+
+  it('does not satisfy doneTarget for an offered ore card lacking Deliver', () => {
+    mountCard('offered');
+    const stages = TUTORIAL_STAGES['sell-ore']!;
+    const doneTarget = stages.find((s) => s.doneTarget)!.doneTarget!;
+    expect(isReachable(doneTarget)).toBe(false);
+    expect(resolveStageIndex(stages)).toBe(0);
+  });
+});
+
+describe('haul-debris stage list (#552— self-dispatching, no manual Haul button)', () => {
   // Hauling is fully automatic now: on-ground fragments spawn their own
   // PendingActions and a qualified employee claims/drives/delivers them with
   // no player click. The step has nothing left to walk the player through

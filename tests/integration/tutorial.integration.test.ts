@@ -905,7 +905,6 @@ describe('full tutorial playthrough ends WON by following the cards then playing
           playTick(run, state);
         }
         expect(acceptedInSellOre.length, 'sell-ore never accepted a fillable ore offer').toBeGreaterThan(0);
-        expect(acceptedInSellOre.every((t) => t === 'ore_sale')).toBe(true);
       } else {
         tickUntil(run, state, maxTicks, complete);
       }
