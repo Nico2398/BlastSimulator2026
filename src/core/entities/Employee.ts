@@ -86,6 +86,8 @@ export interface Employee {
   morale: number; // 0-100
   unionized: boolean;
   injured: boolean;
+  /** Recovery progress left while injured (#1382). Absent when healthy or on legacy saves. */
+  injuryTicksRemaining?: number;
   alive: boolean;
   /** Tick this employee was hired at, for the Crew panel's "hired since" line. Optional: many existing call sites construct an Employee directly without it, and old saves predate the field — the UI falls back to an "unknown" label when absent. */
   hiredAtTick?: number;
@@ -498,6 +500,15 @@ export function getEffectiveness(employee: Employee): number {
   if (employee.injured || !employee.alive || employee.collapsing) return 0;
   // Linear scale: morale 0 → 0.5, morale 100 → 1.2
   return 0.5 + (employee.morale / 100) * 0.7;
+}
+
+/** Hours of recovery left for an injured employee, or null when healthy (#1382). */
+export function injuryHoursRemaining(
+  emp: Pick<Employee, 'injured' | 'injuryTicksRemaining'>,
+): number | null {
+  void emp;
+  // TODO: implement
+  return null;
 }
 
 /**
