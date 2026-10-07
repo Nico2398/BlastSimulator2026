@@ -24,6 +24,7 @@ import { el, button, card, sectionHeader, emptyState, progressBar, panelRoot, pa
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
+import { resolveContractOres } from '../../core/campaign/Level.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
@@ -354,7 +355,11 @@ export class ContractsPanel extends PanelBase {
     btnRow.style.cssText = 'display:flex;gap:6px';
     btnRow.append(acceptBtn, negotiateBtn, declineBtn);
 
-    const cardEl = card([headRow, statRow, haveRow, termsRow, negBox, btnRow]);
+    const offSiteBadge = c.materialId === '' || resolveContractOres(state).includes(c.materialId)
+      ? null
+      : el('span', { text: t('ui.contracts.not_on_site'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);color:var(--bsx-critical-text)' } });
+
+    const cardEl = card([headRow, offSiteBadge, statRow, haveRow, termsRow, negBox, btnRow]);
     cardEl.dataset['contractId'] = String(c.id);
     // data-contract-type/data-contract-material, alongside data-contract-id
     // (#554): a fixed id is a moving target once the tick-based offer pool
@@ -372,6 +377,8 @@ export class ContractsPanel extends PanelBase {
     // random (Contract.ts's generateContracts), so a scenario that must sell
     // what its own blast produced cannot name the material up front and stay
     // true across a re-timing that re-rolls the pool.
+    const onSite = offSiteBadge === null;
+    cardEl.dataset['contractOnsite'] = String(onSite);
     cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, state.logistics.storedMassKg));
     return cardEl;
   }

@@ -4,7 +4,10 @@
 
 import type { GameState } from '../state/GameState.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
+import { getBiome } from '../world/BiomeCatalog.js';
+import { siteRockIds } from '../world/Strata.js';
+import { oresYieldedByRocks } from '../world/RockCatalog.js';
 
 // ── Types ──
 
@@ -237,8 +240,9 @@ export function resolveContractPriceMultiplier(state: GameState): number {
  * Unknown biome falls back to every priced ore.
  */
 export function resolveContractOres(state: GameState): readonly string[] {
-  void state;
-  return []; // TODO: implement
+  const biome = getBiome(state.mineType);
+  if (!biome) return Object.keys(ORE_PRICES);
+  return oresYieldedByRocks(siteRockIds(biome.dominantRocks, state.world?.mixedRockHardness ?? false));
 }
 
 /**

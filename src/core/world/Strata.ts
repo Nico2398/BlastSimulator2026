@@ -101,6 +101,20 @@ export function buildMixedHardnessStrata(dominantRockIds: readonly string[]): St
 }
 
 /**
+ * Ids of the rocks a site's terrain is built from: softest + hardest when
+ * `mixedRockHardness` (matching buildMixedHardnessStrata), else every
+ * resolvable dominant rock (buildStrataProfile's rock set).
+ */
+export function siteRockIds(dominantRockIds: readonly string[], mixedRockHardness: boolean): string[] {
+  const rocks = resolveSortedRocks(dominantRockIds);
+  if (rocks.length === 0) return [];
+  if (!mixedRockHardness) return rocks.map(r => r.id);
+  const soft = rocks[0]!;
+  const hard = rocks[rocks.length - 1]!;
+  return soft.id === hard.id ? [soft.id] : [soft.id, hard.id];
+}
+
+/**
  * Intentionally depth-unbounded (#1183): for any `d` past the last boundary
  * — arbitrarily deep, since generation now materializes rock at any y,
  * including deeply negative — this clamps to the deepest defined layer

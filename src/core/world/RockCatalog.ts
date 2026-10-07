@@ -1,4 +1,5 @@
 import { MaterialRecipe } from './SurfaceMaterialCatalog.js';
+import { getAllOres } from './OreCatalog.js';
 
 // BlastSimulator2026 — Rock type catalog
 // 10 fictional rock types spanning hardness tiers 1–5.
@@ -284,8 +285,15 @@ export function getAllRocks(): readonly RockType[] {
  * getAllOres() catalog order, no duplicates. Unknown rock ids are ignored.
  */
 export function oresYieldedByRocks(rockIds: readonly string[]): string[] {
-  void rockIds;
-  return []; // TODO: implement
+  const hosted = new Set<string>();
+  for (const id of rockIds) {
+    const rock = getRock(id);
+    if (!rock) continue;
+    for (const [oreId, p] of Object.entries(rock.oreProbabilities)) {
+      if (p > 0) hosted.add(oreId);
+    }
+  }
+  return getAllOres().map(o => o.id).filter(id => hosted.has(id));
 }
 
 /**

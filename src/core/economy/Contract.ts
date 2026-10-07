@@ -9,6 +9,7 @@ import {
   NEGOTIATION_EARLY_BONUS_RATE,
   ORE_PRICES,
   RUBBLE_DISPOSAL_PRICE_RANGE,
+  SUPPLY_COMMON_ORE_COUNT,
 } from '../config/balance.js';
 
 // ── Contract types ──
@@ -83,8 +84,6 @@ export function createContractState(): ContractState {
   };
 }
 
-// Ore IDs that can appear in contracts, in rarity order.
-const CONTRACT_ORES = Object.keys(ORE_PRICES);
 const ORE_BASE_PRICES: Record<string, number> = ORE_PRICES;
 
 // ── Generation ──
@@ -112,9 +111,17 @@ export function generateContracts(
   state.lastRefreshTick = currentTick;
 }
 
+/** The cheapest SUPPLY_COMMON_ORE_COUNT of the given ores, by base price. */
+function commonOres(ores: readonly string[]): string[] {
+  return [...ores]
+    .sort((a, b) => (ORE_BASE_PRICES[a] ?? 10) - (ORE_BASE_PRICES[b] ?? 10))
+    .slice(0, SUPPLY_COMMON_ORE_COUNT);
+}
+
 function generateOneContract(state: ContractState, rng: Random, priceMultiplier: number = 1, availableOres: readonly string[]): Contract {
-  void availableOres;
-  const typeRoll = rng.nextFloat(0, 1);
+  let typeRoll = rng.nextFloat(0, 1);
+  // A site whose rocks yield no ore has nothing to sell or supply: rubble only.
+  if (availableOres.length === 0) typeRoll = 0.5;
   let type: ContractType;
   let materialId: string;
   let pricePerKg: number;
@@ -123,7 +130,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   if (typeRoll < 0.5) {
     // Ore sale contract
     type = 'ore_sale';
-    materialId = rng.pick(CONTRACT_ORES);
+    materialId = rng.pick(availableOres);
     pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.8, 1.3);
     description = `Deliver ${materialId} ore`;
   } else if (typeRoll < 0.8) {
@@ -135,7 +142,7 @@ function generateOneContract(state: ContractState, rng: Random, priceMultiplier:
   } else {
     // Supply contract (recurring, higher quantity, lower price)
     type = 'supply';
-    materialId = rng.pick(CONTRACT_ORES.slice(0, 4)); // Only common ores for supply
+    materialId = rng.pick(commonOres(availableOres)); // Only the site's cheapest ores for supply
     pricePerKg = (ORE_BASE_PRICES[materialId] ?? 10) * rng.nextFloat(0.6, 0.9);
     description = `Supply ${materialId} (bulk)`;
   }
