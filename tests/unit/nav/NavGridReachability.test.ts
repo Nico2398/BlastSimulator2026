@@ -208,7 +208,7 @@ describe('computeClimbReachableSetFromSources fill overrides (#1391)', () => {
   });
 
   it('free makes blocked cells passable: freeing the wall gap opens the far side', () => {
-    const grid = makeGrid((x, z) => (x === 10 ? BLOCKED : null));
+    const grid = makeGrid((x) => (x === 10 ? BLOCKED : null));
     expect(computeClimbReachableSetFromSources(grid, src).has(25, 5)).toBe(false);
     const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, { free: rect(10, 5, 11, 6) });
     expect(set.has(10, 5)).toBe(true);
@@ -217,7 +217,7 @@ describe('computeClimbReachableSetFromSources fill overrides (#1391)', () => {
   });
 
   it('block wins over free where they overlap', () => {
-    const grid = makeGrid((x, z) => (x === 10 ? BLOCKED : null));
+    const grid = makeGrid((x) => (x === 10 ? BLOCKED : null));
     const set = computeClimbReachableSetFromSources(grid, src, NAV_CLEARANCE_EMPLOYEE_CELLS, {
       free: rect(10, 5, 11, 6),
       block: rect(10, 5, 11, 6),

@@ -15,6 +15,18 @@ export function placementCutoffFor(state: GameState, newRect: Rect, freedRect?: 
   return computePlacementCutoff(state.navGrid, crew, newRect, freedRect, { holes, orders });
 }
 
+/** Cheap fingerprint of the state a cutoff verdict depends on beyond the nav grid: crew positions, holes, orders. */
+export function cutoffStateKey(state: GameState): string {
+  let crew = 0;
+  let sum = 0;
+  for (const e of state.employees.employees) {
+    if (!e.alive) continue;
+    crew++;
+    sum += Math.round(e.x) * 7919 + Math.round(e.z);
+  }
+  return `${crew}:${sum}:${state.drillHoles?.length ?? 0}:${state.plannedDrillHoles?.length ?? 0}:${state.pendingActions.length}`;
+}
+
 /** "Cuts off 3 benches / 2 drill holes / 1 queued order" — zero parts dropped. */
 export function cutoffLine(c: PlacementCutoff): string {
   const parts: string[] = [];
@@ -29,7 +41,7 @@ export function buildPlacementCutoffConfirm(c: PlacementCutoff, onConfirm: () =>
   return {
     icon: 'warn',
     title: t('ui.build.cutoff_confirm_title'),
-    body: `${cutoffLine(c)}. ${t('ui.build.cutoff_confirm_body')}`,
+    body: t('ui.build.cutoff_confirm_body', { line: cutoffLine(c) }),
     confirmLabel: t('ui.build.cutoff_confirm_label'),
     onConfirm,
   };

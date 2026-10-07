@@ -2458,7 +2458,7 @@
   "ui.build.cutoff_holes": "{count} trou(s) de forage",
   "ui.build.cutoff_orders": "{count} ordre(s) en attente",
   "ui.build.cutoff_confirm_title": "Placer quand même ?",
-  "ui.build.cutoff_confirm_body": "L'équipe ne pourra plus accéder à ce terrain.",
+  "ui.build.cutoff_confirm_body": "{line}. L'équipe ne pourra plus accéder à ce terrain.",
   "ui.build.cutoff_confirm_label": "Placer quand même",
   "ui.build.upgraded": "Amélioration ordonnée !",
   "ui.build.invalid_placement": "Placement invalide",

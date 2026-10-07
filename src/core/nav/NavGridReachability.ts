@@ -605,7 +605,8 @@ function isLegalStep(
   return hasClearance(to, requiredClearance);
 }
 
-function inRect(r: Rect | undefined, x: number, z: number): boolean {
+/** True when (x, z) lies inside `r` (max edges exclusive); false for an undefined rect. */
+export function inRect(r: Rect | undefined, x: number, z: number): boolean {
   return !!r && x >= r.minX && x < r.maxX && z >= r.minZ && z < r.maxZ;
 }
 

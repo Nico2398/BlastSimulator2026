@@ -3,7 +3,7 @@
  */
 
 import type { NavGrid } from '../nav/NavGrid.js';
-import { computeClimbReachableSetFromSources } from '../nav/NavGridReachability.js';
+import { computeClimbReachableSetFromSources, inRect } from '../nav/NavGridReachability.js';
 import { NAV_CLEARANCE_EMPLOYEE_CELLS, PLACEMENT_CUTOFF_MIN_CELLS } from '../config/balance.js';
 import type { Rect } from '../world/WorldGen.js';
 
@@ -35,7 +35,7 @@ export function computePlacementCutoff(
   });
   const isCutOff = (x: number, z: number): boolean =>
     now.has(x, z) && !after.has(x, z)
-    && !(x >= newRect.minX && x < newRect.maxX && z >= newRect.minZ && z < newRect.maxZ);
+    && !inRect(newRect, x, z);
 
   let cells = 0;
   const benchLevels = new Set<number>();
@@ -47,7 +47,7 @@ export function computePlacementCutoff(
       if (cell) benchLevels.add(cell.benchLevel);
     }
   }
-  if (cells === 0 || cells < PLACEMENT_CUTOFF_MIN_CELLS) return null;
+  if (cells < PLACEMENT_CUTOFF_MIN_CELLS) return null;
   const cutOff = (p: { x: number; z: number }): boolean => isCutOff(Math.round(p.x), Math.round(p.z));
   return {
     cells,
