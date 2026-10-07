@@ -199,7 +199,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 3d: buy-drill-rig-assign ──
   // Driver assignment is automatic now (VehicleReservation/ArrivalGate, #921)
   // — completion is purchase alone, the same synchronous "value increased"
-  // shape as contract-accept above (tickBudget: 1, no waitsOnWork: buying a
+  // shape as the other instant steps (tickBudget: 1, no waitsOnWork: buying a
   // vehicle is instant, nothing to wait on).
   createComparisonStep(
     'buy-drill-rig-assign',
@@ -439,22 +439,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // changed yet -- same gap 'drill-plan'/'charge'/'sequence' document above.
   // tickBudget 60 comfortably clears the build plus walk time.
   createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:8,18'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
-
-  // ── contract-accept ──
-  // Moved below build-storage (#556). A contract's deadline starts running the
-  // moment it is accepted (`acceptedAtTick`, Contract.ts) and a rubble_disposal
-  // offer's own deadline is at most 100 ticks (`rng.nextInt(30, 100)`), while
-  // ordering the warehouse is real queued work now: accepting first spent a
-  // large part of that deadline watching a site go up, and since contract-deliver
-  // only advances on a genuinely COMPLETED delivery, a contract that expired in
-  // the meantime left the tutorial card stuck at contract-deliver with no way
-  // forward — a dead end for a real player, not just a failing assertion
-  // (issue #817). Storage before the promise is also the better lesson: you
-  // need somewhere to put the rock before committing to a deadline to remove it.
-  // Offers are regenerated on a timer and the oldest is dropped, so the list
-  // rearranges itself under a player who is reading it. Hold the clock almost
-  // immediately: nothing about choosing an offer needs time to pass.
-  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contract accept 1'], TOOLBAR_TARGET.contracts, { tickBudget: 1 }),
 
   // ── Step 14b: haul-debris ──
   // Fires when stored mass increases — the same "value went up" pattern every

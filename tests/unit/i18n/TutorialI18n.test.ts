@@ -36,12 +36,14 @@ function generateAllTutorialKeys(): string[] {
   // keys.
   for (let i = 1; i <= 23; i++) {
     // #1328: steps 20-22 (set-policy/tick-advance/victory) became free-play.
-    if (i === 1 || i === 18 || (i >= 20 && i <= 22)) continue;
+    // #1335: step 12 (contract-accept) removed.
+    if (i === 1 || i === 12 || i === 18 || (i >= 20 && i <= 22)) continue;
     keys.push(`tutorial.step${i}`);
   }
   for (let i = 1; i <= 23; i++) {
     // #1328: steps 20-22 (set-policy/tick-advance/victory) became free-play.
-    if (i === 1 || i === 18 || (i >= 20 && i <= 22)) continue;
+    // #1335: step 12 (contract-accept) removed.
+    if (i === 1 || i === 12 || i === 18 || (i >= 20 && i <= 22)) continue;
     keys.push(`tutorial.step${i}.title`);
   }
   keys.push('tutorial.free_play', 'tutorial.free_play.title', 'tutorial.goal_chip', 'tutorial.goal_chip_tooltip');
@@ -123,5 +125,50 @@ describe('tutorial keys — en and fr translations differ', () => {
     expect(en, 'tutorial.complete_text must resolve in en').not.toBe('tutorial.complete_text');
     expect(fr, 'tutorial.complete_text must resolve in fr').not.toBe('tutorial.complete_text');
     expect(en, 'en and fr translations for tutorial.complete_text must differ').not.toBe(fr);
+  });
+});
+
+// ── #1335: contract-accept card removed, sell-ore copy reworded ─────────────
+
+import enLocale from '../../../src/core/i18n/locales/en.json' assert { type: 'json' };
+import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
+import { GLOSSARY } from '../../../src/core/i18n/glossary.js';
+
+describe('#1335: contract-accept locale keys are gone', () => {
+  const REMOVED = ['tutorial.step12', 'tutorial.step12.title', 'tutorial.stage.contract_accept'];
+  for (const [name, data] of [['en', enLocale], ['fr', frLocale]] as const) {
+    it(`${name}.json carries none of ${REMOVED.join(', ')}`, () => {
+      for (const key of REMOVED) {
+        expect(key in (data as Record<string, string>), `${key} still in ${name}.json`).toBe(false);
+      }
+    });
+  }
+
+  it('no glossary entry lists tutorial.step12 among its relevantKeys', () => {
+    for (const entry of GLOSSARY) {
+      expect(entry.relevantKeys ?? [], entry.concept).not.toContain('tutorial.step12');
+    }
+  });
+});
+
+describe('#1335: sell-ore copy tells the player to accept an offer for ore already stored', () => {
+  it('en: step and stage text mention stored ore and greyed (unfillable) offers', () => {
+    const data = enLocale as Record<string, string>;
+    for (const key of ['tutorial.step_sellore', 'tutorial.stage.sell_ore']) {
+      const text = data[key]!.toLowerCase();
+      expect(text, key).toMatch(/stor(ed|age)/);
+      expect(text, key).toContain('accept');
+    }
+    expect(data['tutorial.step_sellore']!.toLowerCase()).toMatch(/grey|gray/);
+  });
+
+  it('fr: step and stage text were reworded alongside en', () => {
+    const fr = frLocale as Record<string, string>;
+    const en = enLocale as Record<string, string>;
+    for (const key of ['tutorial.step_sellore', 'tutorial.stage.sell_ore']) {
+      expect(fr[key], key).toBeTruthy();
+      expect(fr[key], key).not.toBe(en[key]);
+    }
+    expect(fr['tutorial.step_sellore']!.toLowerCase()).toMatch(/gris|grisé/);
   });
 });

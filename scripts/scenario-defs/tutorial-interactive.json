@@ -930,7 +930,7 @@
     {
       "command": "employee hire role:manager",
       "timeout": 90,
-      "description": "hire-manager complete: manager hired now that the event is resolved. #776: raised from 30s to 60s -- this step lands right after the blast sequence (steps 24-31) when the scene is heaviest, and effectiveStepTimeoutMs's formula-correct 35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out at exactly 35000ms with the real hire + tutorial advance to contract-accept already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. Card sequence follows tutorialSteps.ts\u2019s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract\u2019s deadline no longer starts while a construction site is still going up.",
+      "description": "hire-manager complete: manager hired now that the event is resolved. #776: raised from 30s to 60s -- this step lands right after the blast sequence (steps 24-31) when the scene is heaviest, and effectiveStepTimeoutMs's formula-correct 35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out at exactly 35000ms with the real hire + tutorial advance to the retired accept step (#1335) already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. Card sequence follows tutorialSteps.ts\u2019s reordered canonical order (#556/#817): the retired accept step (#1335) now sits after build-storage, so a contract\u2019s deadline no longer starts while a construction site is still going up.",
       "role": "player",
       "interaction": [
         {
@@ -952,7 +952,7 @@
     },
     {
       "command": "tick 40",
-      "description": "#816 retarget: the two new order-then-wait pairs inserted upstream of the blast (build-living-quarters/build-driving-center, #556 construction sites) push this step's own command-mode entry tick from 303 to 621 (direct trace, command mode, this fix) -- roughly the +250-300 real ticks those two waits themselves cost, on top of #816's own root-cause dispatch fix (relocating a bystander stranded on a just-completed building's footprint, and letting an idle employee fall through to the open pool when its own taskQueue holds one permanently-unreachable entry) actually letting driving_center/drilling/charging complete for real instead of livelocking forever. Direct-traced (command mode) that a rubble_disposal offer is continuously present in the pool from tick 622 through at least tick 1021 (400-tick scan) -- unlike the earlier #689/#707 rounds' narrower single-instance windows, every ~20-tick rotation in this range still carries a rubble_disposal slot, so this step no longer needs to land inside one specific instance's narrow window. Retargeted 420 -> 721 (100 ticks above the command-mode floor of 621) with max_ticks widened 140 -> 220 to also clear a materially larger interaction-mode entry tick than command mode's own 621 -- interaction mode's extra role:'player' polling ticks (waitForTutorialStep/waitForSelector loops command mode's plain `command` string never runs) were already ~100 ticks ahead of command mode at a similar point in earlier, shorter rounds of this file (#707 follow-up 2's own tick-370-vs-303 trace), and this file has grown since; not independently confirmed under a live interaction-mode run this round (no browser session in this fix pass) -- if interaction mode's own entry to this step is ever traced past 721, retarget upward the same way #689/#707/#707-followup-2 each did, using the continuous-presence property above rather than re-deriving a narrow window. REPLACED for #556: an absolute tickCount target cannot hold here \u2014 command mode and interaction mode enter this step hundreds of ticks apart (interaction mode runs polling ticks command mode never does), and `equals` only matches going forward, so any single number is either already behind one mode or out of reach of the other. What the step actually needs is in the note above: a rubble_disposal offer is continuously present through this range, not confined to one narrow window, so a short relative block that turns the pool once (REFRESH_INTERVAL 20 ticks, Contract.ts) buys it in either mode. #1015: 30 -> 40 -- removing the two speed-control steps (and their ~658-tick box-cut-drain wait) upstream shifts every later tick landing earlier by a similar amount, changing which rubble_disposal pool instance the later contract-accept step lands on; direct-traced (command mode) against the retimed run, `tick 30` here now lands contract-accept on an instance whose deadline the haul can't beat regardless of how the delivery-side wait is tuned (deadlineTicks 31, hauler load lands 37 ticks after accept). `tick 40` lands on a different instance (deadlineTicks 58, hauler loaded 9 ticks after accept) with real margin either side -- see the haul-debris step's own #1015 note below for the matching delivery-side retune.",
+      "description": "#816 retarget: the two new order-then-wait pairs inserted upstream of the blast (build-living-quarters/build-driving-center, #556 construction sites) push this step's own command-mode entry tick from 303 to 621 (direct trace, command mode, this fix) -- roughly the +250-300 real ticks those two waits themselves cost, on top of #816's own root-cause dispatch fix (relocating a bystander stranded on a just-completed building's footprint, and letting an idle employee fall through to the open pool when its own taskQueue holds one permanently-unreachable entry) actually letting driving_center/drilling/charging complete for real instead of livelocking forever. Direct-traced (command mode) that a rubble_disposal offer is continuously present in the pool from tick 622 through at least tick 1021 (400-tick scan) -- unlike the earlier #689/#707 rounds' narrower single-instance windows, every ~20-tick rotation in this range still carries a rubble_disposal slot, so this step no longer needs to land inside one specific instance's narrow window. Retargeted 420 -> 721 (100 ticks above the command-mode floor of 621) with max_ticks widened 140 -> 220 to also clear a materially larger interaction-mode entry tick than command mode's own 621 -- interaction mode's extra role:'player' polling ticks (waitForTutorialStep/waitForSelector loops command mode's plain `command` string never runs) were already ~100 ticks ahead of command mode at a similar point in earlier, shorter rounds of this file (#707 follow-up 2's own tick-370-vs-303 trace), and this file has grown since; not independently confirmed under a live interaction-mode run this round (no browser session in this fix pass) -- if interaction mode's own entry to this step is ever traced past 721, retarget upward the same way #689/#707/#707-followup-2 each did, using the continuous-presence property above rather than re-deriving a narrow window. REPLACED for #556: an absolute tickCount target cannot hold here \u2014 command mode and interaction mode enter this step hundreds of ticks apart (interaction mode runs polling ticks command mode never does), and `equals` only matches going forward, so any single number is either already behind one mode or out of reach of the other. What the step actually needs is in the note above: a rubble_disposal offer is continuously present through this range, not confined to one narrow window, so a short relative block that turns the pool once (REFRESH_INTERVAL 20 ticks, Contract.ts) buys it in either mode. #1015: 30 -> 40 -- removing the two speed-control steps (and their ~658-tick box-cut-drain wait) upstream shifts every later tick landing earlier by a similar amount, changing which rubble_disposal pool instance the later the retired accept step (#1335) step lands on; direct-traced (command mode) against the retimed run, `tick 30` here now lands the retired accept step (#1335) on an instance whose deadline the haul can't beat regardless of how the delivery-side wait is tuned (deadlineTicks 31, hauler load lands 37 ticks after accept). `tick 40` lands on a different instance (deadlineTicks 58, hauler loaded 9 ticks after accept) with real margin either side -- see the haul-debris step's own #1015 note below for the matching delivery-side retune.",
       "timeout": 90,
       "interaction": [
         {
@@ -968,7 +968,7 @@
     {
       "command": "employee hire role:driver",
       "timeout": 90,
-      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and contract-accept steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center/freight_warehouse both complete for real and cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556/#817): with contract-accept moved below build-storage, the step before this one is the manager hire and the panel is already open \u2014 the toolbar tab toggles, so a second click would close it, and the rail (which lights the last reachable control) makes that click inert.",
+      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and the retired accept step (#1335) steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center/freight_warehouse both complete for real and cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556/#817): with the retired accept step (#1335) moved below build-storage, the step before this one is the manager hire and the panel is already open \u2014 the toolbar tab toggles, so a second click would close it, and the rail (which lights the last reachable control) makes that click inert.",
       "role": "player",
       "interaction": [
         {
@@ -1055,7 +1055,7 @@
     {
       "command": "tick 1",
       "timeout": 95,
-      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, so a proactive-rest policy no longer strands anyone permanently). Waits on orderedBuildingCount returning to 0 rather than a hardcoded buildingCount total -- this scenario's own buildingCount at this point depends on how many earlier orders (driving_center, freight_warehouse) have already landed, which this fix run re-verifies directly rather than assumes. Card sequence follows tutorialSteps.ts\u2019s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract\u2019s deadline no longer starts while a construction site is still going up.",
+      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, so a proactive-rest policy no longer strands anyone permanently). Waits on orderedBuildingCount returning to 0 rather than a hardcoded buildingCount total -- this scenario's own buildingCount at this point depends on how many earlier orders (driving_center, freight_warehouse) have already landed, which this fix run re-verifies directly rather than assumes. Card sequence follows tutorialSteps.ts\u2019s reordered canonical order (#556/#817): the retired accept step (#1335) now sits after build-storage, so a contract\u2019s deadline no longer starts while a construction site is still going up. #1335: the contract accept card was removed from the tutorial (29 steps); haul-debris now follows build-storage directly, so this step lands on haul-debris and no rubble_disposal contract is accepted here -- sell-ore accepts the one fillable ore offer instead.",
       "role": "player",
       "interaction": [
         {
@@ -1070,67 +1070,13 @@
         "equals": {
           "orderedBuildingCount": 0
         },
-        "tutorialStep": "contract-accept"
-      }
-    },
-    {
-      "command": "wait_until field:rubbleDisposalOffered equals:true max_ticks:2000",
-      "timeout": 150,
-      "description": "#1263 CI-fix: replaced the fixed `tick N` pad that used to stand here (every round through #1144 retimed it against one direct-traced command-mode landing tick) with the same `wait_until` pattern #1042/#1048 already proved for the identical fragility on the `fillableOreSaleOffered` wait further down this file. Root cause, direct-traced (interaction mode, real browser, this fix): agent occupancy, turned on for this file by this same PR/issue, slows the crew's own dispatch (collision-avoidance detours around other agents on the way to driving_center/freight_warehouse), so build-storage now completes at tickCount 734 in interaction mode, not the ~381-541 range every prior round of this step measured against -- and no rubble_disposal offer exists in the pool at tick 734 (confirmed via a `contract list` probe at that exact tick). Critically, the old fixed-`waitForSelector` step could never have recovered from that on its own no matter how wide its timeout: `main.ts` sets `autoTickEnabled = !scenarioMode`, so every scenario page (`?scenarioMode=1`) never advances the simulation clock on a real-time timer -- only an explicit tick-driving action does (`tick N`, or an interaction's own `waitUntil`/`waitForTutorialStep` loop, both of which call `tick 1` internally). A bare `waitForSelector` polls the DOM only; direct-traced (this fix), tickCount sat frozen at 734 for 30+ real seconds of that wait with `isPaused:false` -- confirming the old step's 30000ms timeout was waiting on a clock that was never running, not merely one running too slowly. Every prior round's `tick N` margin therefore only ever mattered for command mode's own literal `tick N` execution (interaction mode never runs the step's `command` string at all when an `interaction` array is present) -- so this is not a case the established retiming convention (bump the margin) can fix; the fix is the same one #1042 already made for the analogous ore_sale wait: a condition-based `wait_until` on a new derived field, `rubbleDisposalOffered` (`hasRubbleDisposalOffer`, Contract.ts/console-api.ts/main.ts), that ticks forward for real until the pool actually holds the offer, however many refreshes that takes. Direct-traced (interaction mode, this fix): starting from tick 734, the wait resolves 46 ticks in (tickCount 780) -- `generateContracts`'s own 30% roll-per-slot on rubble_disposal (Contract.ts) needing at most a couple of 20-tick refreshes to hit at least once across three rolls each. `max_ticks:2000`/`timeout:150`s pay wide margin over that measured landing (as #1015/#1091/#1131's own margin-over-measured-landing precedent elsewhere in this file does) rather than a tight bound, since the wall-clock cost of the extra ticks is cheap and a future upstream retime rolling this onto a slower-appearing instance should not need yet another CI-fix round. Command mode re-verified unaffected: `wait_until` already drove command mode's own equivalent step the same way before this fix (`findWaitUntilAction`, command-runner.ts) -- only the field waited on changed, from nothing (a bare `waitForSelector` has no command-mode analogue at all, so command mode always ran the fixed `tick N` fallback) to `rubbleDisposalOffered`, and command mode's own trace still lands well inside `max_ticks:2000` (confirmed: offer present continuously from a much earlier tick in that mode's own trajectory, per this step's pre-#1263 history above).",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "rubbleDisposalOffered",
-          "equals": true,
-          "maxTicks": 2000,
-          "timeoutMs": 120000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "rubbleDisposalOffered": true
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "contract accept type:rubble_disposal",
-      "timeout": 90,
-      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this file's sibling scenarios the accept click is scoped to `[data-contract-type]`/`[data-contract-material]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. #653 review round (Finding 2): this step used to stay unscoped, reasoning that tutorialStages.ts's own 'contract-accept' stage declares its live target as the bare `#bs-contract-panel .bs-contract-accept` and that scoping raced the offer pool's own refresh clock (REFRESH_INTERVAL=20 ticks, Contract.ts) -- but an unscoped click accepts whichever offer leads the DOM, which is only rubble_disposal at some tick landings and a different type at others (replay-verified at varied timing), silently accepting the wrong contract while the later deliver step (scoped to `[data-contract-type=\"rubble_disposal\"]`) then finds nothing to deliver and times out. Scoped now, matching contract-negotiation.json/contract-panel-visual.json's own accept steps: a `waitForSelector` on the scoped selector ahead of the click gives the refresh cycle time to surface the right card instead of assuming it's there instantly, and `expect.equals` on `activeContractCount` proves the right contract landed rather than merely some contract. #653: retargeted from `type:ore_sale material:gloomium` to `type:rubble_disposal` (no `material:` -- rubble_disposal contracts carry `materialId: ''`), because the ore_sale/gloomium contract this step used to accept could never actually be delivered later (see the deliver step's own note below) -- the debris hauler this tutorial buys only ever fills storage with excavation spoil, never an ore-bearing fragment. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg`, which the hauler does fill, making this the first contract type in this run the later deliver step can genuinely complete. Live-verified landing under real render load is ~100 extra ticks reaching this point (tick 332 vs command mode's tick 232), not the 300+ an earlier round of this file assumed. issue #585 (merge, agrees independently): a hardcoded id here is exactly as fragile as the DOM-scoped click above and for the same reason -- the contract pool's ids increment off total elapsed ticks (Contract.ts) -- reaching the same `type:rubble_disposal` selector via a separate trace before #653 landed. #776: raised from 30s to 60s -- this step lands right after the blast/event/hire-manager stretch above, and effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real accept + tutorial advance to hire-driver already having succeeded before the deadline fired -- same shape as the hire-manager step's own #776 fix above. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. Card sequence follows tutorialSteps.ts\u2019s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract\u2019s deadline no longer starts while a construction site is still going up. #1263 CI-fix: the toolbar-open click moved back here from the wait step above, now an `ensurePanel` (idempotent -- a player scenario step, not the setup-role wait above, is the right place for a UI click) since the wait step no longer opens the panel itself, only drives the clock; a `waitForSelector` ahead of the click still gives the (now-satisfied) condition time to render before clicking, matching the ore_sale accept step's own `ensurePanel`+`waitForSelector` pair further down this file.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "haul-debris"
-        }
-      ],
-      "expect": {
-        "tutorialStep": "haul-debris",
-        "equals": {
-          "activeContractCount": 1
-        }
+        "tutorialStep": "haul-debris"
       }
     },
     {
       "command": "tick 30",
       "timeout": 90,
-      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline. issue #585 (merge): the accept step above changed independently on both sides of the merge (scoped click instead of unscoped), shifting exactly when the hauler's dispatch clock starts counting relative to before #653's own 10/13/20-tick measurement; kept at 40 (this branch's own pre-merge value) rather than adopting #653's 20 outright, since a full command-mode replay of the merged file (all 43 steps) is a cheaper, equally valid check than re-deriving the exact new landing tick by hand -- confirmed clean end to end with 40, not re-verified at 20. #707: back down to 20 -- granting employee #1 blasting (new bootstrap step before drill_plan) shortens the charging phase enough that the wait_until step above now accepts the rubble_disposal contract at tick 300 instead of 400, and that specific pool instance's own deadlineTicks is 37, not the ~67 #653 measured against a different offer -- `tick 40` alone would cross tick 337 and expire the contract before delivery (direct trace, command mode); `tick 20` lands well inside the deadline while keeping #653's own measured hauler-load margin (loaded by tick 11-13 after dispatch). #928: 20 -> 40 -- direct-traced (command mode) against the current engine: the single-gauge fatigue rebalance shifts this contract's own accept tick earlier (595, down from #707's 300-vs-400 range's own later baseline) and the hauler's driver (employee #4) picks up a detour of real open-pool work (freight_warehouse construction) before ever walking to board the vehicle, pushing storedMassKg's own first nonzero landing to tick 628 (33 ticks after this step's own start at tick 595) -- `tick 20` alone (landing at tick 615) is 13 ticks short. `tick 40` (landing at tick 635) keeps 7 ticks of margin past the 628 landing point while staying inside the accepted contract's own 46-tick deadline (expires tick 641) -- the same margin philosophy #653's own original measurement used, re-measured against today's timing rather than widened blindly. #974 follow-up: 40 -> 44 -- direct-traced (command mode) against the abort-vs-fatigue fix (releaseVehicleReservation now genuinely aborts an in-flight haul instead of the driver silently finishing it underneath a stale reservation): the driver's own single mid-approach forced-rest interruption (before pickup -- isMidLoadedHaul, FragmentTaskLifecycle.ts, protects only the post-pickup to_depot leg from a second one) pushes storedMassKg's first nonzero landing to tick 620 (42 ticks after this step's own start at tick 578) -- `tick 40` alone is 2 ticks short. `tick 44` keeps a couple of ticks of margin past the 620 landing point while staying inside the accepted contract's own deadline (direct-traced: `tick 48` already reports the contract expired/not found, so the safe window here is narrower than #928's own 7-tick margin). #959: the card this step waits for is 'sell-ore', renamed from 'contract-deliver' \u2014 the tutorial's own missing beat is now selling the blasted ore for money, not just delivering whatever contract happened to be accepted. #1015 follow-up: 44 -> 22 -- removing the two speed-control steps upstream (and the earlier #816-retarget pretick's own 30 -> 40 bump, see that step's own #1015 note) moves this step's own entry tick and lands contract-accept on a materially different rubble_disposal pool instance: deadlineTicks 31 (not #974's 46), acceptedAtTick 465, hauler's storedMassKg landing 9 ticks later at tick 474 (direct-traced, command mode, this retune). `tick 44` alone (landing tick 509) is 13 ticks past the instance's own deadlineAbs of 496 -- the delivery step right after finds the contract already expired. `tick 22` (landing tick 487) keeps 9 ticks of margin past the hauler's own load-in and 9 ticks of margin before the deadline, the same two-sided-margin philosophy #928/#974 used against their own instances. #1263 CI-fix: 22 -> 30 -- replacing the accept step's own upstream `tick 160` pad with a condition-based `wait_until rubbleDisposalOffered` (see that step's own #1263 note) collapses command mode's own entry to the accept step from tick 702 down to tick 543 -- the fixed `tick 160` used to pad command mode's trajectory 160 ticks past build-storage regardless of when the offer actually appeared (it appeared 1 tick in this run), and this step's own `tick 22` was never retuned against that padding being removed. Direct-traced (command mode, this fix): accepted contract is a fresh instance (id 26, quantityKg 120, deadlineTicks 58, acceptedAtTick 543, deadlineAbs 601) -- unrelated to any instance a previous round of this note measured, since accept now lands on a different tick entirely. storedMassKg is 0 through this step's own first 23 ticks and first lands its full 1050kg load at tick 567 (24 ticks after accept) -- `tick 22` alone (landing tick 565) is 2 ticks short. `tick 30` (landing tick 573) keeps 6 ticks of margin past the 567 landing point and 28 ticks of margin before the deadline (601), the same two-sided-margin philosophy every earlier round of this step used against its own instance.",
+      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline. issue #585 (merge): the accept step above changed independently on both sides of the merge (scoped click instead of unscoped), shifting exactly when the hauler's dispatch clock starts counting relative to before #653's own 10/13/20-tick measurement; kept at 40 (this branch's own pre-merge value) rather than adopting #653's 20 outright, since a full command-mode replay of the merged file (all 43 steps) is a cheaper, equally valid check than re-deriving the exact new landing tick by hand -- confirmed clean end to end with 40, not re-verified at 20. #707: back down to 20 -- granting employee #1 blasting (new bootstrap step before drill_plan) shortens the charging phase enough that the wait_until step above now accepts the rubble_disposal contract at tick 300 instead of 400, and that specific pool instance's own deadlineTicks is 37, not the ~67 #653 measured against a different offer -- `tick 40` alone would cross tick 337 and expire the contract before delivery (direct trace, command mode); `tick 20` lands well inside the deadline while keeping #653's own measured hauler-load margin (loaded by tick 11-13 after dispatch). #928: 20 -> 40 -- direct-traced (command mode) against the current engine: the single-gauge fatigue rebalance shifts this contract's own accept tick earlier (595, down from #707's 300-vs-400 range's own later baseline) and the hauler's driver (employee #4) picks up a detour of real open-pool work (freight_warehouse construction) before ever walking to board the vehicle, pushing storedMassKg's own first nonzero landing to tick 628 (33 ticks after this step's own start at tick 595) -- `tick 20` alone (landing at tick 615) is 13 ticks short. `tick 40` (landing at tick 635) keeps 7 ticks of margin past the 628 landing point while staying inside the accepted contract's own 46-tick deadline (expires tick 641) -- the same margin philosophy #653's own original measurement used, re-measured against today's timing rather than widened blindly. #974 follow-up: 40 -> 44 -- direct-traced (command mode) against the abort-vs-fatigue fix (releaseVehicleReservation now genuinely aborts an in-flight haul instead of the driver silently finishing it underneath a stale reservation): the driver's own single mid-approach forced-rest interruption (before pickup -- isMidLoadedHaul, FragmentTaskLifecycle.ts, protects only the post-pickup to_depot leg from a second one) pushes storedMassKg's first nonzero landing to tick 620 (42 ticks after this step's own start at tick 578) -- `tick 40` alone is 2 ticks short. `tick 44` keeps a couple of ticks of margin past the 620 landing point while staying inside the accepted contract's own deadline (direct-traced: `tick 48` already reports the contract expired/not found, so the safe window here is narrower than #928's own 7-tick margin). #959: the card this step waits for is 'sell-ore', renamed from 'contract-deliver' \u2014 the tutorial's own missing beat is now selling the blasted ore for money, not just delivering whatever contract happened to be accepted. #1015 follow-up: 44 -> 22 -- removing the two speed-control steps upstream (and the earlier #816-retarget pretick's own 30 -> 40 bump, see that step's own #1015 note) moves this step's own entry tick and lands the retired accept step (#1335) on a materially different rubble_disposal pool instance: deadlineTicks 31 (not #974's 46), acceptedAtTick 465, hauler's storedMassKg landing 9 ticks later at tick 474 (direct-traced, command mode, this retune). `tick 44` alone (landing tick 509) is 13 ticks past the instance's own deadlineAbs of 496 -- the delivery step right after finds the contract already expired. `tick 22` (landing tick 487) keeps 9 ticks of margin past the hauler's own load-in and 9 ticks of margin before the deadline, the same two-sided-margin philosophy #928/#974 used against their own instances. #1263 CI-fix: 22 -> 30 -- replacing the accept step's own upstream `tick 160` pad with a condition-based `wait_until rubbleDisposalOffered` (see that step's own #1263 note) collapses command mode's own entry to the accept step from tick 702 down to tick 543 -- the fixed `tick 160` used to pad command mode's trajectory 160 ticks past build-storage regardless of when the offer actually appeared (it appeared 1 tick in this run), and this step's own `tick 22` was never retuned against that padding being removed. Direct-traced (command mode, this fix): accepted contract is a fresh instance (id 26, quantityKg 120, deadlineTicks 58, acceptedAtTick 543, deadlineAbs 601) -- unrelated to any instance a previous round of this note measured, since accept now lands on a different tick entirely. storedMassKg is 0 through this step's own first 23 ticks and first lands its full 1050kg load at tick 567 (24 ticks after accept) -- `tick 22` alone (landing tick 565) is 2 ticks short. `tick 30` (landing tick 573) keeps 6 ticks of margin past the 567 landing point and 28 ticks of margin before the deadline (601), the same two-sided-margin philosophy every earlier round of this step used against its own instance. #1335: no rubble_disposal contract is accepted before this step any more, so the hauler's landing no longer races a contract deadline; the stored-mass landing tick is the only timing this step depends on.",
       "role": "player",
       "interaction": [
         {
@@ -1185,37 +1131,6 @@
         }
       ],
       "expect": {
-        "tutorialStep": "sell-ore"
-      }
-    },
-    {
-      "command": "contract deliver type:rubble_disposal amount:600",
-      "timeout": 90,
-      "description": "contract-deliver, now genuinely traced in both modes rather than assumed: Deliver clicked on the rubble_disposal contract accepted earlier; the finances card then auto-advances. #653: retargeted from `type:ore_sale material:gloomium amount:200` -- confirmed live that field-plan (even after fixing the vehicle-id step) leaves `collectedOre.gloomium` at 0kg for 600+ ticks, because the debris hauler only ever fills storage with excavation spoil (box-cut/ramp-carve debris), never an ore-bearing blast fragment, so that contract could never be fulfilled before its own deadline. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg` instead, which the hauler does fill. Interaction click scoped to `[data-contract-type=\"rubble_disposal\"]` (unlike the accept step, which stays unscoped against the offer pool's own refresh race) -- safe here because `state.contracts.active` doesn't rotate the way the offer pool does: there is exactly one active contract at this point and no periodic refresh removing it. issue #585 (merge): kept amount:200 rather than #653's own exact-quantity 170 -- the merge shifts exactly which tick this contract is offered/accepted at (the accept step above now scopes its own click, and the haul-debris step above needed re-verifying against the combined file), so the contract's own exact remaining quantity is no longer pinned to the 170kg #653 measured against its own, pre-merge version of this file. amount:200 is a cap, not an exact figure -- it exceeds every rubble-disposal offer's own quantity seen in trace (120-170kg), so this caps at whatever the contract still needs and completes it outright regardless of the exact pool-dependent number, the same robustness #585's own original version of this step already had. Whether it reads COMPLETED or a partial \"Delivered to\" is pool-size-dependent and not asserted here. #707: amount:200 -> 300 -- granting employee #1 blasting shifted the accept step (see wait_until above) onto a different pool instance whose own quantityKg is 260, above the 120-170kg range #653/#585 traced; 200 alone left it short (\"Delivered to\", contract still active, activeContractCount stuck at 1). 300 restores the same cap-not-exact-figure margin over the new instance's own quantity, direct-traced (command mode) to complete outright. #816: driving_center/freight_warehouse both complete for real and cash recovers on schedule now that place_building's root-cause dispatch livelock is fixed (tickTaskCompletion.ts, EmployeeDispatchSteps.ts) -- but that same real construction time is exactly what breaks this step now: 300 -> 600 keeps the cap-not-exact-figure margin over the largest rubble_disposal instance seen near the new, later accept-step landing (tickCount 721, up to 480kg across an 800-tick scan), yet direct-traced (command mode) that the contract itself expires before this step ever runs -- `build-storage`'s own real construction wait (freight_warehouse under continuous policy: ~104 ticks, proactive-rest interruption overhead on top of the base 40-tick tier-1 duration, same overhead class #816 traced for driving_center) exceeds every rubble_disposal offer's own maximum possible deadline (`rng.nextInt(30, 100)`, Contract.ts -- 100 is a hard ceiling, confirmed by scanning every offer instance across an 800-tick window: deadlines 32-100, none reach 104). TODO(#817): this is a genuine game-balance conflict (max contract deadline vs real per-building construction+interruption time under continuous policy), not a scenario-authoring bug -- `contract-accept` unavoidably precedes `build-storage` in the tutorial's own canonical step order (`tutorialSteps.ts`), so no scenario-side retarget escapes it. `commandOutcome: 'refused'` below is an honest, verified description of current behavior (the contract has already expired, `Contract <id> not found`) until #817 lands and either raises the deadline ceiling, reorders the tutorial's own accept/build-storage stages, or reduces continuous-policy interruption overhead on an in-progress place_building task. (No `commandOutcome` field was ever actually added here -- #557's own fix, above, made delivery succeed again before this step ever needed one.) #928: direct-traced (command mode) against the current engine, this step still succeeds (`Contract #28 COMPLETED!`) with the haul-debris step's own padding fix above (`tick 20` -> `tick 40`) -- the single-gauge fatigue rebalance changed the hauler's own dispatch timing (see that step's own #928 note), not this step's amount:600 cap or #817's construction-vs-deadline conflict, which stays closed on this file's current timings.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-          "timeout": 30000
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "activeContractCount": 0
-        },
-        "note": "#959: this delivery completes the rubble_disposal contract accepted earlier (that is what activeContractCount 0 proves) but deliberately does NOT advance the tutorial card any more: 'sell-ore' completes on a genuinely completed ore_sale contract, not on any delivery at all \u2014 the whole point of the issue is that the tutorial never once turned blasted ORE into money. Delivering it anyway keeps the contract from expiring for a penalty and keeps the earlier 'contract-accept' beat honest. A genuinely completed delivery again \u2014 which is what #653/#585/#707\u2019s own history here describes, and what #817 recorded as no longer true at the time. #557: the file's own starting cash (see the new_game step's own history) needed one more bump \u2014 with it, build-storage completes well within every rubble_disposal offer's deadline again (direct-traced, command mode), so #817's genuine game-balance conflict (max contract deadline vs. real construction+interruption time) no longer manifests on this file's own current timings; the underlying conflict itself is unchanged and #817 stays open for whatever crew/timing combination reproduces it. activeContractCount drops to 0 by completion, not by expiry, and the payout is what proves the difference. The payout itself is not asserted here: in interaction mode the payroll accrued across the step\u2019s own clicks can outweigh a small delivery, so the direction of cash is not a stable claim.",
         "tutorialStep": "sell-ore"
       }
     },
@@ -1690,8 +1605,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1720,8 +1634,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1750,8 +1663,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1771,8 +1683,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1801,8 +1712,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1831,8 +1741,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1852,8 +1761,7 @@
         "equals": {
           "fillableSaleOffered": true
         }
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract accept fillable:true",
@@ -1882,8 +1790,7 @@
         "increased": [
           "activeContractCount"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "contract deliver fillable:true amount:100000",
@@ -1912,8 +1819,7 @@
         "increased": [
           "cash"
         ]
-      },
-      "interactionOnly": true
+      }
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",

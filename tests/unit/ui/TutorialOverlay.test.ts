@@ -209,8 +209,8 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 30" at step 0 and has progress bar fill', () => {
-      // Total comes from TUTORIAL_STEPS (30 today); update the literal when a step is added or removed.
+    it('shows step counter "1 / 29" at step 0 and has progress bar fill', () => {
+      // Total comes from TUTORIAL_STEPS (29 today); update the literal when a step is added or removed.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -218,7 +218,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*30/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*29/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -567,7 +567,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (index 17/18 in the current 30-length array: #553's tutorial fix
+      // (index 17/18 in the current 29-length array: #553's tutorial fix
       // added three drill-rig-licensing steps, #555 added two more
       // rock-digger-licensing steps, #681 added
       // build-living-quarters/set-early-policy earlier in the sequence, #557
@@ -605,7 +605,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
       // Do NOT call setGameConsole — gameConsole stays null
 
-      // Index 13 is 'charge' in the current 30-length array (#1015 removed
+      // Index 13 is 'charge' in the current 29-length array (#1015 removed
       // speed-up-for-dig/speed-normal-after-dig, shifting everything from
       // drill-plan onward down by 2).
       tut.stepIndex = 13;
@@ -640,8 +640,8 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (last step, index 29 of 30).
-      tut.stepIndex = 29;
+      // Directly set to congratulations step (last step, index 28 of 29).
+      tut.stepIndex = 28;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
@@ -1060,14 +1060,14 @@ describe('TutorialOverlay (12.4)', () => {
       expect(waitingChip.style.display).toBe('none');
     });
 
-    it('never shows the WAITING chip on a genuinely one-click step (contract-accept), whatever the state holds', () => {
+    it('never shows the WAITING chip on a genuinely one-click step (vehicle-buy-assign), whatever the state holds', () => {
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       const state = createMockState();
       tut.start(state);
-      advanceToStep(tut, 'contract-accept');
+      advanceToStep(tut, 'vehicle-buy-assign');
 
-      // Every "spent" domain lit up at once — contract-accept's stages carry
+      // Every "spent" domain lit up at once — vehicle-buy-assign's stages carry
       // no spentWhen at all, so none of this should matter.
       state.plannedDrillHoles = [{} as never];
       state.plannedChargesByHole = { '1': {} as never };

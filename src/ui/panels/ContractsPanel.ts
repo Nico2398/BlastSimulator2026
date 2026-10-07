@@ -27,7 +27,7 @@ import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { canNegotiate } from '../../core/economy/Negotiation.js';
-import type { Contract, ContractType, NegotiationField } from '../../core/economy/Contract.js';
+import { isFillableSaleOffer, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -358,14 +358,14 @@ export class ContractsPanel extends PanelBase {
     // `material:` ContractSelector (#597) already does.
     cardEl.dataset['contractType'] = c.type;
     cardEl.dataset['contractMaterial'] = c.materialId;
-    // Whether the site could fill this offer outright today — the same
-    // `stored >= c.quantityKg` the "have" bar above already colors green,
-    // exposed so a click can be scoped to an offer that can actually be
+    // Whether the site could fill this offer outright today, per
+    // isFillableSaleOffer (a supply contract is never fillable), exposed so a
+    // click can be scoped to an offer that can actually be
     // completed. Which ore the pool asks for and how much of it are both
     // random (Contract.ts's generateContracts), so a scenario that must sell
     // what its own blast produced cannot name the material up front and stay
     // true across a re-timing that re-rolls the pool.
-    cardEl.dataset['contractFillable'] = String(stored >= c.quantityKg);
+    cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, state.logistics.storedMassKg));
     return cardEl;
   }
 

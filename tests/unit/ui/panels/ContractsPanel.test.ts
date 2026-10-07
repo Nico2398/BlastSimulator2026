@@ -249,6 +249,51 @@ describe('ContractsPanel', () => {
     expect(panel.root.querySelector('[data-contract-id="5"]')).not.toBeNull();
   });
 
+  describe('data-contract-fillable (#1335, derived from isFillableSaleOffer)', () => {
+    function fillableOf(contracts: Contract[], setup: (s: GameState) => void): Record<string, string | undefined> {
+      const { panel } = makePanel();
+      const state = makeState();
+      setup(state);
+      state.contracts.available.push(...contracts);
+      panel.show();
+      panel.update(state);
+      const out: Record<string, string | undefined> = {};
+      for (const c of contracts) {
+        out[String(c.id)] = (panel.root.querySelector(`[data-contract-id="${c.id}"]`) as HTMLElement).dataset['contractFillable'];
+      }
+      return out;
+    }
+
+    it('ore_sale is fillable when collected ore covers the quantity exactly', () => {
+      const r = fillableOf([makeContract({ id: 1, quantityKg: 100 })], (s) => { s.collectedOre['dirtite'] = 100; });
+      expect(r['1']).toBe('true');
+    });
+
+    it('ore_sale is not fillable one kg short', () => {
+      const r = fillableOf([makeContract({ id: 1, quantityKg: 100 })], (s) => { s.collectedOre['dirtite'] = 99; });
+      expect(r['1']).toBe('false');
+    });
+
+    it('ore_sale is not fillable when only another ore is stored', () => {
+      const r = fillableOf([makeContract({ id: 1, quantityKg: 100 })], (s) => { s.collectedOre['gloomium'] = 5000; });
+      expect(r['1']).toBe('false');
+    });
+
+    it('marks fillable and unfillable ore offers independently, side by side', () => {
+      const r = fillableOf(
+        [makeContract({ id: 1, quantityKg: 100 }), makeContract({ id: 2, quantityKg: 900 })],
+        (s) => { s.collectedOre['dirtite'] = 500; },
+      );
+      expect(r).toEqual({ '1': 'true', '2': 'false' });
+    });
+
+    it('rubble_disposal is fillable against stored mass, not collected ore', () => {
+      const rubble = makeContract({ id: 3, type: 'rubble_disposal', materialId: '', quantityKg: 800 });
+      expect(fillableOf([rubble], (s) => { s.logistics.storedMassKg = 800; })['3']).toBe('true');
+      expect(fillableOf([rubble], (s) => { s.logistics.storedMassKg = 799; })['3']).toBe('false');
+    });
+  });
+
   it('Accept on a specific offered card dispatches contract accept for that card only, with two offers present', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();
