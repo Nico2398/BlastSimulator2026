@@ -33,7 +33,7 @@ export const HIRING_COSTS = {
 } as const;
 
 /** Proficiency level a hired blaster starts at (justifies the higher price over a driller). */
-const ROLE_BLASTER_START_LEVEL = 2;
+export const ROLE_BLASTER_START_LEVEL = 2;
 
 /** Qualifications each role arrives with at hire: every role can do its own job unaided. */
 export const ROLE_STARTING_QUALIFICATIONS: Record<
