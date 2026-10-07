@@ -92,7 +92,9 @@ export interface GameOverReport {
 /** Structured result of advancing the simulation by one tick. */
 export interface TickReport {
   tick: number;
-  contractsExpired: Array<{ contractId: number; penalty: number }>;
+  contractsExpired: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }>;
+  /** Stored ore automatically delivered to active contracts this tick. */
+  contractsDelivered: Array<{ contractId: number; kg: number; payment: number; bonus: number; completed: boolean }>;
   smuggling: { income: number; exposed: boolean };
   mafiaExposed: boolean;
   needEvents: FiredEventReport[];
@@ -402,6 +404,7 @@ export function runTick(
   return {
     tick: state.tickCount,
     contractsExpired: expired,
+    contractsDelivered: [],
     smuggling: smugResult,
     mafiaExposed,
     needEvents,

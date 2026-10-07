@@ -43,6 +43,12 @@ export interface Contract {
   expired: boolean;
   /** Negotiation attempts already made on this offer. Absent means none. */
   negotiationAttempts?: number;
+  /** True when the player holds the contract back from automatic delivery. Absent means not held. */
+  held?: boolean;
+  /** Cumulative payment already credited for partial deliveries. Absent means none. */
+  paidTotal?: number;
+  /** Penalty already charged for this contract. Absent means none. */
+  penaltyCharged?: number;
 }
 
 // ── Negotiation outcome (types live here, not in Negotiation.ts, so
@@ -361,8 +367,8 @@ export function findContract(
 export function checkDeadlines(
   state: ContractState,
   currentTick: number,
-): Array<{ contractId: number; penalty: number }> {
-  const penalties: Array<{ contractId: number; penalty: number }> = [];
+): Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }> {
+  const penalties: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }> = [];
 
   for (let i = state.active.length - 1; i >= 0; i--) {
     const c = state.active[i]!;
@@ -371,7 +377,7 @@ export function checkDeadlines(
     const elapsed = currentTick - c.acceptedAtTick;
     if (elapsed > c.deadlineTicks) {
       c.expired = true;
-      penalties.push({ contractId: c.id, penalty: c.penaltyAmount });
+      penalties.push({ contractId: c.id, penalty: c.penaltyAmount, deliveredKg: 0, paid: 0 }); // TODO: implement deliveredKg/paid
       state.active.splice(i, 1);
       state.completedHistory.push(c);
     }
@@ -380,3 +386,27 @@ export function checkDeadlines(
   return penalties;
 }
 
+
+/** Hold or release an active contract for automatic delivery. Returns false when the contract is not active. */
+export function setContractHeld(_state: ContractState, _contractId: number, _held: boolean): boolean {
+  return false; // TODO: implement
+}
+
+/** Kilograms of a contract still to be delivered. */
+export function undeliveredShare(_c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
+  return 0; // TODO: implement
+}
+
+/** Active contracts ordered by soonest deadline first, without mutating the input. */
+export function sortByDeadline(_active: readonly Contract[]): Contract[] {
+  return []; // TODO: implement
+}
+
+/** True when stored stock cannot cover what the contract still needs. */
+export function contractShortOfStock(
+  _c: Contract,
+  _collectedOre: Readonly<Record<string, number>>,
+  _storedMassKg: number,
+): boolean {
+  return false; // TODO: implement
+}
