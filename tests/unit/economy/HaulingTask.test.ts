@@ -31,6 +31,10 @@ import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import type { Itinerary, ArrivalStep } from '../../../src/core/engine/Itinerary.js';
 import { syncHaulDispatch } from '../../../src/core/economy/HaulDispatch.js';
+import { moveTo } from '../../../src/core/engine/MoveTo.js';
+import { claimPendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import { getVehicleDefByTier, type VehicleTier } from '../../../src/core/entities/Vehicle.js';
+import { HAUL_BATCH_MAX_ITEMS, HAUL_BATCH_RADIUS_CELLS } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
 const GRID = 64;
@@ -225,7 +229,7 @@ describe('requestHaulFragment — precondition failures', () => {
     const state = createGame({ seed: SEED });
     placeWarehouse(state, 10, 10);
     const vehicle = makeDrivenHauler(state);
-    vehicle.payload = { fragmentId: 999, massKg: 500 };
+    vehicle.cargo = [{ fragmentId: 999, massKg: 500 }];
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]);
 
     const result = requestHaulFragment(state, vehicle.id, 1);
@@ -579,5 +583,165 @@ describe('fragmentApproachCell — shared between hauling and breaking (#484)', 
     expect(haulLoadLeg.destZ).toBe(expected.z);
     expect(breakSplitLeg.destX).toBe(expected.x);
     expect(breakSplitLeg.destZ).toBe(expected.z);
+  });
+});
+
+
+// ── Batched hauls (#1370) ────────────────────────────────────────────────────
+//
+// A hauler carries several fragments per trip up to its tier capacity: the
+// itinerary drives to the primary, then to each extra (a haul_load effect
+// carrying the extra's `targetId`), and finally one depot leg with a single
+// haul_unload.
+
+describe('requestHaulFragment — batched hauls (#1370)', () => {
+  interface BatchOpts { tier?: VehicleTier; storageKg?: number }
+
+  function planBatch(fragments: FragmentData[], opts: BatchOpts = {}) {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(GRID);
+    placeWarehouse(state, 40, 40);
+    state.logistics.storageCapacityKg = opts.storageKg ?? 1_000_000;
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    state.logistics.storageCapacityKg = opts.storageKg ?? 1_000_000;
+    if (opts.tier) vehicle.tier = opts.tier;
+    addBlastFragments(state.logistics, fragments, state.navGrid);
+    syncHaulDispatch(state);
+    const result = requestHaulFragment(state, vehicle.id, fragments[0]!.id);
+    expect(result.success).toBe(true);
+    const driver = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle))!;
+    return { state, vehicle, itinerary: driver.itinerary! };
+  }
+
+  /** Fragment ids the itinerary loads, primary first. */
+  function loadedIds(itinerary: Itinerary, primaryId: number): number[] {
+    const extras = legsWithEffect(itinerary, 'haul_load')
+      .map(leg => (leg.onArrive as { targetId?: number }).targetId)
+      .filter((id): id is number => id !== undefined && id !== primaryId);
+    return [primaryId, ...extras];
+  }
+
+  const cluster = (n: number, mass: number, firstId = 1) =>
+    Array.from({ length: n }, (_, i) => makeFragment(firstId + i, 5 + (i % 4), 5 + Math.floor(i / 4), mass));
+
+  it('plans one extra haul_load leg per nearby small fragment, then a single unload leg last', () => {
+    const { itinerary } = planBatch(cluster(3, 500));
+
+    expect(legsWithEffect(itinerary, 'haul_load')).toHaveLength(3);
+    expect(legsWithEffect(itinerary, 'haul_unload')).toHaveLength(1);
+    expect(loadedIds(itinerary, 1).sort()).toEqual([1, 2, 3]);
+    const last = itinerary.legs[itinerary.legs.length - 1]!;
+    expect((last.onArrive as { effectId?: string }).effectId).toBe('haul_unload');
+    // Every load happens before the unload.
+    const unloadIdx = itinerary.legs.indexOf(legsWithEffect(itinerary, 'haul_unload')[0]!);
+    for (const leg of legsWithEffect(itinerary, 'haul_load')) expect(itinerary.legs.indexOf(leg)).toBeLessThan(unloadIdx);
+  });
+
+  it('extra loads name their fragment through targetId', () => {
+    const { itinerary } = planBatch(cluster(2, 500));
+    const targeted = legsWithEffect(itinerary, 'haul_load').filter(l => (l.onArrive as { targetId?: number }).targetId === 2);
+    expect(targeted).toHaveLength(1);
+  });
+
+  it('a lone fragment still plans exactly one load and one unload leg', () => {
+    const { itinerary } = planBatch(cluster(1, 500));
+    expect(legsWithEffect(itinerary, 'haul_load')).toHaveLength(1);
+    expect(legsWithEffect(itinerary, 'haul_unload')).toHaveLength(1);
+  });
+
+  it('leaves out a fragment beyond HAUL_BATCH_RADIUS_CELLS of the primary', () => {
+    const far = makeFragment(2, 5 + HAUL_BATCH_RADIUS_CELLS + 10, 5, 500);
+    const { itinerary } = planBatch([makeFragment(1, 5, 5, 500), far]);
+    expect(loadedIds(itinerary, 1)).toEqual([1]);
+  });
+
+  it('takes a fragment inside HAUL_BATCH_RADIUS_CELLS of the primary', () => {
+    const near = makeFragment(2, 5 + HAUL_BATCH_RADIUS_CELLS - 2, 5, 500);
+    const { itinerary } = planBatch([makeFragment(1, 5, 5, 500), near]);
+    expect(loadedIds(itinerary, 1)).toEqual([1, 2]);
+  });
+
+  it('never loads more than HAUL_BATCH_MAX_ITEMS fragments in one trip', () => {
+    const { itinerary } = planBatch(cluster(HAUL_BATCH_MAX_ITEMS + 3, 50));
+    expect(legsWithEffect(itinerary, 'haul_load')).toHaveLength(HAUL_BATCH_MAX_ITEMS);
+  });
+
+  it('a primary heavier than capacity rides alone', () => {
+    const { itinerary } = planBatch([makeFragment(1, 5, 5, 5000), makeFragment(2, 6, 5, 100)]);
+    expect(loadedIds(itinerary, 1)).toEqual([1]);
+    expect(legsWithEffect(itinerary, 'haul_unload')).toHaveLength(1);
+  });
+
+  it('stops adding extras at the tier-1 capacity of 4000 kg', () => {
+    const frags = cluster(5, 1500);
+    const { itinerary } = planBatch(frags);
+    const ids = loadedIds(itinerary, 1);
+    const mass = ids.reduce((sum, id) => sum + frags.find(f => f.id === id)!.mass, 0);
+    expect(ids).toHaveLength(2);
+    expect(mass).toBeLessThanOrEqual(4000);
+  });
+
+  it('stops adding extras once storage room is used up', () => {
+    const { itinerary } = planBatch(cluster(4, 1000), { storageKg: 2500 });
+    expect(loadedIds(itinerary, 1)).toHaveLength(2);
+  });
+
+  it('a higher tier carries strictly more mass per trip on the same debris field: T1 < T2 < T3', () => {
+    const massFor = (tier: VehicleTier) => {
+      const frags = cluster(12, 1500);
+      const { itinerary } = planBatch(frags, { tier });
+      const ids = loadedIds(itinerary, 1);
+      const mass = ids.reduce((sum, id) => sum + frags.find(f => f.id === id)!.mass, 0);
+      expect(mass).toBeLessThanOrEqual(getVehicleDefByTier('debris_hauler', tier).capacity);
+      return mass;
+    };
+    const t1 = massFor(1);
+    const t2 = massFor(2);
+    const t3 = massFor(3);
+    expect(t2).toBeGreaterThan(t1);
+    expect(t3).toBeGreaterThan(t2);
+  });
+});
+
+describe('planned haul resume with cargo already aboard (#1370)', () => {
+  function resumeSetup(extraCargo: boolean) {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(GRID);
+    placeWarehouse(state, 40, 40);
+    state.logistics.storageCapacityKg = 1_000_000;
+    const vehicle = makeDrivenHauler(state, 0, 0);
+    state.logistics.storageCapacityKg = 1_000_000;
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 500), makeFragment(2, 6, 5, 500)], state.navGrid);
+    syncHaulDispatch(state);
+    const driver = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle))!;
+    const action = state.pendingActions.find(a => a.type === 'haul_debris' && a.payload['fragmentId'] === 1)!;
+    // Interrupted after the loads: cargo aboard, fragments in transit, reservation intact.
+    for (const tracked of state.logistics.fragments) {
+      if (tracked.fragment.id === 1 || (extraCargo && tracked.fragment.id === 2)) {
+        tracked.state = 'in_transit';
+        tracked.vehicleId = String(vehicle.id);
+      }
+    }
+    vehicle.cargo = extraCargo
+      ? [{ fragmentId: 1, massKg: 500 }, { fragmentId: 2, massKg: 500 }]
+      : [{ fragmentId: 1, massKg: 500 }];
+    claimPendingAction(state, action.id, driver.id);
+    reserveVehicle(state.vehicles, vehicle.id, action.id);
+    driver.activeActionId = action.id;
+    const result = moveTo(state, driver.id, { actionId: action.id }, { via: vehicle.id });
+    expect(result.success).toBe(true);
+    return { itinerary: driver.itinerary! };
+  }
+
+  it('plans only the depot leg when the primary is already aboard', () => {
+    const { itinerary } = resumeSetup(false);
+    expect(legsWithEffect(itinerary, 'haul_load')).toHaveLength(0);
+    expect(legsWithEffect(itinerary, 'haul_unload')).toHaveLength(1);
+  });
+
+  it('plans only the depot leg when several items are aboard', () => {
+    const { itinerary } = resumeSetup(true);
+    expect(legsWithEffect(itinerary, 'haul_load')).toHaveLength(0);
+    expect(legsWithEffect(itinerary, 'haul_unload')).toHaveLength(1);
   });
 });

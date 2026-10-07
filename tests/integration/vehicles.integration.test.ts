@@ -1278,7 +1278,7 @@ describe('Vehicle fleet', () => {
       // employee is now driving via their itinerary. Under the pre-#1089
       // design, either flag alone routed this vehicle through a second,
       // independent drive call in the same tick.
-      vehicle.payload = { fragmentId: 1, massKg: 100 };
+      vehicle.cargo = [{ fragmentId: 1, massKg: 100 }];
       reserveVehicle(ctx.state!.vehicles, vehicle.id, 999999);
 
       const speed = getVehicleDefByTier(vehicle.type, vehicle.tier).speed;

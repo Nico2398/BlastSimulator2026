@@ -715,7 +715,7 @@ describe('UIManager — blast report deferral holds the event modal (#545)', () 
 function makeVehicle(id: number): Vehicle {
   return {
     id, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100,
-    payload: null,
+    cargo: [],
     occupantIds: [],
   };
 }

@@ -769,11 +769,11 @@ describe('Console — employee fire releases the employee from the world (#1378)
     ctx.state!.logistics.storageCapacityKg = 5000;
     addBlastFragments(ctx.state!.logistics, [makeCargoFragment(1, 850)]);
     pickupFragment(ctx.state!.logistics, 1, String(vehicle.id));
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     employeeCommand(ctx, ['fire', String(driverId)], {});
 
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     const cargo = ctx.state!.logistics.fragments.find(f => f.fragment.id === 1)!;
     expect(cargo.state).toBe('on_ground');
     expect(vehicle.occupantIds).toEqual([]);

@@ -989,7 +989,7 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
 });
 
 // #1091: isMidLoadedHaul moved into ForceShiftRest.ts itself as a private
-// helper (checks vehicle.payload !== null instead of the deleted
+// helper (checks vehicle.cargo.length > 0 instead of the deleted
 // haulingPhase === 'to_depot') — no longer exported from
 // FragmentTaskLifecycle.ts, so it has no dedicated direct-call unit test any
 // more; its behavior is covered indirectly through
@@ -1004,7 +1004,7 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.occupantIds = [employee.id];
-    vehicle.payload = { fragmentId: 1, massKg: 500 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 500 }];
     const prior = pushHeldAction(state, employee.id, 1200);
     prior.requiredVehicleRole = 'debris_hauler';
     employee.activeActionId = prior.id;
@@ -1025,7 +1025,7 @@ describe('forceShiftRestIfNeededByPolicy protects a loaded haul leg via isMidLoa
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     vehicle.occupantIds = [employee.id];
-    vehicle.payload = null;
+    vehicle.cargo = [];
     const prior = pushHeldAction(state, employee.id, 1201);
     prior.requiredVehicleRole = 'debris_hauler';
     employee.activeActionId = prior.id;

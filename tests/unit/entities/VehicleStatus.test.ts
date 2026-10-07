@@ -18,7 +18,7 @@ import { VEHICLE_ROLE_ARRIVAL_TASK } from '../../../src/core/config/balance.js';
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
-    payload: null,
+    cargo: [],
     occupantIds: [],
     ...overrides,
   };
@@ -138,7 +138,7 @@ describe('computeVehicleStatus — hauling (debris_hauler + active reservation)'
   it('reports hauling with phase to_depot when payload is set (already loaded)', () => {
     const vs = createVehicleState();
     const { vehicle } = purchaseVehicle(vs, 'debris_hauler');
-    vehicle.payload = { fragmentId: 1, massKg: 100 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 100 }];
     reserveVehicle(vs, vehicle.id, 1);
     const occupant = makeOccupant({ taskTicksRemaining: null, itinerary: null });
     const status = computeVehicleStatus(vehicle, vs, occupant);

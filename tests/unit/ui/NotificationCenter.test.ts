@@ -253,7 +253,7 @@ describe('NotificationCenter (redesign P1)', () => {
         const driver = stuckWalker(state, 2);
         state.vehicles.vehicles.push({
           id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
-          payload: null, occupantIds: [driver.id],
+          cargo: [], occupantIds: [driver.id],
         });
         expect(walker.id).not.toBe(driver.id);
         const pip = center.update(state).find(p => p.tone === 'warn' && p.tip === t('notification.pip.crew_stuck_tip', { count: 2 }));
@@ -286,7 +286,7 @@ describe('NotificationCenter (redesign P1)', () => {
       employee.isMoveStuck = true;
       state.vehicles.vehicles.push({
         id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
-        payload: null, occupantIds: [employee.id],
+        cargo: [], occupantIds: [employee.id],
       });
       const pips = center.update(state);
       const pip = pips.find(p => p.tip === t('notification.pip.crew_stuck_tip', { count: 1 }));

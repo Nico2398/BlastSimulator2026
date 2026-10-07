@@ -20,6 +20,7 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { Random } from '../../../src/core/math/Random.js';
 import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD, isOversized } from '../../../src/core/mining/BlastCalc.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import {
@@ -120,7 +121,7 @@ describe('applyHaulLoad', () => {
     const result = applyHaulLoad(state, vehicle);
 
     expect(result).toBe(true);
-    expect(vehicle.payload).toEqual({ fragmentId: 1, massKg: 850 });
+    expect(vehicle.cargo).toEqual([{ fragmentId: 1, massKg: 850 }]);
     expect(state.logistics.fragments[0]!.state).toBe('in_transit');
     expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(0);
   });
@@ -135,7 +136,7 @@ describe('applyHaulLoad', () => {
     const result = applyHaulLoad(state, vehicle);
 
     expect(result).toBe(false);
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 
   it('returns false without mutating when the named fragment is already in_transit (claimed by another vehicle)', () => {
@@ -150,7 +151,7 @@ describe('applyHaulLoad', () => {
     const result = applyHaulLoad(state, vehicle);
 
     expect(result).toBe(false);
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     expect(state.logistics.fragments[0]!.vehicleId).toBe('999');
   });
 
@@ -165,7 +166,7 @@ describe('applyHaulLoad', () => {
     const result = applyHaulLoad(state, vehicle);
 
     expect(result).toBe(false);
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     expect(state.logistics.fragments[0]!.state).toBe('on_ground');
   });
 
@@ -178,7 +179,7 @@ describe('applyHaulLoad', () => {
     const result = applyHaulLoad(state, vehicle);
 
     expect(result).toBe(false);
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 });
 
@@ -193,7 +194,7 @@ describe('applyHaulUnload', () => {
     addBlastFragments(state.logistics, [fragment]);
     state.logistics.fragments[0]!.state = 'in_transit';
     state.logistics.fragments[0]!.vehicleId = String(vehicle.id);
-    vehicle.payload = { fragmentId: 1, massKg: 1200 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 1200 }];
     const storedBefore = state.logistics.storedMassKg;
 
     const result = applyHaulUnload(state, vehicle);
@@ -202,7 +203,7 @@ describe('applyHaulUnload', () => {
     expect(state.logistics.fragments[0]!.state).toBe('stored');
     expect(state.logistics.storedMassKg).toBe(storedBefore + 1200);
     expect(state.collectedOre['blingite']).toBeGreaterThan(0);
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 
   it('returns false without mutating collectedOre/storage when vehicle.payload is already null', () => {
@@ -210,12 +211,12 @@ describe('applyHaulUnload', () => {
     const { vehicle } = makeDrivenHauler(state, 10, 10);
     const storedBefore = state.logistics.storedMassKg;
     const collectedBefore = { ...state.collectedOre };
-    vehicle.payload = null;
+    vehicle.cargo = [];
 
     const result = applyHaulUnload(state, vehicle);
 
     expect(result).toBe(false);
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     expect(state.logistics.storedMassKg).toBe(storedBefore);
     expect(state.collectedOre).toEqual(collectedBefore);
   });
@@ -225,12 +226,12 @@ describe('applyHaulUnload', () => {
     const { vehicle } = makeDrivenHauler(state, 10, 10);
     // Fragment named by payload was never tracked at all (e.g. returned to
     // ground and re-picked by someone else, or a stale payload).
-    vehicle.payload = { fragmentId: 999, massKg: 500 };
+    vehicle.cargo = [{ fragmentId: 999, massKg: 500 }];
 
     const result = applyHaulUnload(state, vehicle);
 
     expect(result).toBe(false);
-    expect(vehicle.payload).toEqual({ fragmentId: 999, massKg: 500 });
+    expect(vehicle.cargo).toEqual([{ fragmentId: 999, massKg: 500 }]);
   });
 });
 
@@ -306,7 +307,7 @@ describe('applyArrivalEffect', () => {
     const result = applyArrivalEffect(state, vehicle, 'haul_load');
 
     expect(result).toBe(true);
-    expect(vehicle.payload).toEqual({ fragmentId: 1, massKg: 900 });
+    expect(vehicle.cargo).toEqual([{ fragmentId: 1, massKg: 900 }]);
   });
 
   it('dispatches "haul_unload" to applyHaulUnload', () => {
@@ -315,12 +316,12 @@ describe('applyArrivalEffect', () => {
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 0.3, 900)]);
     state.logistics.fragments[0]!.state = 'in_transit';
     state.logistics.fragments[0]!.vehicleId = String(vehicle.id);
-    vehicle.payload = { fragmentId: 1, massKg: 900 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 900 }];
 
     const result = applyArrivalEffect(state, vehicle, 'haul_unload');
 
     expect(result).toBe(true);
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     expect(state.logistics.fragments[0]!.state).toBe('stored');
   });
 
@@ -342,5 +343,93 @@ describe('applyArrivalEffect', () => {
 
     expect(() => applyArrivalEffect(state, vehicle, 'not_a_real_effect')).not.toThrow();
     expect(applyArrivalEffect(state, vehicle, 'not_a_real_effect')).toBe(false);
+  });
+});
+
+// ── applyHaulUnload — several cargo items in one delivery (#1370) ────────────
+
+describe('applyHaulUnload with a multi-fragment cargo (#1370)', () => {
+  function queuedHaulAction(id: number, fragmentId: number): PendingAction {
+    return {
+      id, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: 5, targetZ: 5, targetY: 0, payload: { fragmentId },
+      targetEmployeeId: null, status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+  }
+
+  function loadedTrip() {
+    const state = createGame({ seed: SEED });
+    const { vehicle, driverId } = makeDrivenHauler(state, 10, 10);
+    const masses = [1200, 800, 500];
+    masses.forEach((m, i) => {
+      const f = makeFragment(i + 1, 5 + i, 5, 0.3, m);
+      f.oreDensities = { blingite: 0.5 };
+      addBlastFragments(state.logistics, [f]);
+    });
+    for (const tracked of state.logistics.fragments) {
+      tracked.state = 'in_transit';
+      tracked.vehicleId = String(vehicle.id);
+    }
+    vehicle.cargo = masses.map((m, i) => ({ fragmentId: i + 1, massKg: m }));
+    const primary = reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, { x: 5, z: 5 });
+    // Extras' own self-dispatched haul actions, still queued.
+    state.pendingActions.push(queuedHaulAction(902, 2), queuedHaulAction(903, 3));
+    return { state, vehicle, primary, masses };
+  }
+
+  it('stores every item: storedMassKg grows by the whole cargo mass and every fragment is stored', () => {
+    const { state, vehicle } = loadedTrip();
+    const before = state.logistics.storedMassKg;
+
+    expect(applyHaulUnload(state, vehicle)).toBe(true);
+
+    expect(state.logistics.storedMassKg).toBe(before + 2500);
+    expect(state.logistics.fragments.map(f => f.state)).toEqual(['stored', 'stored', 'stored']);
+    expect(vehicle.cargo).toEqual([]);
+  });
+
+  it('credits collectedOre once per fragment', () => {
+    const { state, vehicle } = loadedTrip();
+    const single = createGame({ seed: SEED });
+    const f = makeFragment(1, 5, 5, 0.3, 1200);
+    f.oreDensities = { blingite: 0.5 };
+    addBlastFragments(single.logistics, [f]);
+    single.logistics.fragments[0]!.state = 'in_transit';
+    const { vehicle: v2 } = makeDrivenHauler(single, 10, 10);
+    v2.cargo = [{ fragmentId: 1, massKg: 1200 }];
+    applyHaulUnload(single, v2);
+    const perFragment = single.collectedOre['blingite']!; // same volume and density each
+
+    applyHaulUnload(state, vehicle);
+
+    expect(state.collectedOre['blingite']).toBeCloseTo(perFragment * 3, 6);
+  });
+
+  it('removes the haul actions of every loaded fragment', () => {
+    const { state, vehicle } = loadedTrip();
+
+    applyHaulUnload(state, vehicle);
+
+    expect(state.pendingActions.filter(a => a.type === 'haul_debris')).toEqual([]);
+  });
+
+  it('emits vehicle:haul_delivered once per fragment', () => {
+    const { state, vehicle } = loadedTrip();
+    const emitter = new EventEmitter();
+    const delivered: number[] = [];
+    emitter.on('vehicle:haul_delivered', (p: { vehicleId: number; fragmentId: number }) => delivered.push(p.fragmentId));
+
+    applyHaulUnload(state, vehicle, emitter);
+
+    expect([...delivered].sort()).toEqual([1, 2, 3]);
+  });
+
+  it('returns false and changes nothing if no cargo fragment is in transit any more', () => {
+    const { state, vehicle } = loadedTrip();
+    for (const tracked of state.logistics.fragments) tracked.state = 'on_ground';
+    const before = state.logistics.storedMassKg;
+
+    expect(applyHaulUnload(state, vehicle)).toBe(false);
+    expect(state.logistics.storedMassKg).toBe(before);
   });
 });

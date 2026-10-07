@@ -441,7 +441,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     state.pendingActions.push(action);
     driver1.activeActionId = action.id;
     reserveVehicle(state.vehicles, vehicle.id, action.id);
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     evacuateZone(state, zone);
     // #1089/#1138: the drive leg is read off the driving employee's own
@@ -457,7 +457,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     expect(cargo.state).toBe('in_transit');
     expect(cargo.vehicleId).toBe(String(vehicle.id));
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(action.id);
-    expect(vehicle.payload).toEqual({ fragmentId: 1, massKg: 850 });
+    expect(vehicle.cargo).toEqual([{ fragmentId: 1, massKg: 850 }]);
 
     // Vehicle is still ordered out of the zone like any other evacuee.
     const drivenBy1 = resolveVehicleDriver(vehicle, state.employees.employees);
@@ -485,7 +485,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     // No cargo committed yet — the ordinary claim-only release runs
     // (isCommittedToOwnCargo is false), unlike the cargo-loaded case above.
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     // Nothing was carried — the fragment is untouched, still on the ground.
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 2)!;
@@ -517,7 +517,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     tickLocomotion(state);
 
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     const drivenBy3 = resolveVehicleDriver(vehicle, state.employees.employees);
     expect(isInZone(drivenBy3!.itinerary!.legs[0]!.destX, drivenBy3!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
@@ -536,7 +536,7 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
     tickLocomotion(state);
 
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     const drivenBy4 = resolveVehicleDriver(vehicle, state.employees.employees);
     expect(isInZone(drivenBy4!.itinerary!.legs[0]!.destX, drivenBy4!.itinerary!.legs[0]!.destZ, zone)).toBe(false);
   });

@@ -17,7 +17,7 @@ import { purchaseVehicle, getVehicleReservation } from '../../../src/core/entiti
 import { createEmployeeState, hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { board } from '../../../src/core/engine/Mount.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
-import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
+import { addBlastFragments, pickupFragment, inTransitMassKg } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { findPath } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
@@ -570,6 +570,29 @@ describe('releaseEmployeeFromWorld (#1378)', () => {
     expect(driver.locomotion).toEqual({ kind: 'on_foot' });
   });
 
+  it('returns every item of a multi-fragment cargo to the ground and keeps I8 intact (#1370)', () => {
+    const state = setup();
+    state.logistics.storageCapacityKg = 5000;
+    addBlastFragments(state.logistics, [makeCargoFragment(1, 850), makeCargoFragment(2, 400), makeCargoFragment(3, 300)]);
+    const driver = hire(state, 'driver');
+    assignSkill(state.employees, driver.id, 'driving.truck', 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    expect(board(state, vehicle.id, driver.id).success).toBe(true);
+    for (const id of [1, 2, 3]) pickupFragment(state.logistics, id, String(vehicle.id));
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }, { fragmentId: 2, massKg: 400 }, { fragmentId: 3, massKg: 300 }];
+
+    releaseEmployeeFromWorld(state, driver.id);
+
+    expect(vehicle.cargo).toEqual([]);
+    for (const id of [1, 2, 3]) {
+      const f = state.logistics.fragments.find(t => t.fragment.id === id)!;
+      expect(f.state).toBe('on_ground');
+      expect(f.vehicleId).toBeNull();
+    }
+    expect(state.logistics.fragments.filter(f => f.state === 'in_transit')).toHaveLength(0);
+    expect(inTransitMassKg(state.logistics)).toBe(0);
+  });
+
   it('returns the payload a driven hauler carries to the ground', () => {
     const state = setup();
     state.logistics.storageCapacityKg = 5000;
@@ -579,11 +602,11 @@ describe('releaseEmployeeFromWorld (#1378)', () => {
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     expect(board(state, vehicle.id, driver.id).success).toBe(true);
     pickupFragment(state.logistics, 1, String(vehicle.id));
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     releaseEmployeeFromWorld(state, driver.id);
 
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     expect(vehicle.occupantIds).toEqual([]);
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
     expect(cargo.state).toBe('on_ground');
@@ -867,12 +890,12 @@ describe('releaseInjuredEmployeeQueue (#1381)', () => {
     emp.injured = true;
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
     reserveVehicle(state.vehicles, vehicle.id, 4);
-    vehicle.payload = { fragmentId: 9, massKg: 100 };
+    vehicle.cargo = [{ fragmentId: 9, massKg: 100 }];
 
     releaseInjuredEmployeeQueue(state, emp.id);
 
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBe(4);
-    expect(vehicle.payload).not.toBeNull();
+    expect(vehicle.cargo.length).toBeGreaterThan(0);
     expect(state.pendingActions.find(x => x.id === 4)!.status).toBe('queued');
   });
 
