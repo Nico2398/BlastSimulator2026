@@ -15,19 +15,19 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 size:32 staffed:true",
+      "command": "new_game seed:42 size:32 cash:100000 staffed:true",
       "timeout": 30,
       "role": "setup",
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Staffed opening (#551; cash:100000 so the blast spend does not drive cash below the $2,000 manager fee at the later hire step, #1340): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:32 staffed:true"
+          "command": "new_game seed:42 size:32 cash:100000 staffed:true"
         }
       ],
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 100000,
           "holeCount": 0
         }
       }
@@ -221,6 +221,34 @@
           "sequencedCount": 0
         },
         "note": "a fired blast clears the plan back to zero; confirmed against the real dump — cash does not change here (charge/blast spend is not reflected in the serialized cash field for this pipeline, unlike a building/vehicle purchase)"
+      }
+    },
+    {
+      "command": "employee hire role:manager",
+      "timeout": 30,
+      "description": "Negotiating needs a Manager on the roster (#1340): hired through the Crew panel's real hire button before the contracts step below, which clicks Negotiate.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
       }
     },
     {

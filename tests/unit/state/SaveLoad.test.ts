@@ -1947,9 +1947,9 @@ describe('negotiationAttempts persistence (#1366)', () => {
     const restored = deserialize(JSON.stringify(parsed));
     const offer = restored.contracts.available[0]!;
     expect(canNegotiate(offer)).toBe(true);
-    const first = negotiateContract(restored.contracts, offer.id, 0, new Random(1));
+    const first = negotiateContract(restored.contracts, offer.id, 0, new Random(1), 1);
     expect(first && 'refused' in first).toBe(false);
-    expect(negotiateContract(restored.contracts, offer.id, 0, new Random(1))).toEqual({ refused: 'already_negotiated' });
+    expect(negotiateContract(restored.contracts, offer.id, 0, new Random(1), 1)).toEqual({ refused: 'already_negotiated' });
   });
 });
 

@@ -5,7 +5,7 @@ import type { Contract, ContractState, NegotiationChange } from './Contract.js';
 import { computeEarlyBonus } from './Contract.js';
 import { Random } from '../math/Random.js';
 import { hash32, hashCombine } from '../math/Hash.js';
-import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER } from '../config/balance.js';
+import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL } from '../config/balance.js';
 
 // ── Config ──
 
@@ -13,6 +13,9 @@ import { NEGOTIATION_MAX_ATTEMPTS_PER_OFFER } from '../config/balance.js';
 const BASE_SUCCESS_RATE = 0.5;
 /** Score influence: each point of reputation adds this to success rate. */
 const REPUTATION_FACTOR = 0.01;
+/** Success-rate clamp bounds. */
+const MIN_SUCCESS_RATE = 0.05;
+const MAX_SUCCESS_RATE = 0.95;
 /** Maximum improvement factor for successful negotiation (20% better terms). */
 const MAX_IMPROVEMENT = 0.20;
 /** Maximum worsening factor for failed negotiation (15% worse terms). */
@@ -47,6 +50,25 @@ export function canNegotiate(contract: Contract): boolean {
   return (contract.negotiationAttempts ?? 0) < NEGOTIATION_MAX_ATTEMPTS_PER_OFFER;
 }
 
+/** Why a manager-run negotiation is refused up front, or null when allowed (#1340). */
+export function negotiationRefusalReason(
+  contract: Contract,
+  managerLevel: number | null,
+): 'no_manager' | 'already_negotiated' | null {
+  if (managerLevel === null) return 'no_manager';
+  return canNegotiate(contract) ? null : 'already_negotiated';
+}
+
+/** Success-rate bonus a manager level adds to a negotiation, as a probability (#1340). */
+function managerSuccessBonus(level: number): number {
+  return (level - 1) * NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL;
+}
+
+/** Success-rate bonus shown to the player for a manager level, in percent (#1340). */
+export function managerNegotiationBonusPct(level: number): number {
+  return Math.round(managerSuccessBonus(level) * 100);
+}
+
 /** Negotiate using a per-attempt RNG stream derived from seed, tick, id and attempt. */
 export function negotiateContractAtTick(
   state: ContractState,
@@ -54,15 +76,17 @@ export function negotiateContractAtTick(
   reputation: number,
   seed: number,
   tick: number,
+  managerLevel: number,
 ): NegotiationResult | { refused: NegotiationRefusal } {
   const attempt = state.available.find(c => c.id === contractId)?.negotiationAttempts ?? 0;
   const rng = new Random(negotiationStreamSeed(seed, tick, contractId, attempt));
-  return negotiateContract(state, contractId, reputation, rng) ?? { refused: 'not_found' };
+  return negotiateContract(state, contractId, reputation, rng, managerLevel) ?? { refused: 'not_found' };
 }
 
 /**
  * Negotiate a contract in the available list.
- * Success probability = BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR.
+ * Success probability = BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR
+ * + (managerLevel - 1) * NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL.
  * Success: better price, longer deadline, lower penalty (picks 1-2 improvements).
  * Failure: worse price, shorter deadline, higher penalty (picks 1 worsening).
  */
@@ -71,6 +95,7 @@ export function negotiateContract(
   contractId: number,
   reputation: number,
   rng: Random,
+  managerLevel: number,
 ): NegotiationResult | { refused: 'already_negotiated' } | null {
   const contract = state.available.find(c => c.id === contractId);
   if (!contract) return null;
@@ -78,7 +103,13 @@ export function negotiateContract(
   if (attempts >= NEGOTIATION_MAX_ATTEMPTS_PER_OFFER) return { refused: 'already_negotiated' };
   contract.negotiationAttempts = attempts + 1;
 
-  const successRate = Math.min(0.95, Math.max(0.05, BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR));
+  const successRate = Math.min(
+    MAX_SUCCESS_RATE,
+    Math.max(
+      MIN_SUCCESS_RATE,
+      BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR + managerSuccessBonus(managerLevel),
+    ),
+  );
   const isSuccess = rng.chance(successRate);
 
   const changes: NegotiationChange[] = [];

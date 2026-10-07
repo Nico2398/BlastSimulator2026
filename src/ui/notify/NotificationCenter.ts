@@ -7,7 +7,8 @@
 //
 // Consumed by shell/Toasts.ts, shell/ActivityLog.ts and shell/TopBar.ts,
 // each of which polls this per UIManager.update() the same way every other
-// panel polls GameState — no event-callback wiring needed.
+// panel polls GameState — no event-callback wiring needed. One-off core events
+// (crew, research, corruption/mafia) reach notify() through ui/notify/*Notifications.ts.
 
 import type { IconName } from '../icons.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../../core/state/GameState.js';

@@ -50,7 +50,7 @@ Fragments picked up by excavators → loaded onto trucks → sold via contracts
 ## Economy & Management
 
 ### Contracts
-- **Negotiable** with probabilistic outcomes
+- **Negotiable** with probabilistic outcomes, run by a Manager: no eligible manager (alive, not injured, not in training) means no negotiation. Best manager `management` level raises the success rate by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1 (#1340)
 - Types: ore sale, rubble disposal, supply
 - Each specifies: material type, quantity, unit price, deadline, penalties
 
@@ -62,7 +62,7 @@ Can be placed, moved, destroyed. Projections can destroy them.
 Trucks, excavators, drill rigs, bulldozers. Each has purchase/maintenance/fuel cost, capacity, speed.
 
 ### Employees
-Hired with salaries. Specialized roles: drillers, blasters, drivers, surveyors, managers.
+Hired with salaries. Specialized roles: drillers, blasters, drivers, surveyors, managers (managers run contract negotiation; hiring/firing/policy are not gated on one yet).
 Unionized employees cannot be fired. Affected by well-being score.
 
 ### Operating cost and runway (#1375)
@@ -96,6 +96,8 @@ Each event presents 2-4 decision options with different consequences on scores, 
 ## Corruption & Mafia Gameplay
 
 - **Corruption:** Bribe judges, union leaders, inspectors. Success: problem goes away. Failure: scandal, fines, criminal charges.
+- **Corruption failure (#1411):** a failed bribe fines `BRIBERY_FAILURE_FINE_FRACTION` (0.5) of its cost (expense category `fines`), lowers nuisance score by `BRIBERY_FAILURE_NUISANCE_HIT` (8), and adds `BRIBERY_FAILURE_CORRUPTION_DELTA` (2) corruption (can unlock the mafia).
+- **Mafia failure (#1411):** a botched accident or detected frame raises exposure by `INVESTIGATION_EXPOSURE_JUMP` (0.2) and queues the repeatable follow-up `INVESTIGATION_FOLLOWUP_EVENT_ID` (`mafia_police_investigation`: pay off detective / hire lawyer / stonewall; events may carry `exposureDelta`). Exposed smuggling charges `SMUGGLING_EXPOSED_FINE` (25000), adds `SMUGGLING_EXPOSED_EXPOSURE_JUMP` (0.1) exposure and shuts smuggling off. Exposure decays `EXPOSURE_DECAY_PER_TICK` (0.004) per tick once `EXPOSURE_CLEAN_GRACE_TICKS` (30) pass with no mafia action and no active smuggling (`mafia.lastActivityTick`). Each of these raises a toast (`ui/notify/corruptionNotifications.ts`). Mafia rewards unchanged.
 - **Mafia:** Dark escalation path. Arrange incidents for unionized employees. Smuggling. Gets progressively more dangerous.
 
 ## World Generation
@@ -127,7 +129,7 @@ Each has: ore probability, procedural texture, hardness, porosity, density.
 Examples: Cruite (soft), Grumpite (medium), Obstiite (hard), endgame rocks.
 
 ### Explosives (fictional, humorous names)
-Each has: energy yield, cost, water sensitivity, charge limits, rock tier requirement, blast radius modifier, vibration profile.
+Each has: energy yield, cost, water sensitivity, charge limits, minimum rock tier (rock harder than that breaks only at a steep energy penalty, never refused), vibration profile.
 Examples: Pop-Rock (starter), Big Bada Boom (mid), Dynatomics (endgame).
 Cost: costPerKg x kg is charged when the charge order is placed (finance category `explosives`) and refunded in full if the order is cancelled; firing the blast charges nothing.
 

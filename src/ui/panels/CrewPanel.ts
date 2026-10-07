@@ -23,13 +23,13 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
-import { HIRING_COSTS } from '../../core/entities/Employee.js';
+import { HIRING_COSTS, injuryHoursRemaining } from '../../core/entities/Employee.js';
 import { ROLE_STARTING_QUALIFICATIONS } from '../../core/config/balance.js';
 import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
 import {
   roleColorHex, getInitials, moraleColor, makeHiredLocationStrip, makeNeedsSection,
-  makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection,
+  makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection, makeManagerEffect,
 } from '../crewDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -140,7 +140,7 @@ export class CrewPanel extends PanelBase {
       .map(e => {
         const quals = e.qualifications.map(q => `${q.category}${q.proficiencyLevel}`).join(',');
         const activity = computeEmployeeActivity(e, state.vehicles);
-        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${e.collapsing ? 1 : 0}`
+        return `${e.id}:${e.role}:${e.unionized ? 1 : 0}:${e.injured ? 1 : 0}:${injuryHoursRemaining(e) ?? ''}:${e.collapsing ? 1 : 0}`
           + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
       })
       .join('|');
@@ -213,6 +213,12 @@ export class CrewPanel extends PanelBase {
           attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
         }),
       );
+      if (role === 'manager') {
+        info.append(el('span', {
+          text: t('ui.crew.manager_effect_hint'),
+          attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+        }));
+      }
       const cost = el('span', { text: `$${HIRING_COSTS[role]}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
       const hireBtn = el('button', { className: 'bsx-btn', text: t('ui.crew.hire'), attrs: { 'data-role': role } });
       hireBtn.disabled = state.cash < HIRING_COSTS[role];
@@ -259,7 +265,8 @@ export class CrewPanel extends PanelBase {
       moraleTrack, moraleValue,
     );
 
-    const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: [nameLine, roleLine] });
+    const managerEffect = makeManagerEffect(e);
+    const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: managerEffect ? [nameLine, roleLine, managerEffect] : [nameLine, roleLine] });
 
     toggle.append(avatar, col, this.makeStatusTags(e, state), iconEl('chev', 12, 0.4));
     const locateBtn = makeLocateButton({
@@ -292,7 +299,7 @@ export class CrewPanel extends PanelBase {
     const wrap = el('div', { attrs: { style: 'display:flex;gap:4px;flex:0 0 auto' } });
     const tags: Array<{ icon: Parameters<typeof iconEl>[0]; color: string; tip: string }> = [];
     if (e.unionized) tags.push({ icon: 'union', color: 'var(--bsx-ore)', tip: t('ui.crew.tag_union') });
-    if (e.injured) tags.push({ icon: 'injured', color: 'var(--bsx-critical-text)', tip: t('ui.crew.tag_injured') });
+    if (e.injured) tags.push({ icon: 'injured', color: 'var(--bsx-critical-text)', tip: t('ui.crew.injured_back_in', { hours: injuryHoursRemaining(e) ?? 0 }) });
     if (e.collapsing) tags.push({ icon: 'collapse', color: 'var(--bsx-critical)', tip: t('ui.crew.tag_collapsed') });
     if (e.trainingState) tags.push({ icon: 'training', color: 'var(--bsx-info)', tip: t('ui.crew.tag_training') });
     if (activity.kind === 'driving') tags.push({ icon: 'drive', color: 'var(--bsx-info)', tip: t('ui.crew.tag_driving') });

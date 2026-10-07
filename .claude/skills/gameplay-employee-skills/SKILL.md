@@ -24,7 +24,7 @@ Employees not interchangeable tokens. Each has skill qualifications with profici
 |----------|-------------|-------------------|
 | `driving.<vehicle_role>` | Operating vehicles of that role | Driving Center |
 | `blasting` | Charging holes, setting sequences, monitoring blasts | Blasting Academy |
-| `management` | Contract negotiation, hiring/firing, policy setting | Management Office |
+| `management` | Contract negotiation (requires an eligible manager; best level raises odds by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1). Hiring/firing/policy setting are not gated on it yet | Management Office |
 | `geology` | Seismic, core-sample, and aerial surveys | Geology Lab |
 
 ## Starting Qualifications

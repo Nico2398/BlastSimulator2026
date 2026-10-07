@@ -9,6 +9,8 @@ import {
   startFraming,
   completeFrame,
   toggleSmuggling,
+  type MafiaActionResult,
+  applyInvestigation,
   ACCIDENT_COST,
   FRAME_COST,
 } from '../../core/events/MafiaActions.js';
@@ -16,6 +18,13 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame } from './commandUtils.js';
+
+/** A botched action draws police: exposure jump, follow-up event, toast event. */
+function raiseInvestigation(ctx: GameContext, result: MafiaActionResult): void {
+  if (!result.investigationTriggered) return;
+  applyInvestigation(ctx.state!.mafia, ctx.state!.events, ctx.state!.tickCount);
+  ctx.emitter.emit('mafia:investigation', { outcomeKey: result.outcomeKey });
+}
 
 export function mafiaCommand(
   ctx: GameContext,
@@ -63,6 +72,7 @@ export function mafiaCommand(
       const result = arrangeAccident(state.mafia, state, state.corruption, empId, rng);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Arranged accident', state.tickCount);
+      raiseInvestigation(ctx, result);
       return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
     }
 
@@ -76,6 +86,7 @@ export function mafiaCommand(
       );
       if (pending) {
         const result = completeFrame(state.mafia, state, empId, state.tickCount, rng);
+        raiseInvestigation(ctx, result);
         return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
       }
 

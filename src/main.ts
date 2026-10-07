@@ -8,6 +8,7 @@ import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { wireCrewNotifications } from './ui/notify/crewNotifications.js';
 import { wireResearchNotifications } from './ui/notify/researchNotifications.js';
+import { wireCorruptionNotifications } from './ui/notify/corruptionNotifications.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { shouldAutoStartTutorial, shouldKeepTutorialRunning, TUTORIAL_LEVEL_ID } from './ui/tutorialTrigger.js';
@@ -58,6 +59,7 @@ import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRe
 import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
+import { dominantRockUnderHole } from './core/mining/ExplosiveRockFit.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
 // --- 3D Scene ---
@@ -165,6 +167,7 @@ uiManager.setPlacementKit({ controller: placementController, overlay: selectionO
 // truth checkFootprintPlacement does — the raw voxel surface, not a
 // smoothed/rendered height — so the strip and the console never disagree.
 uiManager.setBuildSurfaceSampler((x, z) => ctx.grid ? getSurfaceY(ctx.grid, x, z) : 0);
+uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) : null);
 
 // Survey confidence overlay's player-facing visibility toggle (#496): the
 // panel's own click handler drives the renderer; the renderer's current
@@ -472,6 +475,7 @@ emitter.on('blast:started', ({ originX, originZ }) => {
 
 wireCrewNotifications(emitter, () => ctx.state, n => uiManager.notify(n));
 wireResearchNotifications(emitter, n => uiManager.notify(n));
+wireCorruptionNotifications(emitter, n => uiManager.notify(n));
 
 let lastCommandOutput = '';
 const consoleLogs: string[] = [];

@@ -376,6 +376,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 10: hire-manager ──
+  // A manager runs contract negotiation (#1340); hiring/firing/policy are not gated on one yet.
   createHireStepWithEventGuard('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager'),
 
   // ── Step 13: vehicle-buy-assign ──

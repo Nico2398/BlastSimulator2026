@@ -26,7 +26,8 @@ import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg } from '../../core/economy/formatMoney.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
-import { canNegotiate } from '../../core/economy/Negotiation.js';
+import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
+import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { isFillableSaleOffer, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -96,6 +97,7 @@ export class ContractsPanel extends PanelBase {
       available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
+      managerLevel: bestAvailableManagerLevel(state.employees.employees),
       tick: state.tickCount,
     });
     if (signature === this.lastSignature) return;
@@ -114,6 +116,7 @@ export class ContractsPanel extends PanelBase {
   }
 
   private render(state: GameState): void {
+    const managerLevel = bestAvailableManagerLevel(state.employees.employees);
     const sections: HTMLElement[] = [
       this.makeStorageStrip(state),
       sectionHeader(t('ui.contracts.active')),
@@ -127,7 +130,7 @@ export class ContractsPanel extends PanelBase {
       sectionHeader(t('ui.contracts.available')),
       scrollBoundedSection(
         state.contracts.available.length > 0
-          ? state.contracts.available.map(c => this.makeOfferedCard(c, state))
+          ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel))
           : [emptyState(t('ui.contracts.none'))],
         200,
         { gap: 10 },
@@ -277,7 +280,7 @@ export class ContractsPanel extends PanelBase {
 
   // ── Offered ──
 
-  private makeOfferedCard(c: Contract, state: GameState): HTMLElement {
+  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null): HTMLElement {
     const stored = this.storedOf(c.materialId, state);
     const havePct = c.quantityKg > 0 ? Math.min(100, Math.round((stored / c.quantityKg) * 100)) : 0;
     const haveColor = stored >= c.quantityKg ? 'var(--bsx-positive)' : 'var(--bsx-amber)';
@@ -329,9 +332,13 @@ export class ContractsPanel extends PanelBase {
     acceptBtn.classList.add('bs-contract-accept');
     acceptBtn.style.cssText = 'flex:1;height:30px;font-size:10px';
 
+    const refusal = negotiationRefusalReason(c, managerLevel);
     const negotiateBtn = button('ghost', t('ui.contracts.negotiate'), {
       dataAction: 'negotiate',
-      ...(canNegotiate(c) ? {} : { disabled: true, title: t('ui.contracts.negotiate_used') }),
+      ...(refusal === null ? {} : {
+        disabled: true,
+        title: t(refusal === 'no_manager' ? 'ui.contracts.negotiate_no_manager' : 'ui.contracts.negotiate_used'),
+      }),
       onClick: () => this.gameConsole?.(`contract negotiate id:${c.id}`),
     });
     negotiateBtn.style.cssText = 'flex:1;height:30px;font-size:10px';

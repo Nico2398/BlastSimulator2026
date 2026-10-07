@@ -1,0 +1,184 @@
+{
+  "name": "blast-charge-weak-explosive-warning",
+  "description": "#1358: the Charge step shows a localized weak-explosive warning ([data-warning=\"weak-explosive\"]) when the selected explosive's minRockTier is below the rock under holes, keeps Charge All enabled, and drops the warning once a sufficient explosive is selected. Player clicks only.",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:tropical_karst cash:500000 staffed:true",
+      "timeout": 30,
+      "role": "setup",
+      "description": "Staffed opening (#551) on tropical_karst, whose dominant rock is Gnarlite (tier 4); full explosive catalog (no campaign level).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 mine_type:tropical_karst cash:500000 staffed:true"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:15,15 diameter:0.089",
+      "timeout": 60,
+      "role": "player",
+      "description": "Plan a 3x3 grid by dragging (15,15)-(19,19) at 2m spacing.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 2
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 19,
+          "z2": 19
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:600",
+      "timeout": 125,
+      "role": "setup",
+      "description": "Drain the drill orders so the holes exist and the rock under them is known.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 120000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "description": "Open the Charge step and pick Pop-Rock (tier 1) over tier-4 Gnarlite: the weak-explosive warning appears with the localized text, and Charge All stays enabled.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-warning=\"weak-explosive\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "textEquals": {
+          "#bs-blast-panel [data-warning=\"weak-explosive\"]": "Pop-Rock is too weak for Gnarlite under 9 of 9 holes"
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "description": "Pick Obliviax (tier 4, sufficient for Gnarlite): Charge All still enabled. The warning's absence is judged from the screenshot — the scenario vocabulary has no absent-selector assertion (expect.blocked rejects a control not in the DOM).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"obliviax\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"charge-all\"]"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "description": "Switch to French from Settings, return to Blast Workshop and re-pick Pop-Rock: the warning renders in French without breaking layout.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel [data-lang=\"fr\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-warning=\"weak-explosive\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"charge-all\"]"
+      }
+    }
+  ]
+}

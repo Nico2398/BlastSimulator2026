@@ -1673,6 +1673,9 @@ export const NEGOTIATION_MAX_ATTEMPTS_PER_OFFER = 1;
 /** Early-delivery bonus as a fraction of quantity x price (#1366). */
 export const NEGOTIATION_EARLY_BONUS_RATE = 0.15;
 
+/** Success-rate bonus per manager management level above 1 (#1340). */
+export const NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL = 0.08;
+
 /** Cash fee for hiring a contractor to do an unqualified task (#1380). */
 export const UNQUALIFIED_CONTRACTOR_FEE = 25000;
 
@@ -1740,3 +1743,48 @@ export const DEMOLITION_TIER_MULTIPLIER = { 1: 1, 2: 1.5, 3: 2 } as const;
 
 /** Demolition speed factor per building_destroyer vehicle tier — bigger machines work faster (#1392). */
 export const DEMOLITION_VEHICLE_TIER_SPEED = { 1: 1, 2: 1.5, 3: 2.25 } as const;
+
+/**
+ * Factor applied to a rock's breaking threshold per explosive tier it falls short of
+ * (rock tier above the explosive's minRockTier): threshold x FACTOR ** shortfall (#1358).
+ */
+export const TIER_SHORTFALL_THRESHOLD_FACTOR = 4;
+
+/** Recovery progress an injured employee must accumulate before returning to work (#1382). */
+export const INJURY_RECOVERY_TICKS = 48;
+
+/** Morale lost on injury (#1382). */
+export const INJURY_MORALE_PENALTY = 20;
+
+/** Recovery progress per tick when no living quarters are available (#1382). */
+export const INJURY_ON_FOOT_RECOVERY_RATE = 1;
+
+/** Recovery progress per tick by living-quarters tier (#1382). */
+export const INJURY_RECOVERY_RATE_BY_LQ_TIER: Record<1 | 2 | 3, number> = { 1: 2, 2: 3, 3: 4 };
+
+/** Fraction of the bribe cost levied as a fine when a bribe fails (#1411). */
+export const BRIBERY_FAILURE_FINE_FRACTION = 0.5;
+
+/** Nuisance score hit on a failed bribe (#1411). */
+export const BRIBERY_FAILURE_NUISANCE_HIT = 8;
+
+/** Corruption level change on a failed bribe (#1411). */
+export const BRIBERY_FAILURE_CORRUPTION_DELTA = 2;
+
+/** Exposure risk added when a botched mafia action triggers an investigation (#1411). */
+export const INVESTIGATION_EXPOSURE_JUMP = 0.2;
+
+/** Event id queued as follow-up to a police investigation (#1411). */
+export const INVESTIGATION_FOLLOWUP_EVENT_ID = 'mafia_police_investigation';
+
+/** Ticks without mafia activity before exposure risk starts decaying (#1411). */
+export const EXPOSURE_CLEAN_GRACE_TICKS = 30;
+
+/** Exposure risk lost per tick once the clean grace period has passed (#1411). */
+export const EXPOSURE_DECAY_PER_TICK = 0.004;
+
+/** Fine levied when smuggling is exposed (#1411). */
+export const SMUGGLING_EXPOSED_FINE = 25000;
+
+/** Exposure risk added when smuggling is exposed (#1411). */
+export const SMUGGLING_EXPOSED_EXPOSURE_JUMP = 0.1;

@@ -69,6 +69,7 @@ function kindLabel(kind: 'cash' | 'score' | 'other', key: string): string {
   if (kind === 'score') return t(SCORE_ABBR_KEY[key] ?? key);
   if (key === 'corruption') return t('ui.finances.category.corruption');
   if (key === 'followUp') return t('ui.event.effect_followup');
+  if (key === 'exposure') return t('ui.event.effect_exposure');
   return key;
 }
 

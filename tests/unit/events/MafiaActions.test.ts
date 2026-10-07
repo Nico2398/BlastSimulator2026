@@ -7,11 +7,25 @@ import {
   completeFrame,
   toggleSmuggling,
   processSmuggling,
+  applyInvestigation,
+  applySmugglingExposure,
+  FRAME_EVIDENCE_TICKS as FRAME_TICKS,
+  decayExposure,
 } from '../../../src/core/events/MafiaActions.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
-import { ACCIDENT_EXPOSURE, ACCIDENT_FAILURE_EXPOSURE_EXTRA } from '../../../src/core/config/balance.js';
+import {
+  ACCIDENT_EXPOSURE,
+  ACCIDENT_FAILURE_EXPOSURE_EXTRA,
+  INVESTIGATION_EXPOSURE_JUMP,
+  SMUGGLING_EXPOSED_FINE,
+  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
+  INVESTIGATION_FOLLOWUP_EVENT_ID,
+  EXPOSURE_CLEAN_GRACE_TICKS,
+  EXPOSURE_DECAY_PER_TICK,
+} from '../../../src/core/config/balance.js';
+import { createEventSystemState } from '../../../src/core/events/EventSystem.js';
 import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 const EMPLOYEE_DEFAULTS = {
@@ -105,7 +119,7 @@ describe('Mafia gameplay mechanics', () => {
     expect(incomePerTick).toBeGreaterThan(0);
 
     const initialExposure = mafia.exposureRisk;
-    const result = processSmuggling(mafia, new Random(42));
+    const result = processSmuggling(mafia, new Random(42), 5);
     expect(result.income).toBeGreaterThan(0);
     expect(mafia.exposureRisk).toBeGreaterThan(initialExposure);
   });
@@ -119,7 +133,7 @@ describe('Mafia gameplay mechanics', () => {
     // With high exposure, should eventually trigger
     let triggered = false;
     for (let seed = 0; seed < 200; seed++) {
-      const result = processSmuggling(mafia, new Random(seed));
+      const result = processSmuggling(mafia, new Random(seed), 5);
       // isExposed just checks if risk * 0.05 triggers, but processSmuggling checks exposure too
       if (result.exposed) {
         triggered = true;
@@ -234,5 +248,119 @@ describe('Mafia gameplay mechanics', () => {
       }
       expect(found, `no detected frame in 50 seeds at start ${start}`).toBe(true);
     }
+  });
+});
+
+
+describe('Mafia investigation (#1411)', () => {
+  it('applyInvestigation adds the configured exposure jump', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 0.3;
+    const applied = applyInvestigation(mafia, createEventSystemState());
+    expect(applied).toBeCloseTo(INVESTIGATION_EXPOSURE_JUMP, 10);
+    expect(mafia.exposureRisk).toBeCloseTo(0.3 + INVESTIGATION_EXPOSURE_JUMP, 10);
+  });
+
+  it('applyInvestigation queues the follow-up event', () => {
+    const events = createEventSystemState();
+    applyInvestigation(createMafiaState(), events);
+    expect(events.followUpQueue).toContain(INVESTIGATION_FOLLOWUP_EVENT_ID);
+  });
+
+  it('applyInvestigation does not queue the follow-up twice but still raises exposure', () => {
+    const mafia = createMafiaState();
+    const events = createEventSystemState();
+    applyInvestigation(mafia, events);
+    const after1 = mafia.exposureRisk;
+    applyInvestigation(mafia, events);
+    expect(events.followUpQueue.filter(id => id === INVESTIGATION_FOLLOWUP_EVENT_ID)).toHaveLength(1);
+    expect(mafia.exposureRisk).toBeGreaterThan(after1);
+  });
+
+  it('applyInvestigation stamps lastActivityTick when a tick is given', () => {
+    const mafia = createMafiaState();
+    applyInvestigation(mafia, createEventSystemState(), 77);
+    expect(mafia.lastActivityTick).toBe(77);
+  });
+
+  it('applySmugglingExposure jumps exposure, stops smuggling and returns the fine', () => {
+    const mafia = createMafiaState();
+    toggleSmuggling(mafia);
+    const { fine } = applySmugglingExposure(mafia, 9);
+    expect(fine).toBe(SMUGGLING_EXPOSED_FINE);
+    expect(mafia.exposureRisk).toBeCloseTo(SMUGGLING_EXPOSED_EXPOSURE_JUMP, 10);
+    expect(mafia.smugglingActive).toBe(false);
+    expect(mafia.smugglingIncome).toBe(0);
+    expect(mafia.lastActivityTick).toBe(9);
+  });
+
+  it('applyInvestigation caps exposure at 1 and returns the applied delta', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 0.95;
+    const applied = applyInvestigation(mafia, createEventSystemState());
+    expect(mafia.exposureRisk).toBe(1);
+    expect(applied).toBeCloseTo(0.05, 10);
+  });
+
+  it('applyInvestigation at the cap applies 0 but still queues the follow-up', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 1;
+    const events = createEventSystemState();
+    expect(applyInvestigation(mafia, events)).toBe(0);
+    expect(events.followUpQueue).toContain(INVESTIGATION_FOLLOWUP_EVENT_ID);
+  });
+});
+
+describe('Mafia exposure decay (#1411)', () => {
+  it('createMafiaState starts with lastActivityTick 0', () => {
+    expect(createMafiaState().lastActivityTick).toBe(0);
+  });
+
+  it('does not decay inside the clean grace period', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 0.5;
+    mafia.lastActivityTick = 100;
+    decayExposure(mafia, 100 + EXPOSURE_CLEAN_GRACE_TICKS - 1);
+    expect(mafia.exposureRisk).toBe(0.5);
+  });
+
+  it('decays by the configured step once the grace period has elapsed', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 0.5;
+    mafia.lastActivityTick = 100;
+    decayExposure(mafia, 100 + EXPOSURE_CLEAN_GRACE_TICKS);
+    expect(mafia.exposureRisk).toBeCloseTo(0.5 - EXPOSURE_DECAY_PER_TICK, 10);
+  });
+
+  it('never decays while smuggling is active', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = 0.5;
+    mafia.smugglingActive = true;
+    decayExposure(mafia, 10_000);
+    expect(mafia.exposureRisk).toBe(0.5);
+  });
+
+  it('floors exposure at 0', () => {
+    const mafia = createMafiaState();
+    mafia.exposureRisk = EXPOSURE_DECAY_PER_TICK / 2;
+    decayExposure(mafia, 10_000);
+    expect(mafia.exposureRisk).toBe(0);
+  });
+
+  it('startFraming stamps lastActivityTick with the current tick', () => {
+    const mafia = createMafiaState();
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees);
+    startFraming(mafia, employees, emp.id, 77);
+    expect(mafia.lastActivityTick).toBe(77);
+  });
+
+  it('completeFrame stamps lastActivityTick with the current tick', () => {
+    const mafia = createMafiaState();
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees);
+    startFraming(mafia, employees, emp.id, 10);
+    completeFrame(mafia, stateOf(employees), emp.id, 10 + FRAME_TICKS, new Random(1));
+    expect(mafia.lastActivityTick).toBe(10 + FRAME_TICKS);
   });
 });

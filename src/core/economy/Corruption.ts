@@ -3,7 +3,15 @@
 // More corruption → higher failure risk → mafia events unlock.
 
 import type { Random } from '../math/Random.js';
-import { BRIBERY_BASE_SUCCESS, BRIBERY_HISTORY_PENALTY, MAFIA_UNLOCK_THRESHOLD } from '../config/balance.js';
+import { clampScore, type ScoreState } from '../scores/ScoreManager.js';
+import {
+  BRIBERY_BASE_SUCCESS,
+  BRIBERY_HISTORY_PENALTY,
+  BRIBERY_FAILURE_FINE_FRACTION,
+  BRIBERY_FAILURE_NUISANCE_HIT,
+  BRIBERY_FAILURE_CORRUPTION_DELTA,
+  MAFIA_UNLOCK_THRESHOLD,
+} from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -118,3 +126,20 @@ export function getSuccessRate(state: CorruptionState): number {
 }
 
 export { BASE_SUCCESS_RATE, HISTORY_PENALTY, TARGET_COSTS };
+
+/** Fine levied on a failed bribe of the given cost (#1411). */
+export function bribeFailureFine(cost: number): number {
+  if (!Number.isFinite(cost) || cost <= 0) return 0;
+  return Math.round(cost * BRIBERY_FAILURE_FINE_FRACTION);
+}
+
+/** Apply failed-bribe consequences: corruption level, nuisance hit; returns the fine to charge and whether this unlocked the mafia (#1411). */
+export function applyBribeFailure(
+  state: CorruptionState,
+  scores: ScoreState,
+  cost: number,
+): { fine: number; mafiaJustUnlocked: boolean } {
+  scores.nuisance = clampScore(scores.nuisance - BRIBERY_FAILURE_NUISANCE_HIT);
+  const { mafiaJustUnlocked } = applyCorruptionDelta(state, BRIBERY_FAILURE_CORRUPTION_DELTA);
+  return { fine: bribeFailureFine(cost), mafiaJustUnlocked };
+}

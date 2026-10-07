@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { MAFIA_UNLOCK_THRESHOLD } from '../../../src/core/config/balance.js';
+import {
+  MAFIA_UNLOCK_THRESHOLD,
+  BRIBERY_FAILURE_FINE_FRACTION,
+  BRIBERY_FAILURE_NUISANCE_HIT,
+  BRIBERY_FAILURE_CORRUPTION_DELTA,
+} from '../../../src/core/config/balance.js';
+import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   createCorruptionState,
@@ -10,6 +16,8 @@ import {
   getSuccessRate,
   MAFIA_THRESHOLD,
   TARGET_COSTS,
+  bribeFailureFine,
+  applyBribeFailure,
 } from '../../../src/core/economy/Corruption.js';
 
 describe('Corruption system', () => {
@@ -228,5 +236,60 @@ describe('applyCorruptionDelta (#1406)', () => {
     const state = createCorruptionState();
     applyCorruptionDelta(state, 5);
     expect(state.attempts).toHaveLength(0);
+  });
+});
+
+
+describe('Bribe failure consequences (#1411)', () => {
+  it('fine is the configured fraction of cost, rounded', () => {
+    expect(bribeFailureFine(8000)).toBe(Math.round(8000 * BRIBERY_FAILURE_FINE_FRACTION));
+    expect(bribeFailureFine(8001)).toBe(Math.round(8001 * BRIBERY_FAILURE_FINE_FRACTION));
+    expect(bribeFailureFine(8000)).toBeGreaterThan(0);
+  });
+
+  it('fine is 0 for zero, negative and non-finite cost', () => {
+    expect(bribeFailureFine(0)).toBe(0);
+    expect(bribeFailureFine(-100)).toBe(0);
+    expect(bribeFailureFine(NaN)).toBe(0);
+    expect(bribeFailureFine(Infinity)).toBe(0);
+  });
+
+  it('applyBribeFailure lowers nuisance score by the configured hit', () => {
+    const corruption = createCorruptionState();
+    const scores = createScoreState();
+    scores.nuisance = 50;
+    applyBribeFailure(corruption, scores, 8000);
+    expect(scores.nuisance).toBe(50 - BRIBERY_FAILURE_NUISANCE_HIT);
+  });
+
+  it('applyBribeFailure clamps nuisance at 0', () => {
+    const scores = createScoreState();
+    scores.nuisance = 3;
+    applyBribeFailure(createCorruptionState(), scores, 8000);
+    expect(scores.nuisance).toBe(0);
+  });
+
+  it('applyBribeFailure raises the corruption level by the configured delta', () => {
+    const corruption = createCorruptionState();
+    applyBribeFailure(corruption, createScoreState(), 8000);
+    expect(getCorruptionLevel(corruption)).toBe(BRIBERY_FAILURE_CORRUPTION_DELTA);
+  });
+
+  it('applyBribeFailure can latch the mafia unlock through the corruption delta', () => {
+    const corruption = createCorruptionState();
+    corruption.level = MAFIA_THRESHOLD - 1;
+    applyBribeFailure(corruption, createScoreState(), 8000);
+    expect(isMafiaUnlocked(corruption)).toBe(true);
+  });
+
+  it('applyBribeFailure returns the fine for the given cost', () => {
+    const { fine } = applyBribeFailure(createCorruptionState(), createScoreState(), 12000);
+    expect(fine).toBe(bribeFailureFine(12000));
+    expect(fine).toBeGreaterThan(0);
+  });
+
+  it('applyBribeFailure with zero cost fines nothing', () => {
+    const { fine } = applyBribeFailure(createCorruptionState(), createScoreState(), 0);
+    expect(fine).toBe(0);
   });
 });

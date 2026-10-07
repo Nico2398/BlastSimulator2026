@@ -12,7 +12,8 @@ import {
   type ContractSelector,
   type ContractType,
 } from '../../core/economy/Contract.js';
-import { negotiateContractAtTick } from '../../core/economy/Negotiation.js';
+import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
+import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
@@ -221,7 +222,12 @@ export function contractCommand(
       const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
       const id = resolved.id;
-      const result = negotiateContractAtTick(state.contracts, id, 0, state.seed, state.tickCount);
+      const managerLevel = bestAvailableManagerLevel(state.employees.employees);
+      // `managerLevel === null` is the same gate, repeated only to narrow the type for the call below.
+      if (negotiationRefusalReason(resolved, managerLevel) === 'no_manager' || managerLevel === null) {
+        return { success: false, output: t('economy.negotiation.no_manager') };
+      }
+      const result = negotiateContractAtTick(state.contracts, id, 0, state.seed, state.tickCount, managerLevel);
       if ('refused' in result && result.refused === 'not_found') return { success: false, output: t('economy.negotiation.not_found', { id }) };
       if ('refused' in result) return { success: false, output: t('economy.negotiation.already_negotiated', { id }) };
       state.contracts.lastNegotiation = { contractId: id, success: result.success, changes: result.changes };
