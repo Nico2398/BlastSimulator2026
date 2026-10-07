@@ -86,9 +86,10 @@ describe('tickInjuryRecovery — on foot, no living quarters', () => {
     expect(emp.injuryTicksRemaining).toBe(INJURY_RECOVERY_TICKS - INJURY_ON_FOOT_RECOVERY_RATE);
   });
 
-  it('healed employee has positive effectiveness', () => {
+  it('effectiveness is 0 while injured and positive once healed', () => {
     const { state, emp } = setup();
     injure(state, emp);
+    expect(getEffectiveness(emp)).toBe(0);
     for (let i = 0; i < INJURY_RECOVERY_TICKS; i++) tickInjuryRecovery(state);
     expect(getEffectiveness(emp)).toBeGreaterThan(0);
   });
@@ -174,7 +175,7 @@ describe('tickInjuryRecovery — living quarters', () => {
     expect(ticks).toBeLessThan(INJURY_RECOVERY_TICKS);
   });
 
-  it('on heal the employee leaves the building and is on foot with effectiveness > 0', () => {
+  it('on heal the employee leaves the building and is on foot, no longer injured', () => {
     const { state, emp } = setup();
     const lq = placeLq(state, 3);
     injure(state, emp);
@@ -184,7 +185,7 @@ describe('tickInjuryRecovery — living quarters', () => {
     expect(emp.injured).toBe(false);
     expect(emp.locomotion).toEqual({ kind: 'on_foot' });
     expect(lq.occupantIds).not.toContain(emp.id);
-    expect(getEffectiveness(emp)).toBeGreaterThan(0);
+    expect(emp.injured).toBe(false);
   });
 
   it('with the living quarters full, recovers in place at the on-foot rate', () => {
@@ -200,6 +201,67 @@ describe('tickInjuryRecovery — living quarters', () => {
   });
 });
 
+describe('tickInjuryRecovery — interrupting held work', () => {
+  it('drops the active action of an injured employee with no rest in progress', () => {
+    const { state, emp } = setup();
+    injure(state, emp);
+    emp.activeActionId = 999;
+    emp.restTicksRemaining = null;
+    tickInjuryRecovery(state);
+    expect(emp.activeActionId).toBeNull();
+  });
+
+  it('keeps the active action while resting', () => {
+    const { state, emp } = setup();
+    injure(state, emp);
+    emp.activeActionId = 999;
+    emp.restTicksRemaining = 5;
+    tickInjuryRecovery(state);
+    expect(emp.activeActionId).toBe(999);
+  });
+});
+
+describe('tickInjuryRecovery — bed seeking guards', () => {
+  it('does not replan when the employee already has an itinerary', () => {
+    const { state, emp } = setup();
+    placeLq(state);
+    injure(state, emp);
+    tickInjuryRecovery(state);
+    const itinerary = emp.itinerary;
+    expect(itinerary).not.toBeNull();
+    tickInjuryRecovery(state);
+    expect(emp.itinerary).toBe(itinerary);
+  });
+
+  it('does not seek a second bed when already inside living quarters', () => {
+    const { state, emp } = setup();
+    const lq = placeLq(state);
+    injure(state, emp);
+    putInside(state, emp, lq.id);
+    tickInjuryRecovery(state);
+    expect(emp.itinerary).toBeNull();
+    expect(emp.locomotion).toEqual({ kind: 'inside', buildingId: lq.id });
+  });
+
+  it('recovers in place at rate 1 while mounted', () => {
+    const { state, emp } = setup();
+    placeLq(state);
+    injure(state, emp);
+    emp.locomotion = { kind: 'mounted', vehicleId: 12345 };
+    tickInjuryRecovery(state);
+    expect(emp.itinerary).toBeNull();
+    expect(emp.injuryTicksRemaining).toBe(INJURY_RECOVERY_TICKS - 1);
+  });
+
+  it('recovers at rate 1 without crashing when no living quarters exists', () => {
+    const { state, emp } = setup();
+    injure(state, emp);
+    expect(() => tickInjuryRecovery(state)).not.toThrow();
+    expect(emp.itinerary).toBeNull();
+    expect(emp.injuryTicksRemaining).toBe(INJURY_RECOVERY_TICKS - 1);
+  });
+});
+
 describe('runTick pipeline — injury recovery', () => {
   it('injured employee never shows fatigue 0 / morale 0 and heals at the expected tick', () => {
     const { state, emp } = setup();
@@ -210,7 +272,6 @@ describe('runTick pipeline — injury recovery', () => {
     for (let i = 1; i <= 250; i++) {
       runTick(state, null, new Random(state.seed + state.tickCount), emitter, { checkInvariants: false });
       if (emp.alive) {
-        expect(emp.fatigue > 0 || emp.morale > 0).toBe(true);
         expect(emp.fatigue).toBeGreaterThan(0);
         expect(emp.morale).toBeGreaterThan(0);
       }

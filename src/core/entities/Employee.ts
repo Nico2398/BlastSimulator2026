@@ -502,12 +502,17 @@ export function getEffectiveness(employee: Employee): number {
   return 0.5 + (employee.morale / 100) * 0.7;
 }
 
+/** Recovery progress left for an injured employee; legacy saves without a counter get the full span (#1382). */
+export function injuryTicksOf(emp: Pick<Employee, 'injuryTicksRemaining'>): number {
+  return emp.injuryTicksRemaining ?? INJURY_RECOVERY_TICKS;
+}
+
 /** Hours of recovery left for an injured employee, or null when healthy (#1382). */
 export function injuryHoursRemaining(
   emp: Pick<Employee, 'injured' | 'injuryTicksRemaining'>,
 ): number | null {
   if (!emp.injured) return null;
-  return Math.ceil(emp.injuryTicksRemaining ?? INJURY_RECOVERY_TICKS);
+  return Math.ceil(injuryTicksOf(emp));
 }
 
 /**

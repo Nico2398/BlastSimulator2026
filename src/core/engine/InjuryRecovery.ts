@@ -2,9 +2,9 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
-import { healEmployee } from '../entities/Employee.js';
+import { healEmployee, injuryTicksOf } from '../entities/Employee.js';
 import { isInsideBuilding, isMounted } from '../entities/EmployeeLocomotion.js';
-import { INJURY_RECOVERY_TICKS, INJURY_ON_FOOT_RECOVERY_RATE, INJURY_RECOVERY_RATE_BY_LQ_TIER } from '../config/balance.js';
+import { INJURY_ON_FOOT_RECOVERY_RATE, INJURY_RECOVERY_RATE_BY_LQ_TIER } from '../config/balance.js';
 import { findNearestBuildingOfType } from './RestActionHelpers.js';
 import { moveTo } from './MoveTo.js';
 import { leaveBuildingIfInside } from './Mount.js';
@@ -35,7 +35,7 @@ function seekBed(state: GameState, emp: Employee): void {
 export function tickInjuryRecovery(state: GameState): void {
   for (const emp of state.employees.employees) {
     if (!emp.alive || !emp.injured) continue;
-    emp.injuryTicksRemaining ??= INJURY_RECOVERY_TICKS;
+    emp.injuryTicksRemaining = injuryTicksOf(emp);
 
     // An injured employee drops the work they held; rest stays (it is personal).
     if (emp.activeActionId !== null && emp.restTicksRemaining === null) {

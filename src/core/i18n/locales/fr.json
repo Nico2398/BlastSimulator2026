@@ -2515,7 +2515,6 @@
   "ui.crew.skill_maxed": "MAX",
   "ui.crew.skill_effect": "× {mult} durée de tâche",
   "ui.crew.tag_union": "Syndiqué — licenciement impossible",
-  "ui.crew.tag_injured": "Blessé — formation impossible",
   "ui.crew.injured_back_in": "Blessé — de retour dans ~{hours} h",
   "ui.crew.tag_collapsed": "Effondré de fatigue",
   "ui.crew.tag_training": "En formation",
