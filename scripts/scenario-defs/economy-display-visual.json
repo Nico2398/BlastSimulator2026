@@ -3,11 +3,11 @@
   "description": "Visual verification of the economy display: cash balance in HUD top bar, income/expenses in financial summary, contract income reflection, building maintenance costs, employee salaries, and vehicle maintenance costs.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",

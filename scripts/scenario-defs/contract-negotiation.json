@@ -3,11 +3,11 @@
   "description": "Negotiate a contract once and observe the outcome, then prove a second negotiation on the same offer is refused (one attempt per offer, #1366), then accept and attempt delivery. The file's original version never called `contract negotiate` at all; rewritten to exercise the actual negotiation mechanic (issue #479 follow-up).",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",

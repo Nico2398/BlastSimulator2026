@@ -363,7 +363,7 @@ describe('console-api', () => {
 
     it('counts an accepted contract as active (state.contracts.active)', () => {
       runner.runner.run('new_game seed:42');
-      runner.runner.run('campaign start level:dusty_hollow');
+      runner.runner.run('campaign start level:dusty_hollow staffed:false');
       runner.runner.run('contract accept id:1');
       const state = serializeGameState(runner.ctx as MiningContext)!;
 

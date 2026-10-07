@@ -7,7 +7,7 @@ import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js'
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
 import { getAllOres } from '../../../src/core/world/OreCatalog.js';
 import { sandboxLevelDef, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
-import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../../../src/core/config/balance.js';
+import { TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE } from '../../../src/core/config/balance.js';
 
 describe('Level definition system (7.1)', () => {
   it('getLevel("dusty_hollow") returns valid level data with all required fields', () => {
@@ -341,5 +341,47 @@ describe('resolveContractOres (#1364)', () => {
         for (const ore of inGrid) expect(offered.has(ore)).toBe(true);
       });
     }
+  });
+});
+
+describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
+  it('declares the dusty hollow starting site: crew, fleet, warehouse', () => {
+    expect(getLevel('dusty_hollow')!.startingSite).toBe(DUSTY_HOLLOW_STARTING_SITE);
+  });
+
+  it('the starting site is a driller, a blaster, a driver, a drill rig, a debris hauler and a T1 freight warehouse', () => {
+    expect(DUSTY_HOLLOW_STARTING_SITE.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver']);
+    expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.map(v => v.role).sort()).toEqual(['debris_hauler', 'drill_rig']);
+    expect(DUSTY_HOLLOW_STARTING_SITE.buildings).toEqual([{ type: 'freight_warehouse', tier: 1 }]);
+  });
+
+  it('no other level declares a starting site', () => {
+    for (const level of getAllLevels()) {
+      if (level.id === 'dusty_hollow') continue;
+      expect(level.startingSite, level.id).toBeUndefined();
+    }
+  });
+
+  it('keeps the $50k starting cash: staffing is free', () => {
+    expect(getLevel('dusty_hollow')!.startingCash).toBe(50000);
+  });
+
+  it('dusty hollow uses DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER as its price multiplier', () => {
+    expect(getLevel('dusty_hollow')!.contractPriceMultiplier).toBe(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER);
+  });
+
+  // The multiplier is a tuning lever: it must be raised above the old 1.2
+  // placeholder (the level could not be won at 1.2) yet stay far below the
+  // tutorial's 52x, so Level 1 stays a real market. The upper bound of 10 is a
+  // deliberate sanity cap, not a target: a win bought with a runaway multiplier
+  // proves nothing about the economy.
+  it('DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER sits in the sensible mid-window (1.2, 10]', () => {
+    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeGreaterThan(1.2);
+    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeLessThanOrEqual(10);
+    expect(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER).toBeLessThan(TUTORIAL_CONTRACT_PRICE_MULTIPLIER);
+  });
+
+  it('later levels stay tighter markets than dusty hollow', () => {
+    expect(getLevel('grumpstone_ridge')!.contractPriceMultiplier).toBeLessThan(DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER);
   });
 });

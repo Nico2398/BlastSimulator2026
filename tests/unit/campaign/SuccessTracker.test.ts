@@ -32,6 +32,26 @@ function makeFragment(overrides: Partial<FragmentData> = {}): FragmentData {
   };
 }
 
+describe('Success tracker totalWealth is operating profit (#1363)', () => {
+  it('a fine lowers totalWealth, a vehicle purchase does not', () => {
+    const state = createGame({ seed: 1 });
+    const stats = createLevelStats();
+    addIncome(state.finances, 10000, 'contracts', 'c', 0);
+    addExpense(state.finances, 50000, 'equipment', 'vehicle', 0);
+    addExpense(state.finances, 2000, 'fines', 'fine', 0);
+    snapshotStats(stats, state);
+    expect(stats.totalWealth).toBe(8000);
+  });
+
+  it('refund income is not counted', () => {
+    const state = createGame({ seed: 1 });
+    const stats = createLevelStats();
+    addIncome(state.finances, 5000, 'refund', 'r', 0);
+    snapshotStats(stats, state);
+    expect(stats.totalWealth).toBe(0);
+  });
+});
+
 describe('Success tracker (7.8)', () => {
   it('wealth tracker accumulates over time within a level', () => {
     const state = createGame({ seed: 1 });
@@ -41,12 +61,13 @@ describe('Success tracker (7.8)', () => {
     addExpense(state.finances, 20000, 'equipment', 'test', 0);
     snapshotStats(stats, state);
 
-    expect(stats.totalWealth).toBe(80000);
+    // Operating profit (#1363): the 'equipment' purchase is capital outlay, not counted.
+    expect(stats.totalWealth).toBe(100000);
 
     // More income
     addIncome(state.finances, 50000, 'sales', 'test2', 1);
     snapshotStats(stats, state);
-    expect(stats.totalWealth).toBe(130000);
+    expect(stats.totalWealth).toBe(150000);
   });
 
   it('depth tracker updates correctly', () => {

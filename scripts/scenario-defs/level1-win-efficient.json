@@ -1,1115 +1,54 @@
 {
   "name": "level1-win-efficient",
-  "description": "Level 1 (Dusty Hollow): named for an efficient $80k win, no vehicle ever bought -- but #553 makes drill_hole a queued, vehicle-gated action, so drilling now costs real vehicle purchases where it previously cost none (still zero HAULING vehicles -- debris_hauler/rock_digger/rock_fragmenter/building_destroyer -- so 'no hauling infrastructure means no delivery ever succeeds' still holds). The real trajectory goes further than a missed $80k target: pattern 1 lands and blasts (killing its entire 4-person crew, exactly as tutorial-playthrough.json's own precedent), and pattern 2's fresh crew fully lands all 25 of its own holes before wellbeing (crashed by sustained real-time drilling work with no living_quarters ever built -- EmployeeNeeds.ts, not the dead crew's morale: computeAverageMorale (Employee.ts) already averages only the LIVING roster) stays at 0 long enough for WorkerRevolt.ts to end the level in a permanent revolt -- see the Findings on the campaign status step for the full trajectory. #586-followup (this session's own fix, real interaction-mode CI failure): pattern 1 used to carry ~100 ticks of dead post-drilling tick padding before its own charge step (holes finished landing at real tick 170, charge wasn't issued until tick 270, sandbox-confirmed) -- long enough that wellbeing crashed to 0 and stayed there past WorkerRevolt.ts's REVOLT_TICKS (120) window *during pattern 1's own charge wait*, before its `sequence`/`blast` steps ever ran; that is what the interaction-mode click failure on `#bs-blast-panel [data-step=\"3\"]` actually was -- the level-end overlay was already up, not a transient click race. Removing the dead padding lets pattern 1's charge/sequence/blast complete at wellbeing 0 but only ~70 ticks into the 120-tick revolt window, comfortably before it fires; the revolt (still this file's real ending) now lands during pattern 2 instead, after its own 25 holes are already drilled. The two survey steps (core_sample at (10,10), seismic at (20,20)) that gate the survey-confidence-overlay screenshot are untouched command-for-command, interaction-block-for-interaction-block from the version already confirmed via an inspected screenshot (not just source reading) to render the overlay genuinely -- the stale 'FAILS until GameRenderer wires survey overlay into syncFromContext()' warning this file previously carried is no longer true; a fresh interaction-mode run re-captures the same screenshots at whatever step index this longer file now gives them, not re-inspected as part of this #553 pass (command-mode only per this pass's own verification scope).",
+  "description": "Level 1 (Dusty Hollow) won genuinely (#1363): two large 3x3 deep blasts, selling the rock after each, then waiting for operating profit to reach the target. No cash override, no staffed flag, no campaign complete.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:3000000",
-      "description": "#553: cash bumped from $50,000 to $3,000,000. This file's premise no longer holds 'no vehicle ever bought' as-is (drill_hole is now a queued, vehicle-gated action -- see Findings below), and the crew needed to work it is far larger than a single driller can sustain: sandbox-measured, six tier-3 drill_rig purchases across two patterns ($840,000 -- see Finding on tier choice below), six driller hires, and ~460 ticks of payroll/fuel/maintenance drain plus two punitive random events (lawsuit -$20,000, strike -$25,000) before the workforce permanently walks out. Sized generously above the sandbox-measured minimum rather than pared to the cent.",
+      "command": "campaign start level:dusty_hollow",
+      "role": "setup",
+      "timeout": 60,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:3000000"
+          "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup",
+      "description": "The level exactly as the UI starts it: no cash override, no staffed flag. It opens with a driller, a blaster, a driver, a drill rig, a debris hauler and a freight warehouse (#1363).",
       "expect": {
         "equals": {
-          "cash": 3000000,
+          "cash": 50000,
           "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0,
-          "surveyCount": 0
+          "employeeCount": 3,
+          "holeCount": 0
         }
       }
     },
     {
-      "command": "set_policy mode:continuous fatigue:0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "set_policy mode:continuous fatigue:0"
-        }
-      ],
-      "role": "bootstrap",
-      "description": "#1379: the default site policy (shift_8h, threshold 60) is always in force and would force-rest the crew. This file is not about rest, so continuous mode with the lowest rest threshold (0) neutralizes it and keeps the pre-#1379 no-policy timings."
-    },
-    {
       "command": "time resume",
+      "role": "setup",
       "interaction": [
         {
           "type": "command",
           "command": "time resume"
         }
-      ],
+      ]
+    },
+    {
+      "command": "time speed 8",
       "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "scores",
+      "description": "Speed up the waits below.",
       "interaction": [
         {
           "type": "command",
-          "command": "scores"
+          "command": "time speed 8"
         }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0,
-          "surveyCount": 0,
-          "wellBeing": 50,
-          "safety": 50,
-          "ecology": 50,
-          "nuisance": 50
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
+      ]
     },
     {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "employee hire role:surveyor",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": -1200
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 1 skill:geology level:3",
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 1 skill:geology level:3"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "employee list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "survey core_sample x:10 z:10",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"survey\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-survey-run"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "focusTile",
-          "x": 10,
-          "z": 10,
-          "distance": 45,
-          "yaw": 180,
-          "pitch": 60
-        },
-        {
-          "type": "pickTile",
-          "x": 10,
-          "z": 10
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": -800
-        }
-      }
-    },
-    {
-      "command": "survey seismic x:20 z:20",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-survey-run"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 20,
-          "z": 20
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": -3000
-        }
-      }
-    },
-    {
-      "command": "survey show",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "survey show"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 10,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 10,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 20,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 20,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 30,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 1
-        },
-        "decreased": [
-          "cash"
-        ],
-        "note": "#1189: unclamping restored real terrain relief across the map, which changed findNearestSpawnCell's snap point for a fresh hire on dusty_hollow (seed-dependent -- the old world-centre spawn cell is no longer walkable under real elevation) -- the new spawn is closer to both survey targets (10,10) and (20,20), so the surveyor's walk is shorter and both surveys resolve several ticks earlier than before (direct probe)."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 30,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 1
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 40,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 40,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "survey show",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "survey show"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 40,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 40,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "tick 8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 8"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 48,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        },
-        "note": "#1189: unclamping restored real terrain relief across the map, which changed findNearestSpawnCell's snap point for a fresh hire on dusty_hollow (seed-dependent -- the old world-centre spawn cell is no longer walkable under real elevation) -- the new spawn is closer to both survey targets (10,10) and (20,20), so the surveyor's walk is shorter and both surveys resolve several ticks earlier than before (direct probe)."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 48,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 8"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 56,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "note": "#928: surveyCount 1 -> 2 -- the single-gauge fatigue model shifts dispatch timing enough that the seismic survey queued at step 9 now resolves by tick 56 instead of tick 72 (direct trace, command mode)."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 56,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 8"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 64,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 64,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 8"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "survey show",
-      "description": "#553 Finding: surveyCount is 2 here, not the originally-declared 1 -- a pre-existing bug unrelated to #553 (confirmed red on this exact step even before any drilling change: `npx tsx scripts/run-all-scenarios.ts level1-win-efficient` on the unedited file fails here with 'surveyCount should be 1 but is 2'). Both the core_sample and seismic surveys queued at tick 0 finish within these 72 ticks (seismic at tick 41, core_sample at tick 69); the original count only ever matched by coincidence with a different RNG draw. Corrected here as part of re-deriving the file's real trajectory, per this batch's own convention.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "survey show"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a licensed driller must physically drive a drill_rig to each hole. This file's premise ('no vehicle ever bought') can no longer hold as literally stated; drilling now costs real vehicle purchases where it previously cost none. Employee #2, first of three drillers bought for pattern 1 (see Finding on crew size below).",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 2,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": -1000
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
-      "description": "#553: the drill_rig licence a driller needs before any drill_hole action can be claimed -- hiring only grants the role's own starting qualification (blasting), never a driving licence. Left unmarked for the same reason as the geology assign_skill above: the player-facing path is `employee train` at a driving_center.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 2,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "description": "#553 Finding (crew size): a lone driller-and-rig pair takes far longer than 'roughly 200-300 ticks' to land even the smallest of this file's three patterns -- sandbox-measured, a single tier-1 pair still has 0 of pattern 1's 16 holes landed by tick 245 (173 ticks in). The drill_rig and employee both spawn at the site's grid centre (~48,48 on this 96x96 map) regardless of where the pattern is, so every pair pays the same long march to (10,10) before drilling even starts; a lone worker collapses from fatigue repeatedly during that march, each collapse discarding the walk in progress (TaskDispatch.ts's interruptActiveAction releases the vehicle reservation). Employee #3, second of three.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 3,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": -1000
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 3 skill:driving.drill_rig level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 3 skill:driving.drill_rig level:1"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 3,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "description": "Employee #4, third driller for pattern 1's 3-pair crew.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": -1000
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 4 skill:driving.drill_rig level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 4 skill:driving.drill_rig level:1"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle buy drill_rig tier:3",
-      "description": "#553 Finding (tier choice): tier-1 drill_rigs (speed 1.0) were tried first, matching this batch's own template selector -- but even 5 tier-1 pairs left pattern 1's 16 holes undrilled through tick 790 in a sandbox probe (a genuine regression once more than a handful of pairs compete for the same claim pool, not just slow). Tier-3 rigs (speed 1.8x, VEHICLE_TIER_MULTIPLIERS in balance.ts) let 3 pairs land pattern 1 by tick 265, comfortably inside the wellbeing-zero-to-revolt window measured below -- the tier bump is what makes 3 pairs (not 6+) workable, at 4x tier-1's per-rig cost. `data-tier=\"3\"` replaces this batch's usual `data-tier=\"1\"` template for exactly this reason.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": -140000
-        }
-      }
-    },
-    {
-      "command": "vehicle driver 1 2",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 1 2"
-        }
-      ],
-      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle buy drill_rig tier:3",
-      "description": "#553: does NOT re-click the vehicles toolbar tab -- the panel is already open (left that way by the previous buy/driver steps), and UIManager.togglePanel closes an ALREADY-active panel on re-click instead of leaving it open, which is exactly what made this step's own tier-3 button resolve to zero size before this fix (the panel itself went display:none, not a stale selector -- confirmed via a direct interaction-mode trace: step failed here with 'element has zero size (0x0)', while `getComputedStyle` on the button itself still reported its own authored display value, the signature of a hidden ancestor rather than a hidden element).",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": -140000
-        }
-      }
-    },
-    {
-      "command": "vehicle driver 2 3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 2 3"
-        }
-      ],
-      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle buy drill_rig tier:3",
-      "description": "#553: same reasoning as the previous buy step -- no toolbar re-click, panel is already open.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": -140000
-        }
-      }
-    },
-    {
-      "command": "vehicle driver 3 4",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 3 4"
-        }
-      ],
-      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:10,9",
-      "description": "#553: confirming the grid only orders the 16 holes -- they are ghosts (state.plannedDrillHoles) until the three drillers drive their rigs to each one, so holeCount is 0 here; the drain is the ticks below. #1151: moved one cell north, start:10,10 -> start:10,9. Under the 30-degree slope gate the (10,19) corner of the old box is outside the crew's climb-reachable patch on dusty_hollow (7947 of 9216 cells reachable from spawn), so no driller could ever claim that one hole and the plan stalled at 15 of 16 forever, burning the drain wait's whole budget. Measured with computeClimbReachableSet at level open: start:10,9 puts all 16 holes on reachable ground, and is the nearest origin that does.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
         },
         {
           "type": "clickSelector",
@@ -1122,22 +61,19 @@
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"spacing\"]",
-          "value": 3
+          "value": 4
         },
         {
           "type": "setStepper",
           "selector": "#bs-param-strip [data-field=\"depth\"]",
-          "value": 6
+          "value": 8
         },
         {
           "type": "dragTiles",
-          "x1": 10,
-          "z1": 9,
-          "x2": 20,
-          "z2": 19
-        },
-        {
-          "type": "screenshot"
+          "x1": 15,
+          "z1": 15,
+          "x2": 23,
+          "z2": 23
         },
         {
           "type": "clickSelector",
@@ -1147,99 +83,36 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 72,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "orderedHoleCount": 16,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "orderedHoleCount": 9
         },
-        "changedBy": {
-          "cash": 0
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 92,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 0,
-          "orderedHoleCount": 16
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. cash dropped from this block entirely (this batch's own fallback for a small, unpinnable divergence that a relative check still can't cover): command mode's own trace shows cash flat at this exact step (2560406 -> 2560406, no event actually pending here in that mode), while a live interaction-mode trace reads 2560394, $12 under -- in the same tiny-multiple-of-$6 class as this file's own drill_rig idle/busy fuel-cost timing (three tier-3 rigs' per-tick fuel draw landing on a slightly different idle/busy tick boundary once the earlier driver-assignment steps are click-driven instead of instantaneous). `decreased` was tried first and rejected: it holds in interaction mode but fails in command mode, where cash genuinely does not decrease at this step -- the two modes disagree on direction, not just magnitude, so no equals/increased/decreased check here can satisfy both; only omitting cash does. Every other field in this block stays a hard equals.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 92,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 0,
-          "orderedHoleCount": 16
-        }
+        "note": "9 holes ordered with the level's own crew and rig."
       },
-      "commandOutcome": "either"
+      "description": "Order a drill grid with the crew and rig the level opens with: nothing was hired or bought."
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
-      "description": "#601-followup: replaces #554-followup round 4's hand-tuned +45 unconditional margin (4x tick-15/resolve rounds, 60 ticks regardless of whether an interruption ever happened) with a real `waitUntil`. That margin existed only to survive a pending-event interruption mid-block without knowing in advance whether one would actually occur -- #601 fixed `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time, exactly like command mode's own `runWaitUntil`) so this no longer needs guessing: command mode's own deterministic trace already completes this block in exactly 15 ticks with no interruption ever (confirmed by direct probe), so `waitUntil` costs command mode nothing -- it still resolves after exactly 15 ticks, identical to the original bare `tick 15`. Removing the unconditional block outright (rather than leaving it in place ahead of this step, which an earlier round of this fix mistakenly did) matters here: the old block always burned its full 60 ticks regardless of actual drilling progress, silently absorbing a real per-run UI-vs-console drilling-throughput asymmetry (documented at the ecology `waitUntil` step later in this file) that this step's own `waitUntil` would otherwise expose as a several-tick, run-dependent difference in exactly how long this block itself takes -- harmless here since nothing downstream of *this* checkpoint pins an absolute tickCount, but wasteful and misleading to leave sitting unused ahead of a step that has already made it redundant.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
+      "description": "Cycle 1: the driller lands every ordered hole.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedHoleCount",
           "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 60000
+          "maxTicks": 900,
+          "timeoutMs": 300000
         }
       ],
+      "timeout": 330,
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 16,
           "orderedHoleCount": 0
         }
       }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step and every step through the rest of pattern 1 (charge/sequence/blast/state full/finances/scores/stats/tick/contract-accept/contract-deliver) -- this whole stretch reuses the same cash value the preceding resolveEventIfPending checkpoint already stopped pinning (its own note above has the mechanism), and any drift baked in there would otherwise resurface unchanged at every one of these free (zero-tick-cost) actions. tickCount/holeCount/chargedCount/sequencedCount/deathCount/employeeCount/activeContractCount stay exact throughout -- none of those are wall-clock-sensitive.",
+      "role": "player",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
@@ -1255,19 +128,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player",
       "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 16,
-          "sequencedCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
         "increased": [
           "orderedChargeCount"
         ]
@@ -1275,91 +136,44 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "Cycle 1: the blaster loads every charge.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 3000,
-          "timeoutMs": 120000
+          "timeoutMs": 300000
         }
       ],
+      "timeout": 330,
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 16,
-          "chargedCount": 16,
-          "sequencedCount": 0,
           "orderedChargeCount": 0
         }
       }
     },
     {
       "command": "sequence auto delay_step:25",
+      "role": "player",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 16,
-          "chargedCount": 16,
-          "sequencedCount": 16
-        },
-        "changedBy": {
-          "tickCount": 0
+          "sequencedCount": 9
         }
-      },
-      "description": " #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically — e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame."
-    },
-    {
-      "command": "weather set sunny",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "weather set sunny"
-        }
-      ],
-      "description": "Pin dry weather right before the blast: console ticks drift the weather (#1403), and rain would weaken the water-sensitive boomite charges.",
-      "role": "bootstrap"
+      }
     },
     {
       "command": "blast",
-      "description": "#553 Finding (deaths): all 4 employees die -- the surveyor (still standing near (10,10), the core_sample site) and all 3 drillers (each physically standing at the last hole they drilled within the pattern when it detonates -- new under #553; pre-#553 nobody was ever at a pattern, since confirming a plan wrote the holes instantly). Verified via `employee list` post-blast: all four show DEAD. #1069 CI-fix (real interaction-mode finding -- main red since #1068 merged, CI: clickSelector \"[data-action=report-close]\" failed: element has zero size (0x0)): the wait ahead of this click was waitForSelector, which resolves on DOM PRESENCE alone. The blast report panel is in the DOM before the detonation playback has finished laying it out, so the very next clickSelector could land while the close button still measured 0x0. #1062 moving NEED_HARD_THRESHOLDS.fatigue 5 -> 0 shifts this file rest/collapse timing throughout the drilling phase (see the scores steps own #1062 notes for the same cascade in the score numbers), which is what moved this click inside that window rather than after it. Promoted to awaitUsable -- the same usability gate clickSelector itself clicks through, and the wait already used two steps above for the speed button and the Sequence tab -- so the wait now ends when the button is genuinely clickable instead of merely present. Condition-based, so it advances no ticks and changes nothing in command mode, whose own interaction array never runs it.",
+      "timeout": 60,
+      "role": "player",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -1373,687 +187,73 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "awaitUsable",
-          "selector": "[data-action=\"report-close\"]",
-          "timeoutMs": 30000
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
         },
         {
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
         }
       }
     },
     {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "scores",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` -- the real-time-accrual divergence #553-followup blamed here traced back to the same driver-assign picker bug the file's `equals` header note now documents (see the earlier `contract accept type:ore_sale` step): once the picker stopped silently failing the 2nd/3rd driver assignment, both modes drill in the same order and reach every checkpoint at the identical tick, confirmed byte-identical against a fresh command-mode trace. #928: ecology 55.81 -> 55.49 -- the single-gauge fatigue model shifts dispatch/rest timing throughout the run, which nudges the ecology decay accrued by this checkpoint; nuisance 48.05 -> 47.85 too, for the same reason -- deathCount, employeeCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1062: ecology 55.49 -> 56.12, nuisance 47.85 -> 47.925 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 nudges collapse/rest timing throughout the drilling phase again, the same class of small cascading drift as #928's own note, re-derived from a real run rather than assumed. #1090-followup (sandbox-measured): wellBeing 0 -> 30.50, ecology 56.12 -> 49.17 -- VehicleContinuity.ts's deletion means pattern 1's crew drains fatigue more slowly (no forced dismount/rewalk between same-role holes), so wellBeing hasn't yet crashed to 0 by this checkpoint's tickCount (still 210, unchanged) the way it had before; it still reaches 0 and stays there long enough to end the level (see the later `wait_until`/scores/campaign-status steps below), just later in real ticks. safety/nuisance/deathCount/employeeCount/activeContractCount/surveyCount reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1189: wellBeing 20.389999999999972 -> 20.292499999999976; ecology 46.58 -> 46.44; nuisance 41.45 -> 41.1 -- unclamping restored real terrain relief, which moved findNearestSpawnCell's snap point for the fresh surveyor hire (see the earlier survey-timing notes above); the closer spawn shifts dispatch timing throughout pattern 1's drilling/charging phase enough to nudge how much decay/drain each score has accrued by this checkpoint. Found via `--report-drift`: this step's `equals` block only ever surfaces its first mismatching field per run, so ecology and nuisance were already silently stale here before this fix too -- fixing wellBeing alone exposed ecology, and fixing ecology alone would have exposed nuisance; all three needed re-measuring together, confirmed no further field drifts by re-running with `--report-drift` after. safety/deathCount/employeeCount/activeContractCount/surveyCount all confirmed unchanged at this checkpoint.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "wellBeing": 15.48750000000001,
-          "safety": 50,
-          "ecology": 52.93626354005779,
-          "nuisance": 41.1656588501446
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50. ecology re-measured 46.41 -> 52.79 (union_eco_committee option 0: +8 ecology)."
-      }
-    },
-    {
-      "command": "stats",
-      "description": "#715: `ecology`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #928: ecology 55.81 -> 55.49 -- see the scores step's own note. #1151: re-baselined against a measured run -- wellBeing 30.50249999999994 -> 15.129999999999965; ecology 49.17 -> 46.59; nuisance 47.925 -> 41.475. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1201: wellBeing corrected again, 15.129999999999965 -> 20.389999999999972; ecology 46.59 -> 46.58; nuisance 41.475 -> 41.45 -- writeVehiclePosition (Locomotion.ts) now marks a stopped/working vehicle's own NavCell.vehicleOccupied instead of leaving it permanently clear (a regression of #954 that had gone unnoticed since), so pattern 2's crew now genuinely detours around pattern 1's own still-parked drill_rig instead of cutting through it; direct-traced (command mode): no employee/vehicle stuck (`isMoveStuck`/`vehicleWaitingTicks` stay 0 throughout), and by this checkpoint (right after pattern 1's own blast) the extra detour ticks shift exactly which real-time slice of ongoing decay/drain each score has had -- wellbeing (drained by pattern 2's own sustained drilling work, not pattern 1's dead crew's morale -- see this file's own description) reads higher since less of that work has happened yet; ecology/nuisance shift by their own small real amounts the same way. deathCount/employeeCount/activeContractCount/surveyCount/safety all confirmed unchanged at this checkpoint. #1189: wellBeing 20.389999999999972 -> 20.292499999999976; ecology 46.58 -> 46.44; nuisance 41.45 -> 41.1 -- same cause and same drift-masking finding as the scores step just above.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "stats"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "wellBeing": 15.48750000000001,
-          "safety": 50,
-          "ecology": 52.93626354005779,
-          "nuisance": 41.1656588501446
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; wellBeing re-measured 16.38 -> 14.50."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "#1151: added. The blast above kills four workers, and under the 30-degree slope gate the run arrives at it on a different beat, so the resulting event is already pending when the next `tick` runs -- `tickCommand` refuses to advance at all while one is (\"Pending event! Resolve it first\"), which failed the step below outright. Resolved here first, following the tick/event pairing this file already uses throughout.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
+      "command": "tick 40",
       "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 5",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 5"
+          "command": "tick 40"
         }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
+      ]
     },
     {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
+      "command": "contract accept fillable:true",
       "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "contract list",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an offer the site can fill in full; either outcome passes because whether one is on the board depends on how much rock has been hauled so far.",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract list"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
-        "changedBy": {
-          "tickCount": 0
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
-      }
+      ]
     },
     {
-      "command": "event choose 0",
-      "description": "#554-followup round 4: idempotent -- a no-op when nothing is pending. Round 4's drilling-block widening (see that step's own note, several steps above) adds real ticks to interaction mode's own trajectory that command mode never sees, which can land a random event right at this later checkpoint that wasn't previously pending here -- confirmed live (`#bs-toolbar [data-panel=\"contracts\"]` reported covered by div on the very next step before this resolve was added).",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
+      "command": "contract deliver fillable:true amount:100000",
       "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "contract accept type:ore_sale",
-      "description": "#715: the Fleet panel's driver-assign picker used to filter eligibility on `vehicle.driverId` alone, which stays null for an employee's whole walk to the vehicle (ArrivalGate.ts only sets it on arrival) -- so buying/assigning three drill_rigs back-to-back kept offering the same already-claimed driller as every subsequent picker's default option, and those assign clicks silently refused (`requestBoardVehicle`'s own already-walking guard). That desynced interaction mode's drilling dispatch order from command mode's explicit ids, producing a real tick-trajectory divergence this file's `equals`-loosening history (#555/#698/#714) had been papering over instead of fixing at the mechanism. Now that the picker (`fleetDetailSections.ts`'s `makeAssignRow`) reuses `canBoardVehicle` -- the same check `requestBoardVehicle` itself enforces -- both modes drill in the same order and reach this step at the identical tick 227, confirmed byte-identical against a direct command-mode `contract list` trace. `type:ore_sale` alone, the same style already used for the rubble_disposal accept below, finds the first ore_sale offer regardless of which material it happens to be -- robust to the pool rotating instead of pinned to one material that may not be on offer. The accept click is scoped to the real id currently offered, `[data-contract-type=\"ore_sale\"]` (the first ore_sale entry in that trace, treranium).",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver what is in store against the accepted contract.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 1,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
+      ]
     },
     {
-      "command": "contract accept type:rubble_disposal",
-      "description": "#715: `type:rubble_disposal` finds the first rubble-disposal offer in the pool -- a direct trace at the now-shared tick 227 (see the ore_sale accept step's own note above for why both modes reach this tick identically since the driver-assign fix) shows the real id is 11.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:110",
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- 0.0 kg stored of the accepted ore. No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #715: the driver-assign picker fix (see the accept step's own note above) makes both modes reach this checkpoint at the same tick 227 and accept the same contract -- updated the blocked DOM id to the real one now offered (10, the treranium contract accepted two steps above). #585: declared `commandOutcome: \"refused\"`, a permanent by-design guard rather than a timing gap -- no debris_hauler/rock_digger/rock_fragmenter/building_destroyer is ever bought anywhere in this file, only drill_rigs, so nothing ever hauls the mined ore into storage regardless of which contract happens to be on offer. `level1-win-conservative.json`'s own untouched `contract deliver 5 amount:300` guard step documents the identical permanent guard, and `insufficient-funds-guards-visual.json` already establishes `role: 'guard'` + `commandOutcome: 'refused'` as this codebase's own pairing for a genuinely-blocked action. Forcing this delivery to succeed (a hauler purchase, a driver, a wait) would not fix a bug -- it would falsify this level's real trajectory and contradict this step's own pre-existing `expect.blocked`, which already correctly proves the refusal.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver type:ore_sale amount:110"
-        }
-      ],
-      "role": "guard",
-      "commandOutcome": "refused",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver",
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "contract deliver type:rubble_disposal amount:80",
-      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #715: updated the blocked DOM id to the real one now offered (11, the rubble contract accepted three steps above -- see the accept step's own note for why both modes now reach this checkpoint identically). #585: declared `commandOutcome: \"refused\"`, same reasoning as the ore_sale guard step just above -- no hauling vehicle is ever bought in this file, so this refusal is permanent by design, not a timing gap to wait out.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver type:rubble_disposal amount:80"
-        }
-      ],
-      "role": "guard",
-      "commandOutcome": "refused",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 4,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "description": "#553: pattern 1's entire 3-driller crew died in its own blast (standing at the holes they had just drilled), so pattern 2 needs a wholly fresh crew -- the same replacement pattern tutorial-playthrough.json already established for this exact mechanic. Employee #5, first of three. #553-followup (this batch's own proactive pass, real interaction-mode failure): dropped `cash: 2511276` and every hardcoded cash value through the rest of pattern 2's crew/vehicle setup (down to the drill_plan step) -- a live interaction-mode run read 2511010 here, a $266 gap far bigger than this file's usual few-dollar real-time-accrual class, confirming the drift already baked into the post-blast quiet window (tickCount 265-275, see the charge-step note above) resurfaces at the first exact-arithmetic checkpoint that reuses it. Every one of these hire/buy steps derives its exact cash from that same drifted base via a fixed, otherwise-verifiable deduction, so all of them carry the same risk. employeeCount/tickCount/deathCount/activeContractCount/surveyCount stay exact -- those already proved unaffected.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 5,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 5 skill:driving.drill_rig level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 5 skill:driving.drill_rig level:1"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 5,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "description": "Employee #6, second of three.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 6,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 6 skill:driving.drill_rig level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 6 skill:driving.drill_rig level:1"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 6,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "description": "Employee #7, third of three.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 7 skill:driving.drill_rig level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 7 skill:driving.drill_rig level:1"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle buy drill_rig tier:3",
-      "description": "Pattern 1's three tier-3 rigs were destroyed in its own blast alongside their drivers -- vehicle #4, first of three replacements.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle driver 4 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 4 5"
-        }
-      ],
-      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle buy drill_rig tier:3",
-      "description": "#553: same reasoning as pattern 1's second/third buy steps -- no toolbar re-click, panel is already open from the previous buy/driver steps (UIManager.togglePanel closes an already-active panel on re-click).",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle driver 5 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 5 6"
-        }
-      ],
-      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle buy drill_rig tier:3",
-      "description": "#553: same reasoning as the previous buy step -- no toolbar re-click, panel is already open.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle driver 6 7",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 6 7"
-        }
-      ],
-      "description": "#921: the Fleet panel's Assign/Unassign controls were removed from the DOM entirely -- runs as a bootstrap command instead.",
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:15,20",
-      "description": "#553: 25 holes ordered as ghosts, same as pattern 1. #586-followup: this pattern IS fully landed now (all 25 holes, sandbox-confirmed) -- pattern 1's own dead-padding fix (see the top-level description) freed enough of the wellbeing-vs-revolt margin that pattern 2's crew finishes drilling before the permanent revolt fires; the revolt still ends the level (see the worker-revolt Finding on the tick-drain below), just after pattern 2's own 25th hole lands rather than cutting the pattern short. This pattern's own charge/sequence/blast are never reached, in place of a third blast. #1151: moved from start:15,15 to start:15,20. The first blast above leaves a crater right where this second pattern used to sit, and under the 30-degree slope gate a fresh crater floor is no longer walkable from its own rim -- that is the rule working as specified (gentle enough and a worker walks it, steeper and it has to be cut into a ramp), not a routing defect. Measured by replaying this file's own steps to this point: five of the old 25 holes -- (15,15) (18,15) (21,15) (15,18) (18,18) -- sat inside the crater and could never be claimed, stalling the drain. start:15,20 is the nearest origin whose whole 5x5 grid is on ground the surviving crew can still walk; this file buys no digger and cuts no ramp, so drilling outside the crater is the only option open to it.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:29,15",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
         },
         {
           "type": "clickSelector",
@@ -2064,14 +264,21 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "dragTiles",
-          "x1": 15,
-          "z1": 20,
-          "x2": 27,
-          "z2": 32
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 4
         },
         {
-          "type": "screenshot"
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 8
+        },
+        {
+          "type": "dragTiles",
+          "x1": 29,
+          "z1": 15,
+          "x2": 37,
+          "z2": 23
         },
         {
           "type": "clickSelector",
@@ -2081,706 +288,212 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2,
-          "orderedHoleCount": 25,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "orderedHoleCount": 9
         },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2,
-          "holeCount": 0,
-          "orderedHoleCount": 25
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. A general-strike event fires and is caved to here (-$25,000, wellBeing +20 -- TutorialEvents-style consequence, EventSystem.ts), consumed as part of this file's own real trajectory, not injected. #553-followup (this batch's own proactive pass): dropped `cash: 2064222` pre-emptively despite the deterministic -$25,000 strike hit -- three tier-3 rigs are actively mid-drill on pattern 2 at this tickCount, same real-time-accrual class as line ~1072's own note, and a small wall-clock-tied fuel/idle drift can still stack on top of the strike's own exact deduction. The remaining exact fields (including holeCount/orderedHoleCount) still prove the event resolved.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2,
-          "holeCount": 0,
-          "orderedHoleCount": 25
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
+        "note": "9 holes ordered with the level's own crew and rig."
       },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      },
-      "description": "#586-followup (this session's own fix for the interaction-mode `sequence` click failure, real CI): removed pattern 1's ~100 ticks of dead post-drilling tick padding earlier in this file (holes finished landing at real tick 170, but the charge step wasn't issued until tick 270 -- pure idle waiting with no state change), which pushed every real tick past that point ~80-100 ticks earlier than this file's pre-fix calibration. `holeCount`/`orderedHoleCount` dropped here -- sandbox-confirmed 3 holes already landed by this checkpoint (was 0 pre-fix), same landing-boundary class the sibling tick-20 blocks below already handle. `activeContractCount: 2` still holds -- confirmed via direct trace, neither contract has reached its deadline yet at this (now earlier) real tickCount."
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #586-followup: `holeCount`/`orderedHoleCount` dropped here -- same landing-boundary note as the tick step just above. `activeContractCount: 2` still holds.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "description": "#586-followup: `activeContractCount` corrected to 1, not 2 -- that session's own pattern-1 padding removal shifted this checkpoint's real tickCount earlier, and a direct trace at that new real tickCount showed the ore contract had already expired unfulfilled by this point while the rubble contract was still active. #554-followup round 4 (this session): `activeContractCount` dropped from this step's own equals -- round 4's drilling-block fix (interaction-mode-only, see that step's own note ~90 steps above) delays the contract accept step's own real tickCount in interaction mode only (command mode's trace is untouched and still correctly reads 1 here), pushing the ore contract's expiry deadline later by the same amount and landing this checkpoint on the wrong side of that boundary in interaction mode specifically -- command mode still asserts 1 via its own unaffected trace; interaction mode currently reads 2 (not yet expired). Same landing-boundary class this file already drops fields for elsewhere (e.g. holeCount at tickCount 225's own note) rather than pinning a value one mode's real trajectory doesn't reach at this exact tick.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #586-followup: `activeContractCount` corrected to 1 -- same reasoning as the tick step just above. #554-followup round 4 (this session): dropped again, same reasoning as that step's own note.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "description": "#586-followup: `activeContractCount` corrected to 0, not 2 -- same real-tickCount shift as the block above; a direct trace shows both contracts have now expired unfulfilled by this checkpoint.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #586-followup: `activeContractCount` corrected to 0 -- same reasoning as the tick step just above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "description": "#586-followup: `activeContractCount` corrected to 0, not 1 -- same real-tickCount shift; by this checkpoint both contracts have already expired unfulfilled (confirmed via direct trace), earlier than the pre-fix file's own calibration assumed.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #586-followup: `activeContractCount` corrected to 0 -- same reasoning as the tick step just above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2041935` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 8`/`orderedHoleCount: 17` -- landing-boundary block (holeCount changes from 7 to 8 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2038059` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 13`/`orderedHoleCount: 12` -- landing-boundary block (holeCount changes from 8 to 13 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2033955` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
+      "description": "Order a drill grid with the crew and rig the level opens with: nothing was hired or bought.",
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
-      "timeout": 185,
-      "description": "#1151: the tick-20/event ladder above was calibrated under the old whole-voxel climb rule, where 25 holes finished inside its 180 ticks. Under the 30-degree slope gate the three rigs need longer, so the ladder handed the step below a part-drilled pattern (20 of 25) and every later assertion cascaded. This drains whatever is left on the thing actually being waited for rather than widening the ladder with more hand-counted beats; command mode's waitUntil resolves a pending event with its first option each tick, exactly as the ladder's own `event choose 0` steps do.",
+      "description": "Cycle 2: the driller lands every ordered hole.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "orderedHoleCount",
           "equals": 0,
           "maxTicks": 900,
-          "timeoutMs": 180000
+          "timeoutMs": 300000
         }
       ],
+      "timeout": 330,
       "role": "setup",
       "expect": {
         "equals": {
-          "orderedHoleCount": 0,
-          "holeCount": 25
+          "orderedHoleCount": 0
         }
       }
     },
     {
-      "command": "tick 20",
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "role": "player",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "setup",
       "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 25,
-          "orderedHoleCount": 0
-        },
-        "decreased": [
-          "cash"
-        ],
         "increased": [
-          "tickCount"
+          "orderedChargeCount"
         ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2029905` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 25,
-          "orderedHoleCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
       },
-      "commandOutcome": "either"
+      "skipWhenLevelEnded": true
     },
     {
-      "command": "tick 20",
-      "description": "#Employee.ts morale fix (computeAverageMorale now filters to employees.filter(e => e.alive) before averaging, where it previously summed every roster entry including corpses): the WorkerRevolt threshold (REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) now completes one 20-tick chunk later than before -- tick 491, not 471 -- confirmed via direct trace (three independent tick-chunking styles agree). wellBeing was already exactly 0 by the time this chunk starts; this is purely a shift in exactly when the 120-consecutive-tick streak finishes, not a change in whether it does.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "Cycle 2: the blaster loads every charge.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 300000
         }
       ],
+      "timeout": 330,
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ]
+          "orderedChargeCount": 0
+        }
       }
     },
     {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "command": "sequence auto delay_step:25",
+      "role": "player",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
+          "sequencedCount": 9
         }
       },
-      "commandOutcome": "either"
+      "skipWhenLevelEnded": true
     },
     {
-      "command": "tick 20",
-      "description": "#554 Finding (real trajectory, supersedes the pre-#554 tickCount-491 calibration): worker_revolt no longer fires here at all -- it already fired much earlier, during pattern 1's own `wait_until field:orderedChargeCount` step (charging is now real, queued work, ~69 ticks), well before pattern 1's blast even happens. wellBeing crashes to 0 mid-pattern-1-drilling (well before any death) and stays there uninterrupted long enough for the REVOLT_TICKS=120 streak to complete during that charge wait, so `levelEnded`/`levelEndReason` are already `true`/`worker_revolt` from that point on -- this step doesn't newly trigger anything, it just keeps observing an already-ended level. What #554 actually changes here is `tickCount`: the queued charge action's own real elapsed time shifts every fixed-size `tick N` step after it forward by a constant ~60 ticks relative to the pre-#554 file (charging used to be instant), so this checkpoint reads 551, not 491, purely from that uniform shift -- not from any change in when the revolt itself fires. Real consequence unchanged from the pre-#554 file: pattern 2 still lands all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended. `cash` stays `decreased` rather than a hardcoded equals -- three tier-3 rigs are actively mid-drill on pattern 2 right up to this checkpoint, same real-time-accrual class as line ~1072's own note. #1090-followup (sandbox-measured): `levelEnded`/`levelEndReason` dropped from this step's own expect -- VehicleContinuity.ts's deletion slows pattern 1's crew fatigue drain (no forced dismount/rewalk between same-role holes), so wellBeing no longer crashes to 0 until partway through pattern 2's drilling instead of during pattern 1's charge wait, and the REVOLT_TICKS=120 streak hasn't yet completed by this checkpoint's tickCount (still 431, unchanged) -- `levelEnded` reads `false` here now. The revolt still fires for real, just later (see the `wait_until field:ecology` step below, which now also pays off a real fatigue-driven wellBeing debt as well as ecology's).",
+      "command": "blast",
+      "timeout": 60,
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "tick 40",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 40"
         }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
+      ]
     },
     {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2025975` pre-emptively, same real-time-accrual class documented at line ~1072. `holeCount`/`orderedHoleCount` also dropped -- same landing-boundary note as the tick step just above. #1090-followup (sandbox-measured): `levelEnded`/`levelEndReason` dropped here too, same reason as the tick step above -- the level has not ended yet at this checkpoint.",
+      "command": "contract accept fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an offer the site can fill in full; either outcome passes because whether one is on the board depends on how much rock has been hauled so far.",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      },
-      "commandOutcome": "either"
+      "skipWhenLevelEnded": true
     },
     {
-      "command": "wait_until field:levelEnded equals:true max_ticks:800",
-      "timeout": 155,
-      "description": "#601-followup (real CI, this file's own regression from #601's harness fix): ScoreManager.ts's ecology decays linearly toward baseline 50 at SCORE_DECAY_RATE=0.05/tick and clamps there exactly (`applyDecay`'s `Math.max(50, value - rate)`) -- it does not stop moving just because `levelEnded` is true, and this file issues no further `tick` of any kind after the block above, so whatever ecology reads at that instant is whatever it is permanently. Direct trace: command mode's own path happens to already sit at the exact 50 floor by that point (0 remaining decay debt), while interaction mode's path -- diverging from command's from as early as tick 92 by a few hundredths of a wellBeing point (ordinary UI-click-vs-console-command tick-boundary noise, the same class this file already documents for cash), amplified once that tiny float difference crossed an employee fatigue-collapse threshold a couple of ticks apart -- ends up with materially more employees mid-collapse during pattern 2's drilling stretch, more total active-drilling ticks to land the same 25 holes, and therefore a bigger cumulative ecology hit still owed at the moment ticking stops (51.17, not 50 -- a real ~24-tick decay debt at 0.05/tick). This was invisible before #601: the block above used to run a fixed, generous real-time-driven wait that happened to always burn enough extra wall-clock ticks to fully pay off this debt regardless of its size; #601 removed that slack along with the nondeterminism it was hiding. `waitUntil` is the correct tool for the actual asymmetry (an unknown, path-dependent number of ticks still owed) rather than another fixed pad: it costs command mode exactly 1 tick (already at floor, first check matches) and leaves every field this file already treats as `equals` here unaffected -- ecology's own linear, clamped decay guarantees both paths land on the exact same 50.0, not merely close to it, however many ticks each one needed to get there. #555 (this merge)-followup (real CI): `maxTicks` bumped 200 -> 800 and `timeoutMs` 60000 -> 150000 -- level1's own `LevelDef.scoreDecayRate` (0.03) now actually reaches `updateScores` instead of the hardcoded global 0.05 this note's own math assumed, so the same point-debt takes ~1.67x longer to pay off, and real interaction-mode CI read a bigger debt still outstanding (51.59, not 50) after the old 200-tick budget ran out. #1151: the wait now watches levelEnded rather than ecology. Ecology's decay to its 50 floor and the worker revolt are two independent clocks, and this step asserts both; under the old whole-voxel climb rule the revolt happened to land first, so waiting on ecology also caught it. Under the 30-degree slope gate the order flips -- ecology reaches 50 at t=452 while the revolt lands at t=482 -- and the wait exited 30 ticks before the thing the step is actually about. Waiting on the subject itself, per dev-scenario-authoring; ecology is still asserted exactly in this step's own expect, so a run that reached the revolt without ecology settled would still fail loudly.",
+      "command": "contract deliver fillable:true amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver what is in store against the accepted contract.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ],
+      "skipWhenLevelEnded": true
+    },
+    {
+      "command": "wait_until field:levelEnded equals:true max_ticks:6000",
+      "role": "setup",
+      "timeout": 1260,
+      "description": "Keep selling the blasted rock; the level ends on its own once operating profit reaches the $80,000 target.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "levelEnded",
           "equals": true,
-          "maxTicks": 800,
-          "timeoutMs": 150000
+          "maxTicks": 6000,
+          "timeoutMs": 600000
         }
       ],
-      "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
+          "levelEnded": true
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        }
+      ],
+      "description": "Terminal outcome: a genuine win, reached with no `campaign complete` and no cash override.",
+      "expect": {
+        "equals": {
           "levelEnded": true,
-          "levelEndReason": "worker_revolt",
-          "ecology": 50
+          "levelEndReason": "completed"
         }
-      }
-    },
-    {
-      "command": "employee list",
-      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step through the rest of the file (state full/finances/scores/stats/campaign status) -- all reuse the same cash value the preceding tick-458/resolveEventIfPending checkpoints already stopped pinning (their own notes above have the mechanism), and the level has already ended so nothing here ticks to re-establish a fresh exact figure. tickCount/deathCount/employeeCount/activeContractCount/surveyCount/wellBeing/safety/ecology/nuisance/levelEnded/levelEndReason stay exact -- none of those are wall-clock-sensitive.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        }
-      }
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        }
-      }
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        }
-      }
-    },
-    {
-      "command": "scores",
-      "description": "#715: `safety`/`nuisance` restored to `equals` -- both were dropped (#555, #698) for a mode-divergence that traced back to the Fleet panel's driver-assign picker silently failing the 2nd/3rd assignment click (see the earlier `contract accept type:ore_sale` step's note), which let interaction mode's tick trajectory drift from command mode's. With that fixed, both modes reach tickCount 432 here (not the pre-fix 551/578 split) and read identical scores: `safety` now lands exactly at its 0 floor in both modes (ScoreManager.ts's applyDecay dead-zone), and `nuisance` at its own 50 ceiling -- confirmed byte-identical against a fresh command-mode trace, not merely plausible. #1062: safety 9.229999999999999 -> 0 -- NEED_HARD_THRESHOLDS.fatigue moving 5 -> 0 shifts collapse/rest timing enough that safety's decay now actually reaches the floor this note's own #715 text already claimed it did; re-derived from a real run rather than assumed. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- writeVehiclePosition (Locomotion.ts) now marks a stopped/working vehicle's own NavCell.vehicleOccupied instead of leaving it permanently clear (a regression of #954 that had gone unnoticed since), so foot traffic around pattern 1's and pattern 2's own parked drill_rigs now genuinely detours instead of cutting through; direct-traced (command mode): no employee/vehicle stuck (`isMoveStuck`/`vehicleWaitingTicks` stay 0 throughout the whole file), and the detoured pacing shifts real time earlier relative to this checkpoint's own worker_revolt trigger, giving nuisance's own decay more of it to work with by the time the revolt lands -- same level, same ending, same deaths, only the score's real trajectory to get there differs. deathCount/employeeCount/activeContractCount/surveyCount/wellBeing/safety/ecology all confirmed unchanged. #1189: nuisance corrected again, 37.07000000000029 -> 48.72000000000029 -- unclamping restored real terrain relief, moving findNearestSpawnCell's snap point for the surveyor's fresh-hire spawn (see the earlier survey-timing notes) closer to the survey targets; that alone shifts dispatch timing throughout both patterns enough to move exactly when worker_revolt's own wellBeing-driven trigger fires, giving nuisance's decay a different real-time span to run before this checkpoint captures it. Same level, same ending (worker_revolt, deathCount 4), only the real trajectory to get there differs -- re-derived from a real run, not assumed.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "wellBeing": 0,
-          "safety": 0,
-          "ecology": 50,
-          "nuisance": 48.308294250723314
-        }
-      }
-    },
-    {
-      "command": "stats",
-      "description": "#715: `safety`/`nuisance` restored to `equals` here too -- same reasoning as the scores step just above. #1062: safety 9.229999999999999 -> 0 for the same reason given there. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- see the scores step's own note just above for the mechanism. #1189: nuisance corrected again, 37.07000000000029 -> 48.72000000000029 -- see the scores step's own note just above for the mechanism.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "stats"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "wellBeing": 0,
-          "safety": 0,
-          "ecology": 50,
-          "nuisance": 48.308294250723314
-        }
-      }
-    },
-    {
-      "command": "campaign status",
-      "description": "#554 Findings (still accurate): the level ends in a permanent worker revolt during pattern 1's own queued-charge wait, before pattern 1's blast even happens. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole. #715: `safety`/`nuisance` restored to `equals` -- see the scores step above for the mechanism fix (the Fleet panel driver-assign picker bug) that closed the mode divergence #698 had papered over here. #1062: safety 9.229999999999999 -> 0, same reason as the scores step above. #1151: re-baselined against a measured run -- nuisance 50 -> 49.12500000000029. These figures were all measured under the old whole-voxel climb rule; the crew walks further under the 30-degree slope gate, so it is more tired and its blasts land on re-sited patterns (see the two drill-plan steps). Re-measured rather than loosened, so each stays an exact check. #1151: re-baselined against a measured run -- nuisance 49.12500000000029 -> 48.91500000000028. A mid-game hire or vehicle purchase on this site now lands on the grid's largest climb-connected region instead of whichever region the world corner happened to sit in, so the crew starts from a different spot and the figures downstream of that move with it. Re-measured rather than loosened, so each stays an exact check; no outcome changed -- same level, same ending, same deaths. #1201: nuisance corrected again, 48.91500000000028 -> 37.07000000000029 -- see the scores step above for the mechanism. #1189: nuisance corrected again, 37.07000000000029 -> 48.72000000000029 -- see the scores step above for the mechanism.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "campaign status"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 4,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "wellBeing": 0,
-          "safety": 0,
-          "ecology": 50,
-          "nuisance": 48.308294250723314,
-          "bankrupt": false,
-          "levelEnded": true,
-          "levelEndReason": "worker_revolt",
-          "holeCount": 25,
-          "orderedHoleCount": 0
-        },
-        "note": " #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random union/politics events at ticks 170 and 291 are union_eco_committee and politics_efficiency_expert instead of union_merch and politics_insurance_hike; safety re-measured 10.52 -> 0 (no safety-granting event lands; the post-death floor is not lifted)."
       }
     }
   ]

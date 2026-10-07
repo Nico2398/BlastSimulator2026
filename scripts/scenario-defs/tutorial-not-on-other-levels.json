@@ -44,7 +44,7 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "description": "Click Start on the Dusty Hollow card. Wait for the loading overlay to clear and the HUD to become reachable. The tutorial card must stay hidden: it is a first-time-player aid for tutorial_pit only.",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-world-map [data-action=\"start-level\"][data-level=\"dusty_hollow\"]" },
