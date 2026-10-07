@@ -27,6 +27,7 @@ import { batchCharge, type HoleCharge } from '../../../src/core/mining/ChargePla
 import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { executeBlast, buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js';
+import { identifyFragmentedVoxels } from '../../../src/core/mining/VoxelFragmentation.js';
 import { thresholdAt } from '../../../src/core/mining/EnergyPropagation.js';
 import { TIER_SHORTFALL_THRESHOLD_FACTOR } from '../../../src/core/config/balance.js';
 
@@ -100,16 +101,55 @@ describe('blast energy field — explosive tier gating (#1358)', () => {
     expect(weak.clearedVoxels).toBeLessThan(adequate.clearedVoxels);
   });
 
-  it('the real blast breaks the same voxels the preview field predicts (weak plan)', () => {
-    tierOverrides.map = { boomite: 1 };
+  it('the real blast clears exactly the voxels the preview field predicts (weak plan)', () => {
+    tierOverrides.map = { boomite: 1 }; // molite is tier 2: one tier short, still breaks some rock
     const plan = singleExplosivePlan('boomite', 8);
-    const preview = buildPlanEnergyField(plan, hardGrid())!;
-    // Preview over a fully adequate plan must differ from the weak one, proving the
-    // preview itself applies the gate; executeBlast above proves the real path does.
+    const preview = buildPlanEnergyField(plan, hardGrid('molite'))!;
+    const predicted = identifyFragmentedVoxels(preview, hardGrid('molite')).fragmented.length;
+
+    const blastGrid = hardGrid('molite');
+    const result = executeBlast(plan, blastGrid, [])!;
+    expect(result.clearedVoxels).toBeGreaterThan(0);
+    expect(result.clearedVoxels).toBe(predicted);
+  });
+
+  it('ignores holes with an unknown explosive id instead of penalising them', () => {
+    tierOverrides.map = { boomite: 4 };
+    const holes = createGridPlan(holeCounter, { x: 9, z: 20 }, 1, 2, 21, 8, 0.15);
+    const good = chargeOf('boomite', 8, 4);
+    const bogus: HoleCharge = { ...good, explosiveId: 'no_such_explosive' };
+    const build = (second: HoleCharge) => buildPlanEnergyField(assembleBlastPlan(
+      holes, { [holes[0]!.id]: good, [holes[1]!.id]: second }, autoVPattern(holes, 25)), hardGrid())!;
+    const withBogus = build(bogus);
+    const withGood = build(good);
+    // Bogus hole at x=30 contributes no gating: its column uses the adequate boomite hole's tier.
+    expect(thresholdAt(withBogus, 30, 5, 20)).toBeCloseTo(thresholdAt(withGood, 30, 5, 20), 4);
+  });
+
+  it('does no tier gating when no hole is charged', () => {
+    tierOverrides.map = { boomite: 1 };
+    const holes = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const uncharged = buildPlanEnergyField(assembleBlastPlan(holes, {}, autoVPattern(holes, 25)), hardGrid())!;
     holeCounter.nextHoleId = 1;
     tierOverrides.map = { boomite: 4 };
-    const adequatePreview = buildPlanEnergyField(singleExplosivePlan('boomite', 8), hardGrid())!;
-    expect(thresholdAt(preview, 14, 5, 14)).toBeGreaterThan(thresholdAt(adequatePreview, 14, 5, 14));
+    const holes2 = createGridPlan(holeCounter, { x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const reference = buildPlanEnergyField(assembleBlastPlan(holes2, {}, autoVPattern(holes2, 25)), hardGrid())!;
+    expect(Array.from(uncharged.threshold)).toEqual(Array.from(reference.threshold));
+  });
+
+  it('ignores uncharged holes even when they are nearer than charged ones', () => {
+    tierOverrides.map = { pop_rock: 1 };
+    const holes = createGridPlan(holeCounter, { x: 9, z: 20 }, 1, 2, 21, 8, 0.15);
+    // Only the far hole (x=30) is charged; every column, including those beside the uncharged hole, takes its tier.
+    const plan = assembleBlastPlan(holes, { [holes[1]!.id]: chargeOf('pop_rock', 8, 3) }, autoVPattern(holes, 25));
+    const field = buildPlanEnergyField(plan, hardGrid())!;
+    holeCounter.nextHoleId = 1;
+    tierOverrides.map = { pop_rock: 4 };
+    const holes2 = createGridPlan(holeCounter, { x: 9, z: 20 }, 1, 2, 21, 8, 0.15);
+    const plan2 = assembleBlastPlan(holes2, { [holes2[1]!.id]: chargeOf('pop_rock', 8, 3) }, autoVPattern(holes2, 25));
+    const adequate = buildPlanEnergyField(plan2, hardGrid())!;
+    expect(thresholdAt(field, 9, 5, 20) / thresholdAt(adequate, 9, 5, 20))
+      .toBeCloseTo(TIER_SHORTFALL_THRESHOLD_FACTOR ** 3, 3);
   });
 
   it('uses the nearest charged hole explosive per column when plans mix explosives', () => {

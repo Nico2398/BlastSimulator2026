@@ -2,7 +2,7 @@
 // Assigns explosives and stemming to each hole in the drill plan.
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
-import type { ColumnRock } from './ExplosiveRockFit.js';
+import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
 import { t } from '../i18n/I18n.js';
 import {
   MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
@@ -156,7 +156,7 @@ export function weakHoleSummary(
   const present = columns.filter((c): c is ColumnRock => c !== null);
   const explosive = getExplosive(explosiveId);
   if (!explosive) return { weakCount: 0, total: present.length, rockId: null };
-  const weak = present.filter(c => c.tier > explosive.minRockTier);
+  const weak = present.filter(c => tierShortfall(explosive.minRockTier, c.tier) > 0);
   const counts = new Map<string, { tier: number; count: number }>();
   for (const c of weak) {
     const entry = counts.get(c.rockId) ?? { tier: c.tier, count: 0 };

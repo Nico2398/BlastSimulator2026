@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  tierShortfall, tierThresholdFactor, dominantRockTierAt, dominantRockAlongColumn,
+  tierShortfall, tierThresholdFactor, dominantRockTierAt, dominantRockAlongColumn, dominantRockUnderHole,
 } from '../../../src/core/mining/ExplosiveRockFit.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { TIER_SHORTFALL_THRESHOLD_FACTOR } from '../../../src/core/config/balance.js';
@@ -108,5 +108,16 @@ describe('dominantRockAlongColumn', () => {
     const grid = new VoxelGrid(8, 12);
     fillColumn(grid, 4, 3, 0, 9, 'titanite');
     expect(dominantRockAlongColumn(grid, 3, 3, 10, 6)).toBeNull();
+  });
+});
+
+describe('dominantRockUnderHole', () => {
+  it('samples from the ground surface down by the hole depth, flooring fractional hole positions', () => {
+    const grid = new VoxelGrid(8, 12);
+    fillColumn(grid, 3, 3, 0, 9, 'obstiite'); // surface at y = 10
+    expect(dominantRockUnderHole(grid, { x: 3.4, z: 3.9, depth: 6 })).toEqual({ rockId: 'obstiite', tier: 4 });
+  });
+  it('returns null over an empty column', () => {
+    expect(dominantRockUnderHole(new VoxelGrid(8, 12), { x: 2, z: 2, depth: 4 })).toBeNull();
   });
 });

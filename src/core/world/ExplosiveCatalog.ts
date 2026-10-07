@@ -18,7 +18,7 @@ export interface ExplosiveType {
   readonly minChargeKg: number;
   /** Maximum charge per hole in kg. */
   readonly maxChargeKg: number;
-  /** Minimum rock hardness tier this explosive can fracture. */
+  /** Highest rock hardness tier this explosive handles without penalty; harder rock still breaks, at a raised threshold (#1358). */
   readonly minRockTier: number;
   /** Multiplier on projection risk (1.0 = normal). Higher = more dangerous. */
   readonly projectionRiskMod: number;

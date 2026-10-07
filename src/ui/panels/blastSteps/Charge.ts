@@ -18,7 +18,6 @@
 // Only the active level's explosives are offered (resolveAvailableExplosives);
 // the water-sensitivity badge still surfaces (that data is real and per-hole
 // derivable via wetHoles()).
-//
 
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
 import type { ColumnRock } from '../../../core/mining/ExplosiveRockFit.js';

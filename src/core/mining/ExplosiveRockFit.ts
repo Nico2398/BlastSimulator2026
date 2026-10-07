@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Explosive vs rock tier fit
 // How far an explosive's tier falls short of the rock it must break.
 
-import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { type VoxelGrid, firstEmptyLayerAboveGround } from '../world/VoxelGrid.js';
 import { getRock } from '../world/RockCatalog.js';
 import { TIER_SHORTFALL_THRESHOLD_FACTOR } from '../config/balance.js';
 
@@ -55,4 +55,14 @@ export function dominantRockAlongColumn(
     }
   }
   return best;
+}
+
+/** Dominant rock along a drill hole's column, from the ground surface down by the hole's depth. */
+export function dominantRockUnderHole(
+  grid: VoxelGrid,
+  hole: { x: number; z: number; depth: number },
+): ColumnRock | null {
+  const x = Math.floor(hole.x);
+  const z = Math.floor(hole.z);
+  return dominantRockAlongColumn(grid, x, z, firstEmptyLayerAboveGround(grid, x, z), hole.depth);
 }

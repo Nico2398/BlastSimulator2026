@@ -601,22 +601,31 @@ export function buildBlastEnergyField(
 
 /**
  * Per-column tier of the explosive in the nearest charged hole (horizontal
- * distance), over the field's footprint. Undefined when no hole is charged, so
- * the field then ignores explosive tier (#1358).
+ * distance), over the field's footprint. Holes whose explosive is unknown never
+ * gate (as in weakHoleSummary). Undefined when no such hole exists, or when all
+ * share one tier, so the field then skips per-column gating (#1358).
+ *
+ * Cost: footprint columns x charged holes, once per field build.
  */
 function explosiveTierResolver(
   plan: BlastPlan,
   box: BlastBox,
 ): ((x: number, z: number) => number) | undefined {
-  const charged = plan.holes.filter(h => plan.charges[h.id]);
-  if (charged.length === 0) return undefined;
+  const gating: { hole: DrillHole; tier: number }[] = [];
+  for (const hole of plan.holes) {
+    const charge = plan.charges[hole.id];
+    const explosive = charge ? getExplosive(charge.explosiveId) : undefined;
+    if (explosive) gating.push({ hole, tier: explosive.minRockTier });
+  }
+  if (gating.length === 0) return undefined;
   const nx = box.maxX - box.minX;
   const tiers = new Uint8Array(nx * (box.maxZ - box.minZ));
+  const holes = gating.map(g => g.hole);
+  const tierByHole = new Map(gating.map(g => [g.hole.id, g.tier]));
   for (let z = box.minZ; z < box.maxZ; z++) {
     for (let x = box.minX; x < box.maxX; x++) {
-      const hole = findNearestHole(vec3(x, 0, z), charged);
-      const explosive = getExplosive(plan.charges[hole.id]!.explosiveId);
-      tiers[(z - box.minZ) * nx + (x - box.minX)] = explosive?.minRockTier ?? 0;
+      const hole = findNearestHole(vec3(x, 0, z), holes);
+      tiers[(z - box.minZ) * nx + (x - box.minX)] = tierByHole.get(hole.id)!;
     }
   }
   return (x, z) => tiers[(z - box.minZ) * nx + (x - box.minX)]!;

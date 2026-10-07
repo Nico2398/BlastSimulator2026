@@ -57,7 +57,7 @@ import { regionCenter, regionSpan, type TileRegion } from './ui/tutorialPickerRe
 import { nextRampWidth } from './core/mining/RampWidening.js';
 import { summariseMuckPile } from './core/mining/MuckPileSummary.js';
 import { hasLevelEnded } from './core/engine/GameOverConditions.js';
-import { dominantRockAlongColumn } from './core/mining/ExplosiveRockFit.js';
+import { dominantRockUnderHole } from './core/mining/ExplosiveRockFit.js';
 import { getSurfaceY } from './core/entities/BuildingPlacement.js';
 
 // --- 3D Scene ---
@@ -165,9 +165,7 @@ uiManager.setPlacementKit({ controller: placementController, overlay: selectionO
 // truth checkFootprintPlacement does — the raw voxel surface, not a
 // smoothed/rendered height — so the strip and the console never disagree.
 uiManager.setBuildSurfaceSampler((x, z) => ctx.grid ? getSurfaceY(ctx.grid, x, z) : 0);
-uiManager.setHoleRockSampler(h => ctx.grid
-  ? dominantRockAlongColumn(ctx.grid, Math.floor(h.x), Math.floor(h.z), getSurfaceY(ctx.grid, Math.floor(h.x), Math.floor(h.z)), h.depth)
-  : null);
+uiManager.setHoleRockSampler(h => ctx.grid ? dominantRockUnderHole(ctx.grid, h) : null);
 
 // Survey confidence overlay's player-facing visibility toggle (#496): the
 // panel's own click handler drives the renderer; the renderer's current
