@@ -29,6 +29,7 @@ import {
 } from './shared/puppeteer-utils.js';
 import { describeStepFailure } from './scenario-interaction-runner.js';
 import { checkGoal, gameState } from './shared/interaction-driver.js';
+import { stateIfInteractionOnlyStepMoot } from './shared/interaction-level-skip.js';
 import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
 import { buildScenarioLoadFailure, logBatchProgress } from './run-all-scenarios-result.js';
 
@@ -109,6 +110,20 @@ export async function runBatchInteraction(
           // copy of this comment (PR #616 review round, item 5).
           let lastProgress = 'no interaction action has started yet';
 
+          // Same skip as scenario-interaction-runner.ts: once the level has
+          // ended on its own an interaction-only step has nothing to play, and
+          // the level can also end during the step itself (the tick after the
+          // last sale lands), so the same check runs again on failure.
+          const skipIfLevelEnded = async (): Promise<boolean> => {
+            const current = await stateIfInteractionOnlyStepMoot(page, step);
+            if (current === null) return false;
+            stepResults.push({
+              step: s, command: step.command, commandOutput: 'skipped: level already ended', gameState: current,
+            });
+            return true;
+          };
+          if (await skipIfLevelEnded()) continue;
+
           try {
             await Promise.race([
               (async () => {
@@ -175,6 +190,7 @@ export async function runBatchInteraction(
               ),
             ]);
           } catch (err: unknown) {
+            if (await skipIfLevelEnded()) continue;
             failed = true;
             errorMsg = describeStepFailure(step, err);
             break;

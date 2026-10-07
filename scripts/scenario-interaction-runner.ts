@@ -29,6 +29,7 @@ import {
   forceRenderFrame,
 } from './shared/puppeteer-utils.js';
 import { checkGoal, gameState, InteractionFailure } from './shared/interaction-driver.js';
+import { stateIfInteractionOnlyStepMoot } from './shared/interaction-level-skip.js';
 import { scopeGoalToInteraction, goalAssertsAnything } from './shared/interaction-goal-scope.js';
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
@@ -232,9 +233,8 @@ export async function runScenarioInteraction(
       // the mine is frozen and the goal is reached, so there is nothing left
       // to play: record it skipped rather than wait on a clock that cannot run.
       const skipIfLevelEnded = async (): Promise<boolean> => {
-        if (!step.interactionOnly) return false;
-        const current = await gameState(page);
-        if (current['levelEnded'] !== true) return false;
+        const current = await stateIfInteractionOnlyStepMoot(page, step);
+        if (current === null) return false;
         console.log('  skipped: interaction-only step, level already ended');
         results.push({
           step: i, command: step.command, commandOutput: 'skipped: level already ended',
