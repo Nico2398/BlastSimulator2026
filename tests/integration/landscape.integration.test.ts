@@ -194,7 +194,6 @@ describe('Landscape/playable seam on a real level (#907)', () => {
     expect(state.drillHoles.length, 'no hole was ever drilled').toBeGreaterThan(0);
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
     for (let i = 0; i < 2000 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
-    run('sequence auto delay_step:25');
     expect(run('blast').success).toBe(true);
 
     assertSeamClosed(engine, 'after a blast at the site edge');

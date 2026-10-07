@@ -32,7 +32,7 @@
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:2 depth:6 start:14,14",
-      "description": "One decrement click on the spacing stepper (data-field=\"spacing\") lowers it 3->2m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (14,14)-(20,20) rectangle computes the declared 4x4. #553: spacing tightened from the original 4m (1 increment click) to 2m (1 decrement) to keep this 16-hole grid's total drilling time inside a single driller/drill_rig's practical workday — sandbox-measured, 16 holes at spacing 4 push the crew into a genuine worker_revolt (WorkerRevolt.ts: wellBeing pinned at 0 for REVOLT_TICKS=120) around tick 400 regardless of cash on hand, since one employee cannot both drill nonstop that long and rest enough; at spacing 2 they land by tick 244 with over $300,000 still in hand. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "description": "One decrement click on the spacing stepper (data-field=\"spacing\") lowers it 3->2m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (14,14)-(20,20) rectangle computes the declared 4x4. #553: spacing tightened from the original 4m (1 increment click) to 2m (1 decrement) to keep this 16-hole grid's total drilling time inside a single driller/drill_rig's practical workday — sandbox-measured, 16 holes at spacing 4 push the crew into a genuine worker_revolt (WorkerRevolt.ts: wellBeing pinned at 0 for REVOLT_TICKS=120) around tick 400 regardless of cash on hand, since one employee cannot both drill nonstop that long and rest enough; at spacing 2 they land by tick 244 with over $300,000 still in hand. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -161,31 +161,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 16
-        }
-      }
-    },
-    {
       "command": "blast",
       "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -209,8 +190,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero"
       }

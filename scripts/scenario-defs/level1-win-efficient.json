@@ -1,6 +1,6 @@
 {
   "name": "level1-win-efficient",
-  "description": "Level 1 (Dusty Hollow): named for an efficient $80k win, no vehicle ever bought -- but #553 makes drill_hole a queued, vehicle-gated action, so drilling now costs real vehicle purchases where it previously cost none (still zero HAULING vehicles -- debris_hauler/rock_digger/rock_fragmenter/building_destroyer -- so 'no hauling infrastructure means no delivery ever succeeds' still holds). The real trajectory goes further than a missed $80k target: pattern 1 lands and blasts (killing its entire 4-person crew, exactly as tutorial-playthrough.json's own precedent), and pattern 2's fresh crew fully lands all 25 of its own holes before wellbeing (crashed by sustained real-time drilling work with no living_quarters ever built -- EmployeeNeeds.ts, not the dead crew's morale: computeAverageMorale (Employee.ts) already averages only the LIVING roster) stays at 0 long enough for WorkerRevolt.ts to end the level in a permanent revolt -- see the Findings on the campaign status step for the full trajectory. #586-followup (this session's own fix, real interaction-mode CI failure): pattern 1 used to carry ~100 ticks of dead post-drilling tick padding before its own charge step (holes finished landing at real tick 170, charge wasn't issued until tick 270, sandbox-confirmed) -- long enough that wellbeing crashed to 0 and stayed there past WorkerRevolt.ts's REVOLT_TICKS (120) window *during pattern 1's own charge wait*, before its `sequence`/`blast` steps ever ran; that is what the interaction-mode click failure on `#bs-blast-panel [data-step=\"3\"]` actually was -- the level-end overlay was already up, not a transient click race. Removing the dead padding lets pattern 1's charge/sequence/blast complete at wellbeing 0 but only ~70 ticks into the 120-tick revolt window, comfortably before it fires; the revolt (still this file's real ending) now lands during pattern 2 instead, after its own 25 holes are already drilled. The two survey steps (core_sample at (10,10), seismic at (20,20)) that gate the survey-confidence-overlay screenshot are untouched command-for-command, interaction-block-for-interaction-block from the version already confirmed via an inspected screenshot (not just source reading) to render the overlay genuinely -- the stale 'FAILS until GameRenderer wires survey overlay into syncFromContext()' warning this file previously carried is no longer true; a fresh interaction-mode run re-captures the same screenshots at whatever step index this longer file now gives them, not re-inspected as part of this #553 pass (command-mode only per this pass's own verification scope).",
+  "description": "Level 1 (Dusty Hollow): named for an efficient $80k win, no vehicle ever bought -- but #553 makes drill_hole a queued, vehicle-gated action, so drilling now costs real vehicle purchases where it previously cost none (still zero HAULING vehicles -- debris_hauler/rock_digger/rock_fragmenter/building_destroyer -- so 'no hauling infrastructure means no delivery ever succeeds' still holds). The real trajectory goes further than a missed $80k target: pattern 1 lands and blasts (killing its entire 4-person crew, exactly as tutorial-playthrough.json's own precedent), and pattern 2's fresh crew fully lands all 25 of its own holes before wellbeing (crashed by sustained real-time drilling work with no living_quarters ever built -- EmployeeNeeds.ts, not the dead crew's morale: computeAverageMorale (Employee.ts) already averages only the LIVING roster) stays at 0 long enough for WorkerRevolt.ts to end the level in a permanent revolt -- see the Findings on the campaign status step for the full trajectory. #586-followup (this session's own fix, real interaction-mode CI failure): pattern 1 used to carry ~100 ticks of dead post-drilling tick padding before its own charge step (holes finished landing at real tick 170, charge wasn't issued until tick 270, sandbox-confirmed) -- long enough that wellbeing crashed to 0 and stayed there past WorkerRevolt.ts's REVOLT_TICKS (120) window *during pattern 1's own charge wait*, before its `blast` step ever ran; that is what the interaction-mode click failure on `#bs-blast-panel [data-step=\"3\"]` actually was -- the level-end overlay was already up, not a transient click race. Removing the dead padding lets pattern 1's charge/blast complete at wellbeing 0 but only ~70 ticks into the 120-tick revolt window, comfortably before it fires; the revolt (still this file's real ending) now lands during pattern 2 instead, after its own 25 holes are already drilled. The two survey steps (core_sample at (10,10), seismic at (20,20)) that gate the survey-confidence-overlay screenshot are untouched command-for-command, interaction-block-for-interaction-block from the version already confirmed via an inspected screenshot (not just source reading) to render the overlay genuinely -- the stale 'FAILS until GameRenderer wires survey overlay into syncFromContext()' warning this file previously carried is no longer true; a fresh interaction-mode run re-captures the same screenshots at whatever step index this longer file now gives them, not re-inspected as part of this #553 pass (command-mode only per this pass's own verification scope).",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow cash:3000000",
@@ -1154,8 +1154,7 @@
           "surveyCount": 2,
           "orderedHoleCount": 16,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "cash": 0
@@ -1234,7 +1233,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step and every step through the rest of pattern 1 (charge/sequence/blast/state full/finances/scores/stats/tick/contract-accept/contract-deliver) -- this whole stretch reuses the same cash value the preceding resolveEventIfPending checkpoint already stopped pinning (its own note above has the mechanism), and any drift baked in there would otherwise resurface unchanged at every one of these free (zero-tick-cost) actions. tickCount/holeCount/chargedCount/sequencedCount/deathCount/employeeCount/activeContractCount stay exact throughout -- none of those are wall-clock-sensitive.",
+      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step and every step through the rest of pattern 1 (charge/blast/state full/finances/scores/stats/tick/contract-accept/contract-deliver) -- this whole stretch reuses the same cash value the preceding resolveEventIfPending checkpoint already stopped pinning (its own note above has the mechanism), and any drift baked in there would otherwise resurface unchanged at every one of these free (zero-tick-cost) actions. tickCount/holeCount/chargedCount/deathCount/employeeCount/activeContractCount stay exact throughout -- none of those are wall-clock-sensitive.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1262,8 +1261,7 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "holeCount": 16,
-          "sequencedCount": 0
+          "holeCount": 16
         },
         "changedBy": {
           "tickCount": 0
@@ -1303,43 +1301,9 @@
           "surveyCount": 2,
           "holeCount": 16,
           "chargedCount": 16,
-          "sequencedCount": 0,
           "orderedChargeCount": 0
         }
       }
-    },
-    {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 16,
-          "chargedCount": 16,
-          "sequencedCount": 16
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "description": " #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically — e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame."
     },
     {
       "command": "weather set sunny",
@@ -1358,7 +1322,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -1390,8 +1354,7 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -1458,8 +1421,8 @@
           "surveyCount": 2,
           "wellBeing": 15.48750000000001,
           "safety": 50,
-          "ecology": 52.93626354005779,
-          "nuisance": 41.1656588501446
+          "ecology": 52.794689691413524,
+          "nuisance": 40.81172422853395
         },
         "changedBy": {
           "tickCount": 0
@@ -1485,8 +1448,8 @@
           "surveyCount": 2,
           "wellBeing": 15.48750000000001,
           "safety": 50,
-          "ecology": 52.93626354005779,
-          "nuisance": 41.1656588501446
+          "ecology": 52.794689691413524,
+          "nuisance": 40.81172422853395
         },
         "changedBy": {
           "tickCount": 0
@@ -2045,7 +2008,7 @@
     },
     {
       "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:15,20",
-      "description": "#553: 25 holes ordered as ghosts, same as pattern 1. #586-followup: this pattern IS fully landed now (all 25 holes, sandbox-confirmed) -- pattern 1's own dead-padding fix (see the top-level description) freed enough of the wellbeing-vs-revolt margin that pattern 2's crew finishes drilling before the permanent revolt fires; the revolt still ends the level (see the worker-revolt Finding on the tick-drain below), just after pattern 2's own 25th hole lands rather than cutting the pattern short. This pattern's own charge/sequence/blast are never reached, in place of a third blast. #1151: moved from start:15,15 to start:15,20. The first blast above leaves a crater right where this second pattern used to sit, and under the 30-degree slope gate a fresh crater floor is no longer walkable from its own rim -- that is the rule working as specified (gentle enough and a worker walks it, steeper and it has to be cut into a ramp), not a routing defect. Measured by replaying this file's own steps to this point: five of the old 25 holes -- (15,15) (18,15) (21,15) (15,18) (18,18) -- sat inside the crater and could never be claimed, stalling the drain. start:15,20 is the nearest origin whose whole 5x5 grid is on ground the surviving crew can still walk; this file buys no digger and cuts no ramp, so drilling outside the crater is the only option open to it.",
+      "description": "#553: 25 holes ordered as ghosts, same as pattern 1. #586-followup: this pattern IS fully landed now (all 25 holes, sandbox-confirmed) -- pattern 1's own dead-padding fix (see the top-level description) freed enough of the wellbeing-vs-revolt margin that pattern 2's crew finishes drilling before the permanent revolt fires; the revolt still ends the level (see the worker-revolt Finding on the tick-drain below), just after pattern 2's own 25th hole lands rather than cutting the pattern short. This pattern's own charge/blast are never reached, in place of a third blast. #1151: moved from start:15,15 to start:15,20. The first blast above leaves a crater right where this second pattern used to sit, and under the 30-degree slope gate a fresh crater floor is no longer walkable from its own rim -- that is the rule working as specified (gentle enough and a worker walks it, steeper and it has to be cut into a ramp), not a routing defect. Measured by replaying this file's own steps to this point: five of the old 25 holes -- (15,15) (18,15) (21,15) (15,18) (18,18) -- sat inside the crater and could never be claimed, stalling the drain. start:15,20 is the nearest origin whose whole 5x5 grid is on ground the surviving crew can still walk; this file buys no digger and cuts no ramp, so drilling outside the crater is the only option open to it.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -2087,8 +2050,7 @@
           "surveyCount": 2,
           "orderedHoleCount": 25,
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -2727,7 +2689,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 48.308294250723314
+          "nuisance": 46.538621142670024
         }
       }
     },
@@ -2750,7 +2712,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 48.308294250723314
+          "nuisance": 46.538621142670024
         }
       }
     },
@@ -2773,7 +2735,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 48.308294250723314,
+          "nuisance": 46.538621142670024,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

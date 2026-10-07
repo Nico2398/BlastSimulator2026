@@ -37,13 +37,15 @@ function generateAllTutorialKeys(): string[] {
   for (let i = 1; i <= 23; i++) {
     // #1328: steps 20-22 (set-policy/tick-advance/victory) became free-play.
     // #1335: step 12 (contract-accept) removed.
-    if (i === 1 || i === 12 || i === 18 || (i >= 20 && i <= 22)) continue;
+    // #1344: step 7 (detonation sequence) removed.
+    if (i === 1 || i === 7 || i === 12 || i === 18 || (i >= 20 && i <= 22)) continue;
     keys.push(`tutorial.step${i}`);
   }
   for (let i = 1; i <= 23; i++) {
     // #1328: steps 20-22 (set-policy/tick-advance/victory) became free-play.
     // #1335: step 12 (contract-accept) removed.
-    if (i === 1 || i === 12 || i === 18 || (i >= 20 && i <= 22)) continue;
+    // #1344: step 7 (detonation sequence) removed.
+    if (i === 1 || i === 7 || i === 12 || i === 18 || (i >= 20 && i <= 22)) continue;
     keys.push(`tutorial.step${i}.title`);
   }
   keys.push('tutorial.free_play', 'tutorial.free_play.title', 'tutorial.goal_chip', 'tutorial.goal_chip_tooltip');

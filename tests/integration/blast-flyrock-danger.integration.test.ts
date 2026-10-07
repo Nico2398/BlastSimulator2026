@@ -10,7 +10,6 @@ import {
   blastCommand,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   type MiningContext,
 } from '../../src/console/commands/mining.js';
 
@@ -113,7 +112,6 @@ function blastAt(ctx: MiningContext, stemming: string): void {
   const ordered = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
   expect(ordered.success, ordered.output).toBe(true);
   driveChargePlanToCompletion(ctx);
-  sequenceCommand(ctx, ['auto'], { delay_step: '25' });
   const result = blastCommand(ctx, [], {});
   expect(result.success, result.output).toBe(true);
 }
@@ -245,7 +243,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
     driveDrillPlanToCompletion(reckless);
     chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
     driveChargePlanToCompletion(reckless);
-    sequenceCommand(reckless, ['auto'], {});
     const output = blastCommand(reckless, [], {}).output;
 
     expect(output).toMatch(/Furthest throw: \d+\.\d m/);
@@ -283,7 +280,6 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['auto'], { delay_step: '25' });
     const result = blastCommand(ctx, [], {});
     expect(result.success, result.output).toBe(true);
 

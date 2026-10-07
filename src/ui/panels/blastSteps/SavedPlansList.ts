@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Blast Workshop / Drill step: saved blast plans.
 //
 // Gap G6: `blast_plan save [name:<n>]` / `blast_plan load [name:<n>]` are real
-// gameplay commands — they snapshot and restore the holes, charges and delays
+// gameplay commands — they snapshot and restore the holes and charges
 // a player just built — and had no button anywhere in the UI. A plan could be
 // saved from the console and never from the game, which the project treats as
 // a bug, not a missing convenience.
@@ -85,8 +85,8 @@ export class SavedPlansList {
     const saveRow = el('div', { children: [this.nameInput, saveBtn] });
     saveRow.style.cssText = 'display:flex;gap:7px;align-items:center';
 
-    // Bounded + independently scrollable, same reasoning as the Sequence step's
-    // hole rows: a long-running site accumulates saved plans, and they must not
+    // Bounded + independently scrollable, same reasoning as the Charge step's
+    // product list: a long-running site accumulates saved plans, and they must not
     // push the hole list past the panel's fold.
     this.listEl = scrollBoundedSection([], 120, { gap: 3 });
 

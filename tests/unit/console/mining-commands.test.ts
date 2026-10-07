@@ -10,7 +10,6 @@ import {
   chargeCommand,
   drillPlanCommand,
   previewCommand,
-  sequenceCommand,
   surveyCommand,
   tubingCommand,
 } from '../../../src/console/commands/mining.js';
@@ -53,7 +52,7 @@ function makeMiningContext(): MiningContext {
  * Ticks the game loop until every hole ordered by the most recent
  * `drill_plan grid/add` has landed in `state.drillHoles` (#553), or
  * `maxTicks` is exhausted. Needed anywhere a test drills a plan and then
- * immediately charges/sequences/blasts it — those all read `state.drillHoles`,
+ * immediately charges/blasts it — those all read `state.drillHoles`,
  * which now only gains a hole once its own `drill_hole` action completes.
  *
  * Tops every employee's fatigue gauge up before each tick: this file's plans
@@ -174,7 +173,6 @@ describe('blastPlanCommand — validate subcommand', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const result = blastPlanCommand(ctx, ['validate'], {});
 
@@ -198,20 +196,17 @@ describe('drillPlanCommand — remove subcommand', () => {
     expect(ctx.state!.drillHoles.map(h => h.id)).toEqual(['H2']);
   });
 
-  it('drops the removed hole\'s charge and sequence delay entries', () => {
+  it('drops the removed hole\'s charge entry', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '25ms' });
     expect(ctx.state!.chargesByHole['H1']).toBeDefined();
-    expect(ctx.state!.sequenceDelays['H1']).toBeDefined();
 
     drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
 
     expect(ctx.state!.chargesByHole['H1']).toBeUndefined();
-    expect(ctx.state!.sequenceDelays['H1']).toBeUndefined();
   });
 
   it('returns success:false and leaves the plan untouched for an unknown hole ID', () => {
@@ -241,31 +236,29 @@ describe('drillPlanCommand — remove subcommand', () => {
   });
 
   // ── characterization (#634): removing a *drilled* hole deletes its charge,
-  // sequence delay, AND plannedChargesByHole entry — all three seeded
+  // AND plannedChargesByHole entry — both seeded
   // manually here (a real drill/charge flow never populates
   // plannedChargesByHole for an already-drilled hole) to pin the full
-  // teardown triple the refactor's clearHoleCharges must reproduce exactly.
-  it('removing a drilled hole deletes its charge, sequence delay, AND plannedChargesByHole entry', () => {
+  // teardown pair the refactor's clearHoleCharges must reproduce exactly.
+  it('removing a drilled hole deletes its charge AND plannedChargesByHole entry', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     const holeId = ctx.state!.drillHoles[0]!.id;
     ctx.state!.chargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
     ctx.state!.plannedChargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
-    ctx.state!.sequenceDelays[holeId] = 25;
 
     const result = drillPlanCommand(ctx, ['remove'], { hole: holeId });
 
     expect(result.success).toBe(true);
     expect(ctx.state!.chargesByHole[holeId]).toBeUndefined();
     expect(ctx.state!.plannedChargesByHole[holeId]).toBeUndefined();
-    expect(ctx.state!.sequenceDelays[holeId]).toBeUndefined();
   });
 });
 
 // ── drill_plan remove — planned (not-yet-drilled) hole branch (#634) ───────
-// No existing test exercises this branch's own charge/sequence/planned-charge
-// cleanup — the "drops the removed hole's charge and sequence delay entries"
+// No existing test exercises this branch's own charge/planned-charge
+// cleanup — the "drops the removed hole's charge entry"
 // test above only covers the already-drilled branch.
 
 describe('drillPlanCommand — remove subcommand, planned (not-yet-drilled) hole branch', () => {
@@ -283,41 +276,36 @@ describe('drillPlanCommand — remove subcommand, planned (not-yet-drilled) hole
     expect(ctx.state!.plannedDrillHoles.map(h => h.id)).toEqual(['H2']);
   });
 
-  it('removing a planned hole deletes its charge, sequence delay, AND plannedChargesByHole entry', () => {
+  it('removing a planned hole deletes its charge AND plannedChargesByHole entry', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     const holeId = ctx.state!.plannedDrillHoles[0]!.id;
     ctx.state!.chargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
     ctx.state!.plannedChargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
-    ctx.state!.sequenceDelays[holeId] = 25;
 
     const result = drillPlanCommand(ctx, ['remove'], { hole: holeId });
 
     expect(result.success).toBe(true);
     expect(ctx.state!.chargesByHole[holeId]).toBeUndefined();
     expect(ctx.state!.plannedChargesByHole[holeId]).toBeUndefined();
-    expect(ctx.state!.sequenceDelays[holeId]).toBeUndefined();
   });
 });
 
 describe('drillPlanCommand — clear subcommand', () => {
-  it('empties holes, charges, and sequence delays', () => {
+  it('empties holes and charges', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['auto'], {});
     expect(ctx.state!.drillHoles.length).toBe(2);
     expect(Object.keys(ctx.state!.chargesByHole).length).toBe(2);
-    expect(Object.keys(ctx.state!.sequenceDelays).length).toBe(2);
 
     const result = drillPlanCommand(ctx, ['clear'], {});
 
     expect(result.success).toBe(true);
     expect(ctx.state!.drillHoles).toEqual([]);
     expect(ctx.state!.chargesByHole).toEqual({});
-    expect(ctx.state!.sequenceDelays).toEqual({});
   });
 
   it('succeeds as a no-op when the plan is already empty', () => {
@@ -551,7 +539,7 @@ describe('tubingCommand — buy subcommand', () => {
 describe('blast_preview', () => {
   /**
    * Helper: create a mining context with a single-hole plan already set up
-   * (1 hole, 1 charge, 1 sequence delay). Optionally sets software tier.
+   * (1 hole, 1 charge). Optionally sets software tier.
    */
   function makePlan(ctx: MiningContext, tier?: number): void {
     if (tier !== undefined) ctx.state!.softwareTier = tier;
@@ -559,7 +547,6 @@ describe('blast_preview', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
   // ── guard: no game loaded ───────────────────────────────────────────────────
@@ -687,7 +674,6 @@ describe('blast_preview — state.lastBlastPreview', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
   it('is null before any preview has run', () => {
@@ -1027,7 +1013,6 @@ describe('blastCommand — riders of a vehicle destroyed by flying rock (#1389)'
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const state = ctx.state!;
     const vehicle = state.vehicles.vehicles.find(v => v.type === 'debris_hauler')!;
@@ -1061,7 +1046,6 @@ describe('blastCommand — ore report event wiring', () => {
 
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const mockedReport = {
       oreYields: { dirtite: 1300 },
@@ -1096,7 +1080,6 @@ describe('blastCommand — ore report event wiring', () => {
 
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const mockedReport = {
       oreYields: { dirtite: 1300 },
@@ -1129,7 +1112,6 @@ describe('blastCommand — ore report event wiring', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
     // #554: charging is real work — driveChargePlanToCompletion above ticks
     // the clock forward, so the tick this report should carry is set here,
     // right before blasting, not before the charge (and its own ticks) ran.
@@ -1152,7 +1134,6 @@ describe('blastCommand — ore report event wiring', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['auto'], {});
 
     const result = blastCommand(ctx, [], {});
 
@@ -1330,7 +1311,7 @@ describe('chargeCommand — stemming floor', () => {
 // Characterizes the inline ternary at the top of chargeCommand's non-'*'
 // branch: a spec matching a real drilled OR planned hole id resolves to that
 // exact id; anything else falls back to the legacy hole_${spec} form.
-// Unlike sequenceCommand/tubingCommand below, chargeCommand DOES check the
+// Unlike tubingCommand below, chargeCommand DOES check the
 // planned pool — that's the intentional divergence pinned in case 4/5.
 
 describe('chargeCommand — hole id resolution', () => {
@@ -1375,55 +1356,6 @@ describe('chargeCommand — hole id resolution', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe('Hole "hole_42" not found');
-  });
-});
-
-// ── sequenceCommand set — hole id resolution (#634) ─────────────────────────
-// Characterizes the inline ternary in sequenceCommand's 'set' branch: unlike
-// chargeCommand, this one checks ONLY state.drillHoles, never
-// plannedDrillHoles — an existing, intentional divergence pinned here as
-// current behavior, not treated as a bug.
-
-describe('sequenceCommand — set subcommand, hole id resolution', () => {
-  it('a spec matching a drilled hole\'s real id resolves and sets sequenceDelays under that exact key', () => {
-    const ctx = makeMiningContext();
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    driveDrillPlanToCompletion(ctx);
-    const holeId = ctx.state!.drillHoles[0]!.id;
-
-    const result = sequenceCommand(ctx, ['set'], { hole: holeId, delay: '25ms' });
-
-    expect(result.success).toBe(true);
-    expect(ctx.state!.sequenceDelays[holeId]).toBe(25);
-  });
-
-  it('a spec matching only a planned (undrilled) hole\'s id falls through to the hole_${spec} legacy form, which is not a drilled hole and is refused', () => {
-    const ctx = makeMiningContext();
-    ctx.state!.cash = 999_999;
-    tubingCommand(ctx, ['buy'], { amount: '1' });
-    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
-    const holeId = ctx.state!.plannedDrillHoles[0]!.id;
-    expect(ctx.state!.drillHoles).toEqual([]);
-
-    const result = tubingCommand(ctx, ['install'], { hole: holeId });
-
-    expect(result.success).toBe(false);
-    expect(result.output).toBe(`Hole "hole_${holeId}" not found`);
-    expect(ctx.state!.tubingState.installedHoles.size).toBe(0);
-    expect(ctx.state!.tubingState.inventory).toBe(1);
-  });
-
-  it('a spec matching neither pool (bare number, no hole_ prefix) resolves to hole_<spec> and is refused as unknown, inventory unchanged', () => {
-    const ctx = makeMiningContext();
-    ctx.state!.cash = 999_999;
-    tubingCommand(ctx, ['buy'], { amount: '1' });
-
-    const result = tubingCommand(ctx, ['install'], { hole: '42' });
-
-    expect(result.success).toBe(false);
-    expect(result.output).toBe('Hole "hole_42" not found');
-    expect(ctx.state!.tubingState.installedHoles.size).toBe(0);
-    expect(ctx.state!.tubingState.inventory).toBe(1);
   });
 });
 
@@ -2044,7 +1976,7 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
 // ── #790 characterization tests ─────────────────────────────────────────────
 // The refactor extracts requireGameWithSub/dispatchDrillHoleAction/
 // assembleCurrentBlastPlan/validateCurrentBlastPlan/formatBlastPlanErrors as
-// shared helpers behind drillPlanCommand/sequenceCommand/blastPlanCommand/
+// shared helpers behind drillPlanCommand/blastPlanCommand/
 // tubingCommand/previewCommand's existing bodies. These tests pin the current,
 // pre-refactor observable behavior of those public command functions so the
 // refactor can be proven behavior-preserving: they pass today against the
@@ -2058,15 +1990,6 @@ describe('drillPlanCommand — requires a loaded game', () => {
   it('returns success:false with "No game loaded" when ctx.state is null', () => {
     const ctx = makeEmptyGameContext();
     const result = drillPlanCommand(ctx, ['grid'], {});
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('No game loaded');
-  });
-});
-
-describe('sequenceCommand — requires a loaded game', () => {
-  it('returns success:false with "No game loaded" when ctx.state is null', () => {
-    const ctx = makeEmptyGameContext();
-    const result = sequenceCommand(ctx, ['set'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
   });
@@ -2197,7 +2120,7 @@ describe('drillPlanCommand — omitted diameter defaults to DRILL_HOLE_DEFAULT_D
 describe('previewCommand (#790 characterization)', () => {
   /**
    * Mirrors blast_preview's own makePlan helper above: a single-hole plan
-   * (1 hole, 1 charge, 1 sequence delay), optionally at a given software tier.
+   * (1 hole, 1 charge), optionally at a given software tier.
    */
   function makePlan(ctx: MiningContext, tier?: number): void {
     if (tier !== undefined) ctx.state!.softwareTier = tier;
@@ -2205,7 +2128,6 @@ describe('previewCommand (#790 characterization)', () => {
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
   it('returns the usage message with no subcommand', () => {

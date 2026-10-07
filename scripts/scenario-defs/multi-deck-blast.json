@@ -362,26 +362,11 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
         },
         {
           "type": "clickSelector",
@@ -405,12 +390,11 @@
         }
       ],
       "role": "player",
-      "description": "blast — Fire step's Execute -> confirm -> report-close path, same click sequence as the sibling files (presplit-wall.json, level1-lose-ecology.json). The blast panel is already open (opened at the drill_plan step above) and stays open through every per-hole charge/sequence step, so no panel-open click is needed here.",
+      "description": "blast — Fire step's Execute -> confirm -> report-close path, same click sequence as the sibling files (presplit-wall.json, level1-lose-ecology.json). The blast panel is already open (opened at the drill_plan step above) and stays open through every per-hole charge step, so no panel-open click is needed here.",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero — confirms the blast actually ran (rating PERFECT, 0 projections, matching this file's own 'deep fracture, no surface projection' premise) rather than being silently rejected by validateBlastPlan, which Finding #7's bug would have caused before the hole-id fix"
       }

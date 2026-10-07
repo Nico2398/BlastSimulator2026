@@ -112,7 +112,7 @@ export class PreviewStep {
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
   update(state: GameState): void {
-    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
+    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const errors = state.drillHoles.length > 0 ? validateBlastPlan(plan) : [];
     const canAnalyze = state.drillHoles.length > 0 && errors.length === 0;
 

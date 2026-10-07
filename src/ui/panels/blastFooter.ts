@@ -83,7 +83,7 @@ export class BlastFooter {
   setFireRequestedHandler(cb: () => void): void { this.onFireRequested = cb; }
 
   update(state: GameState, tutorialActive: boolean = false): void {
-    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
+    const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const errors = validateBlastPlan(plan, new Set(Object.keys(state.plannedChargesByHole)));
     const hasHoles = plan.holes.length > 0;
     const baseFireOk = hasHoles && errors.length === 0;

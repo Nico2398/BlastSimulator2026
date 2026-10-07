@@ -1,6 +1,6 @@
 {
   "name": "employee-training",
-  "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs the deleted playtests/training.json's beats required -- then complete a blast task. #553: drill_hole is now a queued, vehicle-gated action (a driller physically drives a drill_rig to each hole), so this file also trains driving.drill_rig (no role starts with it either) and buys a drill_rig -- without both, the drill_plan below would queue forever with no vehicle able to claim it. campaign start was replaced with new_game: a manually-bought vehicle spawns at grid centre (FleetPanel/vehicle.ts), and dusty_hollow's 96x40x96 campaign grid put that centre far enough from the drill site to matter; new_game's 64x64x64 default halves the trip. blasting_academy moved from (7,5) (2 tiles from driving_center at (5,5)) to (5,15): enrolInTraining teleports the trainee to one tile outside the school's footprint (EmployeeTraining.ts) on enrolment -- two schools placed that close land the post-training teleport on top of the other school's own footprint, an unreachable navmesh cell that stranded the driller (and the drill_rig with it) permanently once blasting training finished last. drill_plan grid shrunk from 3x3 (9 holes) to 2x2 (4 holes): a single driller/drill_rig lands one hole roughly every 40-45 ticks door-to-door, so 9 holes risked the site's own cash burn (no income anywhere in this file) before the plan finished -- 4 is enough to prove charge/sequence/blast still work post-#553. `event choose 0` follows every tick block: idempotent no-op when nothing is pending (a bare `tick` command refuses outright once one is), and this file's own ~250-tick training-then-drilling runway is long enough for the real event timers to fire at least once (verified: an Aesthetic Pollution lawsuit fires here on seed 42).",
+  "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs the deleted playtests/training.json's beats required -- then complete a blast task. #553: drill_hole is now a queued, vehicle-gated action (a driller physically drives a drill_rig to each hole), so this file also trains driving.drill_rig (no role starts with it either) and buys a drill_rig -- without both, the drill_plan below would queue forever with no vehicle able to claim it. campaign start was replaced with new_game: a manually-bought vehicle spawns at grid centre (FleetPanel/vehicle.ts), and dusty_hollow's 96x40x96 campaign grid put that centre far enough from the drill site to matter; new_game's 64x64x64 default halves the trip. blasting_academy moved from (7,5) (2 tiles from driving_center at (5,5)) to (5,15): enrolInTraining teleports the trainee to one tile outside the school's footprint (EmployeeTraining.ts) on enrolment -- two schools placed that close land the post-training teleport on top of the other school's own footprint, an unreachable navmesh cell that stranded the driller (and the drill_rig with it) permanently once blasting training finished last. drill_plan grid shrunk from 3x3 (9 holes) to 2x2 (4 holes): a single driller/drill_rig lands one hole roughly every 40-45 ticks door-to-door, so 9 holes risked the site's own cash burn (no income anywhere in this file) before the plan finished -- 4 is enough to prove charge/blast still work post-#553. `event choose 0` follows every tick block: idempotent no-op when nothing is pending (a bare `tick` command refuses outright once one is), and this file's own ~250-tick training-then-drilling runway is long enough for the real event timers to fire at least once (verified: an Aesthetic Pollution lawsuit fires here on seed 42).",
   "steps": [
     {
       "command": "new_game seed:42 cash:150000",
@@ -621,23 +621,12 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -663,8 +652,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         }
       }
     },

@@ -1,6 +1,6 @@
 {
   "name": "building-destruction-visual",
-  "description": "Visual check of building destruction via blast: drill, charge, sequence, and detonate near warehouses. #553: drill_plan no longer writes holes instantly — a staffed driller/drill_rig must physically reach and drill each hole, so the two holes are ordered ON OPEN GROUND (via drill_plan add, one per building origin) and landed BEFORE either warehouse is built. Building a warehouse first would leave its footprint permanently un-navigable to the not-yet-drilled hole underneath it (buildings occupy blocked NavGrid cells; only an already-drilled hole's cell reclassifies to the walkable 'drill_hole' type) — a driller/drill_rig sent to drill under a standing building can never physically arrive there, so drill-then-build is not just tidier ordering here but the only sequence that can complete at all.",
+  "description": "Visual check of building destruction via blast: drill, charge, and detonate near warehouses. #553: drill_plan no longer writes holes instantly — a staffed driller/drill_rig must physically reach and drill each hole, so the two holes are ordered ON OPEN GROUND (via drill_plan add, one per building origin) and landed BEFORE either warehouse is built. Building a warehouse first would leave its footprint permanently un-navigable to the not-yet-drilled hole underneath it (buildings occupy blocked NavGrid cells; only an already-drilled hole's cell reclassifies to the walkable 'drill_hole' type) — a driller/drill_rig sent to drill under a standing building can never physically arrive there, so drill-then-build is not just tidier ordering here but the only sequence that can complete at all.",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000 staffed:true",
@@ -329,31 +329,15 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "sequencedCount": 2
-        }
-      },
-      "description": "role: player: explicit [data-step=\"3\"] click before Sequence controls -- relying on the panel's own autoAdvance to have already landed there is unreliable in a real interaction-mode run (element present but zero-size, i.e. a hidden inactive tab), same finding as level1-win-efficient.json/level1-playthrough-win.json/tutorial-playthrough.json."
-    },
-    {
       "command": "blast",
       "timeout": 70,
       "frames": 6,
       "interval": 50,
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -377,7 +361,6 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
           "buildingCount": 0
         },
         "note": "both warehouses (200/150 max HP) sit a few tiles from the two charged holes (#1390: placement refuses a footprint over a hole) and still get destroyed — the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: explosive_warehouse #1, freight_warehouse #2')"

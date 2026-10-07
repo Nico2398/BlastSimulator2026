@@ -42,17 +42,28 @@ describe('BlastWorkshop', () => {
     expect(workshop.visible).toBe(false);
   });
 
-  it('renders all 5 step labels', () => {
+  it('renders exactly 4 step labels: Drill, Charge, Preview, Fire (no Sequence)', () => {
     const { workshop } = makeWorkshop();
-    for (const label of ['Drill', 'Charge', 'Sequence', 'Preview', 'Fire']) {
+    for (const label of ['Drill', 'Charge', 'Preview', 'Fire']) {
       expect(workshop.root.textContent).toContain(label);
     }
+    expect(workshop.root.textContent).not.toContain('Sequence');
+  });
+
+  it('step tabs carry data-step 1..4 and there is no data-step 5', () => {
+    const { workshop } = makeWorkshop();
+    const steps = Array.from(workshop.root.querySelectorAll('[data-step]')).map(e => e.getAttribute('data-step'));
+    for (const n of ['1', '2', '3', '4']) expect(steps).toContain(n);
+    expect(steps).not.toContain('5');
+    expect(workshop.root.querySelector('[data-step="4"]')!.textContent).toContain('Fire');
+    expect(workshop.root.querySelector('[data-step="3"]')!.textContent).toContain('Preview');
   });
 
   it('the load-bearing data-action selectors resolve under #bs-blast-panel', () => {
     const { workshop } = makeWorkshop();
     expect(workshop.root.id).toBe('bs-blast-panel');
-    for (const action of ['grid-tool', 'clear-holes', 'charge-all', 'auto-sequence', 'execute']) {
+    expect(workshop.root.querySelector('[data-action="auto-sequence"]')).toBeNull();
+    for (const action of ['grid-tool', 'clear-holes', 'charge-all', 'execute']) {
       expect(workshop.root.querySelector(`[data-action="${action}"]`), `missing [data-action="${action}"]`).not.toBeNull();
     }
   });
@@ -94,7 +105,7 @@ describe('BlastWorkshop', () => {
 
     workshop.update(state, 'sunny');
 
-    expect(workshop.currentStep).toBe(3);
+    expect(workshop.currentStep).toBe(4);
   });
 
   it('auto-advances to Charge once holes exist but are not fully charged', () => {
@@ -109,7 +120,7 @@ describe('BlastWorkshop', () => {
     expect(chargeAllBtn.closest('div[style*="display: none"]')).toBeNull();
   });
 
-  it('auto-advances to Sequence once every hole is charged', () => {
+  it('auto-advances to Fire once drilled and charged (no sequencing needed)', () => {
     const { workshop } = makeWorkshop();
     workshop.show();
     const state = makeState();
@@ -119,21 +130,7 @@ describe('BlastWorkshop', () => {
 
     workshop.update(state, 'sunny');
 
-    const autoSeqBtn = workshop.root.querySelector('[data-action="auto-sequence"]') as HTMLElement;
-    expect(autoSeqBtn.closest('div[style*="display: none"]')).toBeNull();
-  });
-
-  it('auto-advances to Fire once drilled, charged, and sequenced', () => {
-    const { workshop } = makeWorkshop();
-    workshop.show();
-    const state = makeState();
-    const hole = addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.15);
-    const chargeResult = createCharge('boomite', 5, 2, hole.depth);
-    if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
-    state.sequenceDelays[hole.id] = 0;
-
-    workshop.update(state, 'sunny');
-
+    expect(workshop.currentStep).toBe(4);
     const fireBtn = workshop.root.querySelector('#bs-blast-fire') as HTMLElement;
     expect(fireBtn.closest('div[style*="display: none"]')).toBeNull();
   });
@@ -157,7 +154,7 @@ describe('BlastWorkshop', () => {
     workshop.show();
     const state = makeState();
     workshop.update(state, 'sunny');
-    tabButton(workshop.root, 'Sequence').click(); // manual pick, disables auto-advance
+    tabButton(workshop.root, 'Charge').click(); // manual pick, disables auto-advance
     workshop.hide();
 
     workshop.show(); // fresh open re-enables auto-advance
@@ -197,7 +194,7 @@ describe('BlastWorkshop', () => {
   // ── Short-viewport reachability (#958) ──
   //
   // #bs-panel-body is the single outer scroll owner for every step (Drill,
-  // Charge, Sequence, Preview, Fire all mount into it — see BlastWorkshop.ts's
+  // Charge, Preview, Fire all mount into it — see BlastWorkshop.ts's
   // constructor). Bounding an inner list (e.g. Drill's hole list) must never
   // come at the cost of this outer container's own scrollability — otherwise
   // a short viewport with every inner wrapper already at its own max-height

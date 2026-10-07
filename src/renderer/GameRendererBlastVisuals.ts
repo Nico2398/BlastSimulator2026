@@ -89,30 +89,17 @@ export function onBlast(deps: BlastVisualsDeps, ctx: MiningContext): void {
     oz,
   );
 
-  // Build per-hole detonation list from sequence delays
-  const holes: import('./BlastEffects.js').HoleDetonation[] = [];
-  const sequenceDelays = ctx.state.sequenceDelays;
-
-  // If we have sequence delays, use them for per-hole timing
-  if (Object.keys(sequenceDelays).length > 0) {
-    for (const [holeId, delayMs] of Object.entries(sequenceDelays)) {
-      // Find hole position from last known drill holes
-      const holePos = ctx.lastBlastHoles?.find(h => h.id === holeId)
-        ?? ctx.state.drillHoles.find(h => h.id === holeId);
-      if (holePos) {
-        holes.push({
-          x: holePos.x,
-          y: deps.getTerrainSurfaceY(holePos.x, holePos.z),
-          z: holePos.z,
-          delaySeconds: delayMs / 1000,
-        });
-      }
-    }
-  }
+  // Every charge fires together: one detonation per hole from the last blast's holes.
+  const blastHoles = ctx.lastBlastHoles ?? ctx.state.drillHoles;
+  const holes: import('./BlastEffects.js').HoleDetonation[] = blastHoles.map(h => ({
+    x: h.x,
+    y: deps.getTerrainSurfaceY(h.x, h.z),
+    z: h.z,
+  }));
 
   // Fallback: single explosion at centroid if no per-hole data
   if (holes.length === 0) {
-    holes.push({ x: ox, y: origin.y, z: oz, delaySeconds: 0 });
+    holes.push({ x: ox, y: origin.y, z: oz });
   }
 
   deps.blastEffects.trigger({
@@ -123,12 +110,12 @@ export function onBlast(deps: BlastVisualsDeps, ctx: MiningContext): void {
 }
 
 /**
- * Show blast plan overlay from current drill/charge/sequence state.
- * Call from main.ts after drill_plan, charge, or sequence commands.
+ * Show blast plan overlay from current drill/charge state.
+ * Call from main.ts after drill_plan or charge commands.
  */
 export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext): void {
   if (!deps.blastOverlay || !ctx.state) return;
-  const { drillHoles, plannedDrillHoles, chargesByHole, plannedChargesByHole, sequenceDelays, softwareTier } = ctx.state;
+  const { drillHoles, plannedDrillHoles, chargesByHole, plannedChargesByHole, softwareTier } = ctx.state;
   const allHoles = [...drillHoles, ...plannedDrillHoles];
   if (allHoles.length === 0) { deps.blastOverlay.hide(); return; }
 
@@ -141,10 +128,10 @@ export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext)
   // fragment-size dots and projection arcs never render — their per-hole
   // fields stay undefined and the overlay's own guards skip them. Only
   // already-drilled holes have a charge to preview against — an ordered
-  // hole (#553) has no charge/delay/frag-size data yet.
+  // hole (#553) has no charge/frag-size data yet.
   let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
   if (softwareTier >= 2 && ctx.grid && drillHoles.length > 0) {
-    const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
+    const plan = assembleBlastPlan(drillHoles, chargesByHole);
     holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier, wetHoleIdSet(ctx));
   }
 
@@ -155,7 +142,6 @@ export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext)
       ...drillHoles.map(h => {
         const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {
           hole: h,
-          delayMs: sequenceDelays[h.id] ?? -1, // unsequenced: no label
           surfaceY: deps.getTerrainSurfaceY(h.x, h.z),
           drilled: true,
           chargeOrdered: h.id in plannedChargesByHole,
@@ -168,10 +154,9 @@ export function showBlastPlanOverlay(deps: BlastVisualsDeps, ctx: MiningContext)
         return hd;
       }),
       // Ordered-but-undrilled holes (#553) — rendered as ghosts by
-      // BlastPlanOverlay (drilled: false), no charge/delay/frag-size data.
+      // BlastPlanOverlay (drilled: false), no charge/frag-size data.
       ...plannedDrillHoles.map(h => ({
         hole: h,
-        delayMs: -1,
         surfaceY: deps.getTerrainSurfaceY(h.x, h.z),
         drilled: false,
       } satisfies import('./BlastPlanOverlay.js').HoleOverlayData)),

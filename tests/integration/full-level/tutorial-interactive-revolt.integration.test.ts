@@ -187,7 +187,7 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // Charging through the blast itself, same as
       // tutorial-interactive.json's own command-mode replay: resolve any
       // pending event, order the charge, wait for all 9 charges to land,
-      // resolve any pending event, auto-sequence, blast (steps
+      // resolve any pending event, blast (steps
       // drillPlanWaitIdx+1..blastIdx inclusive).
       const blastResults = runSteps(engine, steps.slice(drillPlanWaitIdx + 1, blastIdx + 1), outDir);
 

@@ -3,10 +3,8 @@
 // Gap G3: `charge hole:<id> explosive:… amount:…kg stemming:…m` is a real
 // gameplay command that had no button at all — the Charge step only ever
 // exposed CHARGE ALL, so a player could not charge one hole differently from
-// the rest while the console could. This is the missing control, shaped like
-// the Sequence step's per-hole delay rows (`[data-hole="H1"]
-// [data-action="delay-inc"]`): one row per hole keyed by `data-hole`, with its
-// own commit button at `[data-hole="H1"] [data-action="charge-hole"]`.
+// the rest while the console could. This is the missing control: one row per
+// hole keyed by `data-hole`, with its own commit button at `[data-hole="H1"] [data-action="charge-hole"]`.
 //
 // Its own module rather than more of Charge.ts: that file was already over the
 // 300-line convention before these rows existed.
@@ -53,7 +51,7 @@ export class ChargeHoleList {
     );
 
     // Bounded + independently scrollable, same reasoning as the Charge step's
-    // product list and the Sequence step's hole rows: a full plan (16 holes)
+    // product list: a full plan (16 holes)
     // would otherwise push the tubing block past the panel's fold.
     this.listEl = scrollBoundedSection([], 160, { gap: 3 });
 

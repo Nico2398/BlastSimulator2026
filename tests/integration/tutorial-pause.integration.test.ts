@@ -158,7 +158,6 @@ describe('Tutorial pause behaviour (#371)', () => {
       }
       runner.run('tick 1');
     }
-    expect(runner.run('sequence auto delay_step:25').success).toBe(true);
     expect(runner.run('blast').success).toBe(true);
 
     const state = ctx.state!;

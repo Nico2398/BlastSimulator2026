@@ -70,7 +70,7 @@
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
       "timeout": 30,
-      "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here rather than three steps later; autoAdvance is untouched (no tab is clicked anywhere in this file), so the panel still walks itself Drill -> Charge -> Sequence -> Fire as the plan completes, which is what the Fire step below checks.",
+      "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here rather than three steps later; autoAdvance is untouched (no tab is clicked anywhere in this file), so the panel still walks itself Drill -> Charge -> Preview -> Fire as the plan completes, which is what the Fire step below checks.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -144,27 +144,6 @@
       }
     },
     {
-      "command": "sequence set hole:H1 delay:0ms",
-      "timeout": 30,
-      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. H1 has no delay at all at this point (Auto Sequence never ran in this file), and adjustHoleDelay reads an absent delay as 0 and floors the result at 0 — so one decrement dispatches exactly the declared `sequence set hole:H1 delay:0ms`. Charging the only hole moved the panel to Sequence by itself, so no tab click is needed.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-action=\"delay-dec\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"delay-dec\"]"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "sequencedCount": 1
-        }
-      },
-      "role": "player"
-    },
-    {
       "command": "drill_plan add x:34 z:10 depth:6",
       "timeout": 30,
       "description": "role: bootstrap (same reason as the first drill_plan): order 1 more hole that stays undrilled (no tick follows), so plannedDrillHoles stays > 0 when FIRE is clicked (#1346).",
@@ -192,7 +171,7 @@
         },
         {
           "type": "ensureStep",
-          "step": 5
+          "step": 4
         },
         {
           "type": "awaitUsable",

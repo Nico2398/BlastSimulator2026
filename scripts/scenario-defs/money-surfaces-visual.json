@@ -173,26 +173,14 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
-      "timeout": 30,
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "sequencedCount": 4
-        }
-      }
-    },
-    {
       "command": "blast",
       "timeout": 60,
       "role": "player",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -217,8 +205,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "chargedCount": 0
         },
         "note": "a fired blast clears the plan back to zero; confirmed against the real dump — cash does not change here (charge/blast spend is not reflected in the serialized cash field for this pipeline, unlike a building/vehicle purchase)"
       }

@@ -7,7 +7,6 @@ import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast, villagePositions } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
@@ -166,8 +165,7 @@ describe('Blast enhanced', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 6, 1.5);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -182,9 +180,9 @@ describe('Blast enhanced', () => {
 
   it('empty plan returns null blast result', () => {
     const grid = new VoxelGrid(10, 10);
-    // Holes exist but no charges or delays → validation fails
+    // Holes exist but no charges → validation fails
     const holes = createGridPlan(holeCounter, { x: 5, z: 5 }, 1, 1, 3, 6, 0.15);
-    const plan = assembleBlastPlan(holes, {}, {});
+    const plan = assembleBlastPlan(holes, {});
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).toBeNull();
   });
@@ -203,8 +201,7 @@ describe('Blast enhanced', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -227,8 +224,7 @@ describe('Blast enhanced', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'dynatomics', 14, 1);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -250,8 +246,7 @@ describe('Blast enhanced', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'pop_rock', 2, 1);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -274,8 +269,7 @@ describe('Blast enhanced', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'pop_rock', 0.5, 0.5);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -317,8 +311,7 @@ describe('Blast enhanced', () => {
     for (const h of holes) holeDepths[h.id] = h.depth;
 
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 1.5);
-    const delays = autoVPattern(holes, 25);
-    const plan = assembleBlastPlan(holes, charges, delays);
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, VILLAGE_FAR);
     expect(result).not.toBeNull();
@@ -374,7 +367,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
   beforeEach(() => { holeCounter.nextHoleId = 1; });
 
   /** A Grumpstone Ridge game (unlocked through the campaign) with a 2x2 plan drilled and charged, ready to preview/blast. */
-  function chargedRidge(opts: { tier?: number; explosive?: string; noVillages?: boolean } = {}): GameContext {
+  function chargedRidge(opts: { tier?: number; explosive?: string; amountKg?: number; noVillages?: boolean } = {}): GameContext {
     const { runner, ctx } = createRunner();
     const run = (cmd: string) => runner.run(cmd);
     expect(run('new_game seed:42 size:32').success).toBe(true);
@@ -394,16 +387,10 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     tickUntilFresh(run, state, () => state.plannedDrillHoles.length === 0, 800);
     expect(state.drillHoles.length).toBe(4);
 
-    expect(run(`charge hole:* explosive:${opts.explosive ?? 'boomite'} amount:3 stemming:2`).success).toBe(true);
+    expect(run(`charge hole:* explosive:${opts.explosive ?? 'boomite'} amount:${opts.amountKg ?? 3} stemming:2`).success).toBe(true);
     tickUntilFresh(run, state, () => Object.keys(state.plannedChargesByHole).length === 0, 800);
     expect(Object.keys(state.chargesByHole).length).toBe(4);
-    for (const h of state.drillHoles) state.sequenceDelays[h.id] = 0;
     return ctx;
-  }
-
-  /** Overwrite the firing sequence: delay per hole index. */
-  function setDelays(ctx: GameContext, delayOf: (index: number) => number): void {
-    ctx.state!.drillHoles.forEach((h, i) => { ctx.state!.sequenceDelays[h.id] = delayOf(i); });
   }
 
   function previewMax(ctx: GameContext): number | null {
@@ -458,7 +445,7 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'boomite', 5, 1.5);
-    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, charges);
 
     const result = executeBlast(plan, grid, targets);
     expect(result!.vibrationAtVillages).toHaveLength(targets.length);
@@ -495,12 +482,11 @@ describe('Blast enhanced — village vibration (#1343)', () => {
     expect(quiet!).not.toBeCloseTo(loud!, 8);
   });
 
-  it('spreading the charges over more delay groups gives a lower maxVibration', () => {
-    const together = chargedRidge();
-    setDelays(together, () => 0);
-    const staggered = chargedRidge();
-    setDelays(staggered, i => i * 25);
-    expect(fire(staggered)).toBeLessThan(fire(together));
+  it('doubling every hole charge scales maxVibration by 2^0.7 (one scalar of total charge)', () => {
+    const base = fire(chargedRidge({ amountKg: 3 }));
+    const doubled = fire(chargedRidge({ amountKg: 6 }));
+    expect(base).toBeGreaterThan(0);
+    expect(doubled / base).toBeCloseTo(2 ** 0.7, 6);
   });
 
   it('a level without villages records zero vibration and does not crash', () => {

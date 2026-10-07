@@ -19,7 +19,6 @@ import {
   surveyCommand,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   blastCommand,
 } from '../../../src/console/commands/mining.js';
 import { contractCommand } from '../../../src/console/commands/economy.js';
@@ -110,10 +109,6 @@ describe('Tutorial Level — Contract Delivery', () => {
     expect(chargeResult.success).toBe(true);
     expect(chargeResult.output).toContain('Ordered charges');
     driveChargePlanToCompletion(ctx);
-
-    // 6. Auto-sequence
-    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
-    expect(seqResult.success).toBe(true);
 
     // 7. Blast
     const cashBeforeBlast = ctx.state!.cash;

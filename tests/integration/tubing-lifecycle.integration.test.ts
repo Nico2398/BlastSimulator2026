@@ -36,7 +36,6 @@ describe('tubing lifecycle via console (#1351)', () => {
 
     runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     drive(runner, ctx, () => Object.keys(ctx.state!.plannedChargesByHole).length === 0);
-    runner.run('sequence auto delay_step:25');
     expect(runner.run('blast').success).toBe(true);
     expect(ctx.state!.tubingState.installedHoles.size).toBe(0);
     expect(ctx.state!.tubingState.inventory).toBe(1);

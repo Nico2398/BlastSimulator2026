@@ -11,7 +11,6 @@ import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js
 import { VoxelGrid, firstEmptyLayerAboveGround } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { autoVPattern } from '../../../src/core/mining/Sequence.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
@@ -32,7 +31,7 @@ describe('SoftwarePreview — computeHoleContext', () => {
   it('surface Y is 0 for a hole above an empty column', () => {
     const grid = new VoxelGrid(5, 5);
     const holes = createGridPlan(holeCounter, { x: 2, z: 2 }, 1, 1, 3, 2, 0.1);
-    const plan = assembleBlastPlan(holes, {}, {});
+    const plan = assembleBlastPlan(holes, {});
     const ctx = computeHoleContext(plan, grid);
     expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(0);
   });
@@ -51,7 +50,7 @@ describe('SoftwarePreview — computeHoleContext', () => {
       fractureModifier: 1.0,
     });
     const holes = createGridPlan(holeCounter, { x: 3, z: 3 }, 1, 1, 3, 2, 0.1);
-    const plan = assembleBlastPlan(holes, {}, {});
+    const plan = assembleBlastPlan(holes, {});
 
     const ctx = computeHoleContext(plan, grid);
 
@@ -139,7 +138,7 @@ describe('SoftwarePreview — getBlastBBox', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 4, 2);
-    const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
+    const plan = assembleBlastPlan(holes, charges);
 
     const ctx = computeHoleContext(plan, grid);
     // Sanity: the surface really does sit below y=0.
@@ -170,7 +169,7 @@ describe('SoftwarePreview — getBlastBBox', () => {
     });
 
     const holes = createGridPlan(holeCounter, { x: -5, z: 5 }, 1, 1, 3, 4, 0.15);
-    const plan = assembleBlastPlan(holes, {}, {});
+    const plan = assembleBlastPlan(holes, {});
 
     const ctx = computeHoleContext(plan, grid);
     expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(1);

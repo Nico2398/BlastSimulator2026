@@ -437,7 +437,7 @@ describe('Performance Benchmarks', () => {
       const { makeCampaignCtx } = await import('../../integration/full-level/helpers.js');
       const { campaignCompleteCommand } = await import('../../../src/console/commands/campaign.js');
       const { employeeCommand } = await import('../../../src/console/commands/entities.js');
-      const { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } = await import('../../../src/console/commands/mining.js');
+      const { drillPlanCommand, chargeCommand, blastCommand } = await import('../../../src/console/commands/mining.js');
       const { tickCommand, eventCommand } = await import('../../../src/console/commands/events.js');
 
       const ctx = makeCampaignCtx('dusty_hollow');
@@ -447,7 +447,6 @@ describe('Performance Benchmarks', () => {
 
       drillPlanCommand(ctx as any, ['grid'], { origin: '10,10', rows: '2', cols: '2', spacing: '4', depth: '8' });
       chargeCommand(ctx as any, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-      sequenceCommand(ctx as any, ['auto'], {});
       blastCommand(ctx as any, [], {});
 
       // Tick a few times
@@ -580,10 +579,10 @@ describe('Performance Benchmarks', () => {
   });
 
   describe('Blast on level 4 (treranium_depths, 160×64×160) (#458 T6.2/D14)', () => {
-    it('completes drill → charge → sequence → blast within the benchmark budget', async () => {
+    it('completes drill → charge → blast within the benchmark budget', async () => {
       const { makeCampaignCtx } = await import('../../integration/full-level/helpers.js');
       const { employeeCommand } = await import('../../../src/console/commands/entities.js');
-      const { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } = await import('../../../src/console/commands/mining.js');
+      const { drillPlanCommand, chargeCommand, blastCommand } = await import('../../../src/console/commands/mining.js');
 
       const ctx = makeCampaignCtx('treranium_depths');
       employeeCommand(ctx, ['hire'], { role: 'driller' });
@@ -593,7 +592,6 @@ describe('Performance Benchmarks', () => {
 
       drillPlanCommand(ctx as any, ['grid'], { origin: '80,80', rows: '3', cols: '3', spacing: '5', depth: '8' });
       chargeCommand(ctx as any, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
-      sequenceCommand(ctx as any, ['auto'], {});
       const result = blastCommand(ctx as any, [], {});
 
       const elapsed = performance.now() - start;

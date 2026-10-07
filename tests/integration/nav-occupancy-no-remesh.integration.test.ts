@@ -28,7 +28,6 @@ import {
   blastCommand,
   drillPlanCommand,
   chargeCommand,
-  sequenceCommand,
   type MiningContext,
 } from '../../src/console/commands/mining.js';
 
@@ -116,7 +115,6 @@ describe('nav:occupancy_changed never triggers a terrain remesh (#1161)', () => 
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     driveChargePlanToCompletion(ctx);
-    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const callsBeforeBlast = spy.mock.calls.length;
 
