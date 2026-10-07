@@ -601,5 +601,5 @@ export {
 } from './BuildingWarehouse.js';
 export {
   computePlacementCutoff,
-  type CutoffTargets, type PlacementCutoff,
+  type PlacementCutoff,
 } from './PlacementCutoff.js';
