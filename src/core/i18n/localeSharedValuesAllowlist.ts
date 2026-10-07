@@ -83,4 +83,8 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.shady.influence_label', // "INFLUENCE"
   'ui.shady.arrangements_label', // "ARRANGEMENTS"
   'ui.shady.smuggling_inactive', // "Inactive" — correctly-spelled French (fem. of "inactif", agreeing with "la contrebande")
+  'ui.card.line', // "{desc} · {cost}" — separator-only format
+  'ui.build.unit.kg', // "kg" — SI symbol
+  'ui.fleet.unit.m3_per_hour', // "m³/h" — SI symbol
+  'ui.fleet.unit.kg_per_hour', // "kg/h" — SI symbol
 ];

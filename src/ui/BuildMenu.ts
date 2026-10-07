@@ -58,6 +58,7 @@ import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWi
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
+import { buildingCardLine, buildingCardTooltip } from './catalogCardText.js';
 import { buildDemolishConfirm } from './demolishConfirm.js';
 
 export class BuildMenu extends PanelBase {
@@ -524,13 +525,24 @@ export class BuildMenu extends PanelBase {
     });
     this.updateCostDisplay(costEl, type, this.selectedTiers.get(type) ?? 1);
 
+    const descEl = el('span', {
+      className: 'bs-build-desc',
+      attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+    });
+    const refreshCardText = (tier: BuildingTier): void => {
+      const def = getBuildingDef(type, tier);
+      descEl.textContent = buildingCardLine(def);
+      row.title = buildingCardTooltip(def);
+    };
+    refreshCardText((this.selectedTiers.get(type) ?? 1) as BuildingTier);
+
     const constructionEl = el('span', {
       className: 'bs-build-under-construction',
       attrs: { style: 'font:500 9px/1.3 var(--bsx-font-mono);color:var(--bsx-text-micro)' },
     });
     this.underConstructionEls.set(type, constructionEl);
 
-    info.append(nameEl, costEl, constructionEl);
+    info.append(nameEl, costEl, descEl, constructionEl);
 
     // Tier selector
     const tierSel = el('select', { className: 'bs-build-tier-sel' });
@@ -544,6 +556,7 @@ export class BuildMenu extends PanelBase {
       const selected = parseInt(tierSel.value, 10) as BuildingTier;
       this.selectedTiers.set(type, selected);
       this.updateCostDisplay(costEl, type, selected);
+      refreshCardText(selected);
       this.refreshCatalogButtons(this.lastCash);
     });
 
