@@ -550,7 +550,7 @@ describe('spentWhen / waitingKey wiring (#1014)', () => {
     });
   }
 
-  it.each(['sequence', 'evacuate-zone', 'train-driller', 'train-digger'])(
+  it.each(['sequence', 'evacuate-zone', 'train-fragmenter'])(
     '%s carries no spentWhen on any of its stages',
     (stepId) => {
       const stages = TUTORIAL_STAGES[stepId]!;

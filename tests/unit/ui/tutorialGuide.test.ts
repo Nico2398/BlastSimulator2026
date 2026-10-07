@@ -582,7 +582,7 @@ describe('resolveWaitStatus — steps that must never enter waiting (#1014)', ()
     },
   );
 
-  it.each(['train-driller', 'train-digger'])(
+  it.each(['train-fragmenter'])(
     '%s never reports waiting either — already solved by doneTarget, not spentWhen',
     (stepId) => {
       expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, maximallySpentState()))

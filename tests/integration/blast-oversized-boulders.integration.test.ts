@@ -37,7 +37,7 @@ function makeCtx(): GameContext {
 }
 
 /**
- * Hires one driller (qualified 'blasting' by default, ROLE_STARTING_QUALIFICATION)
+ * Hires one driller (qualified 'blasting' by default, ROLE_STARTING_QUALIFICATIONS)
  * and buys one drill_rig vehicle, so drill_plan grid's queued drill_hole
  * actions (#553) can actually land — deliberately NOT `staffed:true`
  * (STARTING_SITE_STAFFED_COMPOSITION also pre-crews a debris_hauler and
@@ -195,7 +195,7 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     const fragmenterDriverId = ctx.state!.employees.employees
       .filter(e => e.role === 'driver')
       .find(e => e.id !== haulerDriverId)!.id;
-    employeeCommand(ctx, ['assign_skill', String(fragmenterDriverId)], { skill: 'driving.excavator', level: '5' });
+    employeeCommand(ctx, ['assign_skill', String(fragmenterDriverId)], { skill: 'driving.rock_fragmenter', level: '5' });
 
     const buyFragmenter = vehicleCommand(ctx, ['buy', 'rock_fragmenter'], {});
     expect(buyFragmenter.success).toBe(true);

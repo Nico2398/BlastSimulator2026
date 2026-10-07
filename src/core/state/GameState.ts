@@ -30,7 +30,7 @@ import type { SerializedVoxels } from './VoxelGridCodec.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState, purchaseVehicle } from '../entities/Vehicle.js';
 import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
-import { createEmployeeState, hireEmployee, calculateSalary } from '../entities/Employee.js';
+import { createEmployeeState, hireEmployee, calculateSalary, qualificationAtLevel } from '../entities/Employee.js';
 import type { VehicleRole } from '../entities/Vehicle.js';
 import { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
@@ -638,11 +638,7 @@ function applyStaffedComposition(state: GameState): void {
   STARTING_SITE_STAFFED_COMPOSITION.employees.forEach((slot, i) => {
     const { employee } = hireEmployee(state.employees, slot.role, rng, i * 2, 0, state.tickCount);
     // Staffing is free at game-open — hiringCost is intentionally not deducted from cash.
-    employee.qualifications = slot.qualifications.map(q => ({
-      category: q.category,
-      proficiencyLevel: q.proficiencyLevel,
-      xp: 0,
-    }));
+    employee.qualifications = slot.qualifications.map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
     employee.salary = calculateSalary(employee);
   });
 

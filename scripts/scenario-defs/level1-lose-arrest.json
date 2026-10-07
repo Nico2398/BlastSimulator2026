@@ -286,7 +286,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 78700
+          "cash": 78580
         },
         "equals": {
           "tickCount": 10,
@@ -317,7 +317,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 165200,
+          "cash": 165080,
           "tickCount": 18,
           "levelEnded": true,
           "levelEndReason": "completed"

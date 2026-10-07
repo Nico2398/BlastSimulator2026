@@ -23,7 +23,7 @@ import { surveyCommand } from '../../src/console/commands/mining.js';
 import { tickEmployees } from '../../src/core/engine/GameLoop.js';
 import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuration.js';
 import { Random } from '../../src/core/math/Random.js';
-import { SURVEY_DURATION_TICKS, XP_THRESHOLDS } from '../../src/core/config/balance.js';
+import { SURVEY_DURATION_TICKS, XP_THRESHOLDS, ROLE_STARTING_QUALIFICATIONS } from '../../src/core/config/balance.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { tickUntil } from './helpers.js';
@@ -285,11 +285,11 @@ describe('Employee skills', () => {
     expect(emp().salary).toBe(atHire + 220 + 120);
   });
 
-  it('a hired blaster arrives holding its role qualification at Rookie level', () => {
+  it('a hired blaster arrives holding blasting at its higher starting level', () => {
     const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
     expect(emp.qualifications).toHaveLength(1);
     expect(emp.qualifications[0]!.category).toBe('blasting');
-    expect(emp.qualifications[0]!.proficiencyLevel).toBe(1);
+    expect(emp.qualifications[0]!.proficiencyLevel).toBe(ROLE_STARTING_QUALIFICATIONS.blaster[0]!.proficiencyLevel);
   });
 
   it('fire employee succeeds for non-unionized', () => {

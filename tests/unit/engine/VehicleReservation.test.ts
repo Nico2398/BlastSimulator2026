@@ -87,8 +87,8 @@ describe('isLicensedForRole', () => {
   it('is false when the employee lacks the role\'s required licence', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
-    // Driller's only starting qualification is 'blasting', not 'driving.drill_rig'.
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    // Blaster's only starting qualification is 'blasting', not 'driving.drill_rig'.
 
     expect(isLicensedForRole(employee, 'drill_rig')).toBe(false);
   });
@@ -207,7 +207,7 @@ describe('findFreeVehicleForRole', () => {
   it('returns null when the employee lacks the role licence, even though a free vehicle exists', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
     // No driving.drill_rig qualification assigned.
     purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
 

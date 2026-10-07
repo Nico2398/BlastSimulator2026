@@ -151,52 +151,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     },
   },
 
-  // ── Step 3b: build-driving-center ──
-  // #553: drill_hole became a queued, vehicle-gated action -- a driller
-  // physically drives a drill_rig to each hole -- but hiring only grants the
-  // driller their 'blasting' qualification (ROLE_STARTING_QUALIFICATION,
-  // Employee.ts), never the driving.drill_rig licence a drill_rig needs. With
-  // nothing in the tutorial ever granting that licence or buying a drill_rig,
-  // the drill-plan step below could never land a single hole -- holeCount
-  // stuck at 0 forever, the same deadlock class #552 fixed for hauling. These
-  // three steps (build a school, train the licence, buy+crew the rig) close
-  // that gap the same way vehicle-buy-assign already does for the hauler.
-  createComparisonStep(
-    'build-driving-center',
-    'tutorial.step_drivingcenter.title',
-    'tutorial.step_drivingcenter',
-    (s) => countBuildingsOfType(s, 'driving_center'),
-    ['build driving_center at:6,15'],
-    TOOLBAR_TARGET.build,
-    // #556: ordering a building is queued work now — a site goes up over
-    // BUILDING_CONSTRUCTION_BASE_DURATION_TICKS plus the walk to it, so without
-    // waitsOnWork this step's clock is held the moment the default budget
-    // elapses and the tutorial never advances past it. Same budget and reason as
-    // build-storage below, whose own comment carries the arithmetic.
-    { tickBudget: 60, waitsOnWork: true },
-  ),
+  // ── Step 3b: hire-driver ──
+  // Arrives holding the truck and excavator licences, so the ramp work of
+  // box-cut and the later hauling need no course.
+  createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
 
-  // ── Step 3c: train-driller ──
-  // Not a comparison step: the driller (employee #2, hired just above) holds
-  // no driving.drill_rig qualification to begin with, so "value increased"
-  // has nothing to increase from -- completion is the licence's existence.
-  {
-    id: 'train-driller',
-    titleKey: 'tutorial.step_traindriller.title',
-    textKey: 'tutorial.step_traindriller',
-    commands: ['employee train 2 skill:driving.drill_rig'],
-    highlightTarget: TOOLBAR_TARGET.employees,
-    tickBudget: 25,
-    waitsOnWork: true,
-    isComplete: (state: GameState) => getEmployees(state).some((e) => {
-      const raw = e as unknown as Record<string, unknown>;
-      if (raw.role !== 'driller') return false;
-      const quals = raw.qualifications as Array<{ category: string }> | undefined;
-      return (quals ?? []).some((q) => q.category === 'driving.drill_rig');
-    }),
-  },
-
-  // ── Step 3d: buy-drill-rig-assign ──
+  // ── Step 3c: buy-drill-rig-assign ──
   // Driver assignment is automatic now (VehicleReservation/ArrivalGate, #921)
   // — completion is purchase alone, the same synchronous "value increased"
   // shape as the other instant steps (tickBudget: 1, no waitsOnWork: buying a
@@ -211,28 +171,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     { tickBudget: 1 },
   ),
 
-  // ── Step 3e: train-digger ──
-  // #555: dig_ramp_segment work (the box-cut step below) now requires a
-  // driving.excavator licence + a rock_digger vehicle, the same gate #553 put
-  // on drilling. Nothing above ever grants that licence -- the surveyor
-  // (employee #1) finished their one-off job at the survey step and is idle
-  // from then on, so they're who trains here. Existence-check like
-  // train-driller: nobody starts with driving.excavator, so "value increased"
-  // has nothing to increase from.
-  {
-    id: 'train-digger',
-    titleKey: 'tutorial.step_traindigger.title',
-    textKey: 'tutorial.step_traindigger',
-    commands: ['employee train 1 skill:driving.excavator'],
-    highlightTarget: TOOLBAR_TARGET.employees,
-    tickBudget: 25,
-    waitsOnWork: true,
-    isComplete: (state: GameState) => (state.employees?.employees ?? []).some((e) =>
-      e.qualifications.some((q) => q.category === 'driving.excavator'),
-    ),
-  },
-
-  // ── Step 3f: buy-rock-digger-assign ──
+  // ── Step 3d: buy-rock-digger-assign ──
   // Same purchase-completes-alone shape as buy-drill-rig-assign above (#921).
   createComparisonStep(
     'buy-rock-digger-assign',
@@ -378,6 +317,36 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     },
   },
 
+  // ── Step 7b: build-driving-center ──
+  // The first blast leaves oversized boulders only a rock fragmenter can break,
+  // and its licence is taught only here -- the one course the tutorial needs.
+  // Every role arrives able to do its own job (ROLE_STARTING_QUALIFICATIONS).
+  createComparisonStep(
+    'build-driving-center',
+    'tutorial.step_drivingcenter.title',
+    'tutorial.step_drivingcenter',
+    (s) => countBuildingsOfType(s, 'driving_center'),
+    ['build driving_center at:6,15'],
+    TOOLBAR_TARGET.build,
+    // #556: ordering a building is queued work -- same budget and reason as
+    // build-storage below, whose own comment carries the arithmetic.
+    { tickBudget: 60, waitsOnWork: true },
+  ),
+
+  // ── Step 7c: train-fragmenter ──
+  // Existence check, not a comparison: nobody is hired holding the licence.
+  {
+    id: 'train-fragmenter',
+    titleKey: 'tutorial.step_trainfragmenter.title',
+    textKey: 'tutorial.step_trainfragmenter',
+    commands: ['employee train <driverId> skill:driving.rock_fragmenter'],
+    highlightTarget: TOOLBAR_TARGET.employees,
+    tickBudget: 25,
+    waitsOnWork: true,
+    isComplete: (state: GameState) =>
+      (state.employees?.employees ?? []).some((e) => e.qualifications.some((q) => q.category === 'driving.rock_fragmenter')),
+  },
+
   // ── Step 8: scores ──
   createUiActionStep('scores', 'tutorial.step9.title', 'tutorial.step9', { kind: 'scores' }, (state: GameState) => ({
     scores: { ...(state.scores ?? {}) },
@@ -409,13 +378,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 10: hire-manager ──
   createHireStepWithEventGuard('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager'),
 
-  // ── Step 12: hire-driver ──
-  createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
-
   // ── Step 13: vehicle-buy-assign ──
   // #553: no longer the tutorial's first-ever vehicle purchase -- the
-  // build-driving-center/train-driller/buy-drill-rig-assign trio above buys
-  // and crews a drill_rig long before this step. Driver assignment is
+  // drill_rig and rock_digger are bought long before this step. Driver assignment is
   // automatic now (VehicleReservation/ArrivalGate, #921) — completion is
   // purchase alone, the same synchronous shape as buy-drill-rig-assign
   // above, so the drill_rig's own driver has no bearing on this check.

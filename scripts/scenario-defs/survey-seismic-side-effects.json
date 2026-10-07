@@ -118,7 +118,7 @@
       "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too. Category fixed from the bare 'driving' typo (not a valid SkillCategory — VALID_SKILL_CATEGORIES only has 'driving.truck'/'driving.digger'/etc.) to 'driving.truck', matching the driver role's own default qualification (issue #585).",
       "expect": {
         "equals": {
-          "proficiencyTotal": 8
+          "proficiencyTotal": 9
         }
       },
       "role": "bootstrap"

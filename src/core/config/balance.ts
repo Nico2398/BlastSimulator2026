@@ -32,6 +32,21 @@ export const HIRING_COSTS = {
   manager: 2000,
 } as const;
 
+/** Proficiency level a hired blaster starts at (justifies the higher price over a driller). */
+export const ROLE_BLASTER_START_LEVEL = 2;
+
+/** Qualifications each role arrives with at hire: every role can do its own job unaided. */
+export const ROLE_STARTING_QUALIFICATIONS: Record<
+  EmployeeRole,
+  readonly { category: SkillCategory; proficiencyLevel: 1 | 2 | 3 | 4 | 5 }[]
+> = {
+  driller: [{ category: 'blasting', proficiencyLevel: 1 }, { category: 'driving.drill_rig', proficiencyLevel: 1 }],
+  blaster: [{ category: 'blasting', proficiencyLevel: ROLE_BLASTER_START_LEVEL }],
+  driver: [{ category: 'driving.truck', proficiencyLevel: 1 }, { category: 'driving.excavator', proficiencyLevel: 1 }],
+  surveyor: [{ category: 'geology', proficiencyLevel: 1 }],
+  manager: [{ category: 'management', proficiencyLevel: 1 }],
+};
+
 /** Base salary per pay cycle by role ($). Real miners: $25–80k/year; scaled per tick. */
 export const BASE_SALARIES = {
   driller: 500,
@@ -1182,11 +1197,15 @@ export const STARTING_SITE_STAFFED_COMPOSITION: {
     { role: 'driver', qualifications: [
       { category: 'driving.truck', proficiencyLevel: 1 },
     ] },
+    // Both excavator drivers also hold the rock fragmenter licence, so either
+    // can crew the fragmenter (it has a licence of its own since #1339).
     { role: 'driver', qualifications: [
       { category: 'driving.excavator', proficiencyLevel: 1 },
+      { category: 'driving.rock_fragmenter', proficiencyLevel: 1 },
     ] },
     { role: 'driver', qualifications: [
       { category: 'driving.excavator', proficiencyLevel: 1 },
+      { category: 'driving.rock_fragmenter', proficiencyLevel: 1 },
     ] },
   ],
   vehicles: [
@@ -1258,11 +1277,11 @@ export const BASE_TASK_DURATION_TICKS = 20;
  * here cannot be obtained by training, which for a skill no role is hired with
  * means it cannot be obtained at all.
  *
- * The Driving Center covers all three vehicle licences: excavator and drill-rig
- * work is reachable only through it, since no role is hired holding them.
+ * The Driving Center covers every vehicle licence. Roles arrive holding their own
+ * (ROLE_STARTING_QUALIFICATIONS); the rock fragmenter licence is reachable only here.
  */
 export const TRAINING_BUILDING_SKILLS = {
-  driving_center: ['driving.truck', 'driving.excavator', 'driving.drill_rig'],
+  driving_center: ['driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter'],
   blasting_academy: ['blasting'],
   management_office: ['management'],
   geology_lab: ['geology'],

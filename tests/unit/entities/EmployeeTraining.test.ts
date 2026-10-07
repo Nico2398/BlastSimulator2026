@@ -120,9 +120,9 @@ function resolveArrival(state: GameState, employee: Employee, maxTicks = 300): v
 // ── Which school teaches what ────────────────────────────────────────────────
 
 describe('trainableSkills', () => {
-  it('the driving center teaches all three vehicle licences', () => {
+  it('the driving center teaches all four vehicle licences (#1339 adds the rock fragmenter)', () => {
     expect([...trainableSkills('driving_center')]).toEqual([
-      'driving.truck', 'driving.excavator', 'driving.drill_rig',
+      'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter',
     ]);
   });
 
@@ -141,7 +141,7 @@ describe('trainableSkills', () => {
 
   it('every skill category has a school, or it could never be obtained', () => {
     const ALL: SkillCategory[] = [
-      'driving.truck', 'driving.excavator', 'driving.drill_rig',
+      'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter',
       'blasting', 'management', 'geology',
     ];
     for (const skill of ALL) {
@@ -442,7 +442,7 @@ describe('tickTraining — school destroyed mid-course', () => {
 // ── The skills that exist only through training ──────────────────────────────
 
 describe('licences no role is hired with', () => {
-  it.each(['driving.excavator', 'driving.drill_rig'] as SkillCategory[])(
+  it.each(['driving.rock_fragmenter', 'driving.drill_rig'] as SkillCategory[])(
     'a driver can obtain %s by walking to, entering, and finishing a driving-center course',
     (skill) => {
       const { state, school } = setupSchool('driving_center');
@@ -526,15 +526,15 @@ describe('tickTraining floors qual.xp at the new level threshold', () => {
 
   it('a brand-new qualification from training still starts at level 1 with 0 xp', () => {
     const { state, school } = setupSchool('driving_center');
-    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2); // holds driving.truck only
-    expect(employee.qualifications.some(q => q.category === 'driving.excavator')).toBe(false);
+    const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), 2, 2); // holds truck + excavator (#1339), not the fragmenter
+    expect(employee.qualifications.some(q => q.category === 'driving.rock_fragmenter')).toBe(false);
 
-    const result = enrolInTraining(state, employee.id, school, 'driving.excavator');
+    const result = enrolInTraining(state, employee.id, school, 'driving.rock_fragmenter');
     expectSuccess(result);
     resolveArrival(state, employee);
     for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
 
-    const qual = employee.qualifications.find(q => q.category === 'driving.excavator')!;
+    const qual = employee.qualifications.find(q => q.category === 'driving.rock_fragmenter')!;
     expect(qual.proficiencyLevel).toBe(1);
     expect(qual.xp).toBe(XP_THRESHOLDS[1]);
   });
@@ -584,9 +584,9 @@ describe('availableTrainingOffers', () => {
     expect(offers[0]!.building.id).toBe(2);
   });
 
-  it('a driving_center offers all three licences from one building', () => {
+  it('a driving_center offers all four licences from one building', () => {
     const offers = availableTrainingOffers([makeBuilding({ type: 'driving_center' })]);
-    expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.truck']);
+    expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.rock_fragmenter', 'driving.truck']);
   });
 });
 

@@ -192,7 +192,7 @@ describe('actors change while paused: the colour follows with no tick', () => {
   it('assigning the licence for the role turns a vehicle-gated order blue once a vehicle exists', () => {
     const site = makeSite();
     expect(runCommand(site.engine, 'vehicle buy rock_digger').success).toBe(true);
-    const emp = hire(site, 'driver', { x: 5, z: 5 });
+    const emp = hire(site, 'surveyor', { x: 5, z: 5 }); // a hired driver would already hold the licence
     const id = queueDig(site, A_TARGET);
     expect(isRed(site, id)).toBe(true); // no licence yet
     expect(runCommand(site.engine, `employee assign_skill ${emp.id} skill:${ROLE_LICENCE_REQUIRED.rock_digger} level:1`).success).toBe(true);

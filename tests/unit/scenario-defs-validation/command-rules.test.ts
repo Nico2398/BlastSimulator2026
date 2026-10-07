@@ -170,7 +170,7 @@ describe('No step names an entity by a runtime-assigned id outside the baseline 
     // tutorial-boxcut-full.json, copied verbatim from tutorial-interactive.json
     // through its build_ramp step, carries the same two data-employee-id
     // train-click selectors at the same step indices).
-    expect(baseline.bakedRuntimeIds.length).toBeLessThanOrEqual(114);
+    expect(baseline.bakedRuntimeIds.length).toBeLessThanOrEqual(108);
   });
 });
 

@@ -64,8 +64,8 @@
         ],
         "equals": {
           "employeeCount": 1,
-          "qualificationCount": 1,
-          "proficiencyTotal": 1
+          "qualificationCount": 2,
+          "proficiencyTotal": 2
         }
       }
     },
@@ -242,7 +242,7 @@
       "expect": {
         "equals": {
           "trainingCount": 0,
-          "qualificationCount": 3
+          "qualificationCount": 5
         },
         "note": "the excavator licence is genuinely obtained -- no role starts with it, so this is the only way anyone on the roster ever holds it One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
       }
@@ -318,7 +318,7 @@
       "expect": {
         "equals": {
           "trainingCount": 0,
-          "qualificationCount": 4
+          "qualificationCount": 5
         },
         "note": "driving.drill_rig obtained -- the driller can now staff the drill_rig bought above One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
       }
@@ -344,7 +344,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Free (no cost), unlike a real academy course.",
       "expect": {
         "equals": {
-          "qualificationCount": 5
+          "qualificationCount": 6
         },
         "note": " One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
       },
@@ -469,7 +469,7 @@
       "expect": {
         "equals": {
           "trainingCount": 0,
-          "qualificationCount": 5
+          "qualificationCount": 6
         },
         "note": "a promotion raises the level of a held qualification rather than adding a second copy of it -- qualificationCount unchanged, proficiencyTotal +1 One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
       }
@@ -690,8 +690,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "qualificationCount": 1,
-          "proficiencyTotal": 1
+          "qualificationCount": 2,
+          "proficiencyTotal": 2
         },
         "note": " One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556). proficiencyTotal 1, not 0: the dedicated builder hired at the top survives the blast that kills the driller, and keeps its driving.truck at Rookie (#556)."
       }

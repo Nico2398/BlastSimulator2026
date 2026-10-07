@@ -359,7 +359,7 @@ describe('employees.ts — dispatch on an employee currently in training', () =>
 // ── dispatch_target_unqualified ──────────────────────────────────────────
 
 describe('employees.ts — dispatch targeting a skill the employee does not hold', () => {
-  // driller's only starting qualification is 'blasting' (ROLE_STARTING_QUALIFICATION) —
+  // driller's only starting qualification is 'blasting' (ROLE_STARTING_QUALIFICATIONS) —
   // asking it to dispatch with skill:geology always misses.
   function expectedEn(id: number, name: string): string {
     return `Employee #${id} (${name}) does not hold skill: geology.`;

@@ -321,7 +321,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -4160
+          "cash": -4380
         },
         "equals": {
           "tickCount": 10,
@@ -351,7 +351,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -4160
+          "cash": -4380
         },
         "equals": {
           "tickCount": 20
@@ -380,7 +380,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -4160
+          "cash": -4380
         },
         "equals": {
           "tickCount": 30
@@ -419,7 +419,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -4240
+          "cash": -4460
         },
         "equals": {
           "tickCount": 45
@@ -448,7 +448,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -8240
+          "cash": -8680
         },
         "equals": {
           "tickCount": 60
@@ -477,7 +477,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -4240
+          "cash": -4460
         },
         "equals": {
           "tickCount": 75
@@ -516,7 +516,7 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": -8240
+          "cash": -8680
         },
         "equals": {
           "tickCount": 90
@@ -545,7 +545,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -41600,
+          "cash": -43800,
           "tickCount": 100,
           "bankrupt": true,
           "levelEnded": true,
@@ -661,7 +661,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -41600,
+          "cash": -43800,
           "tickCount": 100,
           "bankrupt": true,
           "levelEnded": true,

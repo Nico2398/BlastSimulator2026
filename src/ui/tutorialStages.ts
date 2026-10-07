@@ -366,7 +366,7 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     }),
   ],
 
-  // train-driller/buy-drill-rig-assign/train-digger/buy-rock-digger-assign:
+  // buy-drill-rig-assign/buy-rock-digger-assign/train-fragmenter:
   // split into tutorialStagesTraining.ts (#557 — see that file's own header).
   ...TUTORIAL_STAGES_TRAINING,
 

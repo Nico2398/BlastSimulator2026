@@ -71,12 +71,15 @@
       }
     },
     {
-      "command": "tick 130",
-      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 6 holes well inside this pad (sandbox-measured landing at tick 125).",
+      "command": "wait_until field:holeCount equals:6 max_ticks:300",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 6 holes. #1339: wait on the 6th hole landing instead of a fixed 130-tick pad: payroll runs every tick, and the extra licences now held by the staffed drivers raise it enough that the idle pad left too little cash for the later 8 kg recharge.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 130"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 6,
+          "maxTicks": 300,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
@@ -86,7 +89,8 @@
           "holeCount": 6
         },
         "note": "All 6 holes have landed — none lost, none left ordered forever."
-      }
+      },
+      "timeout": 125
     },
     {
       "command": "time speed 8",

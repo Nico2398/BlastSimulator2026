@@ -379,7 +379,7 @@
       "expect": {
         "equals": {
           "trainingCount": 0,
-          "proficiencyTotal": 3
+          "proficiencyTotal": 5
         },
         "note": "Course complete — driving.excavator gained (proficiencyTotal 2→3), training slot freed, employee left the building back onto its ring. Screenshot taken right after they reappear outside."
       }

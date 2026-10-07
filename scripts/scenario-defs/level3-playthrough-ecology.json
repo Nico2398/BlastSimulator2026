@@ -1342,7 +1342,7 @@
           "orderedHoleCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "vehicleCount": 1,
           "levelEnded": false,
@@ -1365,7 +1365,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1388,9 +1388,9 @@
       "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136 -- rest now restores fatigue further per session and preempts mid-task/mid-drive more readily, shifting how much of this checkpoint's crew is mid-rest versus mid-task at this exact tick. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1090-followup (sandbox-measured): wellBeing 3.30 -> 2.86, safety 50.60 -> 50.55 -- one fewer death at the blast above (deathCount 11, not 12; see that step's own #1090-followup note) means computeAverageMorale averages in one more living-but-devastated employee's own near-zero morale, pulling this checkpoint's average down slightly rather than up, and the surviving rig (vehicleCount 1, not 0) shifts the safety decay accrued by this tick too. deathCount, employeeCount, ecology, and nuisance reproduce unchanged. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration, sandbox-measured): wellBeing 2.9091666666666565 -> 2.9641666666666575 -- occupancy-aware pathing shifts exactly which of the single surviving driller's rest/work cycles land inside this tick, a small (~0.055) morale-average difference; deathCount/safety/ecology/nuisance/tickCount (314) all reproduce unchanged, confirming this is the same real-crew composition, not a different trajectory.",
       "expect": {
         "equals": {
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 0,
+          "wellBeing": 44.70133333333366,
           "safety": 50,
           "ecology": 29.533877826223282,
           "nuisance": 0,
@@ -1442,7 +1442,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1469,7 +1469,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1497,7 +1497,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1525,7 +1525,7 @@
           "orderedHoleCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1548,7 +1548,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1571,9 +1571,9 @@
       "description": "#945 (fatigue rest under-restoration + mid-task/mid-drive rest preemption): wellBeing corrected 3.4608333333333245 -> 3.299166666666658, safety 50.70000000000013 -> 50.600000000000136, same recalibration as the earlier `scores` checkpoint above -- no change happened between the two checkpoints (both `changedBy.tickCount: 0`), so they still read identically. Sandbox-measured (`npm run scenarios -- --report-drift level3-playthrough-ecology`), command mode. #1151: re-baselined against a measured run -- wellBeing 2.855833333333325 -> 2.9091666666666565. These figures were all measured under the old whole-voxel climb rule; drilling now keeps pace slightly differently against this file's fixed tick-20 ladder, so each checkpoint catches one more hole landed and one fewer still ordered. Re-measured rather than loosened, so each stays an exact check. #1262-followup (batch B occupancy migration): wellBeing re-derived 2.9091666666666565 -> 2.9641666666666575, same mechanism and same value as the earlier `scores` checkpoint's own note -- still identical between the two checkpoints (`changedBy.tickCount: 0`).",
       "expect": {
         "equals": {
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 0,
+          "wellBeing": 44.70133333333366,
           "safety": 50,
           "ecology": 29.533877826223282,
           "nuisance": 0,
@@ -1599,10 +1599,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 371,
+          "tickCount": 316,
           "holeCount": 0,
           "orderedHoleCount": 0,
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1625,12 +1625,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 371,
+          "tickCount": 316,
           "holeCount": 0,
           "orderedHoleCount": 0,
-          "deathCount": 12,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 0,
+          "wellBeing": 25.701333333333626,
           "safety": 0,
           "ecology": 30.533877826223296,
           "nuisance": 0,
@@ -1652,8 +1652,8 @@
       "description": "#945: tickCount corrected 331 -> 333, following the `tick 20` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 371,
-          "deathCount": 12,
+          "tickCount": 316,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1672,10 +1672,10 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 371,
-          "deathCount": 12,
+          "tickCount": 316,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 0,
+          "wellBeing": 25.701333333333626,
           "safety": 0,
           "ecology": 30.533877826223296,
           "nuisance": 0,
@@ -1696,10 +1696,10 @@
       "description": "#945: tickCount corrected 331 -> 333, wellBeing 4.460833333333321 -> 4.299166666666655, following the `event choose 0` step's own note above.",
       "expect": {
         "equals": {
-          "tickCount": 371,
-          "deathCount": 12,
+          "tickCount": 316,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 0,
+          "wellBeing": 25.701333333333626,
           "safety": 0,
           "ecology": 30.533877826223296,
           "nuisance": 0,

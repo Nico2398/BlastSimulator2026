@@ -3,19 +3,19 @@
   "description": "Visual check of living quarters tiers and employee needs display with hunger and fatigue gauges",
   "steps": [
     {
-      "command": "new_game seed:42 cash:200000",
+      "command": "new_game seed:42 cash:210000",
       "description": "40s is not enough headroom for a level load plus this file's 4 multi-angle `shots` on a GPU-less renderer (~6-10s/frame, #475) — pre-existing on main, not introduced by #1010, but it was blocking this scenario's own interaction-mode run so fixed here rather than filed separately.",
       "timeout": 90,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:200000"
+          "command": "new_game seed:42 cash:210000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 200000,
+          "cash": 210000,
           "buildingCount": 0
         }
       }

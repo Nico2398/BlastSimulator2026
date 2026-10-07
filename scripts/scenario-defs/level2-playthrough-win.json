@@ -1564,67 +1564,7 @@
     },
     {
       "command": "tick 22",
-      "description": "Charging wait chunk: the blasters load the 24 boomite charges.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 22"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 22",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 22"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 22",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 22"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 22",
+      "description": "Charging starts: the blasters begin loading the 24 boomite charges. The pace of loading depends on who is able to charge (#1339: roles arrive able), so the pacing assertions wait on orderedChargeCount in the next step instead of a fixed tick pad.",
       "interaction": [
         {
           "type": "command",
@@ -1639,21 +1579,9 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 24,
-          "chargedCount": 18,
-          "sequencedCount": 0,
-          "orderedChargeCount": 6
+          "sequencedCount": 0
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
@@ -1747,7 +1675,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1771,7 +1699,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1792,7 +1720,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1813,14 +1741,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 97.0491666666668,
+          "wellBeing": 99.93916666666668,
           "safety": 50,
-          "ecology": 48.854892315689796,
-          "nuisance": 47.137230789224496
+          "ecology": 48.894892315689795,
+          "nuisance": 47.2372307892245
         },
         "changedBy": {
           "tickCount": 0
@@ -1840,7 +1768,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1861,7 +1789,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1884,7 +1812,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1904,7 +1832,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1926,7 +1854,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1955,7 +1883,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2003,7 +1931,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -2043,7 +1971,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -2054,21 +1982,35 @@
       }
     },
     {
-      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
+      "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "bootstrap"
+      "role": "player",
+      "description": "Blast 1 killed the staffed driller (#1) along with the blaster and both hired drillers (#2, #8, #9 -- #1339: every role arrives able, so the whole crew stands at the pattern). A new driller (#13) replaces #1 for cycle 2; hiring grants the drill_rig licence, so no assign_skill is needed.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
-      "command": "vehicle driver 1 1",
+      "command": "vehicle driver 1 13",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 1 1"
+          "command": "vehicle driver 1 13"
         }
       ],
       "role": "bootstrap"
@@ -2118,8 +2060,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 4,
+          "employeeCount": 13,
           "activeContractCount": 2,
           "surveyCount": 3,
           "orderedHoleCount": 25,
@@ -2133,327 +2075,33 @@
       }
     },
     {
-      "command": "tick 150",
+      "command": "wait_until field:holeCount equals:13 max_ticks:3000",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 150"
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 13,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
+      "description": "Drilling wait (#1339): wait until 13 holes are drilled instead of a fixed tick pad. The remaining 12 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads.",
       "role": "setup",
+      "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 2,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      },
-      "description": "#553/#593: unlike the pre-#593 file, this pattern is fully drilled -- blast 1 above killed only 2 (see its own finding), leaving one drill_rig/driller pair alive to sink all 25 holes of this pattern across these 4 tick chunks (orderedHoleCount reaches 0, holeCount 25, by the last one). Driller #9, this file's second hired driller, is still unlicensed (see the opening's crew note) and plays no part in it -- the surviving pair from pattern 1 does the work alone."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 2,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "orderedHoleCount": 14,
-          "holeCount": 11
-        },
-        "increased": [
-          "tickCount"
-        ]
-      },
-      "description": "#554: sandbox-measured -- 4 of this pattern's 25 holes are still outstanding at the end of this 4th tick150 chunk; the wait_until step below (not another fixed-tick chunk) is what actually drains them, since a hand-measured budget is no longer long enough now that drilling shares driller time with #554's own queued charging elsewhere in this run. #611: orderedHoleCount/holeCount shifted from 4/21 to 6/19 (measured via direct trace) -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking instead of only inside the bounded top-N reachability window, so a driller idle behind an unclaimable backlog reaches a claimable hole sooner overall, but the two drillers in this scenario now spend that reclaimed time differently tick-for-tick, landing 2 fewer holes actually drilled (though still ordered) by this exact checkpoint -- the wait_until step below still drains the remaining outstanding holes before charging starts, same as before. issue #585: orderedHoleCount/holeCount shifted from 6/19 to 0/25 (confirmed via direct trace) -- all 25 holes now land before this 4th tick150 chunk even finishes, not just before the wait_until step below. Pattern 2's own drill_plan (a few steps above) now issues ~39 ticks earlier in absolute terms than before, since the post-blast-1 haul wait it follows was raised 6 -> 45 ticks (see that step's own note) to give the newly-built freight_warehouse time to receive a delivery; the drilling itself runs identically, just starting from a shifted absolute tick, and the two drillers happen to land their final holes inside this chunk instead of during the wait_until step below at that offset."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 13",
-      "description": "Drilling wait chunk for the second pattern.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 13",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 13",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 13",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 13",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 13",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 13",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 13"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "orderedHoleCount": 12,
-          "holeCount": 13
+          "holeCount": 13,
+          "orderedHoleCount": 12
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "drill_plan show",
@@ -2466,8 +2114,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 4,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2487,8 +2135,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 4,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2508,8 +2156,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 4,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2567,8 +2215,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 4,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 13,
@@ -2580,145 +2228,31 @@
       }
     },
     {
-      "command": "tick 46",
-      "description": "Charging wait chunk for the third pattern.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:6000",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 46"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 46",
-      "interaction": [
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
-          "type": "command",
-          "command": "tick 46"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 6000,
+          "timeoutMs": 120000
         }
       ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 46",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 46"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 46",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 46"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 46",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 46"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 46",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 46"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 46",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 46"
-        }
-      ],
+      "description": "Charging wait (#1339): wait on every ordered charge being loaded instead of a fixed tick pad.",
       "role": "setup",
+      "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "holeCount": 13,
-          "chargedCount": 13,
-          "sequencedCount": 0,
-          "orderedChargeCount": 0
+          "orderedChargeCount": 0,
+          "chargedCount": 13
         }
       }
     },
@@ -2746,8 +2280,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 3,
-          "employeeCount": 12,
+          "deathCount": 4,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 13,
@@ -2786,8 +2320,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -2810,8 +2344,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2831,8 +2365,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2852,8 +2386,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2873,14 +2407,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.95000000000269,
+          "wellBeing": 96.58111111111154,
           "safety": 0,
-          "ecology": 43.309975741657404,
-          "nuisance": 33.274939354143505
+          "ecology": 42.8899757416574,
+          "nuisance": 32.22493935414351
         },
         "changedBy": {
           "tickCount": 0
@@ -2898,8 +2432,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2920,8 +2454,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2942,8 +2476,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2962,8 +2496,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -2984,8 +2518,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3013,8 +2547,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -3053,8 +2587,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3074,8 +2608,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 12,
+          "deathCount": 9,
+          "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3131,11 +2665,11 @@
       }
     },
     {
-      "command": "employee assign_skill 13 skill:driving.drill_rig level:1",
+      "command": "employee assign_skill 14 skill:driving.drill_rig level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 13 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 14 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"
@@ -3165,11 +2699,11 @@
       "role": "player"
     },
     {
-      "command": "vehicle driver 7 13",
+      "command": "vehicle driver 7 14",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 7 13"
+          "command": "vehicle driver 7 14"
         }
       ],
       "role": "bootstrap"
@@ -3219,8 +2753,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
+          "deathCount": 9,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "orderedHoleCount": 30,
@@ -3234,188 +2768,33 @@
       }
     },
     {
-      "command": "tick 150",
+      "command": "wait_until field:holeCount equals:18 max_ticks:3000",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
         },
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
         },
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 18,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
+      "description": "Drilling wait (#1339): wait until 18 holes are drilled instead of a fixed tick pad. The remaining 12 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads.",
       "role": "setup",
+      "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      },
-      "description": "Issue #586 CI, this PR: CI reported \"Step 96 timed out after 60000ms\" twice in a row on this exact step, though it never reproduced across 3 clean local reruns in this session's own investigation -- consistent with a genuine CPU-bound cost spike (not a render-frame cost; interaction batch runs suspend drawing) that only shows up under CI's shared/contended runner (10 concurrent Chrome instances across shards), not a single local run with full CPU access. The preceding step just ordered a fresh 30-hole drill_plan (5x6 grid); tick 150 in one call processes all of that dispatch/pathfinding in a single blocking page.evaluate, an outlier compared to the tick 20/tick 30 chunks used everywhere else in this project's scenario files. Split into 3x tick 50 -- same total simulation-tick advance, same end state. Update: the split alone did not help -- CI reported the identical \"Step 96 timed out after 60000ms\" again on the next push, because the step-level timeout (DEFAULT_STEP_TIMEOUT, puppeteer-utils.ts) wraps the WHOLE step's cumulative action time, not each action individually (run-all-scenarios.ts/scenario-interaction-runner.ts both compute stepTimeout once per step and race it against the step's full for-loop of actions). The real fix is this step's own  field (ScenarioStepDef.timeout, seconds, scenario-types.ts) -- raised to 120s, comfortably covering CI's slower/contended runner for this step's genuinely CPU-heavy 150-tick advance right after a fresh 30-hole drill_plan. Kept the 3x tick 50 split too (harmless, and slightly more granular progress if a future step ever needs to interrupt mid-way).",
-      "timeout": 120
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
+          "holeCount": 18,
+          "orderedHoleCount": 12
         }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      },
-      "description": "CI reported \"Step 98 timed out after 60000ms\" — the same CPU-bound cost spike as step 96 (see that step's note): this step drains the rest of the same 30-hole drill_plan dispatch/pathfinding backlog from step 95, right after step 96 already paid the first half of that cost. Same fix: raise this step's own timeout to 120s.",
-      "timeout": 120
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "orderedHoleCount": 14,
-          "holeCount": 16
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "orderedHoleCount": 14,
-          "holeCount": 16
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
     },
     {
       "command": "drill_plan show",
@@ -3428,8 +2807,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
+          "deathCount": 9,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3449,8 +2828,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
+          "deathCount": 9,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3470,8 +2849,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
+          "deathCount": 9,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3529,11 +2908,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
+          "deathCount": 9,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 16,
+          "holeCount": 18,
           "chargedCount": 0,
           "sequencedCount": 0
         },
@@ -3593,13 +2972,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 6,
-          "employeeCount": 14,
+          "deathCount": 9,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 16,
-          "chargedCount": 16,
-          "sequencedCount": 16
+          "holeCount": 18,
+          "chargedCount": 18,
+          "sequencedCount": 18
         },
         "changedBy": {
           "tickCount": 0
@@ -3633,8 +3012,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -3657,8 +3036,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3678,8 +3057,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3698,50 +3077,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3762,8 +3099,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3782,8 +3119,50 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 11,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3804,8 +3183,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3833,8 +3212,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -3873,8 +3252,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3894,14 +3273,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.27750000000022,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 56.94897847608129,
-          "nuisance": 38.41784344950488
+          "ecology": 47.91006251990767,
+          "nuisance": 23.820131986471758
         },
         "changedBy": {
           "tickCount": 0
@@ -3920,8 +3299,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3941,8 +3320,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 14,
+          "deathCount": 11,
+          "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -3998,11 +3377,11 @@
       }
     },
     {
-      "command": "employee assign_skill 15 skill:driving.drill_rig level:1",
+      "command": "employee assign_skill 16 skill:driving.drill_rig level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 15 skill:driving.drill_rig level:1"
+          "command": "employee assign_skill 16 skill:driving.drill_rig level:1"
         }
       ],
       "role": "bootstrap"
@@ -4032,11 +3411,11 @@
       "role": "player"
     },
     {
-      "command": "vehicle driver 8 15",
+      "command": "vehicle driver 8 16",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle driver 8 15"
+          "command": "vehicle driver 8 16"
         }
       ],
       "role": "bootstrap"
@@ -4086,8 +3465,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "orderedHoleCount": 48,
@@ -4101,261 +3480,33 @@
       }
     },
     {
-      "command": "tick 150",
+      "command": "wait_until field:holeCount equals:22 max_ticks:3000",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 150"
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 22,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
+      "description": "Drilling wait (#1339): wait until 22 holes are drilled instead of a fixed tick pad. The remaining 26 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads.",
       "role": "setup",
+      "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      },
-      "description": "#553: still no drill_rig anywhere in the fleet (both were destroyed in blast 1, tick 440, and this file never buys a replacement) -- sandbox-measured: orderedHoleCount stays 48 across all 6 of these tick chunks, the largest pattern in this file drilling exactly as much as patterns 2 and 3 did: nothing."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
+          "holeCount": 22,
+          "orderedHoleCount": 26
         }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 150",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 150"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "orderedHoleCount": 16,
-          "holeCount": 32
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "orderedHoleCount": 16,
-          "holeCount": 32
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "either"
     },
     {
       "command": "drill_plan show",
@@ -4368,8 +3519,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4389,8 +3540,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4410,8 +3561,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4469,11 +3620,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 32,
+          "holeCount": 22,
           "chargedCount": 0,
           "sequencedCount": 0
         },
@@ -4533,13 +3684,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 16,
+          "deathCount": 11,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 32,
-          "chargedCount": 32,
-          "sequencedCount": 32
+          "holeCount": 22,
+          "chargedCount": 22,
+          "sequencedCount": 22
         },
         "changedBy": {
           "tickCount": 0
@@ -4573,8 +3724,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 0,
@@ -4597,8 +3748,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4618,8 +3769,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4639,8 +3790,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4659,8 +3810,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4681,8 +3832,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4701,8 +3852,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4728,8 +3879,8 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "rubbleDisposalOffered": true
@@ -4746,8 +3897,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4768,8 +3919,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
@@ -4797,8 +3948,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
+          "deathCount": 13,
+          "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
         },
@@ -4837,9 +3988,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
-          "activeContractCount": 0,
+          "deathCount": 13,
+          "employeeCount": 17,
+          "activeContractCount": 1,
           "surveyCount": 3
         },
         "changedBy": {
@@ -4860,14 +4011,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
-          "activeContractCount": 0,
+          "deathCount": 13,
+          "employeeCount": 17,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 97.85428571428571,
+          "wellBeing": 98.56500000000004,
           "safety": 0,
-          "ecology": 36.89599012877338,
-          "nuisance": 16.379146101611337
+          "ecology": 40.8052830950337,
+          "nuisance": 24.752846781062935
         },
         "changedBy": {
           "tickCount": 0
@@ -4886,14 +4037,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 12,
-          "employeeCount": 16,
-          "activeContractCount": 0,
+          "deathCount": 13,
+          "employeeCount": 17,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 97.85428571428571,
+          "wellBeing": 98.56500000000004,
           "safety": 0,
-          "ecology": 36.89599012877338,
-          "nuisance": 16.379146101611337
+          "ecology": 40.8052830950337,
+          "nuisance": 24.752846781062935
         },
         "changedBy": {
           "tickCount": 0

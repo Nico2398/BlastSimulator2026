@@ -43,7 +43,7 @@
         "equals": {
           "employeeCount": 1,
           "qualificationCount": 1,
-          "proficiencyTotal": 1
+          "proficiencyTotal": 2
         }
       }
     },
@@ -67,14 +67,14 @@
         ],
         "equals": {
           "employeeCount": 2,
-          "qualificationCount": 2,
-          "proficiencyTotal": 2
+          "qualificationCount": 3,
+          "proficiencyTotal": 4
         }
       }
     },
     {
       "command": "employee assign_skill 1 skill:blasting level:1",
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATIONS in balance.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "interaction": [
         {
           "type": "command",
@@ -86,7 +86,7 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 2
+          "proficiencyTotal": 3
         },
         "note": "already level 1 from hiring's Rookie starting qualification -- this call is a same-level no-op, not the first level-up"
       },
@@ -100,13 +100,13 @@
           "command": "employee assign_skill 2 skill:driving.truck level:1"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATIONS in balance.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "changedBy": {
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 2
+          "proficiencyTotal": 3
         }
       },
       "role": "bootstrap"
@@ -323,7 +323,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "proficiencyTotal": 2
+          "proficiencyTotal": 3
         },
         "note": "no scalar exists for a single employee's XP/level within SerializableGameState -- only the roster-wide sum, which never crosses a level threshold across this file's 221-tick budget even though employee A genuinely works the whole time (confirmed via direct trace); the XP-bar-fill claim this file is named for is a screenshot-only assertion, not one this field can make"
       }

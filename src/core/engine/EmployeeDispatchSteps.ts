@@ -75,6 +75,16 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
     const depth = employeeQueueDepth(employee);
     if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) break;
 
+    // A rest claimed earlier in this same pass (rests sort first) is already
+    // active: reserving a vehicle for a follow-up now would park it, never
+    // boarded, in taskQueue for the whole rest — the I5 shape
+    // releaseUnboardedTaskQueueVehicleReservations exists to undo, but its
+    // rest-promotion call ran BEFORE this claim, so it never sees it. The
+    // action stays queued and is claimed once the rest completes (#1339:
+    // drivers arrive licensed for the rock fragmenter, so a targeted
+    // fragment_debris sits beside a proactive rest far more often).
+    if (action.requiredVehicleRole !== null && isRestActive(state, employee)) continue;
+
     const vehicleCheck = findVehicleForClaim(state, action, employee);
     if (!vehicleCheck.ok) continue; // vehicle-gated, none free right now — stays queued, retries next tick
 
@@ -89,6 +99,12 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       employee.taskQueue.push(action.id);
     }
   }
+}
+
+/** True when `employee`'s active action is a rest. */
+function isRestActive(state: GameState, employee: Employee): boolean {
+  if (employee.activeActionId === null) return false;
+  return state.pendingActions.find(a => a.id === employee.activeActionId)?.type === 'rest';
 }
 
 /**

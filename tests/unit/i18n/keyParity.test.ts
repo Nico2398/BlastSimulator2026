@@ -101,7 +101,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // hole still in state.plannedDrillHoles, awaiting its drill_hole action —
     // both locales translated.
     // Baseline is now 3263 (up from 3254): #553's tutorial fix adds three new
-    // tutorial steps (build-driving-center, train-driller, buy-drill-rig-assign)
+    // tutorial steps (build-driving-center, train-driller, buy-drill-rig-assign;
+    // train-driller's keys were removed again by #1339 -- drillers arrive licensed)
     // closing the deadlock where drill_hole's vehicle gate left the driller
     // hired but never licensed/equipped to drive a drill_rig — 9 new keys
     // (3 step text + 3 step title + 3 stage hint), both locales translated.
@@ -129,6 +130,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial.step_buyrockdigger[.title]) plus three tutorial rail hint keys
     // (tutorial.stage.expand_digger, tutorial.stage.train_excavator,
     // tutorial.stage.vehicle_buy_rock_digger), both locales translated.
+    // (#1339 later removed the train-digger step's keys -- drivers arrive with
+    // the excavator licence.)
     // Baseline is now 3274 (down from 3275): removed the orphaned
     // ui.build.ramp_built key (#637 review) -- buildRampCommand switched to
     // ui.build.ramp_ordered when ordering a ramp became queued excavation
@@ -450,7 +453,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1349: +8 keys per locale (4 ui + 4 console rating cap keys): 3697.
     // #1334: +3 keys (tutorial scores/finances/needs card text), both locales: 3700.
     // #1335: -3 keys (removed contract-accept step text)
-    expect(Object.keys(en).length).toBe(3697);
+    // #1339: -2 keys (-8 train-driller/train-digger card+stage keys, +4 train-fragmenter, +2 rock_fragmenter course/skill)
+    expect(Object.keys(en).length).toBe(3695);
   });
 });
 

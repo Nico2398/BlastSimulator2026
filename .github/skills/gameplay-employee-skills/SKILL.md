@@ -27,6 +27,20 @@ Employees not interchangeable tokens. Each has skill qualifications with profici
 | `management` | Contract negotiation, hiring/firing, policy setting | Management Office |
 | `geology` | Seismic, core-sample, and aerial surveys | Geology Lab |
 
+## Starting Qualifications
+
+Every role arrives able to do its own job, with no per-employee course (`ROLE_STARTING_QUALIFICATIONS`, `src/core/config/balance.ts`). Each starting qualification's `xp` equals `XP_THRESHOLDS[level]`, and the stored salary is `calculateSalary` from the moment of hire.
+
+| Role | Arrives with |
+|------|--------------|
+| Driller | `blasting` 1, `driving.drill_rig` 1 |
+| Blaster | `blasting` at `ROLE_BLASTER_START_LEVEL` (2) — the higher level justifies the higher price |
+| Driver | `driving.truck` 1, `driving.excavator` 1 |
+| Surveyor | `geology` 1 |
+| Manager | `management` 1 |
+
+Training stays for what a role does not start with: the `driving.rock_fragmenter` licence, cross-training (a surveyor learning to drive), and licence/skill levels (which speed work).
+
 ## Proficiency Levels & Effects
 
 | Level | Label | Task duration multiplier |
@@ -39,7 +53,7 @@ Employees not interchangeable tokens. Each has skill qualifications with profici
 
 XP gain per tick of active work: `xpPerTick = 1 + floor(currentLevel * 0.5)`
 
-An action's XP award is a list, not a single slot — `computeTaskXpAwards` (`src/core/entities/EmployeeXpRules.ts`) evaluates two independent rules per tick: a non-null `requiredSkill` grants that skill category, and a non-null `requiredVehicleRole` additionally grants the licence category `ROLE_LICENCE_REQUIRED[role]` maps it to (`src/core/entities/VehicleDriverAssignment.ts`). An action can carry both fields — `drill_hole` grants blasting and driving.drill_rig XP in the same tick — or just one: `survey` grants geology only, `haul_debris` grants driving.truck only, `fragment_debris` grants driving.excavator only. Every award uses the same `xpPerTick` formula above, keyed to the employee's current proficiency in that award's own category (default level 1 if unqualified in it yet).
+An action's XP award is a list, not a single slot — `computeTaskXpAwards` (`src/core/entities/EmployeeXpRules.ts`) evaluates two independent rules per tick: a non-null `requiredSkill` grants that skill category, and a non-null `requiredVehicleRole` additionally grants the licence category `ROLE_LICENCE_REQUIRED[role]` maps it to (`src/core/entities/VehicleDriverAssignment.ts`). An action can carry both fields — `drill_hole` grants blasting and driving.drill_rig XP in the same tick — or just one: `survey` grants geology only, `haul_debris` grants driving.truck only, `fragment_debris` grants driving.rock_fragmenter only. Every award uses the same `xpPerTick` formula above, keyed to the employee's current proficiency in that award's own category (default level 1 if unqualified in it yet).
 
 ## Task Duration Formula
 

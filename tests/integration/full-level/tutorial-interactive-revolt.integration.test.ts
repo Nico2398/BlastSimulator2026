@@ -136,10 +136,10 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       const steps = dropInstantBuildingCountCheck(loadScenarioDef('tutorial-interactive', SCENARIO_DIR).steps);
 
       // Locate the structural anchors this test pads/drives around: the
-      // driving_center order (construction must finish before the very next
-      // step, `employee train ... driving.drill_rig`, can succeed), "every
+      // living_quarters order (construction must finish before the grind
+      // starts; the driving_center now comes after the blast, #1339), "every
       // ordered hole has actually landed", and "blast fired".
-      const drivingCenterIdx = steps.findIndex(s => s.command.startsWith('build driving_center'));
+      const drivingCenterIdx = steps.findIndex(s => s.command.startsWith('build living_quarters'));
       const drillPlanWaitIdx = steps.findIndex(s => s.command.startsWith('wait_until field:holeCount'));
       const blastIdx = steps.findIndex(s => s.command === 'blast');
       expect(drivingCenterIdx).toBeGreaterThan(-1);
@@ -151,24 +151,22 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
 
       // Setup through "both queued construction sites are real buildings":
       // speed/hire/geology, survey, hire driller, living_quarters order,
-      // continuous policy, driving_center order (steps 0..drivingCenterIdx
-      // inclusive).
+      // living_quarters order (steps 0..drivingCenterIdx inclusive).
       const preBuildResults = runSteps(engine, steps.slice(0, drivingCenterIdx + 1), outDir);
 
       // #1283: agent occupancy is unconditional since #1207 — no per-test
       // opt-in is needed before the drill/charge dispatch below runs.
 
-      // #556: confirming those two placements only queued construction
-      // sites — drive both to completion (needs topped up so there's no
+      // #556: confirming the placement only queued a construction
+      // site — drive it to completion (needs topped up so there's no
       // deadlock with nowhere real to rest yet) before continuing into the
       // steps that need driving_center to actually exist.
       driveTutorialBuildingsToCompletion(engine);
-      expect(engine.ctx.state!.buildings.buildings.length).toBe(2);
+      expect(engine.ctx.state!.buildings.buildings.length).toBe(1);
 
       // Continue through "every drilled hole has actually landed":
-      // driving.drill_rig training, drill_rig purchase + assignment,
-      // driving.excavator training, rock_digger purchase + assignment,
-      // box-cut, and the 9-hole drill order itself -- exactly as
+      // the early policy, driver hire, drill_rig and rock_digger purchases
+      // (every role arrives licensed, #1339), box-cut, and the 9-hole drill order itself -- exactly as
       // tutorial-interactive.json's own command-mode replay runs it today
       // (steps drivingCenterIdx+1..drillPlanWaitIdx inclusive).
       const restOfSetupResults = runSteps(engine, steps.slice(drivingCenterIdx + 1, drillPlanWaitIdx + 1), outDir);

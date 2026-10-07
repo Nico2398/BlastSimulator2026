@@ -58,10 +58,14 @@ Only a Debris Hauler carries cargo.
 | Role | Licence (`ROLE_LICENCE_REQUIRED`) |
 |------|-----------------------------------|
 | Debris Hauler, Building Destroyer | `driving.truck` |
-| Rock Digger, Rock Fragmenter | `driving.excavator` |
+| Rock Digger | `driving.excavator` |
+| Rock Fragmenter | `driving.rock_fragmenter` |
 | Drill Rig | `driving.drill_rig` |
 
-Licences are earned at the Driving Center. A vehicle is not owned by a driver: any licensed
+Roles arrive holding their own licences (`ROLE_STARTING_QUALIFICATIONS`, `balance.ts`): a Driller holds the
+drill-rig licence, a Driver the truck and excavator licences. The rock fragmenter licence is held by no role at
+hire — it is earned at the Driving Center (the tutorial's one course, after the first blast leaves oversized
+boulders), as are further licence levels and cross-training. A vehicle is not owned by a driver: any licensed
 employee may board any vehicle that is unoccupied and unclaimed. Nothing persists a driver
 assignment across tasks.
 

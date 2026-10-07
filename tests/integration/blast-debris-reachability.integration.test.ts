@@ -40,7 +40,7 @@ import {
 function crewHaulingAndBuildDepot(run: (cmd: string) => unknown, state: GameState): void {
   expect(run('employee hire role:driver')).toMatchObject({ success: true });
   const fragmenterDriver = [...state.employees.employees].reverse().find(e => e.role === 'driver')!;
-  expect(run(`employee assign_skill ${fragmenterDriver.id} skill:driving.excavator level:5`)).toMatchObject({ success: true });
+  expect(run(`employee assign_skill ${fragmenterDriver.id} skill:driving.rock_fragmenter level:5`)).toMatchObject({ success: true });
   expect(run('vehicle buy rock_fragmenter')).toMatchObject({ success: true });
   const rockFragmenter = state.vehicles.vehicles.find(v => v.type === 'rock_fragmenter')!;
   expect(run(`vehicle driver ${rockFragmenter.id} ${fragmenterDriver.id}`)).toMatchObject({ success: true });

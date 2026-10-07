@@ -27,7 +27,10 @@ const SEED = 42;
 
 /** A `driver` employee already holds the truck licence — boards a hauler/destroyer directly. */
 function hireTruckDriver(state: ReturnType<typeof createGame>, x = 0, z = 0) {
-  return hireEmployee(state.employees, 'driver', new Random(SEED), x, z).employee;
+  const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED), x, z);
+  // A hired driver also arrives holding the excavator licence; this helper models a truck-only driver.
+  employee.qualifications = employee.qualifications.filter(q => q.category === 'driving.truck');
+  return employee;
 }
 
 /** Grants the excavator licence a rock_digger/rock_fragmenter role requires. */

@@ -142,10 +142,10 @@
           "command": "employee assign_skill 1 skill:geology level:4"
         }
       ],
-      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATIONS in balance.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
       "expect": {
         "equals": {
-          "proficiencyTotal": 6
+          "proficiencyTotal": 8
         }
       },
       "role": "bootstrap"
@@ -533,7 +533,7 @@
     },
     {
       "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it employee #2 (the driller) could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file's own driller-training beat is elsewhere.",
+      "description": "Left unmarked: hiring already grants a driller blasting and driving.drill_rig at Rookie (ROLE_STARTING_QUALIFICATIONS in balance.ts), so a level-1 assignment is a same-level no-op kept only to pin the licence the drill_rig just bought needs for employee #2 (the driller). The player-facing path is training at a driving_center; skipped here since this file's own driller-training beat is elsewhere.",
       "interaction": [
         {
           "type": "command",
@@ -597,7 +597,7 @@
     },
     {
       "command": "employee assign_skill 4 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: same reasoning as employee #2's driving.drill_rig assignment above -- no role starts with this skill, and this file isn't about training.",
+      "description": "Left unmarked: same reasoning as employee #2's driving.drill_rig assignment above -- only a driller starts with this skill, and this file isn't about training.",
       "interaction": [
         {
           "type": "command",
