@@ -29,7 +29,7 @@ import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js
 import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
 import {
   roleColorHex, getInitials, moraleColor, makeHiredLocationStrip, makeNeedsSection,
-  makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection,
+  makeCurrentTaskSection, makeSkillsSection, makePaySection, makeTrainingSection, makeDismissSection, makeManagerEffect,
 } from '../crewDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
@@ -213,6 +213,12 @@ export class CrewPanel extends PanelBase {
           attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
         }),
       );
+      if (role === 'manager') {
+        info.append(el('span', {
+          text: t('ui.crew.manager_effect_hint'),
+          attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
+        }));
+      }
       const cost = el('span', { text: `$${HIRING_COSTS[role]}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
       const hireBtn = el('button', { className: 'bsx-btn', text: t('ui.crew.hire'), attrs: { 'data-role': role } });
       hireBtn.disabled = state.cash < HIRING_COSTS[role];
@@ -259,7 +265,8 @@ export class CrewPanel extends PanelBase {
       moraleTrack, moraleValue,
     );
 
-    const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: [nameLine, roleLine] });
+    const managerEffect = makeManagerEffect(e);
+    const col = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px;min-width:0;flex:1' }, children: managerEffect ? [nameLine, roleLine, managerEffect] : [nameLine, roleLine] });
 
     toggle.append(avatar, col, this.makeStatusTags(e, state), iconEl('chev', 12, 0.4));
     const locateBtn = makeLocateButton({

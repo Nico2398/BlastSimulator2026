@@ -445,6 +445,18 @@ export function isEligibleForWork(
   return employee.alive && !employee.injured && employee.trainingState === null;
 }
 
+/** Highest management proficiency among eligible managers; null when none (#1340). */
+export function bestAvailableManagerLevel(employees: readonly Employee[]): number | null {
+  let best: number | null = null;
+  for (const e of employees) {
+    if (e.role !== 'manager' || !isEligibleForWork(e)) continue;
+    for (const q of e.qualifications) {
+      if (q.category === 'management' && (best === null || q.proficiencyLevel > best)) best = q.proficiencyLevel;
+    }
+  }
+  return best;
+}
+
 /**
  * The living roster — every employee still `alive`. Shared filter for any
  * aggregate/threshold computed over the roster (headcount-style stats,
@@ -454,12 +466,6 @@ export function isEligibleForWork(
  * `employees` (only `fireEmployee` does), so a corpse's frozen fields stay
  * in the array forever unless the reader excludes them explicitly.
  */
-/** Highest management proficiency among eligible managers; null when none (#1340). */
-export function bestAvailableManagerLevel(_employees: readonly Employee[]): number | null {
-  // TODO: implement
-  return null;
-}
-
 export function getLivingEmployees(employees: readonly Employee[]): Employee[] {
   return employees.filter(e => e.alive);
 }
