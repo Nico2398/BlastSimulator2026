@@ -1632,9 +1632,9 @@
         "equals": {
           "deathCount": 1,
           "employeeCount": 1,
-          "activeContractCount": 1
+          "activeContractCount": 2
         },
-        "note": "#593: cash is no longer asserted as decreased -- the driller died in the first pattern's blast, far above, so cash sits flat at -$23,317 through this block.",
+        "note": "#593: cash is no longer asserted as decreased -- the driller died in the first pattern's blast, far above, so cash sits flat at -$23,317 through this block. #1364: the earlier rustite ore_sale is still active here (level-aware offers re-rolled its deadline), so activeContractCount stays 2 through this block and the next event step.",
         "changedBy": {
           "tickCount": 20
         }
@@ -1653,7 +1653,7 @@
         "equals": {
           "deathCount": 1,
           "employeeCount": 1,
-          "activeContractCount": 1
+          "activeContractCount": 2
         },
         "changedBy": {
           "tickCount": 0
@@ -1678,11 +1678,13 @@
           "employeeCount": 1,
           "activeContractCount": 1
         },
-        "note": "#1384: the supply rustite accept (85-tick deadline, accepted at tick 195) outlives this file's last checkpoint now, so nothing expires in this 22-tick block: activeContractCount stays 1 (the earlier rustite ore_sale expired in the block before) and cash sits flat (no living employee draws payroll). Cumulative ticksBelowThreshold (BANKRUPTCY_THRESHOLD=$5,000) never reaches BANKRUPTCY_GRACE_TICKS by the final tick -- cash stays above it.",
+        "note": "#1364: contract offers now draw only ores the level yields, which re-rolled the earlier rustite ore_sale's deadline: it expires in this 22-tick block (not the block before), so activeContractCount drops 2 -> 1 and its penalty lowers cash. The supply rustite accept (85-tick deadline, accepted at tick 195) still outlives this file's last checkpoint. Cumulative ticksBelowThreshold (BANKRUPTCY_THRESHOLD=$5,000) never reaches BANKRUPTCY_GRACE_TICKS by the final tick -- cash stays above it.",
         "changedBy": {
-          "tickCount": 22,
-          "cash": 0
-        }
+          "tickCount": 22
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
