@@ -7,6 +7,7 @@ import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
+import { resolveGeneratedBiome } from '../world/TerrainGen.js';
 import { oresYieldedByRocks } from '../world/RockCatalog.js';
 
 // ── Types ──
@@ -240,9 +241,24 @@ export function resolveContractPriceMultiplier(state: GameState): number {
  * Unknown biome falls back to every priced ore.
  */
 export function resolveContractOres(state: GameState): readonly string[] {
-  const biome = getBiome(state.mineType);
-  if (!biome) return Object.keys(ORE_PRICES);
-  return oresYieldedByRocks(siteRockIds(biome.dominantRocks, state.world?.mixedRockHardness ?? false));
+  const declared = getBiome(state.mineType);
+  if (!declared) return Object.keys(ORE_PRICES);
+  // Terrain generation lands on the climate-weighted biome, which can differ
+  // from the declared one, and the console seeds it differently per entry point
+  // (new_game: state.seed + biome climate centre; campaign start: the level's
+  // own terrainSeed + climateBias). Offer the union of every biome those
+  // paths can generate, so offers never drift from what the grid holds.
+  const world = state.world;
+  if (!world) return oresYieldedByRocks(siteRockIds(declared.dominantRocks, false));
+  const level = state.campaign.activeLevelId ? getLevel(state.campaign.activeLevelId) : undefined;
+  const paths: Array<readonly [number, readonly [number, number]]> = [[state.seed, declared.climateCenter]];
+  if (level) paths.push([level.terrainSeed, level.climateBias]);
+  const rockIds = new Set<string>();
+  for (const [seed, bias] of paths) {
+    const generated = resolveGeneratedBiome(seed, world.baseSizeX, world.baseSizeZ, bias);
+    for (const id of siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false)) rockIds.add(id);
+  }
+  return oresYieldedByRocks([...rockIds]);
 }
 
 /**

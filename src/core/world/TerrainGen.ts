@@ -7,6 +7,7 @@ import { VoxelGrid, surfaceDensityAt, MAX_TERRAIN_GEN_DIMENSION, isValidVoxelY, 
 import type { BiomeDef } from './BiomeCatalog.js';
 import { selectBiomeWeights, dominantBiome, biomeShaping } from './BiomeCatalog.js';
 import { createWorldGenContext, sampleSurfaceHeightY, type WorldGenContext } from './WorldGen.js';
+import { WorldNoiseFields } from './NoiseFields.js';
 import { buildStrataProfile, buildMixedHardnessStrata, StrataSampler } from './Strata.js';
 import { OreVeinSampler } from './OreVeins.js';
 
@@ -87,6 +88,29 @@ export interface TerrainContext {
   biome: BiomeDef;
   strata: StrataSampler;
   oreVeins: OreVeinSampler;
+}
+
+const generatedBiomeCache = new Map<string, BiomeDef>();
+
+/**
+ * The biome terrain generation actually lands on for these params: the
+ * dominant climate-weighted biome at the playable centre. It can differ from
+ * a level's declared biome, so anything asking "which rocks does this site
+ * contain" (contract ores, #1364) must ask here rather than the declared one.
+ * Cheap (two noise samples) and memoized.
+ */
+export function resolveGeneratedBiome(
+  seed: number, sizeX: number, sizeZ: number, climateBias: readonly [number, number],
+): BiomeDef {
+  const key = `${seed}|${sizeX}|${sizeZ}|${climateBias[0]}|${climateBias[1]}`;
+  const hit = generatedBiomeCache.get(key);
+  if (hit) return hit;
+  const fields = new WorldNoiseFields(seed);
+  const biome = dominantBiome(
+    selectBiomeWeights(fields.temperature(sizeX / 2, sizeZ / 2), fields.humidity(sizeX / 2, sizeZ / 2), climateBias, 1.0),
+  );
+  generatedBiomeCache.set(key, biome);
+  return biome;
 }
 
 /**

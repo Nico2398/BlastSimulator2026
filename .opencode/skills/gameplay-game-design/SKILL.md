@@ -52,6 +52,7 @@ Fragments picked up by excavators → loaded onto trucks → sold via contracts
 ### Contracts
 - **Negotiable** with probabilistic outcomes, run by a Manager: no eligible manager (alive, not injured, not in training) means no negotiation. Best manager `management` level raises the success rate by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1 (#1340)
 - Types: ore sale, rubble disposal, supply
+- Offers only ask for ores the active site's rocks can yield (`resolveContractOres`: biome dominant rocks, softest+hardest when `mixedRockHardness`, via `oresYieldedByRocks`), plus rubble disposal. Supply picks from the cheapest `SUPPLY_COMMON_ORE_COUNT` of those ores. A site with no yielding ore offers rubble only. The panel badges an off-site offer (e.g. from an older save) "not found on this site" (`data-contract-onsite`) (#1364)
 - Each specifies: material type, quantity, unit price, deadline, penalties
 
 ### Buildings
