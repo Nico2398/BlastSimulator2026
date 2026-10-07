@@ -310,6 +310,18 @@ export function getVehicleCostsPerTick(state: VehicleState): number {
   return total;
 }
 
+/** Summed per-tick upkeep of every vehicle, regardless of use (#1375). */
+export function getVehicleMaintenanceCostPerTick(_state: VehicleState): number {
+  // TODO: implement
+  return 0;
+}
+
+/** Summed per-tick fuel of vehicles holding an active reservation (#1375). */
+export function getVehicleFuelCostPerTick(_state: VehicleState): number {
+  // TODO: implement
+  return 0;
+}
+
 /**
  * Whether a vehicle's driver seat may be emptied right now. Refuses while
  * the vehicle is carrying a loaded haul so it doesn't get orphaned
