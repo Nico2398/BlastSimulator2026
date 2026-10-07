@@ -25,6 +25,8 @@
 // plumbing (grid access no panel currently has) for a comparison the design
 // doc doesn't specify how to make.
 
+import type { DrillHole } from '../../../core/mining/DrillPlan.js';
+import type { ColumnRock } from '../../../core/mining/ExplosiveRockFit.js';
 import { t } from '../../../core/i18n/I18n.js';
 import { el, stepper, sectionHeader, reasonLine, button, scrollBoundedSection } from '../../dom.js';
 import { iconEl } from '../../icons.js';
@@ -133,6 +135,11 @@ export class ChargeStep {
   get root(): HTMLElement { return this.el; }
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
+
+  /** Dominant rock under a hole, for the too-weak-explosive warning (#1358). */
+  setHoleRockSampler(_fn: (hole: DrillHole) => ColumnRock | null): void {
+    // TODO: implement
+  }
 
   refreshLocale(): void {
     this.locale.refresh();
