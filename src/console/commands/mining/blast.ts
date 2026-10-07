@@ -18,7 +18,7 @@ import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../../core/campaign/SuccessTracker.js';
-import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
+import { computeBlastOreReport, markSurveysStaleByBlast } from '../../../core/mining/SurveyCalc.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
@@ -199,6 +199,8 @@ export function blastCommand(
   // Trigger one post-blast ore report event when conditions are met.
   const oreReport = computeBlastOreReport(result.fragments, state.surveyResults);
   state.lastOreReport = oreReport;
+  // After the report: it compares against estimates that were fresh pre-blast.
+  markSurveysStaleByBlast(state.surveyResults, result.clearedColumns);
   detectOreReport(oreReport, state.events, state.tickCount);
 
   // Track blast fragments in logistics for contract delivery. collectedOre is

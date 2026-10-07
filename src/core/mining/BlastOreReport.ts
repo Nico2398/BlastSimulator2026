@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Post-blast ore yield report
 
 import type { FragmentData } from './BlastExecution.js';
-import type { SurveyResult } from './SurveyCalc.js';
+import { freshSurveys, type SurveyResult } from './SurveyCalc.js';
 import { findSurveyForColumn, surveyColumnKey } from './SurveyColumn.js';
 import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
 
@@ -102,7 +102,7 @@ export function computeBlastOreReport(
   const oreYields: Record<string, number> = {};
   let estimatedYieldKg = 0;
 
-  const surveys = surveyResults ?? [];
+  const surveys = freshSurveys(surveyResults ?? []);
 
   for (const fragment of fragments) {
     // Accumulate actual ore mass per ore type

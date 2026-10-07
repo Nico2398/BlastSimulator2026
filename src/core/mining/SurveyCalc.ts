@@ -155,9 +155,7 @@ export function estimateSurveyResult(
     for (let z = zMin; z <= zMax; z++) {
       if (!grid.containsColumn(x, z)) continue;
 
-      const dx = x - centerX;
-      const dz = z - centerZ;
-      if (Math.sqrt(dx * dx + dz * dz) > radius) continue;
+      if (!isColumnInSurveyDisc({ method, centerX, centerZ }, x, z)) continue;
 
       // Determine which Y levels to sample
       let yLevels: number[];
@@ -207,25 +205,24 @@ export function estimateSurveyResult(
 }
 
 /** True once a blast has cleared a column inside the survey's disc. */
-export function isSurveyStale(_result: Pick<SurveyResult, 'stale'>): boolean {
-  // TODO: implement
-  throw new Error('not implemented');
+export function isSurveyStale(result: Pick<SurveyResult, 'stale'>): boolean {
+  return result.stale === true;
 }
 
-/** True when column (x, z) lies inside the survey's disc. */
+/** True when column (x, z) lies inside the survey's disc (inclusive boundary). */
 export function isColumnInSurveyDisc(
-  _survey: Pick<SurveyResult, 'method' | 'centerX' | 'centerZ'>,
-  _x: number,
-  _z: number,
+  survey: Pick<SurveyResult, 'method' | 'centerX' | 'centerZ'>,
+  x: number,
+  z: number,
 ): boolean {
-  // TODO: implement
-  throw new Error('not implemented');
+  const dx = x - survey.centerX;
+  const dz = z - survey.centerZ;
+  return Math.sqrt(dx * dx + dz * dz) <= SURVEY_COVERAGE_RADIUS[survey.method];
 }
 
 /** Surveys not yet marked stale. */
-export function freshSurveys(_surveys: readonly SurveyResult[]): SurveyResult[] {
-  // TODO: implement
-  throw new Error('not implemented');
+export function freshSurveys(surveys: readonly SurveyResult[]): SurveyResult[] {
+  return surveys.filter(s => !isSurveyStale(s));
 }
 
 /**
@@ -233,11 +230,23 @@ export function freshSurveys(_surveys: readonly SurveyResult[]): SurveyResult[] 
  * `clearedColumns` are `"x,z"` keys. Returns the number of surveys newly marked.
  */
 export function markSurveysStaleByBlast(
-  _surveys: SurveyResult[],
-  _clearedColumns: readonly string[],
+  surveys: SurveyResult[],
+  clearedColumns: readonly string[],
 ): number {
-  // TODO: implement
-  throw new Error('not implemented');
+  if (clearedColumns.length === 0) return 0;
+  const columns = clearedColumns.map(key => {
+    const [x, z] = key.split(',');
+    return { x: Number(x), z: Number(z) };
+  });
+  let marked = 0;
+  for (const survey of surveys) {
+    if (isSurveyStale(survey)) continue;
+    if (columns.some(c => isColumnInSurveyDisc(survey, c.x, c.z))) {
+      survey.stale = true;
+      marked++;
+    }
+  }
+  return marked;
 }
 
 export { applySeismicSurveyDamage } from './SeismicSurveyDamage.js';
