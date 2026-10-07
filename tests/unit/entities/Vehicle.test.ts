@@ -1104,15 +1104,15 @@ describe('Mount.board — happy path: rock_digger requires driving.excavator', (
   });
 });
 
-describe('Mount.board — happy path: rock_fragmenter requires driving.excavator', () => {
-  it('returns { success: true } when employee holds driving.excavator licence', () => {
-    const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
+describe('Mount.board — happy path: rock_fragmenter requires driving.rock_fragmenter', () => {
+  it('returns { success: true } when employee holds driving.rock_fragmenter licence', () => {
+    const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.rock_fragmenter');
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(true);
   });
 
   it('sets vehicle.occupantIds[0] to the employee id on success', () => {
-    const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
+    const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.rock_fragmenter');
     board(state, vehicleId, empId);
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     expect(vehicle.occupantIds[0]).toBe(empId);
@@ -1433,7 +1433,7 @@ describe('Mount.board — error: vehicle already has a driver', () => {
   it('error message is exactly "Vehicle already has a driver"', () => {
     const { state, vehicleId, empId } = makeVehicleTakenFixture(
       'rock_fragmenter',
-      'driving.excavator',
+      'driving.rock_fragmenter',
     );
     const result = board(state, vehicleId, empId);
     expect(result.success).toBe(false);
@@ -1517,7 +1517,7 @@ describe('Mount.board — success: reservation holder boards their own reserved 
   });
 
   it('sets vehicle.occupantIds[0] to the employee id when the reservation matches', () => {
-    const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
+    const { state, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.rock_fragmenter');
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
     const employee = state.employees.employees.find(e => e.id === empId)!;
 

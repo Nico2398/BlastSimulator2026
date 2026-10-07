@@ -51,7 +51,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   it('decrements taskTicksRemaining by exactly 1 per call', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     dispatchAndClaim(state, employee.id, 1);
 
     const before = employee.taskTicksRemaining!;
@@ -65,7 +65,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   it('grants XP incrementally each tick — not deferred to a single lump sum at completion', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng); // 'blasting' level 1, xp 0
+    const { employee } = hireEmployee(state.employees, 'driller', rng); // 'blasting' level 1, xp 0
     dispatchAndClaim(state, employee.id, 1);
 
     const qual = () => employee.qualifications.find(q => q.category === 'blasting')!;
@@ -90,7 +90,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   it('clears activeActionId and resets taskTicksRemaining to null on completion', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, 'blasting', 5); // Master — shortest duration
     dispatchAndClaim(state, employee.id, 1);
 
@@ -108,7 +108,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   it('a freed employee becomes claimable by the next queued action after task completion', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, 'blasting', 5);
     dispatchAndClaim(state, employee.id, 1);
 
@@ -131,7 +131,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   it('crossing an XP threshold purely from ticking triggers a level-up (no direct assign_skill/gainXp call)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng); // 'blasting' level 1
+    const { employee } = hireEmployee(state.employees, 'driller', rng); // 'blasting' level 1
     // Test setup positions XP just short of the level-2 threshold — the
     // proficiency level itself is never set directly, only its XP.
     employee.qualifications.find(q => q.category === 'blasting')!.xp = XP_THRESHOLDS[2] - 2;
@@ -157,7 +157,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   it('grants the pinned per-tick XP award at proficiency level 1 (Rookie)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, 'blasting', 1);
     dispatchAndClaim(state, employee.id, 1);
 
@@ -172,7 +172,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   it('grants the pinned per-tick XP award at proficiency level 5 (Master)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, 'blasting', 5);
     dispatchAndClaim(state, employee.id, 1);
 
@@ -208,7 +208,7 @@ describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (
   it('a drill_hole task grants blasting XP equal to computeXpPerTick at the employee\'s current level', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng); // 'blasting' level 1
+    const { employee } = hireEmployee(state.employees, 'driller', rng); // 'blasting' level 1
     dispatchAndClaimTyped(state, employee.id, 1, 'drill_hole', 'blasting');
 
     const qual = () => employee.qualifications.find(q => q.category === 'blasting')!;
@@ -223,7 +223,7 @@ describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (
   it('a drill_hole task at a higher proficiency level grants the scaled amount', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, 'blasting', 4);
     dispatchAndClaimTyped(state, employee.id, 1, 'drill_hole', 'blasting');
 
@@ -266,7 +266,7 @@ describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (
   it('a drill_hole tick crossing the level-2 threshold returns leveledUp:true with correct oldLevel/newLevel', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     // Position XP just short of the level-2 threshold so this single tick's
     // award (computeXpPerTick(1) = 1) crosses it.
     employee.qualifications.find(q => q.category === 'blasting')!.xp = XP_THRESHOLDS[2] - 1;
@@ -296,7 +296,7 @@ describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (
   it('a tick that does not cross a threshold returns leveledUp:false with no oldLevel/newLevel keys', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng); // fresh, xp 0, far from threshold
+    const { employee } = hireEmployee(state.employees, 'driller', rng); // fresh, xp 0, far from threshold
     dispatchAndClaimTyped(state, employee.id, 1, 'drill_hole', 'blasting');
 
     const progress = tickTaskProgress(state, employee);
@@ -315,7 +315,7 @@ describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (
   it("the result's skill field is null for a task whose action has requiredSkill: null, and grants no XP to any qualification", () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     const qualsBefore = JSON.parse(JSON.stringify(employee.qualifications));
 
     dispatchAndClaimTyped(state, employee.id, 1, 'general_work', null);
@@ -413,7 +413,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
   it('carves cells progressively (nearest-entrance-first) as ticks advance, reaching carvedCount === cells.length on the completing tick', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     const grid = new VoxelGrid(20, 20);
     const cells = makeCells(8);
     fillCells(grid, cells);
@@ -449,7 +449,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
   it('at least one tick before completion carves a strict subset — progress is not deferred to a single lump on completion', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     const grid = new VoxelGrid(20, 20);
     const cells = makeCells(8);
     fillCells(grid, cells);
@@ -468,7 +468,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
   it('grid omitted: no crash, no carve attempted, and taskTicksRemaining still counts down normally', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     const cells = makeCells(4);
     const rampId = state.nextPlannedRampId++;
     wireDigRampSegment(state, employee, rampId, 1, cells, 4);
@@ -483,7 +483,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
   it('a non-dig_ramp_segment action does not look up plannedRamps or attempt a carve, even when a same-id tracker exists', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     const grid = new VoxelGrid(20, 20);
     const cells = makeCells(4);
     fillCells(grid, cells);
@@ -521,7 +521,7 @@ describe('tickTaskProgress — progressive dig_ramp_segment carving (#946)', () 
   it("a tracker not found for the payload's rampId/segmentIndex (e.g. the ramp was cancelled mid-dig) is a no-op — no throw", () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     const grid = new VoxelGrid(20, 20);
     const cells = makeCells(4);
     fillCells(grid, cells);

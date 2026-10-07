@@ -13,8 +13,8 @@ import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 29 entries (#1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(29);
+  it('has exactly 28 entries (#1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(28);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -109,10 +109,10 @@ describe('tutorialSteps', () => {
       'hire-driller',
       'build-living-quarters',
       'set-early-policy',
-      'build-driving-center',
-      'train-driller',
+      // #1339: every role arrives able to do its own job, so the driver is
+      // hired before the rig/digger and no licence course precedes box-cut.
+      'hire-driver',
       'buy-drill-rig-assign',
-      'train-digger',
       'buy-rock-digger-assign',
       'box-cut',
       // #1015: box-cut is immediately followed by drill-plan — the
@@ -126,10 +126,13 @@ describe('tutorialSteps', () => {
       // before 'blast' so the rail cannot skip past it.
       'evacuate-zone',
       'blast',
+      // #1339: the first blast leaves oversized boulders; the driving center
+      // teaches the one licence (rock fragmenter) nobody is hired holding.
+      'build-driving-center',
+      'train-fragmenter',
       'scores',
       'event-fire-resolve',
       'hire-manager',
-      'hire-driver',
       'vehicle-buy-assign',
       'build-storage',
       // #1335: contract-accept is gone; haul-debris follows build-storage
@@ -340,8 +343,8 @@ describe('tutorialSteps', () => {
     // Steps that should definitely have highlight targets
     const stepsWithTarget = new Set([
       'hire-surveyor', 'survey', 'toggle-survey-overlay', 'hire-driller',
-      'build-driving-center', 'train-driller', 'buy-drill-rig-assign',
-      'train-digger', 'buy-rock-digger-assign',
+      'build-driving-center', 'train-fragmenter', 'buy-drill-rig-assign',
+      'buy-rock-digger-assign',
       'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'sell-ore',
@@ -499,7 +502,7 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned directly after build-storage (index 23) and before finances', () => {
+    it('exists, positioned directly after build-storage (index 22) and before finances', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
       const haulIdx = ids.indexOf('haul-debris');
@@ -507,11 +510,11 @@ describe('tutorialSteps', () => {
       expect(haulIdx).toBeGreaterThan(-1);
       // #1335: contract-accept was removed; no step sits between them.
       expect(haulIdx).toBe(buildIdx + 1);
-      expect(haulIdx).toBe(23);
+      expect(haulIdx).toBe(22);
       // #1328: finances/needs sit between haul-debris and sell-ore now, so
       // the first sale is the last guided step.
       expect(ids[haulIdx + 1]).toBe('finances');
-      expect(ids.indexOf('finances')).toBe(24);
+      expect(ids.indexOf('finances')).toBe(23);
       expect(sellOreIdx).toBe(ids.indexOf('needs') + 1);
     });
 
@@ -680,7 +683,7 @@ describe('tutorialSteps', () => {
     // simulation to run a driver's walk-and-board.
     // #959: 'sell-ore' replaces 'contract-deliver' here — haul+sell cycles
     // are queued, real work the same way delivering to a contract always was.
-    const SIMULATION_OWNED = ['survey', 'train-driller', 'train-digger', 'haul-debris', 'sell-ore', 'evacuate-zone'];
+    const SIMULATION_OWNED = ['survey', 'train-fragmenter', 'haul-debris', 'sell-ore', 'evacuate-zone'];
 
     for (const id of SIMULATION_OWNED) {
       it(`"${id}" waits on work and is given a tick allowance`, () => {

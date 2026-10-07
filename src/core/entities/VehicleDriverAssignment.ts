@@ -17,7 +17,7 @@ export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
   debris_hauler: 'driving.truck',
   building_destroyer: 'driving.truck',
   rock_digger: 'driving.excavator',
-  rock_fragmenter: 'driving.excavator',
+  rock_fragmenter: 'driving.rock_fragmenter',
   drill_rig: 'driving.drill_rig',
 };
 

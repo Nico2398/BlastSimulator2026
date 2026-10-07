@@ -107,7 +107,7 @@ function makeCtx(): GameContext {
 }
 
 /**
- * Hires one driller (qualified 'blasting' by default, ROLE_STARTING_QUALIFICATION)
+ * Hires one driller (qualified 'blasting' by default, ROLE_STARTING_QUALIFICATIONS)
  * and buys one drill_rig vehicle, so drill_plan grid's queued drill_hole
  * actions (#553) can actually land.
  */

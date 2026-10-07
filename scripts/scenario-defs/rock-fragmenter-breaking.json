@@ -479,6 +479,17 @@
       "role": "bootstrap"
     },
     {
+      "command": "employee assign_skill 3 skill:driving.rock_fragmenter level:5",
+      "description": "Bootstrap the rock fragmenter licence for the same driver (#1339: the fragmenter needs its own licence).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.rock_fragmenter level:5"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "vehicle buy rock_fragmenter",
       "description": "Vehicle #3 (#553: #1 was the drill_rig, destroyed by the blast; #2 is the debris_hauler) — a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
       "interaction": [

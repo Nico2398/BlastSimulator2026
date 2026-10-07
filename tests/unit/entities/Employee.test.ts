@@ -221,6 +221,14 @@ describe('Employee — skill qualification fields (3.1)', () => {
     }
   });
 
+  it('driller holds blasting and drill rig; blaster starts at level 2; driver holds truck and excavator', () => {
+    const cats = (role: 'driller' | 'blaster' | 'driver') =>
+      hireEmployee(createEmployeeState(), role, new Random(7)).employee.qualifications.map(q => `${q.category}:${q.proficiencyLevel}`);
+    expect(cats('driller')).toEqual(['blasting:1', 'driving.drill_rig:1']);
+    expect(cats('blaster')).toEqual(['blasting:2']);
+    expect(cats('driver')).toEqual(['driving.truck:1', 'driving.excavator:1']);
+  });
+
   it('newly hired employee has trainingState as null', () => {
     const state = createEmployeeState();
     const { employee } = hireEmployee(state, 'blaster', rng);
@@ -454,11 +462,11 @@ describe('calculateSalary() (3.4)', () => {
   it('a newly hired employee has employee.salary equal to base + its role qualification', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'blaster', rng);
+    const { employee } = hireEmployee(state, 'surveyor', rng);
 
     // A hire arrives holding its role qualification at Rookie level, so the
     // stored salary carries that level's bonus and agrees with calculateSalary.
-    expect(employee.salary).toBe(BASE_SALARIES['blaster'] + QUALIFICATION_SALARY_BONUS[1]);
+    expect(employee.salary).toBe(BASE_SALARIES['surveyor'] + QUALIFICATION_SALARY_BONUS[1]);
     expect(employee.salary).toBe(calculateSalary(employee));
   });
 
@@ -466,11 +474,11 @@ describe('calculateSalary() (3.4)', () => {
   it('returns base + QUALIFICATION_SALARY_BONUS[1] for exactly one level-1 qualification', () => {
     const state = createEmployeeState();
     const rng = new Random(1);
-    const { employee } = hireEmployee(state, 'driller', rng);
-    assignSkill(state, employee.id, 'blasting', 1);
+    const { employee } = hireEmployee(state, 'surveyor', rng);
+    assignSkill(state, employee.id, 'geology', 1);
 
     const salary = calculateSalary(employee);
-    const expected = BASE_SALARIES['driller'] + QUALIFICATION_SALARY_BONUS[1];
+    const expected = BASE_SALARIES['surveyor'] + QUALIFICATION_SALARY_BONUS[1];
 
     expect(salary).toBe(expected);
   });

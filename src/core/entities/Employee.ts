@@ -8,7 +8,7 @@ import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
 import type { Itinerary } from '../engine/Itinerary.js';
-import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS } from '../config/balance.js';
 
 // ── Roles ──
 
@@ -55,20 +55,6 @@ export type SkillCategory =
   | 'blasting'
   | 'management'
   | 'geology';
-
-/**
- * The qualification each role arrives with, at Rookie level.
- *
- * `driver` gets the truck licence; excavator and drill-rig licences are raised
- * through training rather than hiring.
- */
-export const ROLE_STARTING_QUALIFICATION: Record<EmployeeRole, SkillCategory> = {
-  surveyor: 'geology',
-  driller: 'blasting',
-  blaster: 'blasting',
-  driver: 'driving.truck',
-  manager: 'management',
-};
 
 export interface SkillQualification {
   category: SkillCategory;
@@ -319,7 +305,7 @@ export function hireEmployee(
     // a driver could not drive, because the only way to grant a qualification
     // was the `employee assign_skill` console command. Training raises
     // proficiency from here.
-    qualifications: [{ category: ROLE_STARTING_QUALIFICATION[role], proficiencyLevel: 1, xp: 0 }],
+    qualifications: ROLE_STARTING_QUALIFICATIONS[role].map(q => ({ ...q, xp: XP_THRESHOLDS[q.proficiencyLevel] })),
     trainingState: null,
     pendingTrainingState: null,
     activeActionId: null,

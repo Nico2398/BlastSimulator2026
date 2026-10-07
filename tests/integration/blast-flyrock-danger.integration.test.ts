@@ -82,7 +82,7 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
  * every charge has landed. Relocating by qualification instead of by these
  * fixed ids would also sweep up a test's own deliberately-placed 'driller'-
  * role bystanders (crewBesideTheBlast, onTheBlast), which are 'blasting'-
- * qualified too (ROLE_STARTING_QUALIFICATION) but must stay exactly where
+ * qualified too (ROLE_STARTING_QUALIFICATIONS) but must stay exactly where
  * each test put them.
  */
 function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
@@ -126,7 +126,7 @@ function blastAt(ctx: MiningContext, stemming: string): void {
  * well inside a minimally-stemmed (0.5m, the createCharge floor) shot's throw.
  *
  * Hired as 'driver', not 'driller' (#554): a 'driller' is 'blasting'-
- * qualified (ROLE_STARTING_QUALIFICATION), and charge_hole — unlike
+ * qualified (ROLE_STARTING_QUALIFICATIONS), and charge_hole — unlike
  * drill_hole — has no vehicle gate, so any 'blasting'-qualified bystander
  * standing this close to the pattern would get dispatched to walk in and
  * charge a hole itself (nearest-first, ActionSelection.ts), planting exactly

@@ -55,7 +55,7 @@ Demolish is confirmed (#1399) from the Build menu row and the selection bar via 
 
 | Building | Skill Granted |
 |----------|--------------|
-| Driving Center | Vehicle licence — one per role (truck, excavator, drill rig, …) |
+| Driving Center | Vehicle licence — truck, excavator, drill rig, rock fragmenter. Roles arrive holding their own; the rock fragmenter licence is only earned here |
 | Blasting Academy | Explosives charging and blast sequencing |
 | Management Office | HR and commercial operations |
 | Geology Lab | Survey techniques and rock analysis |

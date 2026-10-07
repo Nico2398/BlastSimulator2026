@@ -74,7 +74,9 @@
       "role": "player",
       "description": "#947: canTickVehicle now requires a driver aboard to advance on tick at all, so hauler #1 needs a driver before the idle -> moving transition below. Hired first (employee #1) so the driller hired later (issue #550 section) becomes #2 -- that step and the `employee assign_skill`/`employee dispatch` steps below target #2 accordingly.",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -170,7 +172,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -242,7 +246,9 @@
       "role": "player",
       "description": "Issue #550: a driller to claim the vehicle-gated dispatch below. Hired after the debris_hauler section so this file's earlier idle/moving/working coverage is untouched. #947's driver hire earlier took employee id #1, so this driller lands as #2.",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2
         }
@@ -259,7 +265,7 @@
       ],
       "expect": {
         "equals": {
-          "qualificationCount": 3
+          "qualificationCount": 4
         },
         "note": "driving.truck (#947's driver hire) + blasting (from the driller role) + driving.drill_rig (the vehicle's required licence)"
       },
@@ -283,7 +289,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 2
         }

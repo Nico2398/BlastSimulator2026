@@ -355,105 +355,30 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "build-driving-center"
+          "stepId": "hire-driver"
         }
       ],
       "expect": {
-        "tutorialStep": "build-driving-center"
+        "tutorialStep": "hire-driver"
       }
     },
     {
-      "command": "build driving_center at:6,15",
-      "timeout": 30,
-      "description": "#553: build-driving-center, click half: driving_center ordered through the Build panel -- drill_hole became a queued, vehicle-gated action (a driller physically drives a drill_rig to each hole), and hiring only grants the driller their 'blasting' qualification, never the driving.drill_rig licence a drill_rig needs. This step and the two after it (train-driller, buy-drill-rig-assign) close that gap, the same deadlock class #552 fixed for hauling. #556/#816: ordering a building queues a construction site instead of placing it instantly, and `employee train` requires a REAL driving_center (state.buildings, not a pending order) -- confirmed via direct trace that training was genuinely refused immediately after this step with no wait in between, independent of the place_building livelock #816 also found and fixed. The wait step right below drives the site to completion before training is attempted, matching build-living-quarters/build-storage above.",
+      "command": "employee hire role:driver",
+      "timeout": 90,
+      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and the retired accept step (#1335) steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center/freight_warehouse both complete for real and cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556/#817): with the retired accept step (#1335) moved below build-storage, the step before this one is the manager hire and the panel is already open — the toolbar tab toggles, so a second click would close it, and the rail (which lights the last reachable control) makes that click inert.",
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 6,
-          "z": 15
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "expect": {
-        "increased": [
-          "orderedBuildingCount"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:300",
-      "timeout": 95,
-      "description": "#556/#816: build-driving-center complete -- the driving_center site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, so a proactive-rest policy no longer strands anyone permanently).",
-      "role": "setup",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedBuildingCount",
-          "equals": 0,
-          "maxTicks": 300,
-          "timeoutMs": 90000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "orderedBuildingCount": 0
-        },
-        "tutorialStep": "train-driller"
-      }
-    },
-    {
-      "command": "employee train 2 skill:driving.drill_rig",
-      "timeout": 30,
-      "description": "#553: train-driller, click half: driving.drill_rig course booked at the driving_center just built. Training itself takes real ticks (TRAINING_BASE_TICKS, balance.ts) -- command mode has no implicit clock between steps (unlike interaction mode's own waitForTutorialStep), so the wait is its own step right below, mirroring this file's existing tick-1/tick-6 wait-only beats. #816: the driving_center order above now genuinely completes before this step runs (wait_until step inserted), and the root-cause place_building livelock (an idle bystander stranded on a just-completed building's footprint) is fixed in tickTaskCompletion.ts -- training succeeds for real, no longer declared refused.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
-        }
-      ]
-    },
-    {
-      "command": "tick 25",
-      "timeout": 30,
-      "description": "#553: train-driller complete: the training course finishes and the driller (employee #2) is granted driving.drill_rig. waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick since it has no implicit clock between steps.",
-      "role": "player",
-      "interaction": [
         {
           "type": "waitForTutorialStep",
-          "stepId": "buy-drill-rig-assign",
-          "timeout": 30000
+          "stepId": "buy-drill-rig-assign"
         }
       ],
       "expect": {
@@ -476,60 +401,15 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "train-digger",
+          "stepId": "buy-rock-digger-assign",
           "timeout": 60000
         }
       ],
       "expect": {
-        "tutorialStep": "train-digger",
+        "tutorialStep": "buy-rock-digger-assign",
         "increased": [
           "vehicleCount"
         ]
-      }
-    },
-    {
-      "command": "employee train 1 skill:driving.excavator",
-      "timeout": 30,
-      "description": "#555: train-digger, click half: driving.excavator course booked at the driving_center built above -- dig_ramp_segment work (the box-cut step below) now requires this licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training itself takes real ticks (TRAINING_BASE_TICKS, balance.ts) -- command mode has no implicit clock between steps, so the wait is its own step right below, mirroring train-driller's own click/wait split above. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center completes for real and place_building's root-cause livelock is fixed, so this succeeds genuinely. (#1203) Enrolment sends the employee walking to the school rather than relocating them instantly -- trainingCount (trainingState !== null) stays 0 until they actually arrive and enter the building, so this step no longer asserts an immediate increase.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "trainingCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 25",
-      "timeout": 30,
-      "description": "#555: train-digger complete: the training course finishes and the surveyor (employee #1) is granted driving.excavator. waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick since it has no implicit clock between steps.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "buy-rock-digger-assign",
-          "timeout": 30000
-        }
-      ],
-      "expect": {
-        "tutorialStep": "buy-rock-digger-assign"
       }
     },
     {
@@ -539,8 +419,8 @@
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "clickSelector",

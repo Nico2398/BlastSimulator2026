@@ -356,9 +356,9 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
   forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
     const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
     if (stepObj.command !== 'employee hire role:manager') return;
-    // 'hire-driver' (#556/#817, #1335): the card after the manager hire. Same
-    // step, same #776 budget.
-    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('hire-driver')) return;
+    // 'vehicle-buy-assign' (#556/#817, #1335, #1339): the card after the manager
+    // hire (the driver is hired before box-cut now). Same step, same #776 budget.
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('vehicle-buy-assign')) return;
     matchedStepIndex = stepIndex;
     matchedStepObj = stepObj;
   });
@@ -371,10 +371,10 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
     expect(JSON.stringify(scenario)).not.toContain('"tutorialStep":"contract-accept"');
   });
 
-  it('step hiring the manager and waiting for tutorial step "hire-driver" has effectiveStepTimeoutMs >= 60000ms', () => {
+  it('step hiring the manager and waiting for tutorial step "vehicle-buy-assign" has effectiveStepTimeoutMs >= 60000ms', () => {
     expect(
       matchedStepIndex,
-      'expected to find a step with command "employee hire role:manager" whose interaction array waits for tutorial step "hire-driver" — tutorial-interactive.json may have changed shape',
+      'expected to find a step with command "employee hire role:manager" whose interaction array waits for tutorial step "vehicle-buy-assign" — tutorial-interactive.json may have changed shape',
     ).toBeGreaterThanOrEqual(0);
 
     const stepObj = matchedStepObj as ScenarioStepDef;
@@ -419,45 +419,6 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
     ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
   });
 
-  // Step 36's beat (issue #776 second follow-up): two fresh independent
-  // interaction-mode runs both cleared the "hire-driver" beat above (step
-  // 35) cleanly, then timed out identically at the very next
-  // waitForTutorialStep beat — hiring a driver and waiting for the
-  // tutorial to advance to "vehicle-buy-assign". Same shape as the two
-  // cases above: the real hire action succeeds in-browser but the
-  // harness's poll times out first, because this step's declared
-  // "timeout": 30 in the JSON produces the same too-tight ~35000ms
-  // effectiveStepTimeoutMs budget. A planner audit of the rest of the file
-  // (steps 37-46) found no other step with this same tight-margin shape —
-  // this is the last one needing the fix. Located via the same
-  // forEachActionOfType scaffold, not a hand-rolled locator.
-  let driverAssignStepIndex = -1;
-  let driverAssignStepObj: ScenarioStepDef | undefined;
-  forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
-    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
-    if (stepObj.command !== 'employee hire role:driver') return;
-    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('vehicle-buy-assign')) return;
-    driverAssignStepIndex = stepIndex;
-    driverAssignStepObj = stepObj;
-  });
-
-  it('step hiring the driver and waiting for tutorial step "vehicle-buy-assign" has effectiveStepTimeoutMs >= 60000ms', () => {
-    expect(
-      driverAssignStepIndex,
-      'expected to find a step with command "employee hire role:driver" whose interaction array waits for tutorial step "vehicle-buy-assign" — tutorial-interactive.json may have changed shape',
-    ).toBeGreaterThanOrEqual(0);
-
-    const stepObj = driverAssignStepObj as ScenarioStepDef;
-    const outerMs = effectiveStepTimeoutMs(stepObj, 60);
-
-    expect(
-      outerMs,
-      `step[${driverAssignStepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
-        `too tight for the real-world post-blast beat (issue #776: two independent interaction-mode runs both ` +
-        `timed out here at ~35000ms even though the underlying actions succeeded). Needs real wall-clock slack ` +
-        `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
-    ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
-  });
 });
 
 // ──────────────────────────────────────────────
@@ -566,17 +527,13 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     6: 'state',
     7: 'employee hire role:driller',
     8: 'build living_quarters at:8,15',
-    12: 'build driving_center at:6,15',
-    14: 'employee train 2 skill:driving.drill_rig',
-    16: 'tick 25',
-    17: 'vehicle buy drill_rig',
-    18: 'employee train 1 skill:driving.excavator',
-    19: 'tick 25',
-    20: 'vehicle buy rock_digger',
-    21: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
-    22: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089', // #949
-    31: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
-    35: 'sequence auto',
+    12: 'employee hire role:driver', // #1339: moved before box-cut
+    13: 'vehicle buy drill_rig',
+    14: 'vehicle buy rock_digger',
+    15: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
+    16: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089', // #949
+    25: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
+    29: 'sequence auto',
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {

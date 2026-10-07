@@ -23,7 +23,8 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
-import { HIRING_COSTS, ROLE_STARTING_QUALIFICATION } from '../../core/entities/Employee.js';
+import { HIRING_COSTS } from '../../core/entities/Employee.js';
+import { ROLE_STARTING_QUALIFICATIONS } from '../../core/config/balance.js';
 import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
 import {
@@ -203,7 +204,7 @@ export class CrewPanel extends PanelBase {
       info.append(
         el('span', { text: t(`role.${role}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', {
-          text: t('ui.crew.hire_starts_with', { qual: t(`skill.${ROLE_STARTING_QUALIFICATION[role]}`), count }),
+          text: t('ui.crew.hire_starts_with', { qual: ROLE_STARTING_QUALIFICATIONS[role].map(q => `${t(`skill.${q.category}`)} ★${q.proficiencyLevel}`).join(', '), count }),
           attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
         }),
       );

@@ -95,7 +95,7 @@ describe('computeTaskXpAwards', () => {
   }
 
   it('drill_hole-shaped action (requiredSkill: blasting) returns exactly one award at Rookie level', () => {
-    const employee = makeEmployee('blaster'); // starts with 'blasting' level 1
+    const employee = makeEmployee('driller'); // starts with 'blasting' level 1
     const action = makeAction({ type: 'drill_hole', requiredSkill: 'blasting' });
 
     const awards = computeTaskXpAwards(employee, action);
@@ -299,13 +299,13 @@ describe('computeTaskXpAwards — driving licence XP for vehicle-gated actions (
     expect(computeXpPerTick(3)).not.toBe(computeXpPerTick(1));
   });
 
-  it('fragment_debris-shaped action (requiredSkill: null, requiredVehicleRole: rock_fragmenter) returns exactly one driving.excavator award', () => {
-    const employee = makeEmployee('blaster'); // no driving.excavator qualification -> defaults to level 1
+  it('fragment_debris-shaped action (requiredSkill: null, requiredVehicleRole: rock_fragmenter) returns exactly one driving.rock_fragmenter award', () => {
+    const employee = makeEmployee('blaster'); // no driving.rock_fragmenter qualification -> defaults to level 1
     const action = makeAction({ type: 'fragment_debris', requiredSkill: null, requiredVehicleRole: 'rock_fragmenter' });
 
     const awards = computeTaskXpAwards(employee, action);
 
-    expect(awards).toEqual([{ category: 'driving.excavator', amount: computeXpPerTick(1) }]);
+    expect(awards).toEqual([{ category: 'driving.rock_fragmenter', amount: computeXpPerTick(1) }]);
   });
 
   it('survey-shaped action (requiredVehicleRole: null) still returns exactly one award — regression guard, unaffected by the new vehicle-role rule', () => {

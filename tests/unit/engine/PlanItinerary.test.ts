@@ -340,8 +340,8 @@ describe('planItinerary', () => {
   it('employee not licensed for the required vehicle role returns null even though a free vehicle of that role exists (distinguishes "not licensed" from "no vehicle")', () => {
     const state = makeState();
     const rng = new Random(SEED);
-    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
-    // No assignSkill call — employee lacks the driving.drill_rig licence.
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+    // No assignSkill call — a blaster lacks the driving.drill_rig licence (a driller holds it).
     purchaseVehicle(state.vehicles, 'drill_rig', 5, 0);
     const action = makeAction({ id: 1, requiredVehicleRole: 'drill_rig', targetX: 20, targetZ: 0 });
     state.pendingActions.push(action);

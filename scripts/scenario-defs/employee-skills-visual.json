@@ -40,8 +40,8 @@
         ],
         "equals": {
           "employeeCount": 1,
-          "qualificationCount": 1,
-          "proficiencyTotal": 1
+          "qualificationCount": 2,
+          "proficiencyTotal": 2
         }
       }
     },
@@ -64,8 +64,8 @@
         ],
         "equals": {
           "employeeCount": 2,
-          "qualificationCount": 2,
-          "proficiencyTotal": 2
+          "qualificationCount": 3,
+          "proficiencyTotal": 4
         }
       }
     },
@@ -88,8 +88,8 @@
         ],
         "equals": {
           "employeeCount": 3,
-          "qualificationCount": 3,
-          "proficiencyTotal": 3
+          "qualificationCount": 5,
+          "proficiencyTotal": 6
         }
       }
     },
@@ -112,8 +112,8 @@
         ],
         "equals": {
           "employeeCount": 4,
-          "qualificationCount": 4,
-          "proficiencyTotal": 4
+          "qualificationCount": 6,
+          "proficiencyTotal": 7
         }
       }
     },
@@ -136,14 +136,14 @@
         ],
         "equals": {
           "employeeCount": 5,
-          "qualificationCount": 5,
-          "proficiencyTotal": 5
+          "qualificationCount": 7,
+          "proficiencyTotal": 8
         }
       }
     },
     {
       "command": "employee hire role:driller",
-      "description": "Employee #6 \u2014 hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below). Toggled bottom-up (6 -> 1) so the panel's own scrollIntoView leaves it resting on #1's card once every row is expanded \u2014 #1 is the one that later gains a second qualification, and every screenshot from here on needs it in frame, not wherever the last click of a top-down pass happened to land. A screenshot right after each individual click \u2014 before the next click's own scrollIntoView moves the panel again \u2014 is what gets #2-#5's cards in frame too; the step's single closing screenshot only ever shows one scroll position.",
+      "description": "Employee #6 — hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below). Toggled bottom-up (6 -> 1) so the panel's own scrollIntoView leaves it resting on #1's card once every row is expanded — #1 is the one that later gains a second qualification, and every screenshot from here on needs it in frame, not wherever the last click of a top-down pass happened to land. A screenshot right after each individual click — before the next click's own scrollIntoView moves the panel again — is what gets #2-#5's cards in frame too; the step's single closing screenshot only ever shows one scroll position.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -161,8 +161,8 @@
         ],
         "equals": {
           "employeeCount": 6,
-          "qualificationCount": 6,
-          "proficiencyTotal": 6
+          "qualificationCount": 9,
+          "proficiencyTotal": 10
         }
       }
     },
@@ -180,8 +180,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 7,
-          "proficiencyTotal": 9
+          "qualificationCount": 10,
+          "proficiencyTotal": 13
         },
         "note": "a new qualification (driller's own starting one is blasting, not driving.excavator) -- qualificationCount +1, proficiencyTotal +3 for the level"
       },
@@ -201,8 +201,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 8,
-          "proficiencyTotal": 11
+          "qualificationCount": 11,
+          "proficiencyTotal": 15
         },
         "note": "employee #1's third distinct qualification -- qualificationCount +1, proficiencyTotal +2"
       },
@@ -222,8 +222,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 8,
-          "proficiencyTotal": 14
+          "qualificationCount": 11,
+          "proficiencyTotal": 17
         },
         "note": "raises the blaster's own starting qualification (blasting) from its Rookie level 1 to 4 -- qualificationCount unchanged, proficiencyTotal +3"
       },
@@ -243,8 +243,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 8,
-          "proficiencyTotal": 14
+          "qualificationCount": 11,
+          "proficiencyTotal": 17
         },
         "note": "the driver's starting qualification is already driving.truck at level 1 -- this call is a same-level no-op, unlike the others in this block"
       },
@@ -264,8 +264,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 8,
-          "proficiencyTotal": 18
+          "qualificationCount": 11,
+          "proficiencyTotal": 21
         },
         "note": "raises the surveyor's own starting qualification (geology) from level 1 to 5 -- proficiencyTotal +4"
       },
@@ -285,8 +285,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 8,
-          "proficiencyTotal": 19
+          "qualificationCount": 11,
+          "proficiencyTotal": 22
         },
         "note": "raises the manager's own starting qualification (management) from level 1 to 2 -- proficiencyTotal +1"
       },
@@ -316,8 +316,8 @@
           "cash": 0
         },
         "equals": {
-          "qualificationCount": 8,
-          "proficiencyTotal": 19
+          "qualificationCount": 11,
+          "proficiencyTotal": 22
         }
       }
     },

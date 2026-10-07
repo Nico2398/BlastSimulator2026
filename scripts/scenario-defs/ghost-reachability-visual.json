@@ -519,6 +519,22 @@
       }
     },
     {
+      "command": "employee assign_skill 2 skill:driving.rock_fragmenter level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.rock_fragmenter level:5"
+        }
+      ],
+      "description": "Bootstrap the rock fragmenter licence for the same driver (#1339: the fragmenter needs its own licence).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
       "command": "vehicle buy rock_digger",
       "interaction": [
         {
@@ -669,6 +685,22 @@
         }
       ],
       "description": "Excavator licence for the fragmenter driver.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.rock_fragmenter level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.rock_fragmenter level:5"
+        }
+      ],
+      "description": "Bootstrap the rock fragmenter licence for the same driver (#1339: the fragmenter needs its own licence).",
       "role": "bootstrap",
       "expect": {
         "changedBy": {

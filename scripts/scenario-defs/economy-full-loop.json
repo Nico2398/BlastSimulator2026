@@ -170,8 +170,8 @@
         ],
         "equals": {
           "employeeCount": 2,
-          "qualificationCount": 2,
-          "proficiencyTotal": 6
+          "qualificationCount": 3,
+          "proficiencyTotal": 7
         }
       }
     },
@@ -189,7 +189,7 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 10
+          "proficiencyTotal": 11
         }
       },
       "role": "bootstrap"
@@ -520,8 +520,8 @@
         ],
         "equals": {
           "employeeCount": 3,
-          "qualificationCount": 2,
-          "proficiencyTotal": 6
+          "qualificationCount": 3,
+          "proficiencyTotal": 7
         }
       }
     },
@@ -539,7 +539,7 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 10
+          "proficiencyTotal": 11
         }
       },
       "role": "bootstrap"
@@ -606,8 +606,8 @@
         ],
         "equals": {
           "employeeCount": 4,
-          "qualificationCount": 3,
-          "proficiencyTotal": 11
+          "qualificationCount": 5,
+          "proficiencyTotal": 13
         }
       }
     },
@@ -626,7 +626,26 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 16
+          "proficiencyTotal": 17
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.rock_fragmenter level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.rock_fragmenter level:5"
+        }
+      ],
+      "description": "Bootstrap the rock fragmenter licence for the same driver (#1339: the fragmenter needs its own licence).",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "proficiencyTotal": 22
         }
       }
     },

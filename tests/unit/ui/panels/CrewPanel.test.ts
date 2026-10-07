@@ -344,7 +344,7 @@ describe('CrewPanel', () => {
     const text = panel.root.textContent!;
     expect(text).toContain('HIRING');
     expect(text).toContain('$1000');
-    expect(text).toContain('Starts with Blasting ★1 · 1 on roster');
+    expect(text).toContain('Starts with Blasting ★1, Drill Rig Operation ★1 · 1 on roster');
   });
 
   it('hire button dispatches employee hire with the real role', () => {

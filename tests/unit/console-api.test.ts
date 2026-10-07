@@ -229,7 +229,7 @@ describe('console-api', () => {
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       // Hiring grants the role's starting qualification(s) at proficiency 1
-      // (ROLE_STARTING_QUALIFICATION, Employee.ts) — a driller starts with at
+      // (ROLE_STARTING_QUALIFICATIONS, Employee.ts) — a driller starts with at
       // least one, so this is real coverage, not a vacuous zero-vs-zero check.
       expect(state.employeeCount).toBe(1);
       expect(state.qualificationCount).toBeGreaterThan(0);
@@ -433,7 +433,7 @@ describe('console-api', () => {
       runner.runner.run('campaign start level:tutorial_pit');
       runner.runner.run('employee hire role:driller');
       const empId = runner.ctx.state!.employees.employees[0]!.id;
-      // The hired driller starts qualified 'blasting' (ROLE_STARTING_QUALIFICATION,
+      // The hired driller starts qualified 'blasting' (ROLE_STARTING_QUALIFICATIONS,
       // Employee.ts) but drill_plan grid now queues one drill_hole PendingAction
       // per hole instead of writing them straight into state.drillHoles (#553) —
       // it also needs a drill_rig vehicle (and a driving.drill_rig licence) to

@@ -42,10 +42,11 @@ import type {
 const SEED = 42;
 
 /** Return a fresh EmployeeState with one hired employee (id = 1). */
-function makeStateWithOne(): { state: EmployeeState; empId: number } {
+function makeStateWithOne(role: 'driller' | 'blaster' = 'blaster'): { state: EmployeeState; empId: number } {
   const state = createEmployeeState();
   const rng = new Random(SEED);
-  const { employee } = hireEmployee(state, 'driller', rng);
+  // A blaster arrives holding 'blasting' alone, so the assignSkill cases below stay exact.
+  const { employee } = hireEmployee(state, role, rng);
   return { state, empId: employee.id };
 }
 
@@ -73,11 +74,11 @@ function makeGameStateWithOne(): { state: GameState; empId: number; buildingId: 
 
 describe('Employee — new fields after hireEmployee (CH1.4)', () => {
   it('newly hired employee starts with exactly its role qualification', () => {
-    const { state, empId } = makeStateWithOne();
+    const { state, empId } = makeStateWithOne('driller');
     const emp = state.employees.find(e => e.id === empId)!;
-    // An initialised array holding one Rookie-level entry for the hired role.
+    // An initialised array holding the Rookie-level entries for the hired role (blasting + drill rig).
     expect(Array.isArray((emp as any).qualifications)).toBe(true);
-    expect((emp as any).qualifications).toHaveLength(1);
+    expect((emp as any).qualifications).toHaveLength(2);
     expect((emp as any).qualifications[0].proficiencyLevel).toBe(1);
   });
 
@@ -110,10 +111,10 @@ describe('assignSkill', () => {
   });
 
   it('initialises xp to 0 when a qualification is first added', () => {
-    assignSkill(state, empId, 'geology' as SkillCategory, 2);
+    assignSkill(state, empId, 'geology' as SkillCategory, 1);
 
     const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
-    expect(quals[0]!.xp).toBe(0);
+    expect(quals.find(q => q.category === 'geology')!.xp).toBe(0);
   });
 
   it('replaces (does not duplicate) an existing qualification for the same category', () => {
@@ -473,7 +474,7 @@ describe('training end-to-end — all SkillCategory values (four building types)
 
 describe('raises survive skill progression (#1383)', () => {
   it('a raise survives a gainXp level-up', () => {
-    const { state, empId } = makeStateWithOne();
+    const { state, empId } = makeStateWithOne('driller'); // blasting starts at Rookie
     const emp = state.employees.find(e => e.id === empId)!;
     giveRaise(state, empId, 250);
     const before = emp.salary;

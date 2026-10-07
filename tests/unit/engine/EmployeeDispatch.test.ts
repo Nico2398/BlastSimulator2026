@@ -738,8 +738,8 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
   it('seeds taskTicksRemaining from BASE_TASK_DURATION_TICKS scaled by proficiency, need, and living-quarters multipliers', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    // Arrives holding 'blasting' at Rookie (level 1).
-    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    // A driller arrives holding 'blasting' at Rookie (level 1); a blaster starts at level 2.
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
     expect(employee.taskTicksRemaining).toBeNull();
 
     state.pendingActions.push(makeSkillAction({ id: 1, targetEmployeeId: employee.id }));
@@ -758,8 +758,8 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
-    const { employee: rookie } = hireEmployee(state.employees, 'blaster', rng); // stays level 1
-    const { employee: master } = hireEmployee(state.employees, 'blaster', rng);
+    const { employee: rookie } = hireEmployee(state.employees, 'driller', rng); // stays level 1
+    const { employee: master } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, master.id, 'blasting', 5);
 
     state.pendingActions.push(makeSkillAction({ id: 1, targetEmployeeId: rookie.id }));
@@ -1090,7 +1090,7 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
   it('flags no_qualified_employee for a skill-gated (non-vehicle) action nobody on the roster can perform, recording it in result.unqualified', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    // Not 'driller': ROLE_STARTING_QUALIFICATION grants a fresh driller hire
+    // Not 'driller': ROLE_STARTING_QUALIFICATIONS grants a fresh driller hire
     // 'blasting' by default (Employee.ts), so that role would already be
     // qualified for the action below. 'surveyor' starts with 'geology'.
     const { employee } = hireEmployee(state.employees, 'surveyor', rng);
@@ -1113,7 +1113,7 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
   it('flags no_qualified_employee on a vehicle-gated drill_hole order when the only licensed driver lacks the required skill, then clears once an employee holds BOTH', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    // 'surveyor' starts with 'geology' only (ROLE_STARTING_QUALIFICATION) — no
+    // 'surveyor' starts with 'geology' only (ROLE_STARTING_QUALIFICATIONS) — no
     // 'blasting', so licensing them for drill_rig alone must not satisfy the
     // conjunction the new gate requires.
     const { employee } = hireEmployee(state.employees, 'surveyor', rng);
@@ -1253,6 +1253,8 @@ describe('queued-order reachability — per-actor red rule (#1306)', () => {
 
   function hire(state: GameState, at: { x: number; z: number }, skills: string[] = []) {
     const { employee } = hireEmployee(state.employees, 'driver', new Random(SEED + state.employees.nextId), at.x, at.z);
+    // A hired driver arrives holding the excavator licence; each test grants its own.
+    employee.qualifications = employee.qualifications.filter(q => q.category !== 'driving.excavator');
     for (const skill of skills) assignSkill(state.employees, employee.id, skill as never, 1);
     return employee;
   }
@@ -2184,6 +2186,7 @@ describe('dig_ramp_segment actions — vehicle-gated dispatch and driving.excava
 
     // Hired with an unrelated driving licence — no driving.excavator.
     const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
+    employee.qualifications = employee.qualifications.filter(q => q.category !== 'driving.excavator');
     assignSkill(state.employees, employee.id, 'driving.truck', 1);
     purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
 

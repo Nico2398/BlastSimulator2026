@@ -29,7 +29,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { emitFootprintOccupancyChanged } from './buildingHelpers.js';
 
 const VALID_SKILL_CATEGORIES: SkillCategory[] = [
-  'driving.truck', 'driving.excavator', 'driving.drill_rig',
+  'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter',
   'blasting', 'management', 'geology',
 ];
 

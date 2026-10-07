@@ -205,8 +205,8 @@ describe('level_ground — console round trip (#1009)', () => {
   it('6. no driving.excavator-licensed employee: order still queues, but stays pending/unclaimed after many ticks', () => {
     const engine = makeBareRunner();
     expect(runCommand(engine, 'vehicle buy rock_digger').success).toBe(true);
-    // An employee exists, but holds no driving.excavator qualification.
-    expect(runCommand(engine, 'employee hire role:driver').success).toBe(true);
+    // An employee exists, but holds no driving.excavator qualification (a hired driver would).
+    expect(runCommand(engine, 'employee hire role:surveyor').success).toBe(true);
 
     carveSlopedBuildingRect(engine.ctx.grid!);
 
