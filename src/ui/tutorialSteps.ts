@@ -15,7 +15,6 @@ import {
   createSurveyOverlayToggleStep,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
-import { isOversized } from '../core/mining/BlastCalc.js';
 import { hasFillableOreSaleOffer } from '../core/economy/Contract.js';
 import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
 
@@ -336,8 +335,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 
   // ── Step 7c: train-fragmenter ──
   // Existence check, not a comparison: nobody is hired holding the licence.
-  // Also complete when the blast left no oversized boulder on the ground --
-  // there is then nothing to fragment, and the step must not strand the player.
   {
     id: 'train-fragmenter',
     titleKey: 'tutorial.step_trainfragmenter.title',
@@ -347,8 +344,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     tickBudget: 25,
     waitsOnWork: true,
     isComplete: (state: GameState) =>
-      (state.employees?.employees ?? []).some((e) => e.qualifications.some((q) => q.category === 'driving.rock_fragmenter'))
-      || !(state.logistics?.fragments ?? []).some((f) => f.state === 'on_ground' && isOversized(f.fragment.volume)),
+      (state.employees?.employees ?? []).some((e) => e.qualifications.some((q) => q.category === 'driving.rock_fragmenter')),
   },
 
   // ── Step 8: scores ──

@@ -874,7 +874,10 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       }
 
       for (const cmd of step.autoCommands ?? []) run(cmd);
-      for (const cmd of step.commands ?? []) run(cmd);
+      // The card's hint names a placeholder, never an id (#1339): resolve it
+      // the way a player would, by picking the hired driver.
+      const driver = state.employees.employees.find((e) => e.role === 'driver');
+      for (const cmd of step.commands ?? []) run(cmd.replace('<driverId>', String(driver?.id ?? '')));
 
       if (step.id === 'sell-ore') {
         // #1335: the step is "accept the one fillable ore offer, deliver it".
