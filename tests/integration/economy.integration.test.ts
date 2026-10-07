@@ -523,7 +523,6 @@ describe('Economy', () => {
 
     // The drain must be booked as categorized expense transactions.
     const report = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount);
-    const maintenanceCat = report.expensesByCategory.find(c => c.category === 'maintenance');
     const vehicleMaintenanceCat = report.expensesByCategory.find(c => c.category === 'vehicle_maintenance');
     // #1375: vehicle upkeep is booked under its own 'vehicle_maintenance'
     // category, separate from fuel. The idle hauler holds no reservation, so

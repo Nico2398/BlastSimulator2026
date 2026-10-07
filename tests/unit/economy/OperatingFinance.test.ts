@@ -146,8 +146,8 @@ describe('getOperatingIncomePerHour', () => {
 
   it('honours an explicit window argument', () => {
     const f = createFinanceState(0);
-    addIncome(f, 100, 'sales', 's', 98);
     addIncome(f, 900, 'sales', 'older', 50);
+    addIncome(f, 100, 'sales', 's', 98);
     expect(getOperatingIncomePerHour(f, 100, 10)).toBeCloseTo(10, 5);
   });
 });
