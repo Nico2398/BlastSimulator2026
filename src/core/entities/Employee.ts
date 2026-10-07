@@ -445,6 +445,23 @@ export function isEligibleForWork(
   return employee.alive && !employee.injured && employee.trainingState === null;
 }
 
+/** A manager's management proficiency; null for other roles or no management qualification (#1340). */
+export function managementLevelOf(employee: Pick<Employee, 'role' | 'qualifications'>): number | null {
+  if (employee.role !== 'manager') return null;
+  return employee.qualifications.find(q => q.category === 'management')?.proficiencyLevel ?? null;
+}
+
+/** Highest management proficiency among eligible managers; null when none (#1340). */
+export function bestAvailableManagerLevel(employees: readonly Employee[]): number | null {
+  let best: number | null = null;
+  for (const e of employees) {
+    if (!isEligibleForWork(e)) continue;
+    const level = managementLevelOf(e);
+    if (level !== null && (best === null || level > best)) best = level;
+  }
+  return best;
+}
+
 /**
  * The living roster — every employee still `alive`. Shared filter for any
  * aggregate/threshold computed over the roster (headcount-style stats,

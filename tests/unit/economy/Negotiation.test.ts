@@ -10,9 +10,11 @@ import {
   negotiateContractAtTick,
   negotiationStreamSeed,
   canNegotiate,
+  negotiationRefusalReason,
+  managerNegotiationBonusPct,
   type NegotiationResult,
 } from '../../../src/core/economy/Negotiation.js';
-import { NEGOTIATION_EARLY_BONUS_RATE, NEGOTIATION_MAX_ATTEMPTS_PER_OFFER } from '../../../src/core/config/balance.js';
+import { NEGOTIATION_EARLY_BONUS_RATE, NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL } from '../../../src/core/config/balance.js';
 
 function setupContracts(seed: number) {
   const state = createContractState();
@@ -32,8 +34,8 @@ describe('Contract negotiation', () => {
     const { state: s2, rng: r2 } = setupContracts(42);
 
     const id = s1.available[0]!.id;
-    const result1 = performed(negotiateContract(s1, id, 0, r1));
-    const result2 = performed(negotiateContract(s2, id, 0, r2));
+    const result1 = performed(negotiateContract(s1, id, 0, r1, 1));
+    const result2 = performed(negotiateContract(s2, id, 0, r2, 1));
 
     expect(result1).not.toBeNull();
     expect(result2).not.toBeNull();
@@ -50,7 +52,7 @@ describe('Contract negotiation', () => {
       const origDeadline = contract.deadlineTicks;
       const origPenalty = contract.penaltyAmount;
 
-      const result = performed(negotiateContract(state, contract.id, 50, rng)); // High reputation for success
+      const result = performed(negotiateContract(state, contract.id, 50, rng, 1)); // High reputation for success
       if (result && result.success) {
         const improved = (
           contract.pricePerKg > origPrice ||
@@ -75,7 +77,7 @@ describe('Contract negotiation', () => {
       const origDeadline = contract.deadlineTicks;
       const origPenalty = contract.penaltyAmount;
 
-      const result = performed(negotiateContract(state, contract.id, -40, rng)); // Low reputation for failure
+      const result = performed(negotiateContract(state, contract.id, -40, rng, 1)); // Low reputation for failure
       if (result && !result.success) {
         const worsened = (
           contract.pricePerKg < origPrice ||
@@ -101,8 +103,8 @@ describe('Contract negotiation', () => {
       const { state: s2, rng: r2 } = setupContracts(seed * 100);
 
       const id = s1.available[0]!.id;
-      const r1result = performed(negotiateContract(s1, id, 30, r1));
-      const r2result = performed(negotiateContract(s2, id, -30, r2));
+      const r1result = performed(negotiateContract(s1, id, 30, r1, 1));
+      const r2result = performed(negotiateContract(s2, id, -30, r2, 1));
 
       if (r1result?.success) highRepSuccesses++;
       if (r2result?.success) lowRepSuccesses++;
@@ -119,7 +121,7 @@ describe('one negotiation per offer (#1366)', () => {
       const { state, rng } = setupContracts(7);
       const c = state.available[0]!;
       const before = { p: c.pricePerKg, d: c.deadlineTicks, pen: c.penaltyAmount };
-      const result = negotiateContract(state, c.id, rep, rng);
+      const result = negotiateContract(state, c.id, rep, rng, 1);
       expect(result).not.toBeNull();
       expect('refused' in result!).toBe(false);
       expect(c.negotiationAttempts).toBe(1);
@@ -131,11 +133,11 @@ describe('one negotiation per offer (#1366)', () => {
   it('second call is refused, leaves every term untouched and draws nothing from the rng', () => {
     const { state, rng } = setupContracts(11);
     const c = state.available[0]!;
-    negotiateContract(state, c.id, 0, rng);
+    negotiateContract(state, c.id, 0, rng, 1);
     const snap = { p: c.pricePerKg, d: c.deadlineTicks, pen: c.penaltyAmount, b: c.earlyBonus };
     const probe = new Random(999);
     const expectedNext = new Random(999).nextFloat(0, 1);
-    const second = negotiateContract(state, c.id, 0, probe);
+    const second = negotiateContract(state, c.id, 0, probe, 1);
     expect(second).toEqual({ refused: 'already_negotiated' });
     expect(c.pricePerKg).toBe(snap.p);
     expect(c.deadlineTicks).toBe(snap.d);
@@ -147,14 +149,14 @@ describe('one negotiation per offer (#1366)', () => {
 
   it('unknown id returns null', () => {
     const { state, rng } = setupContracts(3);
-    expect(negotiateContract(state, 9999, 0, rng)).toBeNull();
+    expect(negotiateContract(state, 9999, 0, rng, 1)).toBeNull();
   });
 
   it('negotiating one offer does not block another', () => {
     const { state, rng } = setupContracts(5);
     const [a, b] = state.available;
-    negotiateContract(state, a!.id, 0, rng);
-    const r = negotiateContract(state, b!.id, 0, rng);
+    negotiateContract(state, a!.id, 0, rng, 1);
+    const r = negotiateContract(state, b!.id, 0, rng, 1);
     expect(r).not.toBeNull();
     expect('refused' in r!).toBe(false);
     expect(b!.negotiationAttempts).toBe(1);
@@ -204,7 +206,7 @@ describe('earlyBonus follows price (#1366)', () => {
         const { state, rng } = setupContracts(seed);
         const c = state.available[0]!;
         const origPrice = c.pricePerKg;
-        negotiateContract(state, c.id, rep, rng);
+        negotiateContract(state, c.id, rep, rng, 1);
         if (c.pricePerKg !== origPrice) {
           priceChanges++;
           expect(c.earlyBonus).toBe(computeEarlyBonus(c.quantityKg, c.pricePerKg));
@@ -221,7 +223,7 @@ describe('earlyBonus follows price (#1366)', () => {
       const c = state.available[0]!;
       const origPrice = c.pricePerKg;
       const origBonus = c.earlyBonus;
-      negotiateContract(state, c.id, -40, rng);
+      negotiateContract(state, c.id, -40, rng, 1);
       if (c.pricePerKg === origPrice) {
         seen++;
         expect(c.earlyBonus).toBe(origBonus);
@@ -254,8 +256,8 @@ describe('negotiateContractAtTick (#1366)', () => {
     const { state: s1 } = setupContracts(42);
     const { state: s2 } = setupContracts(42);
     const id = s1.available[0]!.id;
-    const r1 = negotiateContractAtTick(s1, id, 0, 42, 5);
-    const r2 = negotiateContractAtTick(s2, id, 0, 42, 5);
+    const r1 = negotiateContractAtTick(s1, id, 0, 42, 5, 1);
+    const r2 = negotiateContractAtTick(s2, id, 0, 42, 5, 1);
     expect('refused' in r1).toBe(false);
     expect((r1 as { success: boolean }).success).toBe((r2 as { success: boolean }).success);
     expect((r1 as { changes: unknown }).changes).toEqual((r2 as { changes: unknown }).changes);
@@ -264,9 +266,9 @@ describe('negotiateContractAtTick (#1366)', () => {
   it('refuses a repeat and reports unknown ids', () => {
     const { state } = setupContracts(42);
     const id = state.available[0]!.id;
-    negotiateContractAtTick(state, id, 0, 42, 5);
-    expect(negotiateContractAtTick(state, id, 0, 42, 5)).toEqual({ refused: 'already_negotiated' });
-    expect(negotiateContractAtTick(state, 9999, 0, 42, 5)).toEqual({ refused: 'not_found' });
+    negotiateContractAtTick(state, id, 0, 42, 5, 1);
+    expect(negotiateContractAtTick(state, id, 0, 42, 5, 1)).toEqual({ refused: 'already_negotiated' });
+    expect(negotiateContractAtTick(state, 9999, 0, 42, 5, 1)).toEqual({ refused: 'not_found' });
   });
 
   it('two offers negotiated at the same tick do not roll identically', () => {
@@ -274,10 +276,91 @@ describe('negotiateContractAtTick (#1366)', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const { state } = setupContracts(seed);
       const [a, b] = state.available;
-      const ra = negotiateContractAtTick(state, a!.id, 0, seed, 7) as { success: boolean; changes: unknown[] };
-      const rb = negotiateContractAtTick(state, b!.id, 0, seed, 7) as { success: boolean; changes: unknown[] };
+      const ra = negotiateContractAtTick(state, a!.id, 0, seed, 7, 1) as { success: boolean; changes: unknown[] };
+      const rb = negotiateContractAtTick(state, b!.id, 0, seed, 7, 1) as { success: boolean; changes: unknown[] };
       if (ra.success !== rb.success || JSON.stringify(ra.changes) !== JSON.stringify(rb.changes)) differing++;
     }
     expect(differing).toBeGreaterThan(0);
+  });
+});
+
+describe('manager level drives success (#1340)', () => {
+  function successes(level: number, rep: number, seeds = 400): number {
+    let n = 0;
+    for (let seed = 1; seed <= seeds; seed++) {
+      const { state } = setupContracts(seed);
+      const r = negotiateContractAtTick(state, state.available[0]!.id, rep, seed, 3, level);
+      if ('success' in r && r.success) n++;
+    }
+    return n;
+  }
+
+  it('constant is 0.08 per level', () => {
+    expect(NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL).toBe(0.08);
+  });
+
+  it('level 5 succeeds clearly more often than level 1 at the same reputation', () => {
+    const l1 = successes(1, 0);
+    const l5 = successes(5, 0);
+    expect(l5).toBeGreaterThan(l1 + 60);
+  });
+
+  it('level 1 adds nothing: rate matches 0.5 + rep*0.01', () => {
+    const rate = successes(1, 0) / 400;
+    expect(rate).toBeGreaterThan(0.4);
+    expect(rate).toBeLessThan(0.6);
+  });
+
+  it('level 5 at rep 0 lands near 0.82', () => {
+    const rate = successes(5, 0) / 400;
+    expect(rate).toBeGreaterThan(0.74);
+    expect(rate).toBeLessThan(0.9);
+  });
+
+  it('upper clamp holds at 0.95 even with level 5 and max reputation', () => {
+    const rate = successes(5, 100) / 400;
+    expect(rate).toBeLessThan(1);
+    expect(rate).toBeGreaterThan(0.88);
+  });
+
+  it('lower clamp holds at 0.05 with level 1 and terrible reputation', () => {
+    const rate = successes(1, -100) / 400;
+    expect(rate).toBeGreaterThan(0);
+    expect(rate).toBeLessThan(0.12);
+  });
+
+  it('same seed, tick and level is deterministic', () => {
+    const a = setupContracts(9).state;
+    const b = setupContracts(9).state;
+    const ra = negotiateContractAtTick(a, a.available[0]!.id, 10, 9, 4, 3);
+    const rb = negotiateContractAtTick(b, b.available[0]!.id, 10, 9, 4, 3);
+    expect(ra).toEqual(rb);
+  });
+});
+
+describe('managerNegotiationBonusPct (#1340)', () => {
+  it('is 0 at level 1 and 32 at level 5', () => {
+    expect(managerNegotiationBonusPct(1)).toBe(0);
+    expect(managerNegotiationBonusPct(5)).toBe(32);
+  });
+  it('rises 8 points per level', () => {
+    expect([1, 2, 3, 4, 5].map(managerNegotiationBonusPct)).toEqual([0, 8, 16, 24, 32]);
+  });
+});
+
+describe('negotiationRefusalReason (#1340)', () => {
+  it('is no_manager when no manager level is available', () => {
+    const { state } = setupContracts(1);
+    expect(negotiationRefusalReason(state.available[0]!, null)).toBe('no_manager');
+  });
+  it('is already_negotiated when the offer was negotiated', () => {
+    const { state } = setupContracts(1);
+    const c = state.available[0]!;
+    c.negotiationAttempts = NEGOTIATION_MAX_ATTEMPTS_PER_OFFER;
+    expect(negotiationRefusalReason(c, 3)).toBe('already_negotiated');
+  });
+  it('is null for a fresh offer with a manager', () => {
+    const { state } = setupContracts(1);
+    expect(negotiationRefusalReason(state.available[0]!, 1)).toBeNull();
   });
 });

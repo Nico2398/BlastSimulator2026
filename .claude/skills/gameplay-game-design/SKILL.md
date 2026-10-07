@@ -50,7 +50,7 @@ Fragments picked up by excavators → loaded onto trucks → sold via contracts
 ## Economy & Management
 
 ### Contracts
-- **Negotiable** with probabilistic outcomes
+- **Negotiable** with probabilistic outcomes, run by a Manager: no eligible manager (alive, not injured, not in training) means no negotiation. Best manager `management` level raises the success rate by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1 (#1340)
 - Types: ore sale, rubble disposal, supply
 - Each specifies: material type, quantity, unit price, deadline, penalties
 
@@ -62,7 +62,7 @@ Can be placed, moved, destroyed. Projections can destroy them.
 Trucks, excavators, drill rigs, bulldozers. Each has purchase/maintenance/fuel cost, capacity, speed.
 
 ### Employees
-Hired with salaries. Specialized roles: drillers, blasters, drivers, surveyors, managers.
+Hired with salaries. Specialized roles: drillers, blasters, drivers, surveyors, managers (managers run contract negotiation; hiring/firing/policy are not gated on one yet).
 Unionized employees cannot be fired. Affected by well-being score.
 
 ### Operating cost and runway (#1375)

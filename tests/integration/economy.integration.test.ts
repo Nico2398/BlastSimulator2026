@@ -456,7 +456,7 @@ describe('Economy', () => {
     const originalPenalty = c.penaltyAmount;
 
     // Negotiate with very high reputation (ensures >95% success rate)
-    const outcome = negotiateContract(cs, c.id, 100, rng);
+    const outcome = negotiateContract(cs, c.id, 100, rng, 1);
 
     expect(outcome).not.toBeNull();
     if (!outcome || 'refused' in outcome) throw new Error('negotiation was not performed');
@@ -487,7 +487,7 @@ describe('Economy', () => {
     }
 
     // Non-existent contract returns null
-    const missing = negotiateContract(cs, 999, 100, rng);
+    const missing = negotiateContract(cs, 999, 100, rng, 1);
     expect(missing).toBeNull();
   });
 
@@ -608,9 +608,21 @@ describe('Economy', () => {
 
   it('contract negotiate resolves an available contract by material: selector', () => {
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    expect(employeeCommand(ctx, ['hire'], { role: 'manager' }).success).toBe(true);
     const result = contractCommand(ctx, ['negotiate'], { material: c.materialId });
     expect(result.success).toBe(true);
     expect(ctx.state!.contracts.lastNegotiation?.contractId).toBe(c.id);
+  });
+
+  it('contract negotiate is refused until a manager is hired, then works once (#1340)', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const refused = contractCommand(ctx, ['negotiate'], { id: String(c.id) });
+    expect(refused.success).toBe(false);
+    expect(c.negotiationAttempts ?? 0).toBe(0);
+    expect(employeeCommand(ctx, ['hire'], { role: 'manager' }).success).toBe(true);
+    expect(contractCommand(ctx, ['negotiate'], { id: String(c.id) }).success).toBe(true);
+    expect(contractCommand(ctx, ['negotiate'], { id: String(c.id) }).success).toBe(false);
+    expect(c.negotiationAttempts).toBe(1);
   });
 
   it('contract accept by material: selector still finds a same-kind contract after the numeric id it started as has rotated out of the pool', () => {

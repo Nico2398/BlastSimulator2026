@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { CrewPanel } from '../../../../src/ui/panels/CrewPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
+import { managerNegotiationBonusPct } from '../../../../src/core/economy/Negotiation.js';
 import { PAY_CYCLE_TICKS, BASE_SALARIES, QUALIFICATION_SALARY_BONUS } from '../../../../src/core/config/balance.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
@@ -496,5 +497,47 @@ describe('CrewPanel — scroll-bounded roster section (#958)', () => {
     expect(wrapper.style.overflowY).toBe('auto');
     expect(wrapper.style.maxHeight).toMatch(/^\d+px$/);
     expect(wrapper.textContent).toContain(t('ui.crew.none'));
+  });
+});
+
+describe('CrewPanel manager effect (#1340)', () => {
+  const mgr = (level: 1 | 2 | 3 | 4 | 5, overrides: Partial<Employee> = {}) => makeEmployee({
+    id: 7, name: 'Pat Boss', role: 'manager',
+    qualifications: [{ category: 'management', proficiencyLevel: level, xp: 0 }],
+    ...overrides,
+  });
+
+  it('a hired manager card shows the negotiation bonus for its level', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([mgr(3)]));
+    const eff = panel.root.querySelector('[data-employee-id="7"] .bs-crew-manager-effect');
+    expect(eff).not.toBeNull();
+    expect(eff!.textContent).toBe(t('ui.crew.manager_effect', { pct: managerNegotiationBonusPct(3) }));
+    expect(eff!.textContent).toContain('16');
+  });
+
+  it('non-manager cards carry no manager effect', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeEmployee({ id: 2 })]));
+    expect(panel.root.querySelector('[data-employee-id="2"] .bs-crew-manager-effect')).toBeNull();
+  });
+
+  it('the effect refreshes when the manager level changes', () => {
+    const { panel } = makePanel();
+    const state = makeState([mgr(1)]);
+    panel.update(state);
+    expect(panel.root.querySelector('.bs-crew-manager-effect')!.textContent).toBe(t('ui.crew.manager_effect', { pct: 0 }));
+    state.employees.employees[0]!.qualifications = [{ category: 'management', proficiencyLevel: 5, xp: 0 }];
+    panel.update(state);
+    expect(panel.root.querySelector('.bs-crew-manager-effect')!.textContent).toBe(t('ui.crew.manager_effect', { pct: 32 }));
+  });
+
+  it('the manager hiring row explains what a manager does', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([]));
+    const row = panel.root.querySelector('[data-role="manager"]')!.parentElement!;
+    expect(row.textContent).toContain(t('ui.crew.manager_effect_hint'));
+    const other = panel.root.querySelector('[data-role="driller"]')!.parentElement!;
+    expect(other.textContent).not.toContain(t('ui.crew.manager_effect_hint'));
   });
 });

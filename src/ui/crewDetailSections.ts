@@ -7,7 +7,8 @@
 import { t } from '../core/i18n/I18n.js';
 import { el, gauge, button, reasonLine } from './dom.js';
 import type { Employee, EmployeeRole, SkillCategory } from '../core/entities/Employee.js';
-import { BASE_SALARIES, calculateQualificationBonus } from '../core/entities/Employee.js';
+import { BASE_SALARIES, calculateQualificationBonus, managementLevelOf } from '../core/entities/Employee.js';
+import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
@@ -171,6 +172,19 @@ export function makeCurrentTaskSection(e: Employee, state: GameState): HTMLEleme
   }
   wrap.appendChild(well(children));
   return wrap;
+}
+
+// ── MANAGER EFFECT ──
+
+/** What a manager's management level does for the mine (negotiation odds); null for other roles or no management skill. */
+export function makeManagerEffect(e: Employee): HTMLElement | null {
+  const level = managementLevelOf(e);
+  if (level === null) return null;
+  return el('span', {
+    className: 'bs-crew-manager-effect',
+    text: t('ui.crew.manager_effect', { pct: managerNegotiationBonusPct(level) }),
+    attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-positive)' },
+  });
 }
 
 // ── SKILLS ──
