@@ -11,6 +11,10 @@ import {
   hasFillableSaleOffer,
   isFillableSaleOffer,
   hasRubbleDisposalOffer,
+  setContractHeld,
+  undeliveredShare,
+  sortByDeadline,
+  contractShortOfStock,
 } from '../../../src/core/economy/Contract.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -605,5 +609,181 @@ describe('contract offers draw only from the available ores (#1364)', () => {
       expect(c.pricePerKg).toBeGreaterThanOrEqual(base * 0.8 - 1e-9);
       expect(c.pricePerKg).toBeLessThanOrEqual(base * 1.3 + 1e-9);
     }
+  });
+});
+
+// ── Automatic delivery helpers (#1367) ──
+
+describe('undeliveredShare', () => {
+  it('is 1 when nothing was delivered', () => {
+    expect(undeliveredShare({ quantityKg: 100, deliveredKg: 0 })).toBe(1);
+  });
+
+  it('is the undelivered fraction for a partial delivery', () => {
+    expect(undeliveredShare({ quantityKg: 100, deliveredKg: 40 })).toBeCloseTo(0.6, 10);
+  });
+
+  it('is 0 when fully delivered', () => {
+    expect(undeliveredShare({ quantityKg: 100, deliveredKg: 100 })).toBe(0);
+  });
+
+  it('clamps an over-delivery to 0', () => {
+    expect(undeliveredShare({ quantityKg: 100, deliveredKg: 150 })).toBe(0);
+  });
+
+  it('clamps a negative delivered amount to 1', () => {
+    expect(undeliveredShare({ quantityKg: 100, deliveredKg: -20 })).toBe(1);
+  });
+
+  it('is 1 for a zero-quantity contract (no division by zero)', () => {
+    expect(undeliveredShare({ quantityKg: 0, deliveredKg: 0 })).toBe(1);
+  });
+
+  it('is 1 for a negative-quantity contract', () => {
+    expect(undeliveredShare({ quantityKg: -5, deliveredKg: 3 })).toBe(1);
+  });
+});
+
+describe('sortByDeadline', () => {
+  it('orders by acceptedAtTick + deadlineTicks, soonest first', () => {
+    const a = offer({ id: 1, acceptedAtTick: 0, deadlineTicks: 500 });
+    const b = offer({ id: 2, acceptedAtTick: 100, deadlineTicks: 200 });
+    const c = offer({ id: 3, acceptedAtTick: 0, deadlineTicks: 100 });
+    expect(sortByDeadline([a, b, c]).map(x => x.id)).toEqual([3, 2, 1]);
+  });
+
+  it('breaks a deadline tie with the lowest id', () => {
+    const a = offer({ id: 9, acceptedAtTick: 0, deadlineTicks: 100 });
+    const b = offer({ id: 4, acceptedAtTick: 50, deadlineTicks: 50 });
+    const c = offer({ id: 7, acceptedAtTick: 10, deadlineTicks: 90 });
+    expect(sortByDeadline([a, b, c]).map(x => x.id)).toEqual([4, 7, 9]);
+  });
+
+  it('does not mutate its input', () => {
+    const a = offer({ id: 1, deadlineTicks: 500 });
+    const b = offer({ id: 2, deadlineTicks: 100 });
+    const input = [a, b];
+    const out = sortByDeadline(input);
+    expect(input.map(x => x.id)).toEqual([1, 2]);
+    expect(out).not.toBe(input);
+  });
+
+  it('returns an empty list for an empty input', () => {
+    expect(sortByDeadline([])).toEqual([]);
+  });
+});
+
+describe('setContractHeld', () => {
+  it('holds an active contract', () => {
+    const state = createContractState();
+    state.active.push(offer({ id: 3 }));
+    expect(setContractHeld(state, 3, true)).toBe(true);
+    expect(state.active[0]!.held).toBe(true);
+  });
+
+  it('releases a held contract', () => {
+    const state = createContractState();
+    state.active.push(offer({ id: 3, held: true }));
+    expect(setContractHeld(state, 3, false)).toBe(true);
+    expect(state.active[0]!.held).toBeFalsy();
+  });
+
+  it('holding twice is idempotent', () => {
+    const state = createContractState();
+    state.active.push(offer({ id: 3 }));
+    expect(setContractHeld(state, 3, true)).toBe(true);
+    expect(setContractHeld(state, 3, true)).toBe(true);
+    expect(state.active[0]!.held).toBe(true);
+  });
+
+  it('refuses an unknown id', () => {
+    const state = createContractState();
+    state.active.push(offer({ id: 3 }));
+    expect(setContractHeld(state, 99, true)).toBe(false);
+    expect(state.active[0]!.held).toBeFalsy();
+  });
+
+  it('refuses a contract that is only on offer, not active', () => {
+    const state = createContractState();
+    state.available.push(offer({ id: 5 }));
+    expect(setContractHeld(state, 5, true)).toBe(false);
+    expect(state.available[0]!.held).toBeFalsy();
+  });
+});
+
+describe('contractShortOfStock', () => {
+  it('ore_sale is short when stored ore of its material is below what it still needs', () => {
+    expect(contractShortOfStock(offer({ quantityKg: 100, deliveredKg: 20 }), { dirtite: 70 }, 5000)).toBe(true);
+  });
+
+  it('ore_sale is not short when stock covers the remainder exactly', () => {
+    expect(contractShortOfStock(offer({ quantityKg: 100, deliveredKg: 20 }), { dirtite: 80 }, 0)).toBe(false);
+  });
+
+  it('ore_sale is short when no ore of its material is stored at all', () => {
+    expect(contractShortOfStock(offer({ quantityKg: 100 }), {}, 5000)).toBe(true);
+  });
+
+  it('supply reads collectedOre like ore_sale', () => {
+    const c = offer({ type: 'supply', quantityKg: 100 });
+    expect(contractShortOfStock(c, { dirtite: 99 }, 0)).toBe(true);
+    expect(contractShortOfStock(c, { dirtite: 100 }, 0)).toBe(false);
+  });
+
+  it('rubble_disposal reads stored mass, not collectedOre', () => {
+    const c = offer({ type: 'rubble_disposal', materialId: '', quantityKg: 300 });
+    expect(contractShortOfStock(c, { dirtite: 1000 }, 299)).toBe(true);
+    expect(contractShortOfStock(c, {}, 300)).toBe(false);
+  });
+
+  it('a held contract still warns when short', () => {
+    expect(contractShortOfStock(offer({ held: true, quantityKg: 100 }), { dirtite: 10 }, 0)).toBe(true);
+  });
+
+  it('a held contract with enough stock is not short', () => {
+    expect(contractShortOfStock(offer({ held: true, quantityKg: 100 }), { dirtite: 100 }, 0)).toBe(false);
+  });
+});
+
+describe('checkDeadlines — reduced penalty and delivery record (#1367)', () => {
+  function expiring(overrides: Partial<Contract>) {
+    const state = createContractState();
+    state.active.push(offer({ id: 1, acceptedAtTick: 0, deadlineTicks: 10, penaltyAmount: 300, quantityKg: 100, ...overrides }));
+    return state;
+  }
+
+  it('charges the full penalty when nothing was delivered', () => {
+    const state = expiring({});
+    const out = checkDeadlines(state, 11);
+    expect(out).toEqual([{ contractId: 1, penalty: 300, deliveredKg: 0, paid: 0 }]);
+    expect(state.completedHistory[0]!.penaltyCharged).toBe(300);
+  });
+
+  it('charges round(penaltyAmount * undeliveredShare) for a part delivery', () => {
+    const state = expiring({ deliveredKg: 40, paidTotal: 400 });
+    const out = checkDeadlines(state, 11);
+    expect(out[0]!.penalty).toBe(180);
+    expect(out[0]!.deliveredKg).toBe(40);
+    expect(out[0]!.paid).toBe(400);
+    const rec = state.completedHistory[0]!;
+    expect(rec.expired).toBe(true);
+    expect(rec.paidTotal).toBe(400);
+    expect(rec.penaltyCharged).toBe(180);
+  });
+
+  it('rounds the reduced penalty to a whole amount', () => {
+    const state = expiring({ penaltyAmount: 100, quantityKg: 3, deliveredKg: 1 });
+    expect(checkDeadlines(state, 11)[0]!.penalty).toBe(67);
+  });
+
+  it('reports paid 0 when the contract carries no paidTotal', () => {
+    const state = expiring({ deliveredKg: 10 });
+    expect(checkDeadlines(state, 11)[0]!.paid).toBe(0);
+  });
+
+  it('charges nothing before the deadline passes', () => {
+    const state = expiring({ deliveredKg: 40 });
+    expect(checkDeadlines(state, 10)).toEqual([]);
+    expect(state.active).toHaveLength(1);
   });
 });

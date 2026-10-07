@@ -1116,3 +1116,291 @@ describe('Economy', () => {
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
   });
 });
+
+// ── Automatic contract delivery (#1367) ──────────────────────────────────────
+
+describe('Economy — automatic contract delivery (#1367)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+  });
+
+  /** Insert + accept a fixture ore_sale contract (blingite unless overridden). */
+  function acceptFixture(quantityKg: number, pricePerKg: number, overrides?: Partial<Contract>): Contract {
+    const c = insertOreSaleContract(ctx.state!.contracts, quantityKg, pricePerKg, overrides);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+    return ctx.state!.contracts.active.find(a => a.id === c.id)!;
+  }
+
+  /** Store `kg` of ore (volume x density x 2500 = kg) in one fragment. */
+  function storeOre(id: number, kg: number, material = 'blingite'): void {
+    pushStoredFragment(ctx, id, kg * 5, kg / 2500, { [material]: 1.0 });
+    ctx.state!.collectedOre[material] = (ctx.state!.collectedOre[material] ?? 0) + kg;
+  }
+
+  function incomeTotal(category: string): number {
+    const report = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount);
+    return report.incomeByCategory.find(c => c.category === category)?.total ?? 0;
+  }
+
+  function tick(n = 1): void {
+    for (let i = 0; i < n; i++) tickCommand(ctx, ['1'], {});
+  }
+
+  // ── delivery on tick ──
+
+  it('one tick delivers a fully covered ore_sale without `contract deliver`', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 100);
+    const cashBefore = ctx.state!.cash;
+
+    tick();
+
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)).toBeUndefined();
+    const done = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(done.completed).toBe(true);
+    expect(done.deliveredKg).toBeCloseTo(100, 6);
+    expect(ctx.state!.collectedOre['blingite']).toBeCloseTo(0, 6);
+    expect(ctx.state!.cash).toBeGreaterThan(cashBefore + 1000);
+  });
+
+  it('books payment under contracts and the early bonus under bonus', () => {
+    acceptFixture(100, 10);
+    storeOre(1, 100);
+
+    tick();
+
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+    expect(incomeTotal('bonus')).toBe(150);
+  });
+
+  it('pays no early bonus once 50% of the deadline has elapsed', () => {
+    const c = acceptFixture(100, 10);
+    ctx.state!.tickCount = 300;
+    c.acceptedAtTick = 0; // 300 of 500 ticks elapsed
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+    expect(incomeTotal('bonus')).toBe(0);
+  });
+
+  it('partial stock delivers partially and the contract stays active', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 40);
+
+    tick();
+
+    const live = ctx.state!.contracts.active.find(a => a.id === c.id)!;
+    expect(live.deliveredKg).toBeCloseTo(40, 6);
+    expect(live.completed).toBe(false);
+    expect(live.paidTotal).toBeCloseTo(400, 6);
+    expect(incomeTotal('contracts')).toBeCloseTo(400, 6);
+    expect(incomeTotal('bonus')).toBe(0);
+  });
+
+  it('a later tick tops a partially delivered contract up from new stock', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 40);
+    tick();
+    storeOre(2, 60);
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+  });
+
+  it('with two contracts for the same ore the nearest deadline is served first', () => {
+    const late = acceptFixture(100, 10, { deadlineTicks: 500 });
+    const soon = acceptFixture(100, 10, { deadlineTicks: 300 });
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.map(a => a.id)).toEqual([soon.id]);
+    expect(ctx.state!.contracts.active.find(a => a.id === late.id)!.deliveredKg).toBe(0);
+  });
+
+  it('a deadline tie goes to the lowest id', () => {
+    const first = acceptFixture(100, 10);
+    const second = acceptFixture(100, 10);
+    expect(first.id).toBeLessThan(second.id);
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.map(a => a.id)).toEqual([first.id]);
+    expect(ctx.state!.contracts.active.find(a => a.id === second.id)!.deliveredKg).toBe(0);
+  });
+
+  it('rubble_disposal auto-delivers from raw stored mass', () => {
+    const c = acceptFixture(300, 2, { type: 'rubble_disposal', materialId: '' });
+    pushStoredFragment(ctx, 1, 500, 0.04, {});
+
+    tick();
+
+    expect(incomeTotal('contracts')).toBeCloseTo(600, 6);
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+  });
+
+  it('supply contracts auto-deliver', () => {
+    const c = acceptFixture(100, 10, { type: 'supply' });
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+    expect(incomeTotal('contracts')).toBeCloseTo(1000, 6);
+  });
+
+  it('delivery is reported in the tick output', () => {
+    const c = acceptFixture(100, 10);
+    storeOre(1, 100);
+    const out = tickCommand(ctx, ['1'], {}).output;
+    expect(out).toContain(`#${c.id}`);
+  });
+
+  // ── hold / release ──
+
+  it('a held contract is not auto-delivered', () => {
+    const c = acceptFixture(100, 10);
+    expect(contractCommand(ctx, ['hold', String(c.id)], {}).success).toBe(true);
+    expect(ctx.state!.contracts.active[0]!.held).toBe(true);
+    storeOre(1, 100);
+
+    tick(3);
+
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)!.deliveredKg).toBe(0);
+    expect(ctx.state!.collectedOre['blingite']).toBeCloseTo(100, 6);
+    expect(incomeTotal('contracts')).toBe(0);
+  });
+
+  it('manual `contract deliver` still works on a held contract', () => {
+    const c = acceptFixture(100, 10);
+    contractCommand(ctx, ['hold', String(c.id)], {});
+    storeOre(1, 100);
+
+    const result = contractCommand(ctx, ['deliver', String(c.id)], { amount: '100' });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('COMPLETED');
+  });
+
+  it('`contract release` resumes automatic delivery', () => {
+    const c = acceptFixture(100, 10);
+    contractCommand(ctx, ['hold', String(c.id)], {});
+    storeOre(1, 100);
+    tick();
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)!.deliveredKg).toBe(0);
+
+    expect(contractCommand(ctx, ['release', String(c.id)], {}).success).toBe(true);
+    expect(ctx.state!.contracts.active[0]!.held).toBeFalsy();
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.completed).toBe(true);
+  });
+
+  it('holding one contract leaves the other to receive the stock', () => {
+    const held = acceptFixture(100, 10, { deadlineTicks: 300 });
+    const free = acceptFixture(100, 10, { deadlineTicks: 500 });
+    contractCommand(ctx, ['hold', String(held.id)], {});
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.map(a => a.id)).toEqual([free.id]);
+  });
+
+  it('`contract hold` accepts a material:/type: selector like the other subcommands', () => {
+    const c = acceptFixture(100, 10);
+    const result = contractCommand(ctx, ['hold'], { type: 'ore_sale', material: c.materialId });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.contracts.active[0]!.held).toBe(true);
+  });
+
+  it('`contract hold` / `release` refuse an unknown id cleanly', () => {
+    acceptFixture(100, 10);
+    const hold = contractCommand(ctx, ['hold', '999'], {});
+    const release = contractCommand(ctx, ['release', '999'], {});
+    expect(hold.success).toBe(false);
+    expect(hold.output).toContain('999');
+    expect(release.success).toBe(false);
+    expect(release.output).toContain('999');
+    expect(ctx.state!.contracts.active[0]!.held).toBeFalsy();
+  });
+
+  it('`contract hold` refuses an offer that has not been accepted', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const result = contractCommand(ctx, ['hold', String(c.id)], {});
+    expect(result.success).toBe(false);
+    expect(c.held).toBeFalsy();
+  });
+
+  it('`contract hold` with no id or selector returns usage, not a crash', () => {
+    acceptFixture(100, 10);
+    const result = contractCommand(ctx, ['hold'], {});
+    expect(result.success).toBe(false);
+    expect(result.output.length).toBeGreaterThan(0);
+  });
+
+  // ── expiry penalty ──
+
+  it('expiry with nothing delivered charges the full penalty', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    ctx.state!.tickCount = 5;
+
+    tick(); // tickCount 6: elapsed 6 > 5
+
+    const rec = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(rec.expired).toBe(true);
+    expect(rec.penaltyCharged).toBe(300);
+    const fines = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount).expensesByCategory.find(e => e.category === 'fines');
+    expect(fines?.total).toBe(300);
+  });
+
+  it('expiry after a part delivery charges round(penalty * undelivered share)', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    storeOre(1, 40);
+    tick(); // delivers 40 kg
+    ctx.state!.tickCount = 5;
+
+    tick(); // expires
+
+    const rec = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(rec.expired).toBe(true);
+    expect(rec.deliveredKg).toBeCloseTo(40, 6);
+    expect(rec.paidTotal).toBeCloseTo(400, 6);
+    expect(rec.penaltyCharged).toBe(180);
+    const fines = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount).expensesByCategory.find(e => e.category === 'fines');
+    expect(fines?.total).toBe(180);
+  });
+
+  it('stock on the final tick is delivered before the expiry check, so no penalty applies', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    ctx.state!.tickCount = 5;
+    storeOre(1, 100);
+
+    tick(); // tickCount 6 would expire it; delivery runs first
+
+    const rec = ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!;
+    expect(rec.completed).toBe(true);
+    expect(rec.expired).toBe(false);
+    expect(rec.penaltyCharged ?? 0).toBe(0);
+    const fines = getFinancialReport(ctx.state!.finances, ctx.state!.tickCount).expensesByCategory.find(e => e.category === 'fines');
+    expect(fines?.total ?? 0).toBe(0);
+  });
+
+  it('a held contract with stock still expires with the full penalty', () => {
+    const c = acceptFixture(100, 10, { deadlineTicks: 5, penaltyAmount: 300 });
+    contractCommand(ctx, ['hold', String(c.id)], {});
+    ctx.state!.tickCount = 5;
+    storeOre(1, 100);
+
+    tick();
+
+    expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.penaltyCharged).toBe(300);
+  });
+});

@@ -19,6 +19,7 @@ function baseReport(overrides: Partial<TickReport>): TickReport {
   return {
     tick: 1,
     contractsExpired: [],
+    contractsDelivered: [],
     smuggling: { income: 0, exposed: false },
     mafiaExposed: false,
     needEvents: [],
@@ -112,5 +113,82 @@ describe('tick.ts — trainingCancellations lines', () => {
 
     expect(result.success).toBe(true);
     expect(result.output).not.toContain('course was cancelled');
+  });
+});
+
+describe('tick.ts — automatic contract delivery lines (#1367)', () => {
+  it('prints a line naming the contract and the kg delivered for each automatic delivery', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({
+      contractsDelivered: [{ contractId: 7, kg: 120, payment: 1440, bonus: 0, completed: false }],
+    }));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.output).toMatch(/#7\b/);
+    expect(result.output).toContain('120');
+    expect(result.output).toMatch(/1,?440/);
+  });
+
+  it('flags a completed delivery and mentions the early bonus', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({
+      contractsDelivered: [{ contractId: 8, kg: 100, payment: 1000, bonus: 150, completed: true }],
+    }));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.output).toMatch(/#8\b/);
+    expect(result.output).toMatch(/complete/i);
+    expect(result.output).toContain('150');
+  });
+
+  it('prints one line per delivered contract', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({
+      contractsDelivered: [
+        { contractId: 1, kg: 10, payment: 100, bonus: 0, completed: false },
+        { contractId: 2, kg: 20, payment: 200, bonus: 0, completed: false },
+      ],
+    }));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.output).toMatch(/#1\b/);
+    expect(result.output).toMatch(/#2\b/);
+  });
+
+  it('prints no delivery line when nothing was delivered', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({}));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.output).not.toMatch(/deliver/i);
+  });
+
+  it('an expiry after a part delivery states the reduced penalty, kg delivered and amount paid', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({
+      contractsExpired: [{ contractId: 9, penalty: 180, deliveredKg: 40, paid: 400 }],
+    }));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.output).toContain('expired');
+    expect(result.output).toContain('180');
+    expect(result.output).toContain('40');
+    expect(result.output).toContain('400');
+  });
+
+  it('a full-penalty expiry keeps the plain penalty line', () => {
+    const ctx = makeGameContext();
+    vi.spyOn(TickPipelineModule, 'runTick').mockReturnValue(baseReport({
+      contractsExpired: [{ contractId: 9, penalty: 300, deliveredKg: 0, paid: 0 }],
+    }));
+
+    const result = tickCommand(ctx, ['1'], {});
+
+    expect(result.output).toContain('Contract expired! Penalty: $300');
   });
 });
