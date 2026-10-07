@@ -8,11 +8,14 @@ import {
   acceptContract,
   setContractHeld,
   findContract,
+  remainingKg,
+  storedStockKg,
   type Contract,
   type ContractSelector,
   type ContractType,
 } from '../../core/economy/Contract.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
+import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { deliverStoredOre, bookDeliveryIncome } from '../../core/economy/ContractFulfilment.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
@@ -195,6 +198,11 @@ export function contractCommand(
       if ('success' in resolved) return resolved;
       const contract = resolved;
       const id = contract.id;
+      // A manual request is all-or-nothing; only the automatic path caps at stock.
+      const stock = storedStockKg(contract, state.collectedOre, state.logistics.storedMassKg);
+      if (Math.min(amount, remainingKg(contract)) > stock + FRAGMENT_SPLIT_EPSILON_KG) {
+        return { success: false, output: t('economy.contract.deliver_insufficient', { material: contract.materialId || t('ui.contracts.material_rubble') }) };
+      }
       const delivery = deliverStoredOre(state.contracts, state.logistics, state.collectedOre, id, amount, state.tickCount);
       if (!delivery.success) return { success: false, output: delivery.error };
       const result = delivery.data;
