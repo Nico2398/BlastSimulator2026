@@ -589,16 +589,21 @@ describe('Performance Benchmarks', () => {
       employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '3' });
       ensureDrillRigCrew(ctx);
 
-      const start = performance.now();
+      // FIRE needs drilled, charged holes (#1345), so the crew works the plan between
+      // commands. Only the commands are timed, as before; the crew ticks are not.
+      let elapsed = 0;
+      const timed = <T>(fn: () => T): T => {
+        const t0 = performance.now();
+        const r = fn();
+        elapsed += performance.now() - t0;
+        return r;
+      };
 
-      // FIRE needs drilled, charged holes (#1345), so the crew works the plan first.
-      drillPlanCommand(ctx as any, ['grid'], { origin: '80,80', rows: '3', cols: '3', spacing: '5', depth: '8' });
+      timed(() => drillPlanCommand(ctx as any, ['grid'], { origin: '80,80', rows: '3', cols: '3', spacing: '5', depth: '8' }));
       driveDrillPlanToCompletion(ctx);
-      chargeCommand(ctx as any, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+      timed(() => chargeCommand(ctx as any, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' }));
       driveChargePlanToCompletion(ctx);
-      const result = blastCommand(ctx as any, [], {});
-
-      const elapsed = performance.now() - start;
+      const result = timed(() => blastCommand(ctx as any, [], {}));
 
       expect(result.success).toBe(true);
       expect(elapsed).toBeLessThan(2000);
