@@ -95,7 +95,6 @@
     "src/core/entities/Employee.ts:schoolFor",
     "src/core/entities/Employee.ts:trainableSkills",
     "src/core/entities/EmployeeXpRules.ts:XpAward",
-    "src/core/entities/Vehicle.ts:VehicleDef",
     "src/core/events/EventResolver.ts:ResolutionResult",
     "src/core/events/MafiaActions.ts:MafiaActionResult",
     "src/core/events/MafiaActions.ts:PendingFrame",
