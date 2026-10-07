@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
-import { TopBar, formatBalance, netPerTick } from '../../../src/ui/shell/TopBar.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { TopBar, formatBalance } from '../../../src/ui/shell/TopBar.js';
 import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
+import { hireEmployee, PAY_CYCLE_TICKS } from '../../../src/core/entities/Employee.js';
+import { Random } from '../../../src/core/math/Random.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
+import { formatDollars } from '../../../src/core/economy/formatMoney.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
 
@@ -339,35 +342,64 @@ describe('TopBar (redesign P1)', () => {
     });
   });
 
-  describe('netPerTick', () => {
-    it('is zero with no transactions', () => {
-      const state = makeState();
-      state.tickCount = 10;
-      expect(netPerTick(state)).toBe(0);
+  describe('operating trend (#1375)', () => {
+    afterEach(() => { document.body.innerHTML = ''; });
+
+    function mount(state: ReturnType<typeof makeState>) {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const topBar = new TopBar(container);
+      topBar.update(state, new NotificationCenter());
+      return { container, topBar };
+    }
+
+    it('shows a zero trend with no operating flows', () => {
+      const { container, topBar } = mount(makeState());
+      expect(container.textContent).toContain('+$0/h');
+      topBar.dispose();
     });
 
-    it('averages income over the window', () => {
+    it('is not moved by a one-off equipment purchase', () => {
       const state = makeState();
-      state.tickCount = 10;
-      state.finances.transactions.push({ tick: 9, type: 'income', amount: 240, category: 'contracts', description: 'x' });
-      // 240 income spread over min(24, 10) = 10 ticks → 24/tick
-      expect(netPerTick(state)).toBeCloseTo(24, 5);
+      state.finances.transactions.push({ tick: 49, type: 'expense', amount: 35000, category: 'equipment', description: 'rig' });
+      const { container, topBar } = mount(state);
+      expect(container.textContent).toContain('+$0/h');
+      topBar.dispose();
     });
 
-    it('nets expenses against income', () => {
+    it('shows operating income per hour over the operating window', () => {
       const state = makeState();
-      state.tickCount = 10;
-      state.finances.transactions.push({ tick: 9, type: 'income', amount: 100, category: 'contracts', description: 'x' });
-      state.finances.transactions.push({ tick: 9, type: 'expense', amount: 40, category: 'fuel', description: 'y' });
-      expect(netPerTick(state)).toBeCloseTo(6, 5);
+      // 72-tick window, game is 50 ticks old -> span 50: 5000 / 50 = 100/h
+      state.finances.transactions.push({ tick: 40, type: 'income', amount: 5000, category: 'contracts', description: 'x' });
+      const { container, topBar } = mount(state);
+      expect(container.textContent).toContain('+$100/h');
+      topBar.dispose();
     });
 
-    it('ignores transactions outside the trailing window', () => {
+    it('trend is operating net: income minus payroll per hour', () => {
       const state = makeState();
-      state.tickCount = 100;
-      state.finances.transactions.push({ tick: 1, type: 'income', amount: 100000, category: 'contracts', description: 'old' });
-      expect(netPerTick(state)).toBe(0);
+      hireEmployee(state.employees, 'manager', new Random(3));
+      const salaryPerHour = state.employees.employees[0]!.salary / PAY_CYCLE_TICKS;
+      const { container, topBar } = mount(state);
+      const trend = `-$${Math.round(salaryPerHour).toLocaleString('en-US')}/h`;
+      expect(container.textContent).toContain(trend);
+      topBar.dispose();
     });
+
+    it('tooltip shows the operating cost per hour', () => {
+      const state = makeState();
+      hireEmployee(state.employees, 'manager', new Random(3));
+      const salaryPerHour = Math.round(state.employees.employees[0]!.salary / PAY_CYCLE_TICKS);
+      const { container, topBar } = mount(state);
+      const titles = Array.from(container.querySelectorAll('[title]')).map(e => e.getAttribute('title') ?? '');
+      expect(titles).toContain(t('ui.finances.operating_cost_tip', { cost: formatDollars(salaryPerHour) }));
+      topBar.dispose();
+    });
+  });
+
+  it('en and fr define the operating-cost tooltip key (#1375)', () => {
+    expect((en as Record<string, string>)['ui.finances.operating_cost_tip']).toBeTruthy();
+    expect((fr as Record<string, string>)['ui.finances.operating_cost_tip']).toBeTruthy();
   });
 
   it('renders exactly 4 score columns', () => {

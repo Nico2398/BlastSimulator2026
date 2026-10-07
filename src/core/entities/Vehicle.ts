@@ -287,24 +287,29 @@ export function computeScrapResidualValue(vehicleType: VehicleRole, vehicleTier:
 }
 
 /**
- * Calculate total maintenance + fuel costs for all vehicles per tick. Billed
+ * Summed per-tick upkeep of every vehicle, regardless of use (#1375). Billed
  * off the vehicle's OWN tier (#1092): a tier-3 rig costs
- * `VEHICLE_TIER_MULTIPLIERS[3].maintenanceCostPerTick` times a tier-1's
- * upkeep, and the same for fuel — upkeep that ignored `tier` made the elite
- * tiers strictly better than their price implied.
+ * `VEHICLE_TIER_MULTIPLIERS[3].maintenanceCostPerTick` times a tier-1's upkeep.
  */
-export function getVehicleCostsPerTick(state: VehicleState): number {
+export function getVehicleMaintenanceCostPerTick(state: VehicleState): number {
   let total = 0;
   for (const v of state.vehicles) {
-    const def = getVehicleDefByTier(v.type, v.tier);
-    total += def.maintenanceCostPerTick;
-    // Fuel bills only while the vehicle holds an active reservation for a
-    // gated action (#1138) — reservation state, not raw occupancy, is the
-    // source of truth for "is this vehicle actively working" everywhere else
-    // on this branch. A vehicle someone merely rides (no reservation) burns
-    // no fuel; a reserved-but-not-yet-boarded vehicle already does.
+    total += getVehicleDefByTier(v.type, v.tier).maintenanceCostPerTick;
+  }
+  return total;
+}
+
+/**
+ * Summed per-tick fuel of vehicles holding an active reservation (#1375).
+ * Fuel bills only while the vehicle holds an active reservation for a gated
+ * action (#1138) — a vehicle someone merely rides burns none; a
+ * reserved-but-not-yet-boarded one already does.
+ */
+export function getVehicleFuelCostPerTick(state: VehicleState): number {
+  let total = 0;
+  for (const v of state.vehicles) {
     if (getVehicleReservation(state, v.id) !== null) {
-      total += def.fuelCostPerTick;
+      total += getVehicleDefByTier(v.type, v.tier).fuelCostPerTick;
     }
   }
   return total;

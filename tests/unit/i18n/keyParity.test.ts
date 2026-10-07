@@ -454,7 +454,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1334: +3 keys (tutorial scores/finances/needs card text), both locales: 3700.
     // #1335: -3 keys (removed contract-accept step text)
     // #1339: -2 keys (-8 train-driller/train-digger card+stage keys, +4 train-fragmenter, +2 rock_fragmenter course/skill)
-    expect(Object.keys(en).length).toBe(3695);
+    // #1375: +8 keys (operating cost/runway, vehicle_maintenance category), -1 (runway_growing): 3702.
+    expect(Object.keys(en).length).toBe(3702);
   });
 });
 

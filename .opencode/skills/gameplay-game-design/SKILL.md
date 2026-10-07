@@ -65,6 +65,9 @@ Trucks, excavators, drill rigs, bulldozers. Each has purchase/maintenance/fuel c
 Hired with salaries. Specialized roles: drillers, blasters, drivers, surveyors, managers.
 Unionized employees cannot be fired. Affected by well-being score.
 
+### Operating cost and runway (#1375)
+`src/core/economy/OperatingFinance.ts` owns the definition, in $/hour (1 tick = 1 hour). **Operating cost** = payroll (living employees' salaries / `PAY_CYCLE_TICKS`) + active-building upkeep + vehicle maintenance + fuel of reserved vehicles. **Operating income** = ledger `sales` + `contracts` over the trailing `OPERATING_INCOME_WINDOW_TICKS`, per hour. TopBar trend = income - cost; **runway** (days) = cash / (cost - income) / `TICKS_PER_DAY`, or "sustainable" when income covers cost. One-off spending (construction, equipment, fines) never enters either side. Ledger categories: building upkeep = `maintenance`, `vehicle_maintenance`, `fuel` booked separately.
+
 ### Scores (0-100 each)
 | Score | Affected by |
 |-------|------------|
