@@ -43,6 +43,12 @@ export interface Contract {
   expired: boolean;
   /** Negotiation attempts already made on this offer. Absent means none. */
   negotiationAttempts?: number;
+  /** True when the player holds the contract back from automatic delivery. Absent means not held. */
+  held?: boolean;
+  /** Cumulative payment already credited for partial deliveries. Absent means none. */
+  paidTotal?: number;
+  /** Penalty already charged for this contract. Absent means none. */
+  penaltyCharged?: number;
 }
 
 // ── Negotiation outcome (types live here, not in Negotiation.ts, so
@@ -210,7 +216,7 @@ export function deliverMaterials(
     return { payment: 0, bonus: 0, completed: false };
   }
 
-  const remaining = contract.quantityKg - contract.deliveredKg;
+  const remaining = remainingKg(contract);
   const delivered = Math.min(amountKg, remaining);
   contract.deliveredKg += delivered;
 
@@ -357,12 +363,63 @@ export function findContract(
   ) ?? null;
 }
 
-/** Check and expire overdue contracts. Returns penalty amounts. */
+/** Share of a contract's quantity still undelivered, clamped to [0, 1]. A contract asking for nothing counts as fully undelivered. */
+export function undeliveredShare(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
+  if (c.quantityKg <= 0) return 1;
+  return Math.min(1, Math.max(0, (c.quantityKg - c.deliveredKg) / c.quantityKg));
+}
+
+/** Kilograms a contract still needs delivered (negative if over-delivered). */
+export function remainingKg(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
+  return c.quantityKg - c.deliveredKg;
+}
+
+/** Penalty owed if the contract expired now: the full penalty scaled by the share still undelivered. */
+export function outstandingPenalty(c: Pick<Contract, 'quantityKg' | 'deliveredKg' | 'penaltyAmount'>): number {
+  return Math.round(c.penaltyAmount * undeliveredShare(c));
+}
+
+/** Active contracts ordered by soonest deadline first (ties: lowest id), without mutating the input. */
+export function sortByDeadline(active: readonly Contract[]): Contract[] {
+  const deadline = (c: Contract) => c.acceptedAtTick + c.deadlineTicks;
+  return [...active].sort((a, b) => deadline(a) - deadline(b) || a.id - b.id);
+}
+
+/** Hold or release an active contract for automatic delivery. Returns false when the contract is not active. */
+export function setContractHeld(state: ContractState, contractId: number, held: boolean): boolean {
+  const contract = state.active.find(c => c.id === contractId);
+  if (!contract) return false;
+  contract.held = held;
+  return true;
+}
+
+/** Stored kilograms that can fill the contract: raw stored mass for rubble, the ore ledger entry otherwise. */
+export function storedStockKg(
+  c: Pick<Contract, 'type' | 'materialId'>,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): number {
+  return c.type === 'rubble_disposal' ? storedMassKg : (collectedOre[c.materialId] ?? 0);
+}
+
+/** True when stored stock of the contract's material cannot cover what it still needs (held contracts included). */
+export function contractShortOfStock(
+  c: Contract,
+  collectedOre: Readonly<Record<string, number>>,
+  storedMassKg: number,
+): boolean {
+  return storedStockKg(c, collectedOre, storedMassKg) < remainingKg(c);
+}
+
+/**
+ * Check and expire overdue contracts. Returns the penalty charged, scaled by
+ * the share still undelivered, with what was delivered and paid before expiry.
+ */
 export function checkDeadlines(
   state: ContractState,
   currentTick: number,
-): Array<{ contractId: number; penalty: number }> {
-  const penalties: Array<{ contractId: number; penalty: number }> = [];
+): Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }> {
+  const penalties: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }> = [];
 
   for (let i = state.active.length - 1; i >= 0; i--) {
     const c = state.active[i]!;
@@ -371,7 +428,9 @@ export function checkDeadlines(
     const elapsed = currentTick - c.acceptedAtTick;
     if (elapsed > c.deadlineTicks) {
       c.expired = true;
-      penalties.push({ contractId: c.id, penalty: c.penaltyAmount });
+      const penalty = outstandingPenalty(c);
+      c.penaltyCharged = penalty;
+      penalties.push({ contractId: c.id, penalty, deliveredKg: c.deliveredKg, paid: c.paidTotal ?? 0 });
       state.active.splice(i, 1);
       state.completedHistory.push(c);
     }
@@ -379,4 +438,3 @@ export function checkDeadlines(
 
   return penalties;
 }
-
