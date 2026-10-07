@@ -103,7 +103,7 @@ describe('PreviewStep', () => {
 
     const runBtn = step.root.querySelector('[data-action="run-analysis"]') as HTMLButtonElement;
     expect(runBtn.disabled).toBe(true);
-    expect(step.root.textContent).toContain('Finish charging and sequencing');
+    expect(step.root.textContent).toContain('Finish charging every hole first');
   });
 
   it('enables Run Analysis once the plan is complete, and it dispatches blast_preview', () => {

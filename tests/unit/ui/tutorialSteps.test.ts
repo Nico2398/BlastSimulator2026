@@ -13,8 +13,8 @@ import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 28 entries (#1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(28);
+  it('has exactly 27 entries (#1339 removes train-driller/train-digger, moves hire-driver before box-cut and build-driving-center after blast, adds train-fragmenter, #1335 removes contract-accept, the player accepts the fillable ore offer in sell-ore, #1328 replaces set-policy/tick-advance/victory with free-play, #553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone, #905 adds toggle-survey-overlay, #923 removed time-speed and added speed-up-for-dig/speed-normal-after-dig, #1344 removes the detonation-sequence step, #1015 removes those two speed-control steps — the speed bar is unconditionally player-controlled from the tutorial\'s very first step onward, so no step teaches it any more)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(27);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -501,7 +501,7 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned directly after build-storage (index 22) and before finances', () => {
+    it('exists, positioned directly after build-storage (index 21) and before finances', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
       const haulIdx = ids.indexOf('haul-debris');
@@ -509,11 +509,11 @@ describe('tutorialSteps', () => {
       expect(haulIdx).toBeGreaterThan(-1);
       // #1335: contract-accept was removed; no step sits between them.
       expect(haulIdx).toBe(buildIdx + 1);
-      expect(haulIdx).toBe(22);
+      expect(haulIdx).toBe(21);
       // #1328: finances/needs sit between haul-debris and sell-ore now, so
       // the first sale is the last guided step.
       expect(ids[haulIdx + 1]).toBe('finances');
-      expect(ids.indexOf('finances')).toBe(23);
+      expect(ids.indexOf('finances')).toBe(22);
       expect(sellOreIdx).toBe(ids.indexOf('needs') + 1);
     });
 
