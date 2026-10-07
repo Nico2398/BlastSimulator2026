@@ -8,19 +8,27 @@ import type { HoleCharge } from './ChargePlan.js';
 import type { GameState } from '../state/GameState.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { waterEffect } from './BlastCalc.js';
-import { isRaining, type WeatherState } from '../weather/WeatherCycle.js';
+import type { DrillHole } from './DrillPlan.js';
+import type { WeatherState } from '../weather/WeatherCycle.js';
 
-/** IDs of drill holes currently full of water: raining, and no tubing installed. */
-export function wetHoles(state: GameState, weather: WeatherState): string[] {
-  if (!isRaining(weather)) return [];
-  return state.drillHoles
-    .filter(hole => !state.tubingState.installedHoles.has(hole.id))
-    .map(hole => hole.id);
+/** Advance every hole's water one tick from the current weather; `porosityOf` supplies rock porosity per hole. */
+export function tickHoleWater(
+  _state: GameState,
+  _weather: WeatherState,
+  _porosityOf: (hole: DrillHole) => number,
+): void {
+  // TODO: implement
+}
+
+/** IDs of drill holes whose water level is past the wet threshold. */
+export function wetHoles(_state: GameState): string[] {
+  // TODO: implement
+  return [];
 }
 
 /** Ids of wet holes as a set, for callers that test membership (previews, execution). */
-export function wetHoleIdsFor(state: GameState, weather: WeatherState): Set<string> {
-  return new Set(wetHoles(state, weather));
+export function wetHoleIdsFor(state: GameState): Set<string> {
+  return new Set(wetHoles(state));
 }
 
 /** Wet charged holes in a blast: `wet` = wet ids carrying a charge (sorted); `fizzled` = the subset whose explosive is water-sensitive. */

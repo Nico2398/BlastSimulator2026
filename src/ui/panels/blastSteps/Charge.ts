@@ -152,7 +152,7 @@ export class ChargeStep {
   }
 
   update(state: GameState, weather: WeatherState | undefined): void {
-    const wet = weather ? wetHoles(state, weather) : [];
+    const wet = weather ? wetHoles(state) : [];
     const holes = state.drillHoles;
     const shallowest = holes.length > 0 ? Math.min(...holes.map(h => h.depth)) : null;
 

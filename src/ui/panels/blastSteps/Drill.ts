@@ -150,7 +150,7 @@ export class DrillStep {
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;
     this.lastHoleCount = totalCount;
-    const wet = weather ? wetHoleIdsFor(state, weather) : new Set<string>();
+    const wet = weather ? wetHoleIdsFor(state) : new Set<string>();
 
     const signature = JSON.stringify({
       holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),

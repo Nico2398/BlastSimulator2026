@@ -93,7 +93,7 @@ export class FireStep {
   update(state: GameState, weather: WeatherState | undefined): void {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     this.currentZone = zone;
-    const wet = weather ? wetHoles(state, weather) : [];
+    const wet = weather ? wetHoles(state) : [];
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
     const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length });

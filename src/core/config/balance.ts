@@ -1857,3 +1857,32 @@ export const CANDIDATE_SKILL_BONUS_MAX = 1;
 
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
+
+// ─── Hole water (#1350) ─────────────────────────────────────────────────────────
+
+/** Water level (fraction of hole depth) above which a hole counts as wet. */
+export const HOLE_WET_THRESHOLD = 0.3;
+
+/** Level fraction a bare hole gains per tick per unit of rain intensity. */
+export const HOLE_RAIN_FILL_RATE = 0.2;
+
+/** Level fraction per tick seeping in from wet ground, per unit of ground wetness. */
+export const HOLE_SEEP_RATE = 0.02;
+
+/** Level fraction lost per tick when no water is arriving, in tight rock. */
+export const HOLE_WATER_FADE_RATE = 0.05;
+
+/** How strongly porosity slows fading (fade divisor = 1 + porosity * this). */
+export const HOLE_FADE_POROSITY_SLOWDOWN = 2;
+
+/** Ground wetness gained per tick per unit of rain intensity. */
+export const GROUND_WETNESS_RISE_RATE = 0.1;
+
+/** Ground wetness lost per tick when it is not raining. */
+export const GROUND_WETNESS_DECAY_RATE = 0.02;
+
+/** Cash to drain one wet hole. */
+export const HOLE_DRAIN_COST_PER_HOLE = 20;
+
+/** Porosity at or below which an untubed hole cannot be drained (water returns at once). */
+export const HOLE_DRAIN_POROSITY_LIMIT = 0.15;

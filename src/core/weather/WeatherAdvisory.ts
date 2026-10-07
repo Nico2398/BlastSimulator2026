@@ -31,7 +31,7 @@ export function computeWeatherAdvisory(
   current: WeatherState,
   forecastDays: readonly WeatherState[],
 ): WeatherAdvisory {
-  const uncoveredHoles = wetHoles(state, current).length;
+  const uncoveredHoles = wetHoles(state).length;
   const sequence: WeatherState[] = [current, ...forecastDays];
 
   if (isRaining(current)) {

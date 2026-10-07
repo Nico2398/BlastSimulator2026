@@ -17,6 +17,7 @@ import type { BlastReport } from '../mining/BlastExecution.js';
 import type { BlastPreviewSummary } from '../mining/Software.js';
 import type { TubingState } from '../mining/Tubing.js';
 import { createTubingState } from '../mining/Tubing.js';
+import type { HoleWater } from '../weather/WeatherEffects.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
@@ -483,6 +484,10 @@ export interface GameState {
   lastBlastPreview: BlastPreviewSummary | null;
   /** Tubing inventory and installed-hole set, for waterproofing charges against rain. */
   tubingState: TubingState;
+  /** Per-hole water state keyed by drill hole id (#1350). */
+  holeWater: Record<string, HoleWater>;
+  /** Ground wetness 0..1: built by rain, seeps into holes (#1350). */
+  groundWetness: number;
   /** Ramps ordered but not yet fully dug — each queues one `dig_ramp_segment` action per segment (#555). */
   plannedRamps: PlannedRamp[];
   /** Next ID to assign to a newly created PlannedRamp. */
@@ -614,6 +619,8 @@ export function createGame(config: GameConfig): GameState {
     softwareTier: 0,
     lastBlastPreview: null,
     tubingState: createTubingState(),
+    holeWater: {},
+    groundWetness: 0,
     plannedRamps: [],
     nextPlannedRampId: 1,
     builtRamps: [],

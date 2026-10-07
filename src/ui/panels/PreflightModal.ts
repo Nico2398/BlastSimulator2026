@@ -117,7 +117,7 @@ export class PreflightModal {
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
 
-    const wet = weather ? wetHoles(state, weather) : [];
+    const wet = weather ? wetHoles(state) : [];
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings.buildings);
