@@ -22,7 +22,7 @@ import type { SkyboxWeather } from './SkyboxWeather.js';
 import type { CloudLayer } from './ambient/CloudLayer.js';
 import type { TerrainMesh } from './TerrainMesh.js';
 import { syncEntitySets, buildingFootprintSurfaceY } from './EntitySync.js';
-import { isSurveyStale } from '../core/mining/SurveyCalc.js';
+import { isSurveyStale } from '../core/mining/SurveyStaleness.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 
 /**

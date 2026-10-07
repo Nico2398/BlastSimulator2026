@@ -4,7 +4,8 @@
 // player already knows (survey estimates), never from ground-truth voxel data.
 
 import type { BlastPlan } from './BlastPlan.js';
-import { freshSurveys, type SurveyResult } from './SurveyCalc.js';
+import type { SurveyResult } from './SurveyCalc.js';
+import { freshSurveys } from './SurveyStaleness.js';
 import { findSurveyForColumn } from './SurveyColumn.js';
 import { getOre } from '../world/OreCatalog.js';
 import {

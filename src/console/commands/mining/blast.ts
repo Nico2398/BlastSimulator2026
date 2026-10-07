@@ -18,7 +18,8 @@ import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../../core/campaign/SuccessTracker.js';
-import { computeBlastOreReport, markSurveysStaleByBlast } from '../../../core/mining/SurveyCalc.js';
+import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
+import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';

@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Post-blast ore yield report
 
 import type { FragmentData } from './BlastExecution.js';
-import { freshSurveys, type SurveyResult } from './SurveyCalc.js';
+import type { SurveyResult } from './SurveyCalc.js';
+import { freshSurveys } from './SurveyStaleness.js';
 import { findSurveyForColumn, surveyColumnKey } from './SurveyColumn.js';
 import { ORE_DENSITY_KG_M3 } from '../config/balance.js';
 

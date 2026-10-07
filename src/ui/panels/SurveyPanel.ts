@@ -2,7 +2,7 @@
 // Method cards (cost/accuracy/radius/depth/duration/note, incl. the seismic
 // damage warning), PICK TARGET IN SCENE (migrated from SurveyUI.ts's already-
 // working PlacementKit wiring), then a results list: age, a stale badge
-// (isSurveyStale, already existed in SurveyCalc.ts), a locate button (same
+// (isSurveyStale, set by markSurveysStaleByBlast once a blast clears a column in the survey's disc), a locate button (same
 // window.__cameraFocus bridge as FleetPanel's, P6), ore bars, confidence.
 //
 // Root id, [data-method] on method rows, #bs-survey-run, and .bs-survey-status
@@ -19,7 +19,7 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { SurveyMethod, SurveyResult } from '../../core/mining/SurveyCalc.js';
-import { isSurveyStale } from '../../core/mining/SurveyCalc.js';
+import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import {
   SURVEY_COSTS, SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,

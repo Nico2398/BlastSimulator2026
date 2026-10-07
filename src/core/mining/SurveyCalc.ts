@@ -15,6 +15,7 @@ import {
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
 import { surveyColumnKey } from './SurveyColumn.js';
+import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
 /** The three supported methods for surveying a mining site. */
@@ -204,51 +205,12 @@ export function estimateSurveyResult(
   return { id, method, centerX, centerZ, surveyorId, completedTick, estimates, confidence };
 }
 
-/** True once a blast has cleared a column inside the survey's disc. */
-export function isSurveyStale(result: Pick<SurveyResult, 'stale'>): boolean {
-  return result.stale === true;
-}
-
-/** True when column (x, z) lies inside the survey's disc (inclusive boundary). */
-export function isColumnInSurveyDisc(
-  survey: Pick<SurveyResult, 'method' | 'centerX' | 'centerZ'>,
-  x: number,
-  z: number,
-): boolean {
-  const dx = x - survey.centerX;
-  const dz = z - survey.centerZ;
-  return Math.sqrt(dx * dx + dz * dz) <= SURVEY_COVERAGE_RADIUS[survey.method];
-}
-
-/** Surveys not yet marked stale. */
-export function freshSurveys(surveys: readonly SurveyResult[]): SurveyResult[] {
-  return surveys.filter(s => !isSurveyStale(s));
-}
-
-/**
- * Marks every survey whose disc contains a cleared column as stale.
- * `clearedColumns` are `"x,z"` keys. Returns the number of surveys newly marked.
- */
-export function markSurveysStaleByBlast(
-  surveys: SurveyResult[],
-  clearedColumns: readonly string[],
-): number {
-  if (clearedColumns.length === 0) return 0;
-  const columns = clearedColumns.map(key => {
-    const [x, z] = key.split(',');
-    return { x: Number(x), z: Number(z) };
-  });
-  let marked = 0;
-  for (const survey of surveys) {
-    if (isSurveyStale(survey)) continue;
-    if (columns.some(c => isColumnInSurveyDisc(survey, c.x, c.z))) {
-      survey.stale = true;
-      marked++;
-    }
-  }
-  return marked;
-}
-
+export {
+  isSurveyStale,
+  isColumnInSurveyDisc,
+  freshSurveys,
+  markSurveysStaleByBlast,
+} from './SurveyStaleness.js';
 export { applySeismicSurveyDamage } from './SeismicSurveyDamage.js';
 
 /** Input parameters for {@link runSurvey}. */

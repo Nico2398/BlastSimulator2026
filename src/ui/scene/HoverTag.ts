@@ -9,7 +9,7 @@ import { t } from '../../core/i18n/I18n.js';
 import { el } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import type { GameState } from '../../core/state/GameState.js';
-import { isSurveyStale } from '../../core/mining/SurveyCalc.js';
+import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import { findSurveyForColumn, surveyColumnKey } from '../../core/mining/SurveyColumn.js';
 import { describeRamp } from '../describeRamp.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
