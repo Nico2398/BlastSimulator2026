@@ -3,6 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { FleetPanel } from '../../../../src/ui/panels/FleetPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
+import { vehicleCardLine, vehicleCardTooltip } from '../../../../src/ui/catalogCardText.js';
+import { getVehicleDefByTier, type VehicleRole, type VehicleTier } from '../../../../src/core/entities/Vehicle.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
@@ -383,10 +385,47 @@ describe('FleetPanel', () => {
 
     const tier2Btn = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
       .find(b => b.dataset['role'] === 'debris_hauler' && b.dataset['tier'] === '2')!;
-    expect(tier2Btn.textContent).toContain('1.3');
+    expect(tier2Btn.textContent).toContain(vehicleCardLine(getVehicleDefByTier('debris_hauler', 2)));
     expect(tier2Btn.disabled).toBe(false);
     tier2Btn.click();
     expect(calls).toContain('vehicle buy debris_hauler tier:2');
+  });
+
+  it('each dealership button shows the "<desc> · $N/h" line and carries the absolute-stats tooltip (#1377)', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    state.cash = 5_000_000;
+    panel.update(state);
+    const buttons = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')];
+    expect(buttons.length).toBe(15);
+    for (const btn of buttons) {
+      const def = getVehicleDefByTier(btn.dataset['role'] as VehicleRole, Number(btn.dataset['tier']) as VehicleTier);
+      const desc = btn.querySelector('.bs-fleet-tier-desc');
+      expect(desc, `${def.type} T${def.tier}`).not.toBeNull();
+      expect(desc!.textContent).toBe(vehicleCardLine(def));
+      expect(btn.title).toBe(vehicleCardTooltip(def));
+      expect(btn.textContent).not.toContain('1.0x');
+      expect(btn.textContent).not.toContain('1.0×');
+      expect(btn.textContent).not.toContain('spd');
+    }
+  });
+
+  it('an unaffordable dealership button keeps the stats tooltip and adds the reason (#1377)', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    state.cash = 0;
+    panel.update(state);
+    const btn = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
+      .find(b => b.dataset['role'] === 'debris_hauler' && b.dataset['tier'] === '3')!;
+    const stats = vehicleCardTooltip(getVehicleDefByTier('debris_hauler', 3));
+    expect(btn.disabled).toBe(true);
+    expect(btn.title).toContain(stats);
+    expect(btn.title.length).toBeGreaterThan(stats.length);
+
+    state.cash = 5_000_000;
+    panel.update(state);
+    expect(btn.disabled).toBe(false);
+    expect(btn.title).toBe(stats);
   });
 
   it('tier buttons are disabled when unaffordable and re-enable as cash changes without a fleet change', () => {
