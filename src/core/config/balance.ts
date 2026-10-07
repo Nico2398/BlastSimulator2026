@@ -1838,5 +1838,22 @@ export const SMUGGLING_EXPOSED_FINE = 25000;
 /** Exposure risk added when smuggling is exposed (#1411). */
 export const SMUGGLING_EXPOSED_EXPOSURE_JUMP = 0.1;
 
+// ─── Hiring pool ────────────────────────────────────────────────────────────────
+
+/** Candidates offered per role. */
+export const HIRING_POOL_SIZE = 3;
+
+/** Ticks between candidate pool refreshes. */
+export const HIRING_POOL_REFRESH_INTERVAL = TICKS_PER_DAY;
+
+/** Chance a candidate is unionized. */
+export const CANDIDATE_UNION_CHANCE = 0.3;
+
+/** Chance a candidate has a bonus skill level over the role's starting qualifications. */
+export const CANDIDATE_SKILL_BONUS_CHANCE = 0.35;
+
+/** Maximum bonus levels a candidate may have. */
+export const CANDIDATE_SKILL_BONUS_MAX = 1;
+
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;

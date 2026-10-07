@@ -1,6 +1,12 @@
 // BlastSimulator2026 — Money formatting for player-facing messages
 // Cash is a float; printing it raw leaks the accumulated rounding error
 // ("have $-5839.852589446586") into messages the player reads.
+import { PAY_CYCLE_TICKS } from '../config/balance.js';
+
+/** Stored salary is per pay cycle; 1 tick = 1 game-hour, so hourly = salary / PAY_CYCLE_TICKS (1 decimal, no trailing .0). */
+export function perHour(perCycle: number): number {
+  return Math.round((perCycle / PAY_CYCLE_TICKS) * 10) / 10;
+}
 
 /**
  * Format a cash amount for a message: whole dollars, thousands separators, and

@@ -22,9 +22,9 @@ import { el, sectionHeader, panelRoot, panelHeader, panelBody, scrollBoundedSect
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { Employee, EmployeeRole } from '../../core/entities/Employee.js';
-import { HIRING_COSTS, injuryHoursRemaining } from '../../core/entities/Employee.js';
-import { ROLE_STARTING_QUALIFICATIONS } from '../../core/config/balance.js';
+import type { Employee } from '../../core/entities/Employee.js';
+import { injuryHoursRemaining } from '../../core/entities/Employee.js';
+import { makeHiringSection, hiringSignature } from './CrewHiring.js';
 import { computeEmployeeActivity } from '../../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining } from '../../core/entities/EmployeeTraining.js';
 import {
@@ -34,13 +34,6 @@ import {
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
-
-const ROLES: EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
-
-/** "Skill ★level" list of what a hire of `role` arrives qualified for. */
-function startingQualificationLabel(role: EmployeeRole): string {
-  return ROLE_STARTING_QUALIFICATIONS[role].map(q => `${t(`skill.${q.category}`)} ★${q.proficiencyLevel}`).join(', ');
-}
 
 export class CrewPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -144,10 +137,8 @@ export class CrewPanel extends PanelBase {
           + `:${e.trainingState ? 1 : 0}:${e.pendingTrainingState ? 1 : 0}:${activity.kind}:${e.name}:${quals}:${this.affordsAnyCourse(e, state) ? 1 : 0}`;
       })
       .join('|');
-    const hireAffordable = ROLES.map(r => (state.cash < HIRING_COSTS[r] ? '0' : '1')).join('');
-    const headcounts = ROLES.map(r => state.employees.employees.filter(e => e.alive && e.role === r).length).join(',');
     const schools = state.buildings.buildings.map(b => `${b.type}${b.tier}`).sort().join(',');
-    return `${rows}#${this.expandedId ?? '-'}#${hireAffordable}#${headcounts}#${schools}`;
+    return `${rows}#${this.expandedId ?? '-'}#${hiringSignature(state)}#${schools}`;
   }
 
   private affordsAnyCourse(e: Employee, state: GameState): boolean {
@@ -197,35 +188,8 @@ export class CrewPanel extends PanelBase {
     this.bodyEl.replaceChildren(
       scrollBoundedSection(cards, 200, { gap: 8, className: 'bsx-roster-scroll' }),
       sectionHeader(t('ui.crew.hiring')),
-      ...this.makeHiringRows(state),
+      ...makeHiringSection(state, (role, candidateId) => this.gameConsole?.(`employee hire role:${role} candidate:${candidateId}`)),
     );
-  }
-
-  private makeHiringRows(state: GameState): HTMLElement[] {
-    return ROLES.map(role => {
-      const count = state.employees.employees.filter(e => e.alive && e.role === role).length;
-      const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)' } });
-      const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
-      info.append(
-        el('span', { text: t(`role.${role}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-        el('span', {
-          text: t('ui.crew.hire_starts_with', { qual: startingQualificationLabel(role), count }),
-          attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
-        }),
-      );
-      if (role === 'manager') {
-        info.append(el('span', {
-          text: t('ui.crew.manager_effect_hint'),
-          attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
-        }));
-      }
-      const cost = el('span', { text: `$${HIRING_COSTS[role]}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
-      const hireBtn = el('button', { className: 'bsx-btn', text: t('ui.crew.hire'), attrs: { 'data-role': role } });
-      hireBtn.disabled = state.cash < HIRING_COSTS[role];
-      hireBtn.addEventListener('click', () => this.gameConsole?.(`employee hire role:${role}`));
-      row.append(info, cost, hireBtn);
-      return row;
-    });
   }
 
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {

@@ -1708,15 +1708,15 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.93916666666668,
+          "wellBeing": 99.57583333333336,
           "safety": 50,
-          "ecology": 48.60524933152729,
-          "nuisance": 46.513123328818224
+          "ecology": 49.67524933152729,
+          "nuisance": 49.18812332881822
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": "#1091-followup (sandbox-measured): ecology 48.86 -> 49, nuisance 47.15 -> 47.5 -- #1090's dispatch-cost reordering (vehicle action cost now delegates to the route planner) shifts exactly which vehicle drives which trip and when, the same dispatch-timing-only recalibration shape as every fix documented below. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged. Direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode; the new numbers are exact and reproducible run to run. #1090-followup (sandbox-measured): ecology 48.9 -> 48.86, nuisance 47.25 -> 47.15 -- VehicleContinuity.ts's deletion shifts exactly which vehicle drives which trip and when, the same dispatch-timing-only recalibration shape as every #1103/#1002/#953 fix documented below. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1103 (mover rebuild, #1089): ecology corrected again, 48.97 -> 48.87, and nuisance 47.425 -> 47.175 -- three genuine fixes landed together for issue #1103 (PlanItinerary.ts refuses an itinerary leg whose real pathfound endpoint silently clamped away from its own requested destination instead of installing one that can never arrive; EmployeeDispatchSteps.ts/PlanItinerary.ts both alight a currently-mounted employee before starting an on-foot walk or boarding a DIFFERENT vehicle, instead of leaving them nominally \"mounted\" on a vehicle that never moves again; VehicleContinuity.ts releases a follow-up action's own pre-existing vehicle reservation before transferring the just-finished vehicle's reservation onto it, instead of leaving both reserved) -- each shifts exactly which vehicle drives which trip and when across this file's own vehicle-scarce fleet, the same cash/ecology/nuisance-only-recalibration shape #1002/#953 above already document for an identical class of dispatch-timing change. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode; the new numbers are exact and reproducible run to run. #953: ecology 50 -> 48.94 and nuisance 50 -> 47.35 are the ramp dug at step 41 showing up in the scores — excavating one is real earthmoving, and this level's first blast now happens on a site that already has a haul road cut into it. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): ecology corrected again, 48.93 -> 48.97, and nuisance 47.325 -> 47.425 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when; that nudges the earthmoving accounted for by the time of this checkpoint. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode (clean, uncontended run — an earlier measurement taken while `npm run test`'s full suite ran concurrently on the same 2-core sandbox produced a stale 47.325 for this one CPU-contended step; every clean rerun since, standalone and in the full `npm run scenarios` batch, reproduces 47.425 exactly); the new number is exact and reproducible run to run. #1107 (merge of main into #1089's branch): ecology corrected again, 48.87 -> 48.9, nuisance 47.175 -> 47.25, and cash -637,450.897 -> -636,943.897 -- tickCollapse now releases a vehicle reservation held by an action still sitting unboarded in a collapsing employee's taskQueue (#1096, PR #1107), and tickEmployees no longer re-reserves it for a collapsing employee on the next tick, so a vehicle returns to the pool for the length of every collapse instead of idling reserved. Same dispatch-timing-only recalibration shape the #1002/#953/#1103 notes above document: deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode, standalone and uncontended, matching the same numbers seen in the full `npm run scenarios` batch."
+        "note": "#1091-followup (sandbox-measured): ecology 48.86 -> 49, nuisance 47.15 -> 47.5 -- #1090's dispatch-cost reordering (vehicle action cost now delegates to the route planner) shifts exactly which vehicle drives which trip and when, the same dispatch-timing-only recalibration shape as every fix documented below. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged. Direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode; the new numbers are exact and reproducible run to run. #1090-followup (sandbox-measured): ecology 48.9 -> 48.86, nuisance 47.25 -> 47.15 -- VehicleContinuity.ts's deletion shifts exactly which vehicle drives which trip and when, the same dispatch-timing-only recalibration shape as every #1103/#1002/#953 fix documented below. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged. #1103 (mover rebuild, #1089): ecology corrected again, 48.97 -> 48.87, and nuisance 47.425 -> 47.175 -- three genuine fixes landed together for issue #1103 (PlanItinerary.ts refuses an itinerary leg whose real pathfound endpoint silently clamped away from its own requested destination instead of installing one that can never arrive; EmployeeDispatchSteps.ts/PlanItinerary.ts both alight a currently-mounted employee before starting an on-foot walk or boarding a DIFFERENT vehicle, instead of leaving them nominally \"mounted\" on a vehicle that never moves again; VehicleContinuity.ts releases a follow-up action's own pre-existing vehicle reservation before transferring the just-finished vehicle's reservation onto it, instead of leaving both reserved) -- each shifts exactly which vehicle drives which trip and when across this file's own vehicle-scarce fleet, the same cash/ecology/nuisance-only-recalibration shape #1002/#953 above already document for an identical class of dispatch-timing change. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode; the new numbers are exact and reproducible run to run. #953: ecology 50 -> 48.94 and nuisance 50 -> 47.35 are the ramp dug at step 41 showing up in the scores — excavating one is real earthmoving, and this level's first blast now happens on a site that already has a haul road cut into it. #1002 (starvation-override vehicle-reservation release + distance-based vehicle tie-break): ecology corrected again, 48.93 -> 48.97, and nuisance 47.325 -> 47.425 -- a starvation dismount now also frees any taskQueue-held vehicle reservation back to the pool, and a tied vehicle claim is now broken by distance to the claiming employee instead of lowest id, both of which shift exactly which vehicle drives which trip and when; that nudges the earthmoving accounted for by the time of this checkpoint. deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win`, command mode (clean, uncontended run — an earlier measurement taken while `npm run test`'s full suite ran concurrently on the same 2-core sandbox produced a stale 47.325 for this one CPU-contended step; every clean rerun since, standalone and in the full `npm run scenarios` batch, reproduces 47.425 exactly); the new number is exact and reproducible run to run. #1107 (merge of main into #1089's branch): ecology corrected again, 48.87 -> 48.9, nuisance 47.175 -> 47.25, and cash -637,450.897 -> -636,943.897 -- tickCollapse now releases a vehicle reservation held by an action still sitting unboarded in a collapsing employee's taskQueue (#1096, PR #1107), and tickEmployees no longer re-reserves it for a collapsing employee on the next tick, so a vehicle returns to the pool for the length of every collapse instead of idling reserved. Same dispatch-timing-only recalibration shape the #1002/#953/#1103 notes above document: deathCount, employeeCount, activeContractCount, surveyCount, wellBeing, and safety all reproduce unchanged -- direct-verified via `npx tsx scripts/scenario-test.ts --scenario level2-playthrough-win --report-drift`, command mode, standalone and uncontended, matching the same numbers seen in the full `npm run scenarios` batch. #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "description": "#553/#593: wellBeing craters to 0 -- 2 deaths at blast 1 (down from the pre-#593 file's 4, see the blast step above), plus every surviving employee's morale sits at 0 (sandbox-measured `employee list`, no living_quarters anywhere in this file to recover it). #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived."
     },
@@ -1876,6 +1876,51 @@
       "role": "player"
     },
     {
+      "command": "wait_until field:rubbleDisposalOffered equals:true max_ticks:2000",
+      "description": "#1385 (hiring pool): hired candidates now differ in skill and salary, which shifts task timing and the RNG draws that roll contract refreshes, so a second rubble_disposal offer is not guaranteed to still sit in the pool. Wait on the offer itself, same as the later rubble steps in this file.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "rubbleDisposalOffered",
+          "equals": true,
+          "maxTicks": 2000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "timeout": 125,
+      "expect": {
+        "equals": {
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
+          "surveyCount": 3,
+          "rubbleDisposalOffered": true
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      },
+      "commandOutcome": "either"
+    },
+    {
       "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
@@ -2002,7 +2047,7 @@
           "x": 31,
           "z": 21,
           "distance": 45,
-          "pitch": 60,
+          "pitch": 80,
           "yaw": 180
         },
         {
@@ -2037,7 +2082,7 @@
       }
     },
     {
-      "command": "wait_until field:holeCount equals:13 max_ticks:3000",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -2049,19 +2094,19 @@
         },
         {
           "type": "waitUntil",
-          "field": "holeCount",
-          "equals": 13,
+          "field": "orderedHoleCount",
+          "equals": 0,
           "maxTicks": 3000,
           "timeoutMs": 120000
         }
       ],
-      "description": "Drilling wait (#1339): wait until 13 holes are drilled instead of a fixed tick pad. The remaining 12 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads.",
+      "description": "Drilling wait (#1339): wait until 13 holes are drilled instead of a fixed tick pad. The remaining 12 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads. #1385 (hiring pool): the hired driller no longer stalls after 13 holes -- it keeps drilling the rest of the pattern while the charges load, so waiting for exactly 13 left a 14th hole uncharged and the blast was refused. Wait on the whole pattern (orderedHoleCount 0) and charge it all; hole, charge and death pins follow.",
       "role": "setup",
       "timeout": 125,
       "expect": {
         "equals": {
-          "holeCount": 13,
-          "orderedHoleCount": 12
+          "holeCount": 25,
+          "orderedHoleCount": 0
         }
       }
     },
@@ -2181,7 +2226,7 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 13
+          "holeCount": 25
         },
         "changedBy": {
           "tickCount": 0
@@ -2213,7 +2258,7 @@
       "expect": {
         "equals": {
           "orderedChargeCount": 0,
-          "chargedCount": 13
+          "chargedCount": 25
         }
       }
     },
@@ -2248,7 +2293,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2257,7 +2302,8 @@
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2271,14 +2317,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2292,14 +2339,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2313,14 +2361,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2334,18 +2383,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 96.58111111111154,
-          "safety": 0,
-          "ecology": 42.68896304087921,
-          "nuisance": 31.722407602198018
+          "wellBeing": 99.95,
+          "safety": 20.600000000000122,
+          "ecology": 32.09818161074745,
+          "nuisance": 5.245454026868625
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2359,14 +2409,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "increased": [
           "tickCount"
-        ]
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "description": "#680: re-measured -- pre-#680 this tick was fully blocked by an already-pending event (changedBy tickCount:0). The tri-state needs-drain retiming shifted event timing enough that the event now only becomes pending partway into this 6-tick request, so tickCount genuinely advances (partially) before halting on it.",
       "commandOutcome": "either"
@@ -2381,14 +2432,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -2403,14 +2455,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "increased": [
           "tickCount"
-        ]
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2423,14 +2476,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -2445,14 +2499,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2474,14 +2529,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 1,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2514,14 +2570,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2535,14 +2592,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2680,7 +2738,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2690,11 +2748,12 @@
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
-      "command": "wait_until field:holeCount equals:18 max_ticks:3000",
+      "command": "wait_until field:holeCount equals:24 max_ticks:3000",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -2707,18 +2766,18 @@
         {
           "type": "waitUntil",
           "field": "holeCount",
-          "equals": 18,
+          "equals": 24,
           "maxTicks": 3000,
           "timeoutMs": 120000
         }
       ],
-      "description": "Drilling wait (#1339): wait until 18 holes are drilled instead of a fixed tick pad. The remaining 12 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads.",
+      "description": "Drilling wait (#1339): wait until 18 holes are drilled instead of a fixed tick pad. The remaining 12 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads. #1385 (hiring pool): the crew no longer stalls part-way through the pattern -- it keeps drilling while charges load, so waiting for a partial count left late holes uncharged and the blast was refused. The crew stalls at a fixed final count (24 of 30 / 28 of 48), so wait on that final count and charge everything; hole, charge and death pins follow.",
       "role": "setup",
       "timeout": 125,
       "expect": {
         "equals": {
-          "holeCount": 18,
-          "orderedHoleCount": 12
+          "holeCount": 24,
+          "orderedHoleCount": 6
         }
       }
     },
@@ -2733,14 +2792,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2754,14 +2814,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2775,14 +2836,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2834,16 +2896,17 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 5,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 18,
+          "holeCount": 24,
           "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2904,7 +2967,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2913,7 +2976,8 @@
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2927,14 +2991,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2948,14 +3013,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -2968,14 +3034,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -2990,14 +3057,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "increased": [
           "tickCount"
-        ]
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3010,14 +3078,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -3032,14 +3101,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "increased": [
           "tickCount"
-        ]
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3052,14 +3122,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -3074,14 +3145,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3103,14 +3175,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3143,14 +3216,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3164,19 +3238,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 99.77000000000028,
           "safety": 0,
-          "ecology": 41.52552443378042,
-          "nuisance": 28.331880581365084
+          "ecology": 40.560728439955675,
+          "nuisance": 8.453787717584571
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": "#1090-followup (sandbox-measured): wellBeing 0.3 -> 0 -- VehicleContinuity.ts's deletion shifts dispatch timing enough that wellBeing's own decay lands exactly on its floor by this checkpoint instead of a hair above it. #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random events drawn across this file's run differ (e.g. union_meditation instead of union_hazard_emotional at tick 165); ecology re-measured 42.7399 -> 42.7099. #1356 (sandbox-measured): blasts mark surveys stale, so blast 3 compares against no fresh estimate (yieldRatio 1.0) and no longer fires the lucky_strike/barren_blast ore-report event main drew there; the shifted event/RNG sequence re-measured ecology 47.9101 -> 43.1001 and nuisance 23.8201 -> 31.9502 here, nuisance 24.7528 -> 26.1527 and wellBeing 98.565 -> 98.145 at the final checkpoints."
+        "note": "#1090-followup (sandbox-measured): wellBeing 0.3 -> 0 -- VehicleContinuity.ts's deletion shifts dispatch timing enough that wellBeing's own decay lands exactly on its floor by this checkpoint instead of a hair above it. #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived. #1413-followup (sandbox-measured): follow-up events are now queue-only, so the random events drawn across this file's run differ (e.g. union_meditation instead of union_hazard_emotional at tick 165); ecology re-measured 42.7399 -> 42.7099. #1356 (sandbox-measured): blasts mark surveys stale, so blast 3 compares against no fresh estimate (yieldRatio 1.0) and no longer fires the lucky_strike/barren_blast ore-report event main drew there; the shifted event/RNG sequence re-measured ecology 47.9101 -> 43.1001 and nuisance 23.8201 -> 31.9502 here, nuisance 24.7528 -> 26.1527 and wellBeing 98.565 -> 98.145 at the final checkpoints. #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3190,14 +3264,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3211,14 +3286,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3356,7 +3432,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3366,11 +3442,12 @@
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
-      "command": "wait_until field:holeCount equals:22 max_ticks:3000",
+      "command": "wait_until field:holeCount equals:28 max_ticks:3000",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -3383,18 +3460,18 @@
         {
           "type": "waitUntil",
           "field": "holeCount",
-          "equals": 22,
+          "equals": 28,
           "maxTicks": 3000,
           "timeoutMs": 120000
         }
       ],
-      "description": "Drilling wait (#1339): wait until 22 holes are drilled instead of a fixed tick pad. The remaining 26 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads.",
+      "description": "Drilling wait (#1339): wait until 22 holes are drilled instead of a fixed tick pad. The remaining 26 ordered holes of the pattern stay unreachable for the crew, exactly as under the old pads. #1385 (hiring pool): the crew no longer stalls part-way through the pattern -- it keeps drilling while charges load, so waiting for a partial count left late holes uncharged and the blast was refused. The crew stalls at a fixed final count (24 of 30 / 28 of 48), so wait on that final count and charge everything; hole, charge and death pins follow.",
       "role": "setup",
       "timeout": 125,
       "expect": {
         "equals": {
-          "holeCount": 22,
-          "orderedHoleCount": 26
+          "holeCount": 28,
+          "orderedHoleCount": 20
         }
       }
     },
@@ -3409,14 +3486,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3430,14 +3508,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3451,14 +3530,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3510,16 +3590,17 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 9,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 22,
+          "holeCount": 28,
           "chargedCount": 0
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3580,7 +3661,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3589,7 +3670,8 @@
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3603,14 +3685,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3624,14 +3707,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3645,14 +3729,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "increased": [
           "tickCount"
-        ]
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3665,14 +3750,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -3687,14 +3773,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "increased": [
           "tickCount"
-        ]
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3707,14 +3794,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -3734,12 +3822,13 @@
       "timeout": 125,
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
           "rubbleDisposalOffered": true
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3752,14 +3841,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "commandOutcome": "either"
     },
@@ -3774,14 +3864,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3803,14 +3894,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
           "activeContractCount": 1,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3843,15 +3935,16 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
           "tickCount": 0,
           "cash": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       },
       "description": "#1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived. #1263: cash re-derived again (-787669.2798309447 -> -787684.2798309447) -- the crew-spawn-agent-separation employee fill and Locomotion's foot-leg vehicle-crossing fallback extraction shift exact pathing/payroll timing without changing the trajectory in kind, same class of update as #591's own note above. #1298 review: cash re-derived (-711670.3654274046 -> -711810.3654274046) -- the ramp carve now gives every footprint cell its own headroom, so this file's ramp across uneven ground clears a few high-side cells it used to leave standing; the longer dig costs $140 more payroll, nothing else moves."
     },
@@ -3866,19 +3959,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.14500000000007,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 38.68899072089543,
-          "nuisance": 21.74373066853227
+          "ecology": 32.752412743407326,
+          "nuisance": 0
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": "#1090-followup (sandbox-measured): wellBeing 2.3 -> 6.3 -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost now delegating to planItinerary) shifts exactly which trips each vehicle makes and when across this file's ~3,000-tick run, the same cash-only-recalibration shape every upstream fix in this file's own history already documents, just landing on a needs-driven score this time instead of only cash. The pattern-4 contract-delivery amount upstream also needed re-pinning to keep completing outright (see that step's own note) -- activeContractCount still reads 0 here. deathCount, employeeCount, activeContractCount, surveyCount, safety, ecology, and nuisance reproduce unchanged. #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived. #1413-followup (sandbox-measured): wellBeing re-measured 98.77 -> 99.95 -- the queue-only follow-up change reshuffles the random events drawn over this file's run. ecology 35.63 -> 36.73 and nuisance 13.28 -> 14.38 for the same reason."
+        "note": "#1090-followup (sandbox-measured): wellBeing 2.3 -> 6.3 -- VehicleContinuity.ts's deletion (and estimateActionCost/resolveActionCost now delegating to planItinerary) shifts exactly which trips each vehicle makes and when across this file's ~3,000-tick run, the same cash-only-recalibration shape every upstream fix in this file's own history already documents, just landing on a needs-driven score this time instead of only cash. The pattern-4 contract-delivery amount upstream also needed re-pinning to keep completing outright (see that step's own note) -- activeContractCount still reads 0 here. deathCount, employeeCount, activeContractCount, surveyCount, safety, ecology, and nuisance reproduce unchanged. #1270 (resolved): `relocateFootprintOccupants` (`BuildingTaskHelpers.ts`) now sweeps `state.vehicles.vehicles` the same way it already swept `state.employees.employees`, so vehicle #3 (the idle `rock_digger` parked at (6,2)) is relocated off the `freight_warehouse` footprint the instant that build order is placed, instead of being stranded there. The `build_ramp` job's driver can reach and claim it normally, employee #4 is dispatched into blast 1's radius as they were pre-#1200, and every figure below is re-measured against the fixed dispatch (ground truth captured via `--report-drift`), not hand-derived. #1413-followup (sandbox-measured): wellBeing re-measured 98.77 -> 99.95 -- the queue-only follow-up change reshuffles the random events drawn over this file's run. ecology 35.63 -> 36.73 and nuisance 13.28 -> 14.38 for the same reason. #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {
@@ -3892,18 +3985,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 13,
+          "deathCount": 12,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 98.14500000000007,
+          "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 38.68899072089543,
-          "nuisance": 21.74373066853227
+          "ecology": 32.752412743407326,
+          "nuisance": 0
         },
         "changedBy": {
           "tickCount": 0
-        }
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
       }
     },
     {

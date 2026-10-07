@@ -1722,7 +1722,7 @@
       "expect": {
         "equals": {
           "tickCount": 460,
-          "cash": 768552,
+          "cash": 756132,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1733,7 +1733,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured)."
+        "note": "#1413-followup (sandbox-measured): follow-up events are now queue-only, so the tick-130 random event is union_talking_rocks instead of union_strike_aftermath (a -$40,000 capitulation); cash re-measured 756,278 -> 795,778 (+$39,500: the two option-0 costs differ by $39,000; the remaining +$500 is the merged-in main drift, re-measured). #1385 (hiring pool): hires now draw named candidates whose salary and skill vary per candidate, so salary-driven figures were re-measured; no behaviour change beyond that."
       }
     },
     {
