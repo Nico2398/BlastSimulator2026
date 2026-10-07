@@ -150,9 +150,26 @@ export interface WeakHoleSummary {
 
 /** Summarise how many columns are too hard for the explosive. Null columns are skipped. */
 export function weakHoleSummary(
-  _explosiveId: string,
-  _columns: readonly (ColumnRock | null)[],
+  explosiveId: string,
+  columns: readonly (ColumnRock | null)[],
 ): WeakHoleSummary {
-  // TODO: implement
-  return { weakCount: 0, total: 0, rockId: null };
+  const present = columns.filter((c): c is ColumnRock => c !== null);
+  const explosive = getExplosive(explosiveId);
+  if (!explosive) return { weakCount: 0, total: present.length, rockId: null };
+  const weak = present.filter(c => c.tier > explosive.minRockTier);
+  const counts = new Map<string, { tier: number; count: number }>();
+  for (const c of weak) {
+    const entry = counts.get(c.rockId) ?? { tier: c.tier, count: 0 };
+    entry.count++;
+    counts.set(c.rockId, entry);
+  }
+  let rockId: string | null = null;
+  let best: { tier: number; count: number } | null = null;
+  for (const [id, e] of counts) {
+    if (!best || e.tier > best.tier || (e.tier === best.tier && e.count > best.count)) {
+      rockId = id;
+      best = e;
+    }
+  }
+  return { weakCount: weak.length, total: present.length, rockId };
 }

@@ -51,6 +51,18 @@ per-voxel objects or string keys, which a blast revisits far too often to afford
   `confinementFactor(distToAir)`. **Rock near a free face breaks for a fraction of the energy**
   (`UNCONFINED_THRESHOLD_FACTOR`, ramping to full over `CONFINEMENT_FULL_DEPTH`) — this is why bench
   blasting works at all.
+- **Explosive tier shortfall (#1358).** An explosive never refuses rock; rock harder than its
+  `minRockTier` just costs more. Per column, the nearest *charged* hole (horizontal distance) names
+  the explosive; each rock voxel's threshold is multiplied by
+  `TIER_SHORTFALL_THRESHOLD_FACTOR ** max(0, rockTier - minRockTier)` (`ExplosiveRockFit.ts`),
+  rock tier = `hardnessTier` of the voxel's dominant rock (air: 0). The factor is applied inside
+  `createEnergyField` through an optional per-column lookup, so `EnergyPropagation` stays unaware of
+  explosives; `buildBlastEnergyField` builds that lookup, which covers both `executeBlast` and the
+  previews (`buildPlanEnergyField`). No charged holes: no lookup, no gating.
+- **Charge step warning.** For the selected explosive, the Charge step samples the dominant rock
+  along each drilled hole (`dominantRockAlongColumn`, modal rock, higher tier wins ties) and,
+  via `weakHoleSummary`, shows `data-warning="weak-explosive"` naming the hardest offending rock and
+  "N of M holes". Advisory: Charge All stays enabled.
 - **Spread** goes to the 18 face-and-edge neighbours, weighted by 1/distance and biased toward
   neighbours nearer a free face (`FREE_FACE_BIAS`), losing `transmissionLoss` (derived from rock
   porosity) at each step. Air neither absorbs nor carries: a void shields what is behind it.

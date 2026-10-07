@@ -15,6 +15,7 @@
 
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { getRock } from '../world/RockCatalog.js';
+import { tierShortfall, tierThresholdFactor, dominantRockTierAt } from './ExplosiveRockFit.js';
 import {
   MAX_PROPAGATION_ITERATIONS,
   PROPAGATION_ENERGY_EPSILON,
@@ -277,8 +278,7 @@ export function confinementFactor(distToAir: number): number {
 export function createEnergyField(
   grid: VoxelGrid,
   box: BlastBox,
-  // TODO: implement — per-column explosive tier used to scale rock thresholds (#1358)
-  _explosiveTierAt?: (x: number, z: number) => number,
+  explosiveTierAt?: (x: number, z: number) => number,
 ): EnergyField {
   const nx = box.maxX - box.minX;
   const ny = box.maxY - box.minY;
@@ -303,7 +303,10 @@ export function createEnergyField(
     for (let y = box.minY; y < box.maxY; y++) {
       for (let x = box.minX; x < box.maxX; x++) {
         const i = indexOf(field, x, y, z);
-        const threshold = grid.densityAt(x, y, z) > 0 ? computeVoxelThreshold(grid, x, y, z) : 0;
+        let threshold = grid.densityAt(x, y, z) > 0 ? computeVoxelThreshold(grid, x, y, z) : 0;
+        if (threshold > 0 && explosiveTierAt) {
+          threshold *= tierThresholdFactor(tierShortfall(explosiveTierAt(x, z), dominantRockTierAt(grid, x, y, z)));
+        }
         if (threshold <= 0) {
           field.air[i] = 1;
           continue;

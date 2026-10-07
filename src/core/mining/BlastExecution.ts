@@ -34,6 +34,7 @@ import { groupProjectiles } from './ProjectileGrouping.js';
 import { resolveFragmentLanding, type FragmentFlight } from './BlastResolve.js';
 import { Random } from '../math/Random.js';
 import { getOre } from '../world/OreCatalog.js';
+import { getExplosive } from '../world/ExplosiveCatalog.js';
 import { VoxelGrid, firstEmptyLayerAboveGround, captureColumnTopsForCarve, renormaliseCarvedColumns } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
@@ -593,9 +594,32 @@ export function buildBlastEnergyField(
     ));
   }
 
-  const field = createEnergyField(grid, box);
+  const field = createEnergyField(grid, box, explosiveTierResolver(plan, box));
   seedEnergy(field, seeds);
   return field;
+}
+
+/**
+ * Per-column tier of the explosive in the nearest charged hole (horizontal
+ * distance), over the field's footprint. Undefined when no hole is charged, so
+ * the field then ignores explosive tier (#1358).
+ */
+function explosiveTierResolver(
+  plan: BlastPlan,
+  box: BlastBox,
+): ((x: number, z: number) => number) | undefined {
+  const charged = plan.holes.filter(h => plan.charges[h.id]);
+  if (charged.length === 0) return undefined;
+  const nx = box.maxX - box.minX;
+  const tiers = new Uint8Array(nx * (box.maxZ - box.minZ));
+  for (let z = box.minZ; z < box.maxZ; z++) {
+    for (let x = box.minX; x < box.maxX; x++) {
+      const hole = findNearestHole(vec3(x, 0, z), charged);
+      const explosive = getExplosive(plan.charges[hole.id]!.explosiveId);
+      tiers[(z - box.minZ) * nx + (x - box.minX)] = explosive?.minRockTier ?? 0;
+    }
+  }
+  return (x, z) => tiers[(z - box.minZ) * nx + (x - box.minX)]!;
 }
 
 function calculateBlastZone(
