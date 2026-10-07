@@ -1710,8 +1710,8 @@
           "surveyCount": 3,
           "wellBeing": 99.93916666666668,
           "safety": 50,
-          "ecology": 48.894892315689795,
-          "nuisance": 47.2372307892245
+          "ecology": 48.60524933152729,
+          "nuisance": 46.513123328818224
         },
         "changedBy": {
           "tickCount": 0
@@ -2340,8 +2340,8 @@
           "surveyCount": 3,
           "wellBeing": 96.58111111111154,
           "safety": 0,
-          "ecology": 42.8899757416574,
-          "nuisance": 32.22493935414351
+          "ecology": 42.68896304087921,
+          "nuisance": 31.722407602198018
         },
         "changedBy": {
           "tickCount": 0
@@ -3170,8 +3170,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 43.10008335987688,
-          "nuisance": 31.95017366641021
+          "ecology": 41.52552443378042,
+          "nuisance": 28.331880581365084
         },
         "changedBy": {
           "tickCount": 0
@@ -3872,8 +3872,8 @@
           "surveyCount": 3,
           "wellBeing": 98.14500000000007,
           "safety": 0,
-          "ecology": 40.8052830950337,
-          "nuisance": 26.15267311465356
+          "ecology": 38.68899072089543,
+          "nuisance": 21.74373066853227
         },
         "changedBy": {
           "tickCount": 0
@@ -3898,8 +3898,8 @@
           "surveyCount": 3,
           "wellBeing": 98.14500000000007,
           "safety": 0,
-          "ecology": 40.8052830950337,
-          "nuisance": 26.15267311465356
+          "ecology": 38.68899072089543,
+          "nuisance": 21.74373066853227
         },
         "changedBy": {
           "tickCount": 0

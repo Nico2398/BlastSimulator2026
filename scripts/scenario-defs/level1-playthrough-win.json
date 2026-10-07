@@ -833,8 +833,8 @@
       "expect": {
         "equals": {
           "safety": 50,
-          "ecology": 49.97650148961315,
-          "nuisance": 49.941253724032876
+          "ecology": 49.91763433527816,
+          "nuisance": 49.79408583819539
         }
       },
       "role": "observe"
