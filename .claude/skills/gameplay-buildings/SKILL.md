@@ -156,3 +156,5 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 
 Meanings the code does not state: `capacity` is role-specific (beds for Living Quarters, trainees for a training building, kg for a warehouse, vehicle slots for a depot) — how many people fit inside is `getBuildingPeopleCapacity`, not `capacity` read raw; `nameKey` is an i18n key naming the tier-specific building name. Per-tier costs and thresholds live in `src/core/config/balance.ts`.
 
+
+Build catalog rows show a one-line purpose plus operating cost in $/h and a tooltip of absolute stats (footprint, capacity with unit, upkeep), built in `src/ui/catalogCardText.ts`; the tooltip follows the selected tier.

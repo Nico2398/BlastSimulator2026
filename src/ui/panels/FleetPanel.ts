@@ -22,11 +22,11 @@ import { el, card, button, sectionHeader, panelRoot, panelHeader, panelBody, scr
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
+import type { Vehicle, VehicleDef, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
 import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
-import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
+import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeNoDriverRow, makePendingDriverRow } from '../fleetDetailSections.js';
@@ -225,7 +225,6 @@ export class FleetPanel extends PanelBase {
 
   private makeTierButton(role: VehicleRole, tier: VehicleTier, cash: number): HTMLElement {
     const def = getVehicleDefByTier(role, tier);
-    const m = VEHICLE_TIER_MULTIPLIERS[tier];
     const btn = el('button', {
       className: 'bs-fleet-tier-btn',
       attrs: { style: TIER_BTN_BASE_STYLE, 'data-role': role, 'data-tier': String(tier), 'data-vtype': role },
@@ -234,20 +233,22 @@ export class FleetPanel extends PanelBase {
     info.append(
       el('span', { text: t(getVehicleDefByTier(role, tier).nameKey), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
       el('span', {
-        text: t('ui.fleet.tier_stats', { speed: m.speed.toFixed(1), capacity: m.capacity.toFixed(1), work: m.workRate.toFixed(1) }),
-        className: 'bsx-mono',
+        text: vehicleCardLine(def),
+        className: 'bs-fleet-tier-desc',
         attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
       }),
     );
     const cost = el('span', { text: `$${def.purchaseCost.toLocaleString('en-US')}`, className: 'bsx-mono', attrs: { style: 'font-size:11px;font-weight:600;color:var(--bsx-amber)' } });
     btn.append(info, cost);
-    this.setTierButtonAffordable(btn, cash >= def.purchaseCost);
+    this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def);
     btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
     return btn;
   }
 
-  private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean): void {
+  private setTierButtonAffordable(btn: HTMLButtonElement, affordable: boolean, def: VehicleDef): void {
     btn.disabled = !affordable;
+    const stats = vehicleCardTooltip(def);
+    btn.title = affordable ? stats : `${stats}\n${t('ui.fleet.tip.cannot_afford', { cost: def.purchaseCost.toLocaleString('en-US') })}`;
     // Rewrite the whole attribute: mutating btn.style piecemeal can drop the var() colour in some CSSOM implementations.
     btn.setAttribute('style', `${TIER_BTN_BASE_STYLE};opacity:${affordable ? '1' : '.45'};cursor:${affordable ? 'pointer' : 'not-allowed'}`);
   }
@@ -256,7 +257,8 @@ export class FleetPanel extends PanelBase {
     this.bodyEl.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn').forEach(btn => {
       const role = btn.dataset['role'] as VehicleRole;
       const tier = Number(btn.dataset['tier']) as VehicleTier;
-      this.setTierButtonAffordable(btn, cash >= getVehicleDefByTier(role, tier).purchaseCost);
+      const def = getVehicleDefByTier(role, tier);
+      this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def);
     });
   }
 
