@@ -2,6 +2,7 @@
 // Assigns explosives and stemming to each hole in the drill plan.
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
+import type { ColumnRock } from './ExplosiveRockFit.js';
 import { t } from '../i18n/I18n.js';
 import {
   MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
@@ -138,4 +139,20 @@ export function chargeFitsHole(amountKg: number, stemmingM: number, holeDepth: n
 export function maxFittingChargeKg(holeDepth: number, stemmingM: number): number {
   const kg = maxChargeKgForHole(holeDepth, stemmingM) + CHARGE_FIT_EPSILON;
   return Math.floor(kg * 10) / 10;
+}
+
+/** Count of holes whose dominant rock outclasses the explosive (#1358). */
+export interface WeakHoleSummary {
+  weakCount: number;
+  total: number;
+  rockId: string | null;
+}
+
+/** Summarise how many columns are too hard for the explosive. Null columns are skipped. */
+export function weakHoleSummary(
+  _explosiveId: string,
+  _columns: readonly (ColumnRock | null)[],
+): WeakHoleSummary {
+  // TODO: implement
+  return { weakCount: 0, total: 0, rockId: null };
 }

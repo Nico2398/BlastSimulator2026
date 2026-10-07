@@ -274,7 +274,12 @@ export function confinementFactor(distToAir: number): number {
 }
 
 /** Allocate a field over `box` and fill its static per-voxel properties. */
-export function createEnergyField(grid: VoxelGrid, box: BlastBox): EnergyField {
+export function createEnergyField(
+  grid: VoxelGrid,
+  box: BlastBox,
+  // TODO: implement — per-column explosive tier used to scale rock thresholds (#1358)
+  _explosiveTierAt?: (x: number, z: number) => number,
+): EnergyField {
   const nx = box.maxX - box.minX;
   const ny = box.maxY - box.minY;
   const nz = box.maxZ - box.minZ;

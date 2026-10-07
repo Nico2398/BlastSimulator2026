@@ -20,10 +20,6 @@ export interface ExplosiveType {
   readonly maxChargeKg: number;
   /** Minimum rock hardness tier this explosive can fracture. */
   readonly minRockTier: number;
-  /** Maximum rock hardness tier this explosive can fracture. */
-  readonly maxRockTier: number;
-  /** Multiplier on blast radius (1.0 = normal). */
-  readonly blastRadiusMod: number;
   /** Multiplier on projection risk (1.0 = normal). Higher = more dangerous. */
   readonly projectionRiskMod: number;
   /** Multiplier on ground vibration (1.0 = normal). Higher = more vibration. */
@@ -41,8 +37,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 0.5,
     maxChargeKg: 3,
     minRockTier: 1,
-    maxRockTier: 1,
-    blastRadiusMod: 0.7,
     projectionRiskMod: 0.5,   // Low risk — gentle
     vibrationMod: 0.4,
   },
@@ -56,8 +50,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 1,
     maxChargeKg: 8,
     minRockTier: 1,
-    maxRockTier: 2,
-    blastRadiusMod: 1.0,
     projectionRiskMod: 0.8,
     vibrationMod: 0.7,
   },
@@ -71,8 +63,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 1,
     maxChargeKg: 10,
     minRockTier: 2,
-    maxRockTier: 3,
-    blastRadiusMod: 0.9,
     projectionRiskMod: 0.7,
     vibrationMod: 0.8,
   },
@@ -86,8 +76,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 1,
     maxChargeKg: 12,
     minRockTier: 2,
-    maxRockTier: 3,
-    blastRadiusMod: 1.2,
     projectionRiskMod: 1.1,   // Bigger boom = more projection risk
     vibrationMod: 1.2,
   },
@@ -101,8 +89,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 1,
     maxChargeKg: 15,
     minRockTier: 3,
-    maxRockTier: 4,
-    blastRadiusMod: 1.1,
     projectionRiskMod: 1.0,
     vibrationMod: 1.0,
   },
@@ -116,8 +102,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 2,
     maxChargeKg: 20,
     minRockTier: 3,
-    maxRockTier: 4,
-    blastRadiusMod: 1.3,
     projectionRiskMod: 1.3,
     vibrationMod: 1.6,        // Defining trait: high vibration
   },
@@ -131,8 +115,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 2,
     maxChargeKg: 20,
     minRockTier: 4,
-    maxRockTier: 5,
-    blastRadiusMod: 1.1,
     projectionRiskMod: 1.5,   // High projection risk
     vibrationMod: 1.2,
   },
@@ -146,8 +128,6 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     minChargeKg: 3,
     maxChargeKg: 25,
     minRockTier: 4,
-    maxRockTier: 5,
-    blastRadiusMod: 1.5,
     projectionRiskMod: 1.8,   // Extremely dangerous
     vibrationMod: 2.0,        // Village-shaking
   },

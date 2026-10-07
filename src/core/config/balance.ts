@@ -1730,3 +1730,9 @@ export const OPERATING_INCOME_WINDOW_TICKS = 72;
 
 /** Income categories that count as operating income (#1375). */
 export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
+
+/**
+ * Factor applied to a rock's breaking threshold per explosive tier it falls short of
+ * (rock tier above the explosive's minRockTier): threshold x FACTOR ** shortfall (#1358).
+ */
+export const TIER_SHORTFALL_THRESHOLD_FACTOR = 4;
