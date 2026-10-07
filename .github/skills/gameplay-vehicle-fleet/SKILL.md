@@ -313,3 +313,5 @@ Where the code still differs from this page, each difference has an owner:
 | A mounted employee keeps the vehicle for the whole rest, not just the drive there | #1122 |
 
 Remove a row when its issue lands.
+
+Dealership cards show a one-line purpose plus running cost in $/h and a tooltip of absolute stats (speed, capacity, work rate, licence level shown = tier, per #1524), built in `src/ui/catalogCardText.ts`.
