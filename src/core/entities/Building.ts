@@ -599,3 +599,7 @@ export {
   getExplosivesCapacity, getExplosivesInStock,
   storeExplosives, consumeExplosives, hasExplosivesForBlast, freightWarehouseHasRoom,
 } from './BuildingWarehouse.js';
+export {
+  computePlacementCutoff,
+  type PlacementCutoff,
+} from './PlacementCutoff.js';

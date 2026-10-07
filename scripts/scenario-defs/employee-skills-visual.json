@@ -3,11 +3,11 @@
   "description": "Visual verification of employee skills UI: skill categories, proficiency stars, XP bars, task queue (incl. overflow), salary breakdown, need gauges, training badges, an employee with no assigned extra skills, and modifiers",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:false"
         }
       ],
       "role": "setup",

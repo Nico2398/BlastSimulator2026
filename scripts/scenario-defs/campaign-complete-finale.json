@@ -37,7 +37,7 @@
       "commandOutcome": "either"
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:false",
       "description": "Player starts Dusty Hollow from its Portfolio card.",
       "interaction": [
         {

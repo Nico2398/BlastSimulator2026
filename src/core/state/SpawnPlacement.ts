@@ -153,8 +153,17 @@ export function isVehicleRouteAcceptable(navGrid: NavGrid, from: Cell, to: Cell)
   );
 }
 
+/** Arithmetic mean of `points`' x and z; the origin when empty. */
+export function meanPosition(points: ReadonlyArray<{ x: number; z: number }>): { x: number; z: number } {
+  if (points.length === 0) return { x: 0, z: 0 };
+  return {
+    x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+    z: points.reduce((sum, p) => sum + p.z, 0) / points.length,
+  };
+}
+
 /** Cells at Chebyshev radius `r` from `origin`, in a fixed order — ring by ring, nearest first. */
-function* ringCells(origin: Cell, radius: number): Generator<Cell> {
+export function* ringCells(origin: Cell, radius: number): Generator<Cell> {
   if (radius === 0) {
     yield origin;
     return;
@@ -373,9 +382,10 @@ export function placeStartingCrew(state: GameState): boolean {
     x: navGrid.clampX(navGrid.originX + Math.floor(navGrid.width / 2)),
     z: navGrid.clampZ(navGrid.originZ + Math.floor(navGrid.height / 2)),
   };
+  const mean = meanPosition(agents);
   const authored = {
-    x: navGrid.clampX(Math.round(agents.reduce((sum, a) => sum + a.x, 0) / agents.length)),
-    z: navGrid.clampZ(Math.round(agents.reduce((sum, a) => sum + a.z, 0) / agents.length)),
+    x: navGrid.clampX(Math.round(mean.x)),
+    z: navGrid.clampZ(Math.round(mean.z)),
   };
 
   // Vehicle separation is what makes the cluster wider than one cell per

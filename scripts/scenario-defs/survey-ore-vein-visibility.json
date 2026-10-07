@@ -19,12 +19,12 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow cash:200000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:200000",
       "description": "#553: drill_hole is now a queued, vehicle-gated action, and this file's own tick blocks (surveys, then drilling) run long enough to roll a random event that can cost up to $80,000 (lawsuit_class_action_mega, seed 42 deterministic) -- the default $50,000 start plus survey/hire costs leaves too thin a cushion, so this mirrors survey-overlay-lifecycle.json's own cash:200000 bump (same seed, same event, same fix).",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:200000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:200000"
         }
       ],
       "role": "setup",

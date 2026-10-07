@@ -1,188 +1,54 @@
 {
   "name": "level1-win-conservative",
-  "description": "Level 1 (Dusty Hollow): 4 small blasts and 2 contract attempts -- named for a conservative win, but no hauling infrastructure means no delivery ever succeeds; see Findings #52-#53 for why the real trajectory (a net cash loss, well short of the $80k target) was originally asserted instead of the named outcome. #553: drilling now requires a licensed driller and a drill_rig, so exactly one vehicle is now bought where the file previously bought none -- the file's own point (no hauling infrastructure, so no delivery ever succeeds) is unchanged, but the real trajectory is far worse: the single rig ends up parked on the pattern it just drilled when the first blast fires (same mechanic tutorial-playthrough documents) and is destroyed, and because this file never buys a replacement, the remaining 3 drill_plan calls only ever order ghost holes nothing can claim. #593: the driller dies alongside the rig in that same first blast (releaseVehicleReservation now correctly syncs the dismounting driver's position to the vehicle's actual location instead of leaving it frozen at the boarding point) -- deathCount ends the run at 1, and payroll/fuel drain stops at tick ~50 rather than running the whole level. Combined with the same unlucky contract-expiry fines Findings #52-#53 already documented, the level still ends deeply in the red -- see the final campaign status step.",
+  "description": "Level 1 (Dusty Hollow) won genuinely (#1363): one small 2x3 blast after clearing the blast zone, selling the rock afterwards, then waiting for operating profit to reach the target. No cash override, no staffed flag, no campaign complete.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow",
+      "role": "setup",
+      "timeout": 60,
       "interaction": [
         {
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup",
+      "description": "The level exactly as the UI starts it: no cash override, no staffed flag. It opens with a driller, a blaster, a driver, a drill rig, a debris hauler and a freight warehouse (#1363).",
       "expect": {
         "equals": {
           "cash": 50000,
           "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
+          "employeeCount": 3,
+          "holeCount": 0
         }
-      },
-      "description": "#1262: agent occupancy turned on for this file; with the dense-grid dispatch fix (#1278) every downstream expectation reproduces the occupancy-off baseline unchanged."
-    },
-    {
-      "command": "set_policy mode:continuous fatigue:0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "set_policy mode:continuous fatigue:0"
-        }
-      ],
-      "role": "bootstrap",
-      "description": "#1379: the default site policy (shift_8h, threshold 60) is always in force and would force-rest the crew. This file is not about rest, so continuous mode with the lowest rest threshold (0) neutralizes it and keeps the pre-#1379 no-policy timings."
+      }
     },
     {
       "command": "time resume",
+      "role": "setup",
       "interaction": [
         {
           "type": "command",
           "command": "time resume"
         }
-      ],
+      ]
+    },
+    {
+      "command": "time speed 8",
       "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
-      "command": "scores",
+      "description": "Speed up the waits below.",
       "interaction": [
         {
           "type": "command",
-          "command": "scores"
+          "command": "time speed 8"
         }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0,
-          "wellBeing": 50,
-          "safety": 50,
-          "ecology": 50,
-          "nuisance": 50
-        }
-      }
+      ]
     },
     {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file, whose whole premise pre-#553 was buying zero vehicles and hiring zero employees, now needs exactly one of each before a single hole can land. This is the ONLY hire in the file: no blaster, no driver, no living quarters -- the file's real point (no hauling infrastructure ever exists) is unchanged, only drilling itself is no longer free. Employee #1.",
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
-      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
-        }
-      ],
-      "description": "#553: the driller needs the drill_rig licence before any drill_hole action can be assigned to them -- hiring grants only the driller role's own starting qualification, never a driving licence. Left unmarked (bootstrap): the player-facing path is `employee train` at a driving_center, which this file never builds.",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "vehicle buy drill_rig",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
-        }
-      ],
-      "description": "#553: the only vehicle this file ever buys (purchaseCost $35,000, VEHICLE_STATS in balance.ts) -- required because drill_plan no longer writes holes into state directly, it queues drill_hole actions that only a driver-crewed drill_rig can claim. Vehicle #1, and the last one: this file's premise (no hauling infrastructure, so no delivery ever succeeds) depends on never buying a debris_hauler, rock_digger or rock_fragmenter either, and per its own instructions this file does not buy a replacement rig even after this one is destroyed below.",
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
-      "command": "vehicle driver 1 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 1 1"
-        }
-      ],
-      "description": "#553: the driller (employee #1) boards the drill_rig (vehicle #1). Without a driver the rig is inert and no queued drill_hole action ever starts. #921: Fleet panel's Assign/Unassign controls removed; vehicles are now claimed automatically by a qualified employee when a vehicle-gated task needs one, so this step runs as a direct bootstrap primitive instead of a click.",
-      "role": "bootstrap",
-      "expect": {
-        "equals": {
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:72,26",
+      "command": "drill_plan grid rows:2 cols:3 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
         },
         {
           "type": "clickSelector",
@@ -203,76 +69,62 @@
           "value": 6
         },
         {
-          "type": "dragTiles",
-          "x1": 72,
-          "z1": 26,
-          "x2": 76,
-          "z2": 30
+          "type": "focusTile",
+          "x": 18,
+          "z": 17,
+          "distance": 30,
+          "yaw": 180,
+          "pitch": 70
         },
         {
-          "type": "screenshot"
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 22,
+          "z2": 19
         },
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "#553: pattern relocated from (10,10)-(14,14) to (72,26)-(76,30) -- a uniform +62x/+16z shift applied to all four of this file's patterns (see the other three drill_plan steps below). Pre-#553 the absolute position never mattered, since confirming a plan wrote every hole into state in the same frame; now a driller has to physically drive there, and the driller/drill_rig both spawn at the nearest walkable cell to this site's grid centre, sandbox-measured at (82,34) (NavGrid.findNearestReachableCell anchored at the map corner -- the pit's own centre is unwalkable, so this is the real reachable point, not (48,48)). The original corner-clustered coordinates (x:8-28, z:8-28) are ~70 tiles from there; a direct trace with the un-shifted coordinates has the lone driller not even finishing this smallest 4-hole pattern until tick ~240, by which point the level has already gone bankrupt (cash crossed below $5,000 around tick 130 and the 100-tick grace period, BANKRUPTCY_GRACE_TICKS in balance.ts, elapses at tick 240) without a single blast fired. Shifting every pattern to sit around the real spawn point is what a player would actually do once drilling costs real travel time, and keeps this file's four blasts happening at all -- see the tick step immediately below for the measured landing time at the new site. Holes are ghosts until the driller drives there, hence orderedHoleCount rather than holeCount here (#553).",
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 4,
-          "holeCount": 0,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        }
-      }
+          "orderedHoleCount": 6
+        },
+        "note": "6 holes ordered with the level's own crew and rig."
+      },
+      "description": "Order a drill grid with the crew and rig the level opens with: nothing was hired or bought."
     },
     {
-      "command": "tick 50",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
+      "description": "Cycle 1: the driller lands every ordered hole.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 900,
+          "timeoutMs": 300000
         }
       ],
-      "description": "#553: sandbox-measured -- the single driller/drill_rig lands all 4 holes of this pattern by tick 40 (H4 at 13, H1 at 20, H2 at 25, H3 at 32); tick 50 is the pad. Cash keeps draining under the pad ($4/tick fuel+maintenance on the rig, $60/tick averaged driller payroll) even after the holes land, which is why cash is asserted as decreased rather than pinned to the exact pad-dependent figure.",
+      "timeout": 330,
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
-        ],
         "equals": {
-          "orderedHoleCount": 0,
-          "holeCount": 4,
-          "tickCount": 50,
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0
+          "orderedHoleCount": 0
         }
       }
     },
     {
-      "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "role": "player",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
-        },
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 3
+          "value": 5
         },
         {
           "type": "setStepper",
@@ -280,82 +132,73 @@
           "value": 2
         },
         {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "2.0 m"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
       "expect": {
-        "changedBy": {
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "holeCount": 4
-        },
         "increased": [
           "orderedChargeCount"
-        ],
-        "decreased": [
-          "cash"
         ]
-      },
-      "role": "player"
+      }
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "Cycle 1: the blaster loads every charge.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 3000,
-          "timeoutMs": 120000
+          "timeoutMs": 300000
         }
       ],
+      "timeout": 330,
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 0,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "holeCount": 4,
-          "chargedCount": 4,
           "orderedChargeCount": 0
         }
       }
     },
     {
-      "command": "blast",
+      "command": "zone clear x1:-1 y1:-1 x2:40 y2:40",
+      "role": "player",
+      "timeout": 90,
+      "description": "Sound the Horn: everyone walks out of the blast radius before the shot, or the crew dies in it.",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"4\"]"
-        },
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
+      "role": "setup",
+      "description": "Wait for the walkout to finish.",
+      "timeout": 330,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "dangerZoneClear",
+          "equals": true,
+          "maxTicks": 300,
+          "timeoutMs": 300000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "dangerZoneClear": true
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 60,
+      "role": "player",
+      "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
@@ -377,1260 +220,2243 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player",
       "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
         "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0,
           "holeCount": 0,
           "chargedCount": 0
-        },
-        "note": "#553: the sole driller and the sole drill_rig both end this blast right where the driller just finished drilling (a real trace: emp#1 never leaves (82,34), veh#1 ends at (72,29), one of this pattern's own 4 holes), the same unavoidable mechanic tutorial-playthrough's Finding documents (nothing in the UI relocates a vehicle before firing). #593: deathCount is now 1, not 0 -- releaseVehicleReservation now correctly syncs the dismounting driver's position to the vehicle's actual (destroyed) location instead of leaving it frozen at the old boarding point, so the driller is standing where the rig was when this blast clears the voxels underneath it; re-verified via a direct trace of state.damage. vehicleCount drops 1->0 here (confirmed via `vehicle list`: \"No vehicles.\") -- not asserted (this file has no vehicleCount checks anywhere), but it is what makes every remaining drill_plan below order holes nothing can ever claim, since this file's own point requires never buying a second rig. With the driller dead, no employee is left alive to work or draw payroll -- see the tick step immediately below."
-      }
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0,
-          "safety": 50,
-          "ecology": 49.97702363372797,
-          "nuisance": 49.94255908431991
-        },
-        "note": "#554-followup (this session, issue #586 CI): wellBeing dropped from equals -- same real-time-accrual drift class already documented and fixed for level1-playthrough-revolt.json's own equivalent checkpoints (see that file's own notes for the full mechanism). This checkpoint sits right after the `wait_until field:orderedChargeCount` step above, which now drives real ticks via the speed-8 button in interaction mode (issue #554's own speed-up fix, ported here this session) to drain a real charge queue within timeoutMs's budget -- that real-clock-driven tick accrual lands at a very slightly different tickCount than command mode's synchronous tick loop by the time this step reads state, and wellBeing (which climbs continuously from the driller's own morale ticking up while working, per the note below) is sensitive enough to that base tick drift to read a different value: command mode still lands exactly 58.55000000000027 here (confirmed by a full clean command-mode run of this file, unchanged), CI's own report puts interaction mode at 57.97000000000027 -- a ~0.58 difference consistent with a handful of ticks' worth of morale accrual, not a logic bug. safety/ecology/nuisance stay pinned -- all three are genuinely flat (50, unmoved) at this point in every environment, immune to tick-count base drift the way a moving field is not. #553: safety is still 50 here -- the accident from the blast above only starts costing safety on the ticks that follow (ScoreManager.ts: recentAccidents * 5 per tick against every accident inside the last 10 ticks), checked on the next tick step. wellBeing has already climbed from the fresh-hire baseline of 50 purely from the driller's own morale ticking up while working; ecology/nuisance are untouched -- this file's one real blast (4 holes, pop_rock) never triggers a vibration hit in a direct trace, unlike the original file's larger boomite blasts. #593: deathCount is 1 here, not 0 -- the driller died in the blast above (see its own note)."
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "safety"
-        ],
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        },
-        "note": "#553: confirmed via direct trace -- safety collapses from 50 toward 0 over these 20 ticks (recentAccidents * 5 per tick, ScoreManager.ts, against the accident from the blast above, which stays \"recent\" for its own 10-tick window). #593: cash is no longer asserted as decreased here -- with the driller dead (see the blast step above), nothing is left alive to draw payroll or burn vehicle fuel, so cash sits flat at $10,620 across this block and stays flat until the first contract-expiry fine (sandbox-measured: cash does not move again until tickCount 135, below).",
-        "changedBy": {
-          "tickCount": 20
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "player",
-      "timeout": 90,
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        },
-        "note": "#593: cash is no longer asserted as decreased here -- the driller died in the first blast above, so nothing alive draws payroll or burns vehicle fuel; cash sits flat at $10,620 through this block.",
-        "changedBy": {
-          "tickCount": 20
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "player",
-      "timeout": 90,
-      "commandOutcome": "either"
-    },
-    {
-      "command": "contract list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract list"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "contract accept type:rubble_disposal",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "description": "#554: this contract's numeric id kept renumbering run to run (charging is now queued, real work, so this checkpoint's tickCount lands later than earlier traces and the pool refreshes further -- CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3 -- by the time this step runs). #635 drops the numeric id for the stable `type:rubble_disposal` selector (rubble, 260kg @ $1.74/kg, 75-tick deadline, $136 penalty -- confirmed via `contract list`; materialId '' for this type, so no `material:` clause). #513/#581: the accept click is scoped to `[data-contract-type=\"rubble_disposal\"]`, the contract this step's `command` names -- unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so scoping keeps both channels testing the same acceptance."
-    },
-    {
-      "command": "contract deliver type:rubble_disposal amount:300",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver type:rubble_disposal amount:300"
-        }
-      ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against this contract -- the single driller this file hires never touches hauling, and no debris_hauler is ever bought. The console command is no better: it returns success:false (\"Not enough rubble in storage: 0.0 kg available, 300.0 kg requested\") and command mode only fails a step on a thrown exception, so this is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. #635: dropped the numeric id for `type:rubble_disposal`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- the #585 audit (commit 7162e090) already classified this exact shape, 'contract deliver on an empty warehouse', as a guard step that declares the field with no description change (see tutorial-playthrough.json's own three identically-worded guard steps), but this file's #553/#554/#555 rescue-merge redrifted the contract id/amount here away from whatever numbers that original fix last saw, and the field was lost in the process. The guard's own claim was never wrong -- confirmed via a live `ScenarioCommandOutcomes` replay and a full `run-all-scenarios` run that the refusal text above is still word-for-word what actually happens; only the structural declaration was missing.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
-        "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery.",
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "guard",
-      "commandOutcome": "refused"
-    },
-    {
-      "command": "drill_plan grid rows:2 cols:4 spacing:3 depth:6 diameter:0.089 start:77,31",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 77,
-          "z1": 31,
-          "x2": 85,
-          "z2": 35
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "description": "#553: pattern relocated from (15,15)-(23,19) to (77,31)-(85,35), the same +62x/+16z shift as every other pattern in this file. This one only ever orders ghosts: the single drill_rig this file ever buys was destroyed at the end of the first blast above, and this file's own point (no hauling infrastructure, so no second vehicle is ever bought either) means nothing exists to claim these 8 queued drill_hole actions. A direct trace confirms it -- orderedHoleCount holds at 8 and holeCount stays 0 no matter how long the following tick step runs.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 8,
-          "holeCount": 0,
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "description": "#553: not a landing pad -- there is no drill_rig left to drive to any of the 8 holes ordered above (destroyed at the end of the first blast, and this file never buys a second one). A direct trace confirms orderedHoleCount still reads 8 and holeCount still reads 0 no matter how many ticks are spent waiting; 5 is enough to prove it without padding this file's tick budget for a landing that can never happen.",
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 8,
-          "holeCount": 0,
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 5
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "2.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "#553: Charge All is still a real, clickable control with zero drilled holes to charge (Charge.ts never disables it on hole count) -- it charges 0 of the 8 still-ordered ghosts, matching command mode's own \"Charged 0 holes with pop_rock 3kg\" output exactly.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "holeCount": 0,
-          "chargedCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "role": "guard",
-      "description": "#553: unlike the charge controls, the Fire button IS gated on real drilled holes -- BlastFooter.ts computes `fireOk = hasHoles && errors.length === 0` off `state.drillHoles` (not the ordered ghosts) and disables the button whenever hasHoles is false. With 0 real holes, no player can click DETONATE here at all; this is the rejection-path counterpart to the first pattern's full click-through blast above, not a weaker version of it. Command mode still runs the bare `blast` command, which returns a real, non-throwing BAD/$0 report (0 cleared voxels) -- the same zero-hole outcome, proven the way each mode actually reaches it. #586 CI: this bare-command `blast` still sets `state.lastBlastReport`, which BlastReportModal.update() reacts to unconditionally (UIManager.ts) by opening a real report modal regardless of which mode fired the command -- and UIManager.update() deliberately defers `eventModal` while that modal is visible (\"Deferred while BlastReportModal is up\"). Nothing in this step's own interaction array used to close it, so it stayed open for the rest of the run and permanently blocked every later `resolveEventIfPending` from ever seeing `#bs-event-dialog` mount -- not a rendering-speed problem, root-caused via a direct screenshot at the first failing event step showing this exact Blast Report modal still on screen. The report-close click above is the real fix; the timeoutMs/step-timeout bumps elsewhere in this file are a harmless margin, not what was actually wrong. #1345: `blast` with no loaded charge is now refused (mining.blast.no_charged_holes) instead of producing a hollow report, so the step expects refusal; nothing mutates.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "holeCount": 0,
-          "chargedCount": 0
-        },
-        "usable": "#bs-blast-panel [data-step=\"2\"]",
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]",
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "refused"
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
         }
       }
     },
     {
       "command": "tick 20",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 20"
         }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "note": "#593: cash stays flat at $10,620 -- still no one alive to draw payroll or fuel.",
-        "changedBy": {
-          "tickCount": 20
-        }
-      }
+      ]
     },
     {
       "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
       "role": "player",
-      "timeout": 90,
-      "commandOutcome": "either"
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
     },
     {
-      "command": "tick 20",
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 6"
         }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        },
-        "note": "#1384: fixed-duration actions scale with proficiency/fatigue, so the contract board refreshed differently and this file's rubble accept (#16, 41-tick deadline, $207 penalty) now expires in this block (tick 169): activeContractCount drops 1 -> 0 and cash falls by exactly the penalty.",
-        "changedBy": {
-          "tickCount": 20,
-          "cash": -207
-        }
-      }
+      ]
     },
     {
-      "command": "event choose 0",
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
       "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
       "interaction": [
         {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s and step-level `timeout` bumped 60s -> 120s (issue #586 CI) as margin, but a sandboxed repro of the real CI failure (screenshot at this exact step) found the actual cause was NOT rendering speed: the second pattern's guard `blast` step above (a bare console `blast` call with 0 real holes, tickCount 95) still sets `state.lastBlastReport`, which BlastReportModal.update() opens unconditionally regardless of which mode fired the command (UIManager.ts) -- and that step's own interaction array never closed it. UIManager.update() deliberately defers `eventModal` while BlastReportModal.visible is true (\"Deferred while BlastReportModal is up\", UIManager.ts), so once that report modal opened at the second pattern's blast it stayed open and permanently blocked `#bs-event-dialog .bs-event-choice` from ever mounting -- no amount of extra timeoutMs would have helped, since the dialog was never going to appear. Fixed at the root: the guard blast steps (second/third/fourth patterns) now click `[data-action=\"report-close\"]` right after the bare command, so this step's own `resolveEventIfPending` reaches a real, unblocked event dialog. The larger timeouts are kept as a harmless margin for genuine per-frame slowness under this file's entity-heavy scene (91 muck-pile fragments sandbox-measured at this tick), not because they were the actual fix.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
-        "note": "#554: re-verified against current code -- no event is pending here; genuine no-op, cash unchanged. The one active contract (#5, rubble) is still open.",
-        "changedBy": {
-          "tickCount": 0
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
-      },
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
       "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "contract list",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract list"
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
         }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "contract accept type:ore_sale material:rustite",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-accept"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "description": "#554: this contract's numeric id kept renumbering run to run for this file's second accept (the earlier rubble accept above, plus contract-pool refreshes -- CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3 -- independent of anything this file does). #635 drops the numeric id for the stable `type:ore_sale material:rustite` selector (rustite bulk, 440kg @ $22.11/kg, 97-tick deadline, $2919 penalty -- confirmed via `contract list`). #513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"]`, the contract this step's `command` names, for the same DOM-order-coupling reason documented on the first accept step above."
-    },
-    {
-      "command": "contract deliver type:ore_sale material:rustite amount:240",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver type:ore_sale material:rustite amount:240"
-        }
-      ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (rubble, rustite supply) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 400.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:rustite`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the deliver step above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"rustite\"] .bs-contract-deliver",
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "guard",
-      "commandOutcome": "refused"
-    },
-    {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:82,36",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "focusTile",
-          "x": 82,
-          "z": 36
-        },
-        {
-          "type": "dragTiles",
-          "x1": 82,
-          "z1": 36,
-          "x2": 90,
-          "z2": 44
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "description": "#553: pattern relocated from (20,20)-(28,28) to (82,36)-(90,44), same +62x/+16z shift. Still no drill_rig anywhere in this file -- these 16 holes only ever order, never land, same as the previous pattern.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 16,
-          "holeCount": 0,
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "description": "#553: same as the previous pattern's landing check -- no drill_rig exists, so orderedHoleCount holds at 16 and holeCount holds at 0 regardless of ticks spent waiting. #593: cash also holds flat here (was asserted decreased pre-#593) -- the driller died in the first pattern's blast, far above, so no one is left alive to draw payroll or fuel.",
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 16,
-          "holeCount": 0,
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 3
-        },
-        "note": "#1384: the event pool draw lands one event (union_miner_month) 3 ticks into this block now, so only 3 of the 5 requested ticks elapse (172 -> 175); the event is resolved by the step below."
-      }
+      ]
     },
     {
       "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
-        }
-      ],
-      "description": "Resolves the event the tick step above triggered (option 0), now 3 ticks into that block (#1384).",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
       "role": "player",
-      "timeout": 90,
-      "commandOutcome": "either"
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 5
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "2.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "resolveEventIfPending"
         }
-      ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #553: still 0 holes to charge -- Charge All is never disabled on hole count, so it charges 0 of the 16 ordered ghosts (\"Charged 0 holes with boomite 5kg\"). #586 CI: amount stepper direction fixed -- entering state here is pop_rock/3kg (Charge.ts's `amountKg` is one instance field with no reset between charge steps, left at 3 by the second pattern's `charge ... pop_rock amount:3` above; selecting boomite clamps into its 1-8kg range, which 3 already satisfies, so it stays 3 unchanged). Reaching the declared 5kg needs two +1 increments (`:last-child`, DELTA=+1, Charge.ts's `adjustAmount`), not one -1 decrement (`:first-child`) -- the prior single decrement click silently undercounted to 2kg and only surfaced once a sandboxed run of this file finally got past the step-32 event-dialog blocker below to reach this step at all (issue #586 CI investigation).",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "holeCount": 0,
-          "chargedCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "player"
+      ]
     },
     {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "role": "guard",
-      "description": "#553: same guard as the second pattern's blast above -- 0 real holes means BlastFooter.ts's fireOk is false and DETONATE is disabled. No player can fire this third \"blast\" at all. #586 CI: report-close click added -- the bare command still opens a real Blast Report modal (BlastReportModal.update() reacts to state.lastBlastReport regardless of mode) which UIManager.ts then uses to defer eventModal indefinitely; see the second pattern's blast step above for the full root-cause writeup. #1345: `blast` with no loaded charge is now refused (mining.blast.no_charged_holes) instead of producing a hollow report, so the step expects refusal; nothing mutates.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "holeCount": 0,
-          "chargedCount": 0
-        },
-        "usable": "#bs-blast-panel [data-step=\"2\"]",
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]",
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "refused"
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "safety": 5,
-          "ecology": 55,
-          "nuisance": 50
-        },
-        "note": "#1412: safety re-measured 3 -> 5 -- the union event gate (needs a living employee) no longer lets union_rename_explosives (+3 safety) fire with the driller dead; politics_mining_expo (+5 safety, +5 ecology) draws instead, so ecology is 55 here. #554-followup (issue #586 CI): wellBeing dropped from this checkpoint too -- same real-time-accrual drift class as this file's other wellBeing checkpoint (CI read 53.47 vs command mode's 54.05, a small mid-climb difference). safety is pinned at its floor of 0, not recovering -- sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run. wellBeing keeps climbing (not falling) toward the equilibrium computeAverageMorale's zero-living-employee fallback (neutral 50) produces, which is exactly why a real-time difference lands on a different point of that climb. ecology/nuisance stay untouched -- no real blast and no event has landed yet. contracts #5 (rubble, accepted tick 121) and #7 (blingite, accepted tick 166) are both still open here -- neither has expired yet."
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
+      "command": "tick 6",
       "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "note": "#554: no event pending during this block; all 20 requested ticks advance. cash sits flat at $7,896 (the union_miner_month fine already landed at the tick step above).",
-        "changedBy": {
-          "tickCount": 20
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
         }
-      }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
     },
     {
       "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "note": "#554: re-verified against current code -- no event is pending here at all (\"No pending event or invalid option\"); genuine no-op, cash stays flat at $7,896."
-      },
       "role": "player",
-      "timeout": 90,
-      "commandOutcome": "either"
-    },
-    {
-      "command": "contract list",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract list"
+          "type": "resolveEventIfPending"
         }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
+      ]
     },
     {
-      "command": "contract accept type:supply material:rustite",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"rustite\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"rustite\"] .bs-contract-accept"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "description": "#554: this contract's numeric id kept renumbering run to run for this file's third accept (the two earlier accepts above, plus the pool refreshing further by this tick). #635 drops the numeric id for the stable `type:supply material:rustite` selector -- the supply rustite offer on the board at this point (#1365: the board now refreshes with exactly CONTRACTS_PER_REFRESH=3 offers, so this is no longer the gloomium supply contract earlier traces accepted; the file's last deliver step names a 230kg amount for it). Same DOM-order scoping reasoning as the two accept steps above."
-    },
-    {
-      "command": "contract deliver type:supply material:rustite amount:70",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver type:supply material:rustite amount:70"
-        }
-      ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (a \"Not enough ... in storage: 0.0 kg available\" refusal for the 230kg requested) -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:rustite`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the two deliver steps above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2
-        },
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"rustite\"] .bs-contract-deliver",
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "guard",
-      "commandOutcome": "refused"
-    },
-    {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:70,24",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "focusTile",
-          "x": 70,
-          "z": 24
-        },
-        {
-          "type": "dragTiles",
-          "x1": 70,
-          "z1": 24,
-          "x2": 80,
-          "z2": 34
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "description": "#553: pattern relocated from (8,8)-(18,18) to (70,24)-(80,34), same +62x/+16z shift as the rest of this file. Still no drill_rig -- this file's fourth and final drill_plan orders 16 more holes that nothing can ever claim, same as the previous two.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 16,
-          "holeCount": 0,
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "description": "#553: same landing check as the previous two patterns -- no drill_rig exists, orderedHoleCount holds at 16 and holeCount holds at 0.",
+      "command": "tick 6",
       "role": "setup",
-      "expect": {
-        "equals": {
-          "orderedHoleCount": 16,
-          "holeCount": 0,
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2
-        },
-        "changedBy": {
-          "tickCount": 5
-        },
-        "note": "#554: contract #5 (rubble, accepted tick 121, $136 penalty) expired mid-block at tick 197 -- sandbox-measured against current code. activeContractCount drops from 3 to 2 as it leaves the active list; cash: $7,896 -> $7,760. #1090-followup (sandbox-measured): VehicleContinuity.ts's deletion shifts the accept 16 ticks earlier (tick 105, not 121) and the expiry with it (tick 181, not 197) -- both land in the earlier tick-20/event-choose-0 pair above now, so activeContractCount already reads 2 well before this step; the count this step itself pins is unchanged."
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:2",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-        },
-        {
-          "type": "setStepper",
-          "selector": "#bs-blast-panel [data-field=\"amount\"]",
-          "value": 6
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "6 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "2.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m — the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" — inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2,
-          "holeCount": 0,
-          "chargedCount": 0
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "blast",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
       "interaction": [
         {
           "type": "command",
-          "command": "blast"
+          "command": "tick 6"
         }
-      ],
-      "role": "guard",
-      "description": "#553: same guard as the second and third patterns' blasts above -- 0 real holes, DETONATE disabled, no player can fire this fourth \"blast\" either. This file's title still counts 4 blasts (the drill/charge/blast cycle runs 4 times, matching its own description) even though only the first one is ever real. #586 CI: report-close click added -- same root cause as the second pattern's blast step above (a bare-command blast still opens a real Blast Report modal that UIManager.ts uses to defer eventModal indefinitely until closed). #1345: `blast` with no loaded charge is now refused (mining.blast.no_charged_holes) instead of producing a hollow report, so the step expects refusal; nothing mutates.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2,
-          "holeCount": 0,
-          "chargedCount": 0
-        },
-        "usable": "#bs-blast-panel [data-step=\"2\"]",
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]",
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "commandOutcome": "refused"
+      ]
     },
     {
-      "command": "finances",
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
       "interaction": [
         {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
-        "changedBy": {
-          "tickCount": 0
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
-      }
+      ]
     },
     {
-      "command": "tick 20",
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
-        "note": "#593: cash is no longer asserted as decreased -- the driller died in the first pattern's blast, far above, so cash sits flat at -$23,317 through this block. #1364: the earlier rustite ore_sale is still active here (level-aware offers re-rolled its deadline), so activeContractCount stays 2 through this block and the next event step.",
-        "changedBy": {
-          "tickCount": 20
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
         }
-      }
+      ]
     },
     {
       "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
       "interaction": [
         {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
+          "type": "resolveEventIfPending"
         }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
-      "role": "player",
-      "timeout": 90,
-      "commandOutcome": "either"
+      ]
     },
     {
-      "command": "tick 22",
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 22"
+          "command": "tick 6"
         }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
-        "note": "#1364: contract offers now draw only ores the level yields, which re-rolled the earlier rustite ore_sale's deadline: it expires in this 22-tick block (not the block before), so activeContractCount drops 2 -> 1 and its penalty lowers cash. The supply rustite accept (85-tick deadline, accepted at tick 195) still outlives this file's last checkpoint. Cumulative ticksBelowThreshold (BANKRUPTCY_THRESHOLD=$5,000) never reaches BANKRUPTCY_GRACE_TICKS by the final tick -- cash stays above it.",
-        "changedBy": {
-          "tickCount": 22
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
-        "decreased": [
-          "cash"
-        ]
-      }
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
     },
     {
       "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending",
-          "timeoutMs": 90000
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      },
       "role": "player",
-      "timeout": 90,
-      "commandOutcome": "either"
-    },
-    {
-      "command": "finances",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
       "interaction": [
         {
-          "type": "command",
-          "command": "finances"
+          "type": "resolveEventIfPending"
         }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
+      ]
     },
     {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "safety": 7.010000000000017,
-          "ecology": 52.989999999999924,
-          "nuisance": 50
-        },
-        "note": "#554: with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down, and with zero living employees avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback). nuisance stays untouched at 50 -- this file's real trajectory only ever triggers a union event (cash/wellBeing only, no nuisance effect), not food_fest. ecology also stays at the fresh-game 50 -- the one real blast never registered a vibration hit, and the other three never fired at all. #554-followup (issue #586 CI): dropped `wellBeing` -- the earlier tick step's own event resolution can land on a different random event between modes (see that step's own note, a tick-seeded RNG draw whose event-pool weights are wellBeing-sensitive), each with its own wellBeing delta, so this checkpoint's exact value isn't pinnable across both modes any more. #1090-followup (sandbox-measured): safety re-measured 0 -> 6.95 -- VehicleContinuity.ts's deletion shifts the first contract's expiry 16 ticks earlier (see the tick-20 steps above), which leaves applyDecay (ScoreManager.ts) more real ticks to pull safety back off its post-death floor toward baseline before this checkpoint, where before it stayed pinned at 0 for this file's whole remaining run. #1365: safety is back at 0 -- the contract board now offers exactly 3 contracts per refresh, so the accepted set and its expiry timing differ (an ore_sale blingite and a supply blingite replace the old supply contracts, and the last expiry lands at tick 242), which changes the penalties applied before this checkpoint; the re-measured trajectory leaves safety pinned at its floor."
-      }
-    },
-    {
-      "command": "stats",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "stats"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "changedBy": {
-          "cash": 0,
-          "tickCount": 0
-        },
-        "equals": {
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "safety": 7.010000000000017
-        }
-      }
-    },
-    {
-      "command": "campaign status",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "campaign status"
-        }
-      ],
+      "command": "tick 6",
       "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:levelEnded equals:true max_ticks:6000",
+      "role": "setup",
+      "timeout": 1260,
+      "description": "Keep selling the blasted rock; the level ends on its own once operating profit reaches the $80,000 target.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "levelEnded",
+          "equals": true,
+          "maxTicks": 6000,
+          "timeoutMs": 600000
+        }
+      ],
       "expect": {
         "equals": {
-          "tickCount": 242,
-          "deathCount": 1,
-          "employeeCount": 1,
-          "activeContractCount": 1,
-          "safety": 7.010000000000017,
-          "bankrupt": false,
-          "levelEnded": false,
-          "levelEndReason": null,
-          "surveyCount": 0
-        },
-        "note": "#554, superseding the pre-#554 note this once carried: charging is now queued, real work (the wait_until step drains the first pattern's charge order before the file can proceed), which pushes every downstream tick later and reshuffles which contract ids are actually live in the pool when this file's three accept steps run (contract ids increment and roll out of the offered pool on their own refresh clock, CONTRACT_REFRESH_INTERVAL=20/CONTRACTS_PER_REFRESH=3, independent of anything this file does). All three accepted contracts land successfully here (#5 rubble, #7 ore_sale blingite, #8 supply blingite), and two of the three expire before the final checkpoint: #5 (rubble, $136 penalty) at tick 197 (#1090-followup, sandbox-measured: tick 181 now -- see the tick-5 step above), and the third accept (supply blingite, #1365; formerly gloomium bulk) at tick 242 -- #7 (ore_sale blingite) never expires within this file's 240-tick run. Real costs this file pays are $1,000 to hire, $35,000 for the rig, and ~$60/tick combined payroll and fuel only for the ~50 ticks the driller is alive to draw them (the sole driller and drill_rig both die in the first blast -- see that step's own note), plus one random union event mid-file and the two contract-expiry fines above (the rubble $136 penalty plus the supply blingite penalty; the cash figures that went with the old $6,514 gloomium fine predate #1365 and are not pinned). The run still ends well short of the level's $80,000 target. bankrupt/levelEnded both stay false: cash never crosses below BANKRUPTCY_THRESHOLD ($5,000) for the required BANKRUPTCY_GRACE_TICKS (100 consecutive ticks) -- confirmed via direct trace. No ecological/revolt shutdown either -- the one real blast never moved ecology off the fresh-game baseline of 50, and nuisance never moves either (no food_fest event lands in this trajectory). #554-followup (issue #586 CI): `cash`/`wellBeing` dropped from equals -- the earlier union-event tick step can resolve a different random event between modes (that step's own note has the mechanism), which changes cash/wellBeing by a different amount than command mode's own $800/6-point trace without changing anything structural (contract counts, bankruptcy, level-end state all stay exactly as calibrated)."
+          "levelEnded": true
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        }
+      ],
+      "description": "Terminal outcome: a genuine win, reached with no `campaign complete` and no cash override.",
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        }
       }
     }
   ]

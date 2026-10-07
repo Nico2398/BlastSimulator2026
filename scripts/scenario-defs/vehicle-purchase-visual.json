@@ -3,11 +3,11 @@
   "description": "Visual check: purchase vehicle deducts cost from cash, mesh appears in scene, fleet shows idle state. Vehicle purchases are made by clicking the dealership rows in the Fleet panel (issue #479), not by typing `vehicle buy`; the list/scores steps stay observation commands.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow cash:100000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:100000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow cash:100000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:100000"
         }
       ],
       "role": "setup",

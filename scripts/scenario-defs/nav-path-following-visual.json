@@ -191,7 +191,7 @@
     },
     {
       "command": "build management_office at:1,8",
-      "description": "Closes the pocket's only remaining side: covers (1,8)-(2,9), blocking the two cells east of it. With the west side sealed by the x=0 world edge, the pocket (0,8)-(0,9) is now enclosed on all 8 directions -- Pathfinding.ts admits a diagonal step with no corner rule, so every diagonal out of the pocket ((1,7) and (1,10)) has to be blocked too, which the north and south walls already cover.",
+      "description": "Closes the pocket's only remaining side: covers (1,8)-(2,9), blocking the two cells east of it. With the west side sealed by the x=0 world edge, the pocket (0,8)-(0,9) is now enclosed on all 8 directions -- Pathfinding.ts admits a diagonal step with no corner rule, so every diagonal out of the pocket ((1,7) and (1,10)) has to be blocked too, which the north and south walls already cover. Sealing the pocket strands it from the crew, so the #1391 cutoff warning opens a 'Place anyway?' modal that the step accepts.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -216,6 +216,14 @@
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player",
