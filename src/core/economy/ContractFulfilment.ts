@@ -23,7 +23,7 @@ interface AutoDelivery extends DeliveryOutcome {
 
 /**
  * Deliver up to `requestedKg` of stored ore to one active contract, drawing it
- * down from storage. The request is capped at what the contract still needs.
+ * down from storage. The request is capped at what the contract still needs and what storage holds.
  */
 export function deliverStoredOre(
   contracts: ContractState,
@@ -36,7 +36,10 @@ export function deliverStoredOre(
   const contract = contracts.active.find(c => c.id === contractId);
   if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
 
-  const request = Math.min(requestedKg, contract.quantityKg - contract.deliveredKg);
+  let request = Math.min(requestedKg, contract.quantityKg - contract.deliveredKg);
+  // Partial delivery: take what storage holds; an empty store falls through to the insufficient-stock error.
+  const stock = storedStockKg(contract, collectedOre, logistics.storedMassKg);
+  if (stock > FRAGMENT_SPLIT_EPSILON_KG) request = Math.min(request, stock);
   if (!(request > 0)) return { success: false, error: t('economy.contract.deliver_fulfilled', { id: contractId }) };
 
   const consumption = consumeStoredOre(logistics, collectedOre, contract.materialId, request);
