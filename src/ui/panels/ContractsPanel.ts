@@ -116,6 +116,7 @@ export class ContractsPanel extends PanelBase {
   }
 
   private render(state: GameState): void {
+    const managerLevel = bestAvailableManagerLevel(state.employees.employees);
     const sections: HTMLElement[] = [
       this.makeStorageStrip(state),
       sectionHeader(t('ui.contracts.active')),
@@ -129,7 +130,7 @@ export class ContractsPanel extends PanelBase {
       sectionHeader(t('ui.contracts.available')),
       scrollBoundedSection(
         state.contracts.available.length > 0
-          ? state.contracts.available.map(c => this.makeOfferedCard(c, state))
+          ? state.contracts.available.map(c => this.makeOfferedCard(c, state, managerLevel))
           : [emptyState(t('ui.contracts.none'))],
         200,
         { gap: 10 },
@@ -279,7 +280,7 @@ export class ContractsPanel extends PanelBase {
 
   // ── Offered ──
 
-  private makeOfferedCard(c: Contract, state: GameState): HTMLElement {
+  private makeOfferedCard(c: Contract, state: GameState, managerLevel: number | null): HTMLElement {
     const stored = this.storedOf(c.materialId, state);
     const havePct = c.quantityKg > 0 ? Math.min(100, Math.round((stored / c.quantityKg) * 100)) : 0;
     const haveColor = stored >= c.quantityKg ? 'var(--bsx-positive)' : 'var(--bsx-amber)';
@@ -331,7 +332,7 @@ export class ContractsPanel extends PanelBase {
     acceptBtn.classList.add('bs-contract-accept');
     acceptBtn.style.cssText = 'flex:1;height:30px;font-size:10px';
 
-    const refusal = negotiationRefusalReason(c, bestAvailableManagerLevel(state.employees.employees));
+    const refusal = negotiationRefusalReason(c, managerLevel);
     const negotiateBtn = button('ghost', t('ui.contracts.negotiate'), {
       dataAction: 'negotiate',
       ...(refusal === null ? {} : {

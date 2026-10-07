@@ -31,7 +31,7 @@ export interface NegotiationResult {
   contract: Contract;
 }
 
-export type NegotiationRefusal = 'not_found' | 'already_negotiated' | 'no_manager';
+export type NegotiationRefusal = 'not_found' | 'already_negotiated';
 
 /** Seed of the RNG stream for one negotiation attempt on one offer. */
 export function negotiationStreamSeed(
@@ -59,9 +59,14 @@ export function negotiationRefusalReason(
   return canNegotiate(contract) ? null : 'already_negotiated';
 }
 
+/** Success-rate bonus a manager level adds to a negotiation, as a probability (#1340). */
+function managerSuccessBonus(level: number): number {
+  return (level - 1) * NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL;
+}
+
 /** Success-rate bonus shown to the player for a manager level, in percent (#1340). */
 export function managerNegotiationBonusPct(level: number): number {
-  return Math.round((level - 1) * NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL * 100);
+  return Math.round(managerSuccessBonus(level) * 100);
 }
 
 /** Negotiate using a per-attempt RNG stream derived from seed, tick, id and attempt. */
@@ -102,7 +107,7 @@ export function negotiateContract(
     MAX_SUCCESS_RATE,
     Math.max(
       MIN_SUCCESS_RATE,
-      BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR + (managerLevel - 1) * NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL,
+      BASE_SUCCESS_RATE + reputation * REPUTATION_FACTOR + managerSuccessBonus(managerLevel),
     ),
   );
   const isSuccess = rng.chance(successRate);
