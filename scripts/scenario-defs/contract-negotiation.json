@@ -200,9 +200,7 @@
         "equals": {
           "activeContractCount": 1
         },
-        "changedBy": {
-          "cash": 0
-        }
+        "note": "no cash assertion here: the manager hired for negotiation (#1340) draws a pay cycle during this tick window (1,050), which is payroll, not contract activity. The accept step above already proved accepting moves no cash."
       }
     },
     {
