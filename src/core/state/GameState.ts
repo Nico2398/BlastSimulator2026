@@ -59,7 +59,7 @@ import type { RevoltState } from '../campaign/WorkerRevolt.js';
 import { createRevoltState } from '../campaign/WorkerRevolt.js';
 import type { LevelStats } from '../campaign/SuccessTracker.js';
 import { createLevelStats } from '../campaign/SuccessTracker.js';
-import type { HiringPoolState } from '../entities/HiringPool.js';
+import { createHiringPool, type HiringPoolState } from '../entities/HiringPool.js';
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 import type { RampDef } from '../mining/Ramp.js';
@@ -146,7 +146,7 @@ import type { RampWidth } from '../config/balance.js';
 // save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
 // v28 -> v29: nextHoleId (#1352)
 // v29 -> v30: weather (#1403). See SaveLoad.ts's migrateV29ToV30.
-export const SAVE_VERSION = 30;
+export const SAVE_VERSION = 31;
 
 export interface GameConfig {
   seed: number;
@@ -597,7 +597,7 @@ export function createGame(config: GameConfig): GameState {
     revolt: createRevoltState(),
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
-    hiringPool: { candidates: [], nextCandidateId: 1, lastRefreshTick: 0 }, // TODO: createHiringPool
+    hiringPool: createHiringPool(config.seed, 0),
     levelEnded: false,
     levelEndReason: null,
     pendingActions: [],

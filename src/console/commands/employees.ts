@@ -22,6 +22,8 @@ import {
 } from '../../core/entities/EmployeeTraining.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
+import { HIRING_ROLES, candidatesForRole, takeCandidate } from '../../core/entities/HiringPool.js';
+import { perHour } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
@@ -54,7 +56,7 @@ export function employeeCommand(
         // uninjured but stopped, and until now only the roster panel showed it.
         const status = !e.alive ? 'DEAD' : e.injured ? 'INJURED' : e.collapsing ? 'COLLAPSING' : 'OK';
         const union = e.unionized ? ' [UNION]' : '';
-        lines.push(`  [${e.id}] ${e.name} (${e.role}) $${e.salary}/cycle morale:${e.morale} ${status}${union}`);
+        lines.push(`  [${e.id}] ${e.name} (${e.role}) $${perHour(e.salary)}/h morale:${e.morale} ${status}${union}`);
       }
       return { success: true, output: lines.join('\n') };
     }
@@ -71,6 +73,8 @@ export function employeeCommand(
       // `state.cash < HIRING_COSTS[role]`, and hireEmployee's returned
       // hiringCost is exactly `HIRING_COSTS[role]`.
       const hiringCost = HIRING_COSTS[role];
+      const candidateRaw = named['candidate'];
+      const candidateId = candidateRaw === undefined ? undefined : parseInt(candidateRaw, 10);
       if (state.cash < hiringCost) {
         return {
           success: false,
@@ -95,6 +99,13 @@ export function employeeCommand(
       // out all three — see its own doc for why the anchor it snaps against
       // is derived rather than the literal corner this call site used to
       // assume (#1151).
+      // Affordability passed: only now remove the candidate from the pool.
+      const candidate = candidateId !== undefined && Number.isNaN(candidateId)
+        ? null
+        : takeCandidate(state.hiringPool, role, candidateId);
+      if (!candidate) {
+        return { success: false, output: t('employees.hire_no_candidate', { role }) };
+      }
       const { x: empX, z: empZ } = state.navGrid
         ? NavGrid.findNearestSpawnCell(state.navGrid, rawEmpX, rawEmpZ)
         : { x: rawEmpX, z: rawEmpZ };
@@ -105,13 +116,27 @@ export function employeeCommand(
       const rng = new Random(state.seed + state.tickCount + state.employees.nextId);
       // Deducts the same `hiringCost` the guard above tested, so the checked
       // amount and the charged amount can never drift apart.
-      const { employee } = hireEmployee(state.employees, role, rng, empX, empZ, state.tickCount);
+      const { employee } = hireEmployee(state.employees, role, rng, empX, empZ, state.tickCount, candidate);
       state.cash -= hiringCost;
       addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);
       return {
         success: true,
         output: t('employees.hire_success', { name: employee.name, role, cost: hiringCost }),
       };
+    }
+    case 'candidates': {
+      const roleRaw = named['role'];
+      const roles = roleRaw === undefined ? HIRING_ROLES : HIRING_ROLES.filter(r => r === roleRaw);
+      const lines = [t('employees.candidates_header')];
+      for (const role of roles) {
+        for (const c of candidatesForRole(state.hiringPool, role)) {
+          lines.push(t('employees.candidate_line', {
+            id: c.id, name: c.name, role: c.role, salary: perHour(c.salary),
+            union: c.unionized ? t('ui.crew.candidate_union') : t('ui.crew.candidate_non_union'),
+          }));
+        }
+      }
+      return { success: true, output: lines.join('\n') };
     }
     case 'raise': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);

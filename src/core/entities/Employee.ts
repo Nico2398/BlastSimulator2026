@@ -9,7 +9,7 @@ import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
 import type { Itinerary } from '../engine/Itinerary.js';
-import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY } from '../config/balance.js';
+import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, CANDIDATE_UNION_CHANCE, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY } from '../config/balance.js';
 
 // ── Roles ──
 
@@ -42,7 +42,7 @@ const LAST_NAMES = [
   'Quartzman', 'Slagheap', 'Bedrock', 'Pitman', 'Drillbit',
 ];
 
-function generateName(rng: Random): string {
+export function generateName(rng: Random): string {
   return `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
 }
 
@@ -294,16 +294,16 @@ export function hireEmployee(
   x: number = 0,
   z: number = 0,
   tickCount: number = 0,
-  _candidate?: Pick<HireCandidate, 'name' | 'unionized' | 'qualifications'>,
+  candidate?: Pick<HireCandidate, 'name' | 'unionized' | 'qualifications'>,
 ): HireResult {
   const employee: Employee = {
     id: state.nextId++,
-    name: generateName(rng),
+    name: candidate ? candidate.name : generateName(rng),
     role,
     salary: BASE_SALARIES[role],
     raises: 0,
     morale: 60, // Neutral-positive starting morale
-    unionized: rng.chance(0.3), // 30% chance of being unionized
+    unionized: candidate ? candidate.unionized : rng.chance(CANDIDATE_UNION_CHANCE),
     injured: false,
     alive: true,
     hiredAtTick: tickCount,
@@ -314,7 +314,9 @@ export function hireEmployee(
     // a driver could not drive, because the only way to grant a qualification
     // was the `employee assign_skill` console command. Training raises
     // proficiency from here.
-    qualifications: ROLE_STARTING_QUALIFICATIONS[role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel)),
+    qualifications: candidate
+      ? candidate.qualifications.map(q => ({ ...q }))
+      : ROLE_STARTING_QUALIFICATIONS[role].map(q => qualificationAtLevel(q.category, q.proficiencyLevel)),
     trainingState: null,
     pendingTrainingState: null,
     activeActionId: null,
@@ -399,7 +401,7 @@ export function removeFromRoster(state: EmployeeState, employeeId: number): void
 export function fireEmployee(
   state: EmployeeState,
   employeeId: number,
-): { success: boolean; error?: string } {
+): { success: boolean; error?: string } & RefusalKey {
   const guard = canFireEmployee(state, employeeId);
   if (!guard.success) return guard;
   removeFromRoster(state, employeeId);
@@ -430,7 +432,7 @@ export function calculateQualificationBonus(employee: Pick<Employee, 'qualificat
 }
 
 /** Total salary: base salary + qualification bonus + permanent raises (`employee.raises`). */
-export function calculateSalary(employee: Employee): number {
+export function calculateSalary(employee: Pick<Employee, 'role' | 'qualifications' | 'raises'>): number {
   return BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + (employee.raises ?? 0);
 }
 
