@@ -137,7 +137,7 @@ function runSurveyOnGrid(
 function surveyResultsToConfidencePoints(
   surveys: SurveyResult[],
   grid: VoxelGrid,
-  currentTick: number,
+  _currentTick: number, // unused: staleness is blast-driven, not time-driven (#1356)
   // Height-free VoxelGrid always reports sizeY=4096 (#1192) — every caller
   // that built its own fixed-height fixture grid passes that grid's own
   // known height here; a caller passing a generator-built terrain grid

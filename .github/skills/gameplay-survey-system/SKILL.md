@@ -33,7 +33,7 @@ finalError = baseError * (1 - (skillLevel - 1) * 0.12)
 
 `src/core/mining/SurveyCalc.ts` declares `SurveyMethod`, `SurveyResult` and `EstimateSurveyParams`, and is the authority on their fields. `estimates` is keyed column-first: `"x,z"` → ore id → estimated density in [0, 1], with zero estimates omitted; `confidence` in [0, 1] comes from surveyor skill and method accuracy.
 
-Survey results **stale after 100 ticks** (terrain disturbed by blasts). UI renders confidence heatmap overlay.
+A survey goes **stale when a blast clears a column inside its coverage disc** (`SurveyResult.stale`, set by `markSurveysStaleByBlast`; time never makes a survey stale). A stale survey drops out of the pre-blast estimate and the post-blast ore report (`freshSurveys`); an older fresh survey still covering a column is used instead. UI renders confidence heatmap overlay, stale points in grey.
 
 ## Estimation Algorithm (`SurveyCalc.ts`)
 

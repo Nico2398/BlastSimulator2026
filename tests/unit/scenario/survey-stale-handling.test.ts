@@ -109,6 +109,10 @@ describe('survey-stale-handling scenario definition', () => {
       'fragments', 'preview', 'blast_preview', 'install_tubing',
       'build_ramp', 'set_policy', 'terrain_info', 'help',
       'blast_plan', 'needs',
+      // wait_until (#590/#554): a descriptive-only pseudo-command, never
+      // executed as one -- the real spec lives in the step's own
+      // `interaction` array.
+      'wait_until',
     ];
     const scenario = loadScenario();
     for (let i = 0; i < scenario.steps.length; i++) {
@@ -128,7 +132,8 @@ describe('survey-stale-handling — stale detection (#1356, blast-driven)', () =
   it('survey completed at tick 0 is fresh at any tick without a blast', () => {
     const survey = makeSurvey(0);
     expect(isSurveyStale(survey)).toBe(false);
-    expect(isSurveyStale({ ...survey, completedTick: 0 })).toBe(false);
+    const sameSurvey: SurveyResult = { ...survey, completedTick: 0 };
+    expect(isSurveyStale(sameSurvey)).toBe(false);
   });
 
   it('survey is stale once a blast clears a column in its disc', () => {
@@ -250,12 +255,13 @@ describe('survey-stale-handling — stale visual rendering', () => {
 // ── Stale handling scenario flow ───────────────────────────────────────────
 
 describe('survey-stale-handling — scenario flow', () => {
-  it('scenario runs initial survey and waits for stale expiry', () => {
+  it('scenario blasts over the initial survey to make it stale (no tick-waiting)', () => {
     const scenario = loadScenario();
     const commands = scenario.steps.map(getCommand);
-    const tickCount = commands.filter(c => c.startsWith('tick')).length;
-    // Must tick past 100 ticks to make survey stale
-    expect(tickCount).toBeGreaterThanOrEqual(8);
+    const surveyIdx = commands.findIndex(c => /^survey (seismic|core_sample|aerial)/.test(c));
+    const blastIdx = commands.findIndex(c => c === 'blast');
+    expect(surveyIdx).toBeGreaterThanOrEqual(0);
+    expect(blastIdx).toBeGreaterThan(surveyIdx);
   });
 
   it('scenario runs a second survey after staleness to refresh', () => {

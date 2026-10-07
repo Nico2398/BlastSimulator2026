@@ -597,8 +597,10 @@ describe('SurveyCalc — isSurveyStale (#1356)', () => {
   });
 
   it('completedTick has no bearing on staleness (no time-driven expiry)', () => {
-    expect(isSurveyStale({ ...BASE_RESULT, completedTick: 0 })).toBe(false);
-    expect(isSurveyStale({ ...BASE_RESULT, completedTick: 1_000_000 })).toBe(false);
+    const early: SurveyResult = { ...BASE_RESULT, completedTick: 0 };
+    const late: SurveyResult = { ...BASE_RESULT, completedTick: 1_000_000 };
+    expect(isSurveyStale(early)).toBe(false);
+    expect(isSurveyStale(late)).toBe(false);
   });
 
   it('does not export the removed time-based threshold from balance', async () => {

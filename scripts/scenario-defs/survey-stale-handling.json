@@ -578,6 +578,10 @@
       "command": "survey core_sample x:30 z:30",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
         },

@@ -94,22 +94,15 @@ describe('console blast marks overlapping surveys stale (#1356)', () => {
     expect(report.yieldRatio).toBe(1.0);
   });
 
-  it('a second blast over an already-stale survey leaves it stale and un-estimated', () => {
+  it('a blast over an already-stale survey leaves it stale and un-estimated', () => {
     const { runner, ctx } = createRunner();
     prepareBlast(runner, ctx);
-    const survey = wideSurvey(1);
+    const survey = wideSurvey(1, { stale: true });
     ctx.state!.surveyResults.push(survey);
-    expect(runner.run('blast').success).toBe(true);
-    expect(survey.stale).toBe(true);
 
-    // Second blast on a different spot.
-    expect(runner.run('drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:2,2').success).toBe(true);
-    drain(runner, ctx, () => ctx.state!.plannedDrillHoles.length === 0);
-    expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
-    drain(runner, ctx, () => Object.keys(ctx.state!.plannedChargesByHole).length === 0);
-    expect(runner.run('sequence auto delay_step:25').success).toBe(true);
     expect(runner.run('blast').success).toBe(true);
 
+    // Marking is idempotent: still stale, and it fed no estimate to this blast.
     expect(survey.stale).toBe(true);
     expect(ctx.state!.lastOreReport!.estimatedYieldKg).toBe(0);
   });
