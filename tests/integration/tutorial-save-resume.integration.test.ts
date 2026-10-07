@@ -150,10 +150,13 @@ describe('Tutorial save/resume (#1333)', () => {
     }
   });
 
-  it('resume re-arms the auto-advance timer of the resumed step', () => {
+  it('resume on the scores step waits for the player: no timer advance, advances after the HUD is inspected (#1334)', () => {
     vi.useFakeTimers();
+    const hud = document.createElement('div');
+    hud.id = 'bs-hud-scores';
+    document.body.appendChild(hud);
     try {
-      const idx = TUTORIAL_STEPS.findIndex((s, i) => (s.autoAdvanceMs ?? 0) > 0 && i < TUTORIAL_STEPS.length - 1);
+      const idx = TUTORIAL_STEPS.findIndex(s => s.id === 'scores');
       expect(idx).toBeGreaterThanOrEqual(0);
       campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
       const state: GameState = ctx.state!;
@@ -161,9 +164,13 @@ describe('Tutorial save/resume (#1333)', () => {
       const fresh = track(new TutorialOverlay(container));
       expect(fresh.resume(state)).toBe(true);
       expect(internals(fresh).stepIndex).toBe(idx);
-      vi.advanceTimersByTime(TUTORIAL_STEPS[idx]!.autoAdvanceMs! + 1);
+      vi.advanceTimersByTime(60_000);
+      expect(internals(fresh).stepIndex).toBe(idx);
+      hud.dataset['inspectCount'] = '1';
+      vi.advanceTimersByTime(5_000);
       expect(internals(fresh).stepIndex).toBe(idx + 1);
     } finally {
+      hud.remove();
       vi.useRealTimers();
     }
   });

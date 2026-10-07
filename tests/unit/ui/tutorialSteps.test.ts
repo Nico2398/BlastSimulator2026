@@ -63,12 +63,9 @@ describe('tutorialSteps', () => {
   });
 
   // ── 8 ────────────────────────────────────────────────────────────────────
-  it('autoAdvanceMs is either undefined or a positive number for all steps', () => {
+  it('no tutorial step auto-dismisses on a timer (#1334)', () => {
     for (const step of TUTORIAL_STEPS) {
-      if (step.autoAdvanceMs != null) {
-        expect(typeof step.autoAdvanceMs).toBe('number');
-        expect(step.autoAdvanceMs).toBeGreaterThan(0);
-      }
+      expect('autoAdvanceMs' in step, `step "${step.id}"`).toBe(false);
     }
   });
 
@@ -196,7 +193,7 @@ describe('tutorialSteps', () => {
   });
 
   // ── 12 ───────────────────────────────────────────────────────────────────
-  it('scores/finances/needs have autoAdvanceMs set to 2000', () => {
+  it('scores/finances/needs have no autoAdvanceMs and are not complete on a fresh DOM (#1334)', () => {
     // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
     // right after hire-driller, shifting every step from box-cut onward up
     // by 3 from their pre-#553 positions (scores 9->12, finances 18->21,
@@ -205,9 +202,13 @@ describe('tutorialSteps', () => {
     const scores = TUTORIAL_STEPS.find((s) => s.id === 'scores')!;
     const finances = TUTORIAL_STEPS.find((s) => s.id === 'finances')!;
     const needs = TUTORIAL_STEPS.find((s) => s.id === 'needs')!;
-    expect(scores.autoAdvanceMs).toBe(2000);
-    expect(finances.autoAdvanceMs).toBe(2000);
-    expect(needs.autoAdvanceMs).toBe(2000);
+    document.body.innerHTML = '';
+    for (const step of [scores, finances, needs]) {
+      expect('autoAdvanceMs' in step, step.id).toBe(false);
+      const state = { isPaused: false } as GameState;
+      const snapshot = step.captureSnapshot ? step.captureSnapshot(state) : {};
+      expect(step.isComplete(state, snapshot), step.id).toBe(false);
+    }
   });
 
   // ── 14 (event-fire-resolve) ──────────────────────────────────────────────

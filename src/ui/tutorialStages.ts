@@ -446,6 +446,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     { target: '#bs-event-dialog .bs-event-dismiss', hintKey: 'tutorial.stage.event_dismiss' },
   ],
 
+  finances: [{ target: '.bs-balance', hintKey: 'tutorial.stage.open_finances' }],
+  needs: [{ target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.check_needs' }],
+  scores: [{ target: '#bs-hud-scores', hintKey: 'tutorial.stage.inspect_scores' }],
+
   'hire-manager': hireStages('manager', 'tutorial.stage.hire_manager'),
 
   'contract-accept': [

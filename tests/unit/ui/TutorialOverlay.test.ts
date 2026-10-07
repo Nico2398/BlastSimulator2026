@@ -260,25 +260,52 @@ describe('TutorialOverlay (12.4)', () => {
     });
   });
 
-  describe('auto-advance timer', () => {
-    it('sets timer for steps with autoAdvanceMs, null for steps without', () => {
+  describe('UI-action steps and congratulations timer', () => {
+    it.each(['scores', 'finances', 'needs'])('%s step does not advance after 60s of fake time, only after the player acts (#1334)', (stepId) => {
       vi.useFakeTimers();
-      // `as any` needed to access private autoAdvanceTimer for verification
-      const tut = new TutorialOverlay(container) as any;
-      overlay = tut;
-      tut.start(createMockState());
-      // Step 0 (hire-surveyor, #923: no longer 'time-speed') has no autoAdvanceMs → timer stays null
-      expect(tut.autoAdvanceTimer).toBeNull();
-      vi.useRealTimers();
+      const hud = document.createElement('div');
+      hud.id = 'bs-hud-scores';
+      document.body.appendChild(hud);
+      try {
+        const idx = TUTORIAL_STEPS.findIndex(s => s.id === stepId);
+        expect(idx).toBeGreaterThanOrEqual(0);
+        const tut = new TutorialOverlay(container) as any;
+        overlay = tut;
+        tut.start(createMockState());
+        tut.landOnStep(idx);
+        expect(tut.stepIndex).toBe(idx);
+
+        vi.advanceTimersByTime(60_000);
+        expect(tut.stepIndex).toBe(idx);
+
+        // The player's own action: inspect the scores HUD, or open the panel.
+        if (stepId === 'scores') {
+          hud.dataset['inspectCount'] = '1';
+        } else {
+          const panel = document.createElement('div');
+          panel.id = stepId === 'finances' ? 'bs-finances-panel' : 'bs-employee-panel';
+          panel.style.display = 'block';
+          document.body.appendChild(panel);
+        }
+        vi.advanceTimersByTime(5_000);
+        expect(tut.stepIndex).toBe(idx + 1);
+      } finally {
+        hud.remove();
+        document.getElementById('bs-finances-panel')?.remove();
+        document.getElementById('bs-employee-panel')?.remove();
+        vi.useRealTimers();
+      }
     });
 
-    it('finishing clears a pending auto-advance timer', () => {
-      // `as any` needed to access private autoAdvanceTimer for verification
+    it('finishing clears a pending congratulations timer', () => {
+      // `as any` needed to access private congratulationsTimer for verification
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       tut.start(createMockState());
+      tut.jumpToLastStep();
+      expect(tut.congratulationsTimer).not.toBeNull();
       tut.finish();
-      expect(tut.autoAdvanceTimer).toBeNull();
+      expect(tut.congratulationsTimer).toBeNull();
     });
 
     it('poll timer advances the step once its condition becomes true', () => {

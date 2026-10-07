@@ -1058,11 +1058,7 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": [
-            "scores",
-            "event-fire-resolve",
-            "hire-manager"
-          ],
+          "stepId": "scores",
           "timeout": 90000
         }
       ],
@@ -1077,6 +1073,26 @@
           "levelEndReason": null
         }
       }
+    },
+    {
+      "command": "scores",
+      "timeout": 90,
+      "description": "#1334: scores card does not auto-dismiss. The player inspects the scores HUD with a real click on #bs-hud-scores (pointerenter/click raise its inspectCount); only that action completes the card, after which the scripted consultant event fires. Waits on the tutorial reaching the next card, not on a delay.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-scores"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": [
+            "event-fire-resolve",
+            "hire-manager"
+          ],
+          "timeout": 60000
+        }
+      ]
     },
     {
       "command": "scores",
@@ -1381,13 +1397,53 @@
         },
         {
           "type": "waitForTutorialStep",
+          "stepId": "finances",
+          "timeout": 60000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "finances",
+        "note": "The old reported bug this beat guarded against (no UI control anywhere could trigger `vehicle haul`) no longer applies -- #552 retires the button and the whole manual flow, so there is nothing left to get stuck on. No increased check on storedMassKg here -- like hauling-gate.json (Finding #33), the exact delivered tonnage is position/timing-dependent, not the thing this beat proves."
+      }
+    },
+    {
+      "command": "finances",
+      "timeout": 90,
+      "description": "#1334: finances card does not auto-dismiss. The player opens the Finances panel by clicking the TopBar balance (data-action open-finances); the card completes while the panel is displayed, then the needs card shows.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"open-finances\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "needs",
+          "timeout": 60000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "needs"
+      }
+    },
+    {
+      "command": "needs",
+      "timeout": 90,
+      "description": "#1334: needs card does not auto-dismiss. The player opens the Crew panel through the toolbar employees button (the card's highlighted control); the card completes while #bs-employee-panel is displayed, then sell-ore shows.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForTutorialStep",
           "stepId": "sell-ore",
           "timeout": 60000
         }
       ],
       "expect": {
-        "tutorialStep": "sell-ore",
-        "note": "The old reported bug this beat guarded against (no UI control anywhere could trigger `vehicle haul`) no longer applies -- #552 retires the button and the whole manual flow, so there is nothing left to get stuck on. No increased check on storedMassKg here -- like hauling-gate.json (Finding #33), the exact delivered tonnage is position/timing-dependent, not the thing this beat proves."
+        "tutorialStep": "sell-ore"
       }
     },
     {

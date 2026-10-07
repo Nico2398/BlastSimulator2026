@@ -174,13 +174,35 @@ export function createComparisonStep(
   };
 }
 
-/**
- * Helper: create a step that auto-advances after 2000ms.
- */
-export function createAutoAdvanceStep(
+/** Player UI action that completes an informational tutorial step. */
+export type TutorialUiAction =
+  | { kind: 'panel'; rootSelector: string } // completes while that panel root is displayed
+  | { kind: 'scores' }; // completes when #bs-hud-scores inspectCount changes from the snapshot, once above 0
+
+/** True when the element matching rootSelector exists and is displayed. */
+export function isPanelVisible(rootSelector: string): boolean {
+  if (typeof document === 'undefined') return false;
+  try {
+    const el = document.querySelector(rootSelector) as HTMLElement | null;
+    return el !== null && el.style.display !== 'none';
+  } catch {
+    return false; // invalid selector: treat as not visible
+  }
+}
+
+/** Read the scores HUD inspectCount (0 when absent). */
+export function readScoresInspectCount(): number {
+  if (typeof document === 'undefined') return 0;
+  const el = document.getElementById('bs-hud-scores');
+  return Number(el?.dataset['inspectCount'] ?? 0) || 0;
+}
+
+/** Helper: create a step that completes on a player UI action, never on a timer. */
+export function createUiActionStep(
   id: string,
   titleKey: string,
   textKey: string,
+  action: TutorialUiAction,
   captureSnapshot?: (state: GameState) => Record<string, unknown>,
   highlightTarget?: string,
 ): TutorialStep {
@@ -188,10 +210,19 @@ export function createAutoAdvanceStep(
     id,
     titleKey,
     textKey,
-    autoAdvanceMs: 2000,
-    ...(captureSnapshot ? { captureSnapshot } : {}),
     ...(highlightTarget ? { highlightTarget } : {}),
-    isComplete: () => true,
+    captureSnapshot: (state: GameState) => ({
+      ...(captureSnapshot ? captureSnapshot(state) : {}),
+      ...(action.kind === 'scores' ? { inspectCount: readScoresInspectCount() } : {}),
+    }),
+    isComplete: (_state: GameState, snapshot: Record<string, unknown>) => {
+      if (action.kind === 'panel') return isPanelVisible(action.rootSelector);
+      // TopBar resets the DOM counter to 0 on page load while a resumed snapshot
+      // keeps the old value, so "changed from baseline, and nonzero" (not ">")
+      // is the robust test: any inspect click moves the count off a stale baseline.
+      const count = readScoresInspectCount();
+      return count > 0 && count !== (Number(snapshot?.inspectCount) || 0);
+    },
   };
 }
 

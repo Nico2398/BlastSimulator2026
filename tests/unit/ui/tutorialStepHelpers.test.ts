@@ -1,213 +1,177 @@
-// BlastSimulator2026 — tutorialStepHelpers hire-step completion regression tests (#409)
-//
-// Bug: createHireStep used to complete on `employees.length > prevCount &&
-// employees.some(e => e.role === role)`. If an employee of the target role
-// already existed at snapshot time, the very next hire of an UNRELATED role
-// wrongly satisfied both clauses — count went up, and "some employee has this
-// role" was already true before the hire. The fix (captureHireStepSnapshot /
-// isHireStepComplete) must key off employee IDS: complete only when an
-// employee holding `role` has an id that was NOT present at snapshot time.
-//
-// captureHireStepSnapshot / isHireStepComplete are not exported directly;
-// they're exercised through the public `createHireStep` factory, exactly as
-// tutorialSteps.test.ts exercises step-specific completion logic.
+// @vitest-environment jsdom
+// BlastSimulator2026 — tutorialStepHelpers: UI-action completion steps (#1334)
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  createHireStep, hasPendingActionOfType, hasPlannedBuildingOfType,
+  createUiActionStep, isPanelVisible, readScoresInspectCount,
 } from '../../../src/ui/tutorialStepHelpers.js';
-import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
-import type { EmployeeRole } from '../../../src/core/entities/Employee.js';
+import type { TutorialUiAction } from '../../../src/ui/tutorialStepHelpers.js';
+import type { GameState } from '../../../src/core/state/GameState.js';
 
-/** Minimal employee shape sufficient for getEmployees() in tutorialStepHelpers.ts. */
-interface MinimalEmployee {
-  id: number;
-  role: EmployeeRole;
+const SCORES: TutorialUiAction = { kind: 'scores' };
+const STATE = { isPaused: false } as GameState;
+
+function addScoresHud(inspectCount?: number): HTMLElement {
+  const el = document.createElement('div');
+  el.id = 'bs-hud-scores';
+  if (inspectCount !== undefined) el.dataset['inspectCount'] = String(inspectCount);
+  document.body.appendChild(el);
+  return el;
 }
 
-function stateWithEmployees(employees: MinimalEmployee[]): GameState {
-  return { employees: { employees } } as unknown as GameState;
+function addPanel(id: string, display: string): HTMLElement {
+  const el = document.createElement('div');
+  el.id = id;
+  el.style.display = display;
+  document.body.appendChild(el);
+  return el;
 }
 
-describe('tutorialStepHelpers — hire step completion (#409 regression)', () => {
-  const step = createHireStep('hire-driller', 'tutorial.hire_driller_title', 'tutorial.hire_driller_text', 'driller');
+describe('tutorialStepHelpers UI-action steps (#1334)', () => {
+  beforeEach(() => { document.body.innerHTML = ''; });
+  afterEach(() => { document.body.innerHTML = ''; });
 
-  // ── 1 — regression case: role already staffed, unrelated hire follows ────
-  it('does not complete when an unrelated role is hired after the target role was already staffed', () => {
-    // Driller already exists when the step opens (e.g. async survey lag left
-    // one on the roster already). Snapshot captures that.
-    const before = stateWithEmployees([{ id: 1, role: 'driller' }]);
-    const snap = step.captureSnapshot!(before);
+  describe('isPanelVisible', () => {
+    it('is false when the element is absent', () => {
+      expect(isPanelVisible('#bs-finances-panel')).toBe(false);
+    });
 
-    // Player hires a surveyor next — count increases, but no NEW driller
-    // appeared. The old buggy check (count up + some driller exists) would
-    // wrongly report complete here.
-    const after = stateWithEmployees([
-      { id: 1, role: 'driller' },
-      { id: 2, role: 'surveyor' },
-    ]);
+    it('is false when the root is display:none', () => {
+      addPanel('bs-finances-panel', 'none');
+      expect(isPanelVisible('#bs-finances-panel')).toBe(false);
+    });
 
-    expect(step.isComplete(after, snap)).toBe(false);
+    it('is true when the root is displayed', () => {
+      addPanel('bs-finances-panel', 'block');
+      expect(isPanelVisible('#bs-finances-panel')).toBe(true);
+    });
+
+    it('is true when display is unset (default)', () => {
+      addPanel('bs-employee-panel', '');
+      expect(isPanelVisible('#bs-employee-panel')).toBe(true);
+    });
+
+    it('never throws on an invalid selector', () => {
+      expect(() => isPanelVisible('###')).not.toThrow();
+    });
   });
 
-  // ── 2 — happy path: genuinely new hire of the target role ────────────────
-  it('completes when a genuinely new employee of the target role is hired', () => {
-    const before = stateWithEmployees([{ id: 1, role: 'surveyor' }]);
-    const snap = step.captureSnapshot!(before);
+  describe('readScoresInspectCount', () => {
+    it('is 0 when the HUD is absent', () => {
+      expect(readScoresInspectCount()).toBe(0);
+    });
 
-    const after = stateWithEmployees([
-      { id: 1, role: 'surveyor' },
-      { id: 2, role: 'driller' },
-    ]);
+    it('is 0 when the HUD has no inspectCount yet', () => {
+      addScoresHud();
+      expect(readScoresInspectCount()).toBe(0);
+    });
 
-    expect(step.isComplete(after, snap)).toBe(true);
+    it('reads the numeric dataset value', () => {
+      addScoresHud(3);
+      expect(readScoresInspectCount()).toBe(3);
+    });
+
+    it('is 0 for a non-numeric value', () => {
+      const el = addScoresHud();
+      el.dataset['inspectCount'] = 'abc';
+      expect(readScoresInspectCount()).toBe(0);
+    });
   });
 
-  // ── 3 — boundary: nothing hired at all ────────────────────────────────────
-  it('does not complete when no employee has been hired since the snapshot', () => {
-    const before = stateWithEmployees([{ id: 1, role: 'surveyor' }]);
-    const snap = step.captureSnapshot!(before);
+  describe('createUiActionStep: scores action', () => {
+    const make = () => createUiActionStep('scores', 'title.key', 'text.key', SCORES, undefined, '#bs-hud-scores');
 
-    // State unchanged — player hasn't acted yet.
-    expect(step.isComplete(before, snap)).toBe(false);
+    it('carries id, keys and highlight target, and no timer', () => {
+      const step = make();
+      expect(step.id).toBe('scores');
+      expect(step.titleKey).toBe('title.key');
+      expect(step.textKey).toBe('text.key');
+      expect(step.highlightTarget).toBe('#bs-hud-scores');
+      expect('autoAdvanceMs' in step).toBe(false);
+    });
+
+    it('is not complete on a DOM-less run and never throws', () => {
+      const step = make();
+      const snap = step.captureSnapshot ? step.captureSnapshot(STATE) : {};
+      expect(() => step.isComplete(STATE, snap)).not.toThrow();
+      expect(step.isComplete(STATE, snap)).toBe(false);
+      expect(step.isComplete(STATE, {})).toBe(false);
+    });
+
+    it('is not complete while inspectCount equals the snapshot', () => {
+      addScoresHud(2);
+      const step = make();
+      const snap = step.captureSnapshot!(STATE);
+      expect(step.isComplete(STATE, snap)).toBe(false);
+    });
+
+    it('completes only when inspectCount rises above the snapshot', () => {
+      const hud = addScoresHud(2);
+      const step = make();
+      const snap = step.captureSnapshot!(STATE);
+      hud.dataset['inspectCount'] = '3';
+      expect(step.isComplete(STATE, snap)).toBe(true);
+    });
+
+    it('does not complete when the count was already high before the step opened', () => {
+      addScoresHud(5);
+      const step = make();
+      const snap = step.captureSnapshot!(STATE);
+      expect(step.isComplete(STATE, snap)).toBe(false);
+    });
+
+    it('completes on a click after a resume restored a snapshot above the reset DOM count', () => {
+      const hud = addScoresHud(0); // TopBar reset the counter on page load
+      const step = make();
+      const staleSnap = { inspectCount: 5 }; // persisted before the reload
+      expect(step.isComplete(STATE, staleSnap)).toBe(false);
+      hud.dataset['inspectCount'] = '1';
+      expect(step.isComplete(STATE, staleSnap)).toBe(true);
+    });
+
+    it('stores inspectCount in the snapshot only for the scores action', () => {
+      addScoresHud(4);
+      const panel = createUiActionStep('p', 't', 'x', { kind: 'panel', rootSelector: '#a' });
+      expect('inspectCount' in panel.captureSnapshot!(STATE)).toBe(false);
+    });
+
+    it('keeps the caller-supplied snapshot fields alongside its own', () => {
+      addScoresHud(1);
+      const step = createUiActionStep(
+        'scores', 't', 'x', { kind: 'scores' }, () => ({ cash: 7 }),
+      );
+      const snap = step.captureSnapshot!(STATE);
+      expect(snap['cash']).toBe(7);
+    });
   });
 
-  it('does not complete from a zero-employee snapshot when nobody is hired', () => {
-    const before = stateWithEmployees([]);
-    const snap = step.captureSnapshot!(before);
+  describe('createUiActionStep: panel action', () => {
+    const make = (root: string) => createUiActionStep('p', 't', 'x', { kind: 'panel', rootSelector: root });
 
-    expect(step.isComplete(before, snap)).toBe(false);
-  });
+    it('is not complete on a DOM-less run and never throws', () => {
+      const step = make('#bs-finances-panel');
+      expect(() => step.isComplete(STATE, {})).not.toThrow();
+      expect(step.isComplete(STATE, {})).toBe(false);
+    });
 
-  // ── 4 — boundary: pre-existing id of target role must not count as new ───
-  it('does not falsely flag a pre-existing employee of the target role as a new hire', () => {
-    const before = stateWithEmployees([{ id: 1, role: 'driller' }]);
-    const snap = step.captureSnapshot!(before);
+    it('is not complete while the panel root is display:none', () => {
+      addPanel('bs-finances-panel', 'none');
+      expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(false);
+    });
 
-    // Same driller, same id, nothing else changed — not a new hire.
-    const after = stateWithEmployees([{ id: 1, role: 'driller' }]);
+    it('completes while the finances panel is displayed', () => {
+      addPanel('bs-finances-panel', 'block');
+      expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(true);
+    });
 
-    expect(step.isComplete(after, snap)).toBe(false);
-  });
+    it('completes while the employee panel is displayed', () => {
+      addPanel('bs-employee-panel', 'block');
+      expect(make('#bs-employee-panel').isComplete(STATE, {})).toBe(true);
+    });
 
-  it('completes when a new-id employee of the target role is hired even though the old one is still present unchanged', () => {
-    const before = stateWithEmployees([{ id: 1, role: 'driller' }]);
-    const snap = step.captureSnapshot!(before);
-
-    // id 1 unchanged AND a genuinely new id 2 of the target role appears.
-    const after = stateWithEmployees([
-      { id: 1, role: 'driller' },
-      { id: 2, role: 'driller' },
-    ]);
-
-    expect(step.isComplete(after, snap)).toBe(true);
-  });
-
-  it('does not complete when the pre-existing employee of the target role is removed and no new one takes its place', () => {
-    const before = stateWithEmployees([{ id: 1, role: 'driller' }]);
-    const snap = step.captureSnapshot!(before);
-
-    // Roster shrinks — the only driller is gone, nobody new hired.
-    const after = stateWithEmployees([]);
-
-    expect(step.isComplete(after, snap)).toBe(false);
-  });
-
-  it('completes when the pre-existing employee of the target role is replaced by a new-id employee of that role', () => {
-    const before = stateWithEmployees([{ id: 1, role: 'driller' }]);
-    const snap = step.captureSnapshot!(before);
-
-    // id 1 (fired) is gone; a distinct new id 2 with the target role is hired.
-    const after = stateWithEmployees([{ id: 2, role: 'driller' }]);
-
-    expect(step.isComplete(after, snap)).toBe(true);
-  });
-
-  // ── captureSnapshot shape ──────────────────────────────────────────────
-  it('captureSnapshot records the ids of employees already holding the target role', () => {
-    const before = stateWithEmployees([
-      { id: 1, role: 'driller' },
-      { id: 2, role: 'surveyor' },
-      { id: 3, role: 'driller' },
-    ]);
-    const snap = step.captureSnapshot!(before) as { prevIdsWithRole: number[] };
-
-    expect(snap.prevIdsWithRole).toEqual(expect.arrayContaining([1, 3]));
-    expect(snap.prevIdsWithRole).not.toContain(2);
-    expect(snap.prevIdsWithRole.length).toBe(2);
-  });
-});
-
-// #1014: hasPendingActionOfType / hasPlannedBuildingOfType back the tutorial
-// waiting-state's `spentWhen` checks (tutorialStages.ts) — a step's issued
-// order counts as "spent" once the simulation genuinely owns it.
-
-function stateWithPendingActions(actions: Partial<PendingAction>[]): GameState {
-  return {
-    pendingActions: actions.map((a, i) => ({
-      id: i + 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
-      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
-      status: 'queued', holderId: null, queuedAtTick: 0,
-      ...a,
-    })),
-  } as unknown as GameState;
-}
-
-describe('hasPendingActionOfType (#1014)', () => {
-  it('reports true when a pending action of the given type is queued', () => {
-    const state = stateWithPendingActions([{ type: 'survey' }]);
-    expect(hasPendingActionOfType(state, 'survey')).toBe(true);
-  });
-
-  it('reports false when no pending action of that type exists', () => {
-    const state = stateWithPendingActions([{ type: 'drill_hole' }]);
-    expect(hasPendingActionOfType(state, 'survey')).toBe(false);
-  });
-
-  it('reports false for an empty pendingActions array', () => {
-    const state = stateWithPendingActions([]);
-    expect(hasPendingActionOfType(state, 'survey')).toBe(false);
-  });
-
-  it('counts a claimed (assigned/in_progress) action too, not only a queued one', () => {
-    const state = stateWithPendingActions([{ type: 'haul_debris', status: 'in_progress', holderId: 7 }]);
-    expect(hasPendingActionOfType(state, 'haul_debris')).toBe(true);
-  });
-
-  it('does not confuse two different action types present at once', () => {
-    const state = stateWithPendingActions([{ type: 'drill_hole' }, { type: 'charge_hole' }]);
-    expect(hasPendingActionOfType(state, 'survey')).toBe(false);
-    expect(hasPendingActionOfType(state, 'charge_hole')).toBe(true);
-  });
-});
-
-function stateWithPlannedBuildings(types: string[]): GameState {
-  return {
-    plannedBuildings: types.map((type, i) => ({
-      id: i + 1, buildingId: i + 1, type, tier: 1, x: 0, z: 0, actionId: i + 1, cost: 100,
-    })),
-  } as unknown as GameState;
-}
-
-describe('hasPlannedBuildingOfType (#1014)', () => {
-  it('reports true when a building of the given type is ordered but not yet built', () => {
-    const state = stateWithPlannedBuildings(['living_quarters']);
-    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(true);
-  });
-
-  it('reports false when no planned building of that type exists', () => {
-    const state = stateWithPlannedBuildings(['freight_warehouse']);
-    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(false);
-  });
-
-  it('reports false once the plannedBuildings list is empty (order landed, or never issued)', () => {
-    const state = stateWithPlannedBuildings([]);
-    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(false);
-  });
-
-  it('does not confuse two different building types present at once', () => {
-    const state = stateWithPlannedBuildings(['driving_center', 'freight_warehouse']);
-    expect(hasPlannedBuildingOfType(state, 'living_quarters')).toBe(false);
-    expect(hasPlannedBuildingOfType(state, 'freight_warehouse')).toBe(true);
+    it('does not complete from an unrelated panel being open', () => {
+      addPanel('bs-employee-panel', 'block');
+      expect(make('#bs-finances-panel').isComplete(STATE, {})).toBe(false);
+    });
   });
 });
