@@ -103,6 +103,13 @@ export function groupChargesByDelay(
 // Helpers
 // --------------------------------------------------------
 
+/** Sum of amountKg over charged holes present in `holes`; 0 if none. */
+export function totalChargeKg(holes: readonly DrillHole[], charges: Record<string, HoleCharge>): number {
+  void holes; void charges;
+  // TODO: implement
+  return 0;
+}
+
 export function parseKey(key: string): [number, number, number] | null {
   const parts = key.split(',');
   if (parts.length !== 3) return null;
