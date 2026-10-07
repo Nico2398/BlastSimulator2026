@@ -4,7 +4,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
@@ -48,6 +48,8 @@ export interface LevelDef {
   eventFreqMultiplier: number;
   /** Multiplier on contract prices (>1 = generous, <1 = tight market). */
   contractPriceMultiplier: number;
+  /** Pre-hired roster, fleet and buildings this level opens with (#1363). */
+  startingSite?: StartingSiteComposition;
   /** Per-tick score decay rate (higher = harder to maintain scores). */
   scoreDecayRate: number;
   /**

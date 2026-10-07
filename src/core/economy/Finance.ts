@@ -84,7 +84,12 @@ export interface CategoryTotal {
   total: number;
 }
 
+/** Expense categories that buy assets rather than run the mine. */
+export const CAPITAL_EXPENSE_CATEGORIES: ReadonlySet<ExpenseCategory> = new Set<ExpenseCategory>(['equipment', 'construction']);
+
 export interface FinancialReport {
+  /** Income excluding refunds, minus expenses outside CAPITAL_EXPENSE_CATEGORIES. */
+  operatingProfit: number;
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
@@ -125,8 +130,14 @@ export function getFinancialReport(
     totalIncome,
     totalExpenses,
     netProfit: totalIncome - totalExpenses,
+    operatingProfit: 0, // TODO: implement
     incomeByCategory: [...incomeMap.entries()].map(([category, total]) => ({ category, total })),
     expensesByCategory: [...expenseMap.entries()].map(([category, total]) => ({ category, total })),
     transactionCount: filtered.length,
   };
+}
+
+/** Operating profit over all transactions: income excluding 'refund' minus non-capital expenses. */
+export function getOperatingProfit(_state: FinanceState): number {
+  return 0; // TODO: implement
 }

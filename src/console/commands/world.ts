@@ -17,7 +17,7 @@ import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } fr
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE, type StartingBuildingSlot } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -231,6 +231,8 @@ export function regenerateGrid(
      * mid-route, wherever the player left them — and must never be regrouped.
      */
     startingCrew?: boolean;
+    /** Buildings to place near the crew on a game's first grid (#1363). */
+    startingBuildings?: readonly StartingBuildingSlot[];
   },
 ): void {
   if (!ctx.state) return;

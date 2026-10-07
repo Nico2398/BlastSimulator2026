@@ -4,6 +4,7 @@
 import {
   STARTING_CASH,
   STARTING_SITE_STAFFED_COMPOSITION,
+  type StartingSiteComposition,
   SPAWN_TILE_SPACING,
 } from '../config/balance.js';
 import type { TutorialProgress } from './TutorialProgress.js';
@@ -163,6 +164,8 @@ export interface GameConfig {
   scoreDecayRate?: number;
   /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
   staffed?: boolean;
+  /** A level's own starting site; wins over `staffed` when set (#1363). */
+  startingSite?: StartingSiteComposition;
 }
 
 /** The type of action a player has issued, waiting for an employee to execute. */
@@ -629,20 +632,20 @@ export function createGame(config: GameConfig): GameState {
  * is truthy; the roster and fleet composition are defined in
  * `STARTING_SITE_STAFFED_COMPOSITION` (src/core/config/balance.ts).
  */
-function applyStaffedComposition(state: GameState): void {
+function applyStaffedComposition(state: GameState, composition: StartingSiteComposition = STARTING_SITE_STAFFED_COMPOSITION): void {
   const rng = new Random(state.seed);
 
   // Small deterministic offsets near the site origin — no navGrid exists yet
   // (this runs before regenerateGrid), so there is no reachable-cell snap
   // available; simple staggered placement is all that's needed here.
-  STARTING_SITE_STAFFED_COMPOSITION.employees.forEach((slot, i) => {
+  composition.employees.forEach((slot, i) => {
     const { employee } = hireEmployee(state.employees, slot.role, rng, i * 2, 0, state.tickCount);
     // Staffing is free at game-open — hiringCost is intentionally not deducted from cash.
     employee.qualifications = slot.qualifications.map(q => qualificationAtLevel(q.category, q.proficiencyLevel));
     employee.salary = calculateSalary(employee);
   });
 
-  STARTING_SITE_STAFFED_COMPOSITION.vehicles.forEach((slot, i) => {
+  composition.vehicles.forEach((slot, i) => {
     // Purchase cost is intentionally not deducted from cash, same as hiring above.
     // Single row, spaced SPAWN_TILE_SPACING apart (#591): the old i*2 spacing
     // put drill_rig at (0,2) exactly octile-tied with a route forced through

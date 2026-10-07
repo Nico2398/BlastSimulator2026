@@ -1185,10 +1185,20 @@ export interface StartingSiteVehicleSlot {
  * ready-to-work site instead of hiring/purchasing through the UI in every
  * unrelated scenario. See issue #551.
  */
-export const STARTING_SITE_STAFFED_COMPOSITION: {
+export interface StartingBuildingSlot {
+  readonly type: BuildingType;
+  readonly tier: BuildingTier;
+}
+
+/** A starting site's pre-hired roster, pre-purchased fleet and pre-placed buildings. */
+export interface StartingSiteComposition {
   readonly employees: readonly StartingSiteEmployeeSlot[];
   readonly vehicles: readonly StartingSiteVehicleSlot[];
-} = {
+  readonly buildings: readonly StartingBuildingSlot[];
+}
+
+export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
+  buildings: [],
   employees: [
     { role: 'driller', qualifications: [
       { category: 'blasting', proficiencyLevel: 1 },
@@ -1218,6 +1228,30 @@ export const STARTING_SITE_STAFFED_COMPOSITION: {
     { role: 'rock_fragmenter', tier: 1 },
   ],
 } as const;
+
+/** Dusty Hollow's own opening crew, fleet and warehouse (#1363). */
+export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
+  employees: [
+    { role: 'driller', qualifications: [
+      { category: 'blasting', proficiencyLevel: 1 },
+      { category: 'driving.drill_rig', proficiencyLevel: 1 },
+    ] },
+    { role: 'blaster', qualifications: [
+      { category: 'blasting', proficiencyLevel: 1 },
+    ] },
+    { role: 'driver', qualifications: [
+      { category: 'driving.truck', proficiencyLevel: 1 },
+    ] },
+  ],
+  vehicles: [
+    { role: 'drill_rig', tier: 1 },
+    { role: 'debris_hauler', tier: 1 },
+  ],
+  buildings: [{ type: 'freight_warehouse', tier: 1 }],
+};
+
+/** Contract price multiplier for Dusty Hollow. Placeholder, tuned by #1363. */
+export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 1.2;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
