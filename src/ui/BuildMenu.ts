@@ -60,6 +60,17 @@ import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
 import { buildingCardLine, buildingCardTooltip } from './catalogCardText.js';
 import { buildDemolishConfirm } from './demolishConfirm.js';
+import { placementCutoffFor, cutoffStateKey, cutoffLine, buildPlacementCutoffConfirm } from './placementCutoffConfirm.js';
+import type { PlacementCutoff } from '../core/entities/Building.js';
+
+/** Footprint rect of a `sizeX` x `sizeZ` building whose origin tile is (x, z). */
+function rectAt(x: number, z: number, sizeX: number, sizeZ: number): Rect {
+  return { minX: x, minZ: z, maxX: x + sizeX, maxZ: z + sizeZ };
+}
+
+function rectKey(r: Rect): string {
+  return `${r.minX},${r.minZ},${r.maxX},${r.maxZ}`;
+}
 
 export class BuildMenu extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -98,6 +109,9 @@ export class BuildMenu extends PanelBase {
   /** Per-type under-construction count span, populated by makeCatalogRow. */
   private readonly underConstructionEls = new Map<BuildingType, HTMLElement>();
   private readonly locale = new LocaleTextRegistry();
+
+  /** Cutoff verdict memoized per footprint tile and nav revision (#1391), so hover redraws do not re-flood. */
+  private cutoffMemo: { key: string; value: PlacementCutoff | null } | null = null;
 
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
 
@@ -302,10 +316,27 @@ export class BuildMenu extends PanelBase {
     return this.lastState ? terrainReservations(this.lastState) : [];
   }
 
+  /** Footprint of `b` at its own tile for `tier`. */
+  private footprintRect(b: Building, tier: BuildingTier): Rect {
+    const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, tier));
+    return rectAt(b.x, b.z, sizeX, sizeZ);
+  }
+
+  /** What `rect` would cut off from the crew (#1391); memoized by rect and nav revision. */
+  private cutoffFor(rect: Rect, freed?: Rect): PlacementCutoff | null {
+    const state = this.lastState;
+    if (!state?.navGrid) return null;
+    const key = `${state.navGrid.revision}|${cutoffStateKey(state)}|${rectKey(rect)}|${freed ? rectKey(freed) : ''}`;
+    if (this.cutoffMemo?.key === key) return this.cutoffMemo.value;
+    const value = placementCutoffFor(state, rect, freed);
+    this.cutoffMemo = { key, value };
+    return value;
+  }
+
   /** Reservation refusal for `b`'s next-tier footprint (#1390), or null. */
   private upgradeRefusal(b: Building, nextTier: BuildingTier, reservations: ReadonlyArray<TerrainReservation>): string | null {
     const { sizeX, sizeZ } = getDefSize(getBuildingDef(b.type, nextTier));
-    return this.reservationRefusal({ minX: b.x, minZ: b.z, maxX: b.x + sizeX, maxZ: b.z + sizeZ }, reservations);
+    return this.reservationRefusal(rectAt(b.x, b.z, sizeX, sizeZ), reservations);
   }
 
   /** Disabled state and tooltip of `b`'s Upgrade button: the refusal reason when blocked, else the cost. */
@@ -450,6 +481,15 @@ export class BuildMenu extends PanelBase {
     const { controller, overlay, strip } = kit;
     if (controller.isArmed) { controller.cancel(); return; }
     const def = getBuildingDef(type, tier);
+    const moving = movingId === undefined ? undefined : this.lastState?.buildings.buildings.find((b) => b.id === movingId);
+    const freedRect = moving ? this.footprintRect(moving, moving.tier) : undefined;
+    const { sizeX, sizeZ } = getDefSize(def);
+    let acceptedCutoff = false;
+    /** Cutoff for the tile, unless a hard refusal already applies (then the cutoff is moot). */
+    const cutoffAt = (at: { x: number; z: number } | null, rectReason: string | null): PlacementCutoff | null => {
+      if (!at || rectReason || !controller.canConfirm) return null;
+      return this.cutoffFor(rectAt(at.x, at.z, sizeX, sizeZ), freedRect);
+    };
 
     const refresh = (): void => {
       if (controller.currentPhase === 'idle') { overlay.clear(); strip.hide(); return; }
@@ -458,12 +498,12 @@ export class BuildMenu extends PanelBase {
       let rectReason: string | null = null;
       if (at) {
         const reservations = this.currentReservations();
-        const { sizeX, sizeZ } = getDefSize(def);
-        const rect = { minX: at.x, minZ: at.z, maxX: at.x + sizeX, maxZ: at.z + sizeZ };
+        const rect = rectAt(at.x, at.z, sizeX, sizeZ);
         rectReason = this.rectRefusal(rect, movingId) ?? this.reservationRefusal(rect, reservations);
       }
       const hover = hoverRefusal(controller, rectReason);
-      overlay.update(at ? { shape: 'point', x: at.x, z: at.z, footprintCells: def.footprint, refused: hover.refused } : null);
+      const cutoff = cutoffAt(at, rectReason);
+      overlay.update(at ? { shape: 'point', x: at.x, z: at.z, footprintCells: def.footprint, refused: hover.refused || cutoff !== null } : null);
       strip.show({
         icon: 'build',
         title,
@@ -472,11 +512,20 @@ export class BuildMenu extends PanelBase {
         result: sel ? `(${sel.x1}, ${sel.z1})` : '—',
         confirmEnabled: controller.canConfirm && !rectReason,
         confirmDisabledReason: hover.reason,
-        instruction: t('ui.build.place_instruction'),
+        instruction: cutoff ? cutoffLine(cutoff) : t('ui.build.place_instruction'),
       });
     };
 
     controller.setConfirmHandler((sel) => {
+      const cutoff = acceptedCutoff ? null : cutoffAt({ x: sel.x1, z: sel.z1 }, null);
+      if (cutoff && this.onConfirmRequestCb) {
+        this.onConfirmRequestCb(buildPlacementCutoffConfirm(cutoff, () => {
+          acceptedCutoff = true;
+          controller.confirm();
+          acceptedCutoff = false;
+        }));
+        return false;
+      }
       if (!onConfirm(sel.x1, sel.z1)) return false;
       overlay.flashConfirm();
       return true;
@@ -751,8 +800,16 @@ export class BuildMenu extends PanelBase {
         this.setStatus(t('ui.build.research_required', { tier: nextTier }));
         return;
       }
-      const cmdResult = this.gameConsole?.(`build upgrade ${b.id}`);
-      this.setStatus(cmdResult?.success ? t('ui.build.upgraded') : (cmdResult?.output ?? ''));
+      const upgrade = (): void => {
+        const cmdResult = this.gameConsole?.(`build upgrade ${b.id}`);
+        this.setStatus(cmdResult?.success ? t('ui.build.upgraded') : (cmdResult?.output ?? ''));
+      };
+      const requestConfirm = this.onConfirmRequestCb;
+      const cutoff = nextTier !== null && requestConfirm
+        ? this.cutoffFor(this.footprintRect(b, nextTier), this.footprintRect(b, b.tier))
+        : null;
+      if (cutoff && requestConfirm) requestConfirm(buildPlacementCutoffConfirm(cutoff, upgrade));
+      else upgrade();
     });
 
     const researchBtn = document.createElement('button');
