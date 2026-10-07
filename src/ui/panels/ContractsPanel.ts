@@ -29,7 +29,7 @@ import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { isFillableSaleOffer, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { isFillableSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -216,8 +216,7 @@ export class ContractsPanel extends PanelBase {
     const color = this.urgencyColor(c, state.tickCount);
     const pct = c.quantityKg > 0 ? Math.round((c.deliveredKg / c.quantityKg) * 100) : 0;
     const stored = this.storedOf(c.materialId, state);
-    const remainingKg = Math.max(0, c.quantityKg - c.deliveredKg);
-    const maxDeliverable = deliverableAmountKg(Math.min(remainingKg, stored));
+    const maxDeliverable = deliverableAmountKg(Math.min(Math.max(0, remainingKg(c)), stored));
 
     const headRow = el('div');
     headRow.style.cssText = 'display:flex;align-items:center;gap:8px';
@@ -421,7 +420,7 @@ export class ContractsPanel extends PanelBase {
     const ok = c.completed && !c.expired;
     const color = ok ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
     const outcome = ok
-      ? `+$${formatMoney(c.deliveredKg * c.pricePerKg)}`
+      ? `+$${formatMoney(c.paidTotal ?? c.deliveredKg * c.pricePerKg)}`
       : `-$${formatMoney(c.penaltyCharged ?? c.penaltyAmount)}`;
     // An expired contract may still have paid for what was delivered before the deadline.
     const paid = c.paidTotal ?? 0;

@@ -322,6 +322,39 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(pips.some(p => p.kind === 'contract')).toBe(false);
     });
 
+    it('raises no expiry pip or toast for a contract the stock already covers', () => {
+      setLocale('en');
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.contracts.active.push({
+        id: 9, type: 'ore_sale', materialId: 'grumpite', description: 'test',
+        quantityKg: 100, deliveredKg: 0, pricePerKg: 1, deadlineTicks: 5,
+        acceptedAtTick: 0, penaltyAmount: 500, earlyBonus: 0, completed: false, expired: false,
+      });
+      state.collectedOre['grumpite'] = 100;
+      state.tickCount = 2; // inside the warning window
+      const pips = center.update(state);
+      expect(pips.some(p => p.kind === 'contract')).toBe(false);
+      expect(center.getLog().filter(e => e.title.includes('#9'))).toHaveLength(0);
+    });
+
+    it('shows the penalty scaled by the undelivered share in the expiry toast', () => {
+      setLocale('en');
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.contracts.active.push({
+        id: 10, type: 'ore_sale', materialId: 'grumpite', description: 'test',
+        quantityKg: 100, deliveredKg: 60, pricePerKg: 1, deadlineTicks: 5,
+        acceptedAtTick: 0, penaltyAmount: 500, earlyBonus: 0, completed: false, expired: false,
+      });
+      state.collectedOre['grumpite'] = 10; // short of the 40 kg still owed
+      state.tickCount = 2;
+      center.update(state);
+      const entry = center.getLog().find(e => e.title.includes('#10'))!;
+      expect(entry.body).toContain(formatMoney(200)); // 500 * 40%
+      expect(entry.body).not.toContain(formatMoney(500));
+    });
+
     // ── #1061: blocked-order warnings ─────────────────────────────────────
 
     function makeBlockedLevelGroundAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {

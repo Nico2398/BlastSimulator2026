@@ -18,7 +18,7 @@ import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
 import { CONTRACT_EXPIRY_WARNING_TICKS, WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { contractShortOfStock, undeliveredShare } from '../../core/economy/Contract.js';
+import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
@@ -191,7 +191,7 @@ export class NotificationCenter {
           severity: 'warn',
           icon: 'clock',
           title: t('notification.contract_expiring_title', { id: urgentContract.id }),
-          body: t('notification.contract_expiring_body', { duration, penalty: formatMoney(Math.round(urgentContract.penaltyAmount * undeliveredShare(urgentContract))) }),
+          body: t('notification.contract_expiring_body', { duration, penalty: formatMoney(outstandingPenalty(urgentContract)) }),
         });
       }
     }

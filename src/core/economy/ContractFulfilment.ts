@@ -2,7 +2,7 @@
 
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
-import { deliverMaterials, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
+import { deliverMaterials, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
 
@@ -36,7 +36,7 @@ export function deliverStoredOre(
   const contract = contracts.active.find(c => c.id === contractId);
   if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
 
-  let request = Math.min(requestedKg, contract.quantityKg - contract.deliveredKg);
+  let request = Math.min(requestedKg, remainingKg(contract));
   // Partial delivery: take what storage holds; an empty store falls through to the insufficient-stock error.
   const stock = storedStockKg(contract, collectedOre, logistics.storedMassKg);
   if (stock > FRAGMENT_SPLIT_EPSILON_KG) request = Math.min(request, stock);
@@ -46,7 +46,7 @@ export function deliverStoredOre(
   if (!consumption.success) {
     return {
       success: false,
-      error: consumption.error ?? t('economy.contract.deliver_insufficient', { material: contract.materialId || 'material' }),
+      error: consumption.error ?? t('economy.contract.deliver_insufficient', { material: contract.materialId || t('ui.contracts.material_rubble') }),
     };
   }
   // Float dust left by splitting fragments must not strand a contract epsilon short of complete.
@@ -60,7 +60,7 @@ export function deliverStoredOre(
 
 /**
  * Deliver stored ore to every eligible (active, not held) contract, soonest
- * deadline first. Each contract takes min(stock, remaining); stock is re-read
+ * deadline first. Each contract takes min(stock, remaining) (clamped by deliverStoredOre); stock is re-read
  * after every delivery, since contracts share one warehouse. Walks the active
  * contracts once.
  */
@@ -76,7 +76,7 @@ export function autoDeliverContracts(
     if (contract.held || contract.completed || contract.expired) continue;
     const stock = storedStockKg(contract, collectedOre, logistics.storedMassKg);
     if (stock <= FRAGMENT_SPLIT_EPSILON_KG) continue;
-    const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, Math.min(stock, contract.quantityKg - contract.deliveredKg), tick);
+    const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick);
     if (result.success && result.data.kg > 0) deliveries.push({ contractId: contract.id, ...result.data });
   }
   return deliveries;

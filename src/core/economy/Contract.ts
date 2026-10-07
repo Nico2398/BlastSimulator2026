@@ -216,7 +216,7 @@ export function deliverMaterials(
     return { payment: 0, bonus: 0, completed: false };
   }
 
-  const remaining = contract.quantityKg - contract.deliveredKg;
+  const remaining = remainingKg(contract);
   const delivered = Math.min(amountKg, remaining);
   contract.deliveredKg += delivered;
 
@@ -369,6 +369,16 @@ export function undeliveredShare(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>
   return Math.min(1, Math.max(0, (c.quantityKg - c.deliveredKg) / c.quantityKg));
 }
 
+/** Kilograms a contract still needs delivered (negative if over-delivered). */
+export function remainingKg(c: Pick<Contract, 'quantityKg' | 'deliveredKg'>): number {
+  return c.quantityKg - c.deliveredKg;
+}
+
+/** Penalty owed if the contract expired now: the full penalty scaled by the share still undelivered. */
+export function outstandingPenalty(c: Pick<Contract, 'quantityKg' | 'deliveredKg' | 'penaltyAmount'>): number {
+  return Math.round(c.penaltyAmount * undeliveredShare(c));
+}
+
 /** Active contracts ordered by soonest deadline first (ties: lowest id), without mutating the input. */
 export function sortByDeadline(active: readonly Contract[]): Contract[] {
   const deadline = (c: Contract) => c.acceptedAtTick + c.deadlineTicks;
@@ -398,7 +408,7 @@ export function contractShortOfStock(
   collectedOre: Readonly<Record<string, number>>,
   storedMassKg: number,
 ): boolean {
-  return storedStockKg(c, collectedOre, storedMassKg) < c.quantityKg - c.deliveredKg;
+  return storedStockKg(c, collectedOre, storedMassKg) < remainingKg(c);
 }
 
 /**
@@ -418,7 +428,7 @@ export function checkDeadlines(
     const elapsed = currentTick - c.acceptedAtTick;
     if (elapsed > c.deadlineTicks) {
       c.expired = true;
-      const penalty = Math.round(c.penaltyAmount * undeliveredShare(c));
+      const penalty = outstandingPenalty(c);
       c.penaltyCharged = penalty;
       penalties.push({ contractId: c.id, penalty, deliveredKg: c.deliveredKg, paid: c.paidTotal ?? 0 });
       state.active.splice(i, 1);
