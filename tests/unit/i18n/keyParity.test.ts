@@ -454,7 +454,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1334: +3 keys (tutorial scores/finances/needs card text), both locales: 3700.
     // #1335: -3 keys (removed contract-accept step text)
     // #1339: -2 keys (-8 train-driller/train-digger card+stage keys, +4 train-fragmenter, +2 rock_fragmenter course/skill)
-    expect(Object.keys(en).length).toBe(3695);
+    // #1340: +4 keys (economy.negotiation.no_manager, ui.contracts.negotiate_no_manager, ui.crew.manager_effect, ui.crew.manager_effect_hint), both locales: 3699 (3695 + 4).
+    expect(Object.keys(en).length).toBe(3699);
   });
 });
 

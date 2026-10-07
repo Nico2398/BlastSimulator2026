@@ -10,9 +10,11 @@ import {
   negotiateContractAtTick,
   negotiationStreamSeed,
   canNegotiate,
+  negotiationRefusalReason,
+  managerNegotiationBonusPct,
   type NegotiationResult,
 } from '../../../src/core/economy/Negotiation.js';
-import { NEGOTIATION_EARLY_BONUS_RATE, NEGOTIATION_MAX_ATTEMPTS_PER_OFFER } from '../../../src/core/config/balance.js';
+import { NEGOTIATION_EARLY_BONUS_RATE, NEGOTIATION_MAX_ATTEMPTS_PER_OFFER, NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL } from '../../../src/core/config/balance.js';
 
 function setupContracts(seed: number) {
   const state = createContractState();
@@ -279,5 +281,86 @@ describe('negotiateContractAtTick (#1366)', () => {
       if (ra.success !== rb.success || JSON.stringify(ra.changes) !== JSON.stringify(rb.changes)) differing++;
     }
     expect(differing).toBeGreaterThan(0);
+  });
+});
+
+describe('manager level drives success (#1340)', () => {
+  function successes(level: number, rep: number, seeds = 400): number {
+    let n = 0;
+    for (let seed = 1; seed <= seeds; seed++) {
+      const { state } = setupContracts(seed);
+      const r = negotiateContractAtTick(state, state.available[0]!.id, rep, seed, 3, level);
+      if ('success' in r && r.success) n++;
+    }
+    return n;
+  }
+
+  it('constant is 0.08 per level', () => {
+    expect(NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL).toBe(0.08);
+  });
+
+  it('level 5 succeeds clearly more often than level 1 at the same reputation', () => {
+    const l1 = successes(1, 0);
+    const l5 = successes(5, 0);
+    expect(l5).toBeGreaterThan(l1 + 60);
+  });
+
+  it('level 1 adds nothing: rate matches 0.5 + rep*0.01', () => {
+    const rate = successes(1, 0) / 400;
+    expect(rate).toBeGreaterThan(0.4);
+    expect(rate).toBeLessThan(0.6);
+  });
+
+  it('level 5 at rep 0 lands near 0.82', () => {
+    const rate = successes(5, 0) / 400;
+    expect(rate).toBeGreaterThan(0.74);
+    expect(rate).toBeLessThan(0.9);
+  });
+
+  it('upper clamp holds at 0.95 even with level 5 and max reputation', () => {
+    const rate = successes(5, 100) / 400;
+    expect(rate).toBeLessThan(1);
+    expect(rate).toBeGreaterThan(0.88);
+  });
+
+  it('lower clamp holds at 0.05 with level 1 and terrible reputation', () => {
+    const rate = successes(1, -100) / 400;
+    expect(rate).toBeGreaterThan(0);
+    expect(rate).toBeLessThan(0.12);
+  });
+
+  it('same seed, tick and level is deterministic', () => {
+    const a = setupContracts(9).state;
+    const b = setupContracts(9).state;
+    const ra = negotiateContractAtTick(a, a.available[0]!.id, 10, 9, 4, 3);
+    const rb = negotiateContractAtTick(b, b.available[0]!.id, 10, 9, 4, 3);
+    expect(ra).toEqual(rb);
+  });
+});
+
+describe('managerNegotiationBonusPct (#1340)', () => {
+  it('is 0 at level 1 and 32 at level 5', () => {
+    expect(managerNegotiationBonusPct(1)).toBe(0);
+    expect(managerNegotiationBonusPct(5)).toBe(32);
+  });
+  it('rises 8 points per level', () => {
+    expect([1, 2, 3, 4, 5].map(managerNegotiationBonusPct)).toEqual([0, 8, 16, 24, 32]);
+  });
+});
+
+describe('negotiationRefusalReason (#1340)', () => {
+  it('is no_manager when no manager level is available', () => {
+    const { state } = setupContracts(1);
+    expect(negotiationRefusalReason(state.available[0]!, null)).toBe('no_manager');
+  });
+  it('is already_negotiated when the offer was negotiated', () => {
+    const { state } = setupContracts(1);
+    const c = state.available[0]!;
+    c.negotiationAttempts = NEGOTIATION_MAX_ATTEMPTS_PER_OFFER;
+    expect(negotiationRefusalReason(c, 3)).toBe('already_negotiated');
+  });
+  it('is null for a fresh offer with a manager', () => {
+    const { state } = setupContracts(1);
+    expect(negotiationRefusalReason(state.available[0]!, 1)).toBeNull();
   });
 });

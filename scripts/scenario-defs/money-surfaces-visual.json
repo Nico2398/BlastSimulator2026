@@ -224,6 +224,34 @@
       }
     },
     {
+      "command": "employee hire role:manager",
+      "timeout": 30,
+      "description": "Negotiating needs a Manager on the roster (#1340): hired through the Crew panel's real hire button before the contracts step below, which clicks Negotiate.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
       "command": "contract list",
       "interaction": [
         {

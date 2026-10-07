@@ -39,7 +39,7 @@
     },
     {
       "command": "contract negotiate type:supply material:dirtite",
-      "description": "Negotiation attempt on the supply/dirtite offer (the only attempt it gets, #1366). The target is fixed at the supply/dirtite offer throughout this file rather than read back from `contract list`'s text output, which expect can't do.",
+      "description": "No manager on the roster yet (#1340): the console refuses with `no_manager` and spends no attempt, and the card's Negotiate button is disabled with the 'Hire a Manager' tooltip. Opening the panel is a real click; the refused command is the console-side half of the same guard.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -47,11 +47,78 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"]"
+        },
+        {
+          "type": "command",
+          "command": "contract negotiate type:supply material:dirtite"
+        }
+      ],
+      "role": "guard",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"negotiate\"]",
+        "note": "no manager: negotiate is refused, no attempt is spent, terms and cash untouched."
+      },
+      "commandOutcome": "refused"
+    },
+    {
+      "command": "employee hire role:manager",
+      "description": "Hire a Manager through the Crew panel's real hire button (#1340). Opening the Crew panel closes the Contracts panel (one active panel at a time).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "contract list",
+      "description": "Back on the Contracts panel with a manager hired, the same card's Negotiate button is usable (#1340).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"negotiate\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"negotiate\"]",
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "contract negotiate type:supply material:dirtite",
+      "description": "Negotiation attempt on the supply/dirtite offer (the only attempt it gets, #1366). The target is fixed at the supply/dirtite offer throughout this file rather than read back from `contract list`'s text output, which expect can't do.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"negotiate\"]"
         }
       ],
       "role": "player",
@@ -146,7 +213,7 @@
           "command": "contract deliver type:supply material:dirtite amount:50"
         }
       ],
-      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline, so nothing is ever in storage. A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-type=\"supply\"][data-contract-material=\"dirtite\"]`, issue #513/#635) rather than performing one.",
+      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here — `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) — this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline, so nothing is ever in storage. A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-type=\"supply\"][data-contract-material=\"dirtite\"]`, issue #513/#635) rather than performing one.",
       "expect": {
         "equals": {
           "activeContractCount": 1

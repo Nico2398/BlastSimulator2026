@@ -4,10 +4,18 @@ import { ContractsPanel, deliverableAmountKg } from '../../../../src/ui/panels/C
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
+import { hireEmployee } from '../../../../src/core/entities/Employee.js';
+import { Random } from '../../../../src/core/math/Random.js';
 import type { Contract } from '../../../../src/core/economy/Contract.js';
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
+}
+
+/** Roster a healthy manager so Negotiate is allowed (#1340). */
+function withManager(state: GameState): GameState {
+  hireEmployee(state.employees, 'manager', new Random(7), 0, 0, 0);
+  return state;
 }
 
 function makePanel(): { panel: ContractsPanel; container: HTMLElement; gameConsole: ReturnType<typeof vi.fn> } {
@@ -158,7 +166,7 @@ describe('ContractsPanel', () => {
 
   it('Negotiate and Decline dispatch their commands', () => {
     const { panel, gameConsole } = makePanel();
-    const state = makeState();
+    const state = withManager(makeState());
     state.contracts.available.push(makeContract({ id: 9 }));
     panel.show();
     panel.update(state);
@@ -473,7 +481,7 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
 
   it('disables the negotiate button only on offers already negotiated (#1366)', () => {
     const { panel } = makePanel();
-    const state = makeState();
+    const state = withManager(makeState());
     state.contracts.available.push(
       makeContract({ id: 1, negotiationAttempts: 1 }),
       makeContract({ id: 2 }),
@@ -492,7 +500,7 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
 
   it('disables a card negotiate button after the offer has been negotiated (#1366)', () => {
     const { panel } = makePanel();
-    const state = makeState();
+    const state = withManager(makeState());
     const c = makeContract({ id: 3 });
     state.contracts.available.push(c, makeContract({ id: 4 }));
     panel.show();
@@ -503,6 +511,60 @@ describe('ContractsPanel — scroll-bounded Active/Available/Closed sections (#9
     panel.update(state);
     expect(panel.root.querySelector<HTMLButtonElement>('[data-contract-id="3"] [data-action="negotiate"]')!.disabled).toBe(true);
     expect(panel.root.querySelector<HTMLButtonElement>('[data-contract-id="4"] [data-action="negotiate"]')!.disabled).toBe(false);
+  });
+});
+
+describe('negotiate needs a manager (#1340)', () => {
+  const btn = (panel: ContractsPanel, id: number) => panel.root.querySelector<HTMLButtonElement>(
+    `[data-contract-id="${id}"] [data-action="negotiate"]`,
+  )!;
+
+  it('is disabled with the no-manager title when the roster has no manager', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 1 }));
+    panel.show();
+    panel.update(state);
+    expect(btn(panel, 1).disabled).toBe(true);
+    expect(btn(panel, 1).title).toBe(t('ui.contracts.negotiate_no_manager'));
+    btn(panel, 1).click();
+    expect(gameConsole).not.toHaveBeenCalledWith('contract negotiate id:1');
+  });
+
+  it('enables on the next update once a manager is hired', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 1 }));
+    panel.show();
+    panel.update(state);
+    expect(btn(panel, 1).disabled).toBe(true);
+
+    withManager(state);
+    panel.update(state);
+    expect(btn(panel, 1).disabled).toBe(false);
+  });
+
+  it('disables again when the only manager is injured', () => {
+    const { panel } = makePanel();
+    const state = withManager(makeState());
+    state.contracts.available.push(makeContract({ id: 1 }));
+    panel.show();
+    panel.update(state);
+    expect(btn(panel, 1).disabled).toBe(false);
+
+    state.employees.employees[0]!.injured = true;
+    panel.update(state);
+    expect(btn(panel, 1).disabled).toBe(true);
+    expect(btn(panel, 1).title).toBe(t('ui.contracts.negotiate_no_manager'));
+  });
+
+  it('an already-negotiated offer keeps the used title even with a manager', () => {
+    const { panel } = makePanel();
+    const state = withManager(makeState());
+    state.contracts.available.push(makeContract({ id: 1, negotiationAttempts: 1 }));
+    panel.show();
+    panel.update(state);
+    expect(btn(panel, 1).title).toBe(t('ui.contracts.negotiate_used'));
   });
 });
 
