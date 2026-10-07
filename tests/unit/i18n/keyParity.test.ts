@@ -456,8 +456,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1339: -2 keys (-8 train-driller/train-digger card+stage keys, +4 train-fragmenter, +2 rock_fragmenter course/skill)
     // #1375: +8 keys (operating cost/runway, vehicle_maintenance category), -1 (runway_growing): 3702.
     // #1377: +31 keys (build/fleet catalog card purpose lines, tooltips, per-hour format, capacity units): 3733.
-    // #1340: +4 keys (economy.negotiation.no_manager, ui.contracts.negotiate_no_manager, ui.crew.manager_effect, ui.crew.manager_effect_hint), both locales: 3737.
-    expect(Object.keys(en).length).toBe(3737);
+    // #1358: +1 key (weak-explosive charge warning): 3734.
+    // #1340: +4 keys (economy.negotiation.no_manager, ui.contracts.negotiate_no_manager, ui.crew.manager_effect, ui.crew.manager_effect_hint), both locales: 3738.
+    expect(Object.keys(en).length).toBe(3738);
   });
 });
 

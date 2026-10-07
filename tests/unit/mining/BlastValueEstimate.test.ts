@@ -231,7 +231,7 @@ describe('estimateBlastOreValue vs executeBlast (seed 42 reference pattern, #135
     const holes = createGridPlan(counter, { x: 12, z: 12 }, 3, 3, 4, 8, 0.15);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
-    const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'boomite', 8, 2);
+    const { charges } = batchCharge(holes.map(h => h.id), holeDepths, 'krackle', 8, 2);
     const plan = assembleBlastPlan(holes, charges, autoVPattern(holes, 25));
 
     const estimate = estimateBlastOreValue(plan, [survey]);

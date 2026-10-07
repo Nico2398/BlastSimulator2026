@@ -2,6 +2,7 @@
 // Assigns explosives and stemming to each hole in the drill plan.
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
+import { tierShortfall, type ColumnRock } from './ExplosiveRockFit.js';
 import { t } from '../i18n/I18n.js';
 import {
   MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG,
@@ -138,4 +139,37 @@ export function chargeFitsHole(amountKg: number, stemmingM: number, holeDepth: n
 export function maxFittingChargeKg(holeDepth: number, stemmingM: number): number {
   const kg = maxChargeKgForHole(holeDepth, stemmingM) + CHARGE_FIT_EPSILON;
   return Math.floor(kg * 10) / 10;
+}
+
+/** Count of holes whose dominant rock outclasses the explosive (#1358). */
+export interface WeakHoleSummary {
+  weakCount: number;
+  total: number;
+  rockId: string | null;
+}
+
+/** Summarise how many columns are too hard for the explosive. Null columns are skipped. */
+export function weakHoleSummary(
+  explosiveId: string,
+  columns: readonly (ColumnRock | null)[],
+): WeakHoleSummary {
+  const present = columns.filter((c): c is ColumnRock => c !== null);
+  const explosive = getExplosive(explosiveId);
+  if (!explosive) return { weakCount: 0, total: present.length, rockId: null };
+  const weak = present.filter(c => tierShortfall(explosive.minRockTier, c.tier) > 0);
+  const counts = new Map<string, { tier: number; count: number }>();
+  for (const c of weak) {
+    const entry = counts.get(c.rockId) ?? { tier: c.tier, count: 0 };
+    entry.count++;
+    counts.set(c.rockId, entry);
+  }
+  let rockId: string | null = null;
+  let best: { tier: number; count: number } | null = null;
+  for (const [id, e] of counts) {
+    if (!best || e.tier > best.tier || (e.tier === best.tier && e.count > best.count)) {
+      rockId = id;
+      best = e;
+    }
+  }
+  return { weakCount: weak.length, total: present.length, rockId };
 }

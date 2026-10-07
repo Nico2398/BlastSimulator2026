@@ -27,10 +27,10 @@ describe('ExplosiveCatalog', () => {
     }
   });
 
-  it('dynatomics can fracture hardness tier 5 rocks', () => {
+  it('dynatomics is a top-tier explosive', () => {
     const dyn = getExplosive('dynatomics');
     expect(dyn).toBeDefined();
-    expect(dyn!.maxRockTier).toBeGreaterThanOrEqual(5);
+    expect(dyn!.minRockTier).toBeGreaterThanOrEqual(4);
   });
 
   it('at least 6 explosives defined', () => {

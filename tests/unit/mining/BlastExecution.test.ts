@@ -251,7 +251,7 @@ describe('executeBlast — post-carve renormalisation (#1148)', () => {
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
-    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+    const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 2);
     const delays = autoVPattern(holes, 25);
     return { grid, plan: assembleBlastPlan(holes, charges, delays) };
   }
@@ -406,7 +406,7 @@ describe('buildBlastReport', () => {
     const holeIds = holes.map(h => h.id);
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
-    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 2);
+    const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 2);
     const delays = autoVPattern(holes, 25);
     const plan = assembleBlastPlan(holes, charges, delays);
 
@@ -435,7 +435,7 @@ describe('buildBlastReport', () => {
     const holeDepths: Record<string, number> = {};
     for (const h of holes) holeDepths[h.id] = h.depth;
     // Light stemming so the blast actually throws rock (traced throw > 0).
-    const { charges } = batchCharge(holeIds, holeDepths, 'boomite', 8, 0.5);
+    const { charges } = batchCharge(holeIds, holeDepths, 'krackle', 8, 0.5);
     const delays = autoVPattern(holes, 25);
     const plan = assembleBlastPlan(holes, charges, delays);
     const result = executeBlast(plan, grid, []);
