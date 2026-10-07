@@ -504,6 +504,10 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
       target: FILLABLE_ORE_ACCEPT,
       hintKey: 'tutorial.stage.sell_ore',
       also: ['#bs-contract-panel .bs-contract-deliver', '#bs-contract-panel .bs-contract-amount'],
+      // Accepting removes the fillable Accept card from the offered list, so
+      // `target` vanishes; the active ore card's Deliver keeps this stage
+      // resolved instead of regressing to "open the Contracts panel" (#1335).
+      doneTarget: '#bs-contract-panel [data-contract-type="ore_sale"] .bs-contract-deliver',
       spentWhen: isSellOreWaiting,
       waitingKey: 'tutorial.waiting.delivering',
     },
