@@ -23,6 +23,8 @@ import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach
 import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup, findNearbyHaulableFragments } from '../../../src/core/economy/HaulDispatch.js';
 import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { isHaulBlockedReason } from '../../../src/core/economy/HaulDispatch.js';
+import { refreshLogisticsCapacity } from '../../../src/core/engine/BuildingTaskHelpers.js';
 
 const SEED = 42;
 
@@ -792,5 +794,102 @@ describe('findNearbyHaulableFragments (#1370)', () => {
     const { ids } = setup([makeFragment(1, 5, 5), makeFragment(9, 8, 5), makeFragment(4, 5, 7), makeFragment(7, 5, 3), makeFragment(2, 6, 5)]);
     // dist: 2 -> 1, 7 -> 2, 4 -> 2, 9 -> 3
     expect(ids()).toEqual([2, 4, 7, 9]);
+  });
+});
+
+// ── #1530: spoil heap routing ───────────────────────────────────────────────
+
+function barren(id: number, x: number, z: number, mass = 400): FragmentData {
+  return makeFragment(id, x, z, mass); // oreDensities: {} is barren
+}
+
+function ore(id: number, x: number, z: number, mass = 400): FragmentData {
+  return { ...makeFragment(id, x, z, mass), oreDensities: { blingite: 0.5 } };
+}
+
+function addHeap(state: ReturnType<typeof createGame>, x = 30, z = 30): void {
+  const result = placeBuilding(state.buildings, 'spoil_heap', x, z, 64, 64);
+  if (!result.success) throw new Error(`Setup: placeBuilding failed — ${result.error}`);
+  refreshLogisticsCapacity(state);
+}
+
+describe('haulBlockedReason — spoil heap (#1530)', () => {
+  const action = () => makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
+
+  it('isHaulBlockedReason accepts no_spoil_heap', () => {
+    expect(isHaulBlockedReason('no_spoil_heap')).toBe(true);
+    expect(isHaulBlockedReason('target_unreachable')).toBe(false);
+  });
+
+  it('a barren fragment with no heap is no_spoil_heap', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    setFreightRoomExact(state, 10_000);
+    addBlastFragments(state.logistics, [barren(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBe('no_spoil_heap');
+  });
+
+  it('a barren fragment with no heap and no warehouse is no_spoil_heap, not no_freight_warehouse', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [barren(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBe('no_spoil_heap');
+  });
+
+  it('a barren fragment is never storage_full: with a heap and a full warehouse it is unblocked', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    setFreightRoomExact(state, 0);
+    addHeap(state);
+    addBlastFragments(state.logistics, [barren(1, 5, 5, 50_000)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('a barren fragment with a heap but no warehouse is unblocked', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    addBlastFragments(state.logistics, [barren(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('an ore fragment with no warehouse is still no_freight_warehouse even with a heap', () => {
+    const state = createGame({ seed: SEED });
+    addHeap(state);
+    addBlastFragments(state.logistics, [ore(1, 5, 5)]);
+    expect(haulBlockedReason(state, action())).toBe('no_freight_warehouse');
+  });
+
+  it('an ore fragment with a warehouse but no heap is unblocked', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    setFreightRoomExact(state, 1000);
+    addBlastFragments(state.logistics, [ore(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBeNull();
+  });
+
+  it('an ore fragment heavier than the room is still storage_full even with a heap', () => {
+    const state = createGame({ seed: SEED });
+    addWarehouse(state);
+    addHeap(state);
+    setFreightRoomExact(state, 100);
+    addBlastFragments(state.logistics, [ore(1, 5, 5, 400)]);
+    expect(haulBlockedReason(state, action())).toBe('storage_full');
+  });
+});
+
+describe('findNearbyHaulableFragments — never mixes barren and ore (#1530)', () => {
+  function setup(fragments: FragmentData[]) {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, fragments);
+    syncHaulDispatch(state);
+    const primary = state.logistics.fragments.find(f => f.fragment.id === fragments[0]!.id)!;
+    return () => findNearbyHaulableFragments(state, primary, 10).map(t => t.fragment.id);
+  }
+
+  it('a barren primary only gets barren extras', () => {
+    expect(setup([barren(1, 5, 5), ore(2, 6, 5), barren(3, 7, 5)])()).toEqual([3]);
+  });
+
+  it('an ore primary only gets ore extras', () => {
+    expect(setup([ore(1, 5, 5), barren(2, 6, 5), ore(3, 7, 5)])()).toEqual([3]);
   });
 });
