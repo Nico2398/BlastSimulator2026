@@ -39,6 +39,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   chargesByHole: { type: 'object' },
   finances: { type: 'object', description: 'Finance sub-state; cash mirrors the flat field' },
   holeCount: { type: 'number' },
+  wetHoleCount: { type: 'number', description: 'Drill holes whose water level is past the wet threshold (wetHoles, #1350)' },
   orderedHoleCount: { type: 'number', description: 'Holes ordered but not yet drilled (state.plannedDrillHoles.length, #553)' },
   orderedChargeCount: { type: 'number', description: 'Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length, #554)' },
   orderedRampSegmentCount: { type: 'number', description: 'Segments ordered but not yet dug across all in-flight ramps (state.plannedRamps, #555)' },

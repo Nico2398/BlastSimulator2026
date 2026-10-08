@@ -24,8 +24,8 @@ import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
-import type { GameState } from '../../core/state/GameState.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
+import type { GameState } from '../../core/state/GameState.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -109,7 +109,7 @@ export class PreflightModal {
   hide(): void { this.open = false; this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.open; }
 
-  update(state: GameState, weather: WeatherState | undefined): void {
+  update(state: GameState, _weather?: WeatherState): void {
     if (!this.open) return;
 
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
@@ -117,7 +117,7 @@ export class PreflightModal {
     const chargeKg = totalChargeKg(plan.holes, plan.charges);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
 
-    const wet = weather ? wetHoles(state, weather) : [];
+    const wet = wetHoles(state);
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings.buildings);

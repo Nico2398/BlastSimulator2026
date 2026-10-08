@@ -249,6 +249,7 @@ Hole ids are monotonic (`state.nextHoleId`, saved with the game, v29 migration b
 - **Reset and edge cases.** `resetPlanState` (clear, post-blast) clears the pattern and the waiting list; removing a hole drops its id from the list. An explosive the level does not offer clears the pattern; a failing `createCharge` for one hole leaves it uncharged, never throws.
 - **Replacing a pattern.** `drill_plan grid` over drilled or charged holes is refused unless `confirm:true` (`mining.drill_plan.confirm_replace`, names the counts); the Drill step opens a ConfirmModal (`replacePatternConfirm.ts`) and re-runs with `confirm:true`. A plan of only ordered-not-yet-drilled holes needs no confirm.
 - **Tubing excluded.** `install_tubing` stays a separate per-hole action; it is not part of the pattern.
+- **Hole water (#1350).** Wetness is per-hole stored water (`state.holeWater`), not "is it raining now": it builds in rain and fades afterwards, slower in porous rock. Tubing blocks new water but does not remove old water; `drain_hole` does, at `HOLE_DRAIN_COST_PER_HOLE`, except an untubed hole in porous rock. Details in `gameplay-game-design` (Weather).
 
 ## Undrilled holes at fire time (#1346)
 
@@ -266,7 +267,7 @@ Firing with ordered-but-undrilled holes (`plannedDrillHoles`) warns in the prefl
 
 Previews run the **same** propagation the blast does (`buildPlanEnergyField`) and the same seeding
 and velocity maths. A preview that models the rock differently from the game is worse than no
-preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in rained-on untubed holes are predicted weakened.
+preview — never reintroduce a separate approximation. Previews also take the wet-hole set (`wetHoleIdsFor`, the same one `executeBlast` receives), so water-sensitive charges in holes holding water (`state.holeWater`, #1350) are predicted weakened.
 
 ### Detonation and Workshop steps
 

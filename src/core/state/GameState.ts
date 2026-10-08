@@ -17,6 +17,7 @@ import type { BlastReport } from '../mining/BlastExecution.js';
 import type { BlastPreviewSummary } from '../mining/Software.js';
 import type { TubingState } from '../mining/Tubing.js';
 import { createTubingState } from '../mining/Tubing.js';
+import type { HoleWater } from '../weather/WeatherEffects.js';
 import type { FinanceState } from '../economy/Finance.js';
 import { createFinanceState } from '../economy/Finance.js';
 import type { ContractState } from '../economy/Contract.js';
@@ -147,7 +148,7 @@ import type { RampWidth } from '../config/balance.js';
 // save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
 // v28 -> v29: nextHoleId (#1352)
 // v29 -> v30: weather (#1403). See SaveLoad.ts's migrateV29ToV30.
-export const SAVE_VERSION = 31;
+export const SAVE_VERSION = 32;
 
 export interface GameConfig {
   seed: number;
@@ -483,6 +484,10 @@ export interface GameState {
   lastBlastPreview: BlastPreviewSummary | null;
   /** Tubing inventory and installed-hole set, for waterproofing charges against rain. */
   tubingState: TubingState;
+  /** Per-hole water state keyed by drill hole id (#1350). */
+  holeWater: Record<string, HoleWater>;
+  /** Ground wetness 0..1: built by rain, seeps into holes (#1350). */
+  groundWetness: number;
   /** Ramps ordered but not yet fully dug — each queues one `dig_ramp_segment` action per segment (#555). */
   plannedRamps: PlannedRamp[];
   /** Next ID to assign to a newly created PlannedRamp. */
@@ -614,6 +619,8 @@ export function createGame(config: GameConfig): GameState {
     softwareTier: 0,
     lastBlastPreview: null,
     tubingState: createTubingState(),
+    holeWater: {},
+    groundWetness: 0,
     plannedRamps: [],
     nextPlannedRampId: 1,
     builtRamps: [],

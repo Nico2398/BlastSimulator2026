@@ -6,6 +6,7 @@ import { createRunner, type RunnerWithContext } from './console/createRunner.js'
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
+import { wetHoles } from './core/mining/WetHoles.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
@@ -43,6 +44,8 @@ export interface SerializableGameState {
   orderedHoleCount: number;
   /** Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length) — proves a charge order queues work instead of writing charges into state instantly (#554). */
   orderedChargeCount: number;
+  /** Drill holes whose water level is past the wet threshold (wetHoles, #1350). */
+  wetHoleCount: number;
   /** Remaining not-yet-`done` segments across every in-flight `state.plannedRamps` entry — proves a ramp order queues progressive excavation work instead of carving the whole corridor instantly (#555). A ramp is spliced out of `plannedRamps` entirely once its last segment lands, so this reaches 0 exactly when every ordered ramp has finished, not merely when the field would otherwise read 0 on an empty ramp. */
   orderedRampSegmentCount: number;
   /** Finished ramps (state.builtRamps.length, #1298). */
@@ -174,6 +177,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     holeCount: s.drillHoles.length,
     orderedHoleCount: s.plannedDrillHoles.length,
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    wetHoleCount: wetHoles(s).length,
     orderedRampSegmentCount: s.plannedRamps.reduce(
       (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
     ),

@@ -10,8 +10,8 @@ import { el, chip, emptyState, scrollBoundedSection, type ChipTone } from '../..
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
-import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import type { GameState } from '../../../core/state/GameState.js';
 import { gridCellPositions } from '../../../core/mining/DrillPlan.js';
 import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
@@ -144,13 +144,13 @@ export class DrillStep {
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setPlacementKit(kit: PlacementKit): void { this.placementKit = kit; }
 
-  update(state: GameState, weather: WeatherState | undefined): void {
+  update(state: GameState, _weather?: WeatherState): void {
     this.lastState = state;
     const holes = state.drillHoles;
     const ordered = state.plannedDrillHoles;
     const totalCount = holes.length + ordered.length;
     this.lastHoleCount = totalCount;
-    const wet = weather ? wetHoleIdsFor(state, weather) : new Set<string>();
+    const wet = wetHoleIdsFor(state);
 
     const signature = JSON.stringify({
       holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
@@ -266,8 +266,9 @@ export class DrillStep {
   }
 
   private holeStatus(hole: DrillHole, state: GameState, wet: Set<string>): { label: string; tone: ChipTone } {
-    if (hasTubing(state.tubingState, hole.id)) return { label: t('ui.blast_workshop.drill.status_tubed'), tone: 'positive' };
+    // Water already inside wins over tubing: tubing keeps new water out but does not drain (#1350).
     if (wet.has(hole.id)) return { label: t('ui.blast_workshop.drill.status_wet'), tone: 'info' };
+    if (hasTubing(state.tubingState, hole.id)) return { label: t('ui.blast_workshop.drill.status_tubed'), tone: 'positive' };
     return { label: t('ui.blast_workshop.drill.status_dry'), tone: 'neutral' };
   }
 

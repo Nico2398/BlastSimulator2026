@@ -108,7 +108,7 @@ export function assembleValidBlastPlan(
 
 /** Ids of drilled holes currently wet (rain-flooded); weather defaults to 'sunny' before the cycle exists. */
 export function wetHoleIdSet(ctx: MiningContext): Set<string> {
-  return wetHoleIdsFor(ctx.state!, ctx.state!.weather.current);
+  return wetHoleIdsFor(ctx.state!);
 }
 
 /** Vibration targets for the current level's villages (none when no playable area is loaded). */
@@ -142,6 +142,7 @@ export function cancelOutstandingDrillActions(state: GameState): number {
  */
 export function resetPlanState(state: GameState): void {
   state.drillHoles = [];
+  state.holeWater = {};
   clearTubing(state.tubingState);
   state.chargesByHole = {};
   state.plannedChargesByHole = {};

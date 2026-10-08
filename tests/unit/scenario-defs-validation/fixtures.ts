@@ -99,7 +99,7 @@ export const KNOWN_COMMANDS = [
   'drill_plan', 'charge', 'blast', 'contract',
   'build', 'vehicle', 'stats', 'inspect', 'zone', 'research',
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
-  'fragments', 'preview', 'blast_preview', 'install_tubing',
+  'fragments', 'preview', 'blast_preview', 'install_tubing', 'drain_hole',
   'build_ramp', 'widen_ramp', 'level_ground', 'set_policy', 'terrain_info', 'help',
   'blast_plan', 'needs', 'save', 'load', 'sandbox',
 ];

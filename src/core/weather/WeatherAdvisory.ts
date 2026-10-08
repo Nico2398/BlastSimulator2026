@@ -13,7 +13,7 @@ export type WeatherAdvisoryKind = 'clear' | 'wet' | 'rain_incoming';
 
 export interface WeatherAdvisory {
   kind: WeatherAdvisoryKind;
-  /** Holes exposed to rain right now (wetHoles against the live weather). */
+  /** Holes currently holding water past the wet threshold (wetHoles). */
   uncoveredHoles: number;
   /** Consecutive rainy days the streak covers: for 'wet', including today; for 'rain_incoming', the incoming stretch. Always 0 for 'clear'. */
   consecutiveWetDays: number;
@@ -31,7 +31,7 @@ export function computeWeatherAdvisory(
   current: WeatherState,
   forecastDays: readonly WeatherState[],
 ): WeatherAdvisory {
-  const uncoveredHoles = wetHoles(state, current).length;
+  const uncoveredHoles = wetHoles(state).length;
   const sequence: WeatherState[] = [current, ...forecastDays];
 
   if (isRaining(current)) {

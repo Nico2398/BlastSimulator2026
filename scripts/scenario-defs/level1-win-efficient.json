@@ -195,6 +195,37 @@
       }
     },
     {
+      "command": "weather set sunny",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "description": "Pin dry weather right before the blast: standing water in the holes (#1350) would weaken the water-sensitive boomite charges.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until no hole holds standing water (#1350): wet holes weaken water-sensitive charges, and natural weather may have wetted them while the crew worked. Costs no ticks when the holes are already dry.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
       "command": "blast",
       "timeout": 60,
       "role": "player",
@@ -235,6 +266,230 @@
         {
           "type": "command",
           "command": "tick 20"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
         }
       ]
     },

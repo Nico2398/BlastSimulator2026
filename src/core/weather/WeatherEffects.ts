@@ -1,78 +1,48 @@
 // BlastSimulator2026 — Weather effects on mining operations
-// Rain fills drill holes based on rock porosity. Flooded holes affect explosive reliability.
+// Rain fills drill holes; water persists per hole until it seeps away. Tubing makes a hole watertight.
 
-import type { DrillHole } from '../mining/DrillPlan.js';
-import type { HoleCharge } from '../mining/ChargePlan.js';
-import { getExplosive } from '../world/ExplosiveCatalog.js';
-import { rainIntensity, type WeatherState } from './WeatherCycle.js';
+import {
+  GROUND_WETNESS_DECAY_RATE,
+  GROUND_WETNESS_RISE_RATE,
+  HOLE_FADE_POROSITY_SLOWDOWN,
+  HOLE_RAIN_FILL_RATE,
+  HOLE_SEEP_RATE,
+  HOLE_WATER_FADE_RATE,
+  HOLE_WET_THRESHOLD,
+} from '../config/balance.js';
 
-// ── Hole flooding ──
-
-export interface HoleFloodState {
-  /** Water level in meters (0 = dry, up to hole depth). */
-  waterLevel: number;
-  /** Whether tubing is installed. */
-  hasTubing: boolean;
+/** Per-hole water state. */
+export interface HoleWater {
+  /** Water level as a fraction of hole depth (0 = dry, 1 = full). */
+  level: number;
+  /** Rock porosity at the hole (0..1); porous rock fades water slower. */
+  porosity: number;
 }
 
-/**
- * Calculate hole flooding from rain.
- * Water accumulation per tick = rainIntensity × porosity × accumulationRate.
- * Tubing prevents flooding entirely.
- */
-export function updateHoleFlooding(
-  hole: DrillHole,
-  floodState: HoleFloodState,
-  weather: WeatherState,
-  rockPorosity: number,
-): HoleFloodState {
-  if (floodState.hasTubing) {
-    return floodState; // Tubing prevents flooding
-  }
-
-  const rain = rainIntensity(weather);
-  if (rain <= 0) {
-    // Slow evaporation in dry weather
-    // Real evaporation: ~2-5mm/day in arid climates. Scaled for game ticks.
-    const evapRate = 0.05;
-    return {
-      ...floodState,
-      waterLevel: Math.max(0, floodState.waterLevel - evapRate),
-    };
-  }
-
-  // Accumulation rate: rain intensity × porosity × base rate
-  // Higher porosity means water seeps in faster from surrounding rock
-  const accumulationRate = 0.3; // meters per tick at full rain + full porosity
-  const waterIncrease = rain * rockPorosity * accumulationRate;
-  return {
-    ...floodState,
-    waterLevel: Math.min(hole.depth, floodState.waterLevel + waterIncrease),
-  };
+/** One tick of water change in a hole. Tubed holes are watertight: water neither enters nor leaves. */
+export function advanceHoleWater(
+  hw: HoleWater,
+  rain: number,
+  groundWetness: number,
+  tubed: boolean,
+): HoleWater {
+  if (tubed) return hw;
+  let level = hw.level;
+  level += rain * HOLE_RAIN_FILL_RATE;
+  level += groundWetness * hw.porosity * HOLE_SEEP_RATE;
+  if (rain <= 0) level -= HOLE_WATER_FADE_RATE * Math.max(0, 1 - hw.porosity * HOLE_FADE_POROSITY_SLOWDOWN);
+  return { ...hw, level: Math.min(1, Math.max(0, level)) };
 }
 
-/**
- * Check if a hole is considered "flooded" (>30% full).
- * Per BLAST_SYSTEM.md: flooded hole + water-sensitive explosive → 10% energy.
- */
-export function isHoleFlooded(floodState: HoleFloodState, holeDepth: number): boolean {
-  return floodState.waterLevel > holeDepth * 0.3;
+/** One tick of ground wetness change: rises with rain, decays when dry. */
+export function advanceGroundWetness(wetness: number, rain: number): number {
+  const next = rain > 0
+    ? wetness + rain * GROUND_WETNESS_RISE_RATE
+    : wetness - GROUND_WETNESS_DECAY_RATE;
+  return Math.min(1, Math.max(0, next));
 }
 
-/**
- * Check if a charge will fail due to flooding.
- * Water-sensitive explosive in a flooded hole without tubing → charge failure.
- */
-export function willChargeFail(
-  charge: HoleCharge,
-  floodState: HoleFloodState,
-  holeDepth: number,
-): boolean {
-  if (floodState.hasTubing) return false;
-  if (!isHoleFlooded(floodState, holeDepth)) return false;
-
-  const explosive = getExplosive(charge.explosiveId);
-  if (!explosive) return false;
-
-  return explosive.waterSensitive;
+/** True when a water level (fraction of depth) is past HOLE_WET_THRESHOLD. */
+export function isHoleFlooded(level: number): boolean {
+  return level > HOLE_WET_THRESHOLD;
 }

@@ -91,7 +91,7 @@ function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
 const SERIALIZED_FIELDS = [
   'trafficJamCount', 'trafficJams', 'pendingEvent', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount',
+  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'rubbleDisposalOffered', 'fillableSaleOffered', 'deathCount',
@@ -654,5 +654,21 @@ describe('console-api', () => {
 
       expect(serializeGameState(second.ctx as MiningContext)).toEqual(first);
     });
+  });
+});
+
+describe('serializeGameState — wetHoleCount (#1350)', () => {
+  it('counts holes whose water is past the wet threshold, so a scenario can assert on hole water', () => {
+    const runner = createRunner();
+    runner.runner.run('new_game seed:42');
+    const state = runner.ctx.state!;
+    state.drillHoles = [
+      { id: 'H1', x: 1, z: 1, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 2, z: 2, depth: 8, diameter: 0.15 },
+    ];
+    expect((serializeGameState(runner.ctx as MiningContext) as unknown as { wetHoleCount: number }).wetHoleCount).toBe(0);
+    state.holeWater['H1'] = { level: 0.9, porosity: 0.03 };
+    state.holeWater['H2'] = { level: 0.05, porosity: 0.03 };
+    expect((serializeGameState(runner.ctx as MiningContext) as unknown as { wetHoleCount: number }).wetHoleCount).toBe(1);
   });
 });

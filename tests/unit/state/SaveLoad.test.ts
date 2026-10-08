@@ -1154,8 +1154,8 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1217,8 +1217,8 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1298,8 +1298,8 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // to the fragment, mid-break, or never hauling at all) gets `payload: null`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {
@@ -1391,8 +1391,8 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 // truth since v19) left exactly as they were.
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
@@ -1477,8 +1477,8 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
 // taken mid vehicle-gated action doesn't forget which vehicle it claimed.
 
 describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a v21 vehicle with reservedForActionId set migrates its reservation into VehicleState.reservations, with none of the seven other fields on the restored Vehicle', () => {
@@ -1625,8 +1625,8 @@ describe('serialize — walk trail is transient (#1199)', () => {
 // locomotion put them.
 
 describe('deserialize — v23→v24 migration for building occupancy (#1202)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a pre-v24 save loads with every building empty and everyone outside', () => {
@@ -1669,8 +1669,8 @@ describe('deserialize — v23→v24 migration for building occupancy (#1202)', (
 // `pendingTrainingState: null`.
 
 describe('deserialize — v24→v25 migration for training walk-in (#1203)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a pre-v25 save loads with every employee\'s pendingTrainingState defaulted to null', () => {
@@ -1707,8 +1707,8 @@ describe('deserialize — v24→v25 migration for training walk-in (#1203)', () 
 // unconditionally.
 
 describe('deserialize — v25→v26 migration for agentOccupancyEnabled removal (#1207)', () => {
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a pre-v26 save with agentOccupancyEnabled: true loads with the field stripped', () => {
@@ -1811,8 +1811,8 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
     return parsed;
   }
 
-  it('SAVE_VERSION is 31', () => {
-    expect(SAVE_VERSION).toBe(31);
+  it('SAVE_VERSION is 32', () => {
+    expect(SAVE_VERSION).toBe(32);
   });
 
   it('a fresh game starts with nextHoleId 1', () => {
@@ -2076,6 +2076,29 @@ describe('backfillRaises (#1383)', () => {
     employee.raises = 250;
     const loaded = deserialize(serialize(state));
     expect(loaded.employees.employees.find(e => e.id === employee.id)!.raises).toBe(250);
+  });
+});
+
+// SAVE_VERSION bumped 31→32 for GameState.holeWater / groundWetness (#1350).
+describe('v31 → v32 migration (hole water)', () => {
+  it('backfills empty hole water and dry ground on an older save', () => {
+    const raw = JSON.parse(serialize(createGame({ seed: 7 }))) as Record<string, unknown>;
+    delete raw['holeWater'];
+    delete raw['groundWetness'];
+    raw['version'] = 31;
+    const loaded = deserialize(JSON.stringify(raw));
+    expect(loaded.holeWater).toEqual({});
+    expect(loaded.groundWetness).toBe(0);
+    expect(loaded.version).toBe(SAVE_VERSION);
+  });
+
+  it('round-trips hole water and ground wetness', () => {
+    const state = createGame({ seed: 7 });
+    state.holeWater = { H1: { level: 0.5, porosity: 0.2 } };
+    state.groundWetness = 0.4;
+    const loaded = deserialize(serialize(state));
+    expect(loaded.holeWater).toEqual(state.holeWater);
+    expect(loaded.groundWetness).toBe(0.4);
   });
 });
 

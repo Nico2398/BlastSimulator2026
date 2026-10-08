@@ -344,6 +344,32 @@
       }
     },
     {
+      "command": "tick 4",
+      "description": "#1350: wetness is per-hole water state, not 'is it raining right now' -- the rain has to fall on the holes. Four heavy_rain ticks (0.7 intensity x HOLE_RAIN_FILL_RATE per tick) push every untubed hole past HOLE_WET_THRESHOLD; the weather pinned just above lasts up to 8 ticks, so it stays heavy_rain throughout.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 4"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "weather": "heavy_rain"
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "blast",
       "description": "boomite is waterSensitive:true (ExplosiveCatalog.ts); every hole here is flooded (raining, no tubing installed -- WetHoles.ts's wetHoles()) so this blast now genuinely detonates weak (Finding #39: BlastExecution.ts never wired the water/flood mechanic into the real energy calculation at all -- waterEffect/wetHoles existed but had zero effect on any blast until this fix). No state field exposes the blast report's clearedVoxels/rating directly, so the weakening itself is proven by dedicated tests rather than a scenario assertion: a direct trace of this exact command sequence shows 27 cleared voxels / $83,500 ore value flooded vs. 395 cleared voxels / $1,337,550 dry (~14x weaker, same seed/grid/charge) -- confirmed end-to-end through the real console command pipeline by tests/integration/weather-blast.integration.test.ts, and at the physics level by new tests in BlastCalc.test.ts/BlastExecution.test.ts. (Figures predate the #554-followup 9-hole -> 4-hole grid trim; the weak-vs-dry ratio this proves is unaffected by grid size, so left as the original measurement rather than re-run for an unasserted description.)",
       "interaction": [
@@ -402,7 +428,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 140,
+          "tickCount": 144,
           "holeCount": 0,
           "weather": "heavy_rain"
         },

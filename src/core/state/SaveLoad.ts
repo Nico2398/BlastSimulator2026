@@ -547,6 +547,18 @@ function migrateV30ToV31(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/**
+ * v31 -> v32 (#1350): backfill per-hole water and ground wetness. Idempotent.
+ * Mutates `obj` in place.
+ */
+function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> {
+  const hw = obj['holeWater'];
+  if (typeof hw !== 'object' || hw === null || Array.isArray(hw)) obj['holeWater'] = {};
+  const gw = obj['groundWetness'];
+  if (typeof gw !== 'number' || !Number.isFinite(gw)) obj['groundWetness'] = 0;
+  return obj;
+}
+
 function migrateV29ToV30(obj: Record<string, unknown>): Record<string, unknown> {
   const w = obj['weather'];
   const c = (typeof w === 'object' && w !== null ? w : {}) as
@@ -865,6 +877,7 @@ export function deserialize(json: string): GameState {
   migrateV28ToV29(obj);
   migrateV29ToV30(obj);
   migrateV30ToV31(obj);
+  migrateV31ToV32(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);
