@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-arrest",
-  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 21). #1313: the mine is frozen once the level has ended, so exposure stops accruing and the arrest never happens here; every tick after the win asserts the frozen state (cash and tickCount unchanged). The arrest outcome itself is proven in tests/integration/full-level/level1-lose-arrest.integration.test.ts, which pre-completes the level so the arrest can race alone.",
+  "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 24). #1313: the mine is frozen once the level has ended, so exposure stops accruing and the arrest never happens here; every tick after the win asserts the frozen state (cash and tickCount unchanged). The arrest outcome itself is proven in tests/integration/full-level/level1-lose-arrest.integration.test.ts, which pre-completes the level so the arrest can race alone.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:false cash:122500",
@@ -372,7 +372,7 @@
           "tickCount": 20,
           "levelEnded": false
         },
-        "note": "#1411: failed bribes now also cost a fine (0.5 x cost) and a nuisance/corruption hit, so the opening cash is lower and the profit threshold is not yet crossed after the second batch: tick 21, level still running."
+        "note": "#1411: failed bribes now also cost a fine (0.5 x cost) and a nuisance/corruption hit, so the opening cash is lower and the profit threshold is not yet crossed after the second batch: tick 20, level still running."
       }
     },
     {
@@ -397,15 +397,15 @@
       "role": "setup",
       "expect": {
         "changedBy": {
-          "cash": 8000,
-          "tickCount": 1
+          "cash": 32000,
+          "tickCount": 4
         },
         "equals": {
-          "tickCount": 21,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "the level's own profit-threshold win condition fires here (tick 21), confirmed via direct trace -- smuggling income at $8000/tick pushes cumulative profit past dusty_hollow's unlock threshold. This \"losing scenario\" actually WINS first. #1313: the tick command stops on the tick the level ends, so this `tick 10` lands on tick 21 and the rest of its batch is not run."
+        "note": "the level's own profit-threshold win condition fires here (tick 24), confirmed via direct trace -- smuggling income at $8000/tick pushes cumulative profit past dusty_hollow's unlock threshold. This \"losing scenario\" actually WINS first. #1313: the tick command stops on the tick the level ends, so this `tick 10` lands on tick 24 and the rest of its batch is not run."
       }
     },
     {
@@ -486,11 +486,11 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 21,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "#1313: level already ended ('completed' at tick 21) -- the mine is frozen, so a tick advances nothing."
+        "note": "#1313: level already ended ('completed' at tick 24) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -519,12 +519,12 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 21,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed",
           "arrested": false
         },
-        "note": "#1313: the level already ended ('completed' at tick 21) and the mine is frozen: exposure stops accruing, so the arrest that used to trigger here never does. Nothing ticks."
+        "note": "#1313: the level already ended ('completed' at tick 24) and the mine is frozen: exposure stops accruing, so the arrest that used to trigger here never does. Nothing ticks."
       }
     },
     {
@@ -553,11 +553,11 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 21,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "#1313: level already ended ('completed' at tick 21) -- the mine is frozen, so a tick advances nothing."
+        "note": "#1313: level already ended ('completed' at tick 24) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -586,11 +586,11 @@
           "tickCount": 0
         },
         "equals": {
-          "tickCount": 21,
+          "tickCount": 24,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "#1313: level already ended ('completed' at tick 21) -- the mine is frozen, so a tick advances nothing."
+        "note": "#1313: level already ended ('completed' at tick 24) -- the mine is frozen, so a tick advances nothing."
       }
     },
     {
@@ -658,12 +658,12 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 21,
+          "tickCount": 24,
           "arrested": false,
           "levelEnded": true,
           "levelEndReason": "completed"
         },
-        "note": "final state: the win at tick 21 froze the mine -- no arrest, tickCount still 21. #1313."
+        "note": "final state: the win at tick 24 froze the mine -- no arrest, tickCount still 24. #1313."
       }
     }
   ]

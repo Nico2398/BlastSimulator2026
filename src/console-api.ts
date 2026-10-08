@@ -151,6 +151,8 @@ export interface SerializableGameState {
    * (#557).
    */
   dangerZoneClear: boolean;
+  /** state.corruption.level, the 0-100 influence meter; flat so a scenario step goal can assert it (#1407). */
+  corruptionLevel: number;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -228,5 +230,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     storedMassKg: s.logistics.storedMassKg,
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
     dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees),
+    corruptionLevel: s.corruption.level,
   };
 }

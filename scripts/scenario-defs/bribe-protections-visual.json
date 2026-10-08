@@ -1,6 +1,6 @@
 {
   "name": "bribe-protections-visual",
-  "description": "Issue #1407: a successful bribe grants a timed protection. A player opens the Shady panel, bribes the inspector through the real call button and confirm dialog, and the panel lists the active protection row ([data-protection=\"inspector\"]) while the influence level rises. Every bribe (caught or not) raises corruption.level, so the level assertions are deterministic in both modes; the protection row relies on at least one of five attempts succeeding.",
+  "description": "Issue #1407: a successful bribe grants a timed protection. A player opens the Shady panel, bribes the inspector through the real call button and confirm dialog, and the panel lists the active protection row ([data-protection=\"inspector\"]) while the influence level rises. Every bribe (caught or not) raises corruptionLevel, so the level assertions are deterministic in both modes; the protection row relies on at least one of five attempts succeeding.",
   "steps": [
     {
       "command": "new_game seed:42 mine_type:desert size:32 cash:200000",
@@ -30,13 +30,13 @@
       ],
       "expect": {
         "increased": [
-          "corruption.level"
+          "corruptionLevel"
         ],
         "decreased": [
           "cash"
         ]
       },
-      "description": "role: bootstrap -- the Shady rail entry only reveals once corruption.level>0 (ToolRail.ts), and the entry is unlabeled by design, so the first dirty deal is what makes the panel reachable at all. Both outcomes of a bribe raise the level (success: BRIBE_CORRUPTION_DELTA, failure: BRIBERY_FAILURE_CORRUPTION_DELTA)."
+      "description": "role: bootstrap -- the Shady rail entry only reveals once corruptionLevel>0 (ToolRail.ts), and the entry is unlabeled by design, so the first dirty deal is what makes the panel reachable at all. Both outcomes of a bribe raise the level (success: BRIBE_CORRUPTION_DELTA, failure: BRIBERY_FAILURE_CORRUPTION_DELTA)."
     },
     {
       "command": "tick 1",
@@ -85,7 +85,7 @@
       ],
       "expect": {
         "increased": [
-          "corruption.level"
+          "corruptionLevel"
         ],
         "decreased": [
           "cash"
@@ -132,7 +132,7 @@
       ],
       "expect": {
         "increased": [
-          "corruption.level"
+          "corruptionLevel"
         ],
         "decreased": [
           "cash"
@@ -179,7 +179,7 @@
       ],
       "expect": {
         "increased": [
-          "corruption.level"
+          "corruptionLevel"
         ],
         "decreased": [
           "cash"
@@ -226,7 +226,7 @@
       ],
       "expect": {
         "increased": [
-          "corruption.level"
+          "corruptionLevel"
         ],
         "decreased": [
           "cash"
@@ -273,7 +273,7 @@
       ],
       "expect": {
         "increased": [
-          "corruption.level"
+          "corruptionLevel"
         ],
         "decreased": [
           "cash"
