@@ -270,21 +270,6 @@ export class TopBar {
 
   setSpeedChangeHandler(cb: (speed: number) => void): void { this.onSpeedChange = cb; }
   setTogglePauseHandler(cb: () => void): void { this.onTogglePause = cb; }
-  private updateObjective(state: GameState): void {
-    const objective = getLevelObjective(state.campaign.activeLevelId, state.finances);
-    const pct = objective ? Math.round(objective.fraction * 100) : 0;
-    const sig = objective ? `${Math.round(objective.profit)}|${objective.target}|${pct}` : '';
-    if (sig === this.lastObjectiveSig) return;
-    this.lastObjectiveSig = sig;
-    if (!objective) { this.objectiveWrap.style.display = 'none'; return; }
-    const profit = Math.round(objective.profit);
-    this.objectiveWrap.style.display = 'flex';
-    this.objectiveWrap.title = t('ui.finances.operating_profit_tip', { target: formatDollars(objective.target) });
-    this.objectiveText.textContent = t('shell.topbar.objective', { profit: formatDollars(profit), target: formatDollars(objective.target) });
-    this.objectiveFill.style.width = `${pct}%`;
-    this.objectiveFill.style.background = objective.fraction >= 1 ? OBJECTIVE_BAR_DONE_COLOR : OBJECTIVE_BAR_COLOR;
-  }
-
   setNavigateHandler(cb: (panel: PanelName) => void): void { this.onNavigate = cb; }
   setOpenLogHandler(cb: () => void): void { this.onOpenLog = cb; }
   setOpenSavesHandler(cb: () => void): void { this.onOpenSaves = cb; }
@@ -488,6 +473,21 @@ export class TopBar {
       case 'rain_incoming':
         return t('ui.weather.advisory_rain_incoming', { days: advisory.daysUntilChange ?? 0, duration: advisory.consecutiveWetDays });
     }
+  }
+
+  private updateObjective(state: GameState): void {
+    const objective = getLevelObjective(state.campaign.activeLevelId, state.finances);
+    const pct = objective ? Math.round(objective.fraction * 100) : 0;
+    const sig = objective ? `${Math.round(objective.profit)}|${objective.target}|${pct}` : '';
+    if (sig === this.lastObjectiveSig) return;
+    this.lastObjectiveSig = sig;
+    if (!objective) { this.objectiveWrap.style.display = 'none'; return; }
+    const profit = Math.round(objective.profit);
+    this.objectiveWrap.style.display = 'flex';
+    this.objectiveWrap.title = t('ui.finances.operating_profit_tip', { target: formatDollars(objective.target) });
+    this.objectiveText.textContent = t('shell.topbar.objective', { profit: formatDollars(profit), target: formatDollars(objective.target) });
+    this.objectiveFill.style.width = `${pct}%`;
+    this.objectiveFill.style.background = objective.fraction >= 1 ? OBJECTIVE_BAR_DONE_COLOR : OBJECTIVE_BAR_COLOR;
   }
 
   private lastScoreSig = '';

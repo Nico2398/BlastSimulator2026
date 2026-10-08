@@ -1,5 +1,7 @@
 import { getOperatingProfit, type FinanceState } from '../economy/Finance.js';
+import { clampedRatio } from '../math/ClampedRatio.js';
 import { getLevel } from './Level.js';
+import { SANDBOX_LEVEL_ID } from './Sandbox.js';
 
 interface LevelObjective {
   profit: number;
@@ -13,9 +15,9 @@ export function getLevelObjective(
   activeLevelId: string | null,
   finances: FinanceState,
 ): LevelObjective | null {
-  if (!activeLevelId || activeLevelId === 'sandbox') return null;
+  if (!activeLevelId || activeLevelId === SANDBOX_LEVEL_ID) return null;
   const target = getLevel(activeLevelId)?.unlockThreshold;
   if (target === undefined || target <= 0) return null;
   const profit = getOperatingProfit(finances);
-  return { profit, target, fraction: Math.max(0, Math.min(1, profit / target)) };
+  return { profit, target, fraction: clampedRatio(0, target, profit) };
 }
