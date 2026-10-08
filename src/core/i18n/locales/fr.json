@@ -3204,6 +3204,7 @@
   "shell.rail.employees": "Équipe",
   "shell.rail.settings": "Paramètres",
   "shell.topbar.day": "Jour {day}",
+  "shell.topbar.objective": "Bénéfice {profit} / {target}",
   "shell.topbar.pause_tip": "Pause / reprise — Espace",
   "shell.topbar.paused": "En pause",
   "shell.topbar.log_tip": "Journal d'activité",

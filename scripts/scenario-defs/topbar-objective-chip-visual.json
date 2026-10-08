@@ -1,0 +1,26 @@
+{
+  "name": "topbar-objective-chip-visual",
+  "description": "Top-bar objective chip (#1374): campaign level shows 'Profit $X / $80,000' with a progress bar; clicking it opens the Finances panel.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow staffed:false",
+      "interaction": [
+        { "type": "command", "command": "campaign start level:dusty_hollow staffed:false" }
+      ],
+      "role": "setup",
+      "description": "Start the first campaign level."
+    },
+    {
+      "command": "state",
+      "interactionOnly": true,
+      "interaction": [
+        { "type": "waitForSelector", "selector": "[data-action=\"open-objective\"]" },
+        { "type": "clickSelector", "selector": "[data-action=\"open-objective\"]" },
+        { "type": "waitForSelector", "selector": "#bs-finances-panel" }
+      ],
+      "role": "player",
+      "description": "Click the objective chip; the Finances panel opens.",
+      "expect": { "usable": "#bs-finances-panel" }
+    }
+  ]
+}
