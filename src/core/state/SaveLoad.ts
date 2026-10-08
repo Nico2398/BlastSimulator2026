@@ -567,7 +567,11 @@ function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> 
 
 /** v34 -> v35 (#1414): EventSystemState gains activeModifiers and nextModifierId. Idempotent. */
 function migrateV34ToV35(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO: implement
+  const events = obj['events'] as Record<string, unknown> | undefined;
+  if (events) {
+    if (!Array.isArray(events['activeModifiers'])) events['activeModifiers'] = [];
+    if (typeof events['nextModifierId'] !== 'number') events['nextModifierId'] = 1;
+  }
   return obj;
 }
 

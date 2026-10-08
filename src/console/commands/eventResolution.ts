@@ -9,6 +9,8 @@ import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
 import { clearLastOutcome } from '../../core/events/EventSystem.js';
+import { effectChipText } from '../../core/events/EventEffectText.js';
+import { modifierSummary } from '../../core/events/ModifierText.js';
 import { applyCorruptionDelta } from '../../core/economy/Corruption.js';
 import { requireGame } from './commandUtils.js';
 
@@ -72,6 +74,9 @@ export function eventCommand(
       for (const e of result.effects) {
         lines.push(`  • ${e}`);
       }
+      for (const chip of result.effectChips) {
+        lines.push(`  • ${effectChipText(chip)}`);
+      }
       if (result.corruptionChange !== 0) {
         applyCorruptionDelta(state.corruption, result.corruptionChange);
       }
@@ -86,6 +91,13 @@ export function eventCommand(
       }
       clearLastOutcome(state.events);
       return { success: true, output: t('eventResolution.dismissed') };
+    }
+
+    case 'modifiers': {
+      const active = state.events.activeModifiers;
+      if (active.length === 0) return { success: true, output: t('eventResolution.no_modifiers') };
+      const lines = [t('eventResolution.modifiers_header'), ...active.map(m => `  ${modifierSummary(m, state.tickCount)}`)];
+      return { success: true, output: lines.join('\n') };
     }
 
     case 'timers': {

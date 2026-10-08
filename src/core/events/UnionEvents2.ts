@@ -2,13 +2,15 @@
 // Satirical worker uprising scenarios: Theme Hospital meets capitalism critique.
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import { EVENT_HAZARD_STIPEND_DAYS, EVENT_HAZARD_STIPEND_PER_DAY } from '../config/balance.js';
 
 export const UNION_EVENTS_2: EventDef[] = [
   // 26 — Emotional proximity to explosions
   ev('union_hazard_emotional', 'union', {
     weight: (s) => 1 + 1.2 * (1 - r.sf(s)),
     options: [
-      { cashDelta: -4000, scoreDelta: { wellBeing: 8 }, effectTag: 'hazard_emotional_pay' },
+      { cashDelta: -4000, scoreDelta: { wellBeing: 8 }, effectTag: 'hazard_emotional_pay',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_HAZARD_STIPEND_PER_DAY, days: EVENT_HAZARD_STIPEND_DAYS }] },
       { cashDelta: 0, scoreDelta: { wellBeing: -6 } },
       { cashDelta: -1500, scoreDelta: { wellBeing: 3 }, effectTag: 'earplugs_feelings' },
     ],

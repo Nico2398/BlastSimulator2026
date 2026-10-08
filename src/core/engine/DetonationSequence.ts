@@ -5,6 +5,7 @@
 import type { GameState } from '../state/GameState.js';
 import { computeDangerZone, defineZone, isDangerZoneClear, isInZone } from '../entities/Zone.js';
 import { evacuateZone } from './Evacuation.js';
+import { isActive } from '../events/ActiveModifiers.js';
 import { t } from '../i18n/I18n.js';
 import { BLAST_DANGER_MARGIN_M, DETONATION_REEVACUATE_INTERVAL_TICKS } from '../config/balance.js';
 
@@ -43,6 +44,9 @@ export function hasChargedHole(state: GameState): boolean {
 export function armDetonation(state: GameState): DetonationResult<PendingDetonation> {
   if (state.pendingDetonation !== null) {
     return { success: false, error: t('mining.blast.detonation_already_armed') };
+  }
+  if (isActive(state.events.activeModifiers, 'blast_ban', state.tickCount)) {
+    return { success: false, error: t('mining.blast.banned') };
   }
   if (!hasChargedHole(state)) return { success: false, error: t('mining.blast.no_charged_holes') };
   const stranded = orderEvacuation(state);

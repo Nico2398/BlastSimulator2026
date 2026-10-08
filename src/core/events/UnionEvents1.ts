@@ -2,6 +2,7 @@
 // Satirical labor disputes, absurd demands, and workplace comedy in open-pit mining.
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import { EVENT_STRIKE_HOURS } from '../config/balance.js';
 
 export const UNION_EVENTS_1: EventDef[] = [
   // 1 — Workers demand artisanal espresso machine
@@ -38,7 +39,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.scores.wellBeing < 35,
     options: [
       { cashDelta: -25000, scoreDelta: { wellBeing: 20 } },
-      { cashDelta: 0, scoreDelta: { wellBeing: -20 }, effectTag: 'full_strike', followUp: 'union_strike_aftermath' },
+      { cashDelta: 0, scoreDelta: { wellBeing: -20 }, effectTag: 'full_strike', followUp: 'union_strike_aftermath',
+        effects: [{ type: 'work_stoppage', hours: EVENT_STRIKE_HOURS }] },
       { corruptionDelta: 15, scoreDelta: { wellBeing: -5 }, effectTag: 'bribe_union_boss' },
     ],
   }),

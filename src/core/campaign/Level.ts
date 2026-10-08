@@ -3,6 +3,7 @@
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 import type { GameState } from '../state/GameState.js';
+import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
@@ -236,8 +237,9 @@ export function getAllLevels(): readonly LevelDef[] {
  */
 export function resolveContractPriceMultiplier(state: GameState): number {
   const levelId = state.campaign.activeLevelId;
-  if (!levelId) return 1;
-  return getLevel(levelId)?.contractPriceMultiplier ?? 1;
+  const level = levelId ? (getLevel(levelId)?.contractPriceMultiplier ?? 1) : 1;
+  // Event modifiers (#1414) move the price of new offers on top of the level's own multiplier.
+  return level * factorFor(state.events.activeModifiers, 'contract_price', state.tickCount);
 }
 
 /**

@@ -25,6 +25,7 @@ import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { computeDangerZone } from '../../../core/entities/Zone.js';
+import { isActive } from '../../../core/events/ActiveModifiers.js';
 import { armDetonation, cancelDetonation, hasChargedHole, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
@@ -84,6 +85,11 @@ export function fireBlast(
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
+
+  // An event's blasting ban (#1414) refuses the shot before anything mutates.
+  if (isActive(ctx.state!.events.activeModifiers, 'blast_ban', ctx.state!.tickCount)) {
+    return { success: false, output: t('mining.blast.banned') };
+  }
 
   // Nothing loaded or loading: refuse before anything mutates (#1345). A hole
   // whose charge is still loading falls through to validation, which names it.

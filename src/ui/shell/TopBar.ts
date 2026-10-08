@@ -17,6 +17,7 @@ import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
 import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
+import { mountModifierChips } from './ModifierChips.js';
 import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX } from '../tokens.js';
 
@@ -90,6 +91,8 @@ export class TopBar {
   private readonly speedButtons: HTMLButtonElement[] = [];
   private readonly pauseChip: HTMLElement;
   private readonly alertPipsEl: HTMLElement;
+  /** Active event modifiers with time left (#1414). */
+  private readonly modifierChips: ReturnType<typeof mountModifierChips>;
   private readonly scoresEl: HTMLElement;
   private readonly logBtn: HTMLButtonElement;
   private readonly logBadge: HTMLElement;
@@ -266,6 +269,7 @@ export class TopBar {
     container.appendChild(this.root);
 
     shellLayoutRegistry.register({ id: 'topbar', layer: 'hud', bounds: topBarBounds });
+    this.modifierChips = mountModifierChips(container);
   }
 
   setSpeedChangeHandler(cb: (speed: number) => void): void { this.onSpeedChange = cb; }
@@ -314,6 +318,8 @@ export class TopBar {
       }
       this.pauseChip.style.display = this.isPaused ? 'flex' : 'none';
     }
+
+    this.modifierChips.update(state.events.activeModifiers, state.tickCount);
 
     // Alert pips
     const pips = center.update(state);
@@ -544,5 +550,6 @@ export class TopBar {
     document.removeEventListener('click', this.onDocumentClick);
     this.root.remove();
     shellLayoutRegistry.unregister('topbar');
+    this.modifierChips.dispose();
   }
 }

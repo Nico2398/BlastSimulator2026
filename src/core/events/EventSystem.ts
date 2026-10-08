@@ -2,7 +2,7 @@
 // Manages category timers, weighted selection, and event firing.
 
 import type { TrafficJam } from './TrafficJams.js';
-import type { ActiveModifier } from './ActiveModifiers.js';
+import { eventWeightFactor, type ActiveModifier } from './ActiveModifiers.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
@@ -178,7 +178,9 @@ export function tickEventSystem(
       // Reset timer with score-modulated interval
       timer.remaining = Math.max(MIN_EVENT_TIMER_TICKS, Math.round(
         getModulatedInterval(timer.category, ctx.scores, timer.baseInterval)
-        * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)));
+        * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)
+        // A heavier category weight (#1414) brings its next event sooner.
+        / eventWeightFactor(state.activeModifiers, timer.category, ctx.tickCount)));
 
       // Cooldown check — prevent events from firing too rapidly. The random
       // component is drawn once per cooldown window and cached (#597) rather

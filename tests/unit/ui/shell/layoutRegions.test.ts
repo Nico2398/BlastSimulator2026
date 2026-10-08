@@ -41,7 +41,7 @@ import {
 } from '../../../../src/ui/shell/LayoutRegistry.js';
 import { TOPBAR_HEIGHT_PX } from '../../../../src/ui/tokens.js';
 
-const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'selection-bar', 'activity-log', 'minimap', 'left-col'] as const;
+const EXPECTED_IDS = ['topbar', 'tool-rail', 'toasts', 'selection-bar', 'activity-log', 'minimap', 'left-col', 'modifier-chips'] as const;
 
 /** Declared bounds of a registered region at a viewport, by id. */
 function boundsFor(id: string, viewport: { width: number; height: number }): Rect {
@@ -95,7 +95,7 @@ describe('shell regions — layout matrix (#956)', () => {
     leftColumn?.dispose();
   });
 
-  it('registers exactly the 7 expected shell regions on construction', () => {
+  it('registers exactly the 8 expected shell regions on construction', () => {
     const ids = shellLayoutRegistry.list().map(r => r.id).sort();
     expect(ids).toEqual([...EXPECTED_IDS].sort());
   });

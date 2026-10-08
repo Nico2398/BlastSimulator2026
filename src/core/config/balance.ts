@@ -1946,3 +1946,29 @@ export const MODIFIER_FACTOR_MAX = 5;
 
 /** Default hp lost by a vehicle_breakdown effect when the spec omits it. */
 export const EVENT_EFFECT_BREAKDOWN_HP_LOSS = 20;
+
+/** Default hp a closed building loses (building_closed effect). */
+export const EVENT_EFFECT_BUILDING_HP_LOSS = 10;
+
+/** Role an employee_joins effect hires when the spec names none. */
+export const EVENT_EFFECT_JOIN_DEFAULT_ROLE = 'driller' as const;
+
+/** Fatigue gauge value a fatigue_relief effect restores everyone to (100 = fully rested). */
+export const EVENT_EFFECT_FATIGUE_RELIEF_LEVEL = 100;
+
+/** Multiplier on contract price a special_contract offer pays above a regular one. */
+export const EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS = 1.5;
+
+/** Hours the whole crew stops when the union's bluff is called (union_strike_threat). */
+export const EVENT_STRIKE_HOURS = 24;
+
+/** Per-day cost and length of the emotional hazard stipend (union_hazard_emotional). */
+export const EVENT_HAZARD_STIPEND_PER_DAY = 400;
+export const EVENT_HAZARD_STIPEND_DAYS = 7;
+
+/** Hours operations stop while the site relocates (politics_mayor_wins). */
+export const EVENT_RELOCATE_PAUSE_HOURS = 24;
+
+/** Work-rate change (percent) and its length in hours under a partial mining ban (politics_mining_ban_vote). */
+export const EVENT_PARTIAL_BAN_WORK_PCT = -40;
+export const EVENT_PARTIAL_BAN_HOURS = 60;
