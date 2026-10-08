@@ -1,4 +1,5 @@
-import type { FinanceState } from '../economy/Finance.js';
+import { getOperatingProfit, type FinanceState } from '../economy/Finance.js';
+import { getLevel } from './Level.js';
 
 export interface LevelObjective {
   profit: number;
@@ -7,10 +8,14 @@ export interface LevelObjective {
   fraction: number;
 }
 
+/** Operating-profit progress toward the active level's unlock threshold; null when no target applies. */
 export function getLevelObjective(
-  _activeLevelId: string | null,
-  _finances: FinanceState,
+  activeLevelId: string | null,
+  finances: FinanceState,
 ): LevelObjective | null {
-  // TODO: implement
-  return null;
+  if (!activeLevelId || activeLevelId === 'sandbox') return null;
+  const target = getLevel(activeLevelId)?.unlockThreshold;
+  if (target === undefined || target <= 0) return null;
+  const profit = getOperatingProfit(finances);
+  return { profit, target, fraction: Math.max(0, Math.min(1, profit / target)) };
 }
