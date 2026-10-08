@@ -565,10 +565,10 @@ function planFragmentTaskItinerary(
   // per tick, and the batch search scans the whole pool each time. Ranking on
   // the primary leg alone also keeps extra legs from inflating a dense
   // cluster's cost, which would invert nearest-first.
-  // A batch unloads at one depot, so it never mixes barren rock and ore (#1530).
+  // A batch unloads at one depot; findNearbyHaulableFragments keeps it to the primary's destination (#1530).
   const destination = haulDestinationOf(tracked.fragment);
   const candidates = fidelity === 'exact'
-    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS).filter(c => haulDestinationOf(c.fragment) === destination)
+    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS)
     : [];
   const candidateById = new Map(candidates.map(c => [c.fragment.id, c]));
   const batch = candidates.length === 0 ? [] : selectHaulBatch(

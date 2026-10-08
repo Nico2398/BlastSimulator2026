@@ -11,7 +11,7 @@ import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
-import { isBarrenFragment } from './SpoilHeaps.js';
+import { haulDestinationOf, isBarrenFragment } from './SpoilHeaps.js';
 import type { TrackedFragment } from './Logistics.js';
 import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
@@ -236,7 +236,8 @@ export function findQueuedHaulAction(state: GameState, fragmentId: number): Pend
 /**
  * On-ground, non-oversized fragments within `radiusCells` (octile) of `primary`
  * whose haul_debris action is still queued and unclaimed, nearest first (id
- * breaks ties) (#1370). One pass over the pool plus one over the fragments.
+ * breaks ties) (#1370). Only fragments sharing the primary's destination
+ * (spoil heap vs warehouse) qualify, so a batch never mixes (#1530). One pass over the pool plus one over the fragments.
  */
 export function findNearbyHaulableFragments(state: GameState, primary: TrackedFragment, radiusCells: number): TrackedFragment[] {
   const queued = new Set<number>();
@@ -245,10 +246,11 @@ export function findNearbyHaulableFragments(state: GameState, primary: TrackedFr
     if (isQueuedUnclaimedHaul(a) && typeof fragmentId === 'number') queued.add(fragmentId);
   }
   const { x, z } = primary.fragment.position;
+  const destination = haulDestinationOf(primary.fragment);
   const near: Array<{ tracked: TrackedFragment; dist: number }> = [];
   for (const tracked of state.logistics.fragments) {
     const f = tracked.fragment;
-    if (tracked.state !== 'on_ground' || f.id === primary.fragment.id || !queued.has(f.id) || isOversized(f.volume)) continue;
+    if (tracked.state !== 'on_ground' || f.id === primary.fragment.id || !queued.has(f.id) || isOversized(f.volume) || haulDestinationOf(f) !== destination) continue;
     const dist = octileHeuristic(x, z, f.position.x, f.position.z);
     if (dist <= radiusCells) near.push({ tracked, dist });
   }

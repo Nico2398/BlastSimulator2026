@@ -184,6 +184,10 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"amount\"]",
           "value": 5
@@ -237,6 +241,10 @@
     {
       "command": "blast",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "ensureStep",
           "step": 4
