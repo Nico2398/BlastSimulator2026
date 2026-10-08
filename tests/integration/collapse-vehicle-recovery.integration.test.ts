@@ -218,7 +218,7 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     run('tick 1');
     const trackedBeforeCollapse = state.logistics.fragments.find(f => f.fragment.id === 9001)!;
     expect(trackedBeforeCollapse.state).toBe('on_ground');
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     driver.fatigue = 0; // NEED_HARD_THRESHOLDS.fatigue (0) — collapses next tick
     tickUntil(run, () => driver.collapsing, 50);
@@ -226,7 +226,7 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
 
     // Alighted cleanly: released the vehicle, never loaded the fragment.
     expect(vehicleDriverId(vehicle)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
     const trackedAtCollapse = state.logistics.fragments.find(f => f.fragment.id === 9001)!;
     expect(trackedAtCollapse.state).toBe('on_ground');
 
@@ -238,7 +238,7 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     tickUntil(run, () => state.logistics.fragments.find(f => f.fragment.id === 9001)?.state === 'stored', 1500);
     const trackedFinal = state.logistics.fragments.find(f => f.fragment.id === 9001)!;
     expect(trackedFinal.state).toBe('stored');
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 
   it('a collapse mid-haul_unload leg (already loaded) alights cleanly, keeps the SAME fragment in transit, and resuming delivers it exactly once', () => {
@@ -254,8 +254,8 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     syncHaulDispatch(state);
     expect(run(`vehicle haul ${vehicleId} fragment:9002`)).toMatchObject({ success: true });
 
-    tickUntil(run, () => vehicle.payload !== null, 30);
-    expect(vehicle.payload).toEqual({ fragmentId: 9002, massKg: 900 });
+    tickUntil(run, () => vehicle.cargo.length > 0, 30);
+    expect(vehicle.cargo).toEqual([{ fragmentId: 9002, massKg: 900 }]);
     // Loaded — the fragment must no longer show as a separate on-ground entry.
     expect(state.logistics.fragments.filter(f => f.fragment.id === 9002 && f.state === 'on_ground')).toHaveLength(0);
 
@@ -271,7 +271,7 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     // The driver stays mounted despite collapsing, and the cargo travels with
     // the vehicle exactly as it was — payload still names the same fragment.
     expect(vehicleDriverId(vehicle)).toBe(driver.id);
-    expect(vehicle.payload).toEqual({ fragmentId: 9002, massKg: 900 });
+    expect(vehicle.cargo).toEqual([{ fragmentId: 9002, massKg: 900 }]);
     expect(state.logistics.fragments.filter(f => f.fragment.id === 9002 && f.state === 'on_ground')).toHaveLength(0);
     expect(state.logistics.fragments.filter(f => f.fragment.id === 9002)).toHaveLength(1);
 
@@ -284,6 +284,6 @@ describe('Vehicle-hauling employee collapse recovery (#1091)', () => {
     const delivered = state.logistics.fragments.filter(f => f.fragment.id === 9002);
     expect(delivered).toHaveLength(1);
     expect(delivered[0]!.state).toBe('stored');
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 });

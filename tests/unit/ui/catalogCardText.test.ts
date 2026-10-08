@@ -107,7 +107,7 @@ describe('vehicleCardTooltip', () => {
   }
 
   it('hauler capacity is a kg payload; destroyer and fragmenter are kg/h throughput', () => {
-    expect(vehicleCardTooltip(getVehicleDefByTier('debris_hauler', 1))).toContain('Capacity: 200 kg');
+    expect(vehicleCardTooltip(getVehicleDefByTier('debris_hauler', 1))).toContain('Capacity: 4,000 kg');
     for (const role of ['rock_fragmenter', 'building_destroyer'] as const) {
       expect(vehicleCardTooltip(getVehicleDefByTier(role, 1))).toMatch(/Capacity: [\d,.]+ kg\/h/);
     }

@@ -148,7 +148,9 @@ import type { RampWidth } from '../config/balance.js';
 // save has answered no jam: it defaults to {}. See SaveLoad.ts's migrateV27ToV28.
 // v28 -> v29: nextHoleId (#1352)
 // v29 -> v30: weather (#1403). See SaveLoad.ts's migrateV29ToV30.
-export const SAVE_VERSION = 32;
+// v31 -> v32: holeWater + groundWetness (#1350). See SaveLoad.ts's migrateV31ToV32.
+// v32 -> v33: Vehicle.payload becomes Vehicle.cargo[] (#1370). See SaveLoad.ts's migrateV32ToV33.
+export const SAVE_VERSION = 33;
 
 export interface GameConfig {
   seed: number;

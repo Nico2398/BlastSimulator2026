@@ -90,7 +90,7 @@ describe('pickScene', () => {
   it('resolves a vehicle hit to its (kind, id)', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    const vehicle = { id: 3, type: 'debris_hauler', x: 5, z: 5, hp: 100, tier: 1, payload: null, occupantIds: [] } as never;
+    const vehicle = { id: 3, type: 'debris_hauler', x: 5, z: 5, hp: 100, tier: 1, cargo: [], occupantIds: [] } as never;
     vm.addVehicle(vehicle, { vehicles: [vehicle], nextId: 4, driverBoardingCount: 0, reservations: [] } as never, [], 0);
     scene.updateMatrixWorld(true);
     const camera = makeTopDownCamera(5, 5);
@@ -558,7 +558,7 @@ describe('pickScene — ramps (#1298)', () => {
   it('a vehicle on a ramp tile keeps priority over the ramp', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleMesh(scene);
-    const vehicle = { id: 3, type: 'debris_hauler', x: 5, z: 5, hp: 100, tier: 1, payload: null, occupantIds: [] } as never;
+    const vehicle = { id: 3, type: 'debris_hauler', x: 5, z: 5, hp: 100, tier: 1, cargo: [], occupantIds: [] } as never;
     vm.addVehicle(vehicle, { vehicles: [vehicle], nextId: 4, driverBoardingCount: 0, reservations: [] } as never, [], 0);
     scene.updateMatrixWorld(true);
     const camera = makeTopDownCamera(5, 5);

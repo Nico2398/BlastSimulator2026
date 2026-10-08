@@ -714,7 +714,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     reserveVehicle(state.vehicles, vehicle.id, 100);
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     releaseVehicleReservation(state, 100);
 
@@ -725,7 +725,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     // fragment-work abort's own cleanup (haul state, cargo) matters here now.
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
 
     // The cargo already picked up is not permanently lost — back on the ground.
     const cargo = state.logistics.fragments.find(f => f.fragment.id === 1)!;
@@ -745,7 +745,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
     reserveVehicle(state.vehicles, vehicle.id, 101);
-    vehicle.payload = { fragmentId: 1, massKg: 850 };
+    vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     releaseVehicleReservation(state, 101);
 
@@ -779,7 +779,7 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     // other reservation).
     expect(vehicleDriverId(vehicle)).toBe(employee.id);
     expect(getVehicleReservation(state.vehicles, vehicle.id)).toBeNull();
-    expect(vehicle.payload).toBeNull();
+    expect(vehicle.cargo).toEqual([]);
   });
 
   it('a vehicle with neither phase set: same claim-only release as the plain case (#1090)', () => {

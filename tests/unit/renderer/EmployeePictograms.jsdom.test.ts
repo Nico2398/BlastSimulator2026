@@ -153,7 +153,7 @@ describe('EmployeePictograms under jsdom with no `canvas` npm package (#1258)', 
     const emp = makeEmployee({ id: 1 });
     const vehicle: Vehicle = {
       id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
-      payload: null,
+      cargo: [],
       occupantIds: [1],
     };
 

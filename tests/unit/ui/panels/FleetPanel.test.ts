@@ -19,7 +19,7 @@ import type {
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100,
-    payload: null,
+    cargo: [],
     occupantIds: [],
     ...overrides,
   };

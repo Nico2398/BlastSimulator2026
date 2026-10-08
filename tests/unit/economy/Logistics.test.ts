@@ -11,6 +11,7 @@ import {
   splitStoredFragmentMass,
   returnFragmentToGround,
   storageRoomKg,
+  inTransitMassKg,
   type LogisticsState,
 } from '../../../src/core/economy/Logistics.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../../../src/core/config/balance.js';
@@ -830,5 +831,64 @@ describe('storageRoomKg (#1369)', () => {
     const s = createLogisticsState(500);
     s.storedMassKg = 500;
     expect(storageRoomKg(s)).toBe(0);
+  });
+});
+
+// ── #1370: several fragments in transit at once ──
+describe('inTransitMassKg (#1370)', () => {
+  it('is zero when nothing is in transit', () => {
+    const s = createLogisticsState(TEST_STORAGE_KG);
+    addBlastFragments(s, [makeFragment(1, 300)]);
+    expect(inTransitMassKg(s)).toBe(0);
+  });
+
+  it('is zero for an empty state', () => {
+    expect(inTransitMassKg(createLogisticsState(TEST_STORAGE_KG))).toBe(0);
+  });
+
+  it('sums the mass of every in_transit fragment and ignores ground and stored ones', () => {
+    const s = createLogisticsState(TEST_STORAGE_KG);
+    addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 450), makeFragment(3, 1000), makeFragment(4, 70)]);
+    expect(pickupFragment(s, 1, '7')).toBe(true);
+    expect(pickupFragment(s, 2, '7')).toBe(true);
+    expect(pickupFragment(s, 3, '8')).toBe(true);
+    deliverToDepot(s, 3);
+    expect(inTransitMassKg(s)).toBe(750);
+  });
+
+  it('drops back after a fragment is returned to the ground', () => {
+    const s = createLogisticsState(TEST_STORAGE_KG);
+    addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 450)]);
+    pickupFragment(s, 1, '7');
+    pickupFragment(s, 2, '7');
+    returnFragmentToGround(s, 2);
+    expect(inTransitMassKg(s)).toBe(300);
+  });
+});
+
+describe('pickupFragment counts mass already in transit against capacity (#1370)', () => {
+  it('refuses a pickup when stored + in-transit + mass exceeds capacity', () => {
+    const s = createLogisticsState(1000);
+    addBlastFragments(s, [makeFragment(1, 600), makeFragment(2, 600)]);
+    expect(pickupFragment(s, 1, '7')).toBe(true);
+    expect(pickupFragment(s, 2, '7')).toBe(false);
+    expect(s.fragments.find(f => f.fragment.id === 2)!.state).toBe('on_ground');
+  });
+
+  it('accepts a pickup that exactly fills capacity with stored + in-transit mass', () => {
+    const s = createLogisticsState(1000);
+    s.storedMassKg = 200;
+    addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 500)]);
+    expect(pickupFragment(s, 1, '7')).toBe(true);
+    expect(pickupFragment(s, 2, '7')).toBe(true);
+    expect(pickupFragment(s, 1, '7')).toBe(false); // already in transit: not on the ground
+  });
+
+  it('refuses a pickup one kg over when stored and in-transit mass together are counted', () => {
+    const s = createLogisticsState(1000);
+    s.storedMassKg = 200;
+    addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 501)]);
+    expect(pickupFragment(s, 1, '7')).toBe(true);
+    expect(pickupFragment(s, 2, '7')).toBe(false);
   });
 });

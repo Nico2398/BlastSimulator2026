@@ -341,7 +341,7 @@ function workSignature(state: GameState): string {
     .slice()
     .sort((a, b) => a.id - b.id)
     .map((v) => [
-      v.id, v.x, v.z, getVehicleReservation(state.vehicles, v.id), v.payload?.fragmentId ?? null,
+      v.id, v.x, v.z, getVehicleReservation(state.vehicles, v.id), v.cargo.map((c) => c.fragmentId).join('+'),
     ].join(','))
     .join(';');
 

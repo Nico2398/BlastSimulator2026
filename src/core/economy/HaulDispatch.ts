@@ -12,6 +12,7 @@ import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 import { storageRoomKg, type TrackedFragment } from './Logistics.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
+import { octileHeuristic } from '../nav/Pathfinding.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
 export interface HaulActionPayload {
@@ -161,7 +162,7 @@ export function isHaulOrFragmentActionClaimable(
 
   if (tracked.state === 'in_transit') {
     return state.vehicles.vehicles.some(
-      v => getVehicleReservation(state.vehicles, v.id) === action.id && v.payload?.fragmentId === tracked.fragment.id,
+      v => getVehicleReservation(state.vehicles, v.id) === action.id && v.cargo.some(c => c.fragmentId === tracked.fragment.id),
     );
   }
 
@@ -196,6 +197,39 @@ export function haulActionCarriesOre(
   if (!tracked) return false;
 
   return fragmentHasOre(tracked.fragment.oreDensities);
+}
+
+/** True iff `action` is a haul_debris order still queued with no holder (#1370). */
+function isQueuedUnclaimedHaul(action: PendingAction): boolean {
+  return action.type === 'haul_debris' && action.status === 'queued' && action.holderId === null;
+}
+
+/** The queued, unclaimed haul_debris action for `fragmentId`, if any (#1370). */
+export function findQueuedHaulAction(state: GameState, fragmentId: number): PendingAction | undefined {
+  return state.pendingActions.find(a => isQueuedUnclaimedHaul(a) && a.payload['fragmentId'] === fragmentId);
+}
+
+/**
+ * On-ground, non-oversized fragments within `radiusCells` (octile) of `primary`
+ * whose haul_debris action is still queued and unclaimed, nearest first (id
+ * breaks ties) (#1370). One pass over the pool plus one over the fragments.
+ */
+export function findNearbyHaulableFragments(state: GameState, primary: TrackedFragment, radiusCells: number): TrackedFragment[] {
+  const queued = new Set<number>();
+  for (const a of state.pendingActions) {
+    const fragmentId = a.payload['fragmentId'];
+    if (isQueuedUnclaimedHaul(a) && typeof fragmentId === 'number') queued.add(fragmentId);
+  }
+  const { x, z } = primary.fragment.position;
+  const near: Array<{ tracked: TrackedFragment; dist: number }> = [];
+  for (const tracked of state.logistics.fragments) {
+    const f = tracked.fragment;
+    if (tracked.state !== 'on_ground' || f.id === primary.fragment.id || !queued.has(f.id) || isOversized(f.volume)) continue;
+    const dist = octileHeuristic(x, z, f.position.x, f.position.z);
+    if (dist <= radiusCells) near.push({ tracked, dist });
+  }
+  near.sort((a, b) => a.dist - b.dist || a.tracked.fragment.id - b.tracked.fragment.id);
+  return near.map(n => n.tracked);
 }
 
 /** True for actions the haul dispatch creates itself (haul_debris / fragment_debris), not player orders (#1302). */

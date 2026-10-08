@@ -559,6 +559,20 @@ function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v32 -> v33 (#1370): Vehicle.payload (item or null) becomes Vehicle.cargo[]. */
+function migrateV32ToV33(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehicles = (obj['vehicles'] as { vehicles?: unknown[] } | undefined)?.vehicles;
+  if (!Array.isArray(vehicles)) return obj;
+  for (const raw of vehicles) {
+    const v = raw as Record<string, unknown>;
+    if (Array.isArray(v['cargo'])) continue;
+    const payload = v['payload'];
+    v['cargo'] = typeof payload === 'object' && payload !== null ? [payload] : [];
+    delete v['payload'];
+  }
+  return obj;
+}
+
 function migrateV29ToV30(obj: Record<string, unknown>): Record<string, unknown> {
   const w = obj['weather'];
   const c = (typeof w === 'object' && w !== null ? w : {}) as
@@ -878,6 +892,7 @@ export function deserialize(json: string): GameState {
   migrateV29ToV30(obj);
   migrateV30ToV31(obj);
   migrateV31ToV32(obj);
+  migrateV32ToV33(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);

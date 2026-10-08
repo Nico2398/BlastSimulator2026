@@ -1043,8 +1043,8 @@ export const VEHICLE_TIER_MULTIPLIERS = {
 
 /** Tier-1 (base) stats for each vehicle role. Units: $, kg, m³, grid cells/tick. */
 export const VEHICLE_BASE_STATS = {
-  /** ~200 kg payload; cost scaled from real $1–5M dump trucks; diesel ~$150/hr scaled. */
-  debris_hauler:      { workRate: 10, purchaseCost: 25_000, maintenanceCostPerTick: 3, fuelCostPerTick: 5, capacity: 200, speed: 3, maxHp: 100 },
+  /** 4000 kg cargo (T2 6400, T3 10000), several fragments per trip (#1370); cost scaled from real $1–5M dump trucks; diesel ~$150/hr scaled. */
+  debris_hauler:      { workRate: 10, purchaseCost: 25_000, maintenanceCostPerTick: 3, fuelCostPerTick: 5, capacity: 4000, speed: 3, maxHp: 100 },
   /** ~8 m³/tick excavation; most expensive vehicle — the key production bottleneck. */
   rock_digger:        { workRate: 8,  purchaseCost: 50_000, maintenanceCostPerTick: 5, fuelCostPerTick: 8, capacity: 50,  speed: 1, maxHp: 150 },
   /** 5 progress units/tick per hole; capacity = 2 holes/tick. */
@@ -1856,6 +1856,12 @@ export const CANDIDATE_SKILL_BONUS_CHANCE = 0.35;
 
 /** Maximum bonus levels a candidate may have. */
 export const CANDIDATE_SKILL_BONUS_MAX = 1;
+
+/** Radius (cells) around the primary fragment within which a haul batch gathers extras (#1370). */
+export const HAUL_BATCH_RADIUS_CELLS = 8;
+
+/** Most fragments one haul trip carries (#1370). */
+export const HAUL_BATCH_MAX_ITEMS = 6;
 
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;

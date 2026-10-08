@@ -24,17 +24,20 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
-import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation, getVehicleDefByTier, vehicleCargoMassKg } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { pickupFragment, deliverToDepot, type TrackedFragment } from '../economy/Logistics.js';
+import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
+import { completePendingAction } from './TaskLifecycleCore.js';
 import type { ArrivalEffectId } from './Itinerary.js';
 
-type ArrivalEffectHandler = (state: GameState, vehicle: Vehicle, emitter?: EventEmitter) => boolean;
+/** `targetId` is the step's own target (an extra haul_load leg's fragment id); absent on every other leg. */
+type ArrivalEffectHandler = (state: GameState, vehicle: Vehicle, emitter?: EventEmitter, targetId?: number) => boolean;
 
 /** The PendingAction `vehicle` is currently reserved for, or undefined when it isn't reserved at all (shouldn't happen for a vehicle mid arrival-effect leg, but the caller (`applyArrivalEffect`) treats an unresolved action as a plain failure rather than throwing). */
 function findReservedAction(state: GameState, vehicle: Vehicle): PendingAction | undefined {
@@ -86,55 +89,79 @@ function completeFragmentGatedAction(state: GameState, vehicle: Vehicle): void {
 }
 
 /**
- * Fires when a debris_hauler's drive-to-fragment leg arrives: loads the
- * fragment named by the vehicle's active haul_debris action onto
- * `vehicle.payload`. Mirrors the old HaulingTask.ts tickHaulingProgress
- * 'to_fragment' arrival branch (pickupFragment + payload assignment), minus
- * the movement it used to also drive. Never completes the action itself —
- * a haul's own final leg (haul_unload) does that.
+ * Fires when a debris_hauler's drive-to-fragment leg arrives: loads a
+ * fragment onto `vehicle.cargo`. A bare leg (no `targetId`) is the primary
+ * pickup — the fragment named by the vehicle's reserved haul_debris action.
+ * An extra leg (`targetId`, #1370) loads that nearby fragment instead and
+ * consumes its own queued, unclaimed haul_debris action; an extra that is
+ * gone, claimed, or no longer fits is a soft no-op (true) — the trip simply
+ * carries less. Never completes the reserved action: the haul's final leg
+ * (haul_unload) does that.
  */
-export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): boolean {
+export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: EventEmitter, targetId?: number): boolean {
+  if (targetId !== undefined) return loadExtraFragment(state, vehicle, targetId, emitter);
+
   const resolved = resolveReservedGroundFragment(state, vehicle);
   if (!resolved || isOversized(resolved.tracked.fragment.volume)) return false;
-  const { fragmentId, tracked } = resolved;
+  return loadFragment(state, vehicle, resolved.tracked, emitter);
+}
 
-  const loaded = pickupFragment(state.logistics, fragmentId, String(vehicle.id));
-  if (!loaded) return false;
+/** Picks `tracked` up onto `vehicle.cargo`; false when logistics refuses (storage room). */
+function loadFragment(state: GameState, vehicle: Vehicle, tracked: TrackedFragment, emitter?: EventEmitter): boolean {
+  const fragmentId = tracked.fragment.id;
+  if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id))) return false;
 
   state.navGrid?.removeFragmentOccupant(
     Math.round(tracked.fragment.position.x),
     Math.round(tracked.fragment.position.z),
   );
-  vehicle.payload = { fragmentId, massKg: tracked.fragment.mass };
+  vehicle.cargo.push({ fragmentId, massKg: tracked.fragment.mass });
   emitter?.emit('vehicle:haul_loaded', { vehicleId: vehicle.id, fragmentId });
   return true;
 }
 
+function loadExtraFragment(state: GameState, vehicle: Vehicle, fragmentId: number, emitter?: EventEmitter): boolean {
+  const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'on_ground');
+  if (!tracked || isOversized(tracked.fragment.volume)) return true;
+  const capacityKg = getVehicleDefByTier(vehicle.type, vehicle.tier).capacity;
+  if (vehicleCargoMassKg(vehicle) + tracked.fragment.mass > capacityKg) return true;
+  const extraAction = findQueuedHaulAction(state, fragmentId);
+  if (!extraAction) return true;
+
+  if (loadFragment(state, vehicle, tracked, emitter)) completePendingAction(state, extraAction.id);
+  return true;
+}
+
 /**
- * Fires when a debris_hauler's drive-to-depot leg arrives: delivers
- * `vehicle.payload` into logistics/collectedOre and clears the payload.
- * Mirrors the old HaulingTask.ts tickHaulingProgress 'to_depot' arrival
- * branch (deliverToDepot + payload clear) — delivers unconditionally,
- * regardless of whether the destination building still exists/is active at
- * this instant (no re-routing on a vanished depot, matching the
- * building-agnostic storedMassKg/collectedOre credit contract). Completes
- * the haul_debris action this vehicle is reserved for.
+ * Fires when a debris_hauler's drive-to-depot leg arrives: delivers every
+ * `vehicle.cargo` item into logistics/collectedOre (one
+ * `vehicle:haul_delivered` per fragment) and clears the cargo.
+ * Delivers unconditionally, regardless of whether the destination building
+ * still exists/is active at this instant (no re-routing on a vanished depot,
+ * matching the building-agnostic storedMassKg/collectedOre credit contract).
+ * Completes the haul_debris action this vehicle is reserved for.
  */
 export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): boolean {
-  if (vehicle.payload === null) return false;
+  if (vehicle.cargo.length === 0) return false;
 
-  const { fragmentId } = vehicle.payload;
   // deliverToDepot's own success/failure must be honored (#1091 fix): it
   // returns false without mutating anything when the named fragment isn't
-  // actually tracked 'in_transit' any more (a stale payload, or a fragment
-  // reclaimed by something else) — ignoring that and always clearing payload/
-  // completing the action regardless would silently report a delivery that
-  // never happened.
-  const delivered = deliverToDepot(state.logistics, fragmentId, state.collectedOre);
-  if (!delivered) return false;
+  // actually tracked 'in_transit' any more — ignoring that and always
+  // clearing cargo/completing the action would silently report a delivery
+  // that never happened. A stale item is skipped; the trip fails only when
+  // nothing at all was delivered.
+  let delivered = 0;
+  for (const { fragmentId } of vehicle.cargo) {
+    if (!deliverToDepot(state.logistics, fragmentId, state.collectedOre)) continue;
+    delivered++;
+    emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
+    // An extra's own haul action is normally consumed at load; sweep any still queued.
+    const leftover = findQueuedHaulAction(state, fragmentId);
+    if (leftover) completePendingAction(state, leftover.id);
+  }
+  if (delivered === 0) return false;
 
-  vehicle.payload = null;
-  emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
+  vehicle.cargo = [];
   completeFragmentGatedAction(state, vehicle);
   return true;
 }
@@ -168,7 +195,7 @@ function highestFragmentId(state: GameState): number {
  * tickBreakProgress body (fragmentBoulder + logistics splice), minus the
  * movement it used to also drive. Always the final (and only) effect of a
  * break itinerary — completes the fragment_debris action this vehicle is
- * reserved for. Never touches `vehicle.payload` — breaking happens in place,
+ * reserved for. Never touches `vehicle.cargo` — breaking happens in place,
  * nothing is ever loaded onto the vehicle.
  */
 export function applyBoulderSplit(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): boolean {
@@ -251,7 +278,8 @@ export function applyArrivalEffect(
   vehicle: Vehicle,
   effectId: string,
   emitter?: EventEmitter,
+  targetId?: number,
 ): boolean {
   if (effectId !== 'haul_load' && effectId !== 'haul_unload' && effectId !== 'boulder_split') return false;
-  return ARRIVAL_EFFECTS[effectId](state, vehicle, emitter);
+  return ARRIVAL_EFFECTS[effectId](state, vehicle, emitter, targetId);
 }

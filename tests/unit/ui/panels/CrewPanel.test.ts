@@ -52,7 +52,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
     id: 1, type: 'debris_hauler', tier: 1, x: 0, z: 0, hp: 100,
-    payload: null,
+    cargo: [],
     occupantIds: [],
     ...overrides,
   };

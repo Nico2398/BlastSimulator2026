@@ -1154,8 +1154,8 @@ describe('deserialize — a v16 save loads with no pendingEvacuationDestination,
 // normally from there afterward), never from "now".
 
 describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1060)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a v17 fixture with a pendingActions entry missing queuedAtTick loads with queuedAtTick backfilled to the save\'s own tickCount', () => {
@@ -1217,8 +1217,8 @@ describe('deserialize — v17→v18 migration for PendingAction.queuedAtTick (#1
 // today's deserialize (undefined/absent fields), not a compile error.
 
 describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee.locomotion (#1087)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a pre-v19 vehicle with driverId set and no occupantIds/locomotion fields loads with occupantIds derived from driverId, and the driving employee mounted', () => {
@@ -1295,11 +1295,11 @@ describe('deserialize — v18→v19 migration for Vehicle.occupantIds / Employee
 // predate `payload` entirely: one whose old `haulingPhase` was 'to_depot'
 // (cargo already picked up) must derive `payload` from its old
 // `haulingFragmentId`/`payloadKg`; every other pre-v20 vehicle (still driving
-// to the fragment, mid-break, or never hauling at all) gets `payload: null`.
+// to the fragment, mid-break, or never hauling at all) gets `cargo: []`.
 
 describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it("a pre-v20 vehicle with haulingPhase 'to_depot' loads with payload derived from haulingFragmentId/payloadKg", () => {
@@ -1314,6 +1314,7 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
     const vehiclesList = vehiclesContainer['vehicles'] as Array<Record<string, unknown>>;
     const rawVehicle = vehiclesList[0]!;
     delete rawVehicle['payload'];
+    delete rawVehicle['cargo']; // a real pre-v33 save never has it
     rawVehicle['haulingPhase'] = 'to_depot';
     rawVehicle['haulingFragmentId'] = 42;
     rawVehicle['payloadKg'] = 850;
@@ -1321,10 +1322,10 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
     const restored = deserialize(JSON.stringify(parsed));
 
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(restoredVehicle.payload).toEqual({ fragmentId: 42, massKg: 850 });
+    expect(restoredVehicle.cargo).toEqual([{ fragmentId: 42, massKg: 850 }]);
   });
 
-  it("a pre-v20 vehicle with haulingPhase 'to_fragment' (not yet loaded) loads with payload: null", () => {
+  it("a pre-v20 vehicle with haulingPhase 'to_fragment' (not yet loaded) loads with cargo: []", () => {
     const state = createGame({ seed: 42 });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
 
@@ -1342,10 +1343,10 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
     const restored = deserialize(JSON.stringify(parsed));
 
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(restoredVehicle.payload).toBeNull();
+    expect(restoredVehicle.cargo).toEqual([]);
   });
 
-  it('a pre-v20 vehicle with no hauling/break state at all loads with payload: null (boundary)', () => {
+  it('a pre-v20 vehicle with no hauling/break state at all loads with cargo: [] (boundary)', () => {
     const state = createGame({ seed: 42 });
     const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
 
@@ -1360,13 +1361,13 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
     const restored = deserialize(JSON.stringify(parsed));
 
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(restoredVehicle.payload).toBeNull();
+    expect(restoredVehicle.cargo).toEqual([]);
   });
 
   it('a save that already carries payload is left untouched (no double-migration)', () => {
     const state = createGame({ seed: 42 });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
-    vehicle.payload = { fragmentId: 7, massKg: 123 };
+    vehicle.cargo = [{ fragmentId: 7, massKg: 123 }];
 
     const json = serialize(state);
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -1378,7 +1379,7 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
     const restored = deserialize(JSON.stringify(parsed));
 
     const restoredVehicle = restored.vehicles.vehicles.find(v => v.id === vehicle.id)!;
-    expect(restoredVehicle.payload).toEqual({ fragmentId: 7, massKg: 123 });
+    expect(restoredVehicle.cargo).toEqual([{ fragmentId: 7, massKg: 123 }]);
   });
 });
 
@@ -1391,8 +1392,8 @@ describe('deserialize — v19→v20 migration for Vehicle.payload (#1091)', () =
 // truth since v19) left exactly as they were.
 
 describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pendingEvacuationDestination removal (#1092)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a pre-v21 vehicle carrying driverId and pendingEvacuationDestination loads with neither field, and occupants/mounts intact', () => {
@@ -1477,8 +1478,8 @@ describe('deserialize — v20→v21 migration for Vehicle.driverId / Vehicle.pen
 // taken mid vehicle-gated action doesn't forget which vehicle it claimed.
 
 describe('deserialize — v21→v22 migration for Vehicle dead-field removal (#1138)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a v21 vehicle with reservedForActionId set migrates its reservation into VehicleState.reservations, with none of the seven other fields on the restored Vehicle', () => {
@@ -1625,8 +1626,8 @@ describe('serialize — walk trail is transient (#1199)', () => {
 // locomotion put them.
 
 describe('deserialize — v23→v24 migration for building occupancy (#1202)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a pre-v24 save loads with every building empty and everyone outside', () => {
@@ -1669,8 +1670,8 @@ describe('deserialize — v23→v24 migration for building occupancy (#1202)', (
 // `pendingTrainingState: null`.
 
 describe('deserialize — v24→v25 migration for training walk-in (#1203)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a pre-v25 save loads with every employee\'s pendingTrainingState defaulted to null', () => {
@@ -1707,8 +1708,8 @@ describe('deserialize — v24→v25 migration for training walk-in (#1203)', () 
 // unconditionally.
 
 describe('deserialize — v25→v26 migration for agentOccupancyEnabled removal (#1207)', () => {
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a pre-v26 save with agentOccupancyEnabled: true loads with the field stripped', () => {
@@ -1811,8 +1812,8 @@ describe('deserialize — v28→v29 migration for nextHoleId (#1352)', () => {
     return parsed;
   }
 
-  it('SAVE_VERSION is 32', () => {
-    expect(SAVE_VERSION).toBe(32);
+  it('SAVE_VERSION is 33', () => {
+    expect(SAVE_VERSION).toBe(33);
   });
 
   it('a fresh game starts with nextHoleId 1', () => {
@@ -2141,5 +2142,43 @@ describe('held contract persistence (#1367)', () => {
     state.collectedOre['dirtite'] = 500;
     const restored = deserialize(serialize(state));
     expect(autoDeliverContracts(restored.contracts, restored.logistics, restored.collectedOre, 1)).toEqual([]);
+  });
+});
+
+// ── v32→v33 migration: Vehicle.payload becomes Vehicle.cargo[] (#1370) ───────
+
+describe('deserialize — v32→v33 migration for Vehicle.cargo (#1370)', () => {
+  function v32Save(payload: { fragmentId: number; massKg: number } | null) {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    const parsed = JSON.parse(serialize(state)) as Record<string, unknown>;
+    parsed['version'] = 32;
+    const list = (parsed['vehicles'] as Record<string, unknown>)['vehicles'] as Array<Record<string, unknown>>;
+    const raw = list.find(v => v['id'] === vehicle.id)!;
+    delete raw['cargo'];
+    raw['payload'] = payload;
+    return { json: JSON.stringify(parsed), vehicleId: vehicle.id };
+  }
+
+  it('a v32 vehicle with a payload loads with a one-item cargo', () => {
+    const { json, vehicleId } = v32Save({ fragmentId: 7, massKg: 321 });
+    const restored = deserialize(json).vehicles.vehicles.find(v => v.id === vehicleId)!;
+    expect(restored.cargo).toEqual([{ fragmentId: 7, massKg: 321 }]);
+    expect((restored as unknown as Record<string, unknown>)['payload']).toBeUndefined();
+  });
+
+  it('a v32 vehicle with payload null loads with an empty cargo (boundary)', () => {
+    const { json, vehicleId } = v32Save(null);
+    const restored = deserialize(json).vehicles.vehicles.find(v => v.id === vehicleId)!;
+    expect(restored.cargo).toEqual([]);
+    expect((restored as unknown as Record<string, unknown>)['payload']).toBeUndefined();
+  });
+
+  it('a multi-item cargo survives a serialize/deserialize round trip', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+    vehicle.cargo = [{ fragmentId: 1, massKg: 100 }, { fragmentId: 2, massKg: 250 }];
+    const restored = deserialize(serialize(state)).vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect(restored.cargo).toEqual([{ fragmentId: 1, massKg: 100 }, { fragmentId: 2, massKg: 250 }]);
   });
 });

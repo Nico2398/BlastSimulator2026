@@ -123,6 +123,17 @@ export function vehicleRequiredClearanceCells(vehicle: Vehicle): number {
 
 // ── Vehicle instance ──
 
+/** One fragment aboard a hauler (#1370). */
+export interface HaulCargoItem {
+  fragmentId: number;
+  massKg: number;
+}
+
+/** Total mass (kg) aboard a vehicle. */
+export function vehicleCargoMassKg(v: Pick<Vehicle, 'cargo'>): number {
+  return v.cargo.reduce((sum, item) => sum + item.massKg, 0);
+}
+
 export interface Vehicle {
   id: number;
   type: VehicleRole;
@@ -131,13 +142,13 @@ export interface Vehicle {
   z: number;
   hp: number;
   /**
-   * The single cargo item this vehicle currently carries — a fragment loaded
-   * by a `haul_load` arrival effect, cleared by `haul_unload`. Null when
-   * empty. Replaces the old `payloadKg` + `haulingFragmentId` pair (#1091):
-   * mass and fragment identity travel together as one loaded/unloaded unit
-   * rather than two fields that could disagree.
+   * Fragments this vehicle currently carries, loaded one by one by
+   * `haul_load` arrival effects and cleared by `haul_unload`. Empty when
+   * unloaded. Replaces the old `payloadKg` + `haulingFragmentId` pair
+   * (#1091) and the single-item `payload` (#1370): mass and fragment
+   * identity travel together per item.
    */
-  payload: { fragmentId: number; massKg: number } | null;
+  cargo: HaulCargoItem[];
   /**
    * IDs of employees currently mounted in this vehicle (driver included).
    * Must agree with each occupant's `Locomotion` in both directions — see
@@ -258,7 +269,7 @@ export function purchaseVehicle(
     tier,
     x, z,
     hp: def.maxHp,
-    payload: null,
+    cargo: [],
     occupantIds: [],
   };
   state.vehicles.push(vehicle);
@@ -340,7 +351,7 @@ export function canReleaseDriver(
 ): { success: boolean; error?: string } & RefusalKey {
   const vehicle = vehicleState.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found', errorKey: 'vehicle.not_found', errorParams: { id: vehicleId } };
-  if (vehicle.payload !== null) return { success: false, error: 'Vehicle is mid-haul', errorKey: 'vehicle.mid_haul', errorParams: { id: vehicleId } };
+  if (vehicle.cargo.length > 0) return { success: false, error: 'Vehicle is mid-haul', errorKey: 'vehicle.mid_haul', errorParams: { id: vehicleId } };
 
   return { success: true };
 }

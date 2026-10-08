@@ -67,7 +67,7 @@ export function pickupFragment(
   if (!tracked) return false;
 
   // Check if storage has room (fragments in transit will go to storage)
-  if (state.storedMassKg + tracked.fragment.mass > state.storageCapacityKg) {
+  if (!hasStorageRoom(state, tracked.fragment.mass)) {
     return false; // No room
   }
 
@@ -356,9 +356,9 @@ export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
   return massKg <= storageRoomKg(state);
 }
 
-/** Free storage room in kg (capacity minus stored mass) (#1369). */
+/** Free storage room in kg (capacity minus stored and in-transit mass) (#1369, #1370). */
 export function storageRoomKg(state: LogisticsState): number {
-  return state.storageCapacityKg - state.storedMassKg;
+  return state.storageCapacityKg - state.storedMassKg - inTransitMassKg(state);
 }
 
 /** Total ore mass across all materials in `collectedOre`, in kg. */
@@ -415,4 +415,13 @@ export function returnFragmentToGround(
   }
 
   return true;
+}
+
+/** Total mass (kg) of fragments currently in transit (#1370). */
+export function inTransitMassKg(state: LogisticsState): number {
+  let total = 0;
+  for (const f of state.fragments) {
+    if (f.state === 'in_transit') total += f.fragment.mass;
+  }
+  return total;
 }

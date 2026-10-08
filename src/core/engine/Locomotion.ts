@@ -1516,7 +1516,7 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, itinerary: 
     // very leg just drove (drivenVehicle, resolved above) — never re-looked
     // up (#1091).
     if (!drivenVehicle) return true;
-    const ok = applyArrivalEffect(state, drivenVehicle, step.effectId, emitter);
+    const ok = applyArrivalEffect(state, drivenVehicle, step.effectId, emitter, step.targetId);
     if (!ok) {
       interruptActiveAction(state, emp, getVehicleReservation(state.vehicles, drivenVehicle.id), { forceOpenPool: true });
       return false;
