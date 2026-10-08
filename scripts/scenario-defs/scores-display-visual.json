@@ -1,6 +1,6 @@
 {
   "name": "scores-display-visual",
-  "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbor Nuisance scores (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
+  "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbour Relations scores (high = good) (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
   "steps": [
     {
       "command": "new_game seed:42 cash:400000",
@@ -579,7 +579,7 @@
     },
     {
       "command": "blast",
-      "description": "Vibration from this blast dips Ecology and Nuisance immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above. #947-followup: leading `resolveEventIfPending` added -- the preceding step's own resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing this click with \"element is covered by div\" (same race rock-fragmenter-breaking.json's own #601-followup sequence/blast steps found and fixed, see their notes).",
+      "description": "Vibration from this blast dips Ecology and Neighbour Relations immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above. #947-followup: leading `resolveEventIfPending` added -- the preceding step's own resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing this click with \"element is covered by div\" (same race rock-fragmenter-breaking.json's own #601-followup sequence/blast steps found and fixed, see their notes).",
       "interaction": [
         {
           "type": "resolveEventIfPending"

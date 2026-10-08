@@ -57,12 +57,12 @@ export const WEATHER_EVENTS_1: EventDef[] = [
   }),
   // 6 — Dust storm reduces visibility to zero
   ev('weather_dust_storm', 'weather', {
-    weight: (s) => 1.0 + 0.5 * r.nu(s),
+    weight: (s) => 1.0 + 0.5 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.weatherId === 'heat_wave' || ctx.weatherId === 'sunny',
     options: [
-      { cashDelta: -8000, scoreDelta: { safety: 10, nuisance: -5 }, effectTag: 'halt_operations' },
+      { cashDelta: -8000, scoreDelta: { safety: 10, nuisance: 5 }, effectTag: 'halt_operations' },
       { cashDelta: 0, scoreDelta: { safety: -12 }, effectTag: 'blind_driving' },
-      { cashDelta: -3000, scoreDelta: { safety: 4, nuisance: 3 }, effectTag: 'dust_masks' },
+      { cashDelta: -3000, scoreDelta: { safety: 4, nuisance: -3 }, effectTag: 'dust_masks' },
     ],
   }),
   // 7 — Rainbow appears, workers stop to admire
@@ -72,7 +72,7 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -2000, scoreDelta: { wellBeing: 10 }, effectTag: 'rainbow_break' },
       { cashDelta: 0, scoreDelta: { wellBeing: -6 }, effectTag: 'back_to_work' },
-      { cashDelta: -500, scoreDelta: { wellBeing: 7, nuisance: 2 }, effectTag: 'rainbow_selfies' },
+      { cashDelta: -500, scoreDelta: { wellBeing: 7, nuisance: -2 }, effectTag: 'rainbow_selfies' },
     ],
   }),
   // 8 — Fog so thick equipment gets lost
@@ -228,12 +228,12 @@ export const WEATHER_EVENTS_1: EventDef[] = [
   }),
   // 23 — Temperature inversion traps dust in pit
   ev('weather_temp_inversion', 'weather', {
-    weight: (s) => 0.9 + 0.8 * r.nu(s),
+    weight: (s) => 0.9 + 0.8 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.weatherId === 'cloudy' || ctx.weatherId === 'sunny',
     options: [
-      { cashDelta: -10000, scoreDelta: { nuisance: -8, wellBeing: 8, safety: 5 }, effectTag: 'dust_suppression' },
-      { cashDelta: 0, scoreDelta: { nuisance: 10, wellBeing: -8 }, effectTag: 'breathe_dust' },
-      { cashDelta: -4000, scoreDelta: { nuisance: -3, safety: 3 }, effectTag: 'respirators' },
+      { cashDelta: -10000, scoreDelta: { nuisance: 8, wellBeing: 8, safety: 5 }, effectTag: 'dust_suppression' },
+      { cashDelta: 0, scoreDelta: { nuisance: -10, wellBeing: -8 }, effectTag: 'breathe_dust' },
+      { cashDelta: -4000, scoreDelta: { nuisance: 3, safety: 3 }, effectTag: 'respirators' },
     ],
   }),
   // 24 — Minor earthquake tremor

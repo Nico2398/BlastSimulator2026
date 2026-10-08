@@ -19,8 +19,8 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 1.5 + 2 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.scores.ecology < 40,
     options: [
-      { cashDelta: -20000, scoreDelta: { ecology: 15, nuisance: -5 } },
-      { cashDelta: 0, scoreDelta: { ecology: -10, nuisance: 12 }, effectTag: 'bulldoze_protesters' },
+      { cashDelta: -20000, scoreDelta: { ecology: 15, nuisance: 5 } },
+      { cashDelta: 0, scoreDelta: { ecology: -10, nuisance: -12 }, effectTag: 'bulldoze_protesters' },
       { cashDelta: -8000, scoreDelta: { ecology: 8 }, effectTag: 'pr_campaign' },
     ],
   }),
@@ -87,9 +87,9 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 0.5 * r.sf(s),
     canFire: (ctx) => ctx.employeeCount > 5,
     options: [
-      { cashDelta: 20000, scoreDelta: { nuisance: 15, safety: -8 }, effectTag: 'cameras_rolling' },
-      { cashDelta: 0, scoreDelta: { nuisance: -3 } },
-      { cashDelta: 10000, scoreDelta: { nuisance: 8, safety: -3 }, effectTag: 'controlled_filming' },
+      { cashDelta: 20000, scoreDelta: { nuisance: -15, safety: -8 }, effectTag: 'cameras_rolling' },
+      { cashDelta: 0, scoreDelta: { nuisance: 3 } },
+      { cashDelta: 10000, scoreDelta: { nuisance: -8, safety: -3 }, effectTag: 'controlled_filming' },
     ],
   }),
   // 10 — Government subsidy available (with strings)
@@ -149,7 +149,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.scores.ecology < 45,
     options: [
       { cashDelta: -30000, corruptionDelta: 25, effectTag: 'fund_opponent' },
-      { cashDelta: -20000, scoreDelta: { ecology: 12, nuisance: -8 }, effectTag: 'go_green_pr' },
+      { cashDelta: -20000, scoreDelta: { ecology: 12, nuisance: 8 }, effectTag: 'go_green_pr' },
       { cashDelta: 0, scoreDelta: { ecology: -10 }, followUp: 'politics_mayor_wins' },
     ],
   }),
@@ -157,7 +157,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
   ev('politics_celebrity', 'politics', {
     weight: (s) => 0.7 + 0.4 * r.wb(s),
     options: [
-      { cashDelta: -35000, scoreDelta: { wellBeing: 10, nuisance: 8 }, effectTag: 'celeb_endorsed' },
+      { cashDelta: -35000, scoreDelta: { wellBeing: 10, nuisance: -8 }, effectTag: 'celeb_endorsed' },
       { cashDelta: 0 },
       { cashDelta: -15000, scoreDelta: { wellBeing: 5 }, effectTag: 'celeb_social_media' },
     ],
@@ -208,7 +208,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 0.8 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.employeeCount > 4,
     options: [
-      { cashDelta: -5000, scoreDelta: { ecology: -10, nuisance: 10 }, effectTag: 'unfiltered_access' },
+      { cashDelta: -5000, scoreDelta: { ecology: -10, nuisance: -10 }, effectTag: 'unfiltered_access' },
       { cashDelta: -20000, scoreDelta: { ecology: 8 }, effectTag: 'curated_footage' },
       { cashDelta: 0, scoreDelta: { ecology: -5 }, effectTag: 'ban_cameras' },
     ],

@@ -47,7 +47,7 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.7 + 0.8 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.hasBuilding('living_quarters'),
     options: [
-      { cashDelta: -3000, scoreDelta: { wellBeing: 8, nuisance: 5 } },
+      { cashDelta: -3000, scoreDelta: { wellBeing: 8, nuisance: -5 } },
       { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
       { cashDelta: -1000, scoreDelta: { wellBeing: 5 }, effectTag: 'karaoke_wednesdays' },
     ],
@@ -93,7 +93,7 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.6 + 0.7 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.employeeCount > 5,
     options: [
-      { cashDelta: -5000, scoreDelta: { wellBeing: 10, nuisance: 3 } },
+      { cashDelta: -5000, scoreDelta: { wellBeing: 10, nuisance: -3 } },
       { cashDelta: 0, scoreDelta: { wellBeing: -5 } },
       { cashDelta: -2000, scoreDelta: { wellBeing: 6 }, effectTag: 'small_talent_show' },
     ],
@@ -114,7 +114,7 @@ export const UNION_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -4000, scoreDelta: { wellBeing: 7 }, effectTag: 'mascot_rocky' },
       { cashDelta: 0, scoreDelta: { wellBeing: -2 } },
-      { cashDelta: -15000, scoreDelta: { wellBeing: 12, nuisance: 4 }, effectTag: 'mascot_animatronic' },
+      { cashDelta: -15000, scoreDelta: { wellBeing: 12, nuisance: -4 }, effectTag: 'mascot_animatronic' },
     ],
   }),
   // 13 — WiFi in the mine shaft
@@ -142,7 +142,7 @@ export const UNION_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -1000, scoreDelta: { wellBeing: 5 }, effectTag: 'remove_posters' },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
-      { cashDelta: -2000, scoreDelta: { wellBeing: 3, nuisance: 2 }, effectTag: 'worker_posters' },
+      { cashDelta: -2000, scoreDelta: { wellBeing: 3, nuisance: -2 }, effectTag: 'worker_posters' },
     ],
   }),
   // 16 — Nap room demand
@@ -193,20 +193,20 @@ export const UNION_EVENTS_1: EventDef[] = [
   }),
   // 21 — Complaint about ambient explosion noise
   ev('union_noise_complaint', 'union', {
-    weight: (s) => 0.8 + 1.5 * r.nu(s),
+    weight: (s) => 0.8 + 1.5 * (1 - r.nu(s)),
     options: [
-      { cashDelta: -15000, scoreDelta: { nuisance: -10, wellBeing: 8 }, effectTag: 'noise_cancel_headphones' },
+      { cashDelta: -15000, scoreDelta: { nuisance: 10, wellBeing: 8 }, effectTag: 'noise_cancel_headphones' },
       { cashDelta: 0, scoreDelta: { wellBeing: -6 } },
-      { cashDelta: -3000, scoreDelta: { nuisance: -3, wellBeing: 4 }, effectTag: 'ear_plugs' },
+      { cashDelta: -3000, scoreDelta: { nuisance: 3, wellBeing: 4 }, effectTag: 'ear_plugs' },
     ],
   }),
   // 22 — Workers want a company band
   ev('union_company_band', 'union', {
     weight: (s) => 0.5 + 0.4 * (1 - r.wb(s)),
     options: [
-      { cashDelta: -6000, scoreDelta: { wellBeing: 9, nuisance: 8 }, effectTag: 'pit_orchestra' },
+      { cashDelta: -6000, scoreDelta: { wellBeing: 9, nuisance: -8 }, effectTag: 'pit_orchestra' },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
-      { cashDelta: -2000, scoreDelta: { wellBeing: 5, nuisance: 3 }, effectTag: 'lunch_jam_session' },
+      { cashDelta: -2000, scoreDelta: { wellBeing: 5, nuisance: -3 }, effectTag: 'lunch_jam_session' },
     ],
   }),
   // 23 — Better parking spaces for haul trucks

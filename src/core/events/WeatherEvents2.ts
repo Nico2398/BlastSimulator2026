@@ -26,12 +26,12 @@ export const WEATHER_EVENTS_2: EventDef[] = [
   }),
   // 28 — Wind shifts blast debris toward nearby village
   ev('weather_debris_wind', 'weather', {
-    weight: (s) => 1.5 + 2.0 * r.nu(s),
+    weight: (s) => 1.5 + 2.0 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.weatherId === 'storm' || ctx.weatherId === 'cloudy',
     options: [
-      { cashDelta: -25000, scoreDelta: { nuisance: -12, safety: 5 }, effectTag: 'village_cleanup' },
-      { cashDelta: 0, scoreDelta: { nuisance: 15, safety: -10 }, followUp: 'weather_lawsuit_debris' },
-      { corruptionDelta: 12, cashDelta: -5000, scoreDelta: { nuisance: -3 }, effectTag: 'bribe_mayor' },
+      { cashDelta: -25000, scoreDelta: { nuisance: 12, safety: 5 }, effectTag: 'village_cleanup' },
+      { cashDelta: 0, scoreDelta: { nuisance: -15, safety: -10 }, followUp: 'weather_lawsuit_debris' },
+      { corruptionDelta: 12, cashDelta: -5000, scoreDelta: { nuisance: 3 }, effectTag: 'bribe_mayor' },
     ],
   }),
   // 29 — Permafrost thawing reveals prehistoric bones
@@ -82,7 +82,7 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -2000, scoreDelta: { wellBeing: 12 }, effectTag: 'rainbow_break' },
       { cashDelta: 0, scoreDelta: { wellBeing: -8 }, effectTag: 'no_fun_allowed' },
-      { cashDelta: 3000, scoreDelta: { wellBeing: 6, nuisance: 3 }, effectTag: 'rainbow_marketing' },
+      { cashDelta: 3000, scoreDelta: { wellBeing: 6, nuisance: -3 }, effectTag: 'rainbow_marketing' },
     ],
   }),
   // 34 — Warm winter melts snow, causes mudflow
@@ -132,7 +132,7 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: 5000, scoreDelta: { wellBeing: 8 }, effectTag: 'divine_marketing' },
       { cashDelta: 0, scoreDelta: { wellBeing: -5 }, effectTag: 'omen_of_doom' },
-      { cashDelta: -3000, scoreDelta: { wellBeing: 10, nuisance: 2 }, effectTag: 'cloud_merch' },
+      { cashDelta: -3000, scoreDelta: { wellBeing: 10, nuisance: -2 }, effectTag: 'cloud_merch' },
     ],
   }),
   // 39 — Static electricity buildup near explosives
@@ -151,9 +151,9 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     weight: (s) => 0.6 + 0.5 * r.ec(s),
     canFire: (ctx) => ctx.weatherId === 'sunny',
     options: [
-      { cashDelta: 15000, scoreDelta: { nuisance: 8, wellBeing: 5 }, effectTag: 'mine_tours' },
+      { cashDelta: 15000, scoreDelta: { nuisance: -8, wellBeing: 5 }, effectTag: 'mine_tours' },
       { cashDelta: 0, scoreDelta: {} },
-      { cashDelta: 8000, scoreDelta: { nuisance: 3, ecology: -3 }, effectTag: 'instagram_spot' },
+      { cashDelta: 8000, scoreDelta: { nuisance: -3, ecology: -3 }, effectTag: 'instagram_spot' },
     ],
   }),
   // 41 — Pollen season: allergies reduce workforce
@@ -190,9 +190,9 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     weight: (s) => 0.6 + 0.8 * r.ec(s),
     canFire: (ctx) => ctx.weatherId === 'storm' || ctx.weatherId === 'cloudy',
     options: [
-      { cashDelta: -40000, scoreDelta: { ecology: 15, nuisance: 5 }, effectTag: 'wind_farm' },
+      { cashDelta: -40000, scoreDelta: { ecology: 15, nuisance: -5 }, effectTag: 'wind_farm' },
       { cashDelta: 0, scoreDelta: {} },
-      { cashDelta: -15000, scoreDelta: { ecology: 8, nuisance: 3 }, effectTag: 'single_turbine' },
+      { cashDelta: -15000, scoreDelta: { ecology: 8, nuisance: -3 }, effectTag: 'single_turbine' },
     ],
   }),
   // 45 — Meteor shower visible from pit, workers want to watch
@@ -222,8 +222,8 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     canFire: (ctx) => ctx.hasDrillPlan,
     options: [
       { cashDelta: -10000, scoreDelta: { ecology: 15 }, effectTag: 'blasting_pause_birds' },
-      { cashDelta: 0, scoreDelta: { ecology: -18, nuisance: 5 }, effectTag: 'blast_through_flock' },
-      { cashDelta: -4000, scoreDelta: { ecology: 8, nuisance: 3 }, effectTag: 'bird_scarers' },
+      { cashDelta: 0, scoreDelta: { ecology: -18, nuisance: -5 }, effectTag: 'blast_through_flock' },
+      { cashDelta: -4000, scoreDelta: { ecology: 8, nuisance: -3 }, effectTag: 'bird_scarers' },
     ],
   }),
   // 48 — Ice formation on equipment overnight
@@ -243,7 +243,7 @@ export const WEATHER_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -20000, scoreDelta: { safety: 12, ecology: 5 }, effectTag: 'emergency_evac' },
       { cashDelta: 0, scoreDelta: { safety: -20, wellBeing: -10 }, effectTag: 'waterspout_hits' },
-      { cashDelta: 5000, scoreDelta: { nuisance: 8, wellBeing: 6 }, effectTag: 'waterspout_tours',
+      { cashDelta: 5000, scoreDelta: { nuisance: -8, wellBeing: 6 }, effectTag: 'waterspout_tours',
         probability: 0.4, alt: { cashDelta: -30000, scoreDelta: { safety: -15 } } },
     ],
   }),

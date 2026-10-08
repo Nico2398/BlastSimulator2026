@@ -60,6 +60,7 @@ const SCORE_ABBR_KEY: Record<string, string> = {
   wellBeing: 'shell.topbar.score_well',
   safety: 'shell.topbar.score_safe',
   ecology: 'shell.topbar.score_eco',
+  // nuisance = neighbour relations: high = good, so a positive delta is green.
   nuisance: 'shell.topbar.score_nuis',
 };
 

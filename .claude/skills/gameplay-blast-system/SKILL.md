@@ -280,11 +280,11 @@ draws; ids `village-<i>`, ground level). Both `executeBlast` and `previewVibrati
 mean hole position (distance clamped to 1 m); every charge fires together, so vibration is
 `totalChargeKg(holes, charges)^0.7 / distance^1.5 x groundFactor` (scalar over all charged holes) with ground factor = base x `averageVibrationMod`
 (charged holes, equal weight, wet holes included), so preview equals blast; callers pass the factor.
-The blast report carries `maxVibration`; `blast` costs nuisance `maxVibration x
+The blast report carries `maxVibration`; `blast` lowers neighbour relations (`nuisance`) by `maxVibration x
 VILLAGE_VIBRATION_SCORE_GAIN` via `recordVibration`, separate from the projection term
 (`BLAST_PROJECTION_NUISANCE_PER_PROJECTION`). For `SCORE_VIBRATION_WINDOW_TICKS` ticks after the blast the tick pipeline
 also feeds the same scaled value to `updateScores`. The gain is large (15000) because PPV falls off as
-distance^-1.5 (~4e-4 mm/s at 445 m for an ordinary Grumpstone Ridge blast); it targets ~1-3 nuisance
+distance^-1.5 (~4e-4 mm/s at 445 m for an ordinary Grumpstone Ridge blast); it targets ~1-3 neighbour-relations
 points for an ordinary blast and ~5 for an oversized one.
 
 ## Working on this pipeline

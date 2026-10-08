@@ -45,8 +45,6 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.settings.french',  // "Français"
 
   // ── True French/English cognates ──
-  'hud.scores.nuisance',        // "Nuisance"
-  'score.nuisance',             // "Nuisance"
   'need.fatigue',               // "Fatigue"
   'proficiency.2',              // "Novice"
   'proficiency.4',              // "Expert"

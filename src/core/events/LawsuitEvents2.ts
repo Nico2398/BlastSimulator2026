@@ -7,11 +7,11 @@ import { hasEnvironmentalCause } from './EventPool.js';
 export const LAWSUIT_EVENTS_2: EventDef[] = [
   // 26 — Class action: chronic dust inhalation fashion damage
   ev('lawsuit_dust_fashion', 'lawsuit', {
-    weight: (s) => 1.0 + 1.8 * r.nu(s),
+    weight: (s) => 1.0 + 1.8 * (1 - r.nu(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.tickCount > 15,
     options: [
-      { cashDelta: -25000, scoreDelta: { nuisance: -8 }, effectTag: 'dust_settlement' },
-      { cashDelta: -5000, scoreDelta: { nuisance: 5 }, followUp: 'lawsuit_dust_fashion_appeal' },
+      { cashDelta: -25000, scoreDelta: { nuisance: 8 }, effectTag: 'dust_settlement' },
+      { cashDelta: -5000, scoreDelta: { nuisance: -5 }, followUp: 'lawsuit_dust_fashion_appeal' },
       { corruptionDelta: 12, cashDelta: -3000, effectTag: 'bribe_dry_cleaners' },
     ],
   }),
@@ -36,12 +36,12 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   }),
   // 29 — Neighbor sues for aesthetic pollution
   ev('lawsuit_aesthetic_pollution', 'lawsuit', {
-    weight: (s) => 0.8 + 1.6 * r.nu(s),
-    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.nuisance > 40,
+    weight: (s) => 0.8 + 1.6 * (1 - r.nu(s)),
+    canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.nuisance < 60,
     options: [
-      { cashDelta: -15000, scoreDelta: { nuisance: -10, ecology: 5 }, effectTag: 'landscaping' },
-      { cashDelta: 0, scoreDelta: { nuisance: 8 }, effectTag: 'beauty_is_subjective' },
-      { cashDelta: -30000, scoreDelta: { nuisance: -15 }, effectTag: 'hire_mine_architect' },
+      { cashDelta: -15000, scoreDelta: { nuisance: 10, ecology: 5 }, effectTag: 'landscaping' },
+      { cashDelta: 0, scoreDelta: { nuisance: -8 }, effectTag: 'beauty_is_subjective' },
+      { cashDelta: -30000, scoreDelta: { nuisance: 15 }, effectTag: 'hire_mine_architect' },
     ],
   }),
   // 30 — Employee discrimination suit (wanted to be a blaster)
@@ -60,7 +60,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 1.5 + 2.0 * (1 - r.ec(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.ecology < 45,
     options: [
-      { cashDelta: -60000, scoreDelta: { ecology: 20, nuisance: -5 }, effectTag: 'full_cleanup' },
+      { cashDelta: -60000, scoreDelta: { ecology: 20, nuisance: 5 }, effectTag: 'full_cleanup' },
       { cashDelta: -20000, scoreDelta: { ecology: 8 }, effectTag: 'minimal_cleanup' },
       { corruptionDelta: 25, cashDelta: -10000, effectTag: 'bury_toxic_report' },
     ],
@@ -77,11 +77,11 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   }),
   // 33 — Noise ordinance violation, multiple infractions
   ev('lawsuit_noise_infractions', 'lawsuit', {
-    weight: (s) => 1.2 + 1.8 * r.nu(s),
+    weight: (s) => 1.2 + 1.8 * (1 - r.nu(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.lawsuitCount > 0,
     options: [
-      { cashDelta: -35000, scoreDelta: { nuisance: -12 }, effectTag: 'install_noise_barriers' },
-      { cashDelta: -15000, scoreDelta: { nuisance: -4 }, effectTag: 'pay_fines_only' },
+      { cashDelta: -35000, scoreDelta: { nuisance: 12 }, effectTag: 'install_noise_barriers' },
+      { cashDelta: -15000, scoreDelta: { nuisance: 4 }, effectTag: 'pay_fines_only' },
       { corruptionDelta: 14, cashDelta: -5000, effectTag: 'bribe_noise_inspector' },
     ],
   }),
@@ -98,12 +98,12 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   }),
   // 35 — Local school sues: blasts interrupt exams
   ev('lawsuit_school_exams', 'lawsuit', {
-    weight: (s) => 1.0 + 1.5 * r.nu(s),
+    weight: (s) => 1.0 + 1.5 * (1 - r.nu(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.hasDrillPlan,
     options: [
-      { cashDelta: -12000, scoreDelta: { nuisance: -10, wellBeing: 5 }, effectTag: 'blast_schedule_change' },
-      { cashDelta: -25000, scoreDelta: { nuisance: -8 }, effectTag: 'fund_school_soundproofing' },
-      { cashDelta: 0, scoreDelta: { nuisance: 10, wellBeing: -8 }, effectTag: 'children_can_cope' },
+      { cashDelta: -12000, scoreDelta: { nuisance: 10, wellBeing: 5 }, effectTag: 'blast_schedule_change' },
+      { cashDelta: -25000, scoreDelta: { nuisance: 8 }, effectTag: 'fund_school_soundproofing' },
+      { cashDelta: 0, scoreDelta: { nuisance: -10, wellBeing: -8 }, effectTag: 'children_can_cope' },
     ],
   }),
   // 36 — Ambulance chaser lawyer appears
@@ -118,11 +118,11 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   }),
   // 37 — Joint lawsuit from multiple villages
   ev('lawsuit_village_coalition', 'lawsuit', {
-    weight: (s) => 1.4 + 2.0 * r.nu(s) + 1.0 * (1 - r.ec(s)),
+    weight: (s) => 1.4 + 2.0 * (1 - r.nu(s)) + 1.0 * (1 - r.ec(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.lawsuitCount > 2,
     options: [
-      { cashDelta: -50000, scoreDelta: { nuisance: -15, ecology: 10 }, effectTag: 'mega_settlement' },
-      { cashDelta: -15000, scoreDelta: { nuisance: 5 }, followUp: 'lawsuit_village_coalition_2' },
+      { cashDelta: -50000, scoreDelta: { nuisance: 15, ecology: 10 }, effectTag: 'mega_settlement' },
+      { cashDelta: -15000, scoreDelta: { nuisance: -5 }, followUp: 'lawsuit_village_coalition_2' },
       { corruptionDelta: 30, cashDelta: -10000, effectTag: 'buy_village_mayors' },
     ],
   }),
@@ -158,12 +158,12 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   }),
   // 41 — Celebrity sues after chipping nail during mine visit
   ev('lawsuit_celeb_nail', 'lawsuit', {
-    weight: (s) => 0.5 + 0.8 * r.nu(s),
+    weight: (s) => 0.5 + 0.8 * (1 - r.nu(s)),
     options: [
-      { cashDelta: -20000, scoreDelta: { nuisance: -5 }, effectTag: 'celeb_settlement' },
-      { cashDelta: 0, scoreDelta: { nuisance: 12 }, effectTag: 'celeb_goes_viral' },
-      { cashDelta: -50000, scoreDelta: { nuisance: -15 }, effectTag: 'celeb_endorsement_deal',
-        probability: 0.3, alt: { cashDelta: -50000, scoreDelta: { nuisance: 8 }, effectTag: 'celeb_still_sues' } },
+      { cashDelta: -20000, scoreDelta: { nuisance: 5 }, effectTag: 'celeb_settlement' },
+      { cashDelta: 0, scoreDelta: { nuisance: -12 }, effectTag: 'celeb_goes_viral' },
+      { cashDelta: -50000, scoreDelta: { nuisance: 15 }, effectTag: 'celeb_endorsement_deal',
+        probability: 0.3, alt: { cashDelta: -50000, scoreDelta: { nuisance: -8 }, effectTag: 'celeb_still_sues' } },
     ],
   }),
   // 42 — Professional mountaineer sues for ruining the mountain
@@ -172,8 +172,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => hasEnvironmentalCause(ctx),
     options: [
       { cashDelta: -15000, scoreDelta: { ecology: 8 }, effectTag: 'mountain_restoration_fund' },
-      { cashDelta: 0, scoreDelta: { ecology: -5, nuisance: 5 }, effectTag: 'its_a_pit_not_a_peak' },
-      { cashDelta: -25000, scoreDelta: { ecology: 12, nuisance: -5 }, effectTag: 'build_climbing_wall' },
+      { cashDelta: 0, scoreDelta: { ecology: -5, nuisance: -5 }, effectTag: 'its_a_pit_not_a_peak' },
+      { cashDelta: -25000, scoreDelta: { ecology: 12, nuisance: 5 }, effectTag: 'build_climbing_wall' },
     ],
   }),
   // 43 — Mine inspectors union demands better inspection conditions
@@ -199,12 +199,12 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   }),
   // 45 — Class action over emotional distress from explosion names
   ev('lawsuit_explosion_names', 'lawsuit', {
-    weight: (s) => 0.6 + 1.0 * r.nu(s),
+    weight: (s) => 0.6 + 1.0 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.hasDrillPlan,
     options: [
-      { cashDelta: -12000, scoreDelta: { nuisance: -8 }, effectTag: 'rename_operations' },
-      { cashDelta: 0, scoreDelta: { nuisance: 6 }, effectTag: 'double_down_names' },
-      { cashDelta: -6000, scoreDelta: { nuisance: -3 }, effectTag: 'sensitivity_committee' },
+      { cashDelta: -12000, scoreDelta: { nuisance: 8 }, effectTag: 'rename_operations' },
+      { cashDelta: 0, scoreDelta: { nuisance: -6 }, effectTag: 'double_down_names' },
+      { cashDelta: -6000, scoreDelta: { nuisance: 3 }, effectTag: 'sensitivity_committee' },
     ],
   }),
   // 46 — Divorce lawyer subpoenas mine records
@@ -222,10 +222,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 0.8 + 1.4 * (1 - r.ec(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx),
     options: [
-      { cashDelta: -18000, scoreDelta: { ecology: 12, nuisance: -5 }, effectTag: 'goat_sanctuary' },
-      { cashDelta: 0, scoreDelta: { ecology: -8, nuisance: 8 }, effectTag: 'goats_are_fine' },
+      { cashDelta: -18000, scoreDelta: { ecology: 12, nuisance: 5 }, effectTag: 'goat_sanctuary' },
+      { cashDelta: 0, scoreDelta: { ecology: -8, nuisance: -8 }, effectTag: 'goats_are_fine' },
       { cashDelta: -10000, scoreDelta: { ecology: 6 }, effectTag: 'goat_relocation',
-        probability: 0.7, alt: { scoreDelta: { ecology: -3, nuisance: 5 }, effectTag: 'goats_return' } },
+        probability: 0.7, alt: { scoreDelta: { ecology: -3, nuisance: -5 }, effectTag: 'goats_return' } },
     ],
   }),
   // 48 — Building code violations from hasty construction
@@ -254,7 +254,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => ctx.lawsuitCount > 3 && ctx.tickCount > 40,
     options: [
       { cashDelta: -70000, scoreDelta: { ecology: 15, safety: 15 }, corruptionDelta: -20, effectTag: 'comply_intl_court' },
-      { cashDelta: -20000, scoreDelta: { ecology: -10, safety: -10, nuisance: 10 }, effectTag: 'ignore_jurisdiction' },
+      { cashDelta: -20000, scoreDelta: { ecology: -10, safety: -10, nuisance: -10 }, effectTag: 'ignore_jurisdiction' },
       { corruptionDelta: 35, cashDelta: -15000, effectTag: 'bribe_intl_judges',
         probability: 0.3, alt: { cashDelta: -80000, corruptionDelta: 20, effectTag: 'bribe_exposed' } },
     ],

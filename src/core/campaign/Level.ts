@@ -161,7 +161,7 @@ const LEVELS: readonly LevelDef[] = [
     // ────────────────────────────────────────────────────────
     // Level 2 — Grumpstone Ridge
     // Mountain site. Mixed rock hardness. Mid-tier explosives. Moderate challenge.
-    // Neighboring village adds nuisance penalties.
+    // Neighboring village lowers neighbour relations.
     // ────────────────────────────────────────────────────────
     id: 'grumpstone_ridge',
     nameKey: 'level.grumpstone_ridge.name',
