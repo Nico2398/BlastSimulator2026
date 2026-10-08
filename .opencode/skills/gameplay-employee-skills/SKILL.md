@@ -40,7 +40,7 @@ Every role arrives able to do its own job, with no per-employee course (`ROLE_ST
 | Surveyor | `geology` 1 |
 | Manager | `management` 1 |
 
-Training grants qualifications and licences a role does not start with: the `driving.rock_fragmenter` licence, cross-training (a surveyor learning to drive). A course teaches a missing skill only: it grants level 1 with 0 XP, carries a flat fee (`TRAINING_BASE_FEE`), a tier-scaled duration (`TRAINING_TIER_SPEED`) and the level-1 salary bonus (`planTraining`); it is refused (`employees.train_already_qualified`) for any held skill, whatever its level. Proficiency rises only from XP earned by working. Licence tiers (vehicle tier gating) arrive with #1524.
+Training grants qualifications and licences a role does not start with: the `driving.rock_fragmenter` licence, cross-training (a surveyor learning to drive). A course teaches a missing skill only: it grants level 1 with 0 XP, carries a flat fee (`TRAINING_BASE_FEE`), a tier-scaled duration (`TRAINING_TIER_SPEED`) and the level-1 salary bonus (`planTraining`); it is refused (`employees.train_already_qualified`) for any held skill, whatever its level. Proficiency rises only from XP earned by working. Licence tiers (vehicle tier gating) arrive with #1524; the vehicle upgrade licence warning (#1401) is specified in `gameplay-vehicle-fleet`.
 
 ## Proficiency Levels & Effects
 

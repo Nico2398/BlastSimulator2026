@@ -1,7 +1,10 @@
 // BlastSimulator2026 — Fleet panel (redesign P6)
 // Traffic advisory banner, then one card per vehicle: name/id/role, status
 // chip, HP gauge, LOAD gauge (haulers only), driver row or no-driver status
-// (licence warning or "unmanned" — display-only since #921), REPOSITION
+// (licence warning or "unmanned" — display-only since #921), UPGRADE (#1401:
+// pay the price difference to move up one tier in place; shows the cost,
+// disabled at tier 3 or when cash is short, patched in place as cash changes;
+// a warning row when nobody on the roster can drive the next tier), REPOSITION
 // (pick a tile in the scene, then `vehicle reposition`), SCRAP (confirm,
 // real residual value). Both Haul and Break are
 // self-dispatching now (#552, #618) — there is no button for either; a
@@ -26,6 +29,7 @@ import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehi
 import type { Employee } from '../../core/entities/Employee.js';
 import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
+import { canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
@@ -158,6 +162,8 @@ export class FleetPanel extends PanelBase {
       const load = makeLoadGauge(v);
       const existingLoad = row.querySelector('.bs-fleet-load');
       if (load && existingLoad) existingLoad.replaceWith(this.tag(load, 'bs-fleet-load'));
+      const upgradeBtn = row.querySelector<HTMLButtonElement>('[data-action="upgrade"]');
+      if (upgradeBtn) this.applyUpgradeState(upgradeBtn, v, state.cash);
     }
   }
 
@@ -303,8 +309,21 @@ export class FleetPanel extends PanelBase {
           : makeNoDriverRow(v, state, () => this.onNavigateCb?.('crew')),
     );
 
+    // Redundant when makeNoDriverRow already warns that nobody holds the role licence.
+    const roleWarningShown = driverId === null && !pendingDriver
+      && !state.employees.employees.some(e => e.alive && isLicensedForRole(e, v.type));
+    const nextTier = nextVehicleTier(v.tier);
+    if (!roleWarningShown && nextTier !== null && !rosterCanDriveVehicleTier(state.employees.employees, v.type, nextTier)) {
+      rows.push(el('div', {
+        text: t('ui.fleet.upgrade_licence_warning'),
+        className: 'bs-fleet-upgrade-warning',
+        attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' },
+      }));
+    }
+
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
     actions.appendChild(this.makeRepositionButton(v, state));
+    actions.appendChild(this.makeUpgradeButton(v, state.cash));
     const scrapBtn = button('danger', '', { icon: 'trash' });
     scrapBtn.style.cssText = 'width:34px;height:28px;padding:0';
     scrapBtn.title = t('ui.fleet.scrap');
@@ -370,6 +389,37 @@ export class FleetPanel extends PanelBase {
     btn.title = t('ui.fleet.reposition_hint');
     btn.addEventListener('click', () => this.requestReposition(v.id));
     return btn;
+  }
+
+  /** "Upgrade" (#1401): dispatches `vehicle upgrade <id>`; state comes from applyUpgradeState and is re-patched as cash drifts. */
+  private makeUpgradeButton(v: Vehicle, cash: number): HTMLButtonElement {
+    const btn = button('ghost', t('ui.fleet.upgrade'), { icon: 'up' });
+    btn.className += ' bs-fleet-upgrade-btn';
+    btn.style.cssText += ';height:28px;font-size:10px;flex:1';
+    btn.dataset['action'] = 'upgrade';
+    btn.addEventListener('click', () => this.gameConsole?.(`vehicle upgrade ${v.id}`));
+    this.applyUpgradeState(btn, v, cash);
+    return btn;
+  }
+
+  private applyUpgradeState(btn: HTMLButtonElement, v: Vehicle, cash: number): void {
+    const next = nextVehicleTier(v.tier);
+    const cost = computeVehicleUpgradeCost(v.type, v.tier);
+    let reason: string | null = null;
+    let label = t('ui.fleet.upgrade');
+    if (next === null || cost === null) {
+      reason = t('ui.fleet.upgrade_max');
+    } else {
+      label = `${t('ui.fleet.upgrade')} ${formatDollars(cost)}`;
+      if (!canAffordVehicleUpgrade(v, cash)) reason = t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
+    }
+    // button() builds [icon][label span]; patch only the label span so the icon survives.
+    const labelEl = btn.lastElementChild;
+    if (labelEl) labelEl.textContent = label;
+    btn.disabled = reason !== null;
+    btn.title = reason ?? t('ui.fleet.upgrade_hint', { tier: next ?? v.tier, cost: formatMoney(cost ?? 0) });
+    btn.style.opacity = reason === null ? '1' : '.45';
+    btn.style.cursor = reason === null ? 'pointer' : 'not-allowed';
   }
 
   /** destroyVehicle removes the vehicle outright — no reversal — so scrap always confirms first, with the real residual credit shown up front. */

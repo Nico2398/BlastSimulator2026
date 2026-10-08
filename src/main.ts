@@ -23,6 +23,7 @@ import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
+import { canAffordVehicleUpgrade } from './core/entities/VehicleUpgrade.js';
 import { getMaxBuildingTier } from './core/entities/Building.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
@@ -1051,11 +1052,20 @@ scenePicking.setHoverChangeHandler((hover) => {
 });
 /** Width of the selected ramp as last drawn (bar + corridor highlight); a widening that lands re-draws both (#1298). */
 let shownRampWidth: number | null = null;
+/** Tier and affordability of the selected vehicle's Upgrade button as last drawn; a change re-draws the bar (#1401). */
+let shownVehicleKey: string | null = null;
+function vehicleSelectionKey(entity: EntityPick, state: GameState): string | null {
+  if (entity.kind !== 'vehicle') return null;
+  const v = state.vehicles.vehicles.find(x => x.id === entity.id);
+  if (!v) return null;
+  return `${v.tier}:${canAffordVehicleUpgrade(v, state.cash)}`;
+}
 function showSelection(entity: EntityPick, state: GameState): void {
   selectionBar.show(entity, state);
   const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);
   const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
   shownRampWidth = ramp?.width ?? null;
+  shownVehicleKey = vehicleSelectionKey(entity, state);
   if (pos && ramp) entityHighlight.showFootprint(ramp.footprint, pos, (x, z) => gameRenderer.smoothSurfaceYAt(x, z));
   else if (pos) entityHighlight.show(pos, entity.kind);
 }
@@ -1064,6 +1074,7 @@ scenePicking.setSelectChangeHandler((entity) => {
     showSelection(entity, ctx.state);
   } else {
     shownRampWidth = null;
+    shownVehicleKey = null;
     selectionBar.hide();
     entityHighlight.hide();
   }
@@ -1107,6 +1118,9 @@ selectionBar.setActionHandler((action, entity) => {
       reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
       break;
     }
+    case 'upgrade_vehicle':
+      reportIfFailed(t('shell.selection.upgrade_vehicle'), window.__gameConsole(`vehicle upgrade ${entity.id}`));
+      break;
     case 'move_here': {
       // Vehicle counterpart of Dispatch Here: drive to whatever tile the
       // player is currently pointing at. `vehicle reposition` takes its
@@ -1223,6 +1237,8 @@ scene.start((dt) => {
     if (!pos) scenePicking.clearSelection();
     else if (shownRampWidth !== null && ctx.state?.builtRamps.find(r => r.id === scenePicking.selection?.id)?.width !== shownRampWidth) {
       showSelection(scenePicking.selection, ctx.state!);
+    } else if (shownVehicleKey !== null && ctx.state && vehicleSelectionKey(scenePicking.selection, ctx.state) !== shownVehicleKey) {
+      showSelection(scenePicking.selection, ctx.state);
     } else entityHighlight.setPosition(pos);
   }
 

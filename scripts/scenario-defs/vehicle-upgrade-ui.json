@@ -1,0 +1,144 @@
+{
+  "name": "vehicle-upgrade-ui",
+  "description": "A player upgrades a vehicle in place twice by clicking: the Fleet panel card Upgrade button (tier 1 to 2), then the selection-bar Upgrade button after selecting the vehicle (tier 2 to 3). Each click costs the purchase-price difference.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:300000",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:300000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 300000,
+          "vehicleCount": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "description": "Player buys a tier-1 hauler (25,000) from the Fleet dealership so there is something to upgrade.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle upgrade 1",
+      "description": "Player opens the Fleet panel and clicks Upgrade on the hauler card: tier 1 to 2 costs 50,000 - 25,000.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle upgrade 1",
+      "description": "Player selects the vehicle by its (only) Fleet panel row, then clicks the selection-bar Upgrade button: tier 2 to 3 costs 100,000 - 50,000.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"upgrade_vehicle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"upgrade_vehicle\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -50000
+        },
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle upgrade 1",
+      "description": "role: guard: at max tier the Fleet panel Upgrade button is disabled (console refuses the same command) and cash does not move.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]"
+        }
+      ],
+      "role": "guard",
+      "commandOutcome": "refused",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "blocked": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]",
+        "note": "rejected: vehicle already at max tier"
+      }
+    },
+    {
+      "command": "vehicle list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "fleet-upgraded",
+      "yaw": 45,
+      "pitch": 30
+    }
+  ]
+}

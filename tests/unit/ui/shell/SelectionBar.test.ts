@@ -64,7 +64,7 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Unassign'))).toBe(false);
     expect(root.querySelector('[data-action="haul"]')).toBeNull();
     expect(root.querySelector('[data-action="unassign"]')).toBeNull();
-    expect(root.querySelectorAll('button[data-action]').length).toBe(2);
+    expect(root.querySelectorAll('button[data-action]').length).toBe(3);
   });
 
   it('shows the building action set (Upgrade, Move, Demolish)', () => {
@@ -287,6 +287,40 @@ describe('SelectionBar', () => {
     const { bar, root, container } = makeBar();
     bar.dispose();
     expect(container.contains(root)).toBe(false);
+  });
+});
+
+describe('SelectionBar vehicle upgrade button (#1401)', () => {
+  function upgradeBtn(root: HTMLElement): HTMLButtonElement {
+    return root.querySelector('[data-action="upgrade_vehicle"]') as HTMLButtonElement;
+  }
+
+  it('is enabled when cash covers the upgrade', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    state.cash = 1e9;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(false);
+  });
+
+  it('is disabled when cash is short', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    state.cash = 0;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(true);
+  });
+
+  it('is disabled at max tier however much cash', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.tier = 3;
+    state.cash = 1e9;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(true);
   });
 });
 
