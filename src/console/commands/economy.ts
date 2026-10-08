@@ -6,6 +6,7 @@ import { getBalance, getFinancialReport } from '../../core/economy/Finance.js';
 import {
   generateContracts,
   acceptContract,
+  contractAcceptBlocker,
   setContractHeld,
   findContract,
   remainingKg,
@@ -14,6 +15,7 @@ import {
   type ContractSelector,
   type ContractType,
 } from '../../core/economy/Contract.js';
+import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
@@ -158,6 +160,10 @@ export function contractCommand(
       const usage = t('economy.contract.usage_accept');
       const resolved = resolveContract(state.contracts.available, args, named, usage, state);
       if ('success' in resolved) return resolved;
+      const offer = state.contracts.available.find(c => c.id === resolved.id);
+      if (offer && contractAcceptBlocker(offer, freightWarehouseSites(state.buildings).length > 0) === 'needs_freight_warehouse') {
+        return { success: false, output: t('economy.contract.needs_warehouse') };
+      }
       const contract = acceptContract(state.contracts, resolved.id, state.tickCount);
       if (!contract) return { success: false, output: `Contract #${resolved.id} not found in available list.` };
       return { success: true, output: `Accepted contract #${contract.id}: ${contract.description}` };

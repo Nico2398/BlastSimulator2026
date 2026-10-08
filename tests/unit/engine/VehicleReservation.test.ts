@@ -18,6 +18,7 @@
 // completeVehicleGatedActionIfApplicable as the sole vehicle-gated completion
 // entry point.
 
+import { setFreightRoom, sitesOf } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -708,8 +709,9 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
+    pickupFragment(state.logistics, 1, String(vehicle.id), sitesOf(state), 0, 0);
 
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
@@ -739,8 +741,9 @@ describe('releaseVehicleReservation aborts in-flight vehicle-gated fragment work
     const { employee } = hireEmployee(state.employees, 'driller', rng);
     assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.debris_hauler, 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 0, 0);
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
+    pickupFragment(state.logistics, 1, String(vehicle.id), sitesOf(state), 0, 0);
 
     vehicle.occupantIds = [employee.id];
     employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };

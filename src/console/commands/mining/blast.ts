@@ -7,7 +7,9 @@ import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleVal
 import { executeBlast, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
-import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
+import { addBlastFragments } from '../../../core/economy/Logistics.js';
+import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
+import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
@@ -22,10 +24,14 @@ import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
-import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone } from '../../../core/entities/Zone.js';
 import { armDetonation, cancelDetonation, hasChargedHole, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
+
+/** Report line for one warehouse whose stock a blast destroyed with it. */
+function stockLossLine(loss: WarehouseLoss): string {
+  return t('mining.blast.warehouse_stock_lost', { id: loss.buildingId, kg: Math.round(loss.massKg) });
+}
 
 /** Dispatch `blast` subcommands: (none) = fire anyway, detonate, cancel, status (#1362). */
 export function blastCommand(
@@ -102,6 +108,14 @@ export function fireBlast(
   ctx.lastBlastFlights = result.flights;
 
   const state = ctx.state!;
+  const stockLossLines: string[] = [];
+  // Refresh logistics after a destruction path: console line plus the toast event per lost warehouse.
+  const recordStockLosses = (): void => {
+    for (const loss of refreshLogisticsCapacity(state)) {
+      stockLossLines.push(stockLossLine(loss));
+      ctx.emitter.emit('logistics:warehouse_stock_lost', loss);
+    }
+  };
 
   // Buildings destroyed by the blast: score penalty per building. Their freed
   // footprint is already inside clearedRegion, which executeBlast's own
@@ -113,7 +127,7 @@ export function fireBlast(
 
   // A blast can destroy a Freight Warehouse — keep logistics capacity honest.
   if (result.destroyedBuildings.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    recordStockLosses();
   }
 
   // Ore value is informational only here — cash is credited when the ore is
@@ -181,7 +195,7 @@ export function fireBlast(
     projectionSecondaryEvents,
   );
   if (impacts.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    recordStockLosses();
   }
   thisBlastAccidents.push(...impacts);
 
@@ -214,7 +228,7 @@ export function fireBlast(
     });
   }
   if (secondaryOutcomes.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    recordStockLosses();
     releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
   }
 
@@ -321,6 +335,7 @@ export function fireBlast(
       ...(result.destroyedBuildings.length > 0
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
+      ...stockLossLines,
       ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties })),
     ].join('\n'),
   };

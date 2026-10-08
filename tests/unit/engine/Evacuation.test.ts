@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Tests for findSafeEvacuationCell / evacuateZone
 // (src/core/engine/Evacuation.ts, #557).
 
+import { setFreightRoom, sitesOf } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
@@ -424,13 +425,13 @@ describe('evacuateZone resolves in-flight vehicle-gated fragment work like any o
 
   it('a vehicle mid-haul (to_depot, cargo already picked up) keeps its reservation and cargo intact instead of dropping it (#1091: isCommittedToOwnCargo carry-over)', () => {
     const state = createGame({ seed: EVACUATION_SEED });
-    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
+    setFreightRoom(state, 5000); // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     state.navGrid = flatWalkableGrid(40);
-    state.logistics.storageCapacityKg = 5000;
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
 
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 15, 15);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
+    pickupFragment(state.logistics, 1, String(vehicle.id), sitesOf(state), 0, 0);
     // #1089: a real, co-located, mounted driver — see the first describe
     // block's own comment on why a dangling driverId no longer works.
     const { employee: driver1 } = hireEmployee(state.employees, 'driller', new Random(EVACUATION_SEED), vehicle.x, vehicle.z);

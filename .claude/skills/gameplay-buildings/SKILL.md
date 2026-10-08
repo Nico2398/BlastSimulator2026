@@ -103,6 +103,15 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 - Stores ore debris hauled from blast zone
 - Primary income source via ore sale contracts
 - Capacity scales with tier; farther from pit = longer haulage trips = lower throughput
+- **Per-warehouse inventory** (#1372): every stored fragment carries the `warehouseId` it sits in
+  (reserved while `in_transit`, null on the ground); each warehouse's stock and free room are derived
+  from fragments (`FreightWarehouses.ts`). A hauler loads only when some warehouse has room for the
+  fragment and unloads at the **nearest warehouse with room** (tie: lowest id; re-picked on arrival if
+  the reserved one vanished or filled). A fragment no single warehouse can hold is never claimed.
+- **Shared pool view:** `storedMassKg`, `storageCapacityKg` and `collectedOre` stay the pooled totals;
+  selling and contract delivery draw from all warehouses, removing only the sold mass.
+- **Ore-sale contracts require a Freight Warehouse** (`contractAcceptBlocker`): console accept refuses
+  and the Accept button is disabled with a hint until one stands.
 
 ## Placement Rules
 
@@ -125,7 +134,10 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 - Building destroyed by a blast → removed from grid immediately; a player demolition is removed when its Building Destroyer finishes (#1392)
 - Employees inside → put out on its ring (any removal: destruction, demolition, an upgrade's
   replace); a projection that destroys it injures them first
-- Stored contents lost. An Explosive Warehouse destroyed by a blast or flying rock **with stock**
+- Stored contents lost. A Freight Warehouse's stock is lost with it (`loseOrphanedStock`): other
+  warehouses are untouched, `storedMassKg`/`collectedOre` are debited, in-transit reservations are not
+  lost (re-picked on delivery). Reported by the `logistics:warehouse_stock_lost` event (toast), the
+  `blast` output, and a warning line on `build destroy`. An Explosive Warehouse destroyed by a blast or flying rock **with stock**
   detonates (`resolveSecondaryBlasts`, `SecondaryBlast.ts`):
   - Radius = `SECONDARY_BLAST_RADIUS_BASE_M + SECONDARY_BLAST_RADIUS_PER_SQRT_KG_M * sqrt(kg)`, capped at
     `SECONDARY_BLAST_RADIUS_MAX_M`, measured from the centre of the warehouse footprint.

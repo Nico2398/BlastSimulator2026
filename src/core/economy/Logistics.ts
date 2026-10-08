@@ -2,9 +2,11 @@
 // Tracks fragments through lifecycle: on_ground → in_transit → stored/sold/disposed.
 
 import type { FragmentData } from '../mining/BlastExecution.js';
-import { accumulateOreMass, oreContributionKg } from '../mining/BlastOreReport.js';
+import { accumulateOreMass, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
+import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
+import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
 
@@ -17,6 +19,8 @@ export interface TrackedFragment {
   state: FragmentState;
   /** Vehicle ID that picked up the fragment (if in_transit). */
   vehicleId: string | null;
+  /** Freight warehouse this fragment is reserved for (in_transit) or stored in; null on the ground. */
+  warehouseId: number | null;
 }
 
 // ── Logistics state ──
@@ -50,43 +54,65 @@ export function addBlastFragments(state: LogisticsState, fragments: FragmentData
       fragment: f,
       state: 'on_ground',
       vehicleId: null,
+      warehouseId: null,
     });
     navGrid?.addFragmentOccupant(Math.round(f.position.x), Math.round(f.position.z));
   }
 }
 
-/** Pick up a fragment with a vehicle. Returns false if storage is full. */
+/**
+ * Pick up a fragment with a vehicle and reserve room for it in the nearest
+ * freight warehouse (from the vehicle's position) that can hold it. Returns
+ * false when no warehouse has room (or none exist).
+ */
 export function pickupFragment(
   state: LogisticsState,
   fragmentId: number,
   vehicleId: string,
+  sites: readonly WarehouseSite[],
+  vehicleX: number,
+  vehicleZ: number,
 ): boolean {
   const tracked = state.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
   );
   if (!tracked) return false;
 
-  // Check if storage has room (fragments in transit will go to storage)
-  if (!hasStorageRoom(state, tracked.fragment.mass)) {
-    return false; // No room
-  }
+  const site = pickWarehouse(state, sites, vehicleX, vehicleZ, tracked.fragment.mass);
+  if (!site) return false;
 
   tracked.state = 'in_transit';
   tracked.vehicleId = vehicleId;
+  tracked.warehouseId = site.id;
   return true;
 }
 
-/** Deliver a fragment to the storage depot. */
+/**
+ * Deliver a fragment to a freight warehouse: the one reserved at pickup if it
+ * still exists and has room, else the nearest (to `atX`,`atZ`) with room.
+ * Returns false without mutating anything when none can take it.
+ */
 export function deliverToDepot(
   state: LogisticsState,
   fragmentId: number,
-  collectedOre?: Record<string, number>,
+  collectedOre: Record<string, number> | undefined,
+  sites: readonly WarehouseSite[],
+  atX: number,
+  atZ: number,
 ): boolean {
   const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked) return false;
 
+  const reserved = sites.find(s => s.id === tracked.warehouseId);
+  // The fragment's own reservation is already counted in warehouseFreeKg.
+  const target = reserved && warehouseFreeKg(state, reserved) >= 0
+    ? reserved
+    : pickWarehouse(state, sites, atX, atZ, tracked.fragment.mass);
+  if (!target) return false;
+
   tracked.state = 'stored';
   tracked.vehicleId = null;
+  tracked.warehouseId = target.id;
   state.storedMassKg += tracked.fragment.mass;
 
   // Accumulate ore mass into collectedOre when provided
@@ -184,25 +210,6 @@ export function splitStoredFragmentMass(
     volume: removedVolume,
     oreDensities: removedOreDensities,
   };
-}
-
-/**
- * Decrement `collectedOre` by the exact ore-kg of EVERY ore carried in a
- * just-removed fragment slice (`sellFragment`/`splitStoredFragmentMass`
- * return shape). Used only by the rubble branch of `consumeStoredOre`, where
- * all the removed mass leaves storage; the ore branch debits only the sold
- * ore via `extractOreFromFragment`. Returns the per-ore breakdown.
- */
-function decrementCollectedOre(
-  collectedOre: Record<string, number>,
-  sold: { volume: number; oreDensities: Record<string, number> },
-): Record<string, number> {
-  const acc: Record<string, number> = {};
-  accumulateOreMass(acc, sold.volume, sold.oreDensities);
-  for (const [oreId, kg] of Object.entries(acc)) {
-    collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
-  }
-  return acc;
 }
 
 /**
@@ -403,11 +410,6 @@ export function getFragmentCounts(state: LogisticsState): FragmentCounts {
   return { onGround, inTransit, stored, total: state.fragments.length };
 }
 
-/** Check if there's room to pick up more fragments. */
-export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
-  return massKg <= storageRoomKg(state);
-}
-
 /** Free storage room in kg (capacity minus stored and in-transit mass) (#1369, #1370). */
 export function storageRoomKg(state: LogisticsState): number {
   return state.storageCapacityKg - state.storedMassKg - inTransitMassKg(state);
@@ -454,6 +456,7 @@ export function returnFragmentToGround(
 
   tracked.state = 'on_ground';
   tracked.vehicleId = null;
+  tracked.warehouseId = null;
 
   if (dropPosition) {
     tracked.fragment.position = dropPosition;

@@ -438,3 +438,11 @@ export function checkDeadlines(
 
   return penalties;
 }
+
+/** Why a contract cannot be accepted yet, or null. */
+export function contractAcceptBlocker(
+  c: Contract,
+  hasFreightWarehouse: boolean,
+): 'needs_freight_warehouse' | null {
+  return c.type === 'ore_sale' && !hasFreightWarehouse ? 'needs_freight_warehouse' : null;
+}

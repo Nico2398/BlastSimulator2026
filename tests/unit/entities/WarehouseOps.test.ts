@@ -14,6 +14,7 @@ import {
   hasExplosivesForBlast,
   freightWarehouseHasRoom,
 } from '../../../src/core/entities/Building.js';
+import { freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import {
   createLogisticsState,
   syncLogisticsCapacity,
@@ -401,5 +402,43 @@ describe('syncLogisticsCapacity', () => {
     // storedMassKg must be untouched
     expect(logisticsState.storedMassKg).toBe(42);
     expect(logisticsState.fragments).toHaveLength(0);
+  });
+});
+
+describe('freightWarehouseSites (#1372)', () => {
+  it('is empty with no buildings', () => {
+    expect(freightWarehouseSites(createBuildingState())).toEqual([]);
+  });
+
+  it('lists active freight warehouses with id, position and tier capacity', () => {
+    const bs = createBuildingState();
+    const a = placeBuilding(bs, 'freight_warehouse', 10, 10, 100, 100, 1);
+    const b = placeBuilding(bs, 'freight_warehouse', 40, 10, 100, 100, 1);
+    expect(a.success && b.success).toBe(true);
+    b.building!.tier = 2; // placing tier 2 needs research; the upgrade itself is not under test
+    const sites = freightWarehouseSites(bs);
+    expect(sites).toHaveLength(2);
+    const byId = new Map(sites.map(s => [s.id, s]));
+    expect(byId.get(a.building!.id)!.capacityKg).toBe(getBuildingDef('freight_warehouse', 1).capacity);
+    expect(byId.get(b.building!.id)!.capacityKg).toBe(getBuildingDef('freight_warehouse', 2).capacity);
+    for (const s of sites) {
+      expect(Number.isFinite(s.x)).toBe(true);
+      expect(Number.isFinite(s.z)).toBe(true);
+    }
+  });
+
+  it('skips inactive freight warehouses and other building types', () => {
+    const bs = createBuildingState();
+    const a = placeBuilding(bs, 'freight_warehouse', 10, 10, 100, 100, 1);
+    placeBuilding(bs, 'explosive_warehouse', 40, 40, 100, 100, 1);
+    a.building!.active = false;
+    expect(freightWarehouseSites(bs)).toEqual([]);
+  });
+
+  it('capacities sum to getStorageCapacity', () => {
+    const bs = createBuildingState();
+    placeBuilding(bs, 'freight_warehouse', 10, 10, 100, 100, 1);
+    placeBuilding(bs, 'freight_warehouse', 40, 10, 100, 100, 3);
+    expect(freightWarehouseSites(bs).reduce((n, s) => n + s.capacityKg, 0)).toBe(getStorageCapacity(bs));
   });
 });

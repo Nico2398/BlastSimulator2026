@@ -10,7 +10,9 @@ import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '.
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
-import { storageRoomKg, type TrackedFragment } from './Logistics.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import type { TrackedFragment } from './Logistics.js';
+import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
 
@@ -150,6 +152,7 @@ export function isHaulOrFragmentActionClaimable(
   state: GameState,
   action: PendingAction,
   lookup?: FragmentLookup,
+  fits: StorageFit = createStorageFit(state),
 ): boolean {
   if (!isAutoDebrisAction(action.type)) return true;
 
@@ -173,12 +176,27 @@ export function isHaulOrFragmentActionClaimable(
   // turned away at the depot every tick (mirrors the same room check
   // findReachableGroundFragment/HaulingTask.ts already applies to the
   // manual Haul button's own candidate search).
-  return fitsStorageRoom(state, tracked);
+  return fits(tracked);
 }
 
-/** True iff the fragment's mass fits the free storage room. Single source for the claim gate and haulBlockedReason. */
-function fitsStorageRoom(state: GameState, tracked: TrackedFragment): boolean {
-  return tracked.fragment.mass <= storageRoomKg(state.logistics);
+/** Whether a fragment's mass fits some freight warehouse's free room. */
+type StorageFit = (tracked: TrackedFragment) => boolean;
+
+/**
+ * Build a lazy storage-fit check for one pass over many fragments: the
+ * warehouse sites and their used mass are computed once, on first use, rather
+ * than rescanned per fragment (O(fragments) per pass, not fragments x stock).
+ * Single source for the claim gate and haulBlockedReason.
+ */
+export function createStorageFit(state: GameState): StorageFit {
+  let sites: ReturnType<typeof freightWarehouseSites> | null = null;
+  let used: Map<number, number> | null = null;
+  return (tracked) => {
+    sites ??= freightWarehouseSites(state.buildings);
+    used ??= warehouseUsedKgMap(state.logistics);
+    const { x, z } = tracked.fragment.position;
+    return pickWarehouse(state.logistics, sites, x, z, tracked.fragment.mass, used) !== null;
+  };
 }
 
 /**
@@ -255,10 +273,11 @@ export function haulBlockedReason(
   state: GameState,
   action: PendingAction,
   lookup?: FragmentLookup,
+  fits: StorageFit = createStorageFit(state),
 ): BlockedOrderReason | null {
   if (action.type !== 'haul_debris') return null;
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked || tracked.state !== 'on_ground') return null;
   if (state.logistics.storageCapacityKg === 0) return 'no_freight_warehouse';
-  return fitsStorageRoom(state, tracked) ? null : 'storage_full';
+  return fits(tracked) ? null : 'storage_full';
 }

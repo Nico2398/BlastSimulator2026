@@ -40,7 +40,7 @@ function stockWith(kg: number, material = 'blingite'): Stock {
   const collectedOre: Record<string, number> = {};
   if (kg > 0) {
     const f = oreFragment(1, kg, material);
-    logistics.fragments.push({ fragment: f, state: 'stored', vehicleId: null });
+    logistics.fragments.push({ fragment: f, state: 'stored', vehicleId: null, warehouseId: null });
     logistics.storedMassKg += f.mass;
     collectedOre[material] = kg;
   }
@@ -266,7 +266,7 @@ function mixedStock(): Stock {
   const mixed: FragmentData = { ...oreFragment(1, 800), oreDensities: { rustite: 0.5, dirtite: 0.5 }, volume: 0.32, mass: 1000 };
   const pure: FragmentData = { ...oreFragment(2, 400, 'dirtite'), mass: 500 };
   for (const f of [mixed, pure]) {
-    logistics.fragments.push({ fragment: f, state: 'stored', vehicleId: null });
+    logistics.fragments.push({ fragment: f, state: 'stored', vehicleId: null, warehouseId: null });
     logistics.storedMassKg += f.mass;
   }
   return { logistics, collectedOre: { rustite: 400, dirtite: 800 } };

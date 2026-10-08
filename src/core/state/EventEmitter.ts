@@ -62,6 +62,9 @@ export interface GameEventMap {
   'vehicle:haul_delivered': { vehicleId: number; fragmentId: number };
   'vehicle:boulder_broken': { vehicleId: number; fragmentId: number; pieceIds: number[] };
 
+  /** A destroyed Freight Warehouse took its stored stock with it (#1372). */
+  'logistics:warehouse_stock_lost': { buildingId: number; massKg: number; oreKg: Record<string, number> };
+
   // Mount/alight (#1087)
   'employee:mounted': { employeeId: number; vehicleId: number };
   'employee:alighted': { employeeId: number; vehicleId: number };
