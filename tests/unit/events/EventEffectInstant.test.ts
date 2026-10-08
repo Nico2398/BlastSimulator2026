@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { applyEventEffects } from '../../../src/core/events/EventEffectCatalog.js';
 import { applyInstantEffect } from '../../../src/core/events/EventEffectInstant.js';
 import { makeEffectWorld } from '../../helpers/eventEffectWorld.js';
 
@@ -71,7 +72,8 @@ describe('applyInstantEffect', () => {
     const fx = makeEffectWorld();
     const v = fx.state.vehicles.vehicles[0]!;
     const hp = v.hp;
-    applyInstantEffect({ type: 'vehicle_breakdown', hpLoss: 15, hours: 12 }, fx.world, 0, fx.rng);
+    // Asset damage is raised with its out_of_service modifier by the catalog, not the instant handler.
+    applyEventEffects([{ type: 'vehicle_breakdown', hpLoss: 15, hours: 12 }], fx.world, 0, fx.rng);
     expect(v.hp).toBe(hp - 15);
   });
 });

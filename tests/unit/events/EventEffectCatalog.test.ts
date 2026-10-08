@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { applyEventEffects, type EventEffectSpec } from '../../../src/core/events/EventEffectCatalog.js';
+import { effectChips, effectChipText } from '../../../src/core/events/EventEffectText.js';
 import { applyInstantEffect } from '../../../src/core/events/EventEffectInstant.js';
 import { workRate, isActive, salaryFactor, factorFor } from '../../../src/core/events/ActiveModifiers.js';
 import { TICKS_PER_DAY } from '../../../src/core/config/balance.js';
@@ -139,8 +140,10 @@ describe('applyEventEffects', () => {
     });
 
     it('describes each effect in plain text (no empty effects)', () => {
-      const out = applyEventEffects([{ type: 'work_stoppage', hours: 24 }], fx.world, 0, fx.rng);
-      expect(out.effects.length).toBeGreaterThan(0);
+      // The outcome carries structured chips (effectChips), not pre-formatted English in EffectOutcome.effects.
+      const chips = effectChips(ALL_SPECS);
+      expect(chips).toHaveLength(ALL_SPECS.length);
+      for (const chip of chips) expect((effectChipText(chip) ?? '').length).toBeGreaterThan(0);
     });
   });
 
