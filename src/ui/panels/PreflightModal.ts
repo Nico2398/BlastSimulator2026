@@ -23,6 +23,7 @@ import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { plannedChargesCost } from '../../core/mining/ChargePlan.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
 import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
+import { detonationPhase, type DetonationPhase } from '../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -37,9 +38,15 @@ export class PreflightModal {
   private readonly predictedEl: HTMLElement;
   private readonly warningsEl: HTMLElement;
   private readonly detonateBtn: HTMLButtonElement;
+  private readonly cancelBtn: HTMLButtonElement;
+  private readonly waitingEl: HTMLElement;
+  private readonly fireAnywayBtn: HTMLButtonElement;
+  private readonly cancelDetonationBtn: HTMLButtonElement;
 
   private gameConsole?: GameConsoleFn;
   private open = false;
+  /** True once DETONATE was pressed: the modal closes when the sequence ends (#1362). */
+  private awaitingDetonation = false;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -74,15 +81,30 @@ export class PreflightModal {
     this.warningsEl = el('div');
     this.warningsEl.style.cssText = 'display:flex;flex-direction:column;gap:8px';
 
-    body.append(this.statsEl, this.predictedEl, this.warningsEl);
+    this.waitingEl = el('div');
+    this.waitingEl.style.cssText = 'display:none;flex-direction:column;gap:6px;padding:11px;border:1px solid rgba(255,91,76,.4);border-radius:5px;background:rgba(255,91,76,.06)';
+
+    body.append(this.waitingEl, this.statsEl, this.predictedEl, this.warningsEl);
 
     const footer = el('div');
     footer.style.cssText = 'padding:14px 20px;background:var(--bsx-well);border-top:1px solid var(--bsx-hairline);display:flex;gap:9px';
-    const cancelBtn = el('button', { className: 'bsx-btn' });
-    cancelBtn.style.cssText = 'flex:1;height:40px';
-    cancelBtn.dataset['action'] = 'preflight-cancel';
-    this.locale.bindText(cancelBtn, 'ui.blast_workshop.preflight.cancel');
-    cancelBtn.addEventListener('click', () => this.hide());
+    this.cancelBtn = el('button', { className: 'bsx-btn' });
+    this.cancelBtn.style.cssText = 'flex:1;height:40px';
+    this.cancelBtn.dataset['action'] = 'preflight-cancel';
+    this.locale.bindText(this.cancelBtn, 'ui.blast_workshop.preflight.cancel');
+    this.cancelBtn.addEventListener('click', () => this.hide());
+
+    // Waiting-state buttons (#1362): blast with people still inside, or abort.
+    this.fireAnywayBtn = el('button', { className: 'bsx-btn bsx-btn-danger-solid' });
+    this.fireAnywayBtn.style.cssText = 'flex:1.6;height:40px;display:none';
+    this.fireAnywayBtn.dataset['action'] = 'preflight-fire-anyway';
+    this.locale.bindText(this.fireAnywayBtn, 'ui.blast_workshop.preflight.fire_anyway');
+    this.fireAnywayBtn.addEventListener('click', () => this.gameConsole?.('blast'));
+    this.cancelDetonationBtn = el('button', { className: 'bsx-btn' });
+    this.cancelDetonationBtn.style.cssText = 'flex:1;height:40px;display:none';
+    this.cancelDetonationBtn.dataset['action'] = 'preflight-cancel-detonation';
+    this.locale.bindText(this.cancelDetonationBtn, 'ui.blast_workshop.preflight.cancel_detonation');
+    this.cancelDetonationBtn.addEventListener('click', () => this.gameConsole?.('blast cancel'));
 
     // bs-btn-danger (legacy class, alongside the bsx- token classes): the
     // tutorial rails' blast-confirm stage target (tutorialStages.ts) and
@@ -95,7 +117,7 @@ export class PreflightModal {
     this.detonateBtn.append(iconEl('blast', 16), this.locale.bindText(el('span'), 'ui.blast_workshop.preflight.detonate'));
     this.detonateBtn.addEventListener('click', () => { if (!this.detonateBtn.disabled) this.detonate(); });
 
-    footer.append(cancelBtn, this.detonateBtn);
+    footer.append(this.cancelBtn, this.detonateBtn, this.cancelDetonationBtn, this.fireAnywayBtn);
     box.append(stripe, header, body, footer);
     this.overlay.appendChild(box);
     container.appendChild(this.overlay);
@@ -105,12 +127,18 @@ export class PreflightModal {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
-  show(): void { this.open = true; this.overlay.style.display = ''; this.lastSignature = ''; }
+  show(): void { this.open = true; this.awaitingDetonation = false; this.overlay.style.display = ''; this.lastSignature = ''; }
   hide(): void { this.open = false; this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.open; }
 
   update(state: GameState, _weather?: WeatherState): void {
     if (!this.open) return;
+
+    // DETONATE keeps the modal open while armed; it closes once the sequence
+    // has ended (fired or cancelled), whichever way (#1362).
+    const phase = detonationPhase(state);
+    if (phase.kind !== 'idle') this.awaitingDetonation = true;
+    else if (this.awaitingDetonation) { this.hide(); return; }
 
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole);
     const planCost = plannedChargesCost(state.chargesByHole);
@@ -131,11 +159,12 @@ export class PreflightModal {
     const signature = JSON.stringify({
       undrilledCount, holes: state.drillHoles.length, chargeKg, planCost, estValue,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
-      protectedCount: protectedHoles.length, loadingCount, errorCount: validationErrors.length,
+      phase, protectedCount: protectedHoles.length, loadingCount, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
+    this.renderWaiting(phase);
     this.detonateBtn.disabled = validationErrors.length > 0;
     this.detonateBtn.style.cursor = validationErrors.length > 0 ? 'not-allowed' : 'pointer';
 
@@ -207,7 +236,25 @@ export class PreflightModal {
   }
 
   private detonate(): void {
-    this.gameConsole?.('blast');
-    this.hide();
+    this.awaitingDetonation = true;
+    this.gameConsole?.('blast detonate');
+  }
+
+  /** Swap the footer and body between the pre-flight and the waiting state. */
+  private renderWaiting(phase: DetonationPhase): void {
+    const waiting = phase.kind !== 'idle';
+    this.cancelBtn.style.display = waiting ? 'none' : '';
+    this.detonateBtn.style.display = waiting ? 'none' : '';
+    this.fireAnywayBtn.style.display = waiting ? '' : 'none';
+    this.cancelDetonationBtn.style.display = waiting ? '' : 'none';
+    this.waitingEl.style.display = waiting ? 'flex' : 'none';
+    if (!waiting) { this.waitingEl.replaceChildren(); return; }
+    const body = phase.kind === 'stranded'
+      ? t('ui.blast_workshop.preflight.stranded_names', { names: phase.names.join(', ') })
+      : t('ui.blast_workshop.preflight.detonating_remaining', { count: phase.kind === 'evacuating' ? phase.remaining : 0 });
+    this.waitingEl.replaceChildren(
+      el('span', { text: t('ui.blast_workshop.preflight.detonating_title'), attrs: { style: 'font:800 12px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-critical-text)' } }),
+      el('span', { text: body, attrs: { style: 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
+    );
   }
 }

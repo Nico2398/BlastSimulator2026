@@ -23,7 +23,8 @@ import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
-import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
+import { computeDangerZone } from '../../../core/entities/Zone.js';
+import { armDetonation, cancelDetonation, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
 /** Dispatch `blast` subcommands: (none) = fire anyway, detonate, cancel, status (#1362). */
@@ -38,47 +39,45 @@ export function blastCommand(
     case 'detonate': return blastDetonate(ctx);
     case 'cancel': return blastCancel(ctx);
     case 'status': return blastStatus(ctx);
-    default:
-      ctx.state!.pendingDetonation = null;
-      return fireBlast(ctx);
+    default: return fireBlast(ctx);
   }
 }
 
-function blastDetonate(_ctx: MiningContext): CommandResult {
-  // TODO: implement
-  return undefined as never;
+/** Localized line describing a non-idle phase. */
+function phaseLine(phase: DetonationPhase): string {
+  switch (phase.kind) {
+    case 'idle': return t('mining.blast.detonation_idle');
+    case 'ready': return t('mining.blast.detonation_armed', { remaining: 0 });
+    case 'evacuating': return t('mining.blast.detonation_armed', { remaining: phase.remaining });
+    case 'stranded': return t('mining.blast.detonation_stranded', { names: phase.names.join(', ') });
+  }
 }
 
-function blastCancel(_ctx: MiningContext): CommandResult {
-  // TODO: implement
-  return undefined as never;
+/** Arm the detonation; fire at once when the zone is already clear. */
+function blastDetonate(ctx: MiningContext): CommandResult {
+  const armed = armDetonation(ctx.state!);
+  if (!armed.success) return { success: false, output: armed.error };
+  const phase = detonationPhase(ctx.state!);
+  if (phase.kind !== 'ready') return { success: true, output: phaseLine(phase) };
+  return fireBlast(ctx);
 }
 
-function blastStatus(_ctx: MiningContext): CommandResult {
-  // TODO: implement
-  return undefined as never;
+function blastCancel(ctx: MiningContext): CommandResult {
+  const wasArmed = cancelDetonation(ctx.state!);
+  return { success: true, output: t(wasArmed ? 'mining.blast.detonation_cancelled' : 'mining.blast.detonation_idle') };
 }
 
-/** Fire the loaded pattern immediately. */
+function blastStatus(ctx: MiningContext): CommandResult {
+  return { success: true, output: phaseLine(detonationPhase(ctx.state!)) };
+}
+
+/** Fire the loaded pattern immediately, dropping any armed detonation. */
 export function fireBlast(
   ctx: MiningContext,
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
-
-  // Tutorial-only refusal (#557): the tutorial teaches evacuating the blast
-  // zone before firing, so it refuses to fire on an occupied one. Outside the
-  // tutorial this never triggers — firing on an occupied zone stays exactly
-  // as before this issue (preflight warning only, still fireable). Runs
-  // before any state mutation: no cash spent, no drill plan cleared,
-  // executeBlast never called.
-  if (ctx.tutorialActive === true) {
-    const preState = ctx.state!;
-    const count = blockingOccupantCount(preState.drillHoles, BLAST_DANGER_MARGIN_M, preState.vehicles, preState.employees);
-    if (count !== null) {
-      return { success: false, output: t('mining.blast.refused_zone_occupied', { count }) };
-    }
-  }
+  ctx.state!.pendingDetonation = null;
 
   // Nothing loaded or loading: refuse before anything mutates (#1345). A hole
   // whose charge is still loading falls through to validation, which names it.

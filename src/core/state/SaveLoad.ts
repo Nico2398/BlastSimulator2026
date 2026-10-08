@@ -561,7 +561,7 @@ function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> 
 
 /** v33 -> v34 (#1362): GameState.pendingDetonation defaults to null. */
 function migrateV33ToV34(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO: implement
+  obj['pendingDetonation'] = null;
   return obj;
 }
 

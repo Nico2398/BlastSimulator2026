@@ -27,6 +27,7 @@ const CARD_CONTROLS: Record<string, string[]> = {
   'stage.open_blast': ['shell.rail.blast'],
   // #1362: the horn button is gone; the evacuate card teaches Fire -> Detonate.
   step_evacuate: ['ui.blast_workshop.footer.fire', 'ui.blast_workshop.preflight.detonate'],
+  'stage.detonate': ['ui.blast_workshop.preflight.detonate'],
   'stage.open_contracts': ['shell.rail.contracts'],
   'stage.open_vehicles': ['shell.rail.vehicles'],
   'stage.open_build': ['shell.rail.build'],

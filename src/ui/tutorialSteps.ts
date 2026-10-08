@@ -293,7 +293,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
       const prev = snapshot.prevValue as number;
       const value = (state.levelStats?.blastsPerformed ?? 0) + Object.keys(state.collectedOre ?? {}).length;
-      return value > prev && !isBlastReportOutstanding();
+      // A blast fired at once by DETONATE (#1362) already counted in the snapshot.
+      const firedEarlier = (state.levelStats?.blastsPerformed ?? 0) > 0;
+      return (value > prev || firedEarlier) && !isBlastReportOutstanding();
     },
   },
 

@@ -5,7 +5,9 @@
 // returned TickReport into the same console lines as before.
 
 import type { CommandResult } from '../ConsoleRunner.js';
-import type { GameContext } from './world.js';
+import type { MiningContext } from './mining/types.js';
+import { fireBlast } from './mining/blast.js';
+import { tickDetonation } from '../../core/engine/DetonationSequence.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { getEventById } from '../../core/events/EventPool.js';
@@ -25,7 +27,7 @@ function formatKg(kg: number): string {
 }
 
 export function tickCommand(
-  ctx: GameContext,
+  ctx: MiningContext,
   args: string[],
   _named: Record<string, string>,
 ): CommandResult {
@@ -135,6 +137,14 @@ export function tickCommand(
         lines.push(`  ${t(def.descKey)}`);
         pushEventOptionLines(lines, def);
       }
+      break;
+    }
+
+    // Armed detonation (#1362): fire once the zone is clear, once, and stop the batch.
+    if (state.pendingDetonation !== null && tickDetonation(state).kind === 'ready') {
+      const fired = fireBlast(ctx);
+      lines.push(fired.output);
+      if (fired.success) lines.push(`[tick ${state.tickCount}] ${t('mining.blast.detonation_auto_fired')}`);
       break;
     }
 
