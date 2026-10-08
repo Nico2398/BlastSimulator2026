@@ -257,3 +257,53 @@ describe('autoDeliverContracts', () => {
     expect(autoDeliverContracts(createContractState(), logistics, collectedOre, 5)).toEqual([]);
   });
 });
+
+// ── ore sale keeps the other ores of shared fragments (#1371) ────────────────
+
+/** One mixed fragment (400kg rustite + 400kg dirtite) and a pure dirtite one (400kg). */
+function mixedStock(): Stock {
+  const logistics = createLogisticsState(1_000_000);
+  const mixed: FragmentData = { ...oreFragment(1, 800), oreDensities: { rustite: 0.5, dirtite: 0.5 }, volume: 0.32, mass: 1000 };
+  const pure: FragmentData = { ...oreFragment(2, 400, 'dirtite'), mass: 500 };
+  for (const f of [mixed, pure]) {
+    logistics.fragments.push({ fragment: f, state: 'stored', vehicleId: null });
+    logistics.storedMassKg += f.mass;
+  }
+  return { logistics, collectedOre: { rustite: 400, dirtite: 800 } };
+}
+
+describe('mixed fragments shared by several contracts (#1371)', () => {
+  it('a second contract for the other ore is fully delivered after a mixed sale', () => {
+    const contracts = stateWith(
+      contract({ id: 1, materialId: 'rustite', quantityKg: 400 }),
+      contract({ id: 2, materialId: 'dirtite', quantityKg: 800 }),
+    );
+    const { logistics, collectedOre } = mixedStock();
+
+    const first = deliverStoredOre(contracts, logistics, collectedOre, 1, 400, 10);
+    expect(first.success).toBe(true);
+    const second = deliverStoredOre(contracts, logistics, collectedOre, 2, 800, 10);
+
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+    expect(second.data.kg).toBeCloseTo(800, 6);
+    expect(second.data.completed).toBe(true);
+    expect(collectedOre['dirtite']).toBeCloseTo(0, 6);
+  });
+
+  it('autoDeliverContracts completes two ore contracts that share fragments', () => {
+    const contracts = stateWith(
+      contract({ id: 1, materialId: 'rustite', quantityKg: 400, deadlineTicks: 100 }),
+      contract({ id: 2, materialId: 'dirtite', quantityKg: 800, deadlineTicks: 200 }),
+    );
+    const { logistics, collectedOre } = mixedStock();
+
+    const out = autoDeliverContracts(contracts, logistics, collectedOre, 5);
+
+    expect(out.map(o => o.contractId).sort()).toEqual([1, 2]);
+    expect(out.find(o => o.contractId === 1)!.kg).toBeCloseTo(400, 6);
+    expect(out.find(o => o.contractId === 2)!.kg).toBeCloseTo(800, 6);
+    expect(out.every(o => o.completed)).toBe(true);
+    expect(contracts.active).toHaveLength(0);
+  });
+});
