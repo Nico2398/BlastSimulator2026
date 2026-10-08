@@ -249,7 +249,7 @@
       "role": "observe"
     },
     {
-      "command": "build freight_warehouse at:10,24",
+      "command": "build freight_warehouse at:12,17",
       "description": "#1372: ore_sale contracts need a Freight Warehouse standing before they can be accepted (ore is stored per warehouse), so the player builds one first.",
       "interaction": [
         {
@@ -266,8 +266,8 @@
         },
         {
           "type": "pickTile",
-          "x": 10,
-          "z": 24
+          "x": 12,
+          "z": 17
         },
         {
           "type": "clickSelector",
@@ -312,12 +312,12 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"] [data-action=\"negotiate\"]",
+          "selector": "#bs-contract-panel [data-contract-type]:not([data-contract-type=\"ore_sale\"]) [data-action=\"negotiate\"]",
           "timeout": 30000
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"supply\"] [data-action=\"negotiate\"]"
+          "selector": "#bs-contract-panel [data-contract-type]:not([data-contract-type=\"ore_sale\"]) [data-action=\"negotiate\"]"
         },
         {
           "type": "waitForSelector",
