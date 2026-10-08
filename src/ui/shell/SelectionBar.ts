@@ -18,6 +18,7 @@ import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { describeStatus } from '../fleetDetailSections.js';
+import { computeVehicleUpgradeCost } from '../../core/entities/VehicleUpgrade.js';
 import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
 /** Minimum horizontal gap between the selection bar and the left column's right edge. */
@@ -112,7 +113,7 @@ function selectionBarBounds(viewport: Viewport): Rect {
 // two unrelated flows, so they never share an action name or a data-action.
 export type SelectionAction =
   | 'detail' | 'dispatch_here' | 'train'
-  | 'follow' | 'move_here'
+  | 'follow' | 'move_here' | 'upgrade_vehicle'
   | 'upgrade' | 'move' | 'demolish'
   | 'focus' | 'widen';
 
@@ -179,7 +180,10 @@ export class SelectionBar {
     this.subEl.textContent = identity.sub;
     const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
     const rebuilding = entity.kind === 'building' && isUnderRebuild(entity.id, state);
-    this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null, rebuilding));
+    const vehicle = entity.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === entity.id) : undefined;
+    const upgradeCost = vehicle ? computeVehicleUpgradeCost(vehicle.type, vehicle.tier) : null;
+    const vehicleUpgradable = upgradeCost !== null && state.cash >= upgradeCost;
+    this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null, rebuilding, vehicleUpgradable));
     this.root.style.display = 'flex';
   }
 
@@ -236,7 +240,7 @@ export class SelectionBar {
     }
   }
 
-  private buildActions(entity: EntityPick, nextWidth: RampWidth | null, rebuilding: boolean): HTMLElement[] {
+  private buildActions(entity: EntityPick, nextWidth: RampWidth | null, rebuilding: boolean, vehicleUpgradable: boolean): HTMLElement[] {
     const fire = (action: SelectionAction) => { if (this.current) this.onAction?.(action, this.current); };
     switch (entity.kind) {
       case 'employee':
@@ -249,6 +253,7 @@ export class SelectionBar {
         return [
           button('ghost', t('shell.selection.follow'), { icon: 'eye', dataAction: 'follow', onClick: () => fire('follow') }),
           button('ghost', t('shell.selection.move_here'), { icon: 'locate', dataAction: 'move_here', onClick: () => fire('move_here') }),
+          button('ghost', t('shell.selection.upgrade_vehicle'), { icon: 'up', dataAction: 'upgrade_vehicle', disabled: !vehicleUpgradable, onClick: () => fire('upgrade_vehicle') }),
         ];
       case 'building':
         return [

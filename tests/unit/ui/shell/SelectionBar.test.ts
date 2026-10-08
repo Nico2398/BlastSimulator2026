@@ -64,7 +64,7 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Unassign'))).toBe(false);
     expect(root.querySelector('[data-action="haul"]')).toBeNull();
     expect(root.querySelector('[data-action="unassign"]')).toBeNull();
-    expect(root.querySelectorAll('button[data-action]').length).toBe(2);
+    expect(root.querySelectorAll('button[data-action]').length).toBe(3);
   });
 
   it('shows the building action set (Upgrade, Move, Demolish)', () => {

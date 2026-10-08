@@ -1107,6 +1107,9 @@ selectionBar.setActionHandler((action, entity) => {
       reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
       break;
     }
+    case 'upgrade_vehicle':
+      reportIfFailed(t('shell.selection.upgrade_vehicle'), window.__gameConsole(`vehicle upgrade ${entity.id}`));
+      break;
     case 'move_here': {
       // Vehicle counterpart of Dispatch Here: drive to whatever tile the
       // player is currently pointing at. `vehicle reposition` takes its

@@ -4,37 +4,44 @@
  */
 import type { Employee } from './Employee.js';
 import type { Vehicle, VehicleRole, VehicleTier } from './Vehicle.js';
+import { getVehicleDefByTier } from './Vehicle.js';
+import { ROLE_LICENCE_REQUIRED } from './VehicleDriverAssignment.js';
+import { VEHICLE_MAX_TIER } from '../config/balance.js';
 
-export type VehicleUpgradeResult =
+type VehicleUpgradeResult =
   | { success: true; cost: number; fromTier: VehicleTier; toTier: VehicleTier }
   | { success: false; reason: 'max_tier' };
 
 /** Next tier above `tier`, or null at VEHICLE_MAX_TIER. */
-export function nextVehicleTier(_tier: VehicleTier): VehicleTier | null {
-  // TODO: implement
-  return undefined as unknown as VehicleTier | null;
+export function nextVehicleTier(tier: VehicleTier): VehicleTier | null {
+  return tier >= VEHICLE_MAX_TIER ? null : ((tier + 1) as VehicleTier);
 }
 
 /** purchaseCost(next tier) - purchaseCost(current tier); null at max tier. */
-export function computeVehicleUpgradeCost(_role: VehicleRole, _tier: VehicleTier): number | null {
-  // TODO: implement
-  return undefined as unknown as number | null;
+export function computeVehicleUpgradeCost(role: VehicleRole, tier: VehicleTier): number | null {
+  const next = nextVehicleTier(tier);
+  if (next === null) return null;
+  return getVehicleDefByTier(role, next).purchaseCost - getVehicleDefByTier(role, tier).purchaseCost;
 }
 
 /** Raises tier by one and sets hp to the new tier's maxHp; mutates only tier and hp. Does not charge cash. */
-export function upgradeVehicle(_vehicle: Vehicle): VehicleUpgradeResult {
-  // TODO: implement
-  return undefined as unknown as VehicleUpgradeResult;
+export function upgradeVehicle(vehicle: Vehicle): VehicleUpgradeResult {
+  const toTier = nextVehicleTier(vehicle.tier);
+  const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
+  if (toTier === null || cost === null) return { success: false, reason: 'max_tier' };
+  const fromTier = vehicle.tier;
+  vehicle.tier = toTier;
+  vehicle.hp = getVehicleDefByTier(vehicle.type, toTier).maxHp;
+  return { success: true, cost, fromTier, toTier };
 }
 
 /** True when `employee` may drive a vehicle of `role` at `tier`. */
-export function isLicensedForVehicleTier(_employee: Employee, _role: VehicleRole, _tier: VehicleTier): boolean {
-  // TODO(#1524): equals isLicensedForRole today; tier-specific licences come with #1524.
-  return undefined as unknown as boolean;
+export function isLicensedForVehicleTier(employee: Employee, role: VehicleRole, _tier: VehicleTier): boolean {
+  // TODO(#1524): equals "holds the role licence" today; tier-specific licences come with #1524.
+  return employee.qualifications.some(q => q.category === ROLE_LICENCE_REQUIRED[role]);
 }
 
 /** True when any alive employee in the roster is licensed for `role` at `tier`. */
-export function rosterCanDriveVehicleTier(_employees: readonly Employee[], _role: VehicleRole, _tier: VehicleTier): boolean {
-  // TODO: implement
-  return undefined as unknown as boolean;
+export function rosterCanDriveVehicleTier(employees: readonly Employee[], role: VehicleRole, tier: VehicleTier): boolean {
+  return employees.some(e => e.alive && isLicensedForVehicleTier(e, role, tier));
 }

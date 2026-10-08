@@ -149,7 +149,7 @@ describe('vehicle.ts — English literal + fr divergence (table-driven)', () => 
     },
     {
       name: 'default/unknown subcommand usage',
-      englishLiteral: 'Usage: vehicle (list|buy|reposition|driver|haul|scrap|break)',
+      englishLiteral: 'Usage: vehicle (list|buy|upgrade|reposition|driver|haul|scrap|break)',
       run: (ctx) => vehicleCommand(ctx, ['bogus'], {}),
     },
   ];
