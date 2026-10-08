@@ -483,7 +483,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1414: +53 keys (event effect texts, modifier chips), both locales: 3898.
     // #1524: +4 keys (licence tier gating: dealership level text, licence-level-too-low), both locales: 3902.
     // #1524 review: licence_required + licence_holders merged into one ui.fleet.licence_line, net -1: 3901.
-    expect(Object.keys(en).length).toBe(3901);
+    // #1538: +44 keys (resN_alt texts for employee_leaves/employee_injured/cancel_contract options), both locales: 3945.
+    expect(Object.keys(en).length).toBe(3945);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {
