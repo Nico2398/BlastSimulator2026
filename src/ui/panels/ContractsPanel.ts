@@ -30,6 +30,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { contractAcceptBlocker, isFillableSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { rubbleStockKg, totalSpoilKg } from '../../core/economy/SpoilHeaps.js';
 import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
@@ -93,7 +94,7 @@ export class ContractsPanel extends PanelBase {
 
   update(state: GameState): void {
     const signature = JSON.stringify({
-      stored: Math.round(state.logistics.storedMassKg), storedTenths: deliverableAmountKg(state.logistics.storedMassKg), cap: state.logistics.storageCapacityKg,
+      stored: Math.round(state.logistics.storedMassKg), spoil: Math.round(totalSpoilKg(state.buildings.buildings)), storedTenths: deliverableAmountKg(rubbleStockKg(state.logistics.storedMassKg, state.buildings.buildings)), cap: state.logistics.storageCapacityKg,
       ore: state.collectedOre, oreTenths: Object.values(state.collectedOre).map(deliverableAmountKg),
       active: state.contracts.active.map(c => `${c.id}:${c.deliveredKg}:${c.acceptedAtTick}:${c.held ? 1 : 0}`),
       available: state.contracts.available.map(c => `${c.id}:${c.pricePerKg}:${c.quantityKg}:${c.penaltyAmount}:${c.deadlineTicks}:${c.negotiationAttempts ?? 0}`),
@@ -152,7 +153,7 @@ export class ContractsPanel extends PanelBase {
 
   /** Kilograms of `materialId` available to deliver — collected ore by type, or raw stored mass for rubble ('' materialId). */
   private storedOf(materialId: string, state: GameState): number {
-    return materialId === '' ? state.logistics.storedMassKg : (state.collectedOre[materialId] ?? 0);
+    return materialId === '' ? rubbleStockKg(state.logistics.storedMassKg, state.buildings.buildings) : (state.collectedOre[materialId] ?? 0);
   }
 
   private materialLabel(materialId: string): string {
@@ -390,7 +391,7 @@ export class ContractsPanel extends PanelBase {
     // true across a re-timing that re-rolls the pool.
     const onSite = offSiteBadge === null;
     cardEl.dataset['contractOnsite'] = String(onSite);
-    cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, state.logistics.storedMassKg));
+    cardEl.dataset['contractFillable'] = String(isFillableSaleOffer(c, state.collectedOre, rubbleStockKg(state.logistics.storedMassKg, state.buildings.buildings)));
     return cardEl;
   }
 

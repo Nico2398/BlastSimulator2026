@@ -84,6 +84,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   nuisance: { type: 'number', description: '0-100 score (ScoreState)' },
   muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
   storedMassKg: { type: 'number', description: 'Mass held in warehouse storage (LogisticsState.storedMassKg)' },
+  storedSpoilKg: { type: 'number', description: 'Barren rock dumped on spoil heaps (sum of Building.storedSpoilKg), never counted in storedMassKg' },
   collectedOreTotal: { type: 'number', description: 'Sum across every material key in state.collectedOre (kg, #671)' },
   dangerZoneClear: { type: 'boolean', description: 'computeDangerZone clear of every vehicle/employee (#557)' },
   corruptionLevel: { type: 'number', description: '0-100 corruption meter (CorruptionState.level, #1407)' },

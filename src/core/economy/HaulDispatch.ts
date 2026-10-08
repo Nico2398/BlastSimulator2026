@@ -10,7 +10,8 @@ import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '.
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
-import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { isBarrenFragment } from './SpoilHeaps.js';
 import type { TrackedFragment } from './Logistics.js';
 import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
@@ -179,7 +180,7 @@ export function isHaulOrFragmentActionClaimable(
   return fits(tracked);
 }
 
-/** Whether a fragment's mass fits some freight warehouse's free room. */
+/** Whether a fragment can be delivered now: barren rock needs any spoil heap (unbounded room), ore a warehouse with room for its mass. */
 type StorageFit = (tracked: TrackedFragment) => boolean;
 
 /**
@@ -190,8 +191,13 @@ type StorageFit = (tracked: TrackedFragment) => boolean;
  */
 export function createStorageFit(state: GameState): StorageFit {
   let sites: ReturnType<typeof freightWarehouseSites> | null = null;
+  let hasHeap: boolean | null = null;
   let used: Map<number, number> | null = null;
   return (tracked) => {
+    if (isBarrenFragment(tracked.fragment.oreDensities)) {
+      hasHeap ??= spoilHeapSites(state.buildings).length > 0;
+      return hasHeap;
+    }
     sites ??= freightWarehouseSites(state.buildings);
     used ??= warehouseUsedKgMap(state.logistics);
     const { x, z } = tracked.fragment.position;
@@ -266,7 +272,9 @@ export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefine
  * Why a haul_debris order cannot be fulfilled now, or null: 'no_freight_warehouse'
  * when no active warehouse provides storage (zero synced capacity),
  * 'storage_full' when its on-ground fragment is heavier than the room left
- * (#1369). Never set for oversized (fragment_debris) work, nor for a fragment
+ * (#1369). A barren fragment instead gets 'no_spoil_heap' when no heap is
+ * placed (#1530) — never storage_full, whatever warehouses exist; heaps have
+ * unlimited room. Never set for oversized (fragment_debris) work, nor for a fragment
  * that is gone or not on the ground.
  */
 export function haulBlockedReason(
@@ -278,6 +286,7 @@ export function haulBlockedReason(
   if (action.type !== 'haul_debris') return null;
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked || tracked.state !== 'on_ground') return null;
+  if (isBarrenFragment(tracked.fragment.oreDensities)) return fits(tracked) ? null : 'no_spoil_heap';
   if (state.logistics.storageCapacityKg === 0) return 'no_freight_warehouse';
   return fits(tracked) ? null : 'storage_full';
 }

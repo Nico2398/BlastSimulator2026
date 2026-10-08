@@ -9,6 +9,7 @@ import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileS
 import { wetHoles } from './core/mining/WetHoles.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
+import { rubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
@@ -139,6 +140,8 @@ export interface SerializableGameState {
   muckPile: MuckPileSummary | null;
   /** Mass (kg) currently held in warehouse storage (LogisticsState.storedMassKg). */
   storedMassKg: number;
+  /** Barren rock (kg) dumped on spoil heaps (sum of Building.storedSpoilKg, #1530); never counted in storedMassKg. */
+  storedSpoilKg: number;
   /** Sum across every material key in state.collectedOre (kg) — proves a delivery actually landed ore, not just spoil, without pinning to one material id a scenario's own RNG/terrain didn't guarantee (#671). */
   collectedOreTotal: number;
   /**
@@ -209,7 +212,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
-    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, s.logistics.storedMassKg),
+    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, rubbleStockKg(s.logistics.storedMassKg, s.buildings.buildings)),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,
@@ -228,6 +231,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     storedMassKg: s.logistics.storedMassKg,
+    storedSpoilKg: totalSpoilKg(s.buildings.buildings),
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
     dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees),
     corruptionLevel: s.corruption.level,

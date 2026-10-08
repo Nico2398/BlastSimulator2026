@@ -28,6 +28,7 @@ import { findNearbyHaulableFragments } from '../economy/HaulDispatch.js';
 import { selectHaulBatch } from '../economy/HaulBatch.js';
 import { largestWarehouseFreeKg } from '../economy/FreightWarehouses.js';
 import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import { haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -522,7 +523,8 @@ function planFragmentTaskItinerary(
   if (action.type === 'haul_debris' && vehicle.cargo.some(c => c.fragmentId === fragmentId)) {
     // The carried fragment's mass is already reserved in its warehouse, so ask
     // for any warehouse not overbooked (0 kg) rather than counting it twice.
-    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ, 0);
+    const carried = state.logistics.fragments.find(f => f.fragment.id === fragmentId);
+    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ, 0, carried ? haulDestinationOf(carried.fragment) : 'warehouse');
     if (depotApproach === null) return null;
 
     const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
@@ -563,13 +565,17 @@ function planFragmentTaskItinerary(
   // per tick, and the batch search scans the whole pool each time. Ranking on
   // the primary leg alone also keeps extra legs from inflating a dense
   // cluster's cost, which would invert nearest-first.
-  const candidates = fidelity === 'exact' ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS) : [];
+  // A batch unloads at one depot, so it never mixes barren rock and ore (#1530).
+  const destination = haulDestinationOf(tracked.fragment);
+  const candidates = fidelity === 'exact'
+    ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS).filter(c => haulDestinationOf(c.fragment) === destination)
+    : [];
   const candidateById = new Map(candidates.map(c => [c.fragment.id, c]));
   const batch = candidates.length === 0 ? [] : selectHaulBatch(
     { fragmentId, massKg: tracked.fragment.mass },
     candidates.map(c => ({ fragmentId: c.fragment.id, massKg: c.fragment.mass })),
     def.capacity,
-    largestWarehouseFreeKg(state.logistics, freightWarehouseSites(state.buildings)),
+    destination === 'spoil_heap' ? Infinity : largestWarehouseFreeKg(state.logistics, freightWarehouseSites(state.buildings)),
     HAUL_BATCH_MAX_ITEMS,
   );
   for (const extra of batch.slice(1)) {
@@ -582,7 +588,7 @@ function planFragmentTaskItinerary(
     lastZ = extraApproach.z;
   }
 
-  const depotApproach = findHaulDepotApproach(state, lastX, lastZ, tracked.fragment.mass);
+  const depotApproach = findHaulDepotApproach(state, lastX, lastZ, tracked.fragment.mass, destination);
   if (depotApproach === null) return null;
 
   const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, lastX, lastZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);

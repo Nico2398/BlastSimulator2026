@@ -500,7 +500,7 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
   function fragment(id: number, mass: number): FragmentData {
     return {
       id, position: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z }, volume: 0.3, mass, rockId: 'cruite',
-      oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      oreDensities: { blingite: 0.5 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
       halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, origin: { x: IN_A_TARGET.x, y: 0, z: IN_A_TARGET.z },
     };
   }

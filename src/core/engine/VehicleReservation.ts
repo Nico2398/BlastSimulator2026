@@ -30,6 +30,8 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { licenceLevelOf, canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
+import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import type { HaulDestination } from '../economy/SpoilHeaps.js';
 import { alight } from './Mount.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 // Direct import from TaskLifecycleCore.ts, not TaskDispatch.ts (see this
@@ -132,17 +134,35 @@ export function hasClaimableSameRoleFollowUp(state: GameState, employee: Employe
  * once a depot does exist, so freeing the vehicle for them is never wasted.
  */
 export function hasBlockedQueuedActionForVehicleRole(state: GameState, role: VehicleRole, employeeId: number): boolean {
+  const hasDepotFor = createDepotCheck(state);
   return state.pendingActions.some(a =>
     a.status === 'queued'
     && a.requiredVehicleRole === role
     && a.targetEmployeeId !== employeeId
-    && (a.type !== 'haul_debris' || a.targetEmployeeId !== null || hasActiveFreightWarehouse(state)),
+    && (a.type !== 'haul_debris' || a.targetEmployeeId !== null || hasDepotFor(a)),
   );
 }
 
-/** Whether any active freight_warehouse exists anywhere on the map — the global precondition a fresh haul_debris action's own depot leg needs (findHaulDepotApproach, HaulingTask.ts). */
-function hasActiveFreightWarehouse(state: GameState): boolean {
-  return state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active);
+/**
+ * Lazy per-pass check that the depot a fresh haul_debris action's own depot leg needs exists
+ * anywhere on the map (findHaulDepotApproach, HaulingTask.ts): an active spoil_heap for barren
+ * rock (#1530), a freight_warehouse for ore. An action whose fragment is gone needs the warehouse,
+ * as before. Fragment index and per-type answers are built once on first use.
+ */
+function createDepotCheck(state: GameState): (action: PendingAction) => boolean {
+  let byId: Map<number, HaulDestination> | null = null;
+  const exists = new Map<string, boolean>();
+  return (action) => {
+    byId ??= new Map(state.logistics.fragments.map(f => [f.fragment.id, haulDestinationOf(f.fragment)]));
+    const fragmentId = action.payload['fragmentId'];
+    const depotType = typeof fragmentId === 'number' && byId.get(fragmentId) === 'spoil_heap' ? 'spoil_heap' : 'freight_warehouse';
+    let found = exists.get(depotType);
+    if (found === undefined) {
+      found = state.buildings.buildings.some(b => b.type === depotType && b.active);
+      exists.set(depotType, found);
+    }
+    return found;
+  };
 }
 
 /** True when `employee` holds `role`'s licence at any level (licenceLevelOf > 0). Role-only, tier-blind: use canDriveTier for a specific vehicle tier. */

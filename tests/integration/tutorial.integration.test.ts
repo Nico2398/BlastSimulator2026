@@ -787,6 +787,9 @@ describe('full tutorial playthrough ends WON by following the cards then playing
         // #1335: the step is "accept the one fillable ore offer, deliver it".
         // Accept is only legal on a fillable ore_sale offer (what the rails
         // let a player click); rubble/supply/unfillable offers stay untouched.
+        // With barren rock on a spoil heap the warehouse holds only ore (#1530), so the card's own
+        // accept + deliver commands can already close a sale before the loop starts.
+        const soldByCommands = complete();
         for (let i = 0; i < maxTicks && !complete(); i++) {
           for (const active of [...state.contracts.active]) {
             if (active.type !== 'ore_sale') continue;
@@ -802,7 +805,7 @@ describe('full tutorial playthrough ends WON by following the cards then playing
           }
           playTick(run, state);
         }
-        expect(acceptedInSellOre.length, 'sell-ore never accepted a fillable ore offer').toBeGreaterThan(0);
+        expect(soldByCommands || acceptedInSellOre.length > 0, 'sell-ore never accepted a fillable ore offer').toBe(true);
       } else {
         tickUntil(run, state, maxTicks, complete);
       }

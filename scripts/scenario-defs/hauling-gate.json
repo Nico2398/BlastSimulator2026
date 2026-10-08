@@ -145,6 +145,42 @@
       }
     },
     {
+      "command": "build spoil_heap at:2,3",
+      "description": "#1530: this small blast leaves only barren rock, which goes to a spoil heap, not the warehouse. Crewless, so it stands at once (the warehouse above is already built). A Build menu click.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"spoil_heap\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 3
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
@@ -390,7 +426,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#552: replaces the old manual 'vehicle haul <id> fragment:<id>' step -- there is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happens automatically at claim time, the same selection the old Haul button used to make on click), and no button to wait for or click. Just letting the clock run is the whole action; automatic dispatch does the rest. #928: storedMassKg now climbs all the way to the warehouse's overfill ceiling (2100kg against a 2000kg nominal capacity -- two in-flight claims can each individually pass the room check before either lands) inside this very window -- #928's single-gauge fatigue model changed which need-driven events fire when, so the full 20 ticks now run with no mid-block event interrupt (sandbox-measured on seed 42: tickCount 135->155, the complete window). The tick-60 block below no longer sees any further increase because there is nothing left this one warehouse can hold.",
+      "description": "#552: automatic dispatch hauls the blast's debris on its own; letting the clock run is the whole action. #1530: this blast leaves only barren rock, so the delivery shows up as spoil on the heap (storedSpoilKg), not in the warehouse (storedMassKg).",
       "interaction": [
         {
           "type": "command",
@@ -403,7 +439,7 @@
           "cash"
         ],
         "increased": [
-          "storedMassKg"
+          "storedSpoilKg"
         ]
       }
     },
@@ -420,7 +456,7 @@
     },
     {
       "command": "tick 60",
-      "description": "#554: the real wait for automatic hauling to make progress, now that the tick 20 + event choose 0 pair above guarantees a clear run (no pending event can still be blocking tickCommand from the very first tick). #928: storedMassKg is no longer asserted increased here -- the tick-20 step above now completes the whole delivery (see its own description), filling the one warehouse to its overfill ceiling before this step even starts, so there is nothing left for this window to add. Only cash's continuing upkeep drain is checkable here on every seed/timing.",
+      "description": "Automatic hauling keeps running; only cash's continuing upkeep drain is checkable on every seed/timing here.",
       "interaction": [
         {
           "type": "command",
@@ -431,8 +467,7 @@
       "expect": {
         "decreased": [
           "cash"
-        ],
-        "note": "The warehouse ordered at the top is standing and already fully loaded by the tick-20 step above; this window only proves the game keeps running (upkeep still draining cash), not further hauling."
+        ]
       }
     },
     {
@@ -500,9 +535,9 @@
         "equals": {
           "employeeCount": 6,
           "vehicleCount": 4,
-          "buildingCount": 1
+          "buildingCount": 2
         },
-        "note": "#553: staffed:true's roster/fleet (5 employees, 4 vehicles minus the drill_rig the blast destroyed, plus this file's own driver/debris_hauler) — not 1/1/1"
+        "note": "#553: staffed:true's roster/fleet (5 employees, 4 vehicles minus the drill_rig the blast destroyed, plus this file's own driver/debris_hauler); #1530: warehouse plus spoil heap."
       }
     }
   ]

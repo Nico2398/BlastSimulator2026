@@ -1,7 +1,7 @@
 ---
 name: gameplay-buildings
 description: >
-  Buildings system specification for BlastSimulator2026: 8 building types with 3 tiers each,
+  Buildings system specification for BlastSimulator2026: 9 building types (8 with 3 tiers, the Spoil Heap with one),
   placement rules, training buildings, living quarters, warehouses, Research Center,
   and destruction effects. Use when implementing or modifying buildings,
   construction, demolition, tier upgrades, or any building-gated action.
@@ -30,6 +30,7 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
 | Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Stores explosives from supply contracts |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
+| Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; unlimited capacity; no crew needed |
 
 ## Tier System
 
@@ -128,6 +129,24 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 5c. **Cutoff warning** (#1391): a placement, move or upgrade that would strand ground from the crew warns, never refuses. `computePlacementCutoff` (`PlacementCutoff.ts`) floods from the crew (alive employees) before and after the footprint blocks (a move or upgrade also frees its old footprint), and counts cells reachable now but not after, excluding the footprint itself. Fewer than `PLACEMENT_CUTOFF_MIN_CELLS` cut cells, or no crew, means no warning. Reported: distinct `benchLevel`s cut, drill holes (drilled and planned), queued orders. `BuildMenu` shows the line and a "Place anyway?" confirm modal (`placementCutoffConfirm.ts`); confirming places. Console commands skip the check. The verdict is memoized per footprint and nav revision.
 6. **Ramps are not buildings** (#1298): a ramp is a dug terrain feature (`state.builtRamps`, see `gameplay-navmesh`), never in `state.buildings`. It takes the selection plumbing only (click picks it, corridor highlighted, selection bar) and offers a widen action — no demolish, no tier upgrade, no move, no occupants.
 
+**Spoil Heap (#1530):**
+- Cost $2000 (`constructionCost`), demolish $500, 2x2, no upkeep, unlimited capacity (`spoilHeapSites`
+  report `capacityKg: Infinity`). Barren rock never uses freight storage.
+- **Barren** = a fragment whose summed ore density is at most `SPOIL_BARREN_ORE_FRACTION_THRESHOLD`
+  (`isBarrenFragment`, `SpoilHeaps.ts`; an empty density map is barren). Barren fragments haul to the
+  nearest heap (`pickSpoilHeap`: squared distance, tie lowest id), ore fragments to warehouses. On
+  delivery the fragment leaves `logistics.fragments` and its mass is added to the heap building's
+  `storedSpoilKg`; `storedMassKg` and `collectedOre` are untouched. A batch never mixes barren and ore.
+- With no heap placed, barren hauls are blocked as `no_spoil_heap` ("place a spoil heap"), never
+  `storage_full`. Rubble-disposal contracts draw on heap stock first, then storage.
+- **Crewless** (`isCrewlessBuilding`): `build spoil_heap at:x,z` and the Build menu validate funds and
+  footprint as usual, then charge and place immediately (`placeBuilding`) — no `PlannedBuilding`, no
+  `place_building` action, works with an empty roster.
+- **Single tier** (`isSingleTierType`): tiers 2/3 alias tier 1; no upgrade or research UI and
+  `build upgrade` is refused. The Build menu shows no capacity line.
+- Destroying a heap loses its spoil silently. A save with no `storedSpoilKg` reads as 0. No Blender
+  model yet: renders as a stand-in box (#1572).
+
 ## Destruction Effects
 
 - Building destroyed by a blast → removed from grid immediately; a player demolition is removed when its Building Destroyer finishes (#1392)
@@ -158,6 +177,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 | Living Quarters Tier 3 | Housing/feeding | High well-being → productivity ×1.10 |
 | Explosive Warehouse | Enables supply contracts | Secondary blast if destroyed with stock |
 | Freight Warehouse | Enables ore sale contracts | Main income; throughput limited by distance |
+| Spoil Heap | Dumps barren rock off the freight pool | Without one, barren hauls are blocked |
 | Research Center | Unlocks building tiers | Occupied during each research task |
 | Training Buildings | Grants skill qualifications | Prevents unqualified-task errors |
 

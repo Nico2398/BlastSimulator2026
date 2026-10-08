@@ -1416,6 +1416,50 @@
       }
     },
     {
+      "command": "build spoil_heap at:12,18",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel [data-build-type=\"spoil_heap\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"spoil_heap\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 18
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "description": "#1530: barren rock now goes to a spoil heap, not the warehouse, so the free-play rubble sales that used to draw on it need a heap on site. The rails are lifted: an ordinary Build menu click. Crewless, so it stands at once.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
       "command": "set_policy mode:continuous fatigue:65",
       "timeout": 90,
       "role": "player",
@@ -1443,14 +1487,14 @@
       }
     },
     {
-      "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
+      "command": "wait_until field:fillableOreSaleOffered equals:true max_ticks:6000",
       "timeout": 650,
       "role": "player",
-      "description": "Free play sale 1: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338).",
+      "description": "Free play sale 1: the rails are lifted and the clock runs; wait on the condition (an ore_sale offer that storage already covers in full), never a tick pad. Barren rock now goes to a spoil heap and ore trips no longer share a batch with it (#1530), so the ore reaches the warehouse slower and the first big sale waits for it; rubble sales alone pay too little to reach the profit target.",
       "interaction": [
         {
           "type": "waitUntil",
-          "field": "fillableSaleOffered",
+          "field": "fillableOreSaleOffered",
           "equals": true,
           "maxTicks": 6000,
           "timeoutMs": 600000
@@ -1463,9 +1507,9 @@
       }
     },
     {
-      "command": "contract accept fillable:true",
+      "command": "contract accept type:ore_sale fillable:true",
       "timeout": 120,
-      "description": "Free play sale 1: click Accept on an offer the site can fill in full (ore or rubble).",
+      "description": "Free play sale 1: click Accept on an ore_sale offer the site can fill in full.",
       "role": "player",
       "interaction": [
         {
@@ -1474,7 +1518,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept",
           "timeout": 30000
         },
         {
@@ -1482,17 +1526,16 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept, #bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ],
       "expect": {
-        "increased": [
-          "activeContractCount"
-        ]
+        "tutorialStep": "sell-ore",
+        "note": "The card is still 'sell-ore' after accepting: accepting an offer is not selling anything, and this step's own predecessor already proved a delivery of any kind no longer advances it. Only the completed ore sale in the next step does."
       }
     },
     {
-      "command": "contract deliver fillable:true amount:100000",
+      "command": "contract deliver type:ore_sale fillable:true amount:100000",
       "timeout": 120,
       "description": "Free play sale 1: click Deliver; payment lands.",
       "role": "player",
@@ -1503,7 +1546,7 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver",
           "timeout": 30000
         },
         {
@@ -1511,13 +1554,17 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver, #bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "free-play",
+          "timeout": 60000
         }
       ],
       "expect": {
-        "increased": [
-          "cash"
-        ]
+        "tutorialStep": "free-play",
+        "note": "#959/#1328: a COMPLETED ore_sale is what advances 'sell-ore'; the card landing on free-play (rails lifted) is the proof the tutorial sold the ore it blasted."
       }
     },
     {

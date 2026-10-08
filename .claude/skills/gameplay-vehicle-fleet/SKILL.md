@@ -29,7 +29,7 @@ Five roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
 | Role | Tier 1 | Tier 2 | Tier 3 | Function |
 |------|--------|--------|--------|---------|
 | **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every demolition and tier upgrade (#1392): `build destroy` / `build upgrade` queue a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
-| **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to Freight Warehouse |
+| **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to a Freight Warehouse (ore) or Spoil Heap (barren rock) |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
 | **Rock Fragmenter** | "Cracky" | "Smasher 2000" | "The Atomizer" | Breaks oversized debris boulders into transportable fragments |
@@ -246,6 +246,11 @@ the primary action. `pickupFragment` and `storageRoomKg` count in-transit mass, 
 haulers cannot oversubscribe storage. An interrupted or scrapped hauler returns all cargo to the
 ground. A destination targeting a depot resolves through the building-approach-cell lookup
 (`gameplay-navmesh`), never the building's raw coordinates.
+
+Hauling destination (#1530): `haulDestinationOf` sends barren fragments (`isBarrenFragment`) to the
+nearest Spoil Heap and ore-bearing ones to a Freight Warehouse. The depot leg, the batch (never mixed)
+and the claim gate all use the fragment's destination; a destroyed target heap falls back to another
+heap. Heaps have unlimited room, so a barren haul is blocked only as `no_spoil_heap` (no heap placed).
 
 Storage capacity is what active Freight Warehouses provide: `INITIAL_STORAGE_CAPACITY_KG` is 0, so
 before the first warehouse nothing can be stored. `OrderReachability.ts` classifies a queued

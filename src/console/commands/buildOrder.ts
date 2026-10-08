@@ -9,6 +9,9 @@ import type { GameContext } from './world.js';
 import {
   getBuildingDef,
   getDefSize,
+  isCrewlessBuilding,
+  isSingleTierType,
+  placeBuilding,
   isPlacementBlockedByResearch,
   checkFootprintPlacement,
   type BuildingType,
@@ -19,6 +22,7 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
 import { dispatchPlaceBuildingAction } from '../../core/engine/PlaceBuildingAction.js';
+import { settleBuiltFootprint } from '../../core/engine/BuildingTaskHelpers.js';
 import { terrainReservations } from '../../core/entities/PlacementReservations.js';
 import { buildingFootprintOccupants } from '../../core/nav/NavGridSync.js';
 import { findBuildingApproachCell, isApproachCellStranded, isOnBuildingRing } from '../../core/nav/BuildingApproach.js';
@@ -74,9 +78,10 @@ export function orderBuildingCommand(
   type: BuildingType,
   x: number,
   z: number,
-  tier: BuildingTier,
+  requestedTier: BuildingTier,
 ): CommandResult {
   const state = ctx.state!;
+  const tier: BuildingTier = isSingleTierType(type) ? 1 : requestedTier;
 
   // Same two-stage order buildCommand's default case already documents:
   // research gate, then funds — both ahead of claimForAction/the footprint
@@ -111,6 +116,22 @@ export function orderBuildingCommand(
     terrainReservations(state),
   );
   if (!check.valid) return { success: false, output: refusalText(check) };
+
+  // A crewless building (spoil heap, #1530) needs no builder: charged and placed
+  // now, with no PlannedBuilding or place_building action.
+  if (isCrewlessBuilding(type)) {
+    const placed = placeBuilding(
+      state.buildings, type, x, z, bounds.width, bounds.depth, tier, bounds.originX, bounds.originZ, undefined, ctx.grid ?? undefined,
+    );
+    if (!placed.success) return { success: false, output: placed.error! };
+    state.cash -= def.constructionCost;
+    addExpense(state.finances, def.constructionCost, 'construction', `Build ${type} T${tier}`, state.tickCount);
+    settleBuiltFootprint(state, ctx.grid, ctx.emitter, x, z, footprintX, footprintZ);
+    return {
+      success: true,
+      output: `${type} T${tier} placed at (${x},${z}). Cost: $${def.constructionCost}`,
+    };
+  }
 
   // Claim the order's own id and the finished building's id now, not when
   // the site completes: sites are built in parallel and land in whatever

@@ -19,6 +19,7 @@
 //
 // Drives the real console command layer (createRunner): no DOM, no Three.js.
 
+import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { describe, it, expect } from 'vitest';
 import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
@@ -59,6 +60,8 @@ function crewHaulingAndBuildDepot(run: (cmd: string) => unknown, state: GameStat
   expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active)).toBe(true);
   // One tier-1 warehouse holds 2000 kg, less than this blast's reachable debris: without ample room the hauler stops on "storage full" and the queue never drains to just the pocket. Capacity is not what these tests probe, so the depot is upgraded to tier 3 (15000 kg).
   upgradeFreightWarehousesToTier3(state, 75_000);
+  // Barren rock goes to a spoil heap, not the warehouse (#1530); crewless, so it lands at once.
+  expect(run('build spoil_heap at:1,4')).toMatchObject({ success: true });
 }
 
 /** Every currently-queued debris action (haul_debris/fragment_debris) still sitting in pendingActions. */
@@ -148,7 +151,9 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
         .reduce((sum, f) => sum + f.fragment.mass, 0);
       expect(strandedMassKg).toBeGreaterThan(0);
 
-      const storedBeforeRamp = state.logistics.storedMassKg;
+      // Barren rock lands on the spoil heap, ore in the warehouse (#1530): count both.
+      const hauledKg = (): number => state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings);
+      const storedBeforeRamp = hauledKg();
       expect(run('build_ramp start:27,9 end:17,9 depth:5')).toMatchObject({ success: true });
       tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 800);
       expect(state.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
@@ -169,7 +174,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       // The crew clears the whole pocket with no further order: no livelock on a repeating route.
       expect(debrisActions(state)).toHaveLength(0);
       expect(state.logistics.fragments.filter(f => f.state === 'on_ground' && isPocketCell(Math.round(f.fragment.position.x), Math.round(f.fragment.position.z)))).toHaveLength(0);
-      expect(state.logistics.storedMassKg - storedBeforeRamp).toBeGreaterThanOrEqual(strandedMassKg - 1e-6);
+      expect(hauledKg() - storedBeforeRamp).toBeGreaterThanOrEqual(strandedMassKg - 1e-6);
       expect(sawOutOfReach).toBe(false);
       expect(sawTargetUnreachable).toBe(false);
       expectNoWorldInvariantViolations(state);

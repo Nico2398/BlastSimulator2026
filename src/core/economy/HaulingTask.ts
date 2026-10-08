@@ -17,7 +17,8 @@ import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
-import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { isBarrenFragment, pickSpoilHeap, type HaulDestination } from './SpoilHeaps.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -88,6 +89,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
 
   const sites = freightWarehouseSites(state.buildings);
   const used = warehouseUsedKgMap(state.logistics);
+  const hasHeap = spoilHeapSites(state.buildings).length > 0;
 
   return findNearestReachableFragment(state, vehicleId, vehicle.x, vehicle.z, tracked => {
     // An oversized fragment can never be hauled until a Rock Fragmenter
@@ -99,6 +101,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
     // away every tick from then on. Blasts throw off boulders far heavier than
     // an early warehouse holds, so skipping them here is what keeps the fleet
     // working instead of silently deadlocked on the nearest rock.
+    if (isBarrenFragment(tracked.fragment.oreDensities)) return hasHeap;
     if (!pickWarehouse(state.logistics, sites, vehicle.x, vehicle.z, tracked.fragment.mass, used)) return false;
     return true;
   });
@@ -106,7 +109,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
 
 /**
  * Nearest walkable NavGrid approach cell, from (`fromX`, `fromZ`), around the
- * nearest active freight_warehouse depot building — the itinerary-planning
+ * nearest active depot building for `destination` (freight_warehouse, or spoil_heap for barren rock, #1530) — the itinerary-planning
  * replacement for the old tickHaulingProgress's own per-tick depot re-target
  * (formerly `resolveDepotApproach`, inlined per-tick since the depot leg only
  * needs resolving once now, at plan time). Prefers the nearest warehouse with
@@ -115,11 +118,23 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
  * behaves as with a single global store. Returns null when no active depot
  * exists.
  */
-export function findHaulDepotApproach(state: GameState, fromX: number, fromZ: number, massKg: number): { x: number; z: number } | null {
-  const sites = freightWarehouseSites(state.buildings);
-  const site = pickWarehouse(state.logistics, sites, fromX, fromZ, massKg)
-    ?? pickWarehouse(state.logistics, sites, fromX, fromZ, 0);
+export function findHaulDepotApproach(
+  state: GameState,
+  fromX: number,
+  fromZ: number,
+  massKg: number,
+  destination: HaulDestination = 'warehouse',
+): { x: number; z: number } | null {
+  const site = destination === 'spoil_heap'
+    ? pickSpoilHeap(spoilHeapSites(state.buildings), fromX, fromZ)
+    : warehouseSiteFor(state, fromX, fromZ, massKg);
   const depot = site && state.buildings.buildings.find(b => b.id === site.id);
   if (!depot) return null;
   return findBuildingApproachCell(state.navGrid, depot, getBuildingDef(depot.type, depot.tier), fromX, fromZ);
+}
+
+function warehouseSiteFor(state: GameState, fromX: number, fromZ: number, massKg: number) {
+  const sites = freightWarehouseSites(state.buildings);
+  return pickWarehouse(state.logistics, sites, fromX, fromZ, massKg)
+    ?? pickWarehouse(state.logistics, sites, fromX, fromZ, 0);
 }

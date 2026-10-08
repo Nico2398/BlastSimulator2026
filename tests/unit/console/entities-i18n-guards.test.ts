@@ -621,7 +621,7 @@ describe('employee fire — refusals', () => {
 describe('vehicle haul / break — refusals', () => {
   function makeFragment(id: number, x: number, z: number, volume: number): FragmentData {
     return {
-      id, position: { x, y: 0, z }, volume, mass: 1000, rockId: 'cruite', oreDensities: {},
+      id, position: { x, y: 0, z }, volume, mass: 1000, rockId: 'cruite', oreDensities: { blingite: 0.5 },
       initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false, halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
       shapeSeed: id, origin: { x, y: 0, z },
     };
