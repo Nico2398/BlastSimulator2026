@@ -1492,6 +1492,58 @@ describe('Economy — per-warehouse freight storage (#1372)', () => {
     expect(ctx.state!.collectedOre.blingite!).toBeGreaterThanOrEqual(0);
   });
 
+  it('completeDemolition of a stocked warehouse emits warehouse_stock_lost once with the kg', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    stock(1, 300, a);
+    stock(2, 100, a);
+    const events: Array<{ buildingId: number; massKg: number }> = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+    });
+    expect(events).toEqual([expect.objectContaining({ buildingId: a, massKg: 400 })]);
+  });
+
+  it('completeDemolition of an empty warehouse emits nothing', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const events: unknown[] = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+    });
+    expect(events).toEqual([]);
+  });
+
+  it('upgrading a stocked warehouse keeps its stock and emits no loss', () => {
+    const a = addFreightWarehouse(ctx, 9, 14);
+    stock(1, 300, a);
+    ctx.state!.cash = 1e9;
+    ctx.state!.buildings.unlockedTiers.freight_warehouse = 3;
+    const events: unknown[] = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+    const ordered = buildCommand(ctx, ['upgrade', String(a)], {});
+    expect(ordered.success, ordered.output).toBe(true);
+    const order = ctx.state!.plannedBuildings.find(pb => pb.buildingId === a)!;
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: order.id,
+    });
+    // Another building change mid-rebuild must not wipe it either.
+    refreshLogisticsCapacity(ctx.state!);
+    expect(events).toEqual([]);
+    expect(storedIn(a)).toBe(300);
+    expect(ctx.state!.logistics.storedMassKg).toBe(300);
+  });
+
+  it('moving a stocked warehouse keeps its stock', () => {
+    const a = addFreightWarehouse(ctx, 9, 14);
+    stock(1, 300, a);
+    ctx.state!.cash = 1e9;
+    const moved = buildCommand(ctx, ['move', String(a)], { to: '9,22' });
+    expect(moved.success, moved.output).toBe(true);
+    expect(storedIn(a)).toBe(300);
+    expect(ctx.state!.logistics.storedMassKg).toBe(300);
+  });
+
   it('refreshLogisticsCapacity after a blast-style destruction reports the lost stock', () => {
     const a = addFreightWarehouse(ctx, 20, 20);
     const b = addFreightWarehouse(ctx, 60, 20);

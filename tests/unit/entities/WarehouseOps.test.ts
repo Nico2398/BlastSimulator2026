@@ -13,8 +13,8 @@ import {
   consumeExplosives,
   hasExplosivesForBlast,
   freightWarehouseHasRoom,
-  freightWarehouseSites,
 } from '../../../src/core/entities/Building.js';
+import { freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import {
   createLogisticsState,
   syncLogisticsCapacity,

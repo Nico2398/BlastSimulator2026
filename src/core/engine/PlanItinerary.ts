@@ -26,7 +26,8 @@ import { isOversized } from '../mining/BlastCalc.js';
 import { findHaulDepotApproach } from '../economy/HaulingTask.js';
 import { findNearbyHaulableFragments } from '../economy/HaulDispatch.js';
 import { selectHaulBatch } from '../economy/HaulBatch.js';
-import { storageRoomKg } from '../economy/Logistics.js';
+import { largestWarehouseFreeKg } from '../economy/FreightWarehouses.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -568,7 +569,7 @@ function planFragmentTaskItinerary(
     { fragmentId, massKg: tracked.fragment.mass },
     candidates.map(c => ({ fragmentId: c.fragment.id, massKg: c.fragment.mass })),
     def.capacity,
-    storageRoomKg(state.logistics),
+    largestWarehouseFreeKg(state.logistics, freightWarehouseSites(state.buildings)),
     HAUL_BATCH_MAX_ITEMS,
   );
   for (const extra of batch.slice(1)) {

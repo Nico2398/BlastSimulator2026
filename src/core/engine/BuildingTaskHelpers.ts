@@ -7,7 +7,8 @@
 // the one field it actually reads — the grid — since GameContext (a console
 // concept) isn't available in core.
 
-import { getStorageCapacity, freightWarehouseSites } from '../entities/Building.js';
+import { getStorageCapacity } from '../entities/Building.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
@@ -53,10 +54,15 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
   return { width: grid.sizeX, depth: grid.sizeZ, originX: grid.minX, originZ: grid.minZ };
 }
 
-/** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
+/**
+ * Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move).
+ * Stock is lost only on destruction: a warehouse demolished for an upgrade keeps its id through
+ * the planned rebuild order, so its stock survives until the rebuilt building takes it back.
+ */
 export function refreshLogisticsCapacity(state: GameState): WarehouseLoss[] {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   const liveIds = new Set(freightWarehouseSites(state.buildings).map(s => s.id));
+  for (const pb of state.plannedBuildings) liveIds.add(pb.buildingId);
   return loseOrphanedStock(state.logistics, state.collectedOre, liveIds);
 }
 

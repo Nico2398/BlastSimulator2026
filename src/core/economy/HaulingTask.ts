@@ -13,7 +13,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
-import { pickWarehouse } from './FreightWarehouses.js';
+import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
@@ -87,6 +87,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
   if (!isHaulEligibleVehicle(vehicle, state.vehicles)) return null;
 
   const sites = freightWarehouseSites(state.buildings);
+  const used = warehouseUsedKgMap(state.logistics);
 
   return findNearestReachableFragment(state, vehicleId, vehicle.x, vehicle.z, tracked => {
     // An oversized fragment can never be hauled until a Rock Fragmenter
@@ -98,7 +99,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
     // away every tick from then on. Blasts throw off boulders far heavier than
     // an early warehouse holds, so skipping them here is what keeps the fleet
     // working instead of silently deadlocked on the nearest rock.
-    if (!pickWarehouse(state.logistics, sites, vehicle.x, vehicle.z, tracked.fragment.mass)) return false;
+    if (!pickWarehouse(state.logistics, sites, vehicle.x, vehicle.z, tracked.fragment.mass, used)) return false;
     return true;
   });
 }

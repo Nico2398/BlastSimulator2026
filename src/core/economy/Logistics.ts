@@ -410,11 +410,6 @@ export function getFragmentCounts(state: LogisticsState): FragmentCounts {
   return { onGround, inTransit, stored, total: state.fragments.length };
 }
 
-/** Check if there's room to pick up more fragments. */
-export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
-  return massKg <= storageRoomKg(state);
-}
-
 /** Free storage room in kg (capacity minus stored and in-transit mass) (#1369, #1370). */
 export function storageRoomKg(state: LogisticsState): number {
   return state.storageCapacityKg - state.storedMassKg - inTransitMassKg(state);

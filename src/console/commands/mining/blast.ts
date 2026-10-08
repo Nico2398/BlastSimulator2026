@@ -77,6 +77,13 @@ export function blastCommand(
 
   const state = ctx.state!;
   const stockLossLines: string[] = [];
+  // Refresh logistics after a destruction path: console line plus the toast event per lost warehouse.
+  const recordStockLosses = (): void => {
+    for (const loss of refreshLogisticsCapacity(state)) {
+      stockLossLines.push(stockLossLine(loss));
+      ctx.emitter.emit('logistics:warehouse_stock_lost', loss);
+    }
+  };
 
   // Buildings destroyed by the blast: score penalty per building. Their freed
   // footprint is already inside clearedRegion, which executeBlast's own
@@ -88,7 +95,7 @@ export function blastCommand(
 
   // A blast can destroy a Freight Warehouse — keep logistics capacity honest.
   if (result.destroyedBuildings.length > 0) {
-    stockLossLines.push(...refreshLogisticsCapacity(state).map(stockLossLine));
+    recordStockLosses();
   }
 
   // Ore value is informational only here — cash is credited when the ore is
@@ -156,7 +163,7 @@ export function blastCommand(
     projectionSecondaryEvents,
   );
   if (impacts.length > 0) {
-    stockLossLines.push(...refreshLogisticsCapacity(state).map(stockLossLine));
+    recordStockLosses();
   }
   thisBlastAccidents.push(...impacts);
 
@@ -189,7 +196,7 @@ export function blastCommand(
     });
   }
   if (secondaryOutcomes.length > 0) {
-    stockLossLines.push(...refreshLogisticsCapacity(state).map(stockLossLine));
+    recordStockLosses();
     releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
   }
 

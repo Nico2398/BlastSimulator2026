@@ -39,7 +39,6 @@
     "src/core/economy/FragmentTaskLifecycle.ts:findRequestVehicle",
     "src/core/economy/HaulDispatch.ts:HaulActionPayload",
     "src/core/economy/Logistics.ts:FragmentCounts",
-    "src/core/economy/Logistics.ts:hasStorageRoom",
     "src/core/engine/GameLoop.ts:ArrivalGateResult",
     "src/core/engine/GameLoop.ts:CollapseResult",
     "src/core/engine/GameLoop.ts:GeneralRestCompletionResult",

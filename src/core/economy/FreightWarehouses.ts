@@ -22,27 +22,45 @@ export function warehouseStoredKg(l: LogisticsState, warehouseId: number): numbe
   return total;
 }
 
-/** Free room (kg): capacity minus stored minus in-transit mass reserved for it. */
-export function warehouseFreeKg(l: LogisticsState, site: WarehouseSite): number {
-  let used = 0;
+/** Mass (kg) stored or in transit per warehouse id, in one pass over the fragments. */
+export function warehouseUsedKgMap(l: LogisticsState): Map<number, number> {
+  const used = new Map<number, number>();
   for (const f of l.fragments) {
-    if (f.warehouseId === site.id && f.state !== 'on_ground') used += f.fragment.mass;
+    if (f.warehouseId === null || f.state === 'on_ground') continue;
+    used.set(f.warehouseId, (used.get(f.warehouseId) ?? 0) + f.fragment.mass);
   }
-  return site.capacityKg - used;
+  return used;
 }
 
-/** Nearest site with room for `massKg` (tie: lowest id), or null. */
+/** Free room (kg): capacity minus stored minus in-transit mass reserved for it. */
+export function warehouseFreeKg(l: LogisticsState, site: WarehouseSite, used?: ReadonlyMap<number, number>): number {
+  return site.capacityKg - ((used ?? warehouseUsedKgMap(l)).get(site.id) ?? 0);
+}
+
+/** Largest free room (kg) any single warehouse offers; 0 with no warehouse. A trip unloads at one warehouse. */
+export function largestWarehouseFreeKg(l: LogisticsState, sites: readonly WarehouseSite[]): number {
+  const used = warehouseUsedKgMap(l);
+  let best = 0;
+  for (const site of sites) best = Math.max(best, warehouseFreeKg(l, site, used));
+  return best;
+}
+
+/**
+ * Nearest site with room for `massKg` (tie: lowest id), or null.
+ * Callers scanning many fragments pass a `used` map built once by `warehouseUsedKgMap`.
+ */
 export function pickWarehouse(
   l: LogisticsState,
   sites: readonly WarehouseSite[],
   fromX: number,
   fromZ: number,
   massKg: number,
+  used: ReadonlyMap<number, number> = warehouseUsedKgMap(l),
 ): WarehouseSite | null {
   let best: WarehouseSite | null = null;
   let bestDist = Infinity;
   for (const site of sites) {
-    if (warehouseFreeKg(l, site) < massKg) continue;
+    if (warehouseFreeKg(l, site, used) < massKg) continue;
     const dist = (site.x - fromX) ** 2 + (site.z - fromZ) ** 2;
     if (dist < bestDist || (dist === bestDist && best !== null && site.id < best.id)) {
       best = site;

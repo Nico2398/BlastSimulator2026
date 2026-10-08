@@ -21,6 +21,7 @@ import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { addFreightWarehouseToState } from '../helpers/freightWarehouse.js';
 
 function makeCtx(): MiningContext {
   // Staffed (#553): drill_plan grid now queues one drill_hole PendingAction
@@ -336,5 +337,32 @@ describe('Blast flyrock — danger reaches the crew', () => {
         a.entityId === placed.building!.id && (a.type === 'building_damage' || a.type === 'building_destroyed'));
       expect(destroyed || damaged, 'building a few metres inside the zone took no outcome at all').toBe(true);
     });
+  });
+});
+
+describe('Blast-destroyed Freight Warehouse stock loss (#1372)', () => {
+  it('emits logistics:warehouse_stock_lost with the lost kg and prints the console line', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    const id = addFreightWarehouseToState(state, 14, 14);
+    state.logistics.fragments.push({
+      fragment: {
+        id: 9001, position: { x: 0, y: 0, z: 0 }, volume: 0.4, mass: 321, rockId: 'sandite',
+        oreDensities: {}, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+        halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 1, origin: { x: 0, y: 0, z: 0 },
+      },
+      state: 'stored', vehicleId: null, warehouseId: id,
+    });
+    state.logistics.storedMassKg += 321;
+    const events: Array<{ buildingId: number; massKg: number }> = [];
+    ctx.emitter.on('logistics:warehouse_stock_lost', e => events.push(e));
+
+    const output = blastAt(ctx, '0.5');
+
+    expect(state.buildings.buildings.some(b => b.id === id)).toBe(false);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.buildingId).toBe(id);
+    expect(events[0]!.massKg).toBe(321);
+    expect(output).toContain('321');
   });
 });
