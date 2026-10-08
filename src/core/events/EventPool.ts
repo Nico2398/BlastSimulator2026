@@ -3,6 +3,7 @@
 
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
+import type { ActiveProtection } from '../economy/BribeProtection.js';
 import { ENV_CAUSE_ECOLOGY_MAX, ENV_CAUSE_NUISANCE_MAX } from '../config/balance.js';
 
 // ── Event types ──
@@ -73,6 +74,8 @@ export interface EventDef {
   followUpOnly?: boolean;
   /** When true, may fire again after it has already fired this level (queued follow-ups only) (#1411). */
   repeatable?: boolean;
+  /** Free-form tags (e.g. 'inspection') protections can match on (#1407). */
+  tags?: readonly string[];
 }
 
 /** Context passed to prerequisite checks. */
@@ -89,6 +92,8 @@ export interface EventContext {
   weatherId: WeatherState;
   /** True once the player has fired at least one blast (#1412). */
   hasBlasted: boolean;
+  /** Bribe protections currently held by the player (#1407). */
+  protections?: readonly ActiveProtection[];
 }
 
 /** Whether environmental events have a plausible cause yet (#1412). */

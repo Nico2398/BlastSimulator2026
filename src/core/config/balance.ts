@@ -88,8 +88,41 @@ export const RUBBLE_DISPOSAL_PRICE_RANGE = { min: 0.5, max: 2.0 } as const;
 export const BRIBERY_BASE_SUCCESS = 0.7;
 /** Per-bribery reduction to success rate. */
 export const BRIBERY_HISTORY_PENALTY = 0.03;
-/** Number of bribes before mafia gets involved. */
-export const MAFIA_UNLOCK_THRESHOLD = 3;
+/** Corruption meter upper bound (meter runs 0..CORRUPTION_MAX) (#1407). */
+export const CORRUPTION_MAX = 100;
+/** Corruption level at which the mafia gets involved. */
+export const MAFIA_UNLOCK_THRESHOLD = 20;
+
+/** Corruption meter increase per successful bribe, by target (#1407). */
+export const BRIBE_CORRUPTION_DELTA = {
+  judge: 15,
+  politician: 12,
+  union_leader: 8,
+  inspector: 5,
+  witness: 5,
+} as const;
+/** Days a successful bribe protects the player, by target; 0 = no timed protection (#1407). */
+export const BRIBE_PROTECTION_DAYS = {
+  judge: 5,
+  politician: 4,
+  union_leader: 4,
+  inspector: 3,
+  witness: 0,
+} as const;
+/** Bribe price per protection day ($), by target; witness is a flat price (#1407). */
+export const BRIBE_PRICE_PER_PROTECTION_DAY = {
+  judge: 10000,
+  politician: 7500,
+  union_leader: 3750,
+  inspector: 2700,
+  witness: 10000,
+} as const;
+/** Lawsuit category timer multiplier while a judge protection is active (#1407). */
+export const JUDGE_LAWSUIT_TIMER_STRETCH = 1.8;
+/** Exposure risk reduction (0-1) granted by a witness bribe (#1407). */
+export const WITNESS_EXPOSURE_REDUCTION = 0.25;
+/** Event tag marking inspection events, shielded by an inspector bribe (#1407). */
+export const INSPECTION_EVENT_TAG = 'inspection';
 
 /** Bribery target costs ($). Inspector: cheap; Council: expensive. */
 export const BRIBERY_COSTS = {

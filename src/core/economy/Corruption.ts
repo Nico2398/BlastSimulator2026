@@ -12,6 +12,7 @@ import {
   BRIBERY_FAILURE_CORRUPTION_DELTA,
   MAFIA_UNLOCK_THRESHOLD,
 } from '../config/balance.js';
+import type { ActiveProtection } from './BribeProtection.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -40,6 +41,8 @@ export interface CorruptionState {
   level: number;
   attempts: CorruptionAttempt[];
   mafiaUnlocked: boolean;
+  /** Timed bribe protections currently held (#1407). */
+  protections: ActiveProtection[];
 }
 
 export interface CorruptionAttempt {
@@ -50,7 +53,7 @@ export interface CorruptionAttempt {
 }
 
 export function createCorruptionState(): CorruptionState {
-  return { level: 0, attempts: [], mafiaUnlocked: false };
+  return { level: 0, attempts: [], mafiaUnlocked: false, protections: [] };
 }
 
 // ── Operations ──
@@ -60,6 +63,10 @@ export interface CorruptionResult {
   cost: number;
   scandalTriggered: boolean;
   mafiaJustUnlocked: boolean;
+  /** Protection granted by a successful bribe (#1407). */
+  protection?: ActiveProtection;
+  /** Exposure risk reduction from a witness bribe (0-1) (#1407). */
+  exposureReduction?: number;
 }
 
 /**

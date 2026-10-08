@@ -13,6 +13,7 @@ export function ev(
     canFire?: (ctx: EventContext) => boolean;
     followUpOnly?: boolean;
     repeatable?: boolean;
+    tags?: readonly string[];
     options: Array<{ cashDelta?: number; scoreDelta?: Partial<Record<keyof ScoreState, number>>;
       corruptionDelta?: number; exposureDelta?: number; followUp?: string; effectTag?: string;
       probability?: number; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>; }>;
@@ -40,6 +41,7 @@ export function ev(
     canFire: opts.canFire ?? (() => true),
     ...(opts.followUpOnly ? { followUpOnly: true } : {}),
     ...(opts.repeatable ? { repeatable: true } : {}),
+    ...(opts.tags ? { tags: opts.tags } : {}),
   };
 }
 
