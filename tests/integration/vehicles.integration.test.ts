@@ -2345,7 +2345,9 @@ describe('vehicle repair (#1393)', () => {
     for (let i = 0; i < 5; i++) tickCommand(ctx, ['1'], {});
     expect(repairOrder(ctx)).toBeUndefined();
     expect(ctx.state!.ghostPreviews.some(g => g.type === 'repair_vehicle')).toBe(false);
-    expect(employee.activeActionId).toBeNull();
+    // Free of the repair: it may legitimately be resting after the work (fatigue), but not claim a repair order.
+    const active = ctx.state!.pendingActions.find(a => a.id === employee.activeActionId);
+    expect(active?.type).not.toBe('repair_vehicle');
     expect(getVehicleReservation(ctx.state!.vehicles, vehicle.id)).toBeNull();
     expect(vehicle.occupantIds).toHaveLength(0);
     expectNoWorldInvariantViolations(ctx.state!);
