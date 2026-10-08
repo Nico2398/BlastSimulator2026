@@ -1,7 +1,35 @@
 // BlastSimulator2026 — Lawsuit events batch 2 (events 26-50)
 // Legal absurdity, ambulance chasers, and satirical courtroom drama.
 import { ev, r } from './EventBuilder.js';
-import { INSPECTION_EVENT_TAG } from '../config/balance.js';
+import {
+  EVENT_BOYCOTT_DAYS,
+  EVENT_BOYCOTT_PRICE_PCT,
+  EVENT_BRIEF_STOP_HOURS,
+  EVENT_CHEER_HOURS,
+  EVENT_CHEER_MORALE_PER_HOUR,
+  EVENT_CURFEW_BAN_HOURS,
+  EVENT_EXPLOSIVE_SURCHARGE_DAYS,
+  EVENT_EXPLOSIVE_SURCHARGE_PCT,
+  EVENT_INSPECTION_BAN_HOURS,
+  EVENT_PENALTY_DAYS,
+  EVENT_PENALTY_PER_DAY,
+  EVENT_PERMANENT_RAISE_SALARY_PCT,
+  EVENT_PERMIT_BAN_HOURS,
+  EVENT_PROTECTION_DAYS,
+  EVENT_PROTECTION_PER_DAY,
+  EVENT_RETAINER_DAYS,
+  EVENT_RETAINER_PER_DAY,
+  EVENT_SCRUTINY_DAYS,
+  EVENT_SCRUTINY_WEIGHT_FACTOR,
+  EVENT_STRIKE_HOURS,
+  EVENT_SULK_HOURS,
+  EVENT_SULK_MORALE_PER_HOUR,
+  EVENT_SURGE_HOURS,
+  EVENT_SURGE_WORK_PCT,
+  EVENT_TARIFF_DAYS,
+  EVENT_TARIFF_PRICE_PCT,
+  INSPECTION_EVENT_TAG,
+} from '../config/balance.js';
 import type { EventDef } from './EventPool.js';
 import { hasEnvironmentalCause } from './EventPool.js';
 
@@ -22,7 +50,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => ctx.activeContractCount > 0,
     options: [
       { cashDelta: -40000, scoreDelta: { wellBeing: 5 }, effectTag: 'pay_invoices' },
-      { cashDelta: -10000, scoreDelta: { wellBeing: -8 }, effectTag: 'dispute_invoices' },
+      { cashDelta: -10000, scoreDelta: { wellBeing: -8 }, effectTag: 'dispute_invoices',
+        effects: [
+          { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_SURCHARGE_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
+        ] },
       { corruptionDelta: 15, cashDelta: -5000, effectTag: 'lose_paperwork' },
     ],
   }),
@@ -42,7 +73,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.nuisance < 60,
     options: [
       { cashDelta: -15000, scoreDelta: { nuisance: 10, ecology: 5 }, effectTag: 'landscaping' },
-      { cashDelta: 0, scoreDelta: { nuisance: -8 }, effectTag: 'beauty_is_subjective' },
+      { cashDelta: 0, scoreDelta: { nuisance: -8 }, effectTag: 'beauty_is_subjective',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -30000, scoreDelta: { nuisance: 15 }, effectTag: 'hire_mine_architect' },
     ],
   }),
@@ -51,8 +85,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 0.9 + 1.2 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.employeeCount > 3,
     options: [
-      { cashDelta: -18000, scoreDelta: { wellBeing: 10 }, effectTag: 'promote_to_blaster' },
-      { cashDelta: -12000, scoreDelta: { wellBeing: -5 }, effectTag: 'settle_quietly' },
+      { cashDelta: -18000, scoreDelta: { wellBeing: 10 }, effectTag: 'promote_to_blaster',
+        effects: [{ type: 'salary', pct: EVENT_PERMANENT_RAISE_SALARY_PCT, days: null, role: 'blaster' }] },
+      { cashDelta: -12000, scoreDelta: { wellBeing: -5 }, effectTag: 'settle_quietly',
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -5000, scoreDelta: { safety: -8 }, effectTag: 'give_them_dynamite',
         probability: 0.5, alt: { cashDelta: -30000, scoreDelta: { safety: -15 }, effectTag: 'unqualified_blast' } },
     ],
@@ -62,8 +98,12 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 1.5 + 2.0 * (1 - r.ec(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.ecology < 45,
     options: [
-      { cashDelta: -60000, scoreDelta: { ecology: 20, nuisance: 5 }, effectTag: 'full_cleanup' },
-      { cashDelta: -20000, scoreDelta: { ecology: 8 }, effectTag: 'minimal_cleanup' },
+      { cashDelta: -60000, scoreDelta: { ecology: 20, nuisance: 5 }, effectTag: 'full_cleanup',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
+      { cashDelta: -20000, scoreDelta: { ecology: 8 }, effectTag: 'minimal_cleanup',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { corruptionDelta: 25, cashDelta: -10000, effectTag: 'bury_toxic_report' },
     ],
   }),
@@ -72,8 +112,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 1.1 + 1.4 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.employeeCount > 5,
     options: [
-      { cashDelta: -10000, scoreDelta: { wellBeing: 15 }, effectTag: 'allow_union' },
-      { cashDelta: -25000, scoreDelta: { wellBeing: -12 }, effectTag: 'fight_unionization' },
+      { cashDelta: -10000, scoreDelta: { wellBeing: 15 }, effectTag: 'allow_union',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
+      { cashDelta: -25000, scoreDelta: { wellBeing: -12 }, effectTag: 'fight_unionization',
+        effects: [{ type: 'work_stoppage', hours: EVENT_STRIKE_HOURS }] },
       { corruptionDelta: 20, cashDelta: -3000, scoreDelta: { wellBeing: -5 }, effectTag: 'install_puppet_union' },
     ],
   }),
@@ -83,7 +125,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.lawsuitCount > 0,
     options: [
       { cashDelta: -35000, scoreDelta: { nuisance: 12 }, effectTag: 'install_noise_barriers' },
-      { cashDelta: -15000, scoreDelta: { nuisance: 4 }, effectTag: 'pay_fines_only' },
+      { cashDelta: -15000, scoreDelta: { nuisance: 4 }, effectTag: 'pay_fines_only',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_PENALTY_PER_DAY, days: EVENT_PENALTY_DAYS }] },
       { corruptionDelta: 14, cashDelta: -5000, effectTag: 'bribe_noise_inspector' },
     ],
   }),
@@ -103,9 +146,13 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 1.0 + 1.5 * (1 - r.nu(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.hasDrillPlan,
     options: [
-      { cashDelta: -12000, scoreDelta: { nuisance: 10, wellBeing: 5 }, effectTag: 'blast_schedule_change' },
+      { cashDelta: -12000, scoreDelta: { nuisance: 10, wellBeing: 5 }, effectTag: 'blast_schedule_change',
+        effects: [{ type: 'ban', what: 'blast', hours: EVENT_CURFEW_BAN_HOURS }] },
       { cashDelta: -25000, scoreDelta: { nuisance: 8 }, effectTag: 'fund_school_soundproofing' },
-      { cashDelta: 0, scoreDelta: { nuisance: -10, wellBeing: -8 }, effectTag: 'children_can_cope' },
+      { cashDelta: 0, scoreDelta: { nuisance: -10, wellBeing: -8 }, effectTag: 'children_can_cope',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
     ],
   }),
   // 36 — Ambulance chaser lawyer appears
@@ -115,7 +162,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -30000, scoreDelta: { safety: 8 }, effectTag: 'preemptive_settlement' },
       { cashDelta: -5000, followUp: 'lawsuit_class_action_mega', effectTag: 'ignore_lawyer' },
-      { corruptionDelta: 18, cashDelta: -8000, effectTag: 'hire_the_chaser' },
+      { corruptionDelta: 18, cashDelta: -8000, effectTag: 'hire_the_chaser',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_RETAINER_PER_DAY, days: EVENT_RETAINER_DAYS }] },
     ],
   }),
   // 37 — Joint lawsuit from multiple villages
@@ -125,7 +173,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -50000, scoreDelta: { nuisance: 15, ecology: 10 }, effectTag: 'mega_settlement' },
       { cashDelta: -15000, scoreDelta: { nuisance: -5 }, followUp: 'lawsuit_village_coalition_2' },
-      { corruptionDelta: 30, cashDelta: -10000, effectTag: 'buy_village_mayors' },
+      { corruptionDelta: 30, cashDelta: -10000, effectTag: 'buy_village_mayors',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_PROTECTION_PER_DAY, days: EVENT_PROTECTION_DAYS }] },
     ],
   }),
   // 38 — Workers sue for lack of career development
@@ -133,9 +182,11 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 0.9 + 1.3 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.employeeCount > 4 && ctx.tickCount > 30,
     options: [
-      { cashDelta: -20000, scoreDelta: { wellBeing: 12 }, effectTag: 'training_program' },
+      { cashDelta: -20000, scoreDelta: { wellBeing: 12 }, effectTag: 'training_program',
+        effects: [{ type: 'work_rate', pct: EVENT_SURGE_WORK_PCT, hours: EVENT_SURGE_HOURS }] },
       { cashDelta: -8000, scoreDelta: { wellBeing: 4 }, effectTag: 'motivational_posters' },
-      { cashDelta: -3000, scoreDelta: { wellBeing: -6 }, effectTag: 'tell_them_rock_is_career' },
+      { cashDelta: -3000, scoreDelta: { wellBeing: -6 }, effectTag: 'tell_them_rock_is_career',
+        effects: [{ type: 'employee_leaves', pick: 'junior' }] },
     ],
   }),
   // 39 — Government demands back-taxes on unreported ore
@@ -145,7 +196,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -55000, scoreDelta: { ecology: 5 }, corruptionDelta: -10, effectTag: 'pay_back_taxes' },
       { cashDelta: -20000, corruptionDelta: 20, effectTag: 'creative_accounting' },
-      { cashDelta: -35000, corruptionDelta: -5, effectTag: 'tax_lawyer_hired' },
+      { cashDelta: -35000, corruptionDelta: -5, effectTag: 'tax_lawyer_hired',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_RETAINER_PER_DAY, days: EVENT_RETAINER_DAYS }] },
     ],
   }),
   // 40 — Shareholder derivative suit
@@ -154,8 +206,12 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => ctx.tickCount > 50,
     options: [
       { cashDelta: -45000, scoreDelta: { safety: 10 }, effectTag: 'governance_reform' },
-      { cashDelta: -15000, scoreDelta: { wellBeing: -5 }, effectTag: 'fight_shareholders' },
-      { corruptionDelta: 22, cashDelta: -8000, effectTag: 'buy_back_shares_quietly' },
+      { cashDelta: -15000, scoreDelta: { wellBeing: -5 }, effectTag: 'fight_shareholders',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
+      { corruptionDelta: 22, cashDelta: -8000, effectTag: 'buy_back_shares_quietly',
+        effects: [{ type: 'recurring_charge', perDay: EVENT_RETAINER_PER_DAY, days: EVENT_RETAINER_DAYS }] },
     ],
   }),
   // 41 — Celebrity sues after chipping nail during mine visit
@@ -163,7 +219,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 0.5 + 0.8 * (1 - r.nu(s)),
     options: [
       { cashDelta: -20000, scoreDelta: { nuisance: 5 }, effectTag: 'celeb_settlement' },
-      { cashDelta: 0, scoreDelta: { nuisance: -12 }, effectTag: 'celeb_goes_viral' },
+      { cashDelta: 0, scoreDelta: { nuisance: -12 }, effectTag: 'celeb_goes_viral',
+        effects: [{ type: 'contract_price', pct: EVENT_TARIFF_PRICE_PCT, days: EVENT_TARIFF_DAYS }] },
       { cashDelta: -50000, scoreDelta: { nuisance: 15 }, effectTag: 'celeb_endorsement_deal',
         probability: 0.3, alt: { cashDelta: -50000, scoreDelta: { nuisance: -8 }, effectTag: 'celeb_still_sues' } },
     ],
@@ -175,7 +232,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -15000, scoreDelta: { ecology: 8 }, effectTag: 'mountain_restoration_fund' },
       { cashDelta: 0, scoreDelta: { ecology: -5, nuisance: -5 }, effectTag: 'its_a_pit_not_a_peak' },
-      { cashDelta: -25000, scoreDelta: { ecology: 12, nuisance: 5 }, effectTag: 'build_climbing_wall' },
+      { cashDelta: -25000, scoreDelta: { ecology: 12, nuisance: 5 }, effectTag: 'build_climbing_wall',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
     ],
   }),
   // 43 — Mine inspectors union demands better inspection conditions
@@ -193,7 +251,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 0.2 + 0.3 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.deathCount > 0,
     options: [
-      { cashDelta: -10000, scoreDelta: { safety: 10, wellBeing: 8 }, effectTag: 'memorial_shrine' },
+      { cashDelta: -10000, scoreDelta: { safety: 10, wellBeing: 8 }, effectTag: 'memorial_shrine',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
       { cashDelta: -5000, scoreDelta: { safety: -3 }, effectTag: 'exorcist_hired' },
       { cashDelta: -30000, scoreDelta: { safety: 15, wellBeing: 12 }, effectTag: 'ghost_satisfaction',
         probability: 0.5, alt: { cashDelta: -30000, scoreDelta: { safety: 5 }, effectTag: 'ghost_unsatisfied' } },
@@ -205,7 +264,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => ctx.hasDrillPlan,
     options: [
       { cashDelta: -12000, scoreDelta: { nuisance: 8 }, effectTag: 'rename_operations' },
-      { cashDelta: 0, scoreDelta: { nuisance: -6 }, effectTag: 'double_down_names' },
+      { cashDelta: 0, scoreDelta: { nuisance: -6 }, effectTag: 'double_down_names',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -6000, scoreDelta: { nuisance: 3 }, effectTag: 'sensitivity_committee' },
     ],
   }),
@@ -215,7 +277,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => ctx.corruptionLevel > 10,
     options: [
       { cashDelta: -8000, effectTag: 'comply_subpoena' },
-      { cashDelta: -3000, corruptionDelta: 12, effectTag: 'shred_documents' },
+      { cashDelta: -3000, corruptionDelta: 12, effectTag: 'shred_documents',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -15000, corruptionDelta: -5, effectTag: 'full_audit_trail' },
     ],
   }),
@@ -225,7 +290,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => hasEnvironmentalCause(ctx),
     options: [
       { cashDelta: -18000, scoreDelta: { ecology: 12, nuisance: 5 }, effectTag: 'goat_sanctuary' },
-      { cashDelta: 0, scoreDelta: { ecology: -8, nuisance: -8 }, effectTag: 'goats_are_fine' },
+      { cashDelta: 0, scoreDelta: { ecology: -8, nuisance: -8 }, effectTag: 'goats_are_fine',
+        effects: [{ type: 'contract_price', pct: EVENT_BOYCOTT_PRICE_PCT, days: EVENT_BOYCOTT_DAYS }] },
       { cashDelta: -10000, scoreDelta: { ecology: 6 }, effectTag: 'goat_relocation',
         probability: 0.7, alt: { scoreDelta: { ecology: -3, nuisance: -5 }, effectTag: 'goats_return' } },
     ],
@@ -235,8 +301,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 1.2 + 1.6 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.hasBuilding('any'),
     options: [
-      { cashDelta: -35000, scoreDelta: { safety: 15 }, effectTag: 'rebuild_to_code' },
-      { cashDelta: -12000, scoreDelta: { safety: 5 }, effectTag: 'patch_violations' },
+      { cashDelta: -35000, scoreDelta: { safety: 15 }, effectTag: 'rebuild_to_code',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
+      { cashDelta: -12000, scoreDelta: { safety: 5 }, effectTag: 'patch_violations',
+        effects: [{ type: 'ban', what: 'drill', hours: EVENT_INSPECTION_BAN_HOURS }] },
       { corruptionDelta: 20, cashDelta: -5000, effectTag: 'bribe_building_inspector' },
     ],
   }),
@@ -245,8 +313,10 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 1.0 + 1.5 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.corruptionLevel > 25,
     options: [
-      { cashDelta: -30000, scoreDelta: { safety: 10, wellBeing: 8 }, corruptionDelta: -15, effectTag: 'protect_whistleblower' },
-      { cashDelta: -10000, scoreDelta: { wellBeing: -10 }, corruptionDelta: 15, effectTag: 'retaliate_whistleblower' },
+      { cashDelta: -30000, scoreDelta: { safety: 10, wellBeing: 8 }, corruptionDelta: -15, effectTag: 'protect_whistleblower',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
+      { cashDelta: -10000, scoreDelta: { wellBeing: -10 }, corruptionDelta: 15, effectTag: 'retaliate_whistleblower',
+        effects: [{ type: 'employee_leaves', pick: 'junior' }] },
       { cashDelta: -20000, corruptionDelta: -8, effectTag: 'anonymous_hotline' },
     ],
   }),
@@ -256,7 +326,8 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     canFire: (ctx) => ctx.lawsuitCount > 3 && ctx.tickCount > 40,
     options: [
       { cashDelta: -70000, scoreDelta: { ecology: 15, safety: 15 }, corruptionDelta: -20, effectTag: 'comply_intl_court' },
-      { cashDelta: -20000, scoreDelta: { ecology: -10, safety: -10, nuisance: -10 }, effectTag: 'ignore_jurisdiction' },
+      { cashDelta: -20000, scoreDelta: { ecology: -10, safety: -10, nuisance: -10 }, effectTag: 'ignore_jurisdiction',
+        effects: [{ type: 'ban', what: 'haul', hours: EVENT_PERMIT_BAN_HOURS }] },
       { corruptionDelta: 35, cashDelta: -15000, effectTag: 'bribe_intl_judges',
         probability: 0.3, alt: { cashDelta: -80000, corruptionDelta: 20, effectTag: 'bribe_exposed' } },
     ],

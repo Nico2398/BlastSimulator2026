@@ -2,6 +2,28 @@
 // Mother Nature vs. open-pit mining: floods, lightning, heat mirages, and mysterious auroras.
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import {
+  EVENT_BRIEF_STOP_HOURS,
+  EVENT_CHEER_HOURS,
+  EVENT_CHEER_MORALE_PER_HOUR,
+  EVENT_CURFEW_BAN_HOURS,
+  EVENT_DRAG_HOURS,
+  EVENT_DRAG_WORK_PCT,
+  EVENT_FRONT_HOURS,
+  EVENT_GLOOM_HOURS,
+  EVENT_GLOOM_MORALE_PER_HOUR,
+  EVENT_INSPECTION_BAN_HOURS,
+  EVENT_SCRUTINY_DAYS,
+  EVENT_SCRUTINY_WEIGHT_FACTOR,
+  EVENT_SLOWDOWN_HOURS,
+  EVENT_SLOWDOWN_WORK_PCT,
+  EVENT_SULK_HOURS,
+  EVENT_SULK_MORALE_PER_HOUR,
+  EVENT_UPKEEP_DISCOUNT_DAYS,
+  EVENT_UPKEEP_DISCOUNT_PCT,
+  EVENT_UPKEEP_SURCHARGE_DAYS,
+  EVENT_UPKEEP_SURCHARGE_PCT,
+} from '../config/balance.js';
 
 export const WEATHER_EVENTS_1: EventDef[] = [
   // 1 — Heavy rain floods pit, ducks move in
@@ -10,8 +32,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heavy_rain' || ctx.weatherId === 'storm',
     options: [
       { cashDelta: -20000, scoreDelta: { ecology: 8, safety: 5 }, effectTag: 'pump_pit' },
-      { cashDelta: 0, scoreDelta: { ecology: 15, wellBeing: 5 }, effectTag: 'duck_sanctuary' },
-      { cashDelta: -5000, scoreDelta: { safety: -5 }, effectTag: 'workers_swim' },
+      { cashDelta: 0, scoreDelta: { ecology: 15, wellBeing: 5 }, effectTag: 'duck_sanctuary',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
+      { cashDelta: -5000, scoreDelta: { safety: -5 }, effectTag: 'workers_swim',
+        effects: [{ type: 'employee_injured' }] },
     ],
   }),
   // 2 — Lightning strikes near explosives magazine
@@ -22,7 +46,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
       { cashDelta: -30000, scoreDelta: { safety: 15 }, effectTag: 'lightning_rods' },
       { cashDelta: 0, scoreDelta: { safety: -20 }, probability: 0.4,
         alt: { cashDelta: -80000, scoreDelta: { safety: -40 }, effectTag: 'magazine_explosion' } },
-      { cashDelta: -10000, scoreDelta: { safety: 8 }, effectTag: 'emergency_relocation' },
+      { cashDelta: -10000, scoreDelta: { safety: 8 }, effectTag: 'emergency_relocation',
+        effects: [{ type: 'ban', what: 'blast', hours: EVENT_CURFEW_BAN_HOURS }] },
     ],
   }),
   // 3 — 47°C heatstroke, workers fainting
@@ -30,9 +55,15 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 1.2 + 1.0 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.weatherId === 'heat_wave',
     options: [
-      { cashDelta: -12000, scoreDelta: { wellBeing: 12, safety: 8 }, effectTag: 'cooling_stations' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -15, safety: -10 }, effectTag: 'heatstroke_wave' },
-      { cashDelta: -5000, scoreDelta: { wellBeing: 6 }, effectTag: 'shortened_shifts' },
+      { cashDelta: -12000, scoreDelta: { wellBeing: 12, safety: 8 }, effectTag: 'cooling_stations',
+        effects: [{ type: 'fatigue_relief' }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -15, safety: -10 }, effectTag: 'heatstroke_wave',
+        effects: [
+          { type: 'employee_injured' },
+          { type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS },
+        ] },
+      { cashDelta: -5000, scoreDelta: { wellBeing: 6 }, effectTag: 'shortened_shifts',
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
     ],
   }),
   // 4 — Mudslide blocks access road
@@ -41,7 +72,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heavy_rain',
     options: [
       { cashDelta: -18000, scoreDelta: { safety: 10 }, effectTag: 'bulldoze_road' },
-      { cashDelta: -3000, scoreDelta: { safety: -5, wellBeing: -8 }, effectTag: 'wait_it_out' },
+      { cashDelta: -3000, scoreDelta: { safety: -5, wellBeing: -8 }, effectTag: 'wait_it_out',
+        effects: [{ type: 'ban', what: 'haul', hours: EVENT_INSPECTION_BAN_HOURS }] },
       { cashDelta: -8000, scoreDelta: { ecology: -5, safety: 6 }, effectTag: 'dynamite_mudslide' },
     ],
   }),
@@ -52,7 +84,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -15000, scoreDelta: { safety: 12 }, effectTag: 'bench_reinforcement' },
       { cashDelta: 5000, scoreDelta: { safety: -15 }, effectTag: 'free_fragmentation' },
-      { cashDelta: -7000, scoreDelta: { safety: 6 }, effectTag: 'revised_drill_plan' },
+      { cashDelta: -7000, scoreDelta: { safety: 6 }, effectTag: 'revised_drill_plan',
+        effects: [{ type: 'ban', what: 'drill', hours: EVENT_CURFEW_BAN_HOURS }] },
     ],
   }),
   // 6 — Dust storm reduces visibility to zero
@@ -60,9 +93,12 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 1.0 + 0.5 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.weatherId === 'heat_wave' || ctx.weatherId === 'sunny',
     options: [
-      { cashDelta: -8000, scoreDelta: { safety: 10, nuisance: 5 }, effectTag: 'halt_operations' },
-      { cashDelta: 0, scoreDelta: { safety: -12 }, effectTag: 'blind_driving' },
-      { cashDelta: -3000, scoreDelta: { safety: 4, nuisance: -3 }, effectTag: 'dust_masks' },
+      { cashDelta: -8000, scoreDelta: { safety: 10, nuisance: 5 }, effectTag: 'halt_operations',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
+      { cashDelta: 0, scoreDelta: { safety: -12 }, effectTag: 'blind_driving',
+        effects: [{ type: 'employee_injured' }] },
+      { cashDelta: -3000, scoreDelta: { safety: 4, nuisance: -3 }, effectTag: 'dust_masks',
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
     ],
   }),
   // 7 — Rainbow appears, workers stop to admire
@@ -70,8 +106,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 0.6 + 0.4 * r.wb(s),
     canFire: (ctx) => ctx.weatherId === 'light_rain' || ctx.weatherId === 'cloudy',
     options: [
-      { cashDelta: -2000, scoreDelta: { wellBeing: 10 }, effectTag: 'rainbow_break' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -6 }, effectTag: 'back_to_work' },
+      { cashDelta: -2000, scoreDelta: { wellBeing: 10 }, effectTag: 'rainbow_break',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -6 }, effectTag: 'back_to_work',
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -500, scoreDelta: { wellBeing: 7, nuisance: -2 }, effectTag: 'rainbow_selfies' },
     ],
   }),
@@ -80,8 +118,12 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 0.6 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.weatherId === 'cloudy' || ctx.weatherId === 'light_rain',
     options: [
-      { cashDelta: -10000, scoreDelta: { safety: 8 }, effectTag: 'fog_shutdown' },
-      { cashDelta: -25000, scoreDelta: { safety: -8 }, effectTag: 'lost_excavator' },
+      { cashDelta: -10000, scoreDelta: { safety: 8 }, effectTag: 'fog_shutdown',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
+      { cashDelta: -25000, scoreDelta: { safety: -8 }, effectTag: 'lost_excavator',
+        effects: [
+          { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_SURCHARGE_PCT, days: EVENT_UPKEEP_SURCHARGE_DAYS },
+        ] },
       { cashDelta: -4000, scoreDelta: { safety: 4 }, effectTag: 'fog_horns' },
     ],
   }),
@@ -90,8 +132,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: () => 0.3,
     canFire: (ctx) => ctx.weatherId === 'cold_snap',
     options: [
-      { cashDelta: -6000, scoreDelta: { wellBeing: 12 }, effectTag: 'snow_day' },
-      { cashDelta: 0, scoreDelta: { safety: -6, wellBeing: -4 }, effectTag: 'slippery_benches' },
+      { cashDelta: -6000, scoreDelta: { wellBeing: 12 }, effectTag: 'snow_day',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
+      { cashDelta: 0, scoreDelta: { safety: -6, wellBeing: -4 }, effectTag: 'slippery_benches',
+        effects: [{ type: 'employee_injured' }] },
       { cashDelta: -2000, scoreDelta: { wellBeing: 8 }, effectTag: 'pit_snowman' },
     ],
   }),
@@ -100,10 +144,12 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 1.4 + 1.0 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.weatherId === 'storm',
     options: [
-      { cashDelta: -15000, scoreDelta: { safety: 18, wellBeing: 5 }, effectTag: 'full_evacuation' },
+      { cashDelta: -15000, scoreDelta: { safety: 18, wellBeing: 5 }, effectTag: 'full_evacuation',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
       { cashDelta: 0, scoreDelta: { safety: -25 }, probability: 0.5,
         alt: { cashDelta: -60000, scoreDelta: { safety: -40 }, effectTag: 'tornado_hit' } },
-      { cashDelta: -5000, scoreDelta: { safety: 8 }, effectTag: 'partial_evacuation' },
+      { cashDelta: -5000, scoreDelta: { safety: 8 }, effectTag: 'partial_evacuation',
+        effects: [{ type: 'work_rate', pct: EVENT_SLOWDOWN_WORK_PCT, hours: EVENT_SLOWDOWN_HOURS }] },
     ],
   }),
   // 11 — Drought: water supply running low
@@ -112,7 +158,11 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heat_wave' || ctx.weatherId === 'sunny',
     options: [
       { cashDelta: -20000, scoreDelta: { wellBeing: 10, ecology: 5 }, effectTag: 'water_trucks' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -14, ecology: -8 }, effectTag: 'ration_water' },
+      { cashDelta: 0, scoreDelta: { wellBeing: -14, ecology: -8 }, effectTag: 'ration_water',
+        effects: [
+          { type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS },
+          { type: 'forced_weather', weather: 'heat_wave', hours: EVENT_FRONT_HOURS },
+        ] },
       { cashDelta: -8000, scoreDelta: { wellBeing: 6, ecology: -3 }, effectTag: 'bore_well' },
     ],
   }),
@@ -122,7 +172,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'sunny',
     options: [
       { cashDelta: -5000, scoreDelta: { safety: 8 }, effectTag: 'tinted_windshields' },
-      { cashDelta: 0, scoreDelta: { safety: -10 }, effectTag: 'squinting_operator' },
+      { cashDelta: 0, scoreDelta: { safety: -10 }, effectTag: 'squinting_operator',
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
       { cashDelta: -2000, scoreDelta: { safety: 4, wellBeing: 3 }, effectTag: 'giant_sunglasses' },
     ],
   }),
@@ -132,7 +183,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heavy_rain' || ctx.weatherId === 'storm',
     options: [
       { cashDelta: -25000, scoreDelta: { safety: 12, ecology: 8 }, effectTag: 'drainage_system' },
-      { cashDelta: 0, scoreDelta: { safety: -10, ecology: -12 }, effectTag: 'flooded_operations' },
+      { cashDelta: 0, scoreDelta: { safety: -10, ecology: -12 }, effectTag: 'flooded_operations',
+        effects: [{ type: 'forced_weather', weather: 'heavy_rain', hours: EVENT_FRONT_HOURS }] },
       { cashDelta: -10000, scoreDelta: { safety: 6, wellBeing: -4 }, effectTag: 'monsoon_shifts' },
     ],
   }),
@@ -142,7 +194,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'storm' && ctx.hasDrillPlan,
     options: [
       { cashDelta: -8000, scoreDelta: { safety: 6 }, effectTag: 'reprint_plans' },
-      { cashDelta: 0, scoreDelta: { safety: -12 }, effectTag: 'blast_from_memory' },
+      { cashDelta: 0, scoreDelta: { safety: -12 }, effectTag: 'blast_from_memory',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -3000, scoreDelta: { safety: 10 }, effectTag: 'digital_plans' },
     ],
   }),
@@ -152,7 +207,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'light_rain' || ctx.weatherId === 'heavy_rain',
     options: [
       { cashDelta: -12000, scoreDelta: { ecology: 10, safety: 5 }, effectTag: 'acid_cleanup' },
-      { cashDelta: 0, scoreDelta: { ecology: -15, safety: -8 }, effectTag: 'ignore_acid' },
+      { cashDelta: 0, scoreDelta: { ecology: -15, safety: -8 }, effectTag: 'ignore_acid',
+        effects: [
+          { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_SURCHARGE_PCT, days: EVENT_UPKEEP_SURCHARGE_DAYS },
+        ] },
       { cashDelta: -5000, corruptionDelta: 10, scoreDelta: { ecology: 3 }, effectTag: 'blame_neighbor' },
     ],
   }),
@@ -162,7 +220,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heavy_rain',
     options: [
       { cashDelta: -14000, scoreDelta: { safety: 12 }, effectTag: 'quicksand_barrier' },
-      { cashDelta: 0, scoreDelta: { safety: -18, wellBeing: -6 }, effectTag: 'worker_sinking' },
+      { cashDelta: 0, scoreDelta: { safety: -18, wellBeing: -6 }, effectTag: 'worker_sinking',
+        effects: [{ type: 'employee_injured' }] },
       { cashDelta: -6000, scoreDelta: { safety: 6, ecology: -3 }, effectTag: 'fill_with_gravel' },
     ],
   }),
@@ -172,8 +231,12 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'storm',
     options: [
       { cashDelta: -22000, scoreDelta: { safety: 10 }, effectTag: 'repair_vehicles' },
-      { cashDelta: 0, scoreDelta: { safety: -8, wellBeing: -5 }, effectTag: 'dented_fleet' },
-      { cashDelta: -10000, scoreDelta: { safety: 6 }, effectTag: 'vehicle_shelters' },
+      { cashDelta: 0, scoreDelta: { safety: -8, wellBeing: -5 }, effectTag: 'dented_fleet',
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
+      { cashDelta: -10000, scoreDelta: { safety: 6 }, effectTag: 'vehicle_shelters',
+        effects: [
+          { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_DISCOUNT_PCT, days: EVENT_UPKEEP_DISCOUNT_DAYS },
+        ] },
     ],
   }),
   // 18 — Extreme humidity rusts equipment overnight
@@ -182,7 +245,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heavy_rain' || ctx.weatherId === 'light_rain',
     options: [
       { cashDelta: -16000, scoreDelta: { safety: 8 }, effectTag: 'rust_treatment' },
-      { cashDelta: 0, scoreDelta: { safety: -10 }, effectTag: 'rusty_machines' },
+      { cashDelta: 0, scoreDelta: { safety: -10 }, effectTag: 'rusty_machines',
+        effects: [
+          { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_SURCHARGE_PCT, days: EVENT_UPKEEP_SURCHARGE_DAYS },
+        ] },
       { cashDelta: -6000, scoreDelta: { safety: 5 }, effectTag: 'dehumidifiers' },
     ],
   }),
@@ -191,7 +257,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     weight: (s) => 1.2 + 0.8 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.weatherId === 'storm' || ctx.weatherId === 'heavy_rain',
     options: [
-      { cashDelta: -30000, scoreDelta: { ecology: -15, safety: 8 }, effectTag: 'rubble_downstream' },
+      { cashDelta: -30000, scoreDelta: { ecology: -15, safety: 8 }, effectTag: 'rubble_downstream',
+        effects: [
+          { type: 'event_weight', category: 'lawsuit', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -15000, scoreDelta: { ecology: 5, safety: 10 }, effectTag: 'flood_barriers' },
       { cashDelta: -8000, scoreDelta: { ecology: -5 }, effectTag: 'let_it_flow' },
     ],
@@ -202,7 +271,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'storm',
     options: [
       { cashDelta: -10000, scoreDelta: { safety: 10, wellBeing: 8 }, effectTag: 'pit_evacuation' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -12, safety: -8 }, effectTag: 'mass_panic' },
+      { cashDelta: 0, scoreDelta: { wellBeing: -12, safety: -8 }, effectTag: 'mass_panic',
+        effects: [{ type: 'morale_shift', perHour: EVENT_GLOOM_MORALE_PER_HOUR, hours: EVENT_GLOOM_HOURS }] },
       { cashDelta: -3000, corruptionDelta: 5, scoreDelta: { wellBeing: 4 }, effectTag: 'cover_up' },
     ],
   }),
@@ -212,7 +282,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heat_wave',
     options: [
       { cashDelta: -35000, scoreDelta: { safety: 10 }, effectTag: 'excavate_mine' },
-      { cashDelta: -15000, scoreDelta: { safety: -5, wellBeing: -8 }, effectTag: 'dig_by_hand' },
+      { cashDelta: -15000, scoreDelta: { safety: -5, wellBeing: -8 }, effectTag: 'dig_by_hand',
+        effects: [{ type: 'work_rate', pct: EVENT_SLOWDOWN_WORK_PCT, hours: EVENT_SLOWDOWN_HOURS }] },
       { cashDelta: -20000, scoreDelta: { safety: 6, ecology: -4 }, effectTag: 'blast_the_sand' },
     ],
   }),
@@ -222,7 +293,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'heat_wave' && ctx.hasDrillPlan,
     options: [
       { cashDelta: -6000, scoreDelta: { safety: 8 }, effectTag: 'resurvey' },
-      { cashDelta: 0, scoreDelta: { safety: -14 }, effectTag: 'mirage_based_drilling' },
+      { cashDelta: 0, scoreDelta: { safety: -14 }, effectTag: 'mirage_based_drilling',
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
       { cashDelta: -3000, scoreDelta: { safety: 5, wellBeing: 3 }, effectTag: 'night_survey' },
     ],
   }),
@@ -232,7 +304,8 @@ export const WEATHER_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.weatherId === 'cloudy' || ctx.weatherId === 'sunny',
     options: [
       { cashDelta: -10000, scoreDelta: { nuisance: 8, wellBeing: 8, safety: 5 }, effectTag: 'dust_suppression' },
-      { cashDelta: 0, scoreDelta: { nuisance: -10, wellBeing: -8 }, effectTag: 'breathe_dust' },
+      { cashDelta: 0, scoreDelta: { nuisance: -10, wellBeing: -8 }, effectTag: 'breathe_dust',
+        effects: [{ type: 'forced_weather', weather: 'cloudy', hours: EVENT_FRONT_HOURS }] },
       { cashDelta: -4000, scoreDelta: { nuisance: 3, safety: 3 }, effectTag: 'respirators' },
     ],
   }),
@@ -240,8 +313,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
   ev('weather_minor_tremor', 'weather', {
     weight: (s) => 0.5 + 0.6 * (1 - r.sf(s)),
     options: [
-      { cashDelta: -20000, scoreDelta: { safety: 15 }, effectTag: 'structural_inspection' },
-      { cashDelta: 0, scoreDelta: { safety: -18, wellBeing: -6 }, effectTag: 'ignore_tremor' },
+      { cashDelta: -20000, scoreDelta: { safety: 15 }, effectTag: 'structural_inspection',
+        effects: [{ type: 'ban', what: 'blast', hours: EVENT_CURFEW_BAN_HOURS }] },
+      { cashDelta: 0, scoreDelta: { safety: -18, wellBeing: -6 }, effectTag: 'ignore_tremor',
+        effects: [{ type: 'employee_injured' }] },
       { cashDelta: -8000, scoreDelta: { safety: 8, wellBeing: 4 }, effectTag: 'early_warning_system' },
     ],
   }),
@@ -249,8 +324,10 @@ export const WEATHER_EVENTS_1: EventDef[] = [
   ev('weather_midday_aurora', 'weather', {
     weight: () => 0.15,
     options: [
-      { cashDelta: -5000, scoreDelta: { wellBeing: 10 }, effectTag: 'aurora_break' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -8, safety: -5 }, effectTag: 'aurora_panic' },
+      { cashDelta: -5000, scoreDelta: { wellBeing: 10 }, effectTag: 'aurora_break',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -8, safety: -5 }, effectTag: 'aurora_panic',
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -2000, corruptionDelta: 5, scoreDelta: { wellBeing: 5 }, effectTag: 'aurora_coverup' },
       { cashDelta: -15000, scoreDelta: { wellBeing: 15, ecology: 5 }, effectTag: 'aurora_tourism',
         probability: 0.4, alt: { cashDelta: -5000, scoreDelta: { wellBeing: 6 } } },

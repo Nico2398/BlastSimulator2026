@@ -1969,3 +1969,149 @@ export const EVENT_RELOCATE_PAUSE_HOURS = 24;
 /** Work-rate change (percent) and its length in hours under a partial mining ban (politics_mining_ban_vote). */
 export const EVENT_PARTIAL_BAN_WORK_PCT = -40;
 export const EVENT_PARTIAL_BAN_HOURS = 60;
+
+// ── Event effect variety (#1538) ──
+
+/** Hours all work stops in a brief stoppage (walkout, short shutdown). */
+export const EVENT_BRIEF_STOP_HOURS = 12;
+
+/** Hours all work stops in a long stoppage (lockdown, full cleanup). */
+export const EVENT_LONG_STOP_HOURS = 48;
+
+/** Hours an activity ban lasts when it is a short curfew. */
+export const EVENT_CURFEW_BAN_HOURS = 12;
+
+/** Hours an activity ban lasts while inspectors are on site. */
+export const EVENT_INSPECTION_BAN_HOURS = 24;
+
+/** Hours an activity ban lasts under an injunction or court order. */
+export const EVENT_INJUNCTION_BAN_HOURS = 48;
+
+/** Hours an activity ban lasts while a permit is held back. */
+export const EVENT_PERMIT_BAN_HOURS = 72;
+
+/** Work-rate change (percent) of a mild drag on output. */
+export const EVENT_DRAG_WORK_PCT = -20;
+
+/** Hours a mild drag on output lasts. */
+export const EVENT_DRAG_HOURS = 48;
+
+/** Work-rate change (percent) of a real slowdown. */
+export const EVENT_SLOWDOWN_WORK_PCT = -30;
+
+/** Hours a real slowdown lasts. */
+export const EVENT_SLOWDOWN_HOURS = 36;
+
+/** Work-rate change (percent) of a motivated surge in output. */
+export const EVENT_SURGE_WORK_PCT = 20;
+
+/** Hours a surge in output lasts. */
+export const EVENT_SURGE_HOURS = 48;
+
+/** Morale change per hour while the crew sulks. */
+export const EVENT_SULK_MORALE_PER_HOUR = -1;
+
+/** Hours the crew sulks. */
+export const EVENT_SULK_HOURS = 24;
+
+/** Morale change per hour under a sharp shock. */
+export const EVENT_GLOOM_MORALE_PER_HOUR = -2;
+
+/** Hours a sharp morale shock lasts. */
+export const EVENT_GLOOM_HOURS = 12;
+
+/** Morale change per hour while the crew is cheerful. */
+export const EVENT_CHEER_MORALE_PER_HOUR = 1;
+
+/** Hours the crew stays cheerful. */
+export const EVENT_CHEER_HOURS = 24;
+
+/** Salary change (percent) of a temporary raise. */
+export const EVENT_RAISE_SALARY_PCT = 15;
+
+/** Days a temporary raise or pay cut lasts. */
+export const EVENT_RAISE_DAYS = 7;
+
+/** Salary change (percent) of a temporary pay cut. */
+export const EVENT_PAYCUT_SALARY_PCT = -15;
+
+/** Salary change (percent) of a permanent raise. */
+export const EVENT_PERMANENT_RAISE_SALARY_PCT = 10;
+
+/** Dollars paid to every employee as a one-off bonus. */
+export const EVENT_BONUS_AMOUNT = 500;
+
+/** Dollars per day of a protection payment. */
+export const EVENT_PROTECTION_PER_DAY = 300;
+
+/** Days a protection payment runs. */
+export const EVENT_PROTECTION_DAYS = 10;
+
+/** Dollars per day of a retainer or extra payroll line. */
+export const EVENT_RETAINER_PER_DAY = 250;
+
+/** Days a retainer or extra payroll line runs. */
+export const EVENT_RETAINER_DAYS = 14;
+
+/** Dollars per day of a settlement instalment. */
+export const EVENT_SETTLEMENT_PER_DAY = 600;
+
+/** Days a settlement instalment runs. */
+export const EVENT_SETTLEMENT_DAYS = 7;
+
+/** Dollars per day of a heavy court-ordered penalty. */
+export const EVENT_PENALTY_PER_DAY = 1000;
+
+/** Days a heavy penalty runs. */
+export const EVENT_PENALTY_DAYS = 5;
+
+/** Explosive price change (percent) of a surcharge. */
+export const EVENT_EXPLOSIVE_SURCHARGE_PCT = 25;
+
+/** Days an explosive surcharge or discount lasts. */
+export const EVENT_EXPLOSIVE_SURCHARGE_DAYS = 7;
+
+/** Explosive price change (percent) of a discount. */
+export const EVENT_EXPLOSIVE_DISCOUNT_PCT = -15;
+
+/** Upkeep cost change (percent) of a surcharge. */
+export const EVENT_UPKEEP_SURCHARGE_PCT = 20;
+
+/** Days an upkeep surcharge lasts. */
+export const EVENT_UPKEEP_SURCHARGE_DAYS = 10;
+
+/** Upkeep cost change (percent) of a discount. */
+export const EVENT_UPKEEP_DISCOUNT_PCT = -15;
+
+/** Days an upkeep discount lasts. */
+export const EVENT_UPKEEP_DISCOUNT_DAYS = 7;
+
+/** Contract price change (percent) under a tariff or sagging market. */
+export const EVENT_TARIFF_PRICE_PCT = -20;
+
+/** Days a tariff or price boom lasts. */
+export const EVENT_TARIFF_DAYS = 7;
+
+/** Contract price change (percent) under a boycott. */
+export const EVENT_BOYCOTT_PRICE_PCT = -30;
+
+/** Days a boycott lasts. */
+export const EVENT_BOYCOTT_DAYS = 10;
+
+/** Contract price change (percent) in a price boom. */
+export const EVENT_BOOM_PRICE_PCT = 15;
+
+/** Frequency factor of an event category under scrutiny. */
+export const EVENT_SCRUTINY_WEIGHT_FACTOR = 2;
+
+/** Days a scrutiny frequency factor lasts. */
+export const EVENT_SCRUTINY_DAYS = 7;
+
+/** Frequency factor of an event category that has been quietened. */
+export const EVENT_CALM_WEIGHT_FACTOR = 0.5;
+
+/** Days a calmed frequency factor lasts. */
+export const EVENT_CALM_DAYS = 7;
+
+/** Hours a lingering weather front holds the sky. */
+export const EVENT_FRONT_HOURS = 36;

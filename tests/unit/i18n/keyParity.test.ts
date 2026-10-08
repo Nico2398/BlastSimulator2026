@@ -481,7 +481,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1393: net -2 keys (vehicle depot building removed, repair skill and repair order added), both locales: 3835.
     // #1401: +10 keys (vehicle upgrade command, Fleet panel upgrade button, SelectionBar upgrade_vehicle), both locales: 3845.
     // #1414: +53 keys (event effect texts, modifier chips), both locales: 3898.
-    expect(Object.keys(en).length).toBe(3898);
+    // #1538: +44 keys (resN_alt texts for employee_leaves/employee_injured/cancel_contract options), both locales: 3942.
+    expect(Object.keys(en).length).toBe(3942);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {
