@@ -32,7 +32,7 @@ import { AudioHooks } from './audio/AudioHooks.js';
 import { selectSaveBackend } from './persistence/selectBackend.js';
 import { loadCampaignProfile, saveCampaignProfile } from './persistence/CampaignProfileStore.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile, hasCampaignProgress } from './persistence/CampaignProfile.js';
-import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
+import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { terrainConfigOf, ensureLandscape, loadGridForState, stateForSave } from './console/commands/world.js';
 import { computeVoxelColumnSurfaceY } from './core/world/VoxelGrid.js';
@@ -520,7 +520,6 @@ function onLevelStateReplaced(state: GameState): void {
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const prevState = ctx.state;
-  syncTutorialActive(ctx, tutorial.isActive);
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -572,7 +571,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 
   // Update UI after every command
   if (ctx.state) {
-    uiManager.update(ctx.state, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
+    uiManager.update(ctx.state, gameRenderer.fragmentPlaybackDuration);
     // A game exists — reveal HUD chrome unless the player is looking at the
     // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
     // command so no entry point (button, console, scenario harness) can miss it.
@@ -1252,7 +1251,7 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, tutorial.isActive, gameRenderer.fragmentPlaybackDuration);
+    uiManager.update(ctx.state, gameRenderer.fragmentPlaybackDuration);
     if (!mainMenu.visible) uiManager.show();
     if (!fullScreenMenuUp()) savesModal.onTick(ctx.state);
   }

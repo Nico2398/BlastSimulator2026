@@ -164,7 +164,8 @@ Tubing lifecycle: installing needs a drilled hole (unknown id refused); removing
 
 ## Safety & Projection Profiles
 
-- Safety zone evacuation required before each blast
+- Safety zone evacuation before each blast is one flow (#1362): FIRE opens the pre-flight modal, DETONATE (`blast detonate`) arms `state.pendingDetonation`, evacuates the danger zone (`DetonationSequence.ts`), re-orders late entrants out every `DETONATION_REEVACUATE_INTERVAL_TICKS`, and fires automatically on the tick the zone is clear (at once when it already is). No separate horn step.
+- Waiting state: modal and `blast status` show who is left, or by name who is stranded (cannot leave). `blast` with no argument = fire anyway (clears the pending detonation, fires with people inside, they die). `blast cancel` = abort. A second `blast detonate` while armed is refused. Armed with no holes left = cancelled automatically. Saved (`pendingDetonation`, save v34).
 - Projection trajectories based on overcharge, stemming, free face
 - Buildings, vehicles, and people in path take damage/die
 

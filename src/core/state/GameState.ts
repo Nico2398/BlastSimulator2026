@@ -8,6 +8,7 @@ import {
   SPAWN_TILE_SPACING,
 } from '../config/balance.js';
 import type { TutorialProgress } from './TutorialProgress.js';
+import type { PendingDetonation } from '../engine/DetonationSequence.js';
 import type { AgentOccupancy } from '../nav/AgentOccupancy.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
 import type { HoleCharge, PlannedCharge } from '../mining/ChargePlan.js';
@@ -150,7 +151,8 @@ import type { RampWidth } from '../config/balance.js';
 // v29 -> v30: weather (#1403). See SaveLoad.ts's migrateV29ToV30.
 // v31 -> v32: holeWater + groundWetness (#1350). See SaveLoad.ts's migrateV31ToV32.
 // v32 -> v33: Vehicle.payload becomes Vehicle.cargo[] (#1370). See SaveLoad.ts's migrateV32ToV33.
-export const SAVE_VERSION = 33;
+// v33 -> v34: pendingDetonation (#1362). See SaveLoad.ts's migrateV33ToV34.
+export const SAVE_VERSION = 34;
 
 export interface GameConfig {
   seed: number;
@@ -407,6 +409,9 @@ export interface GameState {
   /** Charges ordered but not yet loaded — each queues one `charge_hole` action and lands in `chargesByHole` on completion (#554). */
   plannedChargesByHole: Record<string, PlannedCharge>;
 
+  /** Armed detonation awaiting evacuation; null = none (#1362). */
+  pendingDetonation: PendingDetonation | null;
+
   /** Charge applied automatically to each newly drilled hole; null = none (#1345). */
   patternCharge?: HoleCharge | null;
 
@@ -586,6 +591,7 @@ export function createGame(config: GameConfig): GameState {
     plannedDrillHoles: [],
     chargesByHole: {},
     plannedChargesByHole: {},
+    pendingDetonation: null,
     patternCharge: null,
     chargeAwaitingFunds: [],
     savedPlans: {},

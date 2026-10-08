@@ -117,7 +117,6 @@ export class BlastWorkshop extends PanelBase {
     this.drillStep.setGameConsole(fn);
     this.chargeStep.setGameConsole(fn);
     this.previewStep.setGameConsole(fn);
-    this.fireStep.setGameConsole(fn);
   }
 
   /** Routes the Drill step's replace-pattern confirmation to the shared ConfirmModal (#1345). */
@@ -154,7 +153,7 @@ export class BlastWorkshop extends PanelBase {
    */
   get currentStep(): StepId { return this.activeStep; }
 
-  update(state: GameState, _weather?: WeatherState, tutorialActive: boolean = false): void {
+  update(state: GameState, _weather?: WeatherState): void {
     if (this.autoAdvance) {
       const suggested = suggestStep(state);
       if (suggested !== this.activeStep) this.setActiveStep(suggested, false);
@@ -165,7 +164,7 @@ export class BlastWorkshop extends PanelBase {
     this.chargeStep.update(state);
     this.previewStep.update(state);
     this.fireStep.update(state);
-    this.footer.update(state, tutorialActive);
+    this.footer.update(state);
   }
 
   refreshLocale(): void {

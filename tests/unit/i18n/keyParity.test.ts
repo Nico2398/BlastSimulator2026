@@ -476,9 +476,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1350: +14 keys (hole water, drain), both locales: 3811.
     // #1374: +1 key (shell.topbar.objective), both locales: 3812.
     // #1388: net -4 keys (custom shift mode removed, course copy reworded), both locales: 3808.
-    // #1407: +16 keys (bribe protections, Shady panel protection rows, corruption meter), both locales: 3824.
-    // #1372: +5 keys (contract needs warehouse, warehouse stock lost warnings and notification)
-    expect(Object.keys(en).length).toBe(3829);
+    // #1407: +16 keys (bribe protections, Shady panel protection rows, corruption meter) and #1362: +12 keys (detonation flow), -5 (horn, zone-occupied refusal), +1 (unknown blast subcommand), both locales: 3832.
+    // #1372: +5 keys (contract needs warehouse, warehouse stock lost warnings and notification), both locales: 3837.
+    expect(Object.keys(en).length).toBe(3837);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

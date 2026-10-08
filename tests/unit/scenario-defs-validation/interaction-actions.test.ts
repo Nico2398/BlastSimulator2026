@@ -463,9 +463,9 @@ describe('tutorial-interactive.json — every post-blast step has a declared tim
   // original intent (steps 31-46 of the pre-#556 file were exactly "the blast
   // step through the last step").
   const blastIndex = scenario.steps.findIndex(
-    s => typeof s !== 'string' && (s as ScenarioStepDef).command === 'blast',
+    s => typeof s !== 'string' && (s as ScenarioStepDef).command === 'blast detonate', // #1362: DETONATE arms and auto-fires; the plain `blast` step is gone
   );
-  if (blastIndex === -1) throw new Error("tutorial-interactive.json has no 'blast' step — post-blast window can't be located");
+  if (blastIndex === -1) throw new Error("tutorial-interactive.json has no 'blast detonate' step — post-blast window can't be located");
 
   const POST_BLAST_WINDOW_START = blastIndex;
   const POST_BLAST_WINDOW_END = scenario.steps.length - 1; // inclusive
@@ -533,7 +533,7 @@ describe('tutorial-steps-visual.json — additional pre-blast steps have a decla
     15: 'build_ramp start:16,19 end:16,31 depth:6', // #1151: depth 8 -> 6, length 12's new legal ceiling under NAV_MAX_SLOPE_RATIO
     16: 'drill_plan grid rows:3 cols:3 spacing:4 depth:8 start:22,20 diameter:0.089', // #949
     25: 'charge hole:* explosive:boomite amount:4 stemming:2.5',
-    29: 'zone clear x1:7 y1:5 x2:45 y2:43',
+    29: 'blast detonate', // #1362: replaces the Sound the Horn step (zone clear)
   };
 
   for (const [indexStr, expectedCommand] of Object.entries(EXPECTED_COMMANDS_BY_INDEX)) {

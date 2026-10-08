@@ -40,15 +40,15 @@ describe('wireLogisticsNotifications', () => {
   it('raises a warn toast with localized title and body including kg', () => {
     emitter.fire('logistics:warehouse_stock_lost', { buildingId: 7, massKg: 1234.4, oreKg: {} });
     expect(notes).toHaveLength(1);
-    expect(notes[0].severity).toBe('warn');
-    expect(notes[0].title).toBe(t('notification.title.warehouse_stock_lost'));
-    expect(notes[0].body).toBe(t('notification.warehouse_stock_lost', { id: 7, kg: 1234 }));
-    expect(notes[0].body).toContain('1234');
+    expect(notes[0]!.severity).toBe('warn');
+    expect(notes[0]!.title).toBe(t('notification.title.warehouse_stock_lost'));
+    expect(notes[0]!.body).toBe(t('notification.warehouse_stock_lost', { id: 7, kg: 1234 }));
+    expect(notes[0]!.body).toContain('1234');
   });
 
   it('rounds fractional kg and handles zero mass', () => {
     emitter.fire('logistics:warehouse_stock_lost', { buildingId: 1, massKg: 0.4, oreKg: {} });
-    expect(notes[0].body).toBe(t('notification.warehouse_stock_lost', { id: 1, kg: 0 }));
+    expect(notes[0]!.body).toBe(t('notification.warehouse_stock_lost', { id: 1, kg: 0 }));
   });
 
   it('ignores unrelated events', () => {

@@ -810,52 +810,10 @@
       "commandOutcome": "either"
     },
     {
-      "command": "zone clear x1:7 y1:5 x2:45 y2:43",
-      "timeout": 180,
-      "description": "#557: evacuate-zone. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) padding for this file's now-retuned (#949) 3x3/spacing:4/depth:8 grid at (22,20) -- holes span x:22-30, z:20-28, padded by the 15m margin to (7,5)-(45,43); the box moved from the old (5,5)-(41,41) computed for the old 3x3/spacing:3/(20,20) grid. This is the exact box Fire.ts's soundHorn() sends too (computed live from the same drillHoles/margin, not from this command string), so keeping the JSON in sync with it rather than hand-tuning a smaller fixture box is what keeps command mode and interaction mode evacuating the same entities out the same doors. #949 fixer follow-up: with THIS box, the driller/drill_rig parked at hole H9 (30,28) -- the grid's SE corner -- used to strand forever, because Evacuation.ts's buildCandidates only ever tried the single geometrically-nearest zone edge (east, landing at x:51, past the site's 48-wide navGrid) before falling to corners that are equally off-grid. Fixed at the source (Evacuation.ts's buildCandidates now tries every edge, nearest first, before any corner -- west at x:1 was reachable all along) rather than by shrinking this box, so Sound the Horn's real live-computed box clears correctly too, not just this command-mode fixture. The tick-60 step above already routes Kurt/Walt off the pattern toward rest (forceShiftRestIfNeededByPolicy, see that step's own extensive note) before this point, so this step may find the zone already empty -- clearZone/dangerZoneClear still have to genuinely report that, not assume it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed, so Sound the Horn is reachable with no tab click. #921: vehicle drivers are claimed automatically (no bootstrap step re-boards the vehicles), so clearZone orders out whoever is genuinely aboard.",
-      "interaction": [
-        {
-          "type": "ensureStep",
-          "step": 4
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
-        }
-      ],
+      "command": "blast detonate",
+      "timeout": 90,
       "role": "player",
-      "expect": {
-        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
-      }
-    },
-    {
-      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
-      "timeout": 180,
-      "description": "#557: drain the real walkout Sound the Horn just ordered -- the tutorial card only advances to 'blast' once dangerZoneClear genuinely reports true, matching every other wait_until in this file.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "dangerZoneClear",
-          "equals": true,
-          "maxTicks": 300,
-          "timeoutMs": 180000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "tutorialStep": "blast",
-        "equals": {
-          "dangerZoneClear": true
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "timeout": 120,
+      "description": "#1362: FIRE then DETONATE once. DETONATE sounds the horn itself and fires automatically as soon as nobody is left in the danger zone -- no separate Sound the Horn, wait, FIRE sequence.",
       "interaction": [
         {
           "type": "ensureStep",
@@ -867,15 +825,40 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "screenshot"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"preflight-detonate\"]"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "timeout": 330,
+      "role": "setup",
+      "description": "#1362: wait for the automatic fire -- the blast clears the plan (holeCount 0) only once the evacuation finished and the sequence fired. deathCount stays 0: the horn evacuates the real drill-grid footprint (x:20-26, z:20-26) before the sequence fires, so nobody is caught in it.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "deathCount": 0
         },
+        "tutorialStep": "blast"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 120,
+      "interaction": [
         {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
@@ -894,7 +877,7 @@
         }
       ],
       "role": "player",
-      "description": "Fix (CI regression, two parts). (1) This file's own top-level `skipBlastPlayback` was missing (unlike tutorial-interactive.json, which drills the identical 3x3/9-hole/994-fragment pattern and has carried it since #557) -- added at the file's own top level, since per GameRenderer's own __skipBlastPlayback bridge comment (main.ts) skipping the animation \"changes nothing\" for a scenario capturing shots of the settled muck pile (this file's own post-step `shots` orbits), and leaving it on costs real wall-clock time downstream of this step (#475) for no visual-regression value this file actually checks. It does NOT by itself rescue this step's own trailing waitForTutorialStep though -- the runner only calls __skipBlastPlayback() AFTER this step's whole interaction array (scenario-interaction-runner.ts's own `cmdSlug === 'blast'` block runs post-step), so it cannot un-block a wait still in flight inside this same step. (2) The actual fix for the wait itself: timeout 40->120 (outer), the trailing waitForTutorialStep's own inner timeout 60000->90000, matching tutorial-interactive.json's own proven 90s/60000ms budget for the byte-identical 9-hole/994-fragment/`isBlastReportOutstanding` (`[data-blast-report-modal]`, tutorialStepHelpers.ts) post-blast advance (tutorialSteps.ts's 'blast' stage, #545/#707) -- direct-traced (isolated interaction-mode repro of this exact workload, multiple runs) reaching 'scores'/'event-fire-resolve' cleanly well within that budget every time, while two independent FULL 64-step runs against the old 65000ms effective budget both stalled reporting only 1 real tick processed in that window; CI's own real-world timing (more concurrent load than an isolated repro) is exactly the kind of margin a real-time-delay-gated UI transition (BLAST_REPORT_DELAY_MS, #545) can lose across. blast complete: Execute clicked, confirm dialog answered, Blast Report closed. deathCount raised 1 -> 2 (#558 full-disc survey claim follow-up, issue #558/PR #569): step 4's `survey seismic x:23 z:23` claims its full SURVEY_COVERAGE_RADIUS=20 disc (siteExpansion.ts's cellsInDisc), growing the site from the starting 32x32 to 48x48 before the driller is hired at step 7. Employee hire's spawn point is `minX + sizeX/2, minZ + sizeZ/2` -- on this run minX/minZ stay 0 throughout (the site only grows eastward/southward from (0,0), never crosses into negative territory), so that formula numerically equals the pre-#571 `sizeX/2` here; this scenario's deathCount reproduces identically whether or not the #571 origin-offset fix is applied and is NOT evidence for that fix (verified live, both ways). The real driver is #558's site growth alone: on the grown 48x48 site the spawn point resolves to (26, 24), which lands on the real 3x3/spacing-3 drill grid's own footprint (x:20-26, z:20-26) -- x=26 sits exactly on the grid's east edge, z=24 well inside it. (The prior write-up here cited a furthest-throw distance for a drill grid size that was never real -- see the drill_plan step's own #601-followup note -- so that figure is dropped rather than restated unverified for the real grid.) cash is unaffected either way (lawsuits/fines from a death do not deduct immediately). The #571 origin-offset regression itself is covered separately by the unit/integration tests added in 75a06cf, which force a negative origin (x:-4, z:-4). CI cash mismatch fix: cash corrected 70320 -> 70648 (+$328) now that the drill_plan step above carries `diameter:0.089` -- command mode's own drill_rig spent less time (and fuelCostPerTick) sinking all 9 holes once its duration matches what a real click always produced, so more cash survives to this checkpoint. #553-followup (issue #586 CI): that +$328 offset was correct relative to command mode, but the box-cut step several steps up this same file also turned out to carry a real-time-accrual error that compounds forward -- dropped the exact cash figure here too rather than chase a second moving target. Not replaced with `decreased`: as the note above already says, cash is unaffected by this step in either mode (command mode's own trace shows it completely unchanged), so there is no single mode-agnostic cash claim to make -- holeCount/chargedCount/deathCount remain exact since they are not host-timing-sensitive. #555 tutorial worker-revolt fix: a real fix, not a route-around -- the preceding box-cut/drill-plan stretch used to crash wellBeing to a permanently-pinned 0 and flip `state.levelEndReason` to `worker_revolt` before this step ever ran (ScoreManager.ts's `applyDecay` had a dead zone at exactly 0, and `LevelDef.scoreDecayRate` -- tutorial_pit's own 0.01, documented \"player-proof\" -- had never actually reached `updateScores`, which always used the hardcoded global 0.05 instead). Both are fixed now: `state.levelEndReason` stays null through this step and for the rest of the run, `BlastReportModal` opens and renders normally post-blast (its `state.levelEndReason !== null` guard never trips), and this step is back to a real click sequence identical to tutorial-interactive.json's own proven blast step -- `report-close` is genuinely reachable again, not a permanent dead end. #707 (converged): `forceShiftRestIfNeededByPolicy` (GameLoop.ts) now gives idle employees the same proactive rest as working ones, and that changed BOTH employees' fates here, not just the surveyor's -- a command-mode probe stepping tick-by-tick from the chargedCount:9 landing point (replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found deathCount:2 (Walt Dusty AND Kurt Pickaxe both still in the blast footprint) for the first 5 ticks after chargedCount lands, deathCount:1 (Walt alone) for exactly 1 more tick, and deathCount:0 (both clear -- proactively routed toward living_quarters once idle) from 6 ticks past chargedCount:9 onward, continuously, through at least 900 ticks past that point (the full range tested). No nonzero deathCount is a safe target any more: the earlier #689-followup value (1) was only ever true for a single-tick window in command mode's own timeline, and interaction mode's real per-step polling overhead (`.claude/rules/scenario-defs.md`'s tick-count-divergence class, compounded across this file's 85 steps) can land its own blast tick anywhere relative to that window -- there is no reason to expect it to hit the same single tick command mode does. The new `tick 50` step immediately above (between the chargedCount wait and `event choose 0`) spends 50 idle ticks -- comfortably inside the 6-900 safe window and identical in both modes, since a plain `tick N` with no waitUntil target advances both trajectories by the same fixed amount regardless of where each mode's own overhead already left them -- so this step's own deathCount is 0, verified in both command mode (`npx tsx scripts/scenario-test.ts --scenario tutorial-steps-visual`) and interaction mode (`npm run scenario -- --scenario tutorial-steps-visual --mode interaction`).",
+      "description": "Fix (CI regression, two parts). (1) This file's own top-level `skipBlastPlayback` was missing (unlike tutorial-interactive.json, which drills the identical 3x3/9-hole/994-fragment pattern and has carried it since #557) -- added at the file's own top level, since per GameRenderer's own __skipBlastPlayback bridge comment (main.ts) skipping the animation \"changes nothing\" for a scenario capturing shots of the settled muck pile (this file's own post-step `shots` orbits), and leaving it on costs real wall-clock time downstream of this step (#475) for no visual-regression value this file actually checks. It does NOT by itself rescue this step's own trailing waitForTutorialStep though -- the runner only calls __skipBlastPlayback() AFTER this step's whole interaction array (scenario-interaction-runner.ts's own `cmdSlug === 'blast'` block runs post-step), so it cannot un-block a wait still in flight inside this same step. (2) The actual fix for the wait itself: timeout 40->120 (outer), the trailing waitForTutorialStep's own inner timeout 60000->90000, matching tutorial-interactive.json's own proven 90s/60000ms budget for the byte-identical 9-hole/994-fragment/`isBlastReportOutstanding` (`[data-blast-report-modal]`, tutorialStepHelpers.ts) post-blast advance (tutorialSteps.ts's 'blast' stage, #545/#707) -- direct-traced (isolated interaction-mode repro of this exact workload, multiple runs) reaching 'scores'/'event-fire-resolve' cleanly well within that budget every time, while two independent FULL 64-step runs against the old 65000ms effective budget both stalled reporting only 1 real tick processed in that window; CI's own real-world timing (more concurrent load than an isolated repro) is exactly the kind of margin a real-time-delay-gated UI transition (BLAST_REPORT_DELAY_MS, #545) can lose across. blast complete: Execute clicked, confirm dialog answered, Blast Report closed. deathCount raised 1 -> 2 (#558 full-disc survey claim follow-up, issue #558/PR #569): step 4's `survey seismic x:23 z:23` claims its full SURVEY_COVERAGE_RADIUS=20 disc (siteExpansion.ts's cellsInDisc), growing the site from the starting 32x32 to 48x48 before the driller is hired at step 7. Employee hire's spawn point is `minX + sizeX/2, minZ + sizeZ/2` -- on this run minX/minZ stay 0 throughout (the site only grows eastward/southward from (0,0), never crosses into negative territory), so that formula numerically equals the pre-#571 `sizeX/2` here; this scenario's deathCount reproduces identically whether or not the #571 origin-offset fix is applied and is NOT evidence for that fix (verified live, both ways). The real driver is #558's site growth alone: on the grown 48x48 site the spawn point resolves to (26, 24), which lands on the real 3x3/spacing-3 drill grid's own footprint (x:20-26, z:20-26) -- x=26 sits exactly on the grid's east edge, z=24 well inside it. (The prior write-up here cited a furthest-throw distance for a drill grid size that was never real -- see the drill_plan step's own #601-followup note -- so that figure is dropped rather than restated unverified for the real grid.) cash is unaffected either way (lawsuits/fines from a death do not deduct immediately). The #571 origin-offset regression itself is covered separately by the unit/integration tests added in 75a06cf, which force a negative origin (x:-4, z:-4). CI cash mismatch fix: cash corrected 70320 -> 70648 (+$328) now that the drill_plan step above carries `diameter:0.089` -- command mode's own drill_rig spent less time (and fuelCostPerTick) sinking all 9 holes once its duration matches what a real click always produced, so more cash survives to this checkpoint. #553-followup (issue #586 CI): that +$328 offset was correct relative to command mode, but the box-cut step several steps up this same file also turned out to carry a real-time-accrual error that compounds forward -- dropped the exact cash figure here too rather than chase a second moving target. Not replaced with `decreased`: as the note above already says, cash is unaffected by this step in either mode (command mode's own trace shows it completely unchanged), so there is no single mode-agnostic cash claim to make -- holeCount/chargedCount/deathCount remain exact since they are not host-timing-sensitive. #555 tutorial worker-revolt fix: a real fix, not a route-around -- the preceding box-cut/drill-plan stretch used to crash wellBeing to a permanently-pinned 0 and flip `state.levelEndReason` to `worker_revolt` before this step ever ran (ScoreManager.ts's `applyDecay` had a dead zone at exactly 0, and `LevelDef.scoreDecayRate` -- tutorial_pit's own 0.01, documented \"player-proof\" -- had never actually reached `updateScores`, which always used the hardcoded global 0.05 instead). Both are fixed now: `state.levelEndReason` stays null through this step and for the rest of the run, `BlastReportModal` opens and renders normally post-blast (its `state.levelEndReason !== null` guard never trips), and this step is back to a real click sequence identical to tutorial-interactive.json's own proven blast step -- `report-close` is genuinely reachable again, not a permanent dead end. #707 (converged): `forceShiftRestIfNeededByPolicy` (GameLoop.ts) now gives idle employees the same proactive rest as working ones, and that changed BOTH employees' fates here, not just the surveyor's -- a command-mode probe stepping tick-by-tick from the chargedCount:9 landing point (replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found deathCount:2 (Walt Dusty AND Kurt Pickaxe both still in the blast footprint) for the first 5 ticks after chargedCount lands, deathCount:1 (Walt alone) for exactly 1 more tick, and deathCount:0 (both clear -- proactively routed toward living_quarters once idle) from 6 ticks past chargedCount:9 onward, continuously, through at least 900 ticks past that point (the full range tested). No nonzero deathCount is a safe target any more: the earlier #689-followup value (1) was only ever true for a single-tick window in command mode's own timeline, and interaction mode's real per-step polling overhead (`.claude/rules/scenario-defs.md`'s tick-count-divergence class, compounded across this file's 85 steps) can land its own blast tick anywhere relative to that window -- there is no reason to expect it to hit the same single tick command mode does. The new `tick 50` step immediately above (between the chargedCount wait and `event choose 0`) spends 50 idle ticks -- comfortably inside the 6-900 safe window and identical in both modes, since a plain `tick N` with no waitUntil target advances both trajectories by the same fixed amount regardless of where each mode's own overhead already left them -- so this step's own deathCount is 0, verified in both command mode (`npx tsx scripts/scenario-test.ts --scenario tutorial-steps-visual`) and interaction mode (`npm run scenario -- --scenario tutorial-steps-visual --mode interaction`). (#1362: the blast already fired by itself; this step closes its report.)",
       "expect": {
         "equals": {
           "holeCount": 0,

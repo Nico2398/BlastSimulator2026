@@ -1,0 +1,243 @@
+{
+  "name": "blast-detonate-fire-anyway",
+  "description": "#1362: DETONATE arms the sequence with the crew still on the pattern; the waiting state always offers Fire anyway and Cancel. The player overrides the wait and fires immediately, accepting casualties.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow",
+      "role": "setup",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ],
+      "description": "The level exactly as the UI starts it: no cash override, no staffed flag. It opens with a driller, a blaster, a driver, a drill rig, a debris hauler and a freight warehouse (#1363).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "employeeCount": 3,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
+      "command": "time speed 8",
+      "role": "setup",
+      "description": "Speed up the waits below.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ]
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:3 spacing:3 depth:6 start:15,15",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "focusTile",
+          "x": 18,
+          "z": 17,
+          "distance": 30,
+          "yaw": 180,
+          "pitch": 70
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 22,
+          "z2": 19
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 6
+        },
+        "note": "6 holes ordered with the level's own crew and rig."
+      },
+      "description": "Order a drill grid with the crew and rig the level opens with: nothing was hired or bought."
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:900",
+      "description": "Cycle 1: the driller lands every ordered hole.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 900,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"amount\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "Cycle 1: the blaster loads every charge.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 300000
+        }
+      ],
+      "timeout": 330,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "timeout": 90,
+      "role": "player",
+      "description": "DETONATE arms the sequence; the preflight modal switches to its waiting state with both Fire anyway and Cancel detonation, whether or not anyone is stuck.",
+      "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        }
+      ],
+      "expect": {
+        "usable": "[data-action=\"preflight-fire-anyway\"]",
+        "equals": {
+          "deathCount": 0,
+          "holeCount": 6
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 90,
+      "role": "player",
+      "description": "Fire anyway: the blast fires at once with the crew still inside, so there are casualties -- the override the player explicitly chose.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0
+        },
+        "increased": [
+          "deathCount"
+        ]
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "description": "Close the blast report.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    }
+  ]
+}
