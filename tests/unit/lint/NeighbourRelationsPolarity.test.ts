@@ -47,15 +47,10 @@ describe('neighbour relations polarity (#1405)', () => {
   it('completeness: every option carrying a nuisance delta is in the fixture', () => {
     const known = new Set(NEIGHBOUR_POLARITY.map(keyOf));
     const missing = events.flatMap(e => e.consequences.flatMap((c, i) => {
-      const found: string[] = [];
-      if (c.scoreDelta?.nuisance !== undefined && !known.has(keyOf({ eventId: e.id, option: i }))) {
-        found.push(keyOf({ eventId: e.id, option: i }));
-      }
-      if (c.altConsequence?.scoreDelta?.nuisance !== undefined
-        && !known.has(keyOf({ eventId: e.id, option: i, alt: true }))) {
-        found.push(keyOf({ eventId: e.id, option: i, alt: true }));
-      }
-      return found;
+      return [{ alt: false, delta: c.scoreDelta }, { alt: true, delta: c.altConsequence?.scoreDelta }]
+        .filter(({ delta }) => delta?.nuisance !== undefined)
+        .map(({ alt }) => keyOf({ eventId: e.id, option: i, alt }))
+        .filter(key => !known.has(key));
     }));
     expect(missing, `options missing from the polarity fixture:\n${missing.join('\n')}`).toEqual([]);
   });

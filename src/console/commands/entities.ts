@@ -295,7 +295,7 @@ export function scoresCommand(
       `  Well-being: ${s.wellBeing.toFixed(1)}`,
       `  Safety:     ${s.safety.toFixed(1)}`,
       `  Ecology:    ${s.ecology.toFixed(1)}`,
-      `  Neighbours:  ${s.nuisance.toFixed(1)}`,
+      `  Neighbours: ${s.nuisance.toFixed(1)}`,
     ].join('\n'),
   };
 }
