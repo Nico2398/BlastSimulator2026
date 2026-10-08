@@ -982,7 +982,7 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
     expect(state.storedMassKg).toBeCloseTo(storedMassSum(state), 6);
   });
 
-  it('a pure-ore fragment sold fully is removed with no sliver, other fragments untouched', () => {
+  it('selling all dirtite removes pure-dirtite fragment 2 and leaves fragment 1 holding only rustite', () => {
     const { state, collectedOre } = mixedStorage();
 
     const result = consumeStoredOre(state, collectedOre, 'dirtite', 400 - FRAGMENT_SPLIT_EPSILON_KG / 2 + 400);
@@ -990,6 +990,9 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
     expect(result.success).toBe(true);
     // Fragment 2 is pure dirtite and fully consumed: it must be gone.
     expect(state.fragments.find(f => f.fragment.id === 2)).toBeUndefined();
+    const frag1 = state.fragments.find(f => f.fragment.id === 1)!.fragment;
+    expect(Object.keys(frag1.oreDensities)).toEqual(['rustite']);
+    expect(oreKgIn(frag1, 'rustite')).toBeCloseTo(400, 6);
     expect(state.storedMassKg).toBeCloseTo(storedMassSum(state), 6);
     expect(collectedOre.dirtite).toBeCloseTo(storedOreKg(state, 'dirtite'), 6);
   });
@@ -1049,6 +1052,31 @@ describe('extractOreFromFragment (#1371)', () => {
     expect(out!.mass).toBeCloseTo(500, 6);
     expect(state.fragments.find(f => f.fragment.id === 2)).toBeUndefined();
     expect(state.storedMassKg).toBeCloseTo(1000, 6);
+  });
+
+  it('clamps to the full contribution when oreKg exceeds it', () => {
+    const { state } = mixedStorage();
+
+    const out = extractOreFromFragment(state, 1, 'rustite', 5000);
+
+    expect(out).not.toBeNull();
+    expect(out!.oreKg).toBeCloseTo(400, 6);
+    expect(out!.mass).toBeCloseTo(500, 6);
+    const frag = state.fragments.find(f => f.fragment.id === 1)!.fragment;
+    expect(oreKgIn(frag, 'rustite')).toBeCloseTo(0, 6);
+    expect(oreKgIn(frag, 'dirtite')).toBeCloseTo(400, 6);
+  });
+
+  it('shrinks halfExtents by the cube root of the remaining volume ratio', () => {
+    const { state } = mixedStorage();
+
+    extractOreFromFragment(state, 1, 'rustite', 400);
+
+    const frag = state.fragments.find(f => f.fragment.id === 1)!.fragment;
+    const expected = 0.5 * Math.cbrt(0.16 / 0.32);
+    expect(frag.halfExtents.x).toBeCloseTo(expected, 6);
+    expect(frag.halfExtents.y).toBeCloseTo(expected, 6);
+    expect(frag.halfExtents.z).toBeCloseTo(expected, 6);
   });
 
   it('returns null for an unknown fragment, a fragment not in storage, or an absent ore', () => {

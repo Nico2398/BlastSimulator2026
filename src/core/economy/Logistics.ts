@@ -2,11 +2,11 @@
 // Tracks fragments through lifecycle: on_ground → in_transit → stored/sold/disposed.
 
 import type { FragmentData } from '../mining/BlastExecution.js';
-import { accumulateOreMass } from '../mining/BlastOreReport.js';
+import { accumulateOreMass, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
 import { scale } from '../math/Vec3.js';
-import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG, ORE_DENSITY_KG_M3 } from '../config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
 
 // ── Fragment states ──
 
@@ -135,6 +135,24 @@ export function sellFragment(
 }
 
 /**
+ * Shrink a stored fragment in place by the removed mass and volume: scales
+ * halfExtents by the cube root of the remaining volume ratio and debits
+ * state.storedMassKg.
+ */
+function shrinkStoredFragment(
+  state: LogisticsState,
+  fragment: FragmentData,
+  removedMassKg: number,
+  removedVolume: number,
+): void {
+  const oldVolume = fragment.volume;
+  fragment.mass -= removedMassKg;
+  fragment.volume -= removedVolume;
+  fragment.halfExtents = scale(fragment.halfExtents, Math.cbrt(fragment.volume / oldVolume));
+  state.storedMassKg -= removedMassKg;
+}
+
+/**
  * Split a stored fragment's mass, removing `massToRemoveKg` from it and leaving
  * the remainder in storage (as a smaller fragment covering the same ore
  * densities). Returns the removed mass/volume/oreDensities, or null when the
@@ -159,12 +177,7 @@ export function splitStoredFragmentMass(
   const removedVolume = fragment.volume * fraction;
   const removedOreDensities = { ...fragment.oreDensities };
 
-  fragment.mass -= massToRemoveKg;
-  fragment.volume -= removedVolume;
-  const shrink = Math.cbrt(1 - fraction);
-  fragment.halfExtents = scale(fragment.halfExtents, shrink);
-
-  state.storedMassKg -= massToRemoveKg;
+  shrinkStoredFragment(state, fragment, massToRemoveKg, removedVolume);
 
   return {
     mass: massToRemoveKg,
@@ -213,7 +226,7 @@ export function extractOreFromFragment(
   const fragment = tracked.fragment;
   const d = fragment.oreDensities[oreId] ?? 0;
   const volume = fragment.volume;
-  const contribution = volume * d * ORE_DENSITY_KG_M3;
+  const contribution = oreContributionKg(volume, d);
   if (d <= 0 || !(contribution > 0)) return null;
 
   const f = Math.min(1, Math.max(0, oreKg / contribution));
@@ -238,10 +251,7 @@ export function extractOreFromFragment(
     if (next > 0) densities[id] = next;
   }
   fragment.oreDensities = densities;
-  fragment.mass = leftoverMass;
-  fragment.volume = newVolume;
-  fragment.halfExtents = scale(fragment.halfExtents, Math.cbrt(newVolume / volume));
-  state.storedMassKg -= removedMass;
+  shrinkStoredFragment(state, fragment, removedMass, removedVolume);
 
   return { oreKg: removedOreKg, mass: removedMass, volume: removedVolume };
 }
@@ -292,8 +302,10 @@ export function consumeStoredOre(
       if (!tracked) continue;
 
       const remaining = amountKg - tally;
-      const contribution = tracked.fragment.volume
-        * (tracked.fragment.oreDensities[materialId] ?? 0) * ORE_DENSITY_KG_M3;
+      const contribution = oreContributionKg(
+        tracked.fragment.volume,
+        tracked.fragment.oreDensities[materialId] ?? 0,
+      );
       const take = remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG ? contribution : remaining;
       const extracted = extractOreFromFragment(state, id, materialId, take);
       if (!extracted) continue;
