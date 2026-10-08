@@ -5,6 +5,7 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
+import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
 
@@ -17,6 +18,8 @@ export interface TrackedFragment {
   state: FragmentState;
   /** Vehicle ID that picked up the fragment (if in_transit). */
   vehicleId: string | null;
+  /** Freight warehouse this fragment is reserved for (in_transit) or stored in; null on the ground. */
+  warehouseId: number | null;
 }
 
 // ── Logistics state ──
@@ -50,6 +53,7 @@ export function addBlastFragments(state: LogisticsState, fragments: FragmentData
       fragment: f,
       state: 'on_ground',
       vehicleId: null,
+      warehouseId: null,
     });
     navGrid?.addFragmentOccupant(Math.round(f.position.x), Math.round(f.position.z));
   }
@@ -60,6 +64,9 @@ export function pickupFragment(
   state: LogisticsState,
   fragmentId: number,
   vehicleId: string,
+  _sites: readonly WarehouseSite[] = [],
+  _atX: number = 0,
+  _atZ: number = 0,
 ): boolean {
   const tracked = state.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
@@ -81,6 +88,9 @@ export function deliverToDepot(
   state: LogisticsState,
   fragmentId: number,
   collectedOre?: Record<string, number>,
+  _sites: readonly WarehouseSite[] = [],
+  _atX: number = 0,
+  _atZ: number = 0,
 ): boolean {
   const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked) return false;
@@ -454,6 +464,7 @@ export function returnFragmentToGround(
 
   tracked.state = 'on_ground';
   tracked.vehicleId = null;
+  tracked.warehouseId = null;
 
   if (dropPosition) {
     tracked.fragment.position = dropPosition;

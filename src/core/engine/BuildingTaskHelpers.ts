@@ -18,6 +18,7 @@ import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { regionForColumns } from '../nav/NavGridSync.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
+import type { WarehouseLoss } from '../economy/FreightWarehouses.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
 export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
@@ -53,8 +54,9 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
 }
 
 /** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
-export function refreshLogisticsCapacity(state: GameState): void {
+export function refreshLogisticsCapacity(state: GameState): WarehouseLoss[] {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+  return []; // TODO: implement orphan-stock loss
 }
 
 /**

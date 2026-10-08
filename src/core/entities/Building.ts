@@ -598,6 +598,7 @@ export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export {
   getExplosivesCapacity, getExplosivesInStock,
   storeExplosives, consumeExplosives, hasExplosivesForBlast, freightWarehouseHasRoom,
+  freightWarehouseSites, type WarehouseSite,
 } from './BuildingWarehouse.js';
 export {
   computePlacementCutoff,

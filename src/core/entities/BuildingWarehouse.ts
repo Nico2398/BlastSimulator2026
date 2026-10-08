@@ -88,3 +88,16 @@ export function freightWarehouseHasRoom(
 ): boolean {
   return currentStoredKg + additionalKg <= getStorageCapacity(state);
 }
+
+/** A placed, active freight warehouse as seen by logistics: where it is and how much it holds. */
+export interface WarehouseSite {
+  id: number;
+  x: number;
+  z: number;
+  capacityKg: number;
+}
+
+/** Active freight warehouses as logistics sites. */
+export function freightWarehouseSites(_state: BuildingState): WarehouseSite[] {
+  return []; // TODO: implement
+}

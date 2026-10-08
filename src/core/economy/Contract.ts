@@ -438,3 +438,11 @@ export function checkDeadlines(
 
   return penalties;
 }
+
+/** Why a contract cannot be accepted yet, or null. */
+export function contractAcceptBlocker(
+  _c: Contract,
+  _hasFreightWarehouse: boolean,
+): 'needs_freight_warehouse' | null {
+  return null; // TODO: implement
+}
