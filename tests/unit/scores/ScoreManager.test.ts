@@ -11,6 +11,7 @@ import {
 import {
   createBuildingState,
   placeBuilding,
+  getBuildingDef,
 } from '../../../src/core/entities/Building.js';
 
 function makeInputs(overrides: Partial<ScoreInputs> = {}): ScoreInputs {
@@ -51,6 +52,27 @@ describe('Score system', () => {
 
     recordAccident(state);
     expect(state.safety).toBeLessThan(orig);
+  });
+
+  it('recent vibrations lower the neighbour-relations score on a tick (#1405)', () => {
+    const state = createScoreState();
+    updateScores(state, makeInputs({ maxRecentVibration: 50 }));
+    expect(state.nuisance).toBeLessThan(50);
+  });
+
+  it('a positive buildingEffects.nuisance raises the neighbour-relations score (#1405)', () => {
+    const buildings = createBuildingState();
+    placeBuilding(buildings, 'living_quarters', 0, 0, 64, 64);
+    const def = getBuildingDef('living_quarters', 1);
+    const original = { ...def.scoreEffects };
+    try {
+      def.scoreEffects = { ...original, nuisance: 20 };
+      const state = createScoreState();
+      updateScores(state, makeInputs({ buildings }));
+      expect(state.nuisance).toBeGreaterThan(50);
+    } finally {
+      def.scoreEffects = original;
+    }
   });
 
   it('blast vibrations decrease nuisance score', () => {
