@@ -1361,8 +1361,7 @@ export const TRAINING_BASE_FEE = 2500;
 /**
  * Duration and cost of a Research Center task by the tier it unlocks. Tier 3
  * research costs and takes more than tier 2 — a straight step up keeps
- * late-game tiers stay a real investment rather
- * than a rubber-stamp.
+ * late-game tiers a real investment rather than a rubber-stamp.
  */
 /** Cost, duration, and prerequisites for a single tier's research task. */
 export interface ResearchTaskDef {

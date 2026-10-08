@@ -579,7 +579,7 @@ describe('tickTraining grants qualifications only', () => {
     expect(employee.salary).toBe(BASE_SALARIES[employee.role] + calculateQualificationBonus(employee));
   });
 
-  it('completing on an already-held skill leaves its level and xp untouched', () => {
+  it('completing on an already-held skill is skipped: level, xp and salary untouched, no completion reported', () => {
     const { state, school } = setupSchool('blasting_academy');
     const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
     assignSkill(state.employees, employee.id, 'blasting', 3);
@@ -588,21 +588,13 @@ describe('tickTraining grants qualifications only', () => {
     const salaryBefore = employee.salary;
 
     startFinalTick(employee, school, 'blasting');
-    tickTraining(state);
+    const { completed } = tickTraining(state);
 
+    expect(completed).toEqual([]);
     expect(qual.proficiencyLevel).toBe(3);
     expect(qual.xp).toBe(XP_THRESHOLDS[3] + 7);
     expect(employee.qualifications.filter(q => q.category === 'blasting')).toHaveLength(1);
     expect(employee.salary).toBe(salaryBefore);
-  });
-
-  it('completing on a held Rookie skill does not promote it', () => {
-    const { state, school } = setupSchool('blasting_academy');
-    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
-    startFinalTick(employee, school, 'blasting');
-    tickTraining(state);
-    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
-    expect(qual.proficiencyLevel).toBe(1);
   });
 });
 

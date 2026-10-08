@@ -79,19 +79,14 @@ function well(children: (Node | null | undefined)[]): HTMLElement {
   return el('div', { className: 'bsx-well', attrs: { style: 'padding:9px 10px;display:flex;flex-direction:column;gap:6px' }, children });
 }
 
-/**
- * A training-offer row that cannot be started right now — already qualified, or the school is full (#1203) — rendered as a title + reason
- * line with a disabled Train button. Both callers in makeTrainingSection
- * differ only in the title text and the reason line's i18n key/params.
- */
-function renderLockedTrainingRow(row: HTMLElement, titleText: string, reasonKey: string, reasonParams?: Record<string, string | number>, withButton = true): void {
+/** Title line over a detail line, the text block shared by every training-offer row. */
+function trainingInfoBlock(title: string, detail: string): HTMLElement {
   const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
   info.append(
-    el('span', { text: titleText, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-    el('span', { text: t(reasonKey, reasonParams), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+    el('span', { text: title, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+    el('span', { text: detail, attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
   );
-  row.append(info);
-  if (withButton) row.append(button('locked', t('ui.crew.train'), { disabled: true }));
+  return info;
 }
 
 // ── HIRED / LOCATION ──
@@ -314,19 +309,20 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     const plan = planTraining(e, skill, building.tier);
     const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px' } });
 
+    const title = t(`course.${skill}`);
+
     if (!plan) {
-      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed', undefined, false);
+      row.append(trainingInfoBlock(title, t('ui.crew.training_qualified')));
     } else if (isSchoolFull(state, building)) {
-      renderLockedTrainingRow(row, `${t(`course.${skill}`)}`, 'ui.crew.training_school_full');
+      row.append(
+        trainingInfoBlock(title, t('ui.crew.training_school_full')),
+        button('locked', t('ui.crew.train'), { disabled: true }),
+      );
     } else {
       anyOffered = true;
-      const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
-      info.append(
-        el('span', { text: `${t(`course.${skill}`)}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
-        el('span', {
-          text: t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, raise: perHour(plan.salaryIncrease) }),
-          attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
-        }),
+      const info = trainingInfoBlock(
+        title,
+        t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, raise: perHour(plan.salaryIncrease) }),
       );
       const trainBtn = button('warn', t('ui.crew.train'), { disabled: state.cash < plan.fee || e.injured });
       trainBtn.classList.add('bs-train-btn');
@@ -339,7 +335,7 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   }
 
   if (e.injured) rows.push(reasonLine(t('ui.crew.training_injured'), true));
-  else if (!anyOffered) rows.push(reasonLine(t('ui.crew.training_all_maxed')));
+  else if (!anyOffered) rows.push(reasonLine(t('ui.crew.training_all_qualified')));
 
   wrap.appendChild(well(rows));
   return wrap;

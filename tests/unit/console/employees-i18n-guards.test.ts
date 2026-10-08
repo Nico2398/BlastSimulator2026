@@ -519,7 +519,7 @@ describe('employees.ts — train_no_building_on_site (school exists in the catal
   });
 });
 
-// ── train_already_master ──────────────────────────────────────────────────
+// ── train_already_qualified ──────────────────────────────────────────────────
 
 describe('employees.ts — train refusal for an already-held skill (#1388)', () => {
   function setupHeldEmployee(ctx: GameContext, level: 1 | 5) {

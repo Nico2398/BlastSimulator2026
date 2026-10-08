@@ -150,7 +150,7 @@ export function startTraining(
 }
 
 /**
- * Enrol an employee on the next course in a skill at a specific school.
+ * Enrol an employee on the course that teaches a skill they lack, at a specific school.
  *
  * Validates what `startTraining` alone cannot: that the building teaches this
  * skill, that the employee lacks the qualification, and (#1203) that the school has
@@ -279,10 +279,11 @@ export function tickTraining(
     emp.trainingState = null;
     leaveBuilding(state, emp.id, emitter);
 
-    // Enrolment refuses a held skill; guard anyway so a duplicate never lands.
-    if (!emp.qualifications.some(q => q.category === skill)) {
-      emp.qualifications.push({ category: skill, proficiencyLevel: 1, xp: 0 });
-    }
+    // Enrolment refuses a held skill, but the employee may have gained it
+    // mid-course (e.g. assign_skill). The course then teaches nothing: no
+    // completion, event or salary recompute.
+    if (emp.qualifications.some(q => q.category === skill)) continue;
+    emp.qualifications.push({ category: skill, proficiencyLevel: 1, xp: 0 });
     // A newly qualified employee demands more pay; calculateSalary keeps earned raises.
     emp.salary = calculateSalary(emp);
 
