@@ -82,7 +82,7 @@ function employeeMovementDefaults(): Omit<
  * Push a qualified truck driver (driving.truck licence) directly into employee state.
  * Returns the new employee's ID.
  */
-function addTruckDriver(ctx: MiningContext): number {
+function addTruckDriver(ctx: MiningContext, licenceLevel?: 1 | 2 | 3): number {
   const emp: Employee = {
     id: ctx.state!.employees.nextId++,
     name: 'Test Truck Driver',
@@ -94,7 +94,7 @@ function addTruckDriver(ctx: MiningContext): number {
     alive: true,
     x: 0,
     z: 0,
-    qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
+    qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, ...(licenceLevel ? { licenceLevel } : {}) }],
     trainingState: null,
     ...employeeMovementDefaults(),
   };
@@ -818,7 +818,7 @@ describe('vehicle upgrade', () => {
   it('omits the no-licence note when a licensed driver exists', () => {
     const ctx = makeCtx();
     const id = addTruckVehicle(ctx);
-    addTruckDriver(ctx);
+    addTruckDriver(ctx, 2);
     const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(true);
     expect(result.output).not.toContain(t('vehicle.upgrade_no_licensed', { id, type: 'debris_hauler', tier: 2 }));

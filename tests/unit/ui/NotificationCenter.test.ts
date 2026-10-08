@@ -650,6 +650,38 @@ describe('NotificationCenter (redesign P1)', () => {
       expect(message).not.toBe(otherMessage);
     });
 
+    it('names the licence and the level needed for licence_level_too_low (#1524)', () => {
+      const action = makeAction({
+        id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+        blockedReason: 'licence_level_too_low', blockedLicenceLevel: 2,
+      });
+      const message = buildBlockedOrderMessage(action);
+      expect(message).toContain(t(ACTION_LABEL_KEY.drill_hole));
+      expect(message).toContain(t('vehicle_type.drill_rig'));
+      expect(message).toContain('2');
+      expect(message).toBe(t('notification.order_blocked_licence_level', {
+        order: t(ACTION_LABEL_KEY.drill_hole), licence: t('vehicle_type.drill_rig'), level: 2,
+      }));
+      expect(message).not.toBe(buildBlockedOrderMessage(makeAction({ id: 1, blockedReason: 'no_licensed_driver' })));
+    });
+
+    it('has the licence-level message in both locales (#1524)', () => {
+      const params = { order: 'X', licence: 'Y', level: 3 };
+      try {
+        setLocale('en');
+        const en = t('notification.order_blocked_licence_level', params);
+        setLocale('fr');
+        const fr = t('notification.order_blocked_licence_level', params);
+        expect(en).not.toBe('notification.order_blocked_licence_level');
+        expect(fr).not.toBe('notification.order_blocked_licence_level');
+        expect(en).not.toBe(fr);
+        expect(en).toContain('3');
+        expect(fr).toContain('3');
+      } finally {
+        setLocale('en');
+      }
+    });
+
     it('names the order type and required skill for no_qualified_employee', () => {
       const action = makeAction({
         id: 1, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: null,

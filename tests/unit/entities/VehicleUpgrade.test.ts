@@ -6,7 +6,6 @@ import {
   computeVehicleUpgradeCost,
   upgradeVehicle,
   rosterCanDriveVehicleTier,
-  isLicensedForVehicleTier,
   canAffordVehicleUpgrade,
 } from '../../../src/core/entities/VehicleUpgrade.js';
 import { purchaseVehicle, createVehicleState, getVehicleDefByTier, getAllVehicleRoles } from '../../../src/core/entities/Vehicle.js';
@@ -118,7 +117,7 @@ describe('upgradeVehicle', () => {
 
 describe('rosterCanDriveVehicleTier', () => {
   const licensed = (id = 1, over: Partial<Employee> = {}) =>
-    makeEmployee({ id, qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }], ...over });
+    makeEmployee({ id, qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, licenceLevel: 3 }], ...over });
 
   it('is true when an alive employee holds the licence', () => {
     expect(rosterCanDriveVehicleTier([licensed()], 'debris_hauler', 2)).toBe(true);
@@ -143,17 +142,6 @@ describe('rosterCanDriveVehicleTier', () => {
 
   it('is true if any one of several employees is licensed', () => {
     expect(rosterCanDriveVehicleTier([makeEmployee({ id: 5 }), licensed(6)], 'debris_hauler', 3)).toBe(true);
-  });
-});
-
-describe('isLicensedForVehicleTier', () => {
-  it('is true for a holder of the role licence', () => {
-    const e = makeEmployee({ qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }] });
-    expect(isLicensedForVehicleTier(e, 'debris_hauler', 1)).toBe(true);
-  });
-
-  it('is false without the licence', () => {
-    expect(isLicensedForVehicleTier(makeEmployee(), 'debris_hauler', 1)).toBe(false);
   });
 });
 

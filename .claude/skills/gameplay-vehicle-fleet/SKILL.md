@@ -69,6 +69,15 @@ boulders), as are further licence levels and cross-training. A vehicle is not ow
 employee may board any vehicle that is unoccupied and unclaimed. Nothing persists a driver
 assignment across tasks.
 
+**Licence level (#1524).** A licence carries a level 1-3 (`SkillQualification.licenceLevel`, absent = 1), separate
+from proficiency: XP never raises it, only a Driving Center course does (`LICENCE_COURSE_FEE`,
+`LICENCE_COURSE_TICKS_MULT`, `balance.ts`). Driving a tier-N vehicle needs the role licence at level >= N
+(`licenceLevelOf`, `canDriveTier`, `countLicenceHolders` in `VehicleDriverAssignment.ts`); `canAssignDriver`
+refuses with 'Employee lacks licence level for this vehicle tier', `findFreeVehicleForRole` skips vehicles above
+the claimer's level. A vehicle order nobody can level-qualify for carries `licence_level_too_low` (when someone
+holds the licence at a lower level) with `blockedLicenceLevel` = the lowest tier in that role's fleet, else
+`no_licensed_driver`. The dealership shows each tier's required level and how many employees hold it.
+
 ## State Model
 
 ### Employee owns locomotion
@@ -264,7 +273,7 @@ An owned vehicle moves up one tier in place (`src/core/entities/VehicleUpgrade.t
 - **Effect:** `upgradeVehicle` mutates only `tier` and `hp`; hp is set to the new tier's `maxHp` (full restore even when damaged). Id, position, reservation and occupants are kept, so it is allowed while reserved, driven or carrying.
 - **Entry points:** console `vehicle upgrade <id>`; Fleet panel card button (`data-action="upgrade"`, shows cost, disabled with a reason at tier 3 or short cash); SelectionBar `upgrade_vehicle` (distinct from the building `upgrade` action).
 - **Upgrade vs scrap:** scrap sells at the 40% residual and the vehicle is gone; upgrade keeps the vehicle and pays only the difference, so it is the intended way up a tier.
-- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the card shows a warning row. `isLicensedForVehicleTier` equals "holds the role licence" today; it becomes tier-aware with #1524 (TODO(#1524)).
+- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the card shows a warning row. `isLicensedForVehicleTier` is tier-aware (`canDriveTier`, #1524).
 
 ## Traffic
 

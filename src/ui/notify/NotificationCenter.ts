@@ -309,6 +309,12 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return t('notification.order_blocked_no_vehicle', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
     case 'no_licensed_driver':
       return t('notification.order_blocked_no_driver', { order, role: t(`vehicle_type.${action.requiredVehicleRole}`) });
+    case 'licence_level_too_low':
+      return t('notification.order_blocked_licence_level', {
+        order,
+        licence: t(`vehicle_type.${action.requiredVehicleRole}`),
+        level: action.blockedLicenceLevel ?? 1,
+      });
     case 'no_qualified_employee':
       return action.requiredSkill !== null
         ? t('notification.order_blocked_no_employee', { order, skill: t(`skill.${action.requiredSkill}`) })

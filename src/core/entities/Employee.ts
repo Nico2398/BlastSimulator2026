@@ -8,6 +8,7 @@ import { Random } from '../math/Random.js';
 import type { NeedKey } from './EmployeeNeeds.js';
 import type { Locomotion } from './EmployeeLocomotion.js';
 import type { ActionType } from '../state/GameState.js';
+import type { VehicleTier } from './Vehicle.js';
 import type { Itinerary } from '../engine/Itinerary.js';
 import { HIRING_COSTS as _HIRING_COSTS, BASE_SALARIES as _BASE_SALARIES, PAY_CYCLE_TICKS as _PAY_CYCLE_TICKS, QUALIFICATION_SALARY_BONUS, CANDIDATE_UNION_CHANCE, ROLE_STARTING_QUALIFICATIONS, XP_THRESHOLDS, INJURY_RECOVERY_TICKS, INJURY_MORALE_PENALTY } from '../config/balance.js';
 
@@ -62,7 +63,12 @@ export interface SkillQualification {
   category: SkillCategory;
   proficiencyLevel: 1 | 2 | 3 | 4 | 5;
   xp: number;
+  /** Driving-licence level (#1524) for `driving.*` categories; absent = 1. */
+  licenceLevel?: LicenceLevel;
 }
+
+/** Driving-licence level; a licence of level N may drive vehicles of tier <= N. */
+export type LicenceLevel = VehicleTier;
 
 /** A qualification at `level`, with the XP that level starts at. */
 export function qualificationAtLevel(category: SkillCategory, level: SkillQualification['proficiencyLevel']): SkillQualification {
@@ -74,6 +80,8 @@ export interface TrainingState {
   skill: SkillCategory;
   ticksRemaining: number;
   fee: number;
+  /** Set when the course raises an already-held driving licence to this level (#1524). */
+  raisesLicenceTo?: Exclude<LicenceLevel, 1>;
 }
 
 // ── Employee instance ──

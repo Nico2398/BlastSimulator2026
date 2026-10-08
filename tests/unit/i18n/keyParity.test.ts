@@ -481,7 +481,9 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1393: net -2 keys (vehicle depot building removed, repair skill and repair order added), both locales: 3835.
     // #1401: +10 keys (vehicle upgrade command, Fleet panel upgrade button, SelectionBar upgrade_vehicle), both locales: 3845.
     // #1414: +53 keys (event effect texts, modifier chips), both locales: 3898.
-    expect(Object.keys(en).length).toBe(3898);
+    // #1524: +4 keys (licence tier gating: dealership level text, licence-level-too-low), both locales: 3902.
+    // #1524 review: licence_required + licence_holders merged into one ui.fleet.licence_line, net -1: 3901.
+    expect(Object.keys(en).length).toBe(3901);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {
