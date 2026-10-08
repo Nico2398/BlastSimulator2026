@@ -355,8 +355,8 @@ describe('getUpgradeCost()', () => {
   });
 
   it('computes the same demolish-plus-construction sum for a tier-2 to tier-3 upgrade', () => {
-    const building: Building = { id: 2, type: 'vehicle_depot', tier: 2, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
-    const expected = getBuildingDef('vehicle_depot', 2).demolishCost + getBuildingDef('vehicle_depot', 3).constructionCost;
+    const building: Building = { id: 2, type: 'geology_lab', tier: 2, x: 0, z: 0, hp: 100, active: true, occupantIds: [] };
+    const expected = getBuildingDef('geology_lab', 2).demolishCost + getBuildingDef('geology_lab', 3).constructionCost;
 
     expect(getUpgradeCost(building, 3)).toBe(expected);
   });
@@ -745,7 +745,7 @@ describe('getBuildingPeopleCapacity (#1202)', () => {
   });
 
   it('buildings that take no people hold none, whatever their capacity field counts', () => {
-    for (const type of ['research_center', 'explosive_warehouse', 'freight_warehouse', 'vehicle_depot'] as const) {
+    for (const type of ['research_center', 'explosive_warehouse', 'freight_warehouse'] as const) {
       for (const tier of [1, 2, 3] as const) {
         expect(getBuildingPeopleCapacity(type, tier)).toBe(0);
       }

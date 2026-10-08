@@ -69,8 +69,8 @@
       }
     },
     {
-      "command": "build vehicle_depot at:28,19",
-      "description": "Arm the vehicle depot from the catalog and pick a tile whose footprint overlaps the planned ramp. Ghost is refused before any click: Confirm is unreachable and no building is ordered (#1390). Screenshot shows the red ghost with the blocks-a-ramp reason.",
+      "command": "build geology_lab at:28,19",
+      "description": "Arm the geology lab from the catalog and pick a tile whose footprint overlaps the planned ramp. Ghost is refused before any click: Confirm is unreachable and no building is ordered (#1390). Screenshot shows the red ghost with the blocks-a-ramp reason.",
       "timeout": 60,
       "interaction": [
         {
@@ -79,7 +79,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-buy-btn"
         },
         {
           "type": "waitForSelector",
@@ -115,7 +115,7 @@
       }
     },
     {
-      "command": "build vehicle_depot at:30,30",
+      "command": "build geology_lab at:30,30",
       "description": "Same still-armed tool, pick a tile in the middle of the ramp corridor: still refused, Confirm still blocked, nothing ordered.",
       "timeout": 60,
       "interaction": [
@@ -149,7 +149,7 @@
       }
     },
     {
-      "command": "build vehicle_depot at:50,30",
+      "command": "build geology_lab at:50,30",
       "description": "Pick a tile clear of the ramp in the same armed tool: Confirm becomes usable and the order goes through.",
       "timeout": 60,
       "interaction": [

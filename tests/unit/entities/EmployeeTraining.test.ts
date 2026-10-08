@@ -124,10 +124,14 @@ function resolveArrival(state: GameState, employee: Employee, maxTicks = 300): v
 // ── Which school teaches what ────────────────────────────────────────────────
 
 describe('trainableSkills', () => {
-  it('the driving center teaches all four vehicle licences (#1339 adds the rock fragmenter)', () => {
+  it('the driving center teaches all four vehicle licences (#1339 adds the rock fragmenter) and repair (#1393)', () => {
     expect([...trainableSkills('driving_center')]).toEqual([
-      'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter',
+      'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter', 'repair',
     ]);
+  });
+
+  it('repair is taught at the driving center and nowhere else (#1393)', () => {
+    expect(schoolFor('repair')).toBe('driving_center');
   });
 
   it.each([
@@ -146,7 +150,7 @@ describe('trainableSkills', () => {
   it('every skill category has a school, or it could never be obtained', () => {
     const ALL: SkillCategory[] = [
       'driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter',
-      'blasting', 'management', 'geology',
+      'blasting', 'management', 'geology', 'repair',
     ];
     for (const skill of ALL) {
       expect(schoolFor(skill), `${skill} has no school`).not.toBeNull();
@@ -238,6 +242,12 @@ describe('enrolInTraining — validation', () => {
   let state: GameState;
 
   beforeEach(() => { ({ state } = makeStateWithOne()); });
+
+  it('enrols at a driving center for the repair skill (#1393)', () => {
+    const building = makeBuilding({ type: 'driving_center' });
+    state.buildings.buildings.push(building);
+    expectSuccess(enrolInTraining(state, 1, building, 'repair'));
+  });
 
   it('enrols at a school that teaches the skill: success, fee, and pendingTrainingState (not trainingState) set', () => {
     const building = makeBuilding({ type: 'geology_lab' });
@@ -627,9 +637,9 @@ describe('availableTrainingOffers', () => {
     expect(offers[0]!.building.id).toBe(2);
   });
 
-  it('a driving_center offers all four licences from one building', () => {
+  it('a driving_center offers all four licences and repair from one building', () => {
     const offers = availableTrainingOffers([makeBuilding({ type: 'driving_center' })]);
-    expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.rock_fragmenter', 'driving.truck']);
+    expect(offers.map(o => o.skill).sort()).toEqual(['driving.drill_rig', 'driving.excavator', 'driving.rock_fragmenter', 'driving.truck', 'repair']);
   });
 });
 

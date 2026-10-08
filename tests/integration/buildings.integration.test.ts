@@ -115,7 +115,6 @@ const ALL_BUILDING_TYPES: BuildingType[] = [
   'living_quarters',
   'explosive_warehouse',
   'freight_warehouse',
-  'vehicle_depot',
 ];
 
 // ── Buildings lifecycle ──────────────────────────────────────────────────────
@@ -320,7 +319,7 @@ describe('Buildings lifecycle', () => {
 
   // ── 7. Types command lists all 9 ────────────────────────────────────────────
 
-  it('building types command lists all 9 types', () => {
+  it('building types command lists all 8 types', () => {
     const result = buildCommand(ctx, ['types'], {});
     expect(result.success).toBe(true);
 

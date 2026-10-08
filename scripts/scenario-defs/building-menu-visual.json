@@ -348,15 +348,15 @@
       }
     },
     {
-      "command": "build vehicle_depot at:10,13",
+      "command": "build geology_lab at:10,13",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-buy-btn"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn"
+          "selector": "#bs-build-panel [data-build-type=\"geology_lab\"] .bs-build-buy-btn"
         },
         {
           "type": "waitForSelector",
@@ -389,7 +389,7 @@
     },
     {
       "command": "wait_until field:buildingCount equals:6 max_ticks:300",
-      "description": "Drive the vehicle_depot site to completion.",
+      "description": "Drive the geology_lab site to completion.",
       "timeout": 90,
       "interaction": [
         {

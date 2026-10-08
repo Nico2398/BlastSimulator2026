@@ -65,7 +65,7 @@ describe('hasActiveResearchCenter', () => {
   it('is false when only other building types are placed', () => {
     const state = freshState();
     placeBuilding(state, 'living_quarters', 0, 0, 64, 64);
-    placeBuilding(state, 'vehicle_depot', 10, 10, 64, 64);
+    placeBuilding(state, 'geology_lab', 10, 10, 64, 64);
     expect(hasActiveResearchCenter(state)).toBe(false);
   });
 
@@ -96,35 +96,35 @@ describe('hasActiveResearchCenter', () => {
 describe('isConditionMet — building_tier', () => {
   it('is false when no building of the required type exists', () => {
     const state = freshState();
-    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 };
+    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 };
     expect(isConditionMet(state, condition)).toBe(false);
   });
 
   it('is false when the building exists only at a lower tier', () => {
     const state = freshState();
-    placeBuilding(state, 'vehicle_depot', 0, 0, 64, 64, 1);
-    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 };
+    placeBuilding(state, 'geology_lab', 0, 0, 64, 64, 1);
+    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 };
     expect(isConditionMet(state, condition)).toBe(false);
   });
 
   it('is true when a building of exactly the required tier is placed and active', () => {
     const state = freshState();
-    pushRawBuilding(state, 'vehicle_depot', 2, 0, 0);
-    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 };
+    pushRawBuilding(state, 'geology_lab', 2, 0, 0);
+    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 };
     expect(isConditionMet(state, condition)).toBe(true);
   });
 
   it('is false when the matching-tier building is inactive', () => {
     const state = freshState();
-    pushRawBuilding(state, 'vehicle_depot', 2, 0, 0, false);
-    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 };
+    pushRawBuilding(state, 'geology_lab', 2, 0, 0, false);
+    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 };
     expect(isConditionMet(state, condition)).toBe(false);
   });
 
   it('does not consider a building of a different type, even at the required tier', () => {
     const state = freshState();
     pushRawBuilding(state, 'living_quarters', 2, 0, 0); // different type, same tier
-    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 };
+    const condition: ResearchCondition = { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 };
     expect(isConditionMet(state, condition)).toBe(false);
   });
 });
@@ -154,13 +154,13 @@ describe('isConditionMet — research_completed', () => {
     const state = freshState();
     // living_quarters tier 2 is fully researched...
     state.unlockedTiers['living_quarters'] = 2;
-    // ...but the condition asks about vehicle_depot — must still be unmet.
-    const condition: ResearchCondition = { kind: 'research_completed', buildingType: 'vehicle_depot', tier: 2 };
+    // ...but the condition asks about geology_lab — must still be unmet.
+    const condition: ResearchCondition = { kind: 'research_completed', buildingType: 'geology_lab', tier: 2 };
     expect(isConditionMet(state, condition)).toBe(false);
 
-    // Once vehicle_depot itself is researched, the SAME condition object becomes met —
+    // Once geology_lab itself is researched, the SAME condition object becomes met —
     // proving the mechanism reads `condition.buildingType`, not some hard-coded type.
-    state.unlockedTiers['vehicle_depot'] = 2;
+    state.unlockedTiers['geology_lab'] = 2;
     expect(isConditionMet(state, condition)).toBe(true);
   });
 });
@@ -175,7 +175,7 @@ describe('getUnmetConditions', () => {
     const state = freshState();
     const conditions: ResearchCondition[] = [
       { kind: 'research_completed', buildingType: 'driving_center', tier: 2 },
-      { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 },
+      { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 },
     ];
     expect(getUnmetConditions(state, conditions)).toEqual(conditions);
   });
@@ -183,10 +183,10 @@ describe('getUnmetConditions', () => {
   it('returns an empty array when every condition is met', () => {
     const state = freshState();
     state.unlockedTiers['driving_center'] = 2;
-    pushRawBuilding(state, 'vehicle_depot', 2, 0, 0);
+    pushRawBuilding(state, 'geology_lab', 2, 0, 0);
     const conditions: ResearchCondition[] = [
       { kind: 'research_completed', buildingType: 'driving_center', tier: 2 },
-      { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 },
+      { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 },
     ];
     expect(getUnmetConditions(state, conditions)).toEqual([]);
   });
@@ -194,7 +194,7 @@ describe('getUnmetConditions', () => {
   it('returns only the subset that is unmet, in original order', () => {
     const state = freshState();
     state.unlockedTiers['driving_center'] = 2; // this one is met
-    const unmetCondition: ResearchCondition = { kind: 'building_tier', buildingType: 'vehicle_depot', tier: 2 }; // this one is not
+    const unmetCondition: ResearchCondition = { kind: 'building_tier', buildingType: 'geology_lab', tier: 2 }; // this one is not
     const conditions: ResearchCondition[] = [
       { kind: 'research_completed', buildingType: 'driving_center', tier: 2 },
       unmetCondition,
@@ -218,7 +218,7 @@ describe('queueResearchTask — placement prerequisite', () => {
 
   it('rejects with no_research_center even when other buildings ARE placed', () => {
     placeBuilding(state, 'living_quarters', 0, 0, 64, 64);
-    placeBuilding(state, 'vehicle_depot', 10, 10, 64, 64);
+    placeBuilding(state, 'geology_lab', 10, 10, 64, 64);
     const result = queueResearchTask(state, 'driving_center', 2);
     expect(result.success).toBe(false);
     expect(result.code).toBe('no_research_center');
@@ -273,7 +273,7 @@ describe('queueResearchTask — tier 3: cost + duration + conditions', () => {
   });
 
   it("rejects with conditions_not_met when the type's own tier-2 research has not completed", () => {
-    const result = queueResearchTask(state, 'vehicle_depot', 3);
+    const result = queueResearchTask(state, 'geology_lab', 3);
     expect(result.success).toBe(false);
     expect(result.code).toBe('conditions_not_met');
     expect(state.researchQueue).toHaveLength(0);
@@ -283,21 +283,21 @@ describe('queueResearchTask — tier 3: cost + duration + conditions', () => {
     // Physically placed via raw insertion (bypassing the research gate) — proves that
     // PHYSICAL presence of a tier-2 building is not the same as the tier-2 research
     // being COMPLETED. Only unlockedTiers (set by tickResearch) satisfies the condition.
-    pushRawBuilding(state, 'vehicle_depot', 2, 0, 0);
-    expect(isTierUnlocked(state, 'vehicle_depot', 2)).toBe(false);
+    pushRawBuilding(state, 'geology_lab', 2, 0, 0);
+    expect(isTierUnlocked(state, 'geology_lab', 2)).toBe(false);
 
-    const result = queueResearchTask(state, 'vehicle_depot', 3);
+    const result = queueResearchTask(state, 'geology_lab', 3);
     expect(result.success).toBe(false);
     expect(result.code).toBe('conditions_not_met');
   });
 
   it("succeeds once the type's own tier-2 research has completed", () => {
-    const t2 = queueResearchTask(state, 'vehicle_depot', 2);
+    const t2 = queueResearchTask(state, 'geology_lab', 2);
     expect(t2.success, JSON.stringify(t2)).toBe(true);
     tickResearch(state); // tier-2 is 0-ticks — completes on the very next tick
-    expect(isTierUnlocked(state, 'vehicle_depot', 2)).toBe(true);
+    expect(isTierUnlocked(state, 'geology_lab', 2)).toBe(true);
 
-    const result = queueResearchTask(state, 'vehicle_depot', 3);
+    const result = queueResearchTask(state, 'geology_lab', 3);
     expect(result.success, JSON.stringify(result)).toBe(true);
   });
 
@@ -319,8 +319,8 @@ describe('queueResearchTask — tier 3: cost + duration + conditions', () => {
     tickResearch(state);
     expect(isTierUnlocked(state, 'living_quarters', 2)).toBe(true);
 
-    // vehicle_depot's own tier-2 research is still outstanding.
-    const result = queueResearchTask(state, 'vehicle_depot', 3);
+    // geology_lab's own tier-2 research is still outstanding.
+    const result = queueResearchTask(state, 'geology_lab', 3);
     expect(result.success).toBe(false);
     expect(result.code).toBe('conditions_not_met');
   });
@@ -395,12 +395,12 @@ describe('queueResearchTask — rejection precedence', () => {
   it('already_queued wins over conditions_not_met', () => {
     const state = freshState();
     placeResearchCenter(state);
-    // vehicle_depot tier-3's own condition (tier-2 research completed) is NOT met...
-    expect(isTierUnlocked(state, 'vehicle_depot', 2)).toBe(false);
+    // geology_lab tier-3's own condition (tier-2 research completed) is NOT met...
+    expect(isTierUnlocked(state, 'geology_lab', 2)).toBe(false);
     // ...but fabricate an existing queued entry for the same {type, tier}.
-    state.researchQueue.push({ targetType: 'vehicle_depot', targetTier: 3, ticksRemaining: 50, cost: 12000, conditions: [] });
+    state.researchQueue.push({ targetType: 'geology_lab', targetTier: 3, ticksRemaining: 50, cost: 12000, conditions: [] });
 
-    const result = queueResearchTask(state, 'vehicle_depot', 3);
+    const result = queueResearchTask(state, 'geology_lab', 3);
     expect(result.code).toBe('already_queued');
   });
 });
@@ -438,8 +438,8 @@ describe('getQueueBlockCode', () => {
   it('returns "conditions_not_met" when the task\'s own prerequisites are unmet', () => {
     const state = freshState();
     placeResearchCenter(state);
-    expect(isTierUnlocked(state, 'vehicle_depot', 2)).toBe(false);
-    expect(getQueueBlockCode(state, 'vehicle_depot', 3)).toBe('conditions_not_met');
+    expect(isTierUnlocked(state, 'geology_lab', 2)).toBe(false);
+    expect(getQueueBlockCode(state, 'geology_lab', 3)).toBe('conditions_not_met');
   });
 
   it('matches the precedence order queueResearchTask itself enforces', () => {
@@ -467,12 +467,12 @@ describe('tickResearch — Research Center destroyed mid-research (#461)', () =>
     placeResearchCenter(state);
 
     // Complete tier-2 first so tier-3's condition is satisfiable.
-    queueResearchTask(state, 'vehicle_depot', 2);
+    queueResearchTask(state, 'geology_lab', 2);
     tickResearch(state);
 
-    const t3 = queueResearchTask(state, 'vehicle_depot', 3);
+    const t3 = queueResearchTask(state, 'geology_lab', 3);
     expect(t3.success, JSON.stringify(t3)).toBe(true);
-    const def = getResearchTaskDef('vehicle_depot', 3);
+    const def = getResearchTaskDef('geology_lab', 3);
     expect(def.ticks).toBeGreaterThan(1);
 
     // Tick partway through — still in-flight.
@@ -485,9 +485,9 @@ describe('tickResearch — Research Center destroyed mid-research (#461)', () =>
     expect(hasActiveResearchCenter(state)).toBe(false);
 
     const result = tickResearch(state);
-    expect(result).toEqual({ targetType: 'vehicle_depot', targetTier: 3, refund: def.cost });
+    expect(result).toEqual({ targetType: 'geology_lab', targetTier: 3, refund: def.cost });
     expect(state.researchQueue).toHaveLength(0);
-    expect(isTierUnlocked(state, 'vehicle_depot', 3)).toBe(false);
+    expect(isTierUnlocked(state, 'geology_lab', 3)).toBe(false);
   });
 
   it('does NOT cancel when a second research_center remains active — ticksRemaining decrements normally', () => {
@@ -495,9 +495,9 @@ describe('tickResearch — Research Center destroyed mid-research (#461)', () =>
     placeResearchCenter(state, 0, 0);
     placeResearchCenter(state, 20, 20);
 
-    queueResearchTask(state, 'vehicle_depot', 2);
+    queueResearchTask(state, 'geology_lab', 2);
     tickResearch(state);
-    queueResearchTask(state, 'vehicle_depot', 3);
+    queueResearchTask(state, 'geology_lab', 3);
     const before = state.researchQueue[0]!.ticksRemaining;
 
     // Destroy only one of the two active centers.
@@ -513,9 +513,9 @@ describe('tickResearch — Research Center destroyed mid-research (#461)', () =>
     const state = freshState();
     placeResearchCenter(state);
 
-    queueResearchTask(state, 'vehicle_depot', 2);
+    queueResearchTask(state, 'geology_lab', 2);
     tickResearch(state);
-    queueResearchTask(state, 'vehicle_depot', 3);
+    queueResearchTask(state, 'geology_lab', 3);
     const before = state.researchQueue[0]!.ticksRemaining;
 
     // Destroy the only active center...

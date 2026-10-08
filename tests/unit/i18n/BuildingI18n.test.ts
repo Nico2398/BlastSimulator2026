@@ -12,7 +12,6 @@ import type { BuildingType, BuildingTier } from '../../../src/core/entities/Buil
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
   'research_center', 'living_quarters', 'explosive_warehouse', 'freight_warehouse',
-  'vehicle_depot',
 ];
 
 const ALL_TIERS: BuildingTier[] = [1, 2, 3];
@@ -27,7 +26,7 @@ beforeEach(() => {
 
 describe('building generic name keys resolve in both locales', () => {
   for (const locale of LOCALES) {
-    it(`locale ${locale}: building.<type>.name keys resolve for all 9 types`, () => {
+    it(`locale ${locale}: building.<type>.name keys resolve for all 8 types`, () => {
       setLocale(locale);
       for (const type of ALL_BUILDING_TYPES) {
         const key = `building.${type}.name`;
@@ -130,4 +129,22 @@ describe('en.json and fr.json have matching keys for building/tier/course namesp
     expect(frCourse).not.toBe('course.blasting');
     expect(enCourse).not.toBe(frCourse);
   });
+});
+
+// ── Removed vehicle depot (#1393) ────────────────────────────────────────────
+
+describe('vehicle_depot strings are gone from both locales', () => {
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: no building.vehicle_depot.* key resolves`, () => {
+      setLocale(locale);
+      for (const key of [
+        'building.vehicle_depot.name',
+        'building.vehicle_depot.t1.name',
+        'building.vehicle_depot.t2.name',
+        'building.vehicle_depot.t3.name',
+      ]) {
+        expect(t(key), `key "${key}" must be removed`).toBe(key);
+      }
+    });
+  }
 });
