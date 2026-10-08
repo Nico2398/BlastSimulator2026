@@ -555,9 +555,14 @@ function planFragmentTaskItinerary(
   // capacity and the depot's room ride the same trip, each its own load leg.
   let lastX = approach.x;
   let lastZ = approach.z;
-  const candidates = findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS);
+  // Only an 'exact' plan (the one actually committed) builds the batch: the
+  // 'estimate' used for ranking runs per idle driver x claimable haul action
+  // per tick, and the batch search scans the whole pool each time. Ranking on
+  // the primary leg alone also keeps extra legs from inflating a dense
+  // cluster's cost, which would invert nearest-first.
+  const candidates = fidelity === 'exact' ? findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS) : [];
   const candidateById = new Map(candidates.map(c => [c.fragment.id, c]));
-  const batch = selectHaulBatch(
+  const batch = candidates.length === 0 ? [] : selectHaulBatch(
     { fragmentId, massKg: tracked.fragment.mass },
     candidates.map(c => ({ fragmentId: c.fragment.id, massKg: c.fragment.mass })),
     def.capacity,

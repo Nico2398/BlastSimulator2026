@@ -19,7 +19,7 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
-import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup } from '../../../src/core/economy/HaulDispatch.js';
+import { haulBlockedReason, isAutoDebrisAction, syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre, createFragmentLookup, findNearbyHaulableFragments } from '../../../src/core/economy/HaulDispatch.js';
 import { pickupFragment } from '../../../src/core/economy/Logistics.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 
@@ -740,5 +740,60 @@ describe('haulBlockedReason (#1369)', () => {
     pickupFragment(state.logistics, 1, 'v1');
     state.logistics.storageCapacityKg = 10;
     expect(haulBlockedReason(state, makeHaulAction({ id: 1, payload: { fragmentId: 1 } }))).toBeNull();
+  });
+});
+
+// ── findNearbyHaulableFragments (#1370) ──────────────────────────────────────
+
+describe('findNearbyHaulableFragments (#1370)', () => {
+  function setup(fragments: FragmentData[]) {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, fragments);
+    syncHaulDispatch(state);
+    const primary = state.logistics.fragments.find(f => f.fragment.id === fragments[0]!.id)!;
+    const ids = () => findNearbyHaulableFragments(state, primary, 10).map(t => t.fragment.id);
+    return { state, ids };
+  }
+
+  it('excludes the primary itself and fragments beyond the radius', () => {
+    const { ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 40, 5)]);
+    expect(ids()).toEqual([2]);
+  });
+
+  it('excludes oversized fragments', () => {
+    const { ids } = setup([makeFragment(1, 5, 5), makeOversizedFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments already in transit', () => {
+    const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    state.logistics.storageCapacityKg = 100_000; // fresh state holds 0 kg (#1369)
+    expect(pickupFragment(state.logistics, 2, 'v1')).toBe(true);
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments whose haul action is claimed', () => {
+    const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    const claimed = state.pendingActions.find(a => a.payload['fragmentId'] === 2)!;
+    claimed.holderId = 99;
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments whose haul action is not queued', () => {
+    const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    state.pendingActions.find(a => a.payload['fragmentId'] === 2)!.status = 'in_progress';
+    expect(ids()).toEqual([3]);
+  });
+
+  it('excludes fragments with no haul action at all', () => {
+    const { state, ids } = setup([makeFragment(1, 5, 5), makeFragment(2, 6, 5), makeFragment(3, 7, 5)]);
+    state.pendingActions = state.pendingActions.filter(a => a.payload['fragmentId'] !== 3);
+    expect(ids()).toEqual([2]);
+  });
+
+  it('orders nearest first, breaking distance ties by lower fragment id', () => {
+    const { ids } = setup([makeFragment(1, 5, 5), makeFragment(9, 8, 5), makeFragment(4, 5, 7), makeFragment(7, 5, 3), makeFragment(2, 6, 5)]);
+    // dist: 2 -> 1, 7 -> 2, 4 -> 2, 9 -> 3
+    expect(ids()).toEqual([2, 4, 7, 9]);
   });
 });

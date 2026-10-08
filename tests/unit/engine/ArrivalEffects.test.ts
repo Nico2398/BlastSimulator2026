@@ -105,6 +105,68 @@ function reserveFragmentAction(
   return action;
 }
 
+// ── applyHaulLoad — extra pickup (#1370) ────────────────────────────────────
+
+describe('applyHaulLoad with targetId (extra pickup, #1370)', () => {
+  function setupExtra(extraMass = 500, extraVolume = 0.3) {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(20);
+    const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 0.3, 1000), makeFragment(2, 6, 5, extraVolume, extraMass)], state.navGrid);
+    reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, { x: 5, z: 5 });
+    const extraAction = queueHaulAction(state, 2);
+    return { state, vehicle, extraAction };
+  }
+
+  function queueHaulAction(state: GameState, fragmentId: number): PendingAction {
+    const action: PendingAction = {
+      id: 700 + fragmentId, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler',
+      targetX: 6, targetZ: 5, targetY: 0, payload: { fragmentId }, targetEmployeeId: null,
+      status: 'queued', holderId: null, queuedAtTick: 0,
+    };
+    state.pendingActions.push(action);
+    return action;
+  }
+
+  it('loads the extra fragment and consumes its own queued action, leaving the reserved one', () => {
+    const { state, vehicle, extraAction } = setupExtra();
+
+    expect(applyHaulLoad(state, vehicle, undefined, 2)).toBe(true);
+
+    expect(vehicle.cargo).toEqual([{ fragmentId: 2, massKg: 500 }]);
+    expect(state.pendingActions.some(a => a.id === extraAction.id)).toBe(false);
+    expect(state.pendingActions.some(a => a.id === 501)).toBe(true);
+  });
+
+  it('soft-skips (true, nothing loaded) when the extra would exceed vehicle capacity', () => {
+    const { state, vehicle, extraAction } = setupExtra(1_000_000);
+
+    expect(applyHaulLoad(state, vehicle, undefined, 2)).toBe(true);
+
+    expect(vehicle.cargo).toEqual([]);
+    expect(state.logistics.fragments.find(f => f.fragment.id === 2)!.state).toBe('on_ground');
+    expect(state.pendingActions.some(a => a.id === extraAction.id)).toBe(true);
+  });
+
+  it('soft-skips when the extra action is already claimed', () => {
+    const { state, vehicle, extraAction } = setupExtra();
+    extraAction.holderId = 99;
+
+    expect(applyHaulLoad(state, vehicle, undefined, 2)).toBe(true);
+
+    expect(vehicle.cargo).toEqual([]);
+    expect(state.logistics.fragments.find(f => f.fragment.id === 2)!.state).toBe('on_ground');
+  });
+
+  it('soft-skips when the extra has no queued action or is gone', () => {
+    const { state, vehicle, extraAction } = setupExtra();
+    state.pendingActions = state.pendingActions.filter(a => a.id !== extraAction.id);
+    expect(applyHaulLoad(state, vehicle, undefined, 2)).toBe(true);
+    expect(applyHaulLoad(state, vehicle, undefined, 77)).toBe(true);
+    expect(vehicle.cargo).toEqual([]);
+  });
+});
+
 // ── applyHaulLoad ────────────────────────────────────────────────────────────
 
 describe('applyHaulLoad', () => {
