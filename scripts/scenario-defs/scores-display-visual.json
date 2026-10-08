@@ -546,7 +546,14 @@
         }
       ],
       "role": "setup",
-      "commandOutcome": "either"
+      "commandOutcome": "either",
+      "expect": {
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ],
+        "note": "#1362: the armed detonation auto-fires inside this tick batch once the zone is clear (tickCommand), so the blast's vibration dip in ecology/nuisance lands here."
+      }
     },
     {
       "command": "event choose 0",
@@ -587,15 +594,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "blast",
-      "description": "Vibration from this blast dips Ecology and Nuisance immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above. #947-followup: leading `resolveEventIfPending` added -- the preceding step's own resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing this click with \"element is covered by div\" (same race rock-fragmenter-breaking.json's own #601-followup sequence/blast steps found and fixed, see their notes). #1362: the stranded rig blocks the automatic fire, so the player presses Fire anyway in the waiting state.",
+      "command": "state",
+      "description": "#1362: the armed detonation already auto-fired during the preceding tick pad once the zone cleared (no driverless rig is left stranded since #1042), so there is no Fire anyway to press: the player dismisses the blast report and the holes are gone with nobody dead. Original note: the following checkpoints show Ecology and Nuisance decaying back toward neutral while Safety/Well-being climb from the buildings above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"preflight-fire-anyway\"]"
         },
         {
           "type": "clickSelector",
@@ -608,11 +611,7 @@
         "equals": {
           "holeCount": 0,
           "deathCount": 0
-        },
-        "decreased": [
-          "ecology",
-          "nuisance"
-        ]
+        }
       }
     },
     {

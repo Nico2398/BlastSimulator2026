@@ -282,13 +282,13 @@
       ]
     },
     {
-      "command": "tick 6",
+      "command": "tick 8",
       "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "description": "Let the hauler start clearing the blasted rock before selling it. #1362: 8 ticks (was 6): DETONATE fires the blast a few ticks later than the old Sound the Horn + FIRE sequence, which re-rolls the contract board; at 6 the first fillable offer is a tiny dirtite order and the economy never recovers (bankruptcy). Contract draws are seeded by tick, so this pad picks a board whose sales carry the run.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 6"
+          "command": "tick 8"
         }
       ]
     },
