@@ -118,7 +118,7 @@ describe('upgradeVehicle', () => {
 
 describe('rosterCanDriveVehicleTier', () => {
   const licensed = (id = 1, over: Partial<Employee> = {}) =>
-    makeEmployee({ id, qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }], ...over });
+    makeEmployee({ id, qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, licenceLevel: 3 }], ...over });
 
   it('is true when an alive employee holds the licence', () => {
     expect(rosterCanDriveVehicleTier([licensed()], 'debris_hauler', 2)).toBe(true);
