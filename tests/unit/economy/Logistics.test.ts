@@ -562,7 +562,7 @@ describe('consumeStoredOre', () => {
     expect(getFragmentCounts(state).stored).toBe(1);
   });
 
-  it('multi-ore fragment: consuming one ore type also decrements every other ore the removed fragment touched', () => {
+  it('multi-ore fragment: consuming one ore type leaves every other ore untouched', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.06 × 0.5 density × 2500 = 75kg for each of oreF and oreG.
     const frag = makeStoredFragment(1, 700, 0.06, { oreF: 0.5, oreG: 0.5 });
@@ -575,38 +575,35 @@ describe('consumeStoredOre', () => {
     expect(result.consumedKg).toBe(75);
     // The requested ore type is decremented...
     expect(collectedOre.oreF).toBe(0);
-    // ...and so is the other ore type carried by the same (now-removed) fragment.
-    expect(collectedOre.oreG).toBe(0);
-    expect(state.storedMassKg).toBe(0);
-    expect(getFragmentCounts(state).stored).toBe(0);
+    // ...while the other ore type on the same fragment keeps its exact kg.
+    expect(collectedOre.oreG).toBe(75);
+    // Storage mass drops only by the sold ore's share (half the volume is oreF).
+    expect(state.storedMassKg).toBe(350);
   });
 
-  it('multi-ore fragment: a request smaller than the fragment\'s ore content partially splits it, decrementing every ore key proportionally', () => {
+  it('multi-ore fragment: a request smaller than the fragment\'s ore content partially splits it, decrementing only the requested ore', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     // volume 0.06 × 0.5 density × 2500 = 75kg for each of oreF and oreG.
     const frag = makeStoredFragment(1, 700, 0.06, { oreF: 0.5, oreG: 0.5 });
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreF: 75, oreG: 75 };
 
-    // 30kg < the fragment's 75kg of oreF — a partial split, removing 30/75 =
-    // 40% of the fragment's mass/volume and the SAME 40% of every ore key it
-    // carries, not just the requested one.
+    // 30kg < the fragment's 75kg of oreF — only the sold ore is removed.
     const result = consumeStoredOre(state, collectedOre, 'oreF', 30);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(30);
     // The requested ore type is decremented by exactly the requested amount...
     expect(collectedOre.oreF).toBe(45);
-    // ...and the other ore type on the same fragment drops by the same 40%
-    // fraction, not zero and not left unchanged.
-    expect(collectedOre.oreG).toBe(45);
-    // The fragment survives in storage, reduced by the same 40%.
-    expect(state.storedMassKg).toBe(420);
+    // ...and the other ore type on the same fragment keeps its exact kg.
+    expect(collectedOre.oreG).toBe(75);
+    // Storage mass drops only by the sold ore's share: 30/75 of oreF's half.
+    expect(state.storedMassKg).toBe(560);
     const tracked = state.fragments.find(f => f.fragment.id === 1);
     expect(tracked).toBeDefined();
     expect(tracked!.state).toBe('stored');
-    expect(tracked!.fragment.mass).toBe(420);
-    expect(tracked!.fragment.volume).toBeCloseTo(0.036, 9);
+    expect(tracked!.fragment.mass).toBe(560);
+    expect(tracked!.fragment.volume).toBeCloseTo(0.048, 9);
     expect(getFragmentCounts(state).stored).toBe(1);
   });
 });
