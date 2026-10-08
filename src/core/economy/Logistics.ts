@@ -196,6 +196,25 @@ function decrementCollectedOre(
 }
 
 /**
+ * Remove only `oreId` (up to `oreKg`) from one stored fragment, leaving every
+ * other ore in it at its exact kg. Shrinks the fragment's volume and mass,
+ * reduces state.storedMassKg by the removed mass, and removes a pure-ore
+ * fully-sold fragment via sellFragment. Returns the ore kg, mass and volume
+ * actually removed, or null when the fragment is not stored, lacks the ore,
+ * or oreKg is non-finite or <= 0.
+ */
+export function extractOreFromFragment(
+  state: LogisticsState,
+  fragmentId: number,
+  oreId: string,
+  oreKg: number,
+): { oreKg: number; mass: number; volume: number } | null {
+  void state; void fragmentId; void oreId; void oreKg;
+  // TODO: implement
+  return null;
+}
+
+/**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
  * oldest-first, until the requested amount is covered: a fragment whose full
  * contribution the request still needs is removed whole (via sellFragment),
