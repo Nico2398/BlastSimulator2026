@@ -705,6 +705,8 @@ describe('vehicle upgrade', () => {
   it('upgrades tier 2 to tier 3 for the second price difference', () => {
     const ctx = makeCtx();
     const id = addTruckVehicle(ctx);
+    // Starting cash (50k) cannot cover both differences (25k + 50k).
+    ctx.state!.cash += 100_000;
     vehicleCommand(ctx, ['upgrade', String(id)], {});
     const cashBefore = ctx.state!.cash;
     const result = vehicleCommand(ctx, ['upgrade', String(id)], {});

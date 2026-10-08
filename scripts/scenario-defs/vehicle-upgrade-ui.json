@@ -102,19 +102,25 @@
     },
     {
       "command": "vehicle upgrade 1",
-      "description": "At max tier the console refuses and cash does not move.",
+      "description": "role: guard: at max tier the Fleet panel Upgrade button is disabled (console refuses the same command) and cash does not move.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle list"
+          "type": "ensurePanel",
+          "panel": "vehicles"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]"
         }
       ],
-      "role": "observe",
+      "role": "guard",
       "commandOutcome": "refused",
       "expect": {
         "changedBy": {
           "cash": 0
-        }
+        },
+        "blocked": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] [data-action=\"upgrade\"]",
+        "note": "rejected: vehicle already at max tier"
       }
     },
     {

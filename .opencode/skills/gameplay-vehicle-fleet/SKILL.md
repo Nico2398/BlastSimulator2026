@@ -256,6 +256,16 @@ A damaged vehicle (`0 < hp < maxHp`, `isRepairable`) that nobody is sitting in a
 - A vehicle under a claimed repair order is not claimable by `findFreeVehicleForRole` / `findVehicleForClaim` until the repair completes or aborts.
 - Duration: `ceil(missingHp * REPAIR_BASE_TICKS_PER_HP)` base ticks, scaled by proficiency like any `payload.durationTicks` action. Each work tick restores `repairHpThisTick` (missing hp spread over the ticks left) and charges `REPAIR_PARTS_COST_PER_HP` per restored hp as an expense, so an interrupted repair resumes with the right remainder and is never double-charged. XP goes to `repair`.
 
+## Vehicle Upgrade (#1401)
+
+An owned vehicle moves up one tier in place (`src/core/entities/VehicleUpgrade.ts`), up to `VEHICLE_MAX_TIER` (3, `balance.ts`).
+
+- **Cost:** `purchaseCost(next tier) - purchaseCost(current tier)` (`computeVehicleUpgradeCost`, null at max). Refused with `console.insufficient_funds` when cash is short; booked as an `equipment` expense.
+- **Effect:** `upgradeVehicle` mutates only `tier` and `hp`; hp is set to the new tier's `maxHp` (full restore even when damaged). Id, position, reservation and occupants are kept, so it is allowed while reserved, driven or carrying.
+- **Entry points:** console `vehicle upgrade <id>`; Fleet panel card button (`data-action="upgrade"`, shows cost, disabled with a reason at tier 3 or short cash); SelectionBar `upgrade_vehicle` (distinct from the building `upgrade` action).
+- **Upgrade vs scrap:** scrap sells at the 40% residual and the vehicle is gone; upgrade keeps the vehicle and pays only the difference, so it is the intended way up a tier.
+- **Licence warning:** when no alive employee can drive the next tier (`rosterCanDriveVehicleTier`), the console appends `vehicle.upgrade_no_licensed` and the card shows a warning row. `isLicensedForVehicleTier` equals "holds the role licence" today; it becomes tier-aware with #1524 (TODO(#1524)).
+
 ## Traffic
 
 Vehicles cannot share a cell. A driver whose next drive step is occupied waits and retries, then
