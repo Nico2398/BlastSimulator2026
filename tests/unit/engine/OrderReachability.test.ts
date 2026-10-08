@@ -8,6 +8,7 @@
 // EmployeeDispatch.test.ts and the update paths in
 // tests/integration/ghost-reachability.integration.test.ts.
 
+import { setFreightRoom, setFreightRoomExact } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Count every flood fill the nav layer performs, whichever entry point the
@@ -518,7 +519,7 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
     const { state, id } = stageHaul();
     classifyQueuedOrders(state);
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 5000;
+    setFreightRoom(state, 5000);
     classifyQueuedOrders(state);
     expect(reasonOf(state, id)).toBeNull();
   });
@@ -526,8 +527,7 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
   it('stamps storage_full when a warehouse exists but the fragment exceeds the room', () => {
     const { state, id } = stageHaul(400);
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 800;
+    setFreightRoomExact(state, 200);
     classifyQueuedOrders(state);
     expect(reasonOf(state, id)).toBe('storage_full');
   });
@@ -535,10 +535,9 @@ describe('haul orders carry freight-warehouse gating reasons (#1369)', () => {
   it('clears storage_full when room frees up', () => {
     const { state, id } = stageHaul(400);
     addWarehouse(state);
-    state.logistics.storageCapacityKg = 1000;
-    state.logistics.storedMassKg = 800;
+    setFreightRoomExact(state, 200);
     classifyQueuedOrders(state);
-    state.logistics.storedMassKg = 0;
+    state.logistics.fragments = state.logistics.fragments.filter(f => f.state !== 'stored'); // filler gone
     classifyQueuedOrders(state);
     expect(reasonOf(state, id)).toBeNull();
   });

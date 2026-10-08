@@ -6,6 +6,7 @@ import { t } from '../../../../src/core/i18n/I18n.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { addFreightWarehouseToState } from '../../../helpers/freightWarehouse.js';
 import type { Contract } from '../../../../src/core/economy/Contract.js';
 
 function makeState(): GameState {
@@ -120,6 +121,7 @@ describe('ContractsPanel', () => {
   it('Accept dispatches contract accept for the right offered card', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();
+    addFreightWarehouseToState(state); // ore_sale offers can only be accepted with a freight warehouse (#1372)
     state.contracts.available.push(makeContract({ id: 7 }));
     panel.show();
     panel.update(state);
@@ -127,6 +129,20 @@ describe('ContractsPanel', () => {
     (panel.root.querySelector('.bs-contract-accept') as HTMLButtonElement).click();
 
     expect(gameConsole).toHaveBeenCalledWith('contract accept id:7');
+  });
+
+  it('Accept on an ore_sale offer is disabled and explained while no freight warehouse exists (#1372)', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 7 }));
+    panel.show();
+    panel.update(state);
+
+    const accept = panel.root.querySelector('.bs-contract-accept') as HTMLButtonElement;
+    expect(accept.disabled).toBe(true);
+    expect(accept.title).toBe(t('economy.contract.needs_warehouse'));
+    accept.click();
+    expect(gameConsole).not.toHaveBeenCalled();
   });
 
   // data-contract-fillable (#1048 CI fix): the DOM counterpart of
@@ -409,6 +425,7 @@ describe('ContractsPanel', () => {
   it('Accept on a specific offered card dispatches contract accept for that card only, with two offers present', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();
+    addFreightWarehouseToState(state); // ore_sale offers can only be accepted with a freight warehouse (#1372)
     state.contracts.available.push(makeContract({ id: 3 }), makeContract({ id: 9 }));
     panel.show();
     panel.update(state);
@@ -422,6 +439,7 @@ describe('ContractsPanel', () => {
   it('Accept on the other offered card dispatches contract accept for that id, with two offers present', () => {
     const { panel, gameConsole } = makePanel();
     const state = makeState();
+    addFreightWarehouseToState(state); // ore_sale offers can only be accepted with a freight warehouse (#1372)
     state.contracts.available.push(makeContract({ id: 3 }), makeContract({ id: 9 }));
     panel.show();
     panel.update(state);

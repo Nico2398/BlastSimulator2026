@@ -413,8 +413,9 @@ describe('freightWarehouseSites (#1372)', () => {
   it('lists active freight warehouses with id, position and tier capacity', () => {
     const bs = createBuildingState();
     const a = placeBuilding(bs, 'freight_warehouse', 10, 10, 100, 100, 1);
-    const b = placeBuilding(bs, 'freight_warehouse', 40, 10, 100, 100, 2);
+    const b = placeBuilding(bs, 'freight_warehouse', 40, 10, 100, 100, 1);
     expect(a.success && b.success).toBe(true);
+    b.building!.tier = 2; // placing tier 2 needs research; the upgrade itself is not under test
     const sites = freightWarehouseSites(bs);
     expect(sites).toHaveLength(2);
     const byId = new Map(sites.map(s => [s.id, s]));

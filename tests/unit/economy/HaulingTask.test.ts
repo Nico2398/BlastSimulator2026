@@ -9,6 +9,7 @@
 // depot leg target at plan time, replacing the old per-tick
 // resolveDepotApproach re-target.
 
+import { setFreightRoom, setFreightRoomExact } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
@@ -66,7 +67,7 @@ function makeIdleHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
 
 /** A debris_hauler with a licensed driver already boarded (driverId set, occupied, mounted). */
 function makeDrivenHauler(state: ReturnType<typeof createGame>, x = 0, z = 0) {
-  state.logistics.storageCapacityKg = 5000; // fresh state has no warehouse capacity (#1369)
+  setFreightRoom(state, 5000); // fresh state has no warehouse capacity (#1369)
   const vehicle = makeIdleHauler(state, x, z);
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
@@ -157,7 +158,7 @@ describe('findHaulDepotApproach', () => {
     placeWarehouse(state, 40, 40); // far
     const near = placeWarehouse(state, 6, 6); // near
 
-    const approach = findHaulDepotApproach(state, 0, 0);
+    const approach = findHaulDepotApproach(state, 0, 0, 0);
 
     expect(approach).not.toBeNull();
     // Must sit adjacent to the NEAR warehouse, not the far one.
@@ -168,14 +169,14 @@ describe('findHaulDepotApproach', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(GRID);
 
-    expect(findHaulDepotApproach(state, 0, 0)).toBeNull();
+    expect(findHaulDepotApproach(state, 0, 0, 0)).toBeNull();
   });
 
   it('falls back to the warehouse\'s raw coordinates when no NavGrid is built yet', () => {
     const state = createGame({ seed: SEED });
     const warehouse = placeWarehouse(state, 10, 10);
 
-    const approach = findHaulDepotApproach(state, 0, 0);
+    const approach = findHaulDepotApproach(state, 0, 0, 0);
 
     expect(approach).toEqual({ x: warehouse.x, z: warehouse.z });
   });
@@ -337,7 +338,7 @@ describe('requestHaulFragment — happy path', () => {
     expect(loadLegs[0]!.destX).toBe(fragmentApproach.x);
     expect(loadLegs[0]!.destZ).toBe(fragmentApproach.z);
 
-    const depotApproach = findHaulDepotApproach(state, fragmentApproach.x, fragmentApproach.z)!;
+    const depotApproach = findHaulDepotApproach(state, fragmentApproach.x, fragmentApproach.z, 0)!;
     expect(unloadLegs[0]!.destX).toBe(depotApproach.x);
     expect(unloadLegs[0]!.destZ).toBe(depotApproach.z);
 
@@ -406,7 +407,7 @@ describe('findReachableGroundFragment — precondition failures', () => {
 describe('findReachableGroundFragment — selection', () => {
   it('picks the nearest fragment when every candidate is reachable', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
+    setFreightRoom(state, 5000); // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -432,7 +433,7 @@ describe('findReachableGroundFragment — selection', () => {
       rows[z]![x] = 'void';
     }
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
+    setFreightRoom(state, 5000); // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeNavGridFromTypes(rows);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -445,7 +446,7 @@ describe('findReachableGroundFragment — selection', () => {
 
   it('ignores fragments that are in_transit or stored, considering only on_ground ones', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
+    setFreightRoom(state, 5000); // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [
@@ -517,7 +518,7 @@ describe('requestHaulFragment — oversized fragment rejection (#484)', () => {
 describe('findReachableGroundFragment — oversized exclusion (#484)', () => {
   it('never returns an oversized fragment even when it is nearest and reachable, picking the next reachable non-oversized one instead', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 5000; // no warehouse yet: capacity defaults to 0 (#1369)
+    setFreightRoom(state, 5000); // no warehouse yet: capacity defaults to 0 (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const vehicle = makeDrivenHauler(state, 0, 0);
     const oversizedNear = makeFragment(1, 2, 2); // nearest by distance
@@ -600,9 +601,11 @@ describe('requestHaulFragment — batched hauls (#1370)', () => {
   function planBatch(fragments: FragmentData[], opts: BatchOpts = {}) {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(GRID);
-    placeWarehouse(state, 40, 40);
+    const depot = placeWarehouse(state, 40, 40);
+    depot.tier = 3; // a 15000 kg depot: tier-1 (2000 kg) could not even take one heavy boulder
     const vehicle = makeDrivenHauler(state, 0, 0);
-    state.logistics.storageCapacityKg = opts.storageKg ?? 1_000_000; // after makeDrivenHauler, which resets capacity
+    if (opts.storageKg !== undefined) setFreightRoomExact(state, opts.storageKg);
+    else setFreightRoom(state, 15_000);
     if (opts.tier) vehicle.tier = opts.tier;
     addBlastFragments(state.logistics, fragments, state.navGrid);
     syncHaulDispatch(state);
@@ -707,7 +710,7 @@ describe('planned haul resume with cargo already aboard (#1370)', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(GRID);
     placeWarehouse(state, 40, 40);
-    state.logistics.storageCapacityKg = 1_000_000;
+    setFreightRoom(state, 20_000);
     const vehicle = makeDrivenHauler(state, 0, 0);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 500), makeFragment(2, 6, 5, 500)], state.navGrid);
     syncHaulDispatch(state);

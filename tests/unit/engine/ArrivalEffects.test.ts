@@ -11,6 +11,7 @@
 // reads it straight off `vehicle.cargo` ids, since load already put
 // them there.
 
+import { setFreightRoom, setFreightRoomExact } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../src/core/state/GameState.js';
@@ -56,7 +57,7 @@ function makeFlatNavGrid(size: number): NavGrid {
 
 /** A debris_hauler with a licensed driver boarded, positioned at (x, z). */
 function makeDrivenHauler(state: GameState, x = 0, z = 0): { vehicle: Vehicle; driverId: number } {
-  state.logistics.storageCapacityKg = 5000; // fresh state has no warehouse capacity (#1369)
+  setFreightRoom(state, 5000); // fresh state has no warehouse capacity (#1369)
   const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', x, z);
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
@@ -172,7 +173,7 @@ describe('applyHaulLoad with targetId (extra pickup, #1370)', () => {
 describe('applyHaulLoad', () => {
   it('moves an on-ground fragment onto vehicle.cargo, frees its nav-grid occupancy, and returns true', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
+    setFreightRoom(state, 5000); // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     state.navGrid = makeFlatNavGrid(20);
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
     const fragment = makeFragment(1, 5, 5, 0.3, 850);
@@ -220,7 +221,7 @@ describe('applyHaulLoad', () => {
   it('returns false without mutating when storage has no room for the fragment\'s mass', () => {
     const state = createGame({ seed: SEED });
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
-    state.logistics.storageCapacityKg = 100;
+    setFreightRoomExact(state, 100);
     const fragment = makeFragment(1, 5, 5, 0.3, 5000);
     addBlastFragments(state.logistics, [fragment]);
     reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, { x: 5, z: 5 });
@@ -229,7 +230,7 @@ describe('applyHaulLoad', () => {
 
     expect(result).toBe(false);
     expect(vehicle.cargo).toEqual([]);
-    expect(state.logistics.fragments[0]!.state).toBe('on_ground');
+    expect(state.logistics.fragments.find(f => f.fragment.id === 1)!.state).toBe('on_ground');
   });
 
   it('returns false when the vehicle has no reserved action to name a fragment at all', () => {
@@ -361,7 +362,7 @@ describe('applyBoulderSplit', () => {
 describe('applyArrivalEffect', () => {
   it('dispatches "haul_load" to applyHaulLoad', () => {
     const state = createGame({ seed: SEED });
-    state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
+    setFreightRoom(state, 5000); // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 0.3, 900)]);
     reserveFragmentAction(state, vehicle, driverId, 'haul_debris', 1, { x: 5, z: 5 });

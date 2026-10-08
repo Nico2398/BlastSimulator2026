@@ -1139,6 +1139,7 @@ describe('Economy — automatic contract delivery (#1367)', () => {
 
   beforeEach(() => {
     ctx = makeCtx();
+    ensureFreightWarehouse(ctx); // ore_sale contracts need a freight warehouse to be accepted (#1372)
   });
 
   /** Insert + accept a fixture ore_sale contract (blingite unless overridden). */
@@ -1517,9 +1518,10 @@ describe('Economy — per-warehouse freight storage (#1372)', () => {
     stock(1, 300, a);
     stock(2, 200, b);
     const total = ctx.state!.collectedOre.blingite!;
-    const c = insertOreSaleContract(ctx.state!.contracts, Math.floor(total * 0.8), 10);
+    const sellKg = Math.floor(total * 0.8);
+    const c = insertOreSaleContract(ctx.state!.contracts, sellKg, 10);
     expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
-    const res = contractCommand(ctx, ['deliver', String(c.id)], {});
+    const res = contractCommand(ctx, ['deliver', String(c.id)], { amount: String(sellKg) });
     expect(res.success, res.output).toBe(true);
     expect(storedIn(a) + storedIn(b)).toBeCloseTo(ctx.state!.logistics.storedMassKg, 6);
     expect(ctx.state!.logistics.storedMassKg).toBeLessThan(500);

@@ -7,6 +7,7 @@
 // releaseDeadEmployeeActions (#557 review) and cancelAction's fix to not
 // clear a different active action's holder fields (#939).
 
+import { setFreightRoom, sitesOf } from "../../helpers/freightWarehouse.js";
 import { describe, it, expect, vi } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -572,13 +573,13 @@ describe('releaseEmployeeFromWorld (#1378)', () => {
 
   it('returns every item of a multi-fragment cargo to the ground and keeps I8 intact (#1370)', () => {
     const state = setup();
-    state.logistics.storageCapacityKg = 5000;
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850), makeCargoFragment(2, 400), makeCargoFragment(3, 300)]);
     const driver = hire(state, 'driver');
     assignSkill(state.employees, driver.id, 'driving.truck', 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     expect(board(state, vehicle.id, driver.id).success).toBe(true);
-    for (const id of [1, 2, 3]) pickupFragment(state.logistics, id, String(vehicle.id));
+    for (const id of [1, 2, 3]) pickupFragment(state.logistics, id, String(vehicle.id), sitesOf(state), 0, 0);
     vehicle.cargo = [{ fragmentId: 1, massKg: 850 }, { fragmentId: 2, massKg: 400 }, { fragmentId: 3, massKg: 300 }];
 
     releaseEmployeeFromWorld(state, driver.id);
@@ -595,13 +596,13 @@ describe('releaseEmployeeFromWorld (#1378)', () => {
 
   it('returns the payload a driven hauler carries to the ground', () => {
     const state = setup();
-    state.logistics.storageCapacityKg = 5000;
+    setFreightRoom(state, 5000);
     addBlastFragments(state.logistics, [makeCargoFragment(1, 850)]);
     const driver = hire(state, 'driver');
     assignSkill(state.employees, driver.id, 'driving.truck', 1);
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
     expect(board(state, vehicle.id, driver.id).success).toBe(true);
-    pickupFragment(state.logistics, 1, String(vehicle.id));
+    pickupFragment(state.logistics, 1, String(vehicle.id), sitesOf(state), 0, 0);
     vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     releaseEmployeeFromWorld(state, driver.id);
