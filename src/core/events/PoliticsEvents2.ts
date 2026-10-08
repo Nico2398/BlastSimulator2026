@@ -1,11 +1,13 @@
 // BlastSimulator2026 — Political events batch 2 (events 26-50)
 // External pressures, international absurdity, and governmental incompetence.
 import { ev, r } from './EventBuilder.js';
+import { INSPECTION_EVENT_TAG } from '../config/balance.js';
 import type { EventDef } from './EventPool.js';
 
 export const POLITICS_EVENTS_2: EventDef[] = [
   // 26 — UN inspector surprise visit
   ev('politics_un_inspector', 'politics', {
+    tags: [INSPECTION_EVENT_TAG],
     weight: (s) => 1.2 + 1.5 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.tickCount > 30,
     options: [

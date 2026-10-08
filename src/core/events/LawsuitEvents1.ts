@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Lawsuit events batch 1 (25 events)
 // Satirical legal absurdity in open-pit mining: frivolous suits, class actions, and regulatory hell.
 import { ev, r } from './EventBuilder.js';
+import { INSPECTION_EVENT_TAG } from '../config/balance.js';
 import type { EventDef } from './EventPool.js';
 import { hasEnvironmentalCause } from './EventPool.js';
 
@@ -38,6 +39,7 @@ export const LAWSUIT_EVENTS_1: EventDef[] = [
   }),
   // 4 — EPA environmental investigation
   ev('lawsuit_environmental_agency', 'lawsuit', {
+    tags: [INSPECTION_EVENT_TAG],
     weight: (s) => 2.0 + 2.5 * (1 - r.ec(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.scores.ecology < 25,
     options: [
@@ -131,6 +133,7 @@ export const LAWSUIT_EVENTS_1: EventDef[] = [
   }),
   // 13 — OSHA investigation: hardhats used as soup bowls
   ev('lawsuit_osha_hardhats', 'lawsuit', {
+    tags: [INSPECTION_EVENT_TAG],
     weight: (s) => 1.4 + 2.0 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.scores.safety < 35,
     options: [
@@ -254,6 +257,7 @@ export const LAWSUIT_EVENTS_1: EventDef[] = [
   }),
   // 25 — Government fines for exceeding blast limits (again)
   ev('lawsuit_blast_limit_fines', 'lawsuit', {
+    tags: [INSPECTION_EVENT_TAG],
     weight: (s) => 1.5 + 2.0 * (1 - r.sf(s)),
     canFire: (ctx) => hasEnvironmentalCause(ctx) && ctx.lawsuitCount >= 1 && ctx.scores.safety < 40,
     options: [

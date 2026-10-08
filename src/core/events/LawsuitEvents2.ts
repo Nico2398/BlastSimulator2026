@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Lawsuit events batch 2 (events 26-50)
 // Legal absurdity, ambulance chasers, and satirical courtroom drama.
 import { ev, r } from './EventBuilder.js';
+import { INSPECTION_EVENT_TAG } from '../config/balance.js';
 import type { EventDef } from './EventPool.js';
 import { hasEnvironmentalCause } from './EventPool.js';
 
@@ -27,6 +28,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
   }),
   // 28 — Regulatory fine for paperwork violations
   ev('lawsuit_paperwork_fine', 'lawsuit', {
+    tags: [INSPECTION_EVENT_TAG],
     weight: (s) => 1.3 + 1.5 * (1 - r.sf(s)),
     options: [
       { cashDelta: -20000, scoreDelta: { safety: 8 }, effectTag: 'pay_fine_fix_docs' },

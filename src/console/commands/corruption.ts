@@ -11,6 +11,8 @@ import {
   TARGET_COSTS,
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
+import { protectionRemainingTicks } from '../../core/economy/BribeProtection.js';
+import { applyExposure } from '../../core/events/MafiaActions.js';
 import { addExpense, chargeFine } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
@@ -35,6 +37,12 @@ export function corruptCommand(
       `Mafia unlocked: ${state.corruption.mafiaUnlocked ? 'YES' : 'No'}`,
       `Attempts: ${state.corruption.attempts.length}`,
     ];
+    for (const p of state.corruption.protections) {
+      lines.push(t('corruption.protection_line', {
+        target: t(`corruption.target.${p.target}`),
+        ticks: protectionRemainingTicks(p, state.tickCount),
+      }));
+    }
     return { success: true, output: lines.join('\n') };
   }
 
@@ -75,6 +83,13 @@ export function corruptCommand(
       lines.push(t('corruption.scandal_fine', { fine: formatMoney(fine) }));
     }
     ctx.emitter.emit('corruption:scandal', { target, fine });
+  }
+  if (result.protection) {
+    lines.push(t(`corruption.protection_granted.${target}`));
+  }
+  if (result.exposureReduction) {
+    applyExposure(state.mafia, -result.exposureReduction);
+    lines.push(t('corruption.exposure_lowered', { amount: Math.round(result.exposureReduction * 100) }));
   }
   if (mafiaUnlocked) {
     lines.push(t('corruption.mafia_unlocked'));

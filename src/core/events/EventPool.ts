@@ -93,7 +93,7 @@ export interface EventContext {
   /** True once the player has fired at least one blast (#1412). */
   hasBlasted: boolean;
   /** Bribe protections currently held by the player (#1407). */
-  protections?: readonly ActiveProtection[];
+  protections?: ActiveProtection[];
 }
 
 /** Whether environmental events have a plausible cause yet (#1412). */

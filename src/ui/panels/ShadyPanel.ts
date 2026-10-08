@@ -13,6 +13,9 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { getSuccessRate, TARGET_COSTS, MAFIA_THRESHOLD, type CorruptionTarget } from '../../core/economy/Corruption.js';
+import { BRIBE_PROFILES, protectionRemainingTicks } from '../../core/economy/BribeProtection.js';
+import { CORRUPTION_MAX } from '../../core/config/balance.js';
+import { formatGameDuration } from '../formatGameDuration.js';
 import {
   ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS,
 } from '../../core/events/MafiaActions.js';
@@ -34,6 +37,7 @@ export class ShadyPanel extends PanelBase {
   private readonly influenceBarEl: HTMLElement;
   private readonly influenceNoteEl: HTMLElement;
   private readonly targetsEl: HTMLElement;
+  private readonly protectionsEl: HTMLElement;
   private readonly servicesEl: HTMLElement;
   private readonly exposureCard: HTMLElement;
   private readonly exposureValueEl: HTMLElement;
@@ -71,11 +75,19 @@ export class ShadyPanel extends PanelBase {
     );
     this.influenceValueEl = el('span', { attrs: { style: 'margin-left:auto;font:600 14px/1 var(--bsx-font-mono);color:var(--bsx-ore)' } });
     const influenceHeadRow = el('div', { attrs: { style: 'display:flex;align-items:baseline;gap:8px' }, children: [influenceLabel, this.influenceValueEl] });
-    const influenceTrack = el('div', { attrs: { style: 'height:5px;border-radius:3px;overflow:hidden;background:var(--bsx-well)' } });
+    const influenceTrack = el('div', { attrs: { style: 'position:relative;height:5px;border-radius:3px;overflow:hidden;background:var(--bsx-well)' } });
     this.influenceBarEl = el('div', { attrs: { style: 'height:100%;background:var(--bsx-ore);width:0%' } });
-    influenceTrack.appendChild(this.influenceBarEl);
+    const thresholdMarker = el('div', { attrs: {
+      'data-role': 'mafia-threshold',
+      style: `position:absolute;top:0;bottom:0;width:2px;left:${(MAFIA_THRESHOLD / CORRUPTION_MAX) * 100}%;background:var(--bsx-critical)`,
+    } });
+    influenceTrack.append(this.influenceBarEl, thresholdMarker);
     this.influenceNoteEl = el('span', { attrs: { style: 'font:400 10px/1.45 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
     const influenceCard = card([influenceHeadRow, influenceTrack, this.influenceNoteEl]);
+
+    const protectionsHeader = sectionHeader(t('ui.shady.protections_label'));
+    this.locale.bindText(protectionsHeader.querySelector('span')!, 'ui.shady.protections_label');
+    this.protectionsEl = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:8px' } });
 
     const arrangementsHeader = sectionHeader(t('ui.shady.arrangements_label'));
     this.locale.bindText(arrangementsHeader.querySelector('span')!, 'ui.shady.arrangements_label');
@@ -107,7 +119,7 @@ export class ShadyPanel extends PanelBase {
       attrs: { id: 'bs-shady-status', style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);min-height:14px' },
     });
 
-    this.bodyEl.append(introEl, influenceCard, arrangementsHeader, this.targetsEl, servicesHeader, this.servicesEl, this.statusEl);
+    this.bodyEl.append(introEl, influenceCard, protectionsHeader, this.protectionsEl, arrangementsHeader, this.targetsEl, servicesHeader, this.servicesEl, this.statusEl);
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
   }
@@ -176,6 +188,11 @@ export class ShadyPanel extends PanelBase {
     const pct = Math.round(state.mafia.exposureRisk * 100);
     this.exposureValueEl.textContent = `${pct}%`;
     this.exposureBarEl.style.width = `${pct}%`;
+    for (const row of Array.from(this.protectionsEl.querySelectorAll<HTMLElement>('[data-protection]'))) {
+      const p = state.corruption.protections.find(q => q.target === row.dataset['protection']);
+      const remaining = row.querySelector<HTMLElement>('[data-role="remaining"]');
+      if (p && remaining) remaining.textContent = t('ui.shady.protection_remaining', { time: formatGameDuration(protectionRemainingTicks(p, state.tickCount)) });
+    }
   }
 
   /** Everything that only changes on a player action, not every tick. */
@@ -186,6 +203,7 @@ export class ShadyPanel extends PanelBase {
       state.corruption.level,
       state.corruption.attempts.length,
       state.corruption.mafiaUnlocked ? 1 : 0,
+      state.corruption.protections.map(p => `${p.target}:${p.expiresAtTick}:${p.dismissalsLeft}`).join(','),
       state.mafia.smugglingActive ? 1 : 0,
       framesSig,
       rosterSig,
@@ -195,9 +213,11 @@ export class ShadyPanel extends PanelBase {
   private render(state: GameState): void {
     const level = state.corruption.level;
     this.influenceValueEl.textContent = String(level);
-    const pct = Math.min(100, Math.round((level / MAFIA_THRESHOLD) * 100));
+    const pct = Math.min(100, Math.max(0, Math.round((level / CORRUPTION_MAX) * 100)));
     this.influenceBarEl.style.width = `${pct}%`;
     this.influenceNoteEl.textContent = t('ui.shady.influence_note', { threshold: MAFIA_THRESHOLD });
+
+    this.protectionsEl.replaceChildren(this.protectionsCard(state));
 
     const rate = Math.round(getSuccessRate(state.corruption) * 100);
     this.targetsEl.replaceChildren(...TARGETS.map(target => this.targetCard(target, rate, state.cash)));
@@ -207,6 +227,29 @@ export class ShadyPanel extends PanelBase {
     );
   }
 
+  private protectionsCard(state: GameState): HTMLElement {
+    const protections = state.corruption.protections;
+    if (protections.length === 0) {
+      return card([el('span', { text: t('ui.shady.protections_none'), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } })]);
+    }
+    const rows = protections.map(p => {
+      const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [
+        el('span', { text: t(`ui.shady.protection.${p.target}`), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        ...(p.dismissalsLeft > 0 ? [el('span', {
+          text: t('ui.shady.protection_dismissals', { count: p.dismissalsLeft }),
+          attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
+        })] : []),
+        el('span', {
+          text: t('ui.shady.protection_remaining', { time: formatGameDuration(protectionRemainingTicks(p, state.tickCount)) }),
+          attrs: { 'data-role': 'remaining', style: 'margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-positive)' },
+        }),
+      ] });
+      row.dataset['protection'] = p.target;
+      return row;
+    });
+    return card(rows);
+  }
+
   private targetCard(target: { id: CorruptionTarget; nameKey: string; noteKey: string }, rate: number, cash: number): HTMLElement {
     const cost = TARGET_COSTS[target.id];
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [
@@ -214,7 +257,7 @@ export class ShadyPanel extends PanelBase {
       el('span', { text: t(target.nameKey), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
       el('span', { text: `${rate}%`, attrs: { style: 'margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-ore)' } }),
     ] });
-    const noteEl = el('span', { text: t(target.noteKey), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
+    const noteEl = el('span', { text: t(target.noteKey, { duration: formatGameDuration(BRIBE_PROFILES[target.id].durationTicks) }), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
     const callBtn = button('ghost', t('ui.shady.make_the_call'), { dataAction: 'corrupt' });
     callBtn.style.cssText = 'margin-left:auto;border-color:rgba(169,140,255,.4);background:rgba(169,140,255,.1);color:#c4aeff';
     callBtn.disabled = cash < cost;

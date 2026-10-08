@@ -14,7 +14,7 @@ import {
 } from '../config/balance.js';
 
 /** What a protection does while active. All fields optional; each target sets its own. */
-export interface ProtectionEffect {
+interface ProtectionEffect {
   /** Events of this category cannot fire. */
   blockCategory?: EventCategory;
   /** Events carrying this tag cannot fire. */
@@ -29,7 +29,7 @@ export interface ProtectionEffect {
   exposureReduction?: number;
 }
 
-export interface BribeProfile {
+interface BribeProfile {
   corruptionDelta: number;
   durationTicks: number;
   price: number;
@@ -42,13 +42,13 @@ export const BRIBE_PROFILES: Record<CorruptionTarget, BribeProfile> = {
     corruptionDelta: BRIBE_CORRUPTION_DELTA.judge,
     durationTicks: BRIBE_PROTECTION_DAYS.judge * TICKS_PER_DAY,
     price: BRIBE_PRICE_PER_PROTECTION_DAY.judge * BRIBE_PROTECTION_DAYS.judge,
-    effect: { timerStretchCategory: 'lawsuit', timerStretch: JUDGE_LAWSUIT_TIMER_STRETCH },
+    effect: { timerStretchCategory: 'lawsuit', timerStretch: JUDGE_LAWSUIT_TIMER_STRETCH, dismissNextCategory: 'lawsuit' },
   },
   politician: {
     corruptionDelta: BRIBE_CORRUPTION_DELTA.politician,
     durationTicks: BRIBE_PROTECTION_DAYS.politician * TICKS_PER_DAY,
     price: BRIBE_PRICE_PER_PROTECTION_DAY.politician * BRIBE_PROTECTION_DAYS.politician,
-    effect: { dismissNextCategory: 'politics' },
+    effect: { blockCategory: 'politics' },
   },
   union_leader: {
     corruptionDelta: BRIBE_CORRUPTION_DELTA.union_leader,
@@ -77,48 +77,80 @@ export interface ActiveProtection {
   dismissalsLeft: number;
 }
 
-/** Append a protection for a successful bribe; null when the target grants none. */
+function isActive(p: ActiveProtection, tick: number): boolean {
+  return tick < p.expiresAtTick;
+}
+
+/** Append a protection for a successful bribe; null when the target grants none. Re-bribing refreshes, never stacks. */
 export function grantProtection(
-  _list: ActiveProtection[],
-  _target: CorruptionTarget,
-  _tick: number,
+  list: ActiveProtection[],
+  target: CorruptionTarget,
+  tick: number,
 ): ActiveProtection | null {
-  return null; // TODO: implement
+  const profile = BRIBE_PROFILES[target];
+  if (profile.durationTicks <= 0) return null;
+  const expiresAtTick = tick + profile.durationTicks;
+  const dismissalsLeft = profile.effect.dismissNextCategory ? 1 : 0;
+  const existing = list.find(p => p.target === target);
+  if (existing) {
+    existing.expiresAtTick = Math.max(existing.expiresAtTick, expiresAtTick);
+    existing.dismissalsLeft = dismissalsLeft;
+    return existing;
+  }
+  const entry: ActiveProtection = { target, expiresAtTick, dismissalsLeft };
+  list.push(entry);
+  return entry;
 }
 
 /** Drop expired protections in place. */
-export function pruneProtections(_list: ActiveProtection[], _tick: number): void {
-  // TODO: implement
+export function pruneProtections(list: ActiveProtection[], tick: number): void {
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (!isActive(list[i]!, tick)) list.splice(i, 1);
+  }
 }
 
 /** True when an active protection blocks this event from firing. */
 export function isEventShielded(
-  _def: Pick<EventDef, 'category' | 'tags'>,
-  _list: readonly ActiveProtection[],
-  _tick: number,
+  def: Pick<EventDef, 'category' | 'tags'>,
+  list: readonly ActiveProtection[],
+  tick: number,
 ): boolean {
-  return false; // TODO: implement
+  return list.some(p => {
+    if (!isActive(p, tick)) return false;
+    const { blockCategory, blockTag } = BRIBE_PROFILES[p.target].effect;
+    return blockCategory === def.category
+      || (blockTag !== undefined && (def.tags?.includes(blockTag) ?? false));
+  });
 }
 
 /** Consume one auto-dismissal for the category; true when one was available. */
 export function consumeDismissal(
-  _list: ActiveProtection[],
-  _category: EventCategory,
-  _tick: number,
+  list: ActiveProtection[],
+  category: EventCategory,
+  tick: number,
 ): boolean {
-  return false; // TODO: implement
+  const p = list.find(q => isActive(q, tick) && q.dismissalsLeft > 0
+    && BRIBE_PROFILES[q.target].effect.dismissNextCategory === category);
+  if (!p) return false;
+  p.dismissalsLeft--;
+  return true;
 }
 
 /** Combined timer multiplier for the category (1 = unchanged). */
 export function timerStretchFor(
-  _category: EventCategory,
-  _list: readonly ActiveProtection[],
-  _tick: number,
+  category: EventCategory,
+  list: readonly ActiveProtection[],
+  tick: number,
 ): number {
-  return 1; // TODO: implement
+  let stretch = 1;
+  for (const p of list) {
+    const e = BRIBE_PROFILES[p.target].effect;
+    if (isActive(p, tick) && e.timerStretchCategory === category) stretch *= Math.max(1, e.timerStretch ?? 1);
+  }
+  return stretch;
 }
 
 /** Ticks left on a protection (0 when expired). */
-export function protectionRemainingTicks(_p: ActiveProtection, _tick: number): number {
-  return 0; // TODO: implement
+export function protectionRemainingTicks(p: ActiveProtection, tick: number): number {
+  return Math.max(0, p.expiresAtTick - tick);
 }

@@ -6,7 +6,8 @@ import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS } from '../config/balance.js';
+import { isEventShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -142,6 +143,8 @@ export function tickEventSystem(
   // Don't fire new events while one is pending
   if (state.pendingEvent) return null;
 
+  if (ctx.protections) pruneProtections(ctx.protections, ctx.tickCount);
+
   // Follow-up queue: drop stale entries (already fired, unknown, or not follow-up-only),
   // then count down once per tick. While counting, timers run as with an empty queue.
   state.followUpQueue = state.followUpQueue.filter(id =>
@@ -166,7 +169,9 @@ export function tickEventSystem(
 
     if (timer.remaining <= 0) {
       // Reset timer with score-modulated interval
-      timer.remaining = getModulatedInterval(timer.category, ctx.scores, timer.baseInterval);
+      timer.remaining = Math.max(5, Math.round(
+        getModulatedInterval(timer.category, ctx.scores, timer.baseInterval)
+        * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)));
 
       // Cooldown check — prevent events from firing too rapidly. The random
       // component is drawn once per cooldown window and cached (#597) rather
@@ -187,6 +192,11 @@ export function tickEventSystem(
       const event = selectEvent(timer.category, ctx, rng, state.firedEventIds);
       if (event) {
         state.firedEventIds.push(event.id);
+        // A judge's bribe dismisses the lawsuit unseen: it counts as fired, nothing is pending.
+        if (event.category === 'lawsuit' && ctx.protections
+          && consumeDismissal(ctx.protections, 'lawsuit', ctx.tickCount)) {
+          return null;
+        }
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
         state.lastEventTick = ctx.tickCount;
         state.actionCountSinceEvent = 0;
@@ -225,6 +235,8 @@ export function incrementActionCount(state: EventSystemState): void {
 /** Per-category prerequisite gating event selection (#1412). */
 export const CATEGORY_PREREQUISITE: Partial<Record<EventCategory, (ctx: EventContext) => boolean>> = {
   union: (ctx) => ctx.employeeCount >= 1,
+  // The mafia only approaches a player who has been seen paying (#1407).
+  mafia: (ctx) => ctx.corruptionLevel >= MAFIA_UNLOCK_THRESHOLD,
   // A lawsuit needs some cause: pollution/blast, a death, or staff to sue.
   lawsuit: (ctx) => hasEnvironmentalCause(ctx) || ctx.deathCount >= 1 || ctx.employeeCount >= 1,
 };
@@ -241,7 +253,8 @@ export function selectEvent(
 ): EventDef | null {
   if (CATEGORY_PREREQUISITE[category]?.(ctx) === false) return null;
   const events = getEventsByCategory(category);
-  const available = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx));
+  const available = events.filter(e => !e.followUpOnly && !firedEventIds.includes(e.id) && e.canFire(ctx)
+    && !isEventShielded(e, ctx.protections ?? [], ctx.tickCount));
 
   if (available.length === 0) return null;
 
