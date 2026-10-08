@@ -46,11 +46,11 @@ export const POLITICS_EVENTS_2: EventDef[] = [
   }),
   // 30 — Social media campaign against your mine
   ev('politics_viral_hashtag', 'politics', {
-    weight: (s) => 1.1 + 1.8 * r.nu(s),
+    weight: (s) => 1.1 + 1.8 * (1 - r.nu(s)),
     options: [
-      { cashDelta: -15000, scoreDelta: { nuisance: -12, ecology: 5 }, effectTag: 'pr_blitz' },
-      { cashDelta: 0, scoreDelta: { nuisance: 10, ecology: -8 }, effectTag: 'trending_disaster' },
-      { cashDelta: -8000, scoreDelta: { nuisance: -5 }, effectTag: 'hire_influencer' },
+      { cashDelta: -15000, scoreDelta: { nuisance: 12, ecology: 5 }, effectTag: 'pr_blitz' },
+      { cashDelta: 0, scoreDelta: { nuisance: -10, ecology: -8 }, effectTag: 'trending_disaster' },
+      { cashDelta: -8000, scoreDelta: { nuisance: 5 }, effectTag: 'hire_influencer' },
     ],
   }),
   // 31 — Neighboring mine collapses
@@ -67,18 +67,18 @@ export const POLITICS_EVENTS_2: EventDef[] = [
     weight: (s) => 0.9 + 0.7 * (1 - r.ec(s)),
     canFire: (ctx) => ctx.tickCount > 40,
     options: [
-      { cashDelta: -60000, scoreDelta: { ecology: 18, nuisance: -8 }, effectTag: 'electric_fleet' },
+      { cashDelta: -60000, scoreDelta: { ecology: 18, nuisance: 8 }, effectTag: 'electric_fleet' },
       { cashDelta: -10000, scoreDelta: { ecology: -5 }, corruptionDelta: 15, effectTag: 'delay_compliance' },
       { cashDelta: -30000, scoreDelta: { ecology: 8 }, effectTag: 'hybrid_compromise' },
     ],
   }),
   // 33 — Ambassador's wife fainted during mine tour
   ev('politics_ambassador_faint', 'politics', {
-    weight: (s) => 0.5 + 1.2 * r.nu(s),
+    weight: (s) => 0.5 + 1.2 * (1 - r.nu(s)),
     options: [
-      { cashDelta: -12000, scoreDelta: { nuisance: -6, wellBeing: 4 }, effectTag: 'formal_apology' },
-      { cashDelta: 0, scoreDelta: { nuisance: 8 }, followUp: 'politics_diplomatic_incident' },
-      { cashDelta: -25000, scoreDelta: { nuisance: -10 }, effectTag: 'spa_gift_basket' },
+      { cashDelta: -12000, scoreDelta: { nuisance: 6, wellBeing: 4 }, effectTag: 'formal_apology' },
+      { cashDelta: 0, scoreDelta: { nuisance: -8 }, followUp: 'politics_diplomatic_incident' },
+      { cashDelta: -25000, scoreDelta: { nuisance: 10 }, effectTag: 'spa_gift_basket' },
     ],
   }),
   // 34 — International mining expo invitation
@@ -125,7 +125,7 @@ export const POLITICS_EVENTS_2: EventDef[] = [
   ev('politics_ngo_partnership', 'politics', {
     weight: (s) => 1.0 + 1.2 * (1 - r.ec(s)),
     options: [
-      { cashDelta: -10000, scoreDelta: { ecology: 15, nuisance: -5 }, effectTag: 'green_partner' },
+      { cashDelta: -10000, scoreDelta: { ecology: 15, nuisance: 5 }, effectTag: 'green_partner' },
       { cashDelta: 0, scoreDelta: { ecology: -8 }, effectTag: 'reject_ngo' },
       { cashDelta: -5000, scoreDelta: { ecology: 8 }, effectTag: 'token_gesture' },
     ],
@@ -162,12 +162,12 @@ export const POLITICS_EVENTS_2: EventDef[] = [
   }),
   // 42 — Celebrity activist camps at your gate
   ev('politics_celebrity_protest', 'politics', {
-    weight: (s) => 0.9 + 1.5 * r.nu(s),
+    weight: (s) => 0.9 + 1.5 * (1 - r.nu(s)),
     options: [
-      { cashDelta: -15000, scoreDelta: { nuisance: -8, ecology: 5 }, effectTag: 'engage_celebrity' },
-      { cashDelta: 0, scoreDelta: { nuisance: 12 }, effectTag: 'ignore_celeb' },
-      { cashDelta: -8000, scoreDelta: { nuisance: -4 }, effectTag: 'invite_mine_tour',
-        probability: 0.7, alt: { scoreDelta: { nuisance: 5 }, effectTag: 'celeb_horrified' } },
+      { cashDelta: -15000, scoreDelta: { nuisance: 8, ecology: 5 }, effectTag: 'engage_celebrity' },
+      { cashDelta: 0, scoreDelta: { nuisance: -12 }, effectTag: 'ignore_celeb' },
+      { cashDelta: -8000, scoreDelta: { nuisance: 4 }, effectTag: 'invite_mine_tour',
+        probability: 0.7, alt: { scoreDelta: { nuisance: -5 }, effectTag: 'celeb_horrified' } },
     ],
   }),
   // 43 — AI threatens to replace all miners (meta-humor)
@@ -196,7 +196,7 @@ export const POLITICS_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -15000, scoreDelta: { ecology: 12 }, effectTag: 'respect_heritage' },
       { cashDelta: -5000, corruptionDelta: 18, effectTag: 'delist_heritage' },
-      { cashDelta: -25000, scoreDelta: { ecology: 8, nuisance: -5 }, effectTag: 'heritage_museum' },
+      { cashDelta: -25000, scoreDelta: { ecology: 8, nuisance: 5 }, effectTag: 'heritage_museum' },
     ],
   }),
   // 46 — Alien mineral discovered in your ore (fantastical)
@@ -205,8 +205,8 @@ export const POLITICS_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: 100000, scoreDelta: { ecology: -15 }, corruptionDelta: 10, effectTag: 'sell_to_military' },
       { cashDelta: -20000, scoreDelta: { ecology: 15, safety: 10 }, effectTag: 'donate_to_science' },
-      { cashDelta: 30000, scoreDelta: { nuisance: 10 }, effectTag: 'alien_tourism',
-        probability: 0.4, alt: { cashDelta: -10000, scoreDelta: { nuisance: 15 }, effectTag: 'alien_panic' } },
+      { cashDelta: 30000, scoreDelta: { nuisance: -10 }, effectTag: 'alien_tourism',
+        probability: 0.4, alt: { cashDelta: -10000, scoreDelta: { nuisance: -15 }, effectTag: 'alien_panic' } },
     ],
   }),
   // 47 — Political scandal implicates your biggest client
@@ -224,9 +224,9 @@ export const POLITICS_EVENTS_2: EventDef[] = [
     weight: (s) => 0.8 + 0.6 * r.sf(s),
     canFire: (ctx) => ctx.scores.safety > 50,
     options: [
-      { cashDelta: 15000, scoreDelta: { nuisance: 8, safety: -5 }, effectTag: 'open_tours' },
-      { cashDelta: 0, scoreDelta: { nuisance: -3 } },
-      { cashDelta: 5000, scoreDelta: { safety: -2, nuisance: 3 }, effectTag: 'vip_tours_only' },
+      { cashDelta: 15000, scoreDelta: { nuisance: -8, safety: -5 }, effectTag: 'open_tours' },
+      { cashDelta: 0, scoreDelta: { nuisance: 3 } },
+      { cashDelta: 5000, scoreDelta: { safety: -2, nuisance: -3 }, effectTag: 'vip_tours_only' },
     ],
   }),
   // 49 — Insurance company doubles premiums

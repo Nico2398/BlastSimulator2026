@@ -14,7 +14,7 @@
 //      locales. en.json already stores "Français" for the French button, which
 //      is what makes this the file's own convention rather than an omission.
 //   4. True cognate: the value is a real, correctly-spelled French word that
-//      happens to match the English one ("Nuisance", "Total", "Expert").
+//      happens to match the English one ("Mine", "Total", "Expert").
 //
 // Fictional proper nouns are NOT admissible: the catalogs translate them with
 // French puns (Shatternite → Fracassine, Sparkium → Étincelium), so an
@@ -45,8 +45,6 @@ export const LOCALE_SHARED_VALUE_ALLOWLIST: string[] = [
   'ui.settings.french',  // "Français"
 
   // ── True French/English cognates ──
-  'hud.scores.nuisance',        // "Nuisance"
-  'score.nuisance',             // "Nuisance"
   'need.fatigue',               // "Fatigue"
   'proficiency.2',              // "Novice"
   'proficiency.4',              // "Expert"

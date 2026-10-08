@@ -92,6 +92,27 @@ describe('Lawsuit events (6.7)', () => {
     expect(ev.consequences[1]!.corruptionDelta).toBeGreaterThan(0); // corrupt option
   });
 
+  it('settling the dust lawsuit pleases the neighbours: nuisance (Neighbour relations) rises by 8 (#1405)', () => {
+    const eventSystem = createEventSystemState();
+    eventSystem.pendingEvent = { eventId: 'lawsuit_dust_fashion', firedAtTick: 10 };
+    const finances = createFinanceState(500000);
+    const scores = createScoreState();
+    const result = resolveEvent(eventSystem, finances, scores, 0, 10, new Random(42));
+
+    expect(result).not.toBeNull();
+    expect(scores.nuisance).toBe(58);
+  });
+
+  it('lowballing the dust claims annoys the neighbours: nuisance falls by 5 (#1405)', () => {
+    const eventSystem = createEventSystemState();
+    eventSystem.pendingEvent = { eventId: 'lawsuit_dust_fashion', firedAtTick: 10 };
+    const finances = createFinanceState(500000);
+    const scores = createScoreState();
+    resolveEvent(eventSystem, finances, scores, 1, 10, new Random(42));
+
+    expect(scores.nuisance).toBe(45);
+  });
+
   it('lawsuit weights increase with low scores (safety, nuisance, ecology)', () => {
     const events = getEventsByCategory('lawsuit');
     const badScores = { wellBeing: 10, safety: 10, ecology: 10, nuisance: 10, decayRate: 0.05 };

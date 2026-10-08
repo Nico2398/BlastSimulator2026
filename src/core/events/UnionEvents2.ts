@@ -64,7 +64,7 @@ export const UNION_EVENTS_2: EventDef[] = [
     weight: (s) => 0.8 + 0.4 * (1 - r.wb(s)),
     options: [
       { cashDelta: -300, scoreDelta: { wellBeing: 4 }, effectTag: 'jukebox' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -2, nuisance: 3 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -2, nuisance: -3 } },
       { cashDelta: -1500, scoreDelta: { wellBeing: 7 }, effectTag: 'dj_hired' },
     ],
   }),
@@ -90,7 +90,7 @@ export const UNION_EVENTS_2: EventDef[] = [
   ev('union_food_trucks', 'union', {
     weight: (s) => 0.9 + 0.6 * (1 - r.wb(s)),
     options: [
-      { cashDelta: -4000, scoreDelta: { wellBeing: 10, nuisance: 5 }, effectTag: 'food_fest' },
+      { cashDelta: -4000, scoreDelta: { wellBeing: 10, nuisance: -5 }, effectTag: 'food_fest' },
       { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
       { cashDelta: -1500, scoreDelta: { wellBeing: 5 }, effectTag: 'vending_upgrade' },
     ],
@@ -165,7 +165,7 @@ export const UNION_EVENTS_2: EventDef[] = [
     weight: (s) => 0.6 + 0.4 * (1 - r.wb(s)),
     options: [
       { cashDelta: -1000, scoreDelta: { wellBeing: 6 }, effectTag: 'selfie_break' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -4, nuisance: 2 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -4, nuisance: -2 } },
       { cashDelta: -500, scoreDelta: { wellBeing: 3 }, effectTag: 'ring_light_provided' },
     ],
   }),
@@ -195,7 +195,7 @@ export const UNION_EVENTS_2: EventDef[] = [
     options: [
       { cashDelta: -1500, scoreDelta: { wellBeing: 5 }, effectTag: 'newsletter_launch' },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
-      { cashDelta: -600, scoreDelta: { wellBeing: 2, nuisance: 3 }, effectTag: 'gossip_column' },
+      { cashDelta: -600, scoreDelta: { wellBeing: 2, nuisance: -3 }, effectTag: 'gossip_column' },
     ],
   }),
   // 47 — Safety drills too realistic
@@ -211,7 +211,7 @@ export const UNION_EVENTS_2: EventDef[] = [
   ev('union_anthem', 'union', {
     weight: (s) => 0.6 + 0.5 * (1 - r.wb(s)),
     options: [
-      { cashDelta: -3000, scoreDelta: { wellBeing: 7, nuisance: 4 }, effectTag: 'anthem_composed' },
+      { cashDelta: -3000, scoreDelta: { wellBeing: 7, nuisance: -4 }, effectTag: 'anthem_composed' },
       { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
       { cashDelta: -500, scoreDelta: { wellBeing: 3 }, effectTag: 'karaoke_night' },
     ],

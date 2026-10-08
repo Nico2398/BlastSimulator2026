@@ -87,7 +87,7 @@ src/
 │   ├── mining/             # Survey, DrillPlan, ChargePlan, BlastPlan, BlastCalc
 │   ├── economy/            # Finance, Contract, Market, Corruption, HaulingTask
 │   ├── entities/           # Employee, Vehicle, Building, Fragment
-│   ├── scores/             # ScoreManager, WellBeing, Safety, Ecology, Nuisance
+│   ├── scores/             # ScoreManager, WellBeing, Safety, Ecology, NeighbourRelations (nuisance)
 │   ├── events/             # EventSystem, EventCategory, EventPool, EventResolver
 │   ├── weather/            # WeatherCycle, WeatherEffects
 │   └── i18n/               # I18n, locales (en.json, fr.json), keys.ts

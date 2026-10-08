@@ -26,9 +26,9 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
     weight: () => 1.5,
     options: [
       // Settle on appeal — pay more than the original offer
-      { cashDelta: -40000, scoreDelta: { nuisance: -10 }, effectTag: 'appeal_settlement' },
+      { cashDelta: -40000, scoreDelta: { nuisance: 10 }, effectTag: 'appeal_settlement' },
       // Win on a technicality — PR nightmare though
-      { cashDelta: -8000, scoreDelta: { nuisance: 8 }, effectTag: 'technicality_win' },
+      { cashDelta: -8000, scoreDelta: { nuisance: -8 }, effectTag: 'technicality_win' },
       // Bribe the appellate judge — risky at this level
       { corruptionDelta: 20, cashDelta: -15000, effectTag: 'bribe_appeals_court' },
     ],
@@ -53,11 +53,11 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
     weight: () => 1.8,
     options: [
       // Full settlement with community investment fund
-      { cashDelta: -80000, scoreDelta: { nuisance: -20, ecology: 15 }, effectTag: 'community_fund' },
+      { cashDelta: -80000, scoreDelta: { nuisance: 20, ecology: 15 }, effectTag: 'community_fund' },
       // Individual village deals (divide and conquer)
-      { cashDelta: -35000, scoreDelta: { nuisance: -8 }, corruptionDelta: 8, effectTag: 'divide_villages' },
+      { cashDelta: -35000, scoreDelta: { nuisance: 8 }, corruptionDelta: 8, effectTag: 'divide_villages' },
       // Government mediation — slow but fair
-      { cashDelta: -20000, scoreDelta: { nuisance: -5, ecology: 5 }, effectTag: 'govt_mediation' },
+      { cashDelta: -20000, scoreDelta: { nuisance: 5, ecology: 5 }, effectTag: 'govt_mediation' },
     ],
   }),
 
@@ -70,7 +70,7 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
       // Lobby to overturn at regional level
       { cashDelta: -40000, corruptionDelta: 15, effectTag: 'regional_lobby' },
       // Relocate operations (drastic, but fresh start)
-      { cashDelta: -100000, scoreDelta: { ecology: 30, nuisance: -20 }, effectTag: 'relocate_ops' },
+      { cashDelta: -100000, scoreDelta: { ecology: 30, nuisance: 20 }, effectTag: 'relocate_ops' },
       // "Negotiate" with the new mayor (corruption path)
       { cashDelta: -25000, corruptionDelta: 25, scoreDelta: { ecology: 5 }, effectTag: 'bribe_new_mayor' },
     ],
@@ -95,11 +95,11 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
     weight: () => 1.5,
     options: [
       // Formal diplomatic apology + gift to embassy
-      { cashDelta: -35000, scoreDelta: { nuisance: -12 }, effectTag: 'diplomatic_apology' },
+      { cashDelta: -35000, scoreDelta: { nuisance: 12 }, effectTag: 'diplomatic_apology' },
       // Blame it on the altitude (the mine is deep, not high, but still)
-      { cashDelta: -5000, scoreDelta: { nuisance: 5 }, effectTag: 'altitude_excuse' },
+      { cashDelta: -5000, scoreDelta: { nuisance: -5 }, effectTag: 'altitude_excuse' },
       // Trade deal compensation — offer ore at discount
-      { cashDelta: -20000, scoreDelta: { nuisance: -8 }, effectTag: 'trade_compensation' },
+      { cashDelta: -20000, scoreDelta: { nuisance: 8 }, effectTag: 'trade_compensation' },
     ],
   }),
 
@@ -108,12 +108,12 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
     weight: () => 2,
     options: [
       // Pay for all property damage
-      { cashDelta: -45000, scoreDelta: { nuisance: -10, safety: 5 }, effectTag: 'debris_payout' },
+      { cashDelta: -45000, scoreDelta: { nuisance: 10, safety: 5 }, effectTag: 'debris_payout' },
       // Contest in court — wind is an act of God
-      { cashDelta: -10000, scoreDelta: { nuisance: 8 }, probability: 0.5,
-        alt: { cashDelta: -60000, scoreDelta: { nuisance: -5 } } },
+      { cashDelta: -10000, scoreDelta: { nuisance: -8 }, probability: 0.5,
+        alt: { cashDelta: -60000, scoreDelta: { nuisance: 5 } } },
       // Install permanent blast shields (expensive but prevents recurrence)
-      { cashDelta: -70000, scoreDelta: { nuisance: -15, safety: 10 }, effectTag: 'blast_shields' },
+      { cashDelta: -70000, scoreDelta: { nuisance: 15, safety: 10 }, effectTag: 'blast_shields' },
     ],
   }),
 

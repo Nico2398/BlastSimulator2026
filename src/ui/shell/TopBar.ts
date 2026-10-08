@@ -498,6 +498,7 @@ export class TopBar {
       { key: 'wellBeing', abbr: t('shell.topbar.score_well'), tipKey: 'shell.topbar.score_well_tip' },
       { key: 'safety', abbr: t('shell.topbar.score_safe'), tipKey: 'shell.topbar.score_safe_tip' },
       { key: 'ecology', abbr: t('shell.topbar.score_eco'), tipKey: 'shell.topbar.score_eco_tip' },
+      // nuisance = neighbour relations: high = good, like the other three.
       { key: 'nuisance', abbr: t('shell.topbar.score_nuis'), tipKey: 'shell.topbar.score_nuis_tip' },
     ] as const;
     const values = scores.map(s => Math.round((state.scores as unknown as Record<string, number>)[s.key] ?? 50));
