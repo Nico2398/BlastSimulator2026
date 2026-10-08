@@ -100,12 +100,10 @@ export function availableTrainingOffers(buildings: readonly Building[]): SkillOf
 /** What a course would cost and grant. */
 export interface TrainingPlan {
   skill: SkillCategory;
-  /** Proficiency the employee holds now; 0 when they do not hold the skill. */
-  currentLevel: 0 | ProficiencyLevel;
-  /** Proficiency the course grants — always one step up. */
-  targetLevel: ProficiencyLevel;
   ticks: number;
   fee: number;
+  /** Salary raise the new qualification will cause; 0 until implemented. */
+  salaryIncrease: number;
 }
 
 /**
@@ -123,12 +121,12 @@ export function planTraining(
   const currentLevel = held?.proficiencyLevel ?? 0;
   if (currentLevel >= MAX_PROFICIENCY) return null;
 
+  // TODO: implement — null when the skill is already held; only new skills are taught.
   const targetLevel = (currentLevel + 1) as ProficiencyLevel;
   const multiplier = TRAINING_LEVEL_COST_MULTIPLIER[targetLevel];
   return {
     skill,
-    currentLevel,
-    targetLevel,
+    salaryIncrease: 0,
     ticks: Math.max(1, Math.round(TRAINING_BASE_TICKS * multiplier * TRAINING_TIER_SPEED[tier])),
     fee: Math.round(TRAINING_BASE_FEE * multiplier),
   };

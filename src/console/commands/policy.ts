@@ -6,7 +6,7 @@ import { type ShiftMode } from '../../core/entities/SitePolicy.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame } from './commandUtils.js';
 
-const VALID_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
+const VALID_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous'];
 
 export function setPolicyCommand(
   ctx: GameContext,

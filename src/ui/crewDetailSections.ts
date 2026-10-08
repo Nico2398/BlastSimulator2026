@@ -317,12 +317,12 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     if (!plan) {
       renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) });
     } else if (isSchoolFull(state, building)) {
-      renderLockedTrainingRow(row, `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, 'ui.crew.training_school_full');
+      renderLockedTrainingRow(row, `${t(`course.${skill}`)}`, 'ui.crew.training_school_full');
     } else {
       anyOffered = true;
       const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
       info.append(
-        el('span', { text: `${t(`course.${skill}`)} ${plan.currentLevel}→${plan.targetLevel}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+        el('span', { text: `${t(`course.${skill}`)}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', {
           text: t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks }),
           attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },

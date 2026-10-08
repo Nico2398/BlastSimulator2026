@@ -4,14 +4,12 @@
 
 import { SHIFT_DURATIONS_TICKS, SITE_POLICY_DEFAULT_THRESHOLD } from '../config/balance.js';
 
-export type ShiftMode = 'shift_8h' | 'shift_12h' | 'continuous' | 'custom';
+export type ShiftMode = 'shift_8h' | 'shift_12h' | 'continuous';
 
 export interface SitePolicy {
   shiftMode: ShiftMode;
   /** Force rest when fatigue drops to or below this value. Default: 60 */
   fatigueRestThreshold: number;
-  /** Per-employee threshold overrides keyed by employee ID. */
-  customThresholds: Record<number, { fatigue: number }>;
   /**
    * Counts explicit player applications (set_policy / the Operations panel),
    * whether or not any value differs. Default 0. It records player edits only
@@ -30,7 +28,6 @@ export function createSitePolicy(mode: ShiftMode = 'shift_8h'): SitePolicy {
   return {
     shiftMode: mode,
     fatigueRestThreshold: SITE_POLICY_DEFAULT_THRESHOLD,
-    customThresholds: {},
     revision: 0,
   };
 }
@@ -44,7 +41,6 @@ export function getShiftDurationTicks(mode: ShiftMode): number {
     case 'shift_8h':  return SHIFT_DURATIONS_TICKS.shift_8h;
     case 'shift_12h': return SHIFT_DURATIONS_TICKS.shift_12h;
     case 'continuous': return Infinity;
-    case 'custom':     return Infinity;
   }
 }
 
@@ -94,15 +90,6 @@ export function shouldForceRest(
  * policy — a per-employee `customThresholds` override (in 'custom' mode)
  * takes precedence over the policy-level default when present.
  */
-export function getEffectiveThresholds(policy: SitePolicy, employeeId?: number): { fatigue: number } {
-  let fatigueThreshold = policy.fatigueRestThreshold;
-
-  if (policy.shiftMode === 'custom' && employeeId !== undefined) {
-    const override = policy.customThresholds[employeeId];
-    if (override !== undefined) {
-      fatigueThreshold = override.fatigue;
-    }
-  }
-
-  return { fatigue: fatigueThreshold };
+export function getEffectiveThresholds(policy: SitePolicy, _employeeId?: number): { fatigue: number } {
+  return { fatigue: policy.fatigueRestThreshold };
 }

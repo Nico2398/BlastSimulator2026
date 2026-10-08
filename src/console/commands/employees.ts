@@ -306,7 +306,7 @@ export function employeeCommand(
           buildingType: building.type,
           buildingId: building.id,
           skill,
-          targetLevel: plan.targetLevel,
+          targetLevel: 1,
           ticks: plan.ticks,
           fee: plan.fee,
         }),
