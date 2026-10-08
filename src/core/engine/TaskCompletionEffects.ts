@@ -23,6 +23,7 @@ import { recordBuiltRamp } from '../mining/RampWidening.js';
 import { carveLevelColumns } from '../mining/LevelGround.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { placeBuilding, getDefSize, getBuildingDef } from '../entities/Building.js';
+import { getVehicleDefByTier } from '../entities/Vehicle.js';
 import { addIncome } from '../economy/Finance.js';
 import { completeDemolition } from './BuildingDemolition.js';
 import { readDemolishPayload } from './DemolishPayload.js';
@@ -127,6 +128,15 @@ export function applyTaskCompletion(
     // here any more.
     if (progress.actionId !== undefined) {
       completeVehicleGatedAction(state, emp, progress.actionId);
+    }
+
+    // A completed 'repair_vehicle' task leaves the vehicle at full hp (#1393);
+    // per-tick restoration already got it there, this only guards rounding.
+    if (progress.actionType === 'repair_vehicle' && progress.actionPayload) {
+      const vehicle = state.vehicles.vehicles.find(v => v.id === progress.actionPayload!['vehicleId']);
+      if (vehicle !== undefined) {
+        vehicle.hp = Math.min(vehicle.hp, getVehicleDefByTier(vehicle.type, vehicle.tier).maxHp);
+      }
     }
 
     // A completed 'survey' task resolves here — after the surveyor has

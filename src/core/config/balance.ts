@@ -1447,10 +1447,6 @@ export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: R
     2: { cost: 5000, ticks: 0, conditions: [] },
     3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'freight_warehouse', tier: 2 }] },
   },
-  vehicle_depot: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'vehicle_depot', tier: 2 }] },
-  },
 };
 
 /** Look up the research task definition for a building type and tier. */

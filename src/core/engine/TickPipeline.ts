@@ -47,6 +47,7 @@ import {
   BASE_TICK_MS,
 } from './GameLoop.js';
 import { syncHaulDispatch } from '../economy/HaulDispatch.js';
+import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, generateContracts } from '../economy/Contract.js';
@@ -297,6 +298,10 @@ export function runTick(
   // eligible this tick (a blast, or a break that finished on a prior tick)
   // can be claimed the same tick it is queued.
   syncHaulDispatch(state);
+
+  // 8c-4. Repair dispatch (#1393): one repair_vehicle order per idle damaged
+  // vehicle, queued silently until someone trained in repair is free.
+  syncRepairDispatch(state);
 
   // 8d. Dispatch remaining pending actions to idle qualified employees. An
   // action requiring a skill nobody on the roster holds is not left to

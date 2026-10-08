@@ -26,6 +26,7 @@ Employees not interchangeable tokens. Each has skill qualifications with profici
 | `blasting` | Charging holes, setting sequences, monitoring blasts | Blasting Academy |
 | `management` | Contract negotiation (requires an eligible manager; best level raises odds by `NEGOTIATION_MANAGEMENT_BONUS_PER_LEVEL` per level above 1). Hiring/firing/policy setting are not gated on it yet | Management Office |
 | `geology` | Seismic, core-sample, and aerial surveys | Geology Lab |
+| `repair` | Repairing damaged idle vehicles in place (`repair_vehicle`, #1393); parts cost per restored hp | Driving Center |
 
 ## Starting Qualifications
 

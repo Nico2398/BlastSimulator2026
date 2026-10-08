@@ -251,33 +251,4 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       scoreEffects: {},
     },
   },
-
-  // ── Vehicle Depot ───────────────────────────────────────────────────────────
-  vehicle_depot: {
-    1: {
-      type: 'vehicle_depot', tier: 1,
-      nameKey: 'building.vehicle_depot.t1.name',
-      footprint: rect(4, 3), entryPoint: entry(), exitPoint: exit_(4),
-      constructionCost: 18000, demolishCost: 4500, operatingCostPerTick: 12,
-      capacity: 6, maxHp: 130, structuralResistance: 4000,
-      scoreEffects: {},
-    },
-    2: {
-      type: 'vehicle_depot', tier: 2,
-      nameKey: 'building.vehicle_depot.t2.name',
-      footprint: rect(5, 3), entryPoint: entry(), exitPoint: exit_(5),
-      constructionCost: 42000, demolishCost: 10000, operatingCostPerTick: 20,
-      capacity: 12, maxHp: 200, structuralResistance: 6000,
-      scoreEffects: {},
-    },
-    3: {
-      type: 'vehicle_depot', tier: 3,
-      nameKey: 'building.vehicle_depot.t3.name',
-      footprint: rect(6, 4), entryPoint: entry(), exitPoint: exit_(6),
-      constructionCost: 85000, demolishCost: 20000, operatingCostPerTick: 30,
-      capacity: 24, maxHp: 280, structuralResistance: 9000,
-      scoreEffects: {},
-    },
-  },
-
 };

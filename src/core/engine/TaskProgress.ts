@@ -10,6 +10,8 @@ import { gainXp, type Employee, type SkillCategory } from '../entities/Employee.
 import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
+import { repairHpThisTick, repairPartsCost } from '../entities/VehicleRepair.js';
+import { addExpense } from '../economy/Finance.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
 
@@ -47,6 +49,21 @@ export interface TaskProgressResult {
 }
 
 /**
+ * One tick of repair work (#1393): restore this tick's hp share on the live
+ * vehicle and charge its parts. Totals REPAIR_PARTS_COST_PER_HP per restored hp.
+ */
+function tickRepairWork(state: GameState, vehicleId: unknown, ticksRemaining: number): void {
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  if (vehicle === undefined) return;
+  const restored = repairHpThisTick(vehicle, ticksRemaining);
+  if (restored <= 0) return;
+  vehicle.hp += restored;
+  const cost = repairPartsCost(restored);
+  state.cash -= cost;
+  addExpense(state.finances, cost, 'vehicle_maintenance', `Vehicle repair parts: vehicle ${vehicle.id}`, state.tickCount);
+}
+
+/**
  * Advance an employee's dispatched task toward completion, granting XP and
  * reporting completion when taskTicksRemaining reaches zero. Mirrors
  * ShiftCycle.ts's completeRestTick shape for taskTicksRemaining instead of
@@ -59,6 +76,10 @@ export interface TaskProgressResult {
  */
 export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter, grid?: VoxelGrid): TaskProgressResult | null {
   if (emp.taskTicksRemaining === null) return null;
+
+  if (emp.pendingActionType === 'repair_vehicle' && emp.pendingActionPayload) {
+    tickRepairWork(state, emp.pendingActionPayload['vehicleId'], emp.taskTicksRemaining);
+  }
 
   emp.taskTicksRemaining -= 1;
 

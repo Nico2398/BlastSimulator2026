@@ -27,8 +27,7 @@ export type BuildingType =
   | 'research_center'
   | 'living_quarters'
   | 'explosive_warehouse'
-  | 'freight_warehouse'
-  | 'vehicle_depot';
+  | 'freight_warehouse';
 
 /** Building upgrade tier. Tier 1 is the base tier available from the start. */
 export type BuildingTier = 1 | 2 | 3;
