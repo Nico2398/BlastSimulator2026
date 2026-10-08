@@ -26,7 +26,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 // function bodies, never evaluated at module-load time (same reasoning as
 // the documented VehicleReservation.ts <-> MoveTo.ts/PlanItinerary.ts cycle).
 import { planItinerary } from './PlanItinerary.js';
-import { isLicensedForRole } from './VehicleReservation.js';
+import { canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { actionBlocked } from '../events/ActiveModifiers.js';
 
@@ -294,12 +294,13 @@ export function canReleaseStrandedVehicleGatedAction(
   if (resolveActionCost(state, employee, action) !== null) return false;
 
   const role = action.requiredVehicleRole;
+  // The stranded vehicle's own tier decides who can take it over (#1524).
   return state.employees.employees.some(other =>
     other.id !== employee.id &&
     other.alive &&
     other.activeActionId === null &&
     other.restTicksRemaining === null &&
-    isLicensedForRole(other, role),
+    canDriveTier(other, role, vehicle.tier),
   );
 }
 

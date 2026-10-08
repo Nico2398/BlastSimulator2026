@@ -323,7 +323,9 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
       anyOffered = true;
       const info = trainingInfoBlock(
         title,
-        t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, raise: perHour(plan.salaryIncrease) }),
+        plan.raisesLicenceTo !== undefined
+          ? t('ui.crew.training_licence_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, level: plan.raisesLicenceTo })
+          : t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, raise: perHour(plan.salaryIncrease) }),
       );
       const trainBtn = button('warn', t('ui.crew.train'), { disabled: state.cash < plan.fee || e.injured });
       trainBtn.classList.add('bs-train-btn');

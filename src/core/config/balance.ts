@@ -1970,8 +1970,8 @@ export const EVENT_RELOCATE_PAUSE_HOURS = 24;
 export const EVENT_PARTIAL_BAN_WORK_PCT = -40;
 export const EVENT_PARTIAL_BAN_HOURS = 60;
 
-/** Fee for a course raising a driving licence to level 2 or 3 (#1524). Placeholder. */
-export const LICENCE_COURSE_FEE: Record<2 | 3, number> = { 2: 0, 3: 0 };
+/** Fee for a course raising a driving licence to level 2 or 3 (#1524): the base course fee times the target level. */
+export const LICENCE_COURSE_FEE: Record<2 | 3, number> = { 2: TRAINING_BASE_FEE * 2, 3: TRAINING_BASE_FEE * 3 };
 
-/** Course duration multiplier for raising a driving licence to level 2 or 3 (#1524). Placeholder. */
-export const LICENCE_COURSE_TICKS_MULT: Record<2 | 3, number> = { 2: 1, 3: 1 };
+/** Course duration multiplier for raising a driving licence to level 2 or 3 (#1524). */
+export const LICENCE_COURSE_TICKS_MULT: Record<2 | 3, number> = { 2: 1.5, 3: 2 };

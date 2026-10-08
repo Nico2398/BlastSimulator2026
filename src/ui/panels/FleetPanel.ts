@@ -28,7 +28,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
 import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
-import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
+import { countLicenceHolders } from '../../core/entities/VehicleDriverAssignment.js';
 import { canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
@@ -111,12 +111,12 @@ export class FleetPanel extends PanelBase {
     const signature = this.computeSignature(state);
     if (signature === this.lastSignature) {
       this.refreshDynamic(state);
-      this.refreshDealershipAffordability(state.cash);
+      this.refreshDealershipAffordability(state);
       return;
     }
     this.lastSignature = signature;
     this.render(state);
-    this.refreshDealershipAffordability(state.cash);
+    this.refreshDealershipAffordability(state);
   }
 
   refreshLocale(): void {
@@ -213,23 +213,24 @@ export class FleetPanel extends PanelBase {
       ? [el('div', { className: 'bsx-empty', text: t('ui.fleet.none') })]
       : vehicles.map(v => this.makeVehicleCard(v, state));
     children.push(scrollBoundedSection(vehicleCards, 200, { gap: 9 }));
-    children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state.cash));
+    children.push(sectionHeader(t('ui.fleet.dealership')), ...this.makeDealershipRows(state));
     this.bodyEl.replaceChildren(...children);
   }
 
   // ── Dealership ──
 
-  private makeDealershipRows(cash: number): HTMLElement[] {
+  private makeDealershipRows(state: GameState): HTMLElement[] {
     return getAllVehicleRoles().map(role => {
       const group = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px' } });
       group.appendChild(el('span', { text: t(`vehicle_type.${role}`), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.1em;color:var(--bsx-text-secondary)' } }));
       const tiers: VehicleTier[] = [1, 2, 3];
-      for (const tier of tiers) group.appendChild(this.makeTierButton(role, tier, cash));
+      for (const tier of tiers) group.appendChild(this.makeTierButton(role, tier, state));
       return group;
     });
   }
 
-  private makeTierButton(role: VehicleRole, tier: VehicleTier, cash: number): HTMLElement {
+  private makeTierButton(role: VehicleRole, tier: VehicleTier, state: GameState): HTMLElement {
+    const cash = state.cash;
     const def = getVehicleDefByTier(role, tier);
     const btn = el('button', {
       className: 'bs-fleet-tier-btn',
@@ -241,6 +242,11 @@ export class FleetPanel extends PanelBase {
       el('span', {
         text: vehicleCardLine(def),
         className: 'bs-fleet-tier-desc',
+        attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
+      }),
+      el('span', {
+        text: this.licenceLineText(role, tier, countLicenceHolders(state.employees.employees, role, tier)),
+        className: 'bs-fleet-tier-licence',
         attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
       }),
     );
@@ -260,12 +266,22 @@ export class FleetPanel extends PanelBase {
     btn.setAttribute('style', `${TIER_BTN_BASE_STYLE};opacity:${affordable ? '1' : '.45'};cursor:${affordable ? 'pointer' : 'not-allowed'}`);
   }
 
-  private refreshDealershipAffordability(cash: number): void {
+  /** "Licence <name> level N — M hold it" for a dealership tier row. */
+  private licenceLineText(role: VehicleRole, tier: VehicleTier, holders: number): string {
+    return t('ui.fleet.licence_required', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[role]}`), level: tier })
+      + ' — ' + t('ui.fleet.licence_holders', { count: holders });
+  }
+
+  private refreshDealershipAffordability(state: GameState): void {
+    const cash = state.cash;
+    const employees = state.employees.employees;
     this.bodyEl.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn').forEach(btn => {
       const role = btn.dataset['role'] as VehicleRole;
       const tier = Number(btn.dataset['tier']) as VehicleTier;
       const def = getVehicleDefByTier(role, tier);
       this.setTierButtonAffordable(btn, cash >= def.purchaseCost, def.purchaseCost);
+      const line = btn.querySelector<HTMLElement>('.bs-fleet-tier-licence');
+      if (line) line.textContent = this.licenceLineText(role, tier, countLicenceHolders(employees, role, tier));
     });
   }
 
@@ -311,7 +327,7 @@ export class FleetPanel extends PanelBase {
 
     // Redundant when makeNoDriverRow already warns that nobody holds the role licence.
     const roleWarningShown = driverId === null && !pendingDriver
-      && !state.employees.employees.some(e => e.alive && isLicensedForRole(e, v.type));
+      && !rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier);
     const nextTier = nextVehicleTier(v.tier);
     if (!roleWarningShown && nextTier !== null && !rosterCanDriveVehicleTier(state.employees.employees, v.type, nextTier)) {
       rows.push(el('div', {
@@ -374,7 +390,7 @@ export class FleetPanel extends PanelBase {
 
     const reason = getVehicleReservation(state.vehicles, v.id) !== null
       ? t('ui.fleet.reposition_busy')
-      : !state.employees.employees.some(e => e.alive && isLicensedForRole(e, v.type))
+      : !rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier)
         ? t('ui.fleet.no_licensed', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[v.type]}`) })
         : null;
 

@@ -58,7 +58,7 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
-  // Unit-tested licence predicate (#1401); production reaches it only through rosterCanDriveVehicleTier, and #1524 makes it tier-specific.
+  // Unit-tested licence predicate (#1401); production reaches it only through rosterCanDriveVehicleTier.
   'src/core/entities/VehicleUpgrade.ts:isLicensedForVehicleTier',
   // The operating-profit capital/running split is the unit-tested contract of Finance (#1363); production reads it only inside getFinancialReport.
   'src/core/economy/Finance.ts:CAPITAL_EXPENSE_CATEGORIES',

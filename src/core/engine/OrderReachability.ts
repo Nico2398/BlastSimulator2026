@@ -15,7 +15,9 @@ import type { NavGrid } from '../nav/NavGrid.js';
 import type { GameState, PendingAction, BlockedOrderReason } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import { vehicleDriverId } from '../entities/Vehicle.js';
-import { isLicensedForRole } from './VehicleReservation.js';
+import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
+import { lowestFleetTier } from './VehicleReservation.js';
+import { canDriveTier, licenceLevelOf } from '../entities/VehicleDriverAssignment.js';
 import { isAutoDebrisAction, haulBlockedReason, createFragmentLookup, createStorageFit } from '../economy/HaulDispatch.js';
 import { holdsRequiredSkill, isEligibleForWork } from '../entities/Employee.js';
 import {
@@ -53,11 +55,14 @@ const NO_ACTORS: ActorPool = { hasActor: false, reachable: null };
 
 /** Alive, on-roster employees able to act for `req` (skill, licence, named target). */
 function candidateEmployees(state: GameState, req: ActorRequirements): Employee[] {
+  const role = req.requiredVehicleRole;
+  // No fleet vehicle of the role: no actor either way (fillPool reports NO_ACTORS); level 1 keeps the pre-tier filter.
+  const neededTier = role === null ? 1 : (lowestFleetTier(state.vehicles.vehicles, role) ?? 1);
   return state.employees.employees.filter(emp =>
     emp.alive
     && (req.targetEmployeeId === null || emp.id === req.targetEmployeeId)
     && holdsRequiredSkill(emp, req.requiredSkill)
-    && (req.requiredVehicleRole === null || isLicensedForRole(emp, req.requiredVehicleRole)),
+    && (role === null || canDriveTier(emp, role, neededTier)),
   );
 }
 
@@ -258,17 +263,20 @@ export function judgeQueuedOrders(state: GameState): Map<number, OrderReachabili
  * holds both reports `no_dual_qualified_employee`.
  */
 function availabilityReason(
-  state: GameState,
   eligible: ReadonlyArray<Employee>,
   action: PendingAction,
+  neededTierOf: (role: VehicleRole) => VehicleTier | null,
 ): BlockedOrderReason | null {
   const holdsSkill = (emps: ReadonlyArray<Employee>): boolean =>
     emps.some(emp => holdsRequiredSkill(emp, action.requiredSkill));
   const role = action.requiredVehicleRole;
   if (role !== null) {
-    if (!state.vehicles.vehicles.some(v => v.type === role)) return 'no_vehicle_in_fleet';
-    const licensed = eligible.filter(emp => isLicensedForRole(emp, role));
-    if (licensed.length === 0) return 'no_licensed_driver';
+    const needed = neededTierOf(role);
+    if (needed === null) return 'no_vehicle_in_fleet';
+    const licensed = eligible.filter(emp => canDriveTier(emp, role, needed));
+    if (licensed.length === 0) {
+      return eligible.some(emp => licenceLevelOf(emp, role) > 0) ? 'licence_level_too_low' : 'no_licensed_driver';
+    }
     if (holdsSkill(licensed)) return null;
     return holdsSkill(eligible) ? 'no_dual_qualified_employee' : 'no_qualified_employee';
   }
@@ -278,6 +286,11 @@ function availabilityReason(
 /** Stamp blockedReason and the ghost's red flag for `targets`; returns ids needing the unqualified modal. */
 function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<number> {
   const unqualifiedIds = new Set<number>();
+  const tierByRole = new Map<VehicleRole, VehicleTier | null>();
+  const neededTierOf = (role: VehicleRole): VehicleTier | null => {
+    if (!tierByRole.has(role)) tierByRole.set(role, lowestFleetTier(state.vehicles.vehicles, role));
+    return tierByRole.get(role) ?? null;
+  };
   const eligible = state.employees.employees.filter(isEligibleForWork);
   const judgements = judgeActions(state, targets);
   const fragmentOf = createFragmentLookup(state);
@@ -300,9 +313,10 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       // Auto-generated debris work outside the reachable set is a normal,
       // player-owned state (#1302), not a failed order: it waits silently.
       action.blockedReason = isAutoDebrisAction(action.type) ? 'debris_out_of_reach' : 'target_unreachable';
+      action.blockedLicenceLevel = null;
       continue;
     }
-    const reason = availabilityReason(state, eligible, action);
+    const reason = availabilityReason(eligible, action, neededTierOf);
     // Only a skill nobody alive holds raises the modal: a trainee or injured
     // holder is temporarily unavailable, not absent (gameplay-employee-skills rule 5).
     if (
@@ -315,6 +329,9 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
       unqualifiedIds.add(action.id);
     }
     action.blockedReason = reason ?? haulBlockedReason(state, action, fragmentOf, fits);
+    action.blockedLicenceLevel = reason === 'licence_level_too_low' && action.requiredVehicleRole !== null
+      ? neededTierOf(action.requiredVehicleRole)
+      : null;
   }
   if (flipped) state.ghostPreviewsRevision++;
   return unqualifiedIds;

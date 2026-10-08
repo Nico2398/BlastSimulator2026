@@ -80,6 +80,8 @@ export interface TrainingState {
   skill: SkillCategory;
   ticksRemaining: number;
   fee: number;
+  /** Set when the course raises an already-held driving licence to this level (#1524). */
+  raisesLicenceTo?: 2 | 3;
 }
 
 // ── Employee instance ──

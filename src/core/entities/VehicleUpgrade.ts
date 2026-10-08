@@ -7,7 +7,7 @@
 import type { Employee } from './Employee.js';
 import type { Vehicle, VehicleRole, VehicleTier } from './Vehicle.js';
 import { getVehicleDefByTier } from './Vehicle.js';
-import { ROLE_LICENCE_REQUIRED } from './VehicleDriverAssignment.js';
+import { canDriveTier } from './VehicleDriverAssignment.js';
 import { VEHICLE_MAX_TIER } from '../config/balance.js';
 
 type VehicleUpgradeResult =
@@ -44,9 +44,8 @@ export function upgradeVehicle(vehicle: Vehicle): VehicleUpgradeResult {
 }
 
 /** True when `employee` may drive a vehicle of `role` at `tier`. */
-export function isLicensedForVehicleTier(employee: Employee, role: VehicleRole, _tier: VehicleTier): boolean {
-  // TODO(#1524): equals "holds the role licence" today; tier-specific licences come with #1524.
-  return employee.qualifications.some(q => q.category === ROLE_LICENCE_REQUIRED[role]);
+export function isLicensedForVehicleTier(employee: Employee, role: VehicleRole, tier: VehicleTier): boolean {
+  return canDriveTier(employee, role, tier);
 }
 
 /** True when any alive employee in the roster is licensed for `role` at `tier`. */

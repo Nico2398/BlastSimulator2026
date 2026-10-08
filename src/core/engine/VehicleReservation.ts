@@ -23,11 +23,11 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
-import type { Vehicle, VehicleRole, VehicleState } from '../entities/Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, removeVehicleReservation } from '../entities/Vehicle.js';
 import { isVehicleUnderRepair } from '../entities/VehicleRepair.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
+import { ROLE_LICENCE_REQUIRED, canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
 import { alight } from './Mount.js';
@@ -151,6 +151,13 @@ export function isLicensedForRole(employee: Employee, role: VehicleRole): boolea
   return employee.qualifications.some(q => q.category === requiredLicence);
 }
 
+/** Lowest tier among the fleet's vehicles of `role`, or null when it owns none (#1524). */
+export function lowestFleetTier(vehicles: readonly Vehicle[], role: VehicleRole): VehicleTier | null {
+  let lowest: VehicleTier | null = null;
+  for (const v of vehicles) if (v.type === role && (lowest === null || v.tier < lowest)) lowest = v.tier;
+  return lowest;
+}
+
 /**
  * True when `employee` currently holds an active, vehicle-gated PendingAction
  * and is themself the boarded driver of the vehicle reserved for it — whether
@@ -216,6 +223,7 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
 
   const qualifying = state.vehicles.vehicles.filter(v =>
     v.type === role &&
+    canDriveTier(employee, role, v.tier) &&
     v.hp > 0 &&
     getVehicleReservation(state.vehicles, v.id) === null &&
     !isVehicleUnderRepair(state.pendingActions, v.id) &&
