@@ -11,7 +11,7 @@
       "description": "Start the first campaign level."
     },
     {
-      "command": "status",
+      "command": "state",
       "interactionOnly": true,
       "interaction": [
         { "type": "waitForSelector", "selector": "[data-action=\"open-objective\"]" },
