@@ -2140,7 +2140,7 @@ describe('held contract persistence (#1367)', () => {
     state.contracts.active[0]!.held = true;
     state.collectedOre['dirtite'] = 500;
     const restored = deserialize(serialize(state));
-    expect(autoDeliverContracts(restored.contracts, restored.logistics, restored.collectedOre, 1)).toEqual([]);
+    expect(autoDeliverContracts(restored.contracts, restored.logistics, restored.collectedOre, 1, [])).toEqual([]);
   });
 });
 

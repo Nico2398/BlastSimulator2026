@@ -2,13 +2,16 @@
 // Barren fragments are dumped on a spoil heap instead of a freight warehouse.
 
 import type { Building } from '../entities/Building.js';
-import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { SPOIL_BARREN_ORE_FRACTION_THRESHOLD } from '../config/balance.js';
 
 /** Where a hauled fragment is delivered. */
 export type HaulDestination = 'warehouse' | 'spoil_heap';
 
-/** Whether a fragment's ore densities make it barren (summed density at or below the threshold; empty = barren). */
+/**
+ * Whether a fragment's ore densities make it barren: summed density at or below
+ * SPOIL_BARREN_ORE_FRACTION_THRESHOLD (empty = barren). Decides haul destination
+ * and the rubble-draw order in Logistics.consumeStoredOre.
+ */
 export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>): boolean {
   let total = 0;
   for (const d of Object.values(oreDensities)) total += d;
@@ -18,20 +21,6 @@ export function isBarrenFragment(oreDensities: Readonly<Record<string, number>>)
 /** Destination for a fragment, by its ore densities. */
 export function haulDestinationOf(fragment: { oreDensities: Readonly<Record<string, number>> }): HaulDestination {
   return isBarrenFragment(fragment.oreDensities) ? 'spoil_heap' : 'warehouse';
-}
-
-/** Nearest site by squared distance to (x, z); ties go to the lowest id; null when none. */
-export function pickSpoilHeap(sites: readonly WarehouseSite[], x: number, z: number): WarehouseSite | null {
-  let best: WarehouseSite | null = null;
-  let bestDist = Infinity;
-  for (const site of sites) {
-    const dist = (site.x - x) ** 2 + (site.z - z) ** 2;
-    if (dist < bestDist || (dist === bestDist && best !== null && site.id < best.id)) {
-      best = site;
-      bestDist = dist;
-    }
-  }
-  return best;
 }
 
 /** Total barren rock (kg) stored across the given buildings' spoil heaps. */
@@ -48,6 +37,13 @@ export function rubbleStockKg(storedMassKg: number, buildings: readonly Pick<Bui
   return storedMassKg + totalSpoilKg(buildings);
 }
 
+/** rubbleStockKg for any state slice carrying logistics and buildings (GameState fits). */
+export function stateRubbleStockKg(
+  state: { logistics: { storedMassKg: number }; buildings: { buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] } },
+): number {
+  return rubbleStockKg(state.logistics.storedMassKg, state.buildings.buildings);
+}
+
 /** Remove up to `amountKg` of barren rock from the heaps, in building order; returns the kg removed. */
 export function drawSpoilKg(buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[], amountKg: number): number {
   let remaining = amountKg;
@@ -60,4 +56,9 @@ export function drawSpoilKg(buildings: readonly Pick<Building, 'type' | 'storedS
     remaining -= take;
   }
   return amountKg - remaining;
+}
+
+/** Add `amountKg` of barren rock to a heap building (the counterpart of drawSpoilKg). */
+export function creditSpoilKg(heap: Pick<Building, 'storedSpoilKg'>, amountKg: number): void {
+  heap.storedSpoilKg = (heap.storedSpoilKg ?? 0) + amountKg;
 }

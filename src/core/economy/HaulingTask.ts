@@ -17,8 +17,8 @@ import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
-import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
-import { isBarrenFragment, pickSpoilHeap, type HaulDestination } from './SpoilHeaps.js';
+import { freightWarehouseSites, nearestSite, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { isBarrenFragment, type HaulDestination } from './SpoilHeaps.js';
 import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
@@ -126,7 +126,7 @@ export function findHaulDepotApproach(
   destination: HaulDestination = 'warehouse',
 ): { x: number; z: number } | null {
   const site = destination === 'spoil_heap'
-    ? pickSpoilHeap(spoilHeapSites(state.buildings), fromX, fromZ)
+    ? nearestSite(spoilHeapSites(state.buildings), fromX, fromZ)
     : warehouseSiteFor(state, fromX, fromZ, massKg);
   const depot = site && state.buildings.buildings.find(b => b.id === site.id);
   if (!depot) return null;

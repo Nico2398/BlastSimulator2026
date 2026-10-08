@@ -68,6 +68,12 @@ function rescueStrandedApproachTargets(ctx: GameContext, state: GameState, justO
   }
 }
 
+/** Debit a building's construction cost from cash and book it as a construction expense. */
+function chargeConstruction(state: GameState, type: BuildingType, tier: BuildingTier, cost: number): void {
+  state.cash -= cost;
+  addExpense(state.finances, cost, 'construction', `Build ${type} T${tier}`, state.tickCount);
+}
+
 /**
  * Order a new building at (x, z): validates and charges as `buildCommand`'s
  * default case does today, then queues one `place_building` action instead
@@ -124,8 +130,7 @@ export function orderBuildingCommand(
       state.buildings, type, x, z, bounds.width, bounds.depth, tier, bounds.originX, bounds.originZ, undefined, ctx.grid ?? undefined,
     );
     if (!placed.success) return { success: false, output: placed.error! };
-    state.cash -= def.constructionCost;
-    addExpense(state.finances, def.constructionCost, 'construction', `Build ${type} T${tier}`, state.tickCount);
+    chargeConstruction(state, type, tier, def.constructionCost);
     settleBuiltFootprint(state, ctx.grid, ctx.emitter, x, z, footprintX, footprintZ);
     return {
       success: true,
@@ -169,8 +174,7 @@ export function orderBuildingCommand(
     return { success: false, output: t('entities.build_no_approach') };
   }
 
-  state.cash -= def.constructionCost;
-  addExpense(state.finances, def.constructionCost, 'construction', `Build ${type} T${tier}`, state.tickCount);
+  chargeConstruction(state, type, tier, def.constructionCost);
 
   // Anyone caught standing on the new footprint is relocated off it.
   relocateFootprintOccupants(state, makeFootprintRegion(x, z, footprintX, footprintZ));

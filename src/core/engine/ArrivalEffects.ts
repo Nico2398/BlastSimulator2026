@@ -30,7 +30,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
 import { pickupFragment, deliverToDepot, deliverToSpoilHeap, type TrackedFragment } from '../economy/Logistics.js';
-import { haulDestinationOf } from '../economy/SpoilHeaps.js';
+import { creditSpoilKg, haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
@@ -152,7 +152,7 @@ function deliverCargoItem(
     const dumped = deliverToSpoilHeap(state.logistics, fragmentId, heaps, atX, atZ);
     if (!dumped) return false;
     const heap = state.buildings.buildings.find(b => b.id === dumped.heapId);
-    if (heap) heap.storedSpoilKg = (heap.storedSpoilKg ?? 0) + dumped.massKg;
+    if (heap) creditSpoilKg(heap, dumped.massKg);
     return true;
   }
   return deliverToDepot(state.logistics, fragmentId, state.collectedOre, warehouses, atX, atZ);

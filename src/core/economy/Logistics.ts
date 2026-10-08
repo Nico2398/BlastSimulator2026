@@ -5,9 +5,9 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
-import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
+import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
-import { drawSpoilKg, haulDestinationOf, pickSpoilHeap, rubbleStockKg } from './SpoilHeaps.js';
+import { drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg } from './SpoilHeaps.js';
 import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
@@ -83,7 +83,7 @@ export function pickupFragment(
   if (!tracked) return false;
 
   const site = haulDestinationOf(tracked.fragment) === 'spoil_heap'
-    ? pickSpoilHeap(heapSites, vehicleX, vehicleZ)
+    ? nearestSite(heapSites, vehicleX, vehicleZ)
     : pickWarehouse(state, sites, vehicleX, vehicleZ, tracked.fragment.mass);
   if (!site) return false;
 
@@ -147,7 +147,7 @@ export function deliverToSpoilHeap(
   const tracked = findInTransitFragment(state, fragmentId);
   if (!tracked || haulDestinationOf(tracked.fragment) !== 'spoil_heap') return null;
 
-  const target = heapSites.find(s => s.id === tracked.warehouseId) ?? pickSpoilHeap(heapSites, atX, atZ);
+  const target = heapSites.find(s => s.id === tracked.warehouseId) ?? nearestSite(heapSites, atX, atZ);
   if (!target) return null;
 
   state.fragments.splice(state.fragments.indexOf(tracked), 1);
@@ -310,7 +310,7 @@ export function consumeStoredOre(
   collectedOre: Record<string, number>,
   materialId: string,
   amountKg: number,
-  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[] = [],
+  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
 ): { success: boolean; consumedKg: number; error?: string } {
   if (!Number.isFinite(amountKg) || amountKg <= 0) {
     return {
@@ -357,7 +357,7 @@ export function consumeStoredOre(
   }
 
   // Rubble / no-ore materials: consume raw stored mass, any fragment. Barren
-  // fragments (no ore content at all) go first, oldest-first within each
+  // fragments (ore below the spoil-heap threshold) go first, oldest-first within each
   // group, only reaching into ore-bearing fragments once barren stock runs
   // out — a rubble contract pays cents per kg where an ore_sale pays
   // dollars, so scrapping valuable ore-bearing rock as cheap rubble ahead of
@@ -375,9 +375,7 @@ export function consumeStoredOre(
   const storageKg = amountKg - fromHeaps;
 
   const stored = state.fragments.filter(f => f.state === 'stored');
-  const isBarren = (f: TrackedFragment) => (
-    Object.values(f.fragment.oreDensities).every(d => d <= 0)
-  );
+  const isBarren = (f: TrackedFragment) => isBarrenFragment(f.fragment.oreDensities);
   const storedIds = [
     ...stored.filter(isBarren).map(f => f.fragment.id),
     ...stored.filter(f => !isBarren(f)).map(f => f.fragment.id),

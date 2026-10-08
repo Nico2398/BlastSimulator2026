@@ -38,7 +38,7 @@ export function deliverStoredOre(
   contractId: number,
   requestedKg: number,
   tick: number,
-  buildings: SpoilBuildings = [],
+  buildings: SpoilBuildings,
 ): DeliveryResult<DeliveryOutcome> {
   const contract = contracts.active.find(c => c.id === contractId);
   if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
@@ -76,7 +76,7 @@ export function autoDeliverContracts(
   logistics: LogisticsState,
   collectedOre: Record<string, number>,
   tick: number,
-  buildings: SpoilBuildings = [],
+  buildings: SpoilBuildings,
 ): AutoDelivery[] {
   const deliveries: AutoDelivery[] = [];
   // Sorted copy: completing a contract splices it out of contracts.active.

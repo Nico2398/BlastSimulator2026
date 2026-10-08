@@ -9,7 +9,7 @@ import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileS
 import { wetHoles } from './core/mining/WetHoles.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
-import { rubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
+import { stateRubbleStockKg, totalSpoilKg } from './core/economy/SpoilHeaps.js';
 import { hasFillableOreSaleOffer, hasFillableSaleOffer, hasRubbleDisposalOffer } from './core/economy/Contract.js';
 import { findTrafficJams, type ChokepointKind } from './core/events/TrafficJams.js';
 import { isDangerZoneClear } from './core/entities/Zone.js';
@@ -212,7 +212,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
-    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, rubbleStockKg(s.logistics.storedMassKg, s.buildings.buildings)),
+    fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
     vehicleBoardingCount: s.vehicles.driverBoardingCount ?? 0,
     levelEnded: s.levelEnded,

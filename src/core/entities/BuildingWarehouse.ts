@@ -108,6 +108,29 @@ export function freightWarehouseSites(state: BuildingState): WarehouseSite[] {
   return sites;
 }
 
+/**
+ * Nearest site to (x, z) by squared distance among those `accepts` (default all);
+ * ties go to the lowest id; null when none qualifies.
+ */
+export function nearestSite(
+  sites: readonly WarehouseSite[],
+  x: number,
+  z: number,
+  accepts: (site: WarehouseSite) => boolean = () => true,
+): WarehouseSite | null {
+  let best: WarehouseSite | null = null;
+  let bestDist = Infinity;
+  for (const site of sites) {
+    if (!accepts(site)) continue;
+    const dist = (site.x - x) ** 2 + (site.z - z) ** 2;
+    if (dist < bestDist || (dist === bestDist && best !== null && site.id < best.id)) {
+      best = site;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
 /** Active spoil heaps as logistics sites (#1530); capacityKg is unbounded. */
 export function spoilHeapSites(state: BuildingState): WarehouseSite[] {
   const sites: WarehouseSite[] = [];

@@ -18,7 +18,7 @@ import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
 import { CONTRACT_EXPIRY_WARNING_TICKS, WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { rubbleStockKg } from '../../core/economy/SpoilHeaps.js';
+import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
@@ -182,7 +182,7 @@ export class NotificationCenter {
     const urgentContract = state.contracts.active.find(c => {
       const remaining = c.acceptedAtTick + c.deadlineTicks - state.tickCount;
       return remaining <= CONTRACT_EXPIRY_WARNING_TICKS && remaining > 0
-        && contractShortOfStock(c, state.collectedOre, rubbleStockKg(state.logistics.storedMassKg, state.buildings.buildings));
+        && contractShortOfStock(c, state.collectedOre, stateRubbleStockKg(state));
     });
     if (urgentContract) {
       const remaining = urgentContract.acceptedAtTick + urgentContract.deadlineTicks - state.tickCount;

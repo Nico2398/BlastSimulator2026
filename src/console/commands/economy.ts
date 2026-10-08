@@ -21,7 +21,7 @@ import { FRAGMENT_SPLIT_EPSILON_KG } from '../../core/config/balance.js';
 import { negotiateContractAtTick, negotiationRefusalReason } from '../../core/economy/Negotiation.js';
 import { deliverStoredOre, bookDeliveryIncome } from '../../core/economy/ContractFulfilment.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
-import { rubbleStockKg } from '../../core/economy/SpoilHeaps.js';
+import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import type { Building } from '../../core/entities/Building.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
@@ -125,7 +125,7 @@ function resolveContract(
 ): Contract | CommandResult {
   const selector = parseContractSelector(args, named);
   if (!selector) return { success: false, output: usage };
-  const contract = findContract(pool, selector, stock.collectedOre, rubbleStockKg(stock.logistics.storedMassKg, stock.buildings.buildings));
+  const contract = findContract(pool, selector, stock.collectedOre, stateRubbleStockKg(stock));
   if (!contract && selector.fillable) return { success: false, output: t('economy.contract.none_fillable') };
   if (!contract) return { success: false, output: `Contract ${describeContractSelector(selector)} not found.` };
   return contract;
@@ -207,7 +207,7 @@ export function contractCommand(
       const contract = resolved;
       const id = contract.id;
       // A manual request is all-or-nothing; only the automatic path caps at stock.
-      const stock = storedStockKg(contract, state.collectedOre, rubbleStockKg(state.logistics.storedMassKg, state.buildings.buildings));
+      const stock = storedStockKg(contract, state.collectedOre, stateRubbleStockKg(state));
       if (Math.min(amount, remainingKg(contract)) > stock + FRAGMENT_SPLIT_EPSILON_KG) {
         return { success: false, output: t('economy.contract.deliver_insufficient', { material: contract.materialId || t('ui.contracts.material_rubble') }) };
       }
