@@ -200,7 +200,7 @@ export function haulActionCarriesOre(
 }
 
 /** True iff `action` is a haul_debris order still queued with no holder (#1370). */
-export function isQueuedUnclaimedHaul(action: PendingAction): boolean {
+function isQueuedUnclaimedHaul(action: PendingAction): boolean {
   return action.type === 'haul_debris' && action.status === 'queued' && action.holderId === null;
 }
 
