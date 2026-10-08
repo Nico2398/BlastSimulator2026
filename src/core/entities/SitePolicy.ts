@@ -1,17 +1,15 @@
 // BlastSimulator2026 — SitePolicy: shift scheduling and rest thresholds.
-// Governs shift modes (8 h, 12 h, continuous, custom) and the fatigue level
+// Governs shift modes (8 h, 12 h, continuous) and the fatigue level
 // that forces rest. Hunger and breakNeed thresholds were removed (#928).
 
 import { SHIFT_DURATIONS_TICKS, SITE_POLICY_DEFAULT_THRESHOLD } from '../config/balance.js';
 
-export type ShiftMode = 'shift_8h' | 'shift_12h' | 'continuous' | 'custom';
+export type ShiftMode = 'shift_8h' | 'shift_12h' | 'continuous';
 
 export interface SitePolicy {
   shiftMode: ShiftMode;
   /** Force rest when fatigue drops to or below this value. Default: 60 */
   fatigueRestThreshold: number;
-  /** Per-employee threshold overrides keyed by employee ID. */
-  customThresholds: Record<number, { fatigue: number }>;
   /**
    * Counts explicit player applications (set_policy / the Operations panel),
    * whether or not any value differs. Default 0. It records player edits only
@@ -30,27 +28,24 @@ export function createSitePolicy(mode: ShiftMode = 'shift_8h'): SitePolicy {
   return {
     shiftMode: mode,
     fatigueRestThreshold: SITE_POLICY_DEFAULT_THRESHOLD,
-    customThresholds: {},
     revision: 0,
   };
 }
 
 /**
  * Returns the number of ticks in a shift for the given mode.
- * continuous and custom have no enforced tick limit (Infinity).
+ * continuous has no enforced tick limit (Infinity).
  */
 export function getShiftDurationTicks(mode: ShiftMode): number {
   switch (mode) {
     case 'shift_8h':  return SHIFT_DURATIONS_TICKS.shift_8h;
     case 'shift_12h': return SHIFT_DURATIONS_TICKS.shift_12h;
     case 'continuous': return Infinity;
-    case 'custom':     return Infinity;
   }
 }
 
 /** Employee data subset required by shouldForceRest. */
 type EmployeeSnapshot = {
-  id?: number;
   fatigue: number;
   ticksWorked: number;
 };
@@ -61,9 +56,7 @@ type EmployeeSnapshot = {
  * Rules (evaluated in order):
  *  1. If !isWorking → false (already resting, nothing to force).
  *  2. For shift_8h / shift_12h → true if ticksWorked >= shift duration ticks.
- *  3. For all modes → true if fatigue is at or below its rest threshold. In
- *     'custom' mode, per-employee overrides (customThresholds[id]) take
- *     precedence over the policy-level default when present.
+ *  3. For all modes → true if fatigue is at or below the policy's rest threshold.
  *  4. Otherwise → false.
  */
 export function shouldForceRest(
@@ -79,30 +72,5 @@ export function shouldForceRest(
     return true;
   }
 
-  // Determine effective threshold
-  const { fatigue: fatigueThreshold } = getEffectiveThresholds(policy, employee.id);
-
-  if (employee.fatigue <= fatigueThreshold) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Returns the effective fatigue rest threshold for an employee under this
- * policy — a per-employee `customThresholds` override (in 'custom' mode)
- * takes precedence over the policy-level default when present.
- */
-export function getEffectiveThresholds(policy: SitePolicy, employeeId?: number): { fatigue: number } {
-  let fatigueThreshold = policy.fatigueRestThreshold;
-
-  if (policy.shiftMode === 'custom' && employeeId !== undefined) {
-    const override = policy.customThresholds[employeeId];
-    if (override !== undefined) {
-      fatigueThreshold = override.fatigue;
-    }
-  }
-
-  return { fatigue: fatigueThreshold };
+  return employee.fatigue <= policy.fatigueRestThreshold;
 }

@@ -895,8 +895,7 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
 // carry the stale hunger/breakNeed fields (stripped) and a
 // restNeedKey/pendingRestNeedKey/pending-action needKey/collapsedNeed naming
 // a removed gauge (remapped to 'fatigue' rather than nulled). SitePolicy's
-// hungerRestThreshold/socialBreakThreshold (top-level and per-employee
-// customThresholds overrides) are stripped too.
+// hungerRestThreshold/socialBreakThreshold are stripped too.
 
 describe('deserialize — v14→v15 migration for the single-gauge (fatigue) need model (#928)', () => {
   it('a v14 employee with hunger/breakNeed fields and restNeedKey: "hunger" migrates cleanly to v15', () => {
@@ -962,7 +961,7 @@ describe('deserialize — v14→v15 migration for the single-gauge (fatigue) nee
 
     expect('hungerRestThreshold' in restored.sitePolicy).toBe(false);
     expect('socialBreakThreshold' in restored.sitePolicy).toBe(false);
-    expect(restored.sitePolicy.customThresholds[7]).toEqual({ fatigue: 10 });
+    // customThresholds itself no longer exists on SitePolicy (#1388).
   });
 
   it('a v15+ save with only fatigue is left untouched by the migration (regression)', () => {

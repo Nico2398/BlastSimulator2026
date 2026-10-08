@@ -358,17 +358,36 @@ describe('Employee skills', () => {
     expect(emp().x !== before.x || emp().z !== before.z).toBe(true);
   });
 
-  it('employee train raises proficiency in a skill already held', () => {
+  it('employee train refuses a skill already held: no fee, no enrolment, level untouched (#1388)', () => {
     const state = ctx.state!;
     placeBuilding(state.buildings, 'blasting_academy', 5, 5, 32, 32, 1);
     const emp = () => state.employees.employees.find(e => e.id === empId)!;
     const before = emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel;
+    const cashBefore = state.cash;
 
-    expect(employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' }).success).toBe(true);
+    const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.length).toBeGreaterThan(0);
+    expect(state.cash).toBe(cashBefore);
+    expect(emp().pendingTrainingState).toBeNull();
+    expect(emp().trainingState).toBeNull();
+    expect(emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(before);
+  });
+
+  it('employee train grants a new qualification at Rookie with 0 xp and raises salary (#1388)', () => {
+    const state = ctx.state!;
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 1);
+    const emp = () => state.employees.employees.find(e => e.id === empId)!;
+    const salaryBefore = emp().salary;
+    expect(emp().qualifications.some(q => q.category === 'geology')).toBe(false);
+
+    expect(employeeCommand(ctx, ['train', String(empId)], { skill: 'geology' }).success).toBe(true);
     tickUntilTrainingStarted(ctx, empId);
     tickCommand(ctx, [String(emp().trainingState!.ticksRemaining)], {});
 
-    expect(emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(before + 1);
+    expect(emp().qualifications.find(q => q.category === 'geology')).toEqual({ category: 'geology', proficiencyLevel: 1, xp: 0 });
+    expect(emp().salary).toBeGreaterThan(salaryBefore);
   });
 
   it('employee train refuses when no school for that skill is built', () => {
@@ -396,8 +415,8 @@ describe('Employee skills', () => {
 
   it('an employee in training is not dispatched to work', () => {
     const state = ctx.state!;
-    placeBuilding(state.buildings, 'blasting_academy', 5, 5, 32, 32, 1);
-    employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' });
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 1);
+    employeeCommand(ctx, ['train', String(empId)], { skill: 'geology' });
 
     state.pendingActions.push({
       id: 1, type: 'charge_hole', requiredSkill: 'blasting',
@@ -603,43 +622,34 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
 // there via training or via task xp accumulation. Red until tickTraining
 // floors qual.xp at XP_THRESHOLDS[newLevel] instead of leaving it untouched.
 
-describe('training and natural xp accumulation land at equal xp for the same level (#620)', () => {
-  it('a trained employee and a naturally-progressed employee at the same level need equal additional xp', () => {
+describe('a course grants a qualification, never a level (#620, #1388)', () => {
+  it('a course on a held skill leaves level and xp untouched', () => {
     const ctx = makeCtx();
-
-    // Employee A: reaches blasting level 3 through training, starting from a
-    // partial level-2 xp balance.
-    const empAId = hireOne(ctx, 'blaster'); // holds blasting at level 1
-    assignSkill(ctx.state!.employees, empAId, 'blasting', 2);
-    const qualA = ctx.state!.employees.employees.find(e => e.id === empAId)!
+    const empId = hireOne(ctx, 'blaster'); // holds blasting at level 1
+    assignSkill(ctx.state!.employees, empId, 'blasting', 2);
+    const qual = ctx.state!.employees.employees.find(e => e.id === empId)!
       .qualifications.find(q => q.category === 'blasting')!;
-    qualA.xp = 150; // partial progress toward the level-3 threshold (300)
+    qual.xp = 150;
 
-    // A real, placed building — see the #1203 comment on the tickTraining
-    // test above for why a fake buildingId can no longer be used here.
     const building = placeBuilding(ctx.state!.buildings, 'blasting_academy', 5, 5, 32, 32, 1).building!;
-    const startA = startTraining(ctx.state!.employees, empAId, building.id, 'blasting', 5, 500);
-    expect(startA.success).toBe(true);
+    expect(startTraining(ctx.state!.employees, empId, building.id, 'blasting', 5, 500).success).toBe(true);
     for (let i = 0; i < 5; i++) tickTraining(ctx.state!);
-    expect(qualA.proficiencyLevel).toBe(3);
 
-    // Employee B: reaches blasting level 3 purely through gainXp, starting
-    // from the identical partial level-2 xp balance and given exactly enough
-    // xp to cross the level-3 threshold (300).
-    const empBId = hireOne(ctx, 'blaster');
-    assignSkill(ctx.state!.employees, empBId, 'blasting', 2);
-    const qualB = ctx.state!.employees.employees.find(e => e.id === empBId)!
-      .qualifications.find(q => q.category === 'blasting')!;
-    qualB.xp = 150;
+    expect(qual.proficiencyLevel).toBe(2);
+    expect(qual.xp).toBe(150);
+  });
 
-    const gainResult = gainXp(ctx.state!.employees, empBId, 'blasting', XP_THRESHOLDS[3] - qualB.xp, ctx.emitter);
-    expect(gainResult).not.toBeNull();
-    expect(qualB.proficiencyLevel).toBe(3);
+  it('a course on a new skill yields level 1 with zero xp', () => {
+    const ctx = makeCtx();
+    const empId = hireOne(ctx, 'blaster');
+    const building = placeBuilding(ctx.state!.buildings, 'geology_lab', 5, 5, 32, 32, 1).building!;
+    expect(startTraining(ctx.state!.employees, empId, building.id, 'geology', 5, 500).success).toBe(true);
+    for (let i = 0; i < 5; i++) tickTraining(ctx.state!);
 
-    // Both landed on level 3 — they must need equal additional xp to reach
-    // level 4, i.e. carry equal xp.
-    expect(qualA.xp).toBe(qualB.xp);
-    expect(XP_THRESHOLDS[4] - qualA.xp).toBe(XP_THRESHOLDS[4] - qualB.xp);
+    const qual = ctx.state!.employees.employees.find(e => e.id === empId)!
+      .qualifications.find(q => q.category === 'geology')!;
+    expect(qual.proficiencyLevel).toBe(1);
+    expect(qual.xp).toBe(0);
   });
 });
 

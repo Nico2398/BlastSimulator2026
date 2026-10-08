@@ -12,7 +12,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "Employee #1 — the tutorial's own train-driller stage (tutorialStagesTraining.ts) targets a driller's driving.drill_rig course the same way.",
+      "description": "Employee #1 — the tutorial's own train-driller stage (tutorialStagesTraining.ts) trains a skill the employee lacks the same way; courses grant new qualifications only (#1388), so the driller (who starts with blasting and driving.drill_rig) takes the rock fragmenter licence.",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
         { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" },
@@ -23,7 +23,7 @@
     },
     {
       "command": "build driving_center at:3,5",
-      "description": "The only school that teaches driving.drill_rig — no role starts with it (ROLE_STARTING_QUALIFICATION).",
+      "description": "The only school that teaches driving.rock_fragmenter — no role starts with it (ROLE_STARTING_QUALIFICATIONS).",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
         { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn" },
@@ -51,7 +51,7 @@
         { "type": "viewport", "width": 1280, "height": 600 },
         { "type": "ensurePanel", "panel": "employees" },
         { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle" },
-        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]" },
         { "type": "screenshot" },
         { "type": "assert", "selector": "#bs-employee-panel .bsx-roster-scroll", "property": "scrollTop", "expectedValue": 0 },
         { "type": "mousemove", "x": 190, "y": 300 },
@@ -66,13 +66,13 @@
         { "type": "screenshot" }
       ],
       "role": "player",
-      "expect": { "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]", "note": "The Train button below the fold is reachable once the wheel gesture has scrolled to it — the step's own subject, and what step 5 then clicks. The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
+      "expect": { "usable": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]", "note": "The Train button below the fold is reachable once the wheel gesture has scrolled to it — the step's own subject, and what step 5 then clicks. The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
     },
     {
-      "command": "employee train 1 skill:driving.drill_rig",
+      "command": "employee train 1 skill:driving.rock_fragmenter",
       "description": "Completes the tutorial's own train-driller stage target. clickSelector's own scrollIntoView brings the button the rest of the way into view — legitimate here, since the assert above already proved a real player's own wheel gesture can too. (#1203) This file's own subject is the scroll gesture, not training timing — enrolment now sends the employee walking to the school rather than relocating them instantly, so trainingCount stays 0 until arrival; cash decreasing is what proves enrolment itself succeeded.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" }
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.rock_fragmenter\"]" }
       ],
       "role": "player",
       "expect": { "decreased": ["cash"], "equals": { "trainingCount": 0 } }

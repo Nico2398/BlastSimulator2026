@@ -42,7 +42,6 @@ export function wireCrewNotifications(
     kind: CrewKind,
     employeeId: number,
     params: Record<string, string | number> = {},
-    textKey: string = kind,
   ): void => {
     if (COOLDOWN_KINDS.has(kind)) {
       const tick = getState()?.tickCount ?? 0;
@@ -54,7 +53,7 @@ export function wireCrewNotifications(
     notify({
       severity: CREW_SEVERITY[kind],
       title: t('notification.title.crew'),
-      body: t(`notification.crew.${textKey}`, { name: nameOf(employeeId), ...params }),
+      body: t(`notification.crew.${kind}`, { name: nameOf(employeeId), ...params }),
     });
   };
 
@@ -68,7 +67,6 @@ export function wireCrewNotifications(
     raise('training_cancelled', employeeId, { skill: t(`skill.${skill}`), refund: formatMoney(refund) }));
   emitter.on('employee:levelup', ({ employeeId, category, newLevel }) =>
     raise('levelup', employeeId, { skill: t(`skill.${category}`), level: newLevel }));
-  emitter.on('employee:trained', ({ employeeId, skill, level, isNew }) => {
-    raise('trained', employeeId, { skill: t(`skill.${skill}`), level }, isNew ? 'trained' : 'trained_level');
-  });
+  emitter.on('employee:trained', ({ employeeId, skill }) =>
+    raise('trained', employeeId, { skill: t(`skill.${skill}`) }));
 }
