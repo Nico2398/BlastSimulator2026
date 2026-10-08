@@ -520,6 +520,7 @@ function onLevelStateReplaced(state: GameState): void {
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const prevState = ctx.state;
+  const prevBlastReport = ctx.state?.lastBlastReport ?? null;
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -550,7 +551,10 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 
   // Trigger blast effects after a blast (terrain remesh already happened via
   // the terrain:updated subscription above, fired from inside executeBlast).
-  if (cmdName === 'blast' && result.success && ctx.state) {
+  // Keyed on a new blast report rather than the command name (#1362): a
+  // detonation can fire from inside `tick` once its zone clears, and a
+  // `blast` subcommand can succeed without firing anything.
+  if (!enteredNewLevel && ctx.state && ctx.state.lastBlastReport !== prevBlastReport && ctx.state.lastBlastReport !== null) {
     gameRenderer.onBlast(ctx);
     audioHooks.onBlast();
   }
