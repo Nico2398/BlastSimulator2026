@@ -5,7 +5,7 @@
 // Vehicle.ts.
 
 import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
-import type { Vehicle, VehicleRole, VehicleState } from './Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from './Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import { isMounted } from './EmployeeLocomotion.js';
 import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
@@ -20,6 +20,24 @@ export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
   rock_fragmenter: 'driving.rock_fragmenter',
   drill_rig: 'driving.drill_rig',
 };
+
+/** Licence level `employee` holds for `role`'s licence: 0 when not held, else `licenceLevel ?? 1` (#1524). */
+export function licenceLevelOf(_employee: Pick<Employee, 'qualifications'>, _role: VehicleRole): number {
+  // TODO: implement
+  return 0;
+}
+
+/** Whether `employee` holds `role`'s licence at a level sufficient for a vehicle of `tier` (#1524). */
+export function canDriveTier(_employee: Pick<Employee, 'qualifications'>, _role: VehicleRole, _tier: VehicleTier): boolean {
+  // TODO: implement
+  return false;
+}
+
+/** Number of living employees licensed for `role` at a level sufficient for `tier` (#1524). */
+export function countLicenceHolders(_employees: readonly Employee[], _role: VehicleRole, _tier: VehicleTier): number {
+  // TODO: implement
+  return 0;
+}
 
 /**
  * Validate that an employee may become a vehicle's driver: vehicle exists,

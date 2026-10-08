@@ -228,7 +228,7 @@ export type PendingActionStatus = 'queued' | 'assigned' | 'in_progress';
  * Why a PendingAction currently has nobody able to perform it — surfaced as a
  * non-blocking player warning rather than cancelling the order (#1061).
  */
-export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full';
+export type BlockedOrderReason = 'no_qualified_employee' | 'no_dual_qualified_employee' | 'no_vehicle_in_fleet' | 'no_licensed_driver' | 'target_unreachable' | 'debris_out_of_reach' | 'no_freight_warehouse' | 'storage_full' | 'licence_level_too_low';
 
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {
@@ -287,6 +287,8 @@ export interface PendingAction {
    * or SAVE_VERSION bump applies. Always read with `!= null` (loose), not `!==`.
    */
   blockedReason?: BlockedOrderReason | null;
+  /** Licence level the blocking vehicle tier needs when `blockedReason` is 'licence_level_too_low' (#1524). Optional like `blockedReason`. */
+  blockedLicenceLevel?: number | null;
   /**
    * Tick after which this action becomes claimable again, stamped when a
    * vehicle abandons it as stuck. Null/absent = no backoff active.

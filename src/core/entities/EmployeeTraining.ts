@@ -100,6 +100,8 @@ export interface TrainingPlan {
   fee: number;
   /** Salary raise (per pay cycle) the new qualification causes on grant. */
   salaryIncrease: number;
+  /** Set when the course raises an already-held driving licence to this level (#1524). */
+  raisesLicenceTo?: 2 | 3;
 }
 
 /**
