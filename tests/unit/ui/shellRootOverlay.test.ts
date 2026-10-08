@@ -15,7 +15,7 @@ describe('#bs-ui-root overlay (#1425)', () => {
     const html = norm(readFileSync(resolve(__dirname, '../../../index.html'), 'utf8'));
     const m = /#bs-ui-root\s*\{([^}]*)\}/.exec(html);
     expect(m, '#bs-ui-root rule missing in index.html').not.toBeNull();
-    const body = m![1].replace(/\s+/g, '');
+    const body = (m?.[1] ?? '').replace(/\s+/g, '');
     expect(body).toContain('position:fixed');
     expect(body).toContain('inset:0');
     expect(body).toContain('pointer-events:none');
@@ -28,6 +28,6 @@ describe('#bs-ui-root overlay (#1425)', () => {
       .join('\n');
     const m = /:where\(\s*#bs-ui-root\s*\)\s*>\s*:where\(\s*\*\s*\)\s*\{([^}]*)\}/.exec(norm(text));
     expect(m, ':where(#bs-ui-root) > :where(*) rule missing').not.toBeNull();
-    expect(m![1].replace(/\s+/g, '')).toContain('pointer-events:auto');
+    expect((m?.[1] ?? '').replace(/\s+/g, '')).toContain('pointer-events:auto');
   });
 });
