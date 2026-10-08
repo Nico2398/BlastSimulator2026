@@ -62,6 +62,8 @@ export const CONTRACT_REFRESH_INTERVAL = 20;
 export const CONTRACTS_PER_REFRESH = 3;
 /** Number of most-common level ores that supply contracts may still ask for. */
 export const SUPPLY_COMMON_ORE_COUNT = 4;
+/** Ticks before a deadline at which an undelivered contract is flagged as about to expire. */
+export const CONTRACT_EXPIRY_WARNING_TICKS = 10;
 /** Max contracts available at once. */
 export const MAX_AVAILABLE_CONTRACTS = 8;
 

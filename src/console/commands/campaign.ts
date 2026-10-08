@@ -62,10 +62,18 @@ export function campaignStatusCommand(
 // ── campaign complete (debug) ──
 
 /**
+ * Bound on shortfall top-ups. Each grant is the exact remaining gap, so the
+ * residual shrinks to rounding error (~1e-11) after one pass; a handful of
+ * passes always converges and the bound only guards against an endless loop.
+ */
+const FORCE_COMPLETE_MAX_TOP_UPS = 4;
+
+/**
  * Debug force-win. Works on the active level; with `level:<id>` it also
  * activates that level on the running game (unlocking it) so a scenario
- * started by `new_game` can still end as a real campaign win. Grants only the
- * income shortfall below the level's profit threshold, then snapshots the
+ * started by `new_game` can still end as a real campaign win. Grants the
+ * income shortfall below the level's profit threshold (topped up against
+ * float dust), then snapshots the
  * stats so `levelStats.totalWealth` (the state dump's `profit`) reads the
  * threshold rather than a stale pre-completion value.
  */
@@ -91,8 +99,12 @@ export function campaignCompleteCommand(
   const level = getLevel(levelId);
   if (!level) return { success: false, output: t('campaign.complete_unknown_level', { levelId }) };
 
-  const shortfall = level.unlockThreshold - getOperatingProfit(ctx.state.finances);
-  if (shortfall > 0) {
+  // The ledger sums sequentially in floating point, so one grant can land a few
+  // ulps under the threshold (249999.99999999977 vs 250000) and read as "not
+  // met". Top up the residual until the sum reaches the threshold.
+  for (let attempt = 0; attempt < FORCE_COMPLETE_MAX_TOP_UPS; attempt++) {
+    const shortfall = level.unlockThreshold - getOperatingProfit(ctx.state.finances);
+    if (shortfall <= 0) break;
     addIncome(ctx.state.finances, shortfall, 'contracts', 'debug:force_complete', ctx.state.tickCount);
   }
   ctx.state.cash = ctx.state.finances.cash;

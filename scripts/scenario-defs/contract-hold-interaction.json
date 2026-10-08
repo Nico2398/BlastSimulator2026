@@ -1,0 +1,109 @@
+{
+  "name": "contract-hold-interaction",
+  "description": "A player holds an active contract back from automatic delivery and releases it again, using only the Contracts panel's hold-toggle button (#1367). Delivery itself is proven by the economy integration tests; this proves the control is reachable by clicking.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow staffed:false",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow staffed:false"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
+    },
+    {
+      "command": "contract accept type:supply material:dirtite",
+      "description": "Open the Contracts panel and accept the supply/dirtite offer with real clicks (#1367 setup for the hold toggle).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "activeContractCount": 1
+        },
+        "note": "accepting is free; the active card now carries a hold-toggle"
+      }
+    },
+    {
+      "command": "contract hold type:supply material:dirtite",
+      "description": "#1367: a player holds the active contract back from automatic delivery by clicking the card's own hold-toggle. No console command stands in for the click.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "activeContractCount": 1
+        },
+        "usable": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]",
+        "note": "the toggle stays usable after the click so the player can release again"
+      }
+    },
+    {
+      "command": "contract release type:supply material:dirtite",
+      "description": "#1367: clicking the same toggle again releases the contract, resuming automatic delivery.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "equals": {
+          "activeContractCount": 1
+        },
+        "usable": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]",
+        "note": "hold then release leaves the contract active and the control usable"
+      }
+    },
+    {
+      "command": "contract status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract status"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}

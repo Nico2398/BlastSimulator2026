@@ -1046,14 +1046,14 @@
           "command": "state full"
         }
       ],
-      "description": "#553: employeeCount/vehicleCount bumped over the pre-#553 baseline -- employee #2 (the driller, needed to drive the drill_rig) and employee #4 (the second driver, crewing the rock_fragmenter) are both new. vehicleCount is 2: the debris_hauler and rock_fragmenter are both still alive; the drill_rig (#1) was destroyed by the blast and no longer counts.",
+      "description": "#553: employeeCount/vehicleCount bumped over the pre-#553 baseline -- employee #2 (the driller, needed to drive the drill_rig) and employee #4 (the second driver, crewing the rock_fragmenter) are both new. vehicleCount is 2: the debris_hauler and rock_fragmenter are both still alive; the drill_rig (#1) was destroyed by the blast and no longer counts. #1367: activeContractCount is 0 -- the manual 200kg deliver above leaves 130kg of the 330kg rubble_disposal contract, and the 80 ticks since auto-deliver the hauled stock to it (nearest deadline first), completing it.",
       "role": "observe",
       "expect": {
         "equals": {
           "employeeCount": 4,
           "buildingCount": 1,
           "vehicleCount": 2,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 1
         }
       }

@@ -2101,3 +2101,45 @@ describe('v31 → v32 migration (hole water)', () => {
     expect(loaded.groundWetness).toBe(0.4);
   });
 });
+
+describe('held contract persistence (#1367)', () => {
+  function stateWithActive() {
+    const state = createGame({ seed: 3, mineType: 'desert' });
+    state.contracts.active.push({
+      id: 78, type: 'ore_sale', materialId: 'dirtite', description: 'x',
+      quantityKg: 100, deliveredKg: 40, pricePerKg: 3, deadlineTicks: 50, acceptedAtTick: 0,
+      penaltyAmount: 90, earlyBonus: 45, completed: false, expired: false,
+    });
+    return state;
+  }
+
+  it('round trip keeps held, paidTotal and penaltyCharged', () => {
+    const state = stateWithActive();
+    const c = state.contracts.active[0]!;
+    c.held = true;
+    c.paidTotal = 120;
+    c.penaltyCharged = 0;
+    const restored = deserialize(serialize(state)).contracts.active[0]!;
+    expect(restored.held).toBe(true);
+    expect(restored.paidTotal).toBe(120);
+    expect(restored.penaltyCharged).toBe(0);
+  });
+
+  it('an old save without the fields loads as not held', () => {
+    const parsed = JSON.parse(serialize(stateWithActive()));
+    delete parsed.contracts.active[0].held;
+    delete parsed.contracts.active[0].paidTotal;
+    const restored = deserialize(JSON.stringify(parsed)).contracts.active[0]!;
+    expect(restored.held).toBeFalsy();
+    expect(restored.deliveredKg).toBe(40);
+  });
+
+  it('a held contract still skips automatic delivery after a reload', async () => {
+    const { autoDeliverContracts } = await import('../../../src/core/economy/ContractFulfilment.js');
+    const state = stateWithActive();
+    state.contracts.active[0]!.held = true;
+    state.collectedOre['dirtite'] = 500;
+    const restored = deserialize(serialize(state));
+    expect(autoDeliverContracts(restored.contracts, restored.logistics, restored.collectedOre, 1)).toEqual([]);
+  });
+});

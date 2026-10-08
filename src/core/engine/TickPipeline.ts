@@ -50,6 +50,7 @@ import { syncHaulDispatch } from '../economy/HaulDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, generateContracts } from '../economy/Contract.js';
+import { autoDeliverContracts, bookDeliveryIncome } from '../economy/ContractFulfilment.js';
 import { updateScores, clampScore, type ScoreInputs } from '../scores/ScoreManager.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -96,7 +97,9 @@ export interface GameOverReport {
 /** Structured result of advancing the simulation by one tick. */
 export interface TickReport {
   tick: number;
-  contractsExpired: Array<{ contractId: number; penalty: number }>;
+  contractsExpired: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }>;
+  /** Stored ore automatically delivered to active contracts this tick. */
+  contractsDelivered: Array<{ contractId: number; kg: number; payment: number; bonus: number; completed: boolean }>;
   smuggling: { income: number; exposed: boolean };
   mafiaExposed: boolean;
   needEvents: FiredEventReport[];
@@ -186,7 +189,13 @@ export function runTick(
   deductExpense(state, getVehicleMaintenanceCostPerTick(state.vehicles), 'vehicle_maintenance', 'Vehicle maintenance');
   deductExpense(state, getVehicleFuelCostPerTick(state.vehicles), 'fuel', 'Vehicle fuel');
 
-  // 3. Contract deadlines — expire overdue contracts and apply penalties
+  // 3. Contracts — stored ore is delivered first, so a deadline tick that stock
+  // can still fill pays out and completes before the penalty is assessed.
+  const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount);
+  for (const delivery of contractsDelivered) {
+    bookDeliveryIncome(state, delivery.contractId, delivery, state.tickCount);
+  }
+  // Expire overdue contracts and apply penalties
   const expired = checkDeadlines(state.contracts, state.tickCount);
   for (const { penalty } of expired) {
     state.cash -= penalty;
@@ -412,6 +421,7 @@ export function runTick(
   return {
     tick: state.tickCount,
     contractsExpired: expired,
+    contractsDelivered,
     smuggling: smugResult,
     mafiaExposed,
     needEvents,

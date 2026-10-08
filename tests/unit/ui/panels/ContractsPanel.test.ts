@@ -209,6 +209,89 @@ describe('ContractsPanel', () => {
     expect(panel.root.textContent).toContain('-$75');
   });
 
+  it('an active card carries a hold-toggle button that dispatches `contract hold <id>`', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5 }));
+    panel.show();
+    panel.update(state);
+
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-contract-id="5"] [data-action="hold-toggle"]');
+    expect(btn).not.toBeNull();
+    btn!.click();
+
+    expect(gameConsole).toHaveBeenCalledWith('contract hold 5');
+  });
+
+  it('a held card dispatches `contract release <id>` from the same button', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5, held: true }));
+    panel.show();
+    panel.update(state);
+
+    panel.root.querySelector<HTMLButtonElement>('[data-contract-id="5"] [data-action="hold-toggle"]')!.click();
+
+    expect(gameConsole).toHaveBeenCalledWith('contract release 5');
+  });
+
+  it('the active signature includes held: toggling held re-renders the button', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5 }));
+    panel.show();
+    panel.update(state);
+    const before = panel.root.querySelector('[data-contract-id="5"] [data-action="hold-toggle"]')!.textContent;
+
+    state.contracts.active[0]!.held = true;
+    panel.update(state);
+
+    const btn = panel.root.querySelector<HTMLButtonElement>('[data-contract-id="5"] [data-action="hold-toggle"]')!;
+    expect(btn.textContent).not.toBe(before);
+    btn.click();
+    expect(gameConsole).toHaveBeenCalledWith('contract release 5');
+  });
+
+  it('each active card has its own hold-toggle', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.active.push(makeContract({ id: 5 }), makeContract({ id: 6, held: true }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelectorAll('[data-action="hold-toggle"]')).toHaveLength(2);
+    panel.root.querySelector<HTMLButtonElement>('[data-contract-id="6"] [data-action="hold-toggle"]')!.click();
+    expect(gameConsole).toHaveBeenCalledWith('contract release 6');
+  });
+
+  it('an expired history row shows what was paid and the reduced penalty actually charged', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.completedHistory.push(makeContract({
+      id: 13, quantityKg: 100, deliveredKg: 40, pricePerKg: 10, penaltyAmount: 300,
+      completed: false, expired: true, paidTotal: 400, penaltyCharged: 180,
+    }));
+    panel.show();
+    panel.update(state);
+
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('400');
+    expect(text).toContain('-$180');
+    expect(text).not.toContain('-$300');
+  });
+
+  it('an expired history row with nothing delivered still shows the full penalty', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.completedHistory.push(makeContract({
+      id: 14, penaltyAmount: 300, completed: false, expired: true, penaltyCharged: 300,
+    }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.textContent).toContain('-$300');
+  });
+
   it('storage strip link navigates to Operations', () => {
     const { panel } = makePanel();
     const onNavigate = vi.fn();
