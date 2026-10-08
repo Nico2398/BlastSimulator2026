@@ -48,5 +48,5 @@ export const r = {
   wb: (s: ScoreState) => s.wellBeing / 100,
   sf: (s: ScoreState) => s.safety / 100,
   ec: (s: ScoreState) => s.ecology / 100,
-  nu: (s: ScoreState) => s.nuisance / 100,
+  nu: (s: ScoreState) => s.nuisance / 100, // neighbour relations, high = good
 };

@@ -32,7 +32,7 @@ import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 const RECENT_INCIDENTS = 10;
 
 /** Shift modes accepted by `set_policy` (mirrors SettingsMenu.ts's own list — SitePolicy.ts doesn't export one). */
-const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
+const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous'];
 
 const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
   queued: 'ui.operations.work_queue_status_queued',

@@ -25,11 +25,11 @@ import { el, card, sectionHeader, emptyState, progressBar, panelRoot, panelHeade
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatDollars } from '../../core/economy/formatMoney.js';
-import { getFinancialReport, getOperatingProfit, type CategoryTotal } from '../../core/economy/Finance.js';
+import { getFinancialReport, type CategoryTotal } from '../../core/economy/Finance.js';
 import type { OperatingCostBreakdown } from '../../core/economy/OperatingFinance.js';
 import { getOperatingSummary, getRunway } from '../../core/economy/OperatingFinance.js';
 import type { GameState } from '../../core/state/GameState.js';
-import { getLevel } from '../../core/campaign/Level.js';
+import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
 import { BANKRUPTCY_GRACE_TICKS } from '../../core/campaign/Bankruptcy.js';
 
 const RECENT_TRANSACTIONS = 15;
@@ -146,10 +146,9 @@ export class FinancesPanel extends PanelBase {
 
   /** Operating profit against the active level's target; null when no level target applies. */
   private makeOperatingProfitRow(state: GameState): HTMLElement | null {
-    const levelId = state.campaign.activeLevelId;
-    const target = levelId ? getLevel(levelId)?.unlockThreshold : undefined;
-    if (target === undefined) return null;
-    const profit = getOperatingProfit(state.finances);
+    const objective = getLevelObjective(state.campaign.activeLevelId, state.finances);
+    if (!objective) return null;
+    const { profit, target } = objective;
     const r = el('div');
     r.style.cssText = 'display:flex;justify-content:space-between;font:600 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-secondary)';
     r.title = t('ui.finances.operating_profit_tip', { target: formatDollars(target) });

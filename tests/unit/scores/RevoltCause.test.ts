@@ -7,13 +7,8 @@ describe('revoltCause', () => {
     expect(revoltCause('continuous', true)).toBe('no_rest_policy');
   });
 
-  it('custom with housing -> no_rest_policy', () => {
-    expect(revoltCause('custom', true)).toBe('no_rest_policy');
-  });
-
   it('no-rest policy takes precedence over missing housing', () => {
     expect(revoltCause('continuous', false)).toBe('no_rest_policy');
-    expect(revoltCause('custom', false)).toBe('no_rest_policy');
   });
 
   it('shift_8h without active housing -> no_housing', () => {
@@ -33,10 +28,10 @@ describe('revoltCause', () => {
   });
 
   it('covers every shift mode x housing combination', () => {
-    const modes: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
+    const modes: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous'];
     for (const m of modes) {
       for (const housing of [true, false]) {
-        const expected = m === 'continuous' || m === 'custom'
+        const expected = m === 'continuous'
           ? 'no_rest_policy'
           : housing ? 'morale_drain' : 'no_housing';
         expect(revoltCause(m, housing)).toBe(expected);

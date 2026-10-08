@@ -5,7 +5,7 @@
 // (spec §5 defect: they collided with the paused/event chip).
 
 import { iconEl } from '../icons.js';
-import { el, sectionHeader } from '../dom.js';
+import { el, sectionHeader, progressBar } from '../dom.js';
 import { t } from '../../core/i18n/I18n.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -13,6 +13,7 @@ import { forecast, rainIntensity, type WeatherState } from '../../core/weather/W
 import { computeWeatherAdvisory, type WeatherAdvisory } from '../../core/weather/WeatherAdvisory.js';
 import { formatDollars } from '../../core/economy/formatMoney.js';
 import { TICKS_PER_DAY } from '../../core/config/balance.js';
+import { getLevelObjective } from '../../core/campaign/LevelObjective.js';
 import { getOperatingSummary } from '../../core/economy/OperatingFinance.js';
 import type { NotificationCenter, AlertPip } from '../notify/NotificationCenter.js';
 import type { PanelName } from '../UIManager.js';
@@ -66,10 +67,17 @@ function topBarBounds(viewport: Viewport): Rect {
   return { x: 0, y: 0, width: viewport.width, height: TOPBAR_HEIGHT_PX };
 }
 
+const OBJECTIVE_BAR_COLOR = 'var(--bsx-amber)';
+const OBJECTIVE_BAR_DONE_COLOR = 'var(--bsx-positive)';
+
 export class TopBar {
   private readonly root: HTMLElement;
   private readonly balanceWrap: HTMLButtonElement;
   private readonly balanceValue: HTMLElement;
+  private readonly objectiveWrap: HTMLButtonElement;
+  private readonly objectiveText: HTMLElement;
+  private readonly objectiveFill: HTMLElement;
+  private lastObjectiveSig: string | null = null;
   private readonly trendValue: HTMLElement;
   private readonly trendRow: HTMLElement;
   private readonly trendIcon: HTMLElement;
@@ -136,6 +144,18 @@ export class TopBar {
     this.trendRow = trendRow;
     balCol.append(this.balanceValue, trendRow);
     this.balanceWrap.appendChild(balCol);
+
+    // ── Level objective chip ── operating profit toward the level target; click opens Finances.
+    this.objectiveWrap = document.createElement('button');
+    this.objectiveWrap.dataset['action'] = 'open-objective';
+    this.objectiveWrap.dataset['panel'] = 'finances';
+    this.objectiveWrap.style.cssText = 'display:none;flex:0 0 auto;flex-direction:column;justify-content:center;gap:4px;padding:0 16px;border:0;border-right:1px solid var(--bsx-hairline);background:transparent;cursor:pointer;font:inherit;text-align:left';
+    this.objectiveWrap.addEventListener('click', () => this.onNavigate?.('finances'));
+    this.objectiveText = el('span', { className: 'bsx-mono' });
+    this.objectiveText.style.cssText = 'font-size:11px;white-space:nowrap';
+    const bar = progressBar(0, OBJECTIVE_BAR_COLOR);
+    this.objectiveFill = bar.firstElementChild as HTMLElement;
+    this.objectiveWrap.append(this.objectiveText, bar);
 
     // ── Day / clock ──
     const dayWrap = el('div');
@@ -242,7 +262,7 @@ export class TopBar {
 
     rightWrap.append(this.logBtn, savesBtn, mapBtn);
 
-    this.root.append(this.balanceWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap);
+    this.root.append(this.balanceWrap, this.objectiveWrap, dayWrap, speedWrap, alertWrap, this.scoresEl, rightWrap);
     container.appendChild(this.root);
 
     shellLayoutRegistry.register({ id: 'topbar', layer: 'hud', bounds: topBarBounds });
@@ -268,6 +288,8 @@ export class TopBar {
     this.trendValue.style.color = positive ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
     this.trendIcon.setAttribute('name', positive ? 'up' : 'down');
     this.trendIcon.style.color = positive ? 'var(--bsx-positive)' : 'var(--bsx-critical-text)';
+
+    this.updateObjective(state);
 
     // Day / clock
     const day = Math.floor(state.tickCount / TICKS_PER_DAY) + 1;
@@ -453,6 +475,21 @@ export class TopBar {
     }
   }
 
+  private updateObjective(state: GameState): void {
+    const objective = getLevelObjective(state.campaign.activeLevelId, state.finances);
+    const pct = objective ? Math.round(objective.fraction * 100) : 0;
+    const sig = objective ? `${Math.round(objective.profit)}|${objective.target}|${pct}` : '';
+    if (sig === this.lastObjectiveSig) return;
+    this.lastObjectiveSig = sig;
+    if (!objective) { this.objectiveWrap.style.display = 'none'; return; }
+    const profit = Math.round(objective.profit);
+    this.objectiveWrap.style.display = 'flex';
+    this.objectiveWrap.title = t('ui.finances.operating_profit_tip', { target: formatDollars(objective.target) });
+    this.objectiveText.textContent = t('shell.topbar.objective', { profit: formatDollars(profit), target: formatDollars(objective.target) });
+    this.objectiveFill.style.width = `${pct}%`;
+    this.objectiveFill.style.background = objective.fraction >= 1 ? OBJECTIVE_BAR_DONE_COLOR : OBJECTIVE_BAR_COLOR;
+  }
+
   private lastScoreSig = '';
   private lastScoreState: GameState | undefined;
   private updateScores(state: GameState): void {
@@ -461,6 +498,7 @@ export class TopBar {
       { key: 'wellBeing', abbr: t('shell.topbar.score_well'), tipKey: 'shell.topbar.score_well_tip' },
       { key: 'safety', abbr: t('shell.topbar.score_safe'), tipKey: 'shell.topbar.score_safe_tip' },
       { key: 'ecology', abbr: t('shell.topbar.score_eco'), tipKey: 'shell.topbar.score_eco_tip' },
+      // nuisance = neighbour relations: high = good, like the other three.
       { key: 'nuisance', abbr: t('shell.topbar.score_nuis'), tipKey: 'shell.topbar.score_nuis_tip' },
     ] as const;
     const values = scores.map(s => Math.round((state.scores as unknown as Record<string, number>)[s.key] ?? 50));
@@ -492,6 +530,7 @@ export class TopBar {
     this.locale.refresh();
     this.weatherBtn.title = t(`hud.weather.${this.lastWeather}`);
     this.lastScoreSig = '';
+    this.lastObjectiveSig = '';
     if (this.lastScoreState) this.updateScores(this.lastScoreState);
     if (this.weatherPopoverOpen) this.renderWeatherPopover();
   }

@@ -594,7 +594,7 @@ export type {
   ProficiencyLevel, TrainingPlan, EnrolInTrainingResult, TrainingCompletion, TrainingCancellation,
 } from './EmployeeTraining.js';
 export {
-  MAX_PROFICIENCY, trainableSkills, isTrainingBuilding, schoolFor,
+  trainableSkills, isTrainingBuilding, schoolFor,
   planTraining, startTraining, enrolInTraining, tickTraining,
   isEnrolledInTraining, isSchoolFull,
 } from './EmployeeTraining.js';

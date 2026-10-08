@@ -283,8 +283,8 @@ function getModulatedInterval(
       multiplier = 0.8 + 0.4 * (scores.ecology / 100);
       break;
     case 'weather':
-      // Weather is mostly independent of scores
-      multiplier = 0.9 + 0.2 * (scores.nuisance / 100);
+      // Weather is mostly independent of scores (slightly likelier when neighbour relations are poor)
+      multiplier = 0.9 + 0.2 * (1 - scores.nuisance / 100);
       break;
     case 'mafia':
       // More frequent when corruption is high (handled by canFire)

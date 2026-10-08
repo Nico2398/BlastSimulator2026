@@ -474,9 +474,10 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1345: +14 keys (pattern-level charge settings), both locales: 3783.
     // #1367: +14 keys (contract auto-delivery, hold toggle, partial expiry), both locales: 3797.
     // #1350: +14 keys (hole water, drain), both locales: 3811.
-    // #1362: +12 keys (detonation flow), -5 (horn, zone-occupied refusal), both locales: 3818.
-    // #1362 review: +1 (unknown blast subcommand): 3819.
-    expect(Object.keys(en).length).toBe(3819);
+    // #1374: +1 key (shell.topbar.objective), both locales: 3812.
+    // #1388: net -4 keys (custom shift mode removed, course copy reworded), both locales: 3808.
+    // #1362: +12 keys (detonation flow), -5 (horn, zone-occupied refusal), +1 (unknown blast subcommand), both locales: 3816.
+    expect(Object.keys(en).length).toBe(3816);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

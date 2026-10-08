@@ -22,7 +22,7 @@ const LOCALES = ['en', 'fr'] as const;
 
 const PROFICIENCY_LEVELS = [1, 2, 3, 4, 5] as const;
 
-const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
+const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous'];
 
 const NEED_KEYS: NeedKey[] = ['fatigue'];
 
@@ -87,7 +87,7 @@ describe('proficiency labels — en and fr translations differ', () => {
   });
 });
 
-// ── Policy names (policy.shift_8h, policy.shift_12h, policy.continuous, policy.custom) ─
+// ── Policy names (policy.shift_8h, policy.shift_12h, policy.continuous) ─
 
 describe('policy name keys resolve in both locales', () => {
   for (const locale of LOCALES) {
@@ -767,6 +767,19 @@ describe('notification.bankruptcy_triggered — pre-formatted {cash} (#1376)', (
       expect(result).toContain('-$25,832');
       expect(result).not.toContain('$-');
       expect(result).not.toContain('${');
+    });
+  }
+});
+
+describe('removed custom shift mode keys (#1388)', () => {
+  const REMOVED = ['ui.policy.custom', 'ui.policy.note_custom', 'policy.custom'];
+  for (const locale of LOCALES) {
+    it(`locale ${locale}: no custom-policy keys remain`, async () => {
+      const raw = await import(`../../../src/core/i18n/locales/${locale}.json`, { with: { type: 'json' } });
+      const table = (raw.default ?? raw) as Record<string, string>;
+      for (const key of REMOVED) {
+        expect(key in table, `${key} must be removed from ${locale}.json`).toBe(false);
+      }
     });
   }
 });

@@ -55,6 +55,7 @@ Fragments picked up by excavators → loaded onto trucks → sold via contracts
 - Offers only ask for ores the active site's rocks can yield (`resolveContractOres`: biome dominant rocks, softest+hardest when `mixedRockHardness`, via `oresYieldedByRocks`), plus rubble disposal. Supply picks from the cheapest `SUPPLY_COMMON_ORE_COUNT` of those ores. A site with no yielding ore offers rubble only. The panel badges an off-site offer (e.g. from an older save) "not found on this site" (`data-contract-onsite`) (#1364)
 - Each specifies: material type, quantity, unit price, deadline, penalties
 - **Automatic delivery (#1367):** every tick (`TickPipeline` step 3, before `checkDeadlines`) `autoDeliverContracts` (`ContractFulfilment.ts`) delivers stored ore to each active, non-held contract, soonest deadline first (`acceptedAtTick + deadlineTicks`, tie lowest id). Each takes `min(stock, remaining)` of its material (`ore_sale`/`supply` from `collectedOre`, `rubble_disposal` from `storedMassKg`), re-reading stock after every delivery since contracts share one warehouse. Payment is `kg * pricePerKg` plus the early bonus when completed before 50% of the deadline, booked as `contracts` / `bonus` income (`bookDeliveryIncome`, shared with the console `contract deliver`, which uses `deliverStoredOre`). Partial payments accumulate in `paidTotal`. Manual Deliver still works.
+- **Delivering one ore removes only that ore (#1371):** `consumeStoredOre` takes just the sold ore's mass out of each fragment (`extractOreFromFragment`); other ores in the same fragments stay stored and in `collectedOre`. Rubble disposal removes raw mass and debits every ore it carried.
 - **Hold / Resume:** `contract hold <id>` / `contract release <id>` (ContractsPanel Hold/Resume, `data-action="hold-toggle"`) sets `held`; a held contract is skipped by automatic delivery but still expires and still raises the expiry warning.
 - **Partial-delivery expiry:** the penalty is `round(penaltyAmount * undeliveredShare)` (recorded in `penaltyCharged`); what was delivered and paid stays paid. Zero delivered = full penalty. The expiry warning (`CONTRACT_EXPIRY_WARNING_TICKS` before the deadline) only fires for contracts still short of stock (`contractShortOfStock`).
 
@@ -78,14 +79,14 @@ Unionized employees cannot be fired. Affected by well-being score.
 | **Worker Well-being** | Quarters quality, breaks, overwork, raises, accidents |
 | **Safety** | Equipment investment, accident rate, evacuation, PPE |
 | **Ecology** | Dust, water contamination, waste management, restoration |
-| **Neighbor Nuisance** | Blast vibrations, noise, dust, projections, traffic |
+| **Neighbour Relations** | High = good. Lowered by blast vibrations, noise, dust, projections, traffic, failed bribes; raised by events that please the village |
 
 ## Event System
 
 ### Architecture
 Events grouped into categories with independent timers. Timer fires → check available events → roll weighted selection → fire event. Weights + values depend on player scores.
 
-Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an employee exists and `lawsuit` until some cause exists (environmental cause, a death, or staff). Environmental lawsuits additionally require `hasEnvironmentalCause` (a blast fired, or ecology/nuisance strictly below `ENV_CAUSE_*_MAX` = 45, under the initial 50). `lawsuitCount` counts fired lawsuit-category events.
+Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an employee exists and `lawsuit` until some cause exists (environmental cause, a death, or staff). Environmental lawsuits additionally require `hasEnvironmentalCause` (a blast fired, or ecology/neighbour relations (`nuisance`) strictly below `ENV_CAUSE_*_MAX` = 45, under the initial 50). `lawsuitCount` counts fired lawsuit-category events.
 
 ### Categories
 - **Unions:** Strike threats, wage demands, safety complaints, overtime protests
@@ -100,7 +101,7 @@ Each event presents 2-4 decision options with different consequences on scores, 
 ## Corruption & Mafia Gameplay
 
 - **Corruption:** Bribe judges, union leaders, inspectors. Success: problem goes away. Failure: scandal, fines, criminal charges.
-- **Corruption failure (#1411):** a failed bribe fines `BRIBERY_FAILURE_FINE_FRACTION` (0.5) of its cost (expense category `fines`), lowers nuisance score by `BRIBERY_FAILURE_NUISANCE_HIT` (8), and adds `BRIBERY_FAILURE_CORRUPTION_DELTA` (2) corruption (can unlock the mafia).
+- **Corruption failure (#1411):** a failed bribe fines `BRIBERY_FAILURE_FINE_FRACTION` (0.5) of its cost (expense category `fines`), lowers the neighbour-relations score (`nuisance`) by `BRIBERY_FAILURE_NUISANCE_HIT` (8), and adds `BRIBERY_FAILURE_CORRUPTION_DELTA` (2) corruption (can unlock the mafia).
 - **Mafia failure (#1411):** a botched accident or detected frame raises exposure by `INVESTIGATION_EXPOSURE_JUMP` (0.2) and queues the repeatable follow-up `INVESTIGATION_FOLLOWUP_EVENT_ID` (`mafia_police_investigation`: pay off detective / hire lawyer / stonewall; events may carry `exposureDelta`). Exposed smuggling charges `SMUGGLING_EXPOSED_FINE` (25000), adds `SMUGGLING_EXPOSED_EXPOSURE_JUMP` (0.1) exposure and shuts smuggling off. Exposure decays `EXPOSURE_DECAY_PER_TICK` (0.004) per tick once `EXPOSURE_CLEAN_GRACE_TICKS` (30) pass with no mafia action and no active smuggling (`mafia.lastActivityTick`). Each of these raises a toast (`ui/notify/corruptionNotifications.ts`). Mafia rewards unchanged.
 - **Mafia:** Dark escalation path. Arrange incidents for unionized employees. Smuggling. Gets progressively more dangerous.
 

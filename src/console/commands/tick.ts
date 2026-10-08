@@ -91,8 +91,7 @@ export function tickCommand(
     }
 
     for (const done of report.trainingCompletions) {
-      const what = done.isNew ? 'qualified in' : 'promoted to level ' + done.level + ' in';
-      lines.push(`[tick ${state.tickCount}] ${done.employeeName} ${what} ${done.skill}.`);
+      lines.push(`[tick ${state.tickCount}] ${done.employeeName} qualified in ${done.skill}.`);
     }
 
     for (const cancelled of report.trainingCancellations ?? []) {

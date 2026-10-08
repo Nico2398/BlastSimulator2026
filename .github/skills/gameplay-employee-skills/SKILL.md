@@ -39,7 +39,7 @@ Every role arrives able to do its own job, with no per-employee course (`ROLE_ST
 | Surveyor | `geology` 1 |
 | Manager | `management` 1 |
 
-Training stays for what a role does not start with: the `driving.rock_fragmenter` licence, cross-training (a surveyor learning to drive), and licence/skill levels (which speed work).
+Training grants qualifications and licences a role does not start with: the `driving.rock_fragmenter` licence, cross-training (a surveyor learning to drive). A course teaches a missing skill only: it grants level 1 with 0 XP, carries a flat fee (`TRAINING_BASE_FEE`), a tier-scaled duration (`TRAINING_TIER_SPEED`) and the level-1 salary bonus (`planTraining`); it is refused (`employees.train_already_qualified`) for any held skill, whatever its level. Proficiency rises only from XP earned by working. Licence tiers (vehicle tier gating) arrive with #1524.
 
 ## Proficiency Levels & Effects
 
@@ -96,7 +96,7 @@ A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` 
 **Unqualified-task event (#1380):** raised once per blocked action, not every tick — `detectUnqualifiedTask` keeps `events.raisedUnqualifiedActionIds` (pruned to ids still blocked each tick; a newly blocked action raises it again) and stamps the event with every blocked id (`unqualifiedActionIds`). Options act on those actions (`src/core/events/UnqualifiedTaskEffects.ts`):
 - **Cancel the Task:** each id is cancelled (`cancelAction`, order cost refunded) and its planned entry released (`releasePlannedOrderForCancelledAction`, `CancelledOrderCleanup.ts`).
 - **Hire a Contractor:** costs `UNQUALIFIED_CONTRACTOR_FEE`, debited once by the option's `cashDelta`. A synthetic, off-roster contractor (rank 1 in the skill, no XP) applies the completion effects (`applyTaskCompletion`) of each blocked action of a supported type (`general_work`, `survey`, `drill_hole`, `charge_hole`, `place_building`, `level_ground`); other types stay queued. If nothing could be done the fee is returned and the `_alt` outcome shows.
-- **Send Someone to Training:** books the first blocked action's skill with the best school on site for the lowest-id employee who is alive, not injured, not training and below Master in it; the course fee is debited as `plan.fee` like `employee train`. No school, candidate, cash or free seat: nothing is booked (`_alt`). The action stays queued until the course finishes.
+- **Send Someone to Training:** books the first blocked action's skill with the best school on site for the lowest-id employee who is alive, not injured, not training and lacking it; the course fee is debited as `plan.fee` like `employee train`. No school, candidate, cash or free seat: nothing is booked (`_alt`). The action stays queued until the course finishes.
 
 **Ghost rendering:** For every `PendingAction`, renderer creates a blue fresnel-effect translucent mesh with pulsing animation, tracked via `GhostPreview.claimed`. Claiming sets `claimed: true` — the ghost stays blue but renders dimmer and pulses slower (`src/renderer/GhostMesh.ts`) to distinguish claimed from unclaimed work without removing it. The ghost is removed when the action completes or is cancelled.
 

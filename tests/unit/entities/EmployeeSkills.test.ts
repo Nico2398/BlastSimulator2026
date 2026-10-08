@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { placeBuilding, type BuildingType } from '../../../src/core/entities/Building.js';
 import {
@@ -281,8 +282,7 @@ describe('tickTraining', () => {
   });
 
   it('granted qualification has proficiencyLevel 1 when employee had no prior qualification', () => {
-    // A driller is hired holding 'blasting', so training that skill is a
-    // promotion rather than a first grant. 'geology' is one the role never has.
+    // A driller is hired holding 'blasting'; 'geology' is one the role never has.
     startTraining(state.employees, empId, buildingId, 'geology' as SkillCategory, 1, 100);
     tickTraining(state);
 
@@ -291,36 +291,24 @@ describe('tickTraining', () => {
     expect(geology.proficiencyLevel).toBe(1);
   });
 
-  it('raises proficiency by one level when the employee already holds the skill', () => {
-    // Training a held skill used to leave the qualification untouched: the fee
-    // was charged and nothing changed, which made every level above Rookie
-    // unobtainable.
-    const before = (state.employees.employees.find(e => e.id === empId) as any).qualifications
-      .find((q: SkillQualification) => q.category === 'blasting')!.proficiencyLevel;
-
+  it('a skill gained mid-course is left untouched and the course reports no completion (#1388)', () => {
     startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
-    tickTraining(state);
+    assignSkill(state.employees, empId, 'blasting' as SkillCategory, 3);
+    const salaryBefore = state.employees.employees.find(e => e.id === empId)!.salary;
+    const emitter = new EventEmitter();
+    const seen: unknown[] = [];
+    emitter.on('employee:trained', (p: unknown) => seen.push(p));
 
-    const after = (state.employees.employees.find(e => e.id === empId) as any).qualifications
-      .find((q: SkillQualification) => q.category === 'blasting')!;
-    expect(after.proficiencyLevel).toBe(before + 1);
-  });
+    const { completed } = tickTraining(state, emitter);
 
-  it('does not add a duplicate qualification when promoting', () => {
-    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
-    tickTraining(state);
-
-    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
-    expect(quals.filter((q: SkillQualification) => q.category === 'blasting')).toHaveLength(1);
-  });
-
-  it('never promotes past level 5', () => {
-    assignSkill(state.employees, empId, 'blasting' as SkillCategory, 5);
-    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
-    tickTraining(state);
-
-    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
-    expect(quals.find((q: SkillQualification) => q.category === 'blasting')!.proficiencyLevel).toBe(5);
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const blasting = emp.qualifications.filter((q: SkillQualification) => q.category === 'blasting');
+    expect(blasting).toHaveLength(1);
+    expect(blasting[0]!.proficiencyLevel).toBe(3);
+    expect(emp.trainingState).toBeNull();
+    expect(completed).toEqual([]);
+    expect(seen).toEqual([]);
+    expect(emp.salary).toBe(salaryBefore);
   });
 
   it('reports each completion so the caller can tell the player', () => {
@@ -332,14 +320,6 @@ describe('tickTraining', () => {
     expect(completed[0]!.skill).toBe('geology');
     expect(completed[0]!.level).toBe(1);
     expect(completed[0]!.isNew).toBe(true);
-  });
-
-  it('reports a promotion as not new', () => {
-    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
-    const { completed } = tickTraining(state);
-
-    expect(completed[0]!.isNew).toBe(false);
-    expect(completed[0]!.level).toBe(2);
   });
 
   it('returns no completions while a course is still running', () => {
@@ -358,18 +338,6 @@ describe('tickTraining', () => {
 
     expect(emp().salary).toBeGreaterThan(before);
     expect(emp().salary).toBe(calculateSalary(emp()));
-  });
-
-  it('promoted qualification has xp floored at the new level\'s threshold', () => {
-    // blasting is a promotion (the employee already holds it), not a fresh
-    // grant — training it must not leave xp at 0, which would under-credit a
-    // trained employee relative to one who reached the same level via work.
-    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
-    tickTraining(state);
-
-    const quals: SkillQualification[] = (state.employees.employees.find(e => e.id === empId) as any).qualifications;
-    const blasting = quals.find((q: SkillQualification) => q.category === 'blasting')!;
-    expect(blasting.xp).toBe(XP_THRESHOLDS[blasting.proficiencyLevel as 1 | 2 | 3 | 4 | 5]);
   });
 
   it('freshly granted qualification has xp initialised to 0', () => {

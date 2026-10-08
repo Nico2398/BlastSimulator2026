@@ -1,6 +1,6 @@
 {
   "name": "scores-display-visual",
-  "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbor Nuisance scores (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
+  "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbour Relations scores (high = good) (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
   "steps": [
     {
       "command": "new_game seed:42 cash:400000",
@@ -595,7 +595,7 @@
     },
     {
       "command": "state",
-      "description": "#1362: the armed detonation already auto-fired during the preceding tick pad once the zone cleared (no driverless rig is left stranded since #1042), so there is no Fire anyway to press: the player dismisses the blast report and the holes are gone with nobody dead. Original note: the following checkpoints show Ecology and Nuisance decaying back toward neutral while Safety/Well-being climb from the buildings above.",
+      "description": "#1362: the armed detonation already auto-fired during the preceding tick pad once the zone cleared (no driverless rig is left stranded since #1042), so there is no Fire anyway to press: the player dismisses the blast report and the holes are gone with nobody dead. Original note: the following checkpoints show Ecology and Neighbour Relations decaying back toward neutral while Safety/Well-being climb from the buildings above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"

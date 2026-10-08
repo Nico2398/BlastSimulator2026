@@ -296,33 +296,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -330,16 +308,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -347,7 +325,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -408,33 +386,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -442,16 +398,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -459,7 +415,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -520,33 +476,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -554,16 +488,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -571,7 +505,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -632,33 +566,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -666,16 +578,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -683,7 +595,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -744,33 +656,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -778,16 +668,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -795,63 +685,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -912,33 +746,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -946,16 +758,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -963,63 +775,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -1080,33 +836,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1114,16 +848,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1131,63 +865,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -1248,33 +926,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1282,16 +938,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1299,63 +955,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -1416,33 +1016,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1450,16 +1028,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1467,63 +1045,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -1584,22 +1106,11 @@
       ]
     },
     {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1607,16 +1118,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1624,7 +1135,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -1685,33 +1196,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1719,16 +1208,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1736,63 +1225,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -1853,33 +1286,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1887,16 +1298,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1904,63 +1315,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -2021,33 +1376,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -2055,16 +1388,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -2072,63 +1405,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -2189,33 +1466,11 @@
       ]
     },
     {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
+      "command": "contract accept type:rubble_disposal fillable:true",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -2223,16 +1478,16 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
         }
       ]
     },
     {
-      "command": "contract deliver type:ore_sale amount:100000",
+      "command": "contract deliver type:rubble_disposal amount:100000",
       "role": "player",
       "commandOutcome": "either",
       "timeout": 120,
-      "description": "Deliver the ore in store against it.",
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -2240,63 +1495,7 @@
         },
         {
           "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "role": "player",
-      "commandOutcome": "either",
-      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "contract accept type:ore_sale fillable:true",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Accept an ore sale the store covers in full.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver type:ore_sale amount:100000",
-      "role": "player",
-      "commandOutcome": "either",
-      "timeout": 120,
-      "description": "Deliver the ore in store against it.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "contracts"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },
@@ -2357,6 +1556,40 @@
       ]
     },
     {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
       "command": "event choose 0",
       "role": "player",
       "commandOutcome": "either",
@@ -2409,6 +1642,2099 @@
         {
           "type": "clickIfPresent",
           "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "commandOutcome": "either",
+      "description": "Resolved through the event dialog's own buttons, only when one is pending.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
+    },
+    {
+      "command": "tick 6",
+      "role": "setup",
+      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:ore_sale fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept an ore sale the store covers in full.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:ore_sale amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the ore in store against it.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
+        }
+      ]
+    },
+    {
+      "command": "contract accept type:rubble_disposal fillable:true",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Accept a rubble disposal the store covers in full, so cleared rubble frees warehouse room for the next hauls.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"][data-contract-fillable=\"true\"] .bs-contract-accept"
+        }
+      ]
+    },
+    {
+      "command": "contract deliver type:rubble_disposal amount:100000",
+      "role": "player",
+      "commandOutcome": "either",
+      "timeout": 120,
+      "description": "Deliver the stored rubble against it (an ore sale removes only the ore, so rubble must leave by its own contract).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "contracts"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ]
     },

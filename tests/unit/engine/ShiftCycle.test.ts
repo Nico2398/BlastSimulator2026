@@ -881,25 +881,23 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
   });
 
-  it("'custom' mode honours per-employee customThresholds", () => {
+  it("every employee shares the one site-wide fatigue threshold (#1388)", () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
-    applyPolicy(state, { shiftMode: 'custom' });
+    applyPolicy(state, { shiftMode: 'continuous' });
+    expect('customThresholds' in state.sitePolicy).toBe(false);
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
 
     const { employee } = hireEmployee(state.employees, 'driller', rng);
-    state.sitePolicy.customThresholds[employee.id] = { fatigue: 70 };
     employee.activeActionId = 950;
     employee.ticksWorked = 1;
-    // Below the custom fatigue threshold (70) but above the policy-level
-    // default (60) — only the per-employee override explains a fire here.
-    employee.fatigue = 65;
+    // Above the site threshold: no override exists that could trigger rest.
+    employee.fatigue = state.sitePolicy.fatigueRestThreshold + 5;
 
     processShiftCycle(state, []);
 
-    expect(employee.pendingRestNeedKey).toBe('fatigue');
-    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.pendingRestNeedKey).toBeFalsy();
   });
 
   // ── employee_shift_change event still fires under the policy path ─────────

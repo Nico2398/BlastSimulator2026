@@ -180,6 +180,16 @@ describe('OperationsPanel', () => {
     expect(btn12h.style.background).toContain('--bsx-amber');
   });
 
+  it('renders exactly three shift mode buttons and no custom one (#1388)', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+
+    const buttons = Array.from(panel.root.querySelectorAll('[data-shift-mode]')) as HTMLElement[];
+    expect(buttons.map(b => b.dataset['shiftMode'])).toEqual(['shift_8h', 'shift_12h', 'continuous']);
+    expect(panel.root.querySelector('[data-shift-mode="custom"]')).toBeNull();
+  });
+
   it('Apply dispatches set_policy with the selected mode and thresholds', () => {
     const { panel, gameConsole } = makePanel();
     panel.show();

@@ -139,12 +139,12 @@ export const MAFIA_EVENTS_2: EventDef[] = [
   }),
   // 39 — Mine as movie set
   ev('mafia_movie_set', 'mafia', {
-    weight: (s) => 0.7 + 0.5 * r.nu(s),
+    weight: (s) => 0.7 + 0.5 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.corruptionLevel >= 1,
     options: [
-      { cashDelta: 10000, scoreDelta: { nuisance: 12, safety: -6 }, corruptionDelta: 3, effectTag: 'mob_movie' },
-      { cashDelta: 0, scoreDelta: { nuisance: -3 } },
-      { cashDelta: 4000, scoreDelta: { nuisance: 5 }, corruptionDelta: 1, effectTag: 'cameo_only' },
+      { cashDelta: 10000, scoreDelta: { nuisance: -12, safety: -6 }, corruptionDelta: 3, effectTag: 'mob_movie' },
+      { cashDelta: 0, scoreDelta: { nuisance: 3 } },
+      { cashDelta: 4000, scoreDelta: { nuisance: -5 }, corruptionDelta: 1, effectTag: 'cameo_only' },
     ],
   }),
   // 40 — Fake alibis using timesheets
@@ -173,9 +173,9 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 0.8 + 0.5 * r.wb(s),
     canFire: (ctx) => ctx.corruptionLevel >= 2,
     options: [
-      { cashDelta: -8000, scoreDelta: { nuisance: 10, wellBeing: -5 }, corruptionDelta: 5, effectTag: 'boss_party' },
+      { cashDelta: -8000, scoreDelta: { nuisance: -10, wellBeing: -5 }, corruptionDelta: 5, effectTag: 'boss_party' },
       { cashDelta: 0, scoreDelta: { safety: -8 }, corruptionDelta: -2, effectTag: 'party_declined' },
-      { cashDelta: -3000, scoreDelta: { nuisance: 4 }, corruptionDelta: 3, effectTag: 'modest_party' },
+      { cashDelta: -3000, scoreDelta: { nuisance: -4 }, corruptionDelta: 3, effectTag: 'modest_party' },
     ],
   }),
   // 43 — Courier service through tunnels
@@ -220,12 +220,12 @@ export const MAFIA_EVENTS_2: EventDef[] = [
   }),
   // 47 — Crime family reunion at canteen
   ev('mafia_family_reunion', 'mafia', {
-    weight: (s) => 0.8 + 0.5 * r.nu(s),
+    weight: (s) => 0.8 + 0.5 * (1 - r.nu(s)),
     canFire: (ctx) => ctx.corruptionLevel >= 2,
     options: [
-      { cashDelta: -5000, scoreDelta: { nuisance: 12, wellBeing: -6 }, corruptionDelta: 5, effectTag: 'family_reunion' },
+      { cashDelta: -5000, scoreDelta: { nuisance: -12, wellBeing: -6 }, corruptionDelta: 5, effectTag: 'family_reunion' },
       { cashDelta: 0, scoreDelta: { safety: -6 }, corruptionDelta: -2 },
-      { cashDelta: -2000, scoreDelta: { nuisance: 5 }, corruptionDelta: 2, effectTag: 'reunion_buffet' },
+      { cashDelta: -2000, scoreDelta: { nuisance: -5 }, corruptionDelta: 2, effectTag: 'reunion_buffet' },
     ],
   }),
   // 48 — Naming rights to rock formation
@@ -233,7 +233,7 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 0.6 + 0.4 * r.ec(s),
     canFire: (ctx) => ctx.corruptionLevel >= 1,
     options: [
-      { cashDelta: 5000, scoreDelta: { nuisance: 6 }, corruptionDelta: 3, effectTag: 'don_cliff' },
+      { cashDelta: 5000, scoreDelta: { nuisance: -6 }, corruptionDelta: 3, effectTag: 'don_cliff' },
       { cashDelta: 0, scoreDelta: { ecology: 3 } },
       { cashDelta: 2000, corruptionDelta: 1, effectTag: 'subtle_plaque' },
     ],

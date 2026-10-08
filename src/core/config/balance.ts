@@ -1356,26 +1356,12 @@ export const TRAINING_TIER_SPEED: Record<1 | 2 | 3, number> = {
 /** Fee to teach a skill the employee does not hold yet ($). */
 export const TRAINING_BASE_FEE = 2500;
 
-/**
- * Fee and duration multiplier by the level being trained *to*. Reaching Master
- * costs several times what a first licence does, so raising one specialist is a
- * real alternative to hiring another body.
- */
-export const TRAINING_LEVEL_COST_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> = {
-  1: 1,
-  2: 1.6,
-  3: 2.4,
-  4: 3.4,
-  5: 4.6,
-} as const;
-
 // ─── Research Center ───────────────────────────────────────────────────────────
 
 /**
  * Duration and cost of a Research Center task by the tier it unlocks. Tier 3
- * research costs and takes more than tier 2 — a straight step up mirrors the
- * training level multiplier so late-game tiers stay a real investment rather
- * than a rubber-stamp.
+ * research costs and takes more than tier 2 — a straight step up keeps
+ * late-game tiers a real investment rather than a rubber-stamp.
  */
 /** Cost, duration, and prerequisites for a single tier's research task. */
 export interface ResearchTaskDef {
@@ -1704,13 +1690,13 @@ export const AUDIO_DEFAULT_VOLUMES: Record<'master' | 'effects' | 'ambient' | 'u
  * Score gain per unit of village vibration (#1343). The PPV law falls off as
  * distance^-1.5, so a Grumpstone Ridge village 445 m away sees only ~4e-4 mm/s
  * from an ordinary 6 x 10 kg blast (~1.4e-3 from an oversized 9 x 60 kg one).
- * Scaled so recordVibration plus the windowed per-tick term (~0.27 nuisance per
- * scaled unit in total) cost an ordinary blast ~1-3 nuisance points and an
+ * Scaled so recordVibration plus the windowed per-tick term (~0.27 neighbour-relations points lost per
+ * scaled unit in total) cost an ordinary blast ~1-3 points and an
  * oversized one ~5.
  */
 export const VILLAGE_VIBRATION_SCORE_GAIN = 15000;
 
-/** Nuisance added per projected fragment (#1343). */
+/** Neighbour-relations points lost per projected fragment (#1343). */
 export const BLAST_PROJECTION_NUISANCE_PER_PROJECTION = 0.5;
 
 /** Ticks over which vibration score effects are applied (#1343). */
@@ -1761,7 +1747,7 @@ export const CREW_TOAST_COOLDOWN_TICKS = 30;
 /** Ecology score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
 export const ENV_CAUSE_ECOLOGY_MAX = 45;
 
-/** Nuisance score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
+/** Neighbour-relations (nuisance) score strictly below which environmental events have a cause (#1412). Initial score is 50, so this must stay below 50. */
 export const ENV_CAUSE_NUISANCE_MAX = 45;
 
 /** Max cached reachability fills in OrderReachability (#1427). One grid-sized Uint8Array per key, so memory is bounded by this cap. */
@@ -1816,7 +1802,7 @@ export const INJURY_RECOVERY_RATE_BY_LQ_TIER: Record<1 | 2 | 3, number> = { 1: 2
 /** Fraction of the bribe cost levied as a fine when a bribe fails (#1411). */
 export const BRIBERY_FAILURE_FINE_FRACTION = 0.5;
 
-/** Nuisance score hit on a failed bribe (#1411). */
+/** Neighbour-relations (nuisance) score hit on a failed bribe (#1411). */
 export const BRIBERY_FAILURE_NUISANCE_HIT = 8;
 
 /** Corruption level change on a failed bribe (#1411). */

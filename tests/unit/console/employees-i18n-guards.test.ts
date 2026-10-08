@@ -519,35 +519,34 @@ describe('employees.ts — train_no_building_on_site (school exists in the catal
   });
 });
 
-// ── train_already_master ──────────────────────────────────────────────────
+// ── train_already_qualified ──────────────────────────────────────────────────
 
-describe('employees.ts — train_already_master', () => {
-  function expectedEn(name: string): string {
-    return `${name} is already a Master of management.`;
-  }
-
-  function setupMasteredEmployee(ctx: GameContext) {
+describe('employees.ts — train refusal for an already-held skill (#1388)', () => {
+  function setupHeldEmployee(ctx: GameContext, level: 1 | 5) {
     const emp = hireTestEmployee(ctx);
     placeTestBuilding(ctx, 'management_office', 1);
-    assignSkill(ctx.state!.employees, emp.id, 'management', 5);
+    assignSkill(ctx.state!.employees, emp.id, 'management', level);
     return emp;
   }
 
-  it('matches the exact English literal by default', () => {
-    const ctx = makeCtx();
-    const emp = setupMasteredEmployee(ctx);
+  it.each([1, 5] as const)('refuses a skill held at level %i, charging nothing', (level) => {
+    const ctx = makeCtx(10_000);
+    const emp = setupHeldEmployee(ctx, level);
     const result = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' });
     expect(result.success).toBe(false);
-    expect(result.output).toBe(expectedEn(emp.name));
+    expect(ctx.state!.cash).toBe(10_000);
+    expect(emp.pendingTrainingState ?? null).toBeNull();
   });
 
-  it('differs from the English literal under locale fr', () => {
-    const ctx = makeCtx();
-    const emp = setupMasteredEmployee(ctx);
+  it('the refusal is translated: fr text differs from en text and is no raw key', () => {
+    const ctx = makeCtx(10_000);
+    const emp = setupHeldEmployee(ctx, 1);
+    const en = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' }).output;
     setLocale('fr');
-    const result = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' });
-    expect(result.success).toBe(false);
-    expect(result.output).not.toBe(expectedEn(emp.name));
+    const fr = employeeCommand(ctx, ['train', String(emp.id)], { skill: 'management' }).output;
+    expect(en).not.toBe(fr);
+    expect(en).not.toMatch(/^employees\./);
+    expect(fr).not.toMatch(/^employees\./);
   });
 });
 
@@ -580,7 +579,7 @@ describe('employees.ts — train_insufficient_funds', () => {
 
 describe('employees.ts — train success message', () => {
   function expectedEn(name: string, buildingId: number): string {
-    return `${name} enrolled at management_office #${buildingId}: management level 1 in 20 ticks ($2500).`;
+    return `${name} enrolled at management_office #${buildingId}: management in 20 ticks ($2500), +$5/h pay once qualified.`;
   }
 
   it('matches the exact English literal, embedding the real name/buildingId', () => {
