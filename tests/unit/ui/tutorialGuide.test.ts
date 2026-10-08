@@ -302,7 +302,7 @@ describe('resolveStageIndex — evacuate-zone tab escape hatch (#926, #1344)', (
     const fireBody = document.createElement('div');
     fireBody.style.display = activeStep === 4 ? '' : 'none';
     panel.appendChild(fireBody);
-    makeButton({ 'data-action': 'sound-horn' }, fireBody);
+    makeButton({ 'data-action': 'execute' }, fireBody);
   }
 
   for (const activeStep of [2, 4] as const) {

@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
+import { t } from '../../src/core/i18n/I18n.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
@@ -238,16 +239,13 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
   });
 });
 
-// ── evacuate before you fire (#557) ─────────────────────────────────────────
+// ── evacuate before you fire (#557, reworked by #1362) ──────────────────────
 //
-// The tutorial's evacuate-zone step (between 'charge' and 'blast') exists
-// because the console command it's teaching has real teeth: with
-// ctx.tutorialActive set, `blast` refuses to fire while anyone is still
-// standing in the danger zone, and the refusal must leave the whole blast
-// step a no-op — no cash spent, no plan cleared, no blast recorded — not just
-// an error string.
+// #1362 removed the tutorial-only refusal: `blast` (Fire anyway) fires even on
+// an occupied zone with ctx.tutorialActive set, and `blast detonate` is the
+// evacuate-zone step's action — it arms the horn + auto-fire sequence.
 
-describe('blast refuses to fire on an occupied zone during the tutorial (#557)', () => {
+describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', () => {
   function setup(): { ctx: MiningContext; runCmd: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']> } {
     const { runner, ctx } = createRunner();
     ctx.tutorialActive = true;
@@ -270,29 +268,34 @@ describe('blast refuses to fire on an occupied zone during the tutorial (#557)',
     return { ctx, runCmd };
   }
 
-  it('refuses to fire while the danger zone is still occupied: no cash spent, no plan cleared, no blast recorded', () => {
+  it('fires on an occupied zone while tutorialActive (Fire anyway): no refusal', () => {
     const { ctx, runCmd } = setup();
     const state = ctx.state!;
-
-    // Leave the crew standing inside the danger zone instead of clearing it.
     for (const emp of state.employees.employees) {
       emp.x = 16;
       emp.z = 16;
     }
 
-    const beforeCash = state.cash;
-    const beforeHoleCount = state.drillHoles.length;
-    const beforeChargeCount = Object.keys(state.chargesByHole).length;
-    const beforeBlastCount = state.damage.blastCount;
-
     const result = runCmd('blast');
 
-    expect(result.success, 'blast fired while tutorialActive and the zone was occupied').toBe(false);
-    expect(result.output.length).toBeGreaterThan(0);
-    expect(state.cash).toBe(beforeCash);
-    expect(state.drillHoles.length).toBe(beforeHoleCount);
-    expect(Object.keys(state.chargesByHole).length).toBe(beforeChargeCount);
-    expect(state.damage.blastCount).toBe(beforeBlastCount);
+    expect(result.success, result.output).toBe(true);
+    expect(state.damage.blastCount).toBe(1);
+    expect(result.output).not.toContain(t('mining.blast.refused_zone_occupied', { count: 1 }));
+  });
+
+  it('blast detonate during the tutorial arms the sequence instead of refusing or firing at once', () => {
+    const { ctx, runCmd } = setup();
+    const state = ctx.state!;
+    for (const emp of state.employees.employees) {
+      emp.x = 16;
+      emp.z = 16;
+    }
+
+    const result = runCmd('blast detonate');
+
+    expect(result.success, result.output).toBe(true);
+    expect(state.pendingDetonation).not.toBeNull();
+    expect(state.damage.blastCount).toBe(0);
   });
 
   it('fires once the zone is genuinely clear of every employee and vehicle', () => {
@@ -801,22 +804,10 @@ describe('full tutorial playthrough ends WON by following the cards then playing
       }
 
       if (step.id === 'evacuate-zone') {
-        // Carve-out: the step teaches "Sound the Horn" (no console hint);
-        // relocate crew and fleet beyond the danger zone, the state a real
-        // evacuation leaves them in.
-        const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
-        expect(zone, 'no drill holes to compute a danger zone from').not.toBeNull();
-        const safeX = zone!.x1 - 5;
-        const safeZ = zone!.z1 - 5;
-        for (const emp of state.employees.employees) {
-          if (!emp.alive) continue;
-          emp.x = safeX;
-          emp.z = safeZ;
-        }
-        for (const veh of state.vehicles.vehicles) {
-          veh.x = safeX;
-          veh.z = safeZ;
-        }
+        // #1362: the player presses Fire -> Detonate. That arms the sequence
+        // (horn + auto-fire); the step is done once it is armed or fired.
+        const armed = run('blast detonate');
+        expect(armed.success, armed.output).toBe(true);
         expect(complete(), `tutorial step "${step.id}" never completed`).toBe(true);
         continue;
       }

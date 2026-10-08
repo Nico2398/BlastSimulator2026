@@ -474,7 +474,12 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1345: +14 keys (pattern-level charge settings), both locales: 3783.
     // #1367: +14 keys (contract auto-delivery, hold toggle, partial expiry), both locales: 3797.
     // #1350: +14 keys (hole water, drain), both locales: 3811.
-    expect(Object.keys(en).length).toBe(3811);
+    // #1362: +9 keys (preflight.detonating_title/_remaining, stranded_names, fire_anyway,
+    // cancel_detonation, mining.blast.detonation_armed/_cancelled/_auto_fired/_stranded) and
+    // -5 keys with the horn button, the tutorial-only refusal and its hint
+    // (ui.blast_workshop.fire.sound_horn, .sound_horn_note, footer.fire_reason_zone_occupied,
+    // mining.blast.refused_zone_occupied, tutorial.stage.sound_horn), both locales: 3815.
+    expect(Object.keys(en).length).toBe(3815);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

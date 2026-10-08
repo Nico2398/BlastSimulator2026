@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FireStep } from '../../../../../src/ui/panels/blastSteps/Fire.js';
 import { wetAllHoles } from '../../../../helpers/holeWater.js';
+import { readFileSync } from 'node:fs';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../../src/core/mining/DrillPlan.js';
 import { purchaseVehicle } from '../../../../../src/core/entities/Vehicle.js';
@@ -45,13 +46,11 @@ function addEmployee(state: GameState, x: number, z: number): Employee {
 beforeEach(() => { holeCounter.nextHoleId = 1; });
 
 describe('FireStep', () => {
-  it('shows the no-plan empty state and disables Sound the Horn when there are no holes', () => {
+  it('shows the no-plan empty state when there are no holes', () => {
     const { step } = makeStep();
     step.update(makeState(), 'sunny');
 
     expect(step.root.textContent).toContain('Drill a plan first');
-    const hornBtn = step.root.querySelector('[data-action="sound-horn"]') as HTMLButtonElement;
-    expect(hornBtn.disabled).toBe(true);
   });
 
   it('shows the danger zone as clear when a plan exists but nobody is nearby', () => {
@@ -61,8 +60,6 @@ describe('FireStep', () => {
     step.update(state, 'sunny');
 
     expect(step.root.textContent).toContain('Danger zone is clear');
-    const hornBtn = step.root.querySelector('[data-action="sound-horn"]') as HTMLButtonElement;
-    expect(hornBtn.disabled).toBe(true);
   });
 
   it('lists an employee standing inside the computed danger zone, tagged IN ZONE', () => {
@@ -74,8 +71,6 @@ describe('FireStep', () => {
 
     expect(step.root.textContent).toContain('Walt Diggins');
     expect(step.root.textContent).toContain('IN ZONE');
-    const hornBtn = step.root.querySelector('[data-action="sound-horn"]') as HTMLButtonElement;
-    expect(hornBtn.disabled).toBe(false);
   });
 
   it('does not list a dead employee, even if their last position was inside the zone', () => {
@@ -141,20 +136,7 @@ describe('FireStep', () => {
     expect(step.root.textContent).toContain('stranded with no driver');
   });
 
-  it('keeps Sound the Horn clickable when the only occupant is a stranded driverless vehicle (#947)', () => {
-    const { step } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
-    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 22, 22);
-    vehicle.occupantIds = [];
-
-    step.update(state, 'sunny');
-
-    const hornBtn = step.root.querySelector('[data-action="sound-horn"]') as HTMLButtonElement;
-    expect(hornBtn.disabled).toBe(false);
-  });
-
-  it('does not list an employee standing outside the padded box', () => {
+    it('does not list an employee standing outside the padded box', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
@@ -165,29 +147,7 @@ describe('FireStep', () => {
     expect(step.root.textContent).toContain('Danger zone is clear');
   });
 
-  it('Sound the Horn dispatches zone clear with the real computed bounds', () => {
-    const { step, gameConsole } = makeStep();
-    const state = makeState();
-    addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
-    addEmployee(state, 22, 22);
-    step.update(state, 'sunny');
-
-    (step.root.querySelector('[data-action="sound-horn"]') as HTMLButtonElement).click();
-
-    // Single hole at (20,20), 15m margin → box (5,5)-(35,35)
-    expect(gameConsole).toHaveBeenCalledWith('zone clear x1:5 y1:5 x2:35 y2:35');
-  });
-
-  it('Sound the Horn is a no-op (no dispatch) when there is no plan', () => {
-    const { step, gameConsole } = makeStep();
-    step.update(makeState(), 'sunny');
-
-    (step.root.querySelector('[data-action="sound-horn"]') as HTMLButtonElement).click();
-
-    expect(gameConsole).not.toHaveBeenCalled();
-  });
-
-  it('pre-flight checklist warns about holes holding water, and clears once they are dry', () => {
+      it('pre-flight checklist warns about holes holding water, and clears once they are dry', () => {
     const { step } = makeStep();
     const state = makeState();
     const hole = addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
@@ -260,7 +220,7 @@ describe('FireStep — scroll-bounded zone occupant list (#958)', () => {
     expect(wrapper!.children.length).toBe(40);
   });
 
-  it('keeps Sound the Horn and the pre-flight checklist reachable as siblings, outside the bounded wrapper', () => {
+  it('keeps the pre-flight checklist reachable as a sibling, outside the bounded wrapper, with no Horn button (#1362)', () => {
     const { step } = makeStep();
     const state = makeState();
     addHole(holeCounter, state.drillHoles, 20, 20, 8, 0.15);
@@ -271,11 +231,32 @@ describe('FireStep — scroll-bounded zone occupant list (#958)', () => {
     const wrapper = findZoneListWrapper(step.root)!;
     expect(wrapper).not.toBeUndefined();
 
-    const hornBtn = step.root.querySelector('[data-action="sound-horn"]');
-    expect(hornBtn).not.toBeNull();
-    expect(wrapper.contains(hornBtn)).toBe(false);
-    expect(hornBtn instanceof HTMLButtonElement && hornBtn.disabled).toBe(false);
+    expect(step.root.querySelector('[data-action="sound-horn"]')).toBeNull();
 
     expect(step.root.textContent).toContain('Pre-Flight');
+  });
+});
+
+// ── #1362: DETONATE sounds the horn itself; the Fire step has no Horn button ─
+
+describe('FireStep — no Horn button (#1362)', () => {
+  it.each([
+    ['no plan', (_s: GameState) => undefined],
+    ['clear zone', (s: GameState) => { addHole(holeCounter, s.drillHoles, 20, 20, 8, 0.15); }],
+    ['occupied zone', (s: GameState) => { addHole(holeCounter, s.drillHoles, 20, 20, 8, 0.15); addEmployee(s, 22, 22); }],
+  ])('renders no sound-horn control with %s', (_label, setup) => {
+    const { step } = makeStep();
+    const state = makeState();
+    setup(state);
+    step.update(state, 'sunny');
+    expect(step.root.querySelector('[data-action="sound-horn"]')).toBeNull();
+  });
+
+  it('en.json and fr.json no longer define the horn button and note keys', () => {
+    for (const l of ['en', 'fr']) {
+      const loc = JSON.parse(readFileSync(`src/core/i18n/locales/${l}.json`, 'utf8')) as Record<string, string>;
+      expect(loc['ui.blast_workshop.fire.sound_horn']).toBeUndefined();
+      expect(loc['ui.blast_workshop.fire.sound_horn_note']).toBeUndefined();
+    }
   });
 });

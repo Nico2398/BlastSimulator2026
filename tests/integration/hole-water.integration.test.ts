@@ -389,8 +389,8 @@ describe('hole water in the blast (#1350)', () => {
 });
 
 describe('hole water persistence (#1350)', () => {
-  it('SAVE_VERSION is 33', () => {
-    expect(SAVE_VERSION).toBe(33);
+  it('SAVE_VERSION is 34', () => {
+    expect(SAVE_VERSION).toBe(34);
   });
 
   it('save/load round-trips holeWater and groundWetness', () => {
