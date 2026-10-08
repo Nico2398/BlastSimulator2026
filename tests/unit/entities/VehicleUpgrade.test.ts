@@ -7,6 +7,7 @@ import {
   upgradeVehicle,
   rosterCanDriveVehicleTier,
   isLicensedForVehicleTier,
+  canAffordVehicleUpgrade,
 } from '../../../src/core/entities/VehicleUpgrade.js';
 import { purchaseVehicle, createVehicleState, getVehicleDefByTier, getAllVehicleRoles } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
@@ -153,5 +154,21 @@ describe('isLicensedForVehicleTier', () => {
 
   it('is false without the licence', () => {
     expect(isLicensedForVehicleTier(makeEmployee(), 'debris_hauler', 1)).toBe(false);
+  });
+});
+
+describe('canAffordVehicleUpgrade', () => {
+  const cost = computeVehicleUpgradeCost('debris_hauler', 1)!;
+
+  it('is true when cash equals the price difference', () => {
+    expect(canAffordVehicleUpgrade({ type: 'debris_hauler', tier: 1 }, cost)).toBe(true);
+  });
+
+  it('is false when cash is one short', () => {
+    expect(canAffordVehicleUpgrade({ type: 'debris_hauler', tier: 1 }, cost - 1)).toBe(false);
+  });
+
+  it('is false at max tier however much cash', () => {
+    expect(canAffordVehicleUpgrade({ type: 'debris_hauler', tier: VEHICLE_MAX_TIER as 3 }, 1e12)).toBe(false);
   });
 });

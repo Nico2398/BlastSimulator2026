@@ -290,6 +290,40 @@ describe('SelectionBar', () => {
   });
 });
 
+describe('SelectionBar vehicle upgrade button (#1401)', () => {
+  function upgradeBtn(root: HTMLElement): HTMLButtonElement {
+    return root.querySelector('[data-action="upgrade_vehicle"]') as HTMLButtonElement;
+  }
+
+  it('is enabled when cash covers the upgrade', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    state.cash = 1e9;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(false);
+  });
+
+  it('is disabled when cash is short', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    state.cash = 0;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(true);
+  });
+
+  it('is disabled at max tier however much cash', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    vehicle.tier = 3;
+    state.cash = 1e9;
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(upgradeBtn(root).disabled).toBe(true);
+  });
+});
+
 describe('removed vehicle Haul/Unassign i18n keys (#1400)', () => {
   const locales = ['en', 'fr'].map(l => [l, JSON.parse(readFileSync(join(process.cwd(), `src/core/i18n/locales/${l}.json`), 'utf8')) as Record<string, unknown>] as const);
   for (const key of ['shell.selection.haul', 'shell.selection.unassign', 'shell.selection.no_haul_target']) {

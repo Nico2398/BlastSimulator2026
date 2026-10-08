@@ -697,9 +697,9 @@ describe('vehicle upgrade', () => {
     const ctx = makeCtx();
     const id = addTruckVehicle(ctx);
     const result = vehicleCommand(ctx, ['upgrade', String(id)], {});
-    expect(t('vehicle.upgrade_success', { id })).not.toBe('vehicle.upgrade_success');
-    expect(result.output).not.toContain('vehicle.upgrade_success');
-    expect(result.output.length).toBeGreaterThan(0);
+    const expected = t('vehicle.upgrade_success', { id, tier: 2, cost: 25_000 });
+    expect(expected).not.toBe('vehicle.upgrade_success');
+    expect(result.output).toContain(expected);
   });
 
   it('upgrades tier 2 to tier 3 for the second price difference', () => {

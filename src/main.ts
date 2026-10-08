@@ -23,7 +23,7 @@ import { LoadingScreen } from './ui/LoadingScreen.js';
 import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
 import { getLevel, getAllLevels } from './core/campaign/Level.js';
-import { computeVehicleUpgradeCost } from './core/entities/VehicleUpgrade.js';
+import { canAffordVehicleUpgrade } from './core/entities/VehicleUpgrade.js';
 import { getMaxBuildingTier } from './core/entities/Building.js';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from './ui/loadingSiteInfo.js';
 import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
@@ -1058,8 +1058,7 @@ function vehicleSelectionKey(entity: EntityPick, state: GameState): string | nul
   if (entity.kind !== 'vehicle') return null;
   const v = state.vehicles.vehicles.find(x => x.id === entity.id);
   if (!v) return null;
-  const cost = computeVehicleUpgradeCost(v.type, v.tier);
-  return `${v.tier}:${cost !== null && state.cash >= cost}`;
+  return `${v.tier}:${canAffordVehicleUpgrade(v, state.cash)}`;
 }
 function showSelection(entity: EntityPick, state: GameState): void {
   selectionBar.show(entity, state);

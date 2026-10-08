@@ -1,6 +1,8 @@
 /**
  * Vehicle tier upgrade (#1401): pay the purchase-price difference to move a
- * vehicle up one tier in place. Stubs only — implementation pending.
+ * vehicle up one tier in place. Holds the tier arithmetic, the upgrade cost,
+ * the in-place tier/hp mutation (cash is charged by the caller) and the
+ * affordability and licence checks shared by console, UI and main loop.
  */
 import type { Employee } from './Employee.js';
 import type { Vehicle, VehicleRole, VehicleTier } from './Vehicle.js';
@@ -22,6 +24,12 @@ export function computeVehicleUpgradeCost(role: VehicleRole, tier: VehicleTier):
   const next = nextVehicleTier(tier);
   if (next === null) return null;
   return getVehicleDefByTier(role, next).purchaseCost - getVehicleDefByTier(role, tier).purchaseCost;
+}
+
+/** True when `vehicle` has a tier left to buy and `cash` covers the price difference. */
+export function canAffordVehicleUpgrade(vehicle: Pick<Vehicle, 'type' | 'tier'>, cash: number): boolean {
+  const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
+  return cost !== null && cash >= cost;
 }
 
 /** Raises tier by one and sets hp to the new tier's maxHp; mutates only tier and hp. Does not charge cash. */

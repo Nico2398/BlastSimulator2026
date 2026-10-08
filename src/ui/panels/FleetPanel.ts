@@ -29,7 +29,7 @@ import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehi
 import type { Employee } from '../../core/entities/Employee.js';
 import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, getVehicleReservation, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { isLicensedForRole } from '../../core/engine/VehicleReservation.js';
-import { computeVehicleUpgradeCost, nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
+import { canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
 import { findTrafficJams } from '../../core/events/TrafficJams.js';
@@ -411,7 +411,7 @@ export class FleetPanel extends PanelBase {
       reason = t('ui.fleet.upgrade_max');
     } else {
       label = `${t('ui.fleet.upgrade')} ${formatDollars(cost)}`;
-      if (cash < cost) reason = t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
+      if (!canAffordVehicleUpgrade(v, cash)) reason = t('ui.fleet.tip.cannot_afford_upgrade', { cost: formatMoney(cost) });
     }
     // button() builds [icon][label span]; patch only the label span so the icon survives.
     const labelEl = btn.lastElementChild;

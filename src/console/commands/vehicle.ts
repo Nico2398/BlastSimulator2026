@@ -16,7 +16,7 @@ import {
   type VehicleRole,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
-import { computeVehicleUpgradeCost, upgradeVehicle, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
+import { canAffordVehicleUpgrade, computeVehicleUpgradeCost, upgradeVehicle, rosterCanDriveVehicleTier } from '../../core/entities/VehicleUpgrade.js';
 import { findAvailableDriverForReposition } from '../../core/entities/VehicleDriverAssignment.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { alight, releaseOccupantsOfRemovedVehicles } from '../../core/engine/Mount.js';
@@ -196,18 +196,18 @@ export function vehicleCommand(
       const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
       if (cost === null) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
       // Cash is checked before upgradeVehicle, which mutates tier and hp.
-      if (state.cash < cost) {
+      if (!canAffordVehicleUpgrade(vehicle, state.cash)) {
         return {
           success: false,
           output: t('console.insufficient_funds', { need: formatMoney(cost), have: formatMoney(state.cash) }),
         };
       }
-      const result = upgradeVehicle(vehicle);
-      if (!result.success) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
-      state.cash -= result.cost;
-      addExpense(state.finances, result.cost, 'equipment', `Upgrade ${vehicle.type} #${id}`, state.tickCount);
-      let output = t('vehicle.upgrade_success', { id, tier: result.toTier, cost: result.cost });
-      if (!rosterCanDriveVehicleTier(state.employees.employees, vehicle.type, result.toTier)) {
+      // Max tier and cash were checked above, so the upgrade cannot fail here.
+      upgradeVehicle(vehicle);
+      state.cash -= cost;
+      addExpense(state.finances, cost, 'equipment', `Upgrade ${vehicle.type} #${id}`, state.tickCount);
+      let output = t('vehicle.upgrade_success', { id, tier: vehicle.tier, cost });
+      if (!rosterCanDriveVehicleTier(state.employees.employees, vehicle.type, vehicle.tier)) {
         output += `\n${t('vehicle.upgrade_no_licensed')}`;
       }
       return { success: true, output };

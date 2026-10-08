@@ -18,7 +18,7 @@ import { shellLayoutRegistry, type Viewport, type Rect } from './LayoutRegistry.
 import { resolveVehicleDriver } from '../../core/entities/Vehicle.js';
 import { computeVehicleStatus } from '../../core/entities/VehicleStatus.js';
 import { describeStatus } from '../fleetDetailSections.js';
-import { computeVehicleUpgradeCost } from '../../core/entities/VehicleUpgrade.js';
+import { canAffordVehicleUpgrade } from '../../core/entities/VehicleUpgrade.js';
 import { getBuildingPeopleCapacity } from '../../core/entities/Building.js';
 
 /** Minimum horizontal gap between the selection bar and the left column's right edge. */
@@ -181,8 +181,7 @@ export class SelectionBar {
     const ramp = entity.kind === 'ramp' ? state.builtRamps.find(r => r.id === entity.id) : undefined;
     const rebuilding = entity.kind === 'building' && isUnderRebuild(entity.id, state);
     const vehicle = entity.kind === 'vehicle' ? state.vehicles.vehicles.find(v => v.id === entity.id) : undefined;
-    const upgradeCost = vehicle ? computeVehicleUpgradeCost(vehicle.type, vehicle.tier) : null;
-    const vehicleUpgradable = upgradeCost !== null && state.cash >= upgradeCost;
+    const vehicleUpgradable = vehicle !== undefined && canAffordVehicleUpgrade(vehicle, state.cash);
     this.actionsEl.replaceChildren(...this.buildActions(entity, ramp ? nextRampWidth(ramp.width) : null, rebuilding, vehicleUpgradable));
     this.root.style.display = 'flex';
   }
