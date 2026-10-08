@@ -6,6 +6,11 @@ import { workRate, isActive, remainingTicks } from '../../../src/core/events/Act
 import { makeEffectWorld, type EffectFixture } from '../../helpers/eventEffectWorld.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import en from '../../../src/core/i18n/locales/en.json';
+import fr from '../../../src/core/i18n/locales/fr.json';
+import {
+  EVENT_STRIKE_HOURS, EVENT_RELOCATE_PAUSE_HOURS, EVENT_PARTIAL_BAN_HOURS, EVENT_PARTIAL_BAN_WORK_PCT,
+  EVENT_HAZARD_STIPEND_DAYS, EVENT_HAZARD_STIPEND_PER_DAY, TICKS_PER_DAY,
+} from '../../../src/core/config/balance.js';
 
 function resolve(fx: EffectFixture, eventId: string, option: number, tick = 100): ResolutionResult {
   fx.state.events.pendingEvent = { eventId, firedAtTick: tick };
@@ -40,20 +45,21 @@ describe('event outcomes keep their promises (#1414)', () => {
     expect(fx.state.employees.employees.filter(e => e.alive).length).toBe(before - 1);
   });
 
-  it('union_hazard_emotional res0 yields a recurring effect with its duration stated', () => {
+  it('union_hazard_emotional res0 charges the stipend daily for the configured days', () => {
     const res = resolve(fx, 'union_hazard_emotional', 0, 100);
-    const m = fx.state.events.activeModifiers.find(x => x.kind === 'recurring_charge' || x.kind === 'salary_factor');
+    const m = fx.state.events.activeModifiers.find(x => x.kind === 'recurring_charge');
     expect(m).toBeDefined();
-    expect(m!.endTick).not.toBeNull();
+    expect(m!.magnitude).toBe(EVENT_HAZARD_STIPEND_PER_DAY);
+    expect(m!.endTick).toBe(100 + EVENT_HAZARD_STIPEND_DAYS * TICKS_PER_DAY);
     expect(res.effects.some(e => /\d/.test(e))).toBe(true);
   });
 
-  it('politics_mayor_wins "relocate ops" changes the operation (modifier, crew or both)', () => {
-    const crew = fx.state.employees.employees.filter(e => e.alive).length;
-    const res = resolve(fx, 'politics_mayor_wins', 2);
-    const changed = fx.state.events.activeModifiers.length > 0
-      || fx.state.employees.employees.filter(e => e.alive).length !== crew;
-    expect(changed).toBe(true);
+  it('politics_mayor_wins "relocate ops" stops all work for the configured pause', () => {
+    const res = resolve(fx, 'politics_mayor_wins', 2, 100);
+    const m = fx.state.events.activeModifiers.find(x => x.kind === 'work_stoppage');
+    expect(m).toBeDefined();
+    expect(m!.role).toBeNull();
+    expect(m!.endTick).toBe(100 + EVENT_RELOCATE_PAUSE_HOURS);
     expect(res.effects.length).toBeGreaterThan(0);
   });
 
@@ -87,6 +93,23 @@ describe('no raw effectTag leaks into result effects', () => {
       });
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('result prose numbers match their balance constants', () => {
+  const locales: Array<[string, Record<string, string>]> = [['en', en], ['fr', fr]];
+  const cases: Array<[string, number, number]> = [
+    ['event.union_strike_threat.res1', EVENT_STRIKE_HOURS, 0],
+    ['event.politics_mayor_wins.res2', EVENT_RELOCATE_PAUSE_HOURS, 0],
+    ['event.politics_mining_ban_vote.res1', EVENT_PARTIAL_BAN_HOURS, 0],
+    ['event.politics_mining_ban_vote.res1', Math.abs(EVENT_PARTIAL_BAN_WORK_PCT), 0],
+    ['event.union_hazard_emotional.res0', EVENT_HAZARD_STIPEND_DAYS, 0],
+  ];
+  it.each(locales)('%s texts state the configured numbers', (_name, table) => {
+    for (const [key, value] of cases) {
+      const numbers = (table[key] ?? '').match(/\d+/g)?.map(Number) ?? [];
+      expect(numbers, key).toContain(value);
+    }
   });
 });
 

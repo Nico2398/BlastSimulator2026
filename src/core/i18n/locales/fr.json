@@ -2650,7 +2650,7 @@
   "ui.modifier.work_rate": "Cadence de travail {value}",
   "ui.modifier.morale_drift": "Moral {value}/h",
   "ui.modifier.salary_factor": "Salaires {value}",
-  "ui.modifier.recurring_charge": "Charge de {value}/jour",
+  "ui.modifier.recurring_charge": "Charge de {value} $/jour",
   "ui.modifier.blast_ban": "Tir interdit",
   "ui.modifier.haul_pause": "Transport suspendu",
   "ui.modifier.drill_ban": "Forage interdit",

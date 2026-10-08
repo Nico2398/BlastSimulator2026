@@ -8,7 +8,7 @@ import { getLivingEmployees, hireEmployee, injureEmployee } from '../entities/Em
 import { hireSpawnPoint } from '../entities/HireSpawn.js';
 import { fireEmployeeFromWorld } from '../engine/TaskCancellation.js';
 import { offerSpecialContract, outstandingPenalty } from '../economy/Contract.js';
-import { addExpense, chargeFine } from '../economy/Finance.js';
+import { chargeFine, deductExpense } from '../economy/Finance.js';
 import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign/Level.js';
 import {
   EVENT_EFFECT_FATIGUE_RELIEF_LEVEL, EVENT_EFFECT_JOIN_DEFAULT_ROLE, EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS,
@@ -62,8 +62,7 @@ export function applyInstantEffect(
     case 'bonus_per_employee': {
       const total = spec.amount * staff.length;
       if (total <= 0) return outcome();
-      state.cash -= total;
-      addExpense(state.finances, total, 'salaries', 'Event bonus', tick);
+      deductExpense(state, total, 'salaries', 'Event bonus');
       return outcome({ cashSettled: -total });
     }
     case 'special_contract':

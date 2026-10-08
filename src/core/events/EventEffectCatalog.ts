@@ -64,7 +64,7 @@ function timedModifier(spec: EventEffectSpec, tick: number, base: Pick<ModifierD
   }
 }
 
-/** Takes a random vehicle or the building out of service and damages it; '_alt' when there is nothing to hit. */
+/** Takes a random vehicle or building out of service and damages it; 'none' when the site owns none (the caller falls back to the '_alt' result text), null when the spec is not an asset effect. */
 function assetModifier(spec: EventEffectSpec, world: EventWorld, tick: number, rng: Random, base: Pick<ModifierDraft, 'sourceEventId'>): ModifierDraft | 'none' | null {
   if (spec.type !== 'vehicle_breakdown' && spec.type !== 'building_closed') return null;
   const { vehicles, buildings } = world.state;
@@ -94,8 +94,6 @@ export function applyEventEffects(
     } else if (draft !== null) {
       const id = addModifier(events.activeModifiers, draft, events.nextModifierId);
       if (id === events.nextModifierId) events.nextModifierId++;
-      const stored = events.activeModifiers.find(m => m.id === id);
-      if (stored) (total.modifiers ??= []).push(stored);
     } else {
       const out = applyInstantEffect(spec, world, tick, rng);
       total.cashChange += out.cashChange;

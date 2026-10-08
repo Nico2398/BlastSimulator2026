@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  addModifier, pruneExpired, remainingTicks, workRate, salaryFactor, isActive, factorFor,
+  addModifier, pruneExpired, remainingTicks, workRate, salaryFactor, isActive, factorFor, tickModifiers, actionBlocked,
   type ActiveModifier,
 } from '../../../src/core/events/ActiveModifiers.js';
-import { MODIFIER_FACTOR_MIN, MODIFIER_FACTOR_MAX, MAX_ACTIVE_MODIFIERS } from '../../../src/core/config/balance.js';
+import { MODIFIER_FACTOR_MIN, MODIFIER_FACTOR_MAX, MAX_ACTIVE_MODIFIERS, TICKS_PER_DAY } from '../../../src/core/config/balance.js';
+import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { mod } from '../../helpers/eventEffectWorld.js';
 
 function listOf(...ms: Array<Parameters<typeof mod>[0]>): ActiveModifier[] {
@@ -151,5 +152,58 @@ describe('ActiveModifiers.isActive / factorFor', () => {
   });
   it('factorFor clamps', () => {
     expect(factorFor(listOf({ kind: 'survey_cost', magnitude: 0.001 }), 'survey_cost', 1)).toBe(MODIFIER_FACTOR_MIN);
+  });
+});
+
+describe('ActiveModifiers.tickModifiers', () => {
+  function tickWorld(list: ReturnType<typeof makeList>) {
+    return {
+      tickCount: 10, cash: 1000, finances: createFinanceState(1000),
+      events: { activeModifiers: list }, employees: { employees: [{ alive: true, morale: 50 }, { alive: false, morale: 50 }] },
+    } as unknown as Parameters<typeof tickModifiers>[0];
+  }
+  function makeList() { return [] as ActiveModifier[]; }
+
+  it('deducts a recurring charge per tick as one day share of its magnitude', () => {
+    const list = makeList();
+    addModifier(list, mod({ kind: 'recurring_charge', magnitude: 240, endTick: 100 }), 1);
+    const world = tickWorld(list);
+    tickModifiers(world);
+    expect(world.cash).toBeCloseTo(1000 - 240 / TICKS_PER_DAY);
+  });
+
+  it('drifts morale of living employees only', () => {
+    const list = makeList();
+    addModifier(list, mod({ kind: 'morale_drift', magnitude: -2, endTick: 100 }), 1);
+    const world = tickWorld(list);
+    tickModifiers(world);
+    expect(world.employees.employees[0]!.morale).toBe(48);
+    expect(world.employees.employees[1]!.morale).toBe(50);
+  });
+
+  it('drops lapsed modifiers without applying them', () => {
+    const list = makeList();
+    addModifier(list, mod({ kind: 'recurring_charge', magnitude: 240, endTick: 10 }), 1);
+    const world = tickWorld(list);
+    tickModifiers(world);
+    expect(list).toHaveLength(0);
+    expect(world.cash).toBe(1000);
+  });
+});
+
+describe('ActiveModifiers.actionBlocked', () => {
+  it('a drill_ban blocks drill_hole but not rest or other work', () => {
+    const list: ActiveModifier[] = [];
+    addModifier(list, mod({ kind: 'drill_ban', endTick: 100 }), 1);
+    expect(actionBlocked(list, 'drill_hole', 5, 'driller')).toBe(true);
+    expect(actionBlocked(list, 'rest', 5, 'driller')).toBe(false);
+    expect(actionBlocked(list, 'survey', 5, 'surveyor')).toBe(false);
+  });
+
+  it('a stoppage blocks work but never rest', () => {
+    const list: ActiveModifier[] = [];
+    addModifier(list, mod({ kind: 'work_stoppage', endTick: 100 }), 1);
+    expect(actionBlocked(list, 'drill_hole', 5, 'driller')).toBe(true);
+    expect(actionBlocked(list, 'rest', 5, 'driller')).toBe(false);
   });
 });

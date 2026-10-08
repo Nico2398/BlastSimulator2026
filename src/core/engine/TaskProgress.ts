@@ -86,7 +86,8 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
 
   // Event modifiers (#1414): a stoppage freezes the task, a slowdown lets only some ticks count
   // (the fraction left over carries to the next tick), a boost counts more than one.
-  const rate = workRate(state.events.activeModifiers, emp.role, state.tickCount);
+  // Rest is exempt, as it is from actionBlocked: an exhausted crew still recovers during a strike.
+  const rate = emp.pendingActionType === 'rest' ? 1 : workRate(state.events.activeModifiers, emp.role, state.tickCount);
   const workTicks = rate === 1 ? 1 : takeWholeWorkTicks(emp, rate);
   if (workTicks === 0) return null;
   emp.taskTicksRemaining -= workTicks - 1;

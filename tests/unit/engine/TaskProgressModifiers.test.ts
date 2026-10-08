@@ -46,4 +46,12 @@ describe('task progress under event modifiers (#1414)', () => {
     tickTaskProgress(state, emp);
     expect(emp.taskTicksRemaining).toBe(9);
   });
+
+  it('a work_stoppage does not freeze a rest task', () => {
+    const { state, emp } = workingFixture();
+    emp.pendingActionType = 'rest';
+    addModifier(state.events.activeModifiers, mod({ kind: 'work_stoppage', startTick: 0, endTick: 100 }), 1);
+    tickTaskProgress(state, emp);
+    expect(emp.taskTicksRemaining).toBe(9);
+  });
 });

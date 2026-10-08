@@ -95,23 +95,24 @@ export function remainingTicks(m: ActiveModifier, tick: number): number | null {
   return m.endTick === null ? null : Math.max(0, m.endTick - tick);
 }
 
+/** Product of the magnitudes of every modifier matching `predicate`, clamped to the modifier factor bounds. */
+function productOf(list: readonly ActiveModifier[], predicate: (m: ActiveModifier) => boolean): number {
+  let factor = 1;
+  for (const m of list) {
+    if (predicate(m)) factor *= m.magnitude;
+  }
+  return clampFactor(factor);
+}
+
 /** Work-rate multiplier for a role; 0 during a stoppage. */
 export function workRate(list: readonly ActiveModifier[], role: EmployeeRole, tick: number): number {
   if (isActive(list, 'work_stoppage', tick, role)) return 0;
-  let rate = 1;
-  for (const m of list) {
-    if (m.kind === 'work_rate' && isLive(m, tick) && appliesToRole(m, role)) rate *= m.magnitude;
-  }
-  return clampFactor(rate);
+  return productOf(list, m => m.kind === 'work_rate' && isLive(m, tick) && appliesToRole(m, role));
 }
 
 /** Salary multiplier for a role. */
 export function salaryFactor(list: readonly ActiveModifier[], role: EmployeeRole): number {
-  let factor = 1;
-  for (const m of list) {
-    if (m.kind === 'salary_factor' && appliesToRole(m, role)) factor *= m.magnitude;
-  }
-  return clampFactor(factor);
+  return productOf(list, m => m.kind === 'salary_factor' && appliesToRole(m, role));
 }
 
 /** True when a live modifier of this kind (optionally for this role) exists. */
@@ -123,20 +124,12 @@ export function isActive(
 
 /** Product of live magnitudes of this kind, clamped to the modifier factor bounds. */
 export function factorFor(list: readonly ActiveModifier[], kind: ModifierKind, tick: number): number {
-  let factor = 1;
-  for (const m of list) {
-    if (m.kind === kind && isLive(m, tick)) factor *= m.magnitude;
-  }
-  return clampFactor(factor);
+  return productOf(list, m => m.kind === kind && isLive(m, tick));
 }
 
 /** Frequency factor the live event_weight modifiers give one event category. */
 export function eventWeightFactor(list: readonly ActiveModifier[], category: EventCategory, tick: number): number {
-  let factor = 1;
-  for (const m of list) {
-    if (m.kind === 'event_weight' && m.category === category && isLive(m, tick)) factor *= m.magnitude;
-  }
-  return clampFactor(factor);
+  return productOf(list, m => m.kind === 'event_weight' && m.category === category && isLive(m, tick));
 }
 
 /** Action types each ban kind keeps employees from claiming. */

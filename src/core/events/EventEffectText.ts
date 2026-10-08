@@ -2,6 +2,7 @@
 
 import type { EventEffect } from './EventSystem.js';
 import type { EventEffectSpec } from './EventEffectCatalog.js';
+import { formatMoney } from '../economy/formatMoney.js';
 import { t } from '../i18n/I18n.js';
 import { EVENT_EFFECT_JOIN_DEFAULT_ROLE } from '../config/balance.js';
 
@@ -18,6 +19,9 @@ const PARAM_NAMESPACE: Readonly<Record<string, string>> = {
   what: 'ui.event.effect.what',
   pick: 'ui.event.effect.pick',
 };
+
+/** Params holding a dollar amount; shown rounded and grouped, with the currency sign in the template. */
+const MONEY_PARAMS: ReadonlySet<string> = new Set(['amount', 'perDay']);
 
 /** Specs whose role field narrows who they hit; absent means everyone. */
 const SCOPED_TYPES: ReadonlySet<EventEffectSpec['type']> = new Set(['work_stoppage', 'work_rate', 'salary']);
@@ -49,6 +53,7 @@ export function effectChipText(effect: EventEffect): string | undefined {
   const params: Record<string, string | number> = {};
   for (const [k, v] of Object.entries(raw)) {
     if (k === 'scope') params[k] = v === 'all' ? t('ui.event.effect.scope_all') : t(`role.${v}`);
+    else if (MONEY_PARAMS.has(k) && typeof v === 'number') params[k] = formatMoney(v);
     else params[k] = typeof v === 'string' && PARAM_NAMESPACE[k] ? t(`${PARAM_NAMESPACE[k]}.${v}`) : v;
   }
   return t(effect.textKey, params);

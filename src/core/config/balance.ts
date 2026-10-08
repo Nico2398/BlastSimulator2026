@@ -1944,9 +1944,6 @@ export const MODIFIER_FACTOR_MIN = 0.1;
 /** Upper bound a combined modifier factor may reach. */
 export const MODIFIER_FACTOR_MAX = 5;
 
-/** Default hp lost by a vehicle_breakdown effect when the spec omits it. */
-export const EVENT_EFFECT_BREAKDOWN_HP_LOSS = 20;
-
 /** Default hp a closed building loses (building_closed effect). */
 export const EVENT_EFFECT_BUILDING_HP_LOSS = 10;
 

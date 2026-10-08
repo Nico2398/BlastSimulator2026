@@ -4,7 +4,6 @@ import type { GameState } from '../state/GameState.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import type { ActiveModifier } from './ActiveModifiers.js';
 import type { TrafficJam } from './TrafficJams.js';
 import { respreadLegDestination } from '../engine/Locomotion.js';
 import { nextRampWidth, orderRampWiden, rampFootprint } from '../mining/RampWidening.js';
@@ -34,8 +33,6 @@ export interface EffectOutcome {
   scoreChanges: Partial<Record<keyof ScoreState, number>>;
   /** '_alt' when the handler could not do what was asked and the fallback result text applies. */
   resultKeySuffix: '' | '_alt';
-  /** Timed modifiers the handler raised, for the caller to register (#1414). */
-  modifiers?: ActiveModifier[];
 }
 
 type JamEffectHandler = (jam: TrafficJam, world: EventWorld, tick: number) => EffectOutcome;

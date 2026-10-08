@@ -3,13 +3,14 @@
 import type { ActiveModifier } from './ActiveModifiers.js';
 import { remainingTicks } from './ActiveModifiers.js';
 import { ALL_WEATHER_STATES } from '../weather/WeatherCycle.js';
+import { formatMoney } from '../economy/formatMoney.js';
 import { t } from '../i18n/I18n.js';
 
 /** The number or name a modifier's label shows, by kind. */
 function labelValue(m: ActiveModifier): string {
   switch (m.kind) {
     case 'morale_drift': return `${m.magnitude > 0 ? '+' : ''}${m.magnitude}`;
-    case 'recurring_charge': return `$${Math.round(m.magnitude).toLocaleString('en-US')}`;
+    case 'recurring_charge': return formatMoney(m.magnitude);
     case 'forced_weather': return t(`hud.weather.${ALL_WEATHER_STATES[m.magnitude] ?? 'sunny'}`);
     case 'event_weight': return `${t(`ui.event.category.${m.category ?? 'union'}`)} ×${m.magnitude.toFixed(2)}`;
     case 'work_stoppage': case 'blast_ban': case 'haul_pause': case 'drill_ban': case 'out_of_service': return '';
