@@ -28,8 +28,9 @@ import { vehicleDriverId, getVehicleReservation, getVehicleDefByTier, vehicleCar
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
-import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
-import { pickupFragment, deliverToDepot, type TrackedFragment } from '../economy/Logistics.js';
+import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { pickupFragment, deliverToDepot, deliverToSpoilHeap, type TrackedFragment } from '../economy/Logistics.js';
+import { creditSpoilKg, haulDestinationOf } from '../economy/SpoilHeaps.js';
 import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
@@ -110,7 +111,7 @@ export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: Even
 /** Picks `tracked` up onto `vehicle.cargo`; false when logistics refuses (storage room). */
 function loadFragment(state: GameState, vehicle: Vehicle, tracked: TrackedFragment, emitter?: EventEmitter): boolean {
   const fragmentId = tracked.fragment.id;
-  if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id), freightWarehouseSites(state.buildings), vehicle.x, vehicle.z)) return false;
+  if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id), freightWarehouseSites(state.buildings), vehicle.x, vehicle.z, spoilHeapSites(state.buildings))) return false;
 
   state.navGrid?.removeFragmentOccupant(
     Math.round(tracked.fragment.position.x),
@@ -134,6 +135,30 @@ function loadExtraFragment(state: GameState, vehicle: Vehicle, fragmentId: numbe
 }
 
 /**
+ * Delivers one carried fragment to its destination: barren rock is dumped on a
+ * spoil heap and credited to that heap building (#1530), ore goes to a freight
+ * warehouse. False when the fragment is not in transit or no site takes it.
+ */
+function deliverCargoItem(
+  state: GameState,
+  fragmentId: number,
+  warehouses: ReturnType<typeof freightWarehouseSites>,
+  heaps: ReturnType<typeof spoilHeapSites>,
+  atX: number,
+  atZ: number,
+): boolean {
+  const tracked = state.logistics.fragments.find(f => f.fragment.id === fragmentId && f.state === 'in_transit');
+  if (tracked && haulDestinationOf(tracked.fragment) === 'spoil_heap') {
+    const dumped = deliverToSpoilHeap(state.logistics, fragmentId, heaps, atX, atZ);
+    if (!dumped) return false;
+    const heap = state.buildings.buildings.find(b => b.id === dumped.heapId);
+    if (heap) creditSpoilKg(heap, dumped.massKg);
+    return true;
+  }
+  return deliverToDepot(state.logistics, fragmentId, state.collectedOre, warehouses, atX, atZ);
+}
+
+/**
  * Fires when a debris_hauler's drive-to-depot leg arrives: delivers every
  * `vehicle.cargo` item into logistics/collectedOre (one
  * `vehicle:haul_delivered` per fragment) and clears the cargo.
@@ -153,8 +178,9 @@ export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: Ev
   // nothing at all was delivered.
   let delivered = 0;
   const sites = freightWarehouseSites(state.buildings);
+  const heaps = spoilHeapSites(state.buildings);
   for (const { fragmentId } of vehicle.cargo) {
-    if (!deliverToDepot(state.logistics, fragmentId, state.collectedOre, sites, vehicle.x, vehicle.z)) continue;
+    if (!deliverCargoItem(state, fragmentId, sites, heaps, vehicle.x, vehicle.z)) continue;
     delivered++;
     emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
     // An extra's own haul action is normally consumed at load; sweep any still queued.

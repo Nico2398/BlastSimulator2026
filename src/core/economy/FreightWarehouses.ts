@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Per-warehouse freight storage behind the shared pool (#1372)
 
-import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
+import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
 import type { LogisticsState, TrackedFragment } from './Logistics.js';
 import { accumulateOreMass, decrementCollectedOre } from '../mining/BlastOreReport.js';
 
@@ -57,17 +57,7 @@ export function pickWarehouse(
   massKg: number,
   used: ReadonlyMap<number, number> = warehouseUsedKgMap(l),
 ): WarehouseSite | null {
-  let best: WarehouseSite | null = null;
-  let bestDist = Infinity;
-  for (const site of sites) {
-    if (warehouseFreeKg(l, site, used) < massKg) continue;
-    const dist = (site.x - fromX) ** 2 + (site.z - fromZ) ** 2;
-    if (dist < bestDist || (dist === bestDist && best !== null && site.id < best.id)) {
-      best = site;
-      bestDist = dist;
-    }
-  }
-  return best;
+  return nearestSite(sites, fromX, fromZ, site => warehouseFreeKg(l, site, used) >= massKg);
 }
 
 /** Remove stock held by warehouses not in `liveIds`; debits `collectedOre`. */

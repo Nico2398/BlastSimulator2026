@@ -484,7 +484,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1524: +4 keys (licence tier gating: dealership level text, licence-level-too-low), both locales: 3902.
     // #1524 review: licence_required + licence_holders merged into one ui.fleet.licence_line, net -1: 3901.
     // #1538: +44 keys (resN_alt texts for employee_leaves/employee_injured/cancel_contract options), both locales: 3945.
-    expect(Object.keys(en).length).toBe(3945);
+    // #1530: +4 keys (spoil heap names, description, no_spoil_heap blocked notification), both locales: 3949.
+    expect(Object.keys(en).length).toBe(3949);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

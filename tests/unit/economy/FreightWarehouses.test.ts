@@ -234,7 +234,7 @@ describe('pool sums stay consistent', () => {
     const perFragment = oreContributionKg(200 / 2.5, 0.5);
     expect(ore.blingite).toBeCloseTo(perFragment * 2, 6);
     const want = perFragment * 1.5;
-    const res = consumeStoredOre(l, ore, 'blingite', want);
+    const res = consumeStoredOre(l, ore, 'blingite', want, []);
     expect(res.success).toBe(true);
     expect(res.consumedKg).toBeCloseTo(want, 6);
     expect(ore.blingite).toBeCloseTo(perFragment * 0.5, 6);

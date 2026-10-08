@@ -806,6 +806,31 @@ describe('blocked haul orders: warehouse gating (#1369)', () => {
     expect(blockedEntries(center)).toHaveLength(1);
   });
 
+  it('buildBlockedOrderMessage returns a translated message for no_spoil_heap (#1530)', () => {
+    const msg = buildBlockedOrderMessage(makeHaulAction(1, 'no_spoil_heap'));
+    expect(msg).not.toContain('notification.order_blocked_no_spoil_heap');
+    expect(msg).toBe(t('notification.order_blocked_no_spoil_heap', { order: t(ACTION_LABEL_KEY.haul_debris) }));
+    expect(msg).not.toBe(buildBlockedOrderMessage(makeHaulAction(1, 'no_freight_warehouse')));
+  });
+
+  it('en and fr both define notification.order_blocked_no_spoil_heap with different text (#1530)', () => {
+    const key = 'notification.order_blocked_no_spoil_heap';
+    expect(typeof locale('en')[key]).toBe('string');
+    expect(typeof locale('fr')[key]).toBe('string');
+    expect(locale('fr')[key]).not.toBe(locale('en')[key]);
+  });
+
+  it('raises one localized toast for N haul actions blocked by no_spoil_heap (#1530)', () => {
+    const center = new NotificationCenter();
+    const state = makeState();
+    for (let i = 1; i <= 12; i++) state.pendingActions.push(makeHaulAction(i, 'no_spoil_heap'));
+    center.update(state);
+    const entries = blockedEntries(center);
+    expect(entries).toHaveLength(1);
+    expect(JSON.stringify(entries[0])).not.toContain('notification.order_blocked_no_spoil_heap');
+    expect(JSON.stringify(entries[0])).toContain(t('notification.order_blocked_no_spoil_heap', { order: t(ACTION_LABEL_KEY.haul_debris) }).slice(0, 12));
+  });
+
   it('re-toasts when the shared reason changes (warehouse built, then storage fills)', () => {
     const center = new NotificationCenter();
     const state = makeState();

@@ -1,0 +1,38 @@
+{
+  "name": "spoil-heap-haul",
+  "description": "Spoil heap (#1530): a player places the crewless Spoil Heap from the Build menu with an empty roster; it stands at once, with no construction order, for its flat price.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:50000",
+      "description": "Fresh site, no roster at all: a spoil heap takes no crew, so nobody has to be hired for it to be built.",
+      "timeout": 90,
+      "interaction": [{ "type": "command", "command": "new_game seed:42 cash:50000" }],
+      "role": "setup",
+      "expect": { "equals": { "cash": 50000, "buildingCount": 0, "employeeCount": 0 } }
+    },
+    {
+      "command": "build spoil_heap at:30,3",
+      "description": "Open the Build menu, buy the Spoil Heap card, pick a tile and confirm. Unlike every crewed building, confirming places it immediately: no construction site is queued (orderedBuildingCount stays 0) and the price is charged in full.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"spoil_heap\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 30, "z": 3 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": { "cash": -2000, "buildingCount": 1 },
+        "equals": { "orderedBuildingCount": 0, "employeeCount": 0 },
+        "note": "Crewless placement: the heap exists straight away, with an empty roster."
+      }
+    },
+    {
+      "command": "state",
+      "description": "Read back the world: one standing building, nothing queued.",
+      "interaction": [{ "type": "command", "command": "state" }],
+      "role": "observe",
+      "expect": { "equals": { "buildingCount": 1, "orderedBuildingCount": 0 } }
+    }
+  ]
+}

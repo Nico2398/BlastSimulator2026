@@ -16,6 +16,7 @@ import {
   type Building,
   type BuildingTier,
   type FootprintOccupant,
+  isSingleTierType,
 } from '../../core/entities/Building.js';
 import { warehouseStoredKg } from '../../core/economy/FreightWarehouses.js';
 import { addExpense } from '../../core/economy/Finance.js';
@@ -107,7 +108,7 @@ export function buildCommand(
       if (isNaN(id)) return { success: false, output: t('entities.build_upgrade_usage') };
       const toUpgrade = state.buildings.buildings.find(b => b.id === id);
       if (!toUpgrade) return { success: false, output: t('entities.building_not_found', { id }) };
-      if (toUpgrade.tier >= 3) return { success: false, output: t('entities.build_upgrade_max_tier', { id }) };
+      if (toUpgrade.tier >= 3 || isSingleTierType(toUpgrade.type)) return { success: false, output: t('entities.build_upgrade_max_tier', { id }) };
       if (isDemolitionOrdered(state, id)) {
         return { success: false, output: t('entities.build_demolish_already_ordered', { id }) };
       }

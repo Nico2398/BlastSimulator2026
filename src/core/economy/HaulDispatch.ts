@@ -10,7 +10,8 @@ import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '.
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
-import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import { freightWarehouseSites, spoilHeapSites } from '../entities/BuildingWarehouse.js';
+import { haulDestinationOf, isBarrenFragment } from './SpoilHeaps.js';
 import type { TrackedFragment } from './Logistics.js';
 import { pickWarehouse, warehouseUsedKgMap } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
@@ -179,7 +180,7 @@ export function isHaulOrFragmentActionClaimable(
   return fits(tracked);
 }
 
-/** Whether a fragment's mass fits some freight warehouse's free room. */
+/** Whether a fragment can be delivered now: barren rock needs any spoil heap (unbounded room), ore a warehouse with room for its mass. */
 type StorageFit = (tracked: TrackedFragment) => boolean;
 
 /**
@@ -190,8 +191,13 @@ type StorageFit = (tracked: TrackedFragment) => boolean;
  */
 export function createStorageFit(state: GameState): StorageFit {
   let sites: ReturnType<typeof freightWarehouseSites> | null = null;
+  let hasHeap: boolean | null = null;
   let used: Map<number, number> | null = null;
   return (tracked) => {
+    if (isBarrenFragment(tracked.fragment.oreDensities)) {
+      hasHeap ??= spoilHeapSites(state.buildings).length > 0;
+      return hasHeap;
+    }
     sites ??= freightWarehouseSites(state.buildings);
     used ??= warehouseUsedKgMap(state.logistics);
     const { x, z } = tracked.fragment.position;
@@ -230,7 +236,8 @@ export function findQueuedHaulAction(state: GameState, fragmentId: number): Pend
 /**
  * On-ground, non-oversized fragments within `radiusCells` (octile) of `primary`
  * whose haul_debris action is still queued and unclaimed, nearest first (id
- * breaks ties) (#1370). One pass over the pool plus one over the fragments.
+ * breaks ties) (#1370). Only fragments sharing the primary's destination
+ * (spoil heap vs warehouse) qualify, so a batch never mixes (#1530). One pass over the pool plus one over the fragments.
  */
 export function findNearbyHaulableFragments(state: GameState, primary: TrackedFragment, radiusCells: number): TrackedFragment[] {
   const queued = new Set<number>();
@@ -239,10 +246,11 @@ export function findNearbyHaulableFragments(state: GameState, primary: TrackedFr
     if (isQueuedUnclaimedHaul(a) && typeof fragmentId === 'number') queued.add(fragmentId);
   }
   const { x, z } = primary.fragment.position;
+  const destination = haulDestinationOf(primary.fragment);
   const near: Array<{ tracked: TrackedFragment; dist: number }> = [];
   for (const tracked of state.logistics.fragments) {
     const f = tracked.fragment;
-    if (tracked.state !== 'on_ground' || f.id === primary.fragment.id || !queued.has(f.id) || isOversized(f.volume)) continue;
+    if (tracked.state !== 'on_ground' || f.id === primary.fragment.id || !queued.has(f.id) || isOversized(f.volume) || haulDestinationOf(f) !== destination) continue;
     const dist = octileHeuristic(x, z, f.position.x, f.position.z);
     if (dist <= radiusCells) near.push({ tracked, dist });
   }
@@ -255,10 +263,10 @@ export function isAutoDebrisAction(type: ActionType): boolean {
   return type === 'haul_debris' || type === 'fragment_debris';
 }
 
-const HAUL_BLOCKED_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>(['no_freight_warehouse', 'storage_full']);
+const HAUL_BLOCKED_REASONS: ReadonlySet<BlockedOrderReason> = new Set<BlockedOrderReason>(['no_freight_warehouse', 'storage_full', 'no_spoil_heap']);
 
 /** True for the blocked reasons haulBlockedReason can produce (#1369). */
-export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefined): reason is 'no_freight_warehouse' | 'storage_full' {
+export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefined): reason is 'no_freight_warehouse' | 'storage_full' | 'no_spoil_heap' {
   return reason != null && HAUL_BLOCKED_REASONS.has(reason);
 }
 
@@ -266,7 +274,9 @@ export function isHaulBlockedReason(reason: BlockedOrderReason | null | undefine
  * Why a haul_debris order cannot be fulfilled now, or null: 'no_freight_warehouse'
  * when no active warehouse provides storage (zero synced capacity),
  * 'storage_full' when its on-ground fragment is heavier than the room left
- * (#1369). Never set for oversized (fragment_debris) work, nor for a fragment
+ * (#1369). A barren fragment instead gets 'no_spoil_heap' when no heap is
+ * placed (#1530) — never storage_full, whatever warehouses exist; heaps have
+ * unlimited room. Never set for oversized (fragment_debris) work, nor for a fragment
  * that is gone or not on the ground.
  */
 export function haulBlockedReason(
@@ -278,6 +288,7 @@ export function haulBlockedReason(
   if (action.type !== 'haul_debris') return null;
   const tracked = resolveTrackedFragment(state, action, lookup);
   if (!tracked || tracked.state !== 'on_ground') return null;
+  if (isBarrenFragment(tracked.fragment.oreDensities)) return fits(tracked) ? null : 'no_spoil_heap';
   if (state.logistics.storageCapacityKg === 0) return 'no_freight_warehouse';
   return fits(tracked) ? null : 'storage_full';
 }

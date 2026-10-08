@@ -818,7 +818,7 @@ describe('Buildings — completes despite a starved debris_hauler backlog (#1000
           volume: 0.3,
           mass: 5,
           rockId: 'cruite',
-          oreDensities: {},
+          oreDensities: { blingite: 0.5 },
           initialVelocity: { x: 0, y: 0, z: 0 },
           isProjection: false,
           halfExtents: { x: 0.5, y: 0.5, z: 0.5 },

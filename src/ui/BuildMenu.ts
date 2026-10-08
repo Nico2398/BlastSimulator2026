@@ -44,6 +44,7 @@ import {
   getUpgradeCost,
   getMoveCost,
   isTierUnlocked,
+  isSingleTierType,
   getResearchProgress,
   isFootprintBuildable,
   type BuildingType,
@@ -597,6 +598,8 @@ export class BuildMenu extends PanelBase {
     const tierSel = el('select', { className: 'bs-build-tier-sel' });
     tierSel.style.cssText = 'flex:0 0 auto;font:600 10px/1 var(--bsx-font-mono);width:44px;padding:4px 2px;border-radius:4px;border:1px solid var(--bsx-hairline-strong);background:var(--bsx-well);color:var(--bsx-text-secondary)';
     tierSel.title = t('ui.build.select_tier');
+    // A single-tier type has nothing to choose (#1530).
+    if (isSingleTierType(type)) tierSel.style.display = 'none';
     for (const tier of [1, 2, 3] as BuildingTier[]) {
       tierSel.appendChild(el('option', { text: `T${tier}`, attrs: { value: String(tier) } }));
     }
@@ -716,7 +719,7 @@ export class BuildMenu extends PanelBase {
   }
 
   private nextTierOf(b: Building): BuildingTier | null {
-    return b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
+    return b.tier < 3 && !isSingleTierType(b.type) ? ((b.tier + 1) as BuildingTier) : null;
   }
 
   /** Update progress text on existing rows in place (called every tick while research is queued). */
@@ -833,7 +836,8 @@ export class BuildMenu extends PanelBase {
       }));
     });
 
-    row.append(info, moveBtn, upgradeBtn, researchBtn, demolishBtn);
+    if (isSingleTierType(b.type)) row.append(info, moveBtn, demolishBtn);
+    else row.append(info, moveBtn, upgradeBtn, researchBtn, demolishBtn);
     this.syncResearchControls(row, b.type, nextTier, nextLocked);
     return row;
   }

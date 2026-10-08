@@ -18,6 +18,7 @@ import { revoltTicksRemaining } from '../../core/campaign/WorkerRevolt.js';
 import { CONTRACT_EXPIRY_WARNING_TICKS, WELL_BEING_ALERT_THRESHOLD } from '../../core/config/balance.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { contractShortOfStock, outstandingPenalty } from '../../core/economy/Contract.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
@@ -181,7 +182,7 @@ export class NotificationCenter {
     const urgentContract = state.contracts.active.find(c => {
       const remaining = c.acceptedAtTick + c.deadlineTicks - state.tickCount;
       return remaining <= CONTRACT_EXPIRY_WARNING_TICKS && remaining > 0
-        && contractShortOfStock(c, state.collectedOre, state.logistics.storedMassKg);
+        && contractShortOfStock(c, state.collectedOre, stateRubbleStockKg(state));
     });
     if (urgentContract) {
       const remaining = urgentContract.acceptedAtTick + urgentContract.deadlineTicks - state.tickCount;
@@ -329,6 +330,8 @@ export function buildBlockedOrderMessage(action: PendingAction): string {
       return t('notification.order_blocked_target_unreachable', { order });
     case 'no_freight_warehouse':
       return t('notification.order_blocked_no_warehouse', { order });
+    case 'no_spoil_heap':
+      return t('notification.order_blocked_no_spoil_heap', { order });
     case 'storage_full':
       return t('notification.order_blocked_storage_full', { order });
     case 'debris_out_of_reach':

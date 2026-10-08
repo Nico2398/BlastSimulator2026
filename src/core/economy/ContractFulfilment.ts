@@ -5,6 +5,11 @@ import { t } from '../i18n/I18n.js';
 import { deliverMaterials, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addIncome, type FinanceState } from './Finance.js';
 import { consumeStoredOre, type LogisticsState } from './Logistics.js';
+import { rubbleStockKg } from './SpoilHeaps.js';
+import type { Building } from '../entities/Building.js';
+
+/** The slice of a building a rubble delivery reads and draws down: its spoil heap stock. */
+type SpoilBuildings = readonly Pick<Building, 'type' | 'storedSpoilKg'>[];
 
 type DeliveryResult<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -24,6 +29,7 @@ interface AutoDelivery extends DeliveryOutcome {
 /**
  * Deliver up to `requestedKg` of stored ore to one active contract, drawing it
  * down from storage. The request is capped at what the contract still needs and what storage holds.
+ * Rubble draws on the spoil heaps in `buildings` first (#1530).
  */
 export function deliverStoredOre(
   contracts: ContractState,
@@ -32,17 +38,18 @@ export function deliverStoredOre(
   contractId: number,
   requestedKg: number,
   tick: number,
+  buildings: SpoilBuildings,
 ): DeliveryResult<DeliveryOutcome> {
   const contract = contracts.active.find(c => c.id === contractId);
   if (!contract) return { success: false, error: t('economy.contract.deliver_not_found', { id: contractId }) };
 
   let request = Math.min(requestedKg, remainingKg(contract));
   // Partial delivery: take what storage holds; an empty store falls through to the insufficient-stock error.
-  const stock = storedStockKg(contract, collectedOre, logistics.storedMassKg);
+  const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.storedMassKg, buildings));
   if (stock > FRAGMENT_SPLIT_EPSILON_KG) request = Math.min(request, stock);
   if (!(request > 0)) return { success: false, error: t('economy.contract.deliver_fulfilled', { id: contractId }) };
 
-  const consumption = consumeStoredOre(logistics, collectedOre, contract.materialId, request);
+  const consumption = consumeStoredOre(logistics, collectedOre, contract.materialId, request, buildings);
   if (!consumption.success) {
     return {
       success: false,
@@ -69,14 +76,15 @@ export function autoDeliverContracts(
   logistics: LogisticsState,
   collectedOre: Record<string, number>,
   tick: number,
+  buildings: SpoilBuildings,
 ): AutoDelivery[] {
   const deliveries: AutoDelivery[] = [];
   // Sorted copy: completing a contract splices it out of contracts.active.
   for (const contract of sortByDeadline(contracts.active)) {
     if (contract.held || contract.completed || contract.expired) continue;
-    const stock = storedStockKg(contract, collectedOre, logistics.storedMassKg);
+    const stock = storedStockKg(contract, collectedOre, rubbleStockKg(logistics.storedMassKg, buildings));
     if (stock <= FRAGMENT_SPLIT_EPSILON_KG) continue;
-    const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick);
+    const result = deliverStoredOre(contracts, logistics, collectedOre, contract.id, stock, tick, buildings);
     if (result.success && result.data.kg > 0) deliveries.push({ contractId: contract.id, ...result.data });
   }
   return deliveries;

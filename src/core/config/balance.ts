@@ -1169,6 +1169,9 @@ export const BUILDING_CONSTRUCTION_TIER_MULTIPLIER: Record<BuildingTier, number>
  */
 export const BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD = 1;
 
+/** Summed ore density of a fragment at or below which it counts as barren and goes to a spoil heap (#1530). */
+export const SPOIL_BARREN_ORE_FRACTION_THRESHOLD = 0.02;
+
 /** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',
@@ -1449,6 +1452,11 @@ export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: R
   freight_warehouse: {
     2: { cost: 5000, ticks: 0, conditions: [] },
     3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'freight_warehouse', tier: 2 }] },
+  },
+  // Single-tier: never researched (isSingleTierType); entry only satisfies the exhaustive Record (#1530).
+  spoil_heap: {
+    2: { cost: 0, ticks: 0, conditions: [] },
+    3: { cost: 0, ticks: 0, conditions: [] },
   },
 };
 

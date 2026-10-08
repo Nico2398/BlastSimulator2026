@@ -40,9 +40,11 @@ function makeFilledGrid(sizeX: number, sizeZ: number, fillUpToY: number): VoxelG
 // ── BuildingType union ───────────────────────────────────────────────────────
 
 describe('BuildingType union', () => {
-  it('contains exactly 8 canonical types', () => {
+  it('contains exactly 9 canonical types', () => {
     const types = getAllBuildingTypes();
-    expect(types).toHaveLength(8);
+    // The 8 tiered types plus the single-tier spoil heap (#1530).
+    expect(types).toHaveLength(ALL_BUILDING_TYPES.length + 1);
+    expect(types).toContain('spoil_heap');
   });
 
   it('contains all required canonical types', () => {

@@ -86,6 +86,22 @@ function makeState(width = 60, height = 60): GameState {
   const warehouse = placeBuilding(state.buildings, 'freight_warehouse', 30, 30, width, height);
   if (!warehouse.success) throw new Error(`Setup: placeBuilding failed — ${warehouse.error}`);
   warehouse.building!.active = true;
+  // Barren ("plain") fragments haul to a spoil heap, ore to the warehouse (#1530).
+  const heap = placeBuilding(state.buildings, 'spoil_heap', 36, 30, width, height);
+  if (!heap.success) throw new Error(`Setup: placeBuilding failed — ${heap.error}`);
+  return state;
+}
+
+/**
+ * Same site with a spoil heap in the warehouse's slot (same top-left corner, so the
+ * same nearest approach cell from the south-west): a barren candidate's depot leg then
+ * costs what an ore candidate's costs in makeState (#1530).
+ */
+function makeHeapOnlyState(width = 60, height = 60): GameState {
+  const state = createGame({ seed: 42 });
+  state.navGrid = makeFlatGrid(width, height);
+  const heap = placeBuilding(state.buildings, 'spoil_heap', 30, 30, width, height);
+  if (!heap.success) throw new Error(`Setup: placeBuilding failed — ${heap.error}`);
   return state;
 }
 
@@ -230,6 +246,8 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
   it("an ore-bearing haul_debris candidate's resolved totalTicks matches an otherwise-identical plain candidate's, with no bonus subtracted", () => {
     const state = makeState();
     const emp = makeHaulerEmployee(state, 0, 0);
+    const heapState = makeHeapOnlyState();
+    const heapEmp = makeHaulerEmployee(heapState, 0, 0);
 
     // Two fragments at the exact same position — one ore-bearing, one not,
     // otherwise identical (same mass/volume, so computeActionWorkTicks's own
@@ -239,14 +257,13 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
     // travel-distance recomputation) stays correct regardless of exactly how
     // many legs planFragmentTaskItinerary's route happens to carry (today: a
     // drive to the fragment, then on to the depot).
-    addBlastFragments(state.logistics, [
-      makeFragment(1, 10, 0, {}),
-      makeFragment(2, 10, 0, { gloomium: 0.2 }),
-    ]);
+    // (The plain one is barren, so it lives in the heap-only twin of the site.)
+    addBlastFragments(heapState.logistics, [makeFragment(1, 10, 0, {})]);
+    addBlastFragments(state.logistics, [makeFragment(2, 10, 0, { gloomium: 0.2 })]);
     const plain = makeHaulAction({ id: 1, targetX: 10, targetZ: 0, payload: { fragmentId: 1 } });
     const ore = makeHaulAction({ id: 2, targetX: 10, targetZ: 0, payload: { fragmentId: 2 } });
 
-    const resolvedPlain = resolveActionCost(state, emp, plain);
+    const resolvedPlain = resolveActionCost(heapState, heapEmp, plain);
     const resolvedOre = resolveActionCost(state, emp, ore);
     expect(resolvedPlain).not.toBeNull();
     expect(resolvedOre).not.toBeNull();
@@ -266,7 +283,7 @@ describe('resolveActionCost — ore priority bonus never affects the real resolv
     addBlastFragments(state.logistics, [
       makeFragment(1, 10, 0, {}),
       makeFragment(2, 0, 10, { gloomium: 0.2 }),
-      makeFragment(3, 0, 10, {}),
+      makeFragment(3, 0, 10, { gloomium: 0.2 }),
     ]);
     const plain = makeHaulAction({ id: 1, targetX: 10, targetZ: 0, payload: { fragmentId: 1 } });
     const ore = makeHaulAction({ id: 2, targetX: 0, targetZ: 10, payload: { fragmentId: 2 } });

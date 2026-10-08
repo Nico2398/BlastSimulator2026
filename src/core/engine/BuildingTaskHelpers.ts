@@ -67,6 +67,31 @@ export function refreshLogisticsCapacity(state: GameState): WarehouseLoss[] {
 }
 
 /**
+ * Everything that follows a building landing in `state.buildings`: re-sync
+ * freight capacity, level the ground under the footprint, tell the nav grid,
+ * and move anyone standing on it. Shared by construction completion and the
+ * crewless instant placement (#1530). Returns the voxels cleared by levelling.
+ */
+export function settleBuiltFootprint(
+  state: GameState,
+  grid: VoxelGrid | null | undefined,
+  emitter: EventEmitter,
+  x: number,
+  z: number,
+  sizeX: number,
+  sizeZ: number,
+): number {
+  refreshLogisticsCapacity(state);
+  let voxelsCleared = 0;
+  if (grid) {
+    voxelsCleared = levelBuildingFootprint(grid, x, z, sizeX, sizeZ, emitter).voxelsCleared;
+    emitFootprintRegionChanged(emitter, grid, x, z, sizeX, sizeZ);
+  }
+  relocateFootprintOccupants(state, makeFootprintRegion(x, z, sizeX, sizeZ));
+  return voxelsCleared;
+}
+
+/**
  * Emit `nav:occupancy_changed` for a footprint of `sizeX`x`sizeZ` anchored
  * at (x, z) — the one shared implementation for every call site that needs
  * NavGridSync to re-patch a footprint's region without a voxel carve

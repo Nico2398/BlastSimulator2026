@@ -38,7 +38,7 @@ function makeFragment(id: number, x: number, z: number): FragmentData {
     volume: 0.3,
     mass: 1000,
     rockId: 'cruite',
-    oreDensities: {},
+    oreDensities: { blingite: 0.5 },
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
     halfExtents: { x: 0.5, y: 0.5, z: 0.5 },

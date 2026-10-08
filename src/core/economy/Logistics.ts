@@ -5,8 +5,10 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import { accumulateOreMass, decrementCollectedOre, oreContributionKg } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
-import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
+import { nearestSite, type WarehouseSite } from '../entities/BuildingWarehouse.js';
 import { pickWarehouse, warehouseFreeKg } from './FreightWarehouses.js';
+import { drawSpoilKg, haulDestinationOf, isBarrenFragment, rubbleStockKg } from './SpoilHeaps.js';
+import type { Building } from '../entities/Building.js';
 import { scale } from '../math/Vec3.js';
 import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
 
@@ -62,8 +64,9 @@ export function addBlastFragments(state: LogisticsState, fragments: FragmentData
 
 /**
  * Pick up a fragment with a vehicle and reserve room for it in the nearest
- * freight warehouse (from the vehicle's position) that can hold it. Returns
- * false when no warehouse has room (or none exist).
+ * freight warehouse (from the vehicle's position) that can hold it. A barren
+ * fragment reserves the nearest of `heapSites` instead (unbounded room, #1530).
+ * Returns false when no suitable site has room (or none exist).
  */
 export function pickupFragment(
   state: LogisticsState,
@@ -72,13 +75,16 @@ export function pickupFragment(
   sites: readonly WarehouseSite[],
   vehicleX: number,
   vehicleZ: number,
+  heapSites: readonly WarehouseSite[] = [],
 ): boolean {
   const tracked = state.fragments.find(
     f => f.fragment.id === fragmentId && f.state === 'on_ground',
   );
   if (!tracked) return false;
 
-  const site = pickWarehouse(state, sites, vehicleX, vehicleZ, tracked.fragment.mass);
+  const site = haulDestinationOf(tracked.fragment) === 'spoil_heap'
+    ? nearestSite(heapSites, vehicleX, vehicleZ)
+    : pickWarehouse(state, sites, vehicleX, vehicleZ, tracked.fragment.mass);
   if (!site) return false;
 
   tracked.state = 'in_transit';
@@ -121,6 +127,31 @@ export function deliverToDepot(
   }
 
   return true;
+}
+
+/**
+ * Dump a barren in-transit fragment on a spoil heap: the one reserved at
+ * pickup if it still exists, else the nearest to (`atX`,`atZ`). The fragment
+ * leaves logistics entirely — storedMassKg and collectedOre are untouched
+ * (heaps are not freight storage). Returns the heap and mass dumped so the
+ * caller can credit the heap building (logistics never imports buildings),
+ * or null without mutating anything when no heap can take it (#1530).
+ */
+export function deliverToSpoilHeap(
+  state: LogisticsState,
+  fragmentId: number,
+  heapSites: readonly WarehouseSite[],
+  atX: number,
+  atZ: number,
+): { heapId: number; massKg: number } | null {
+  const tracked = findInTransitFragment(state, fragmentId);
+  if (!tracked || haulDestinationOf(tracked.fragment) !== 'spoil_heap') return null;
+
+  const target = heapSites.find(s => s.id === tracked.warehouseId) ?? nearestSite(heapSites, atX, atZ);
+  if (!target) return null;
+
+  state.fragments.splice(state.fragments.indexOf(tracked), 1);
+  return { heapId: target.id, massKg: tracked.fragment.mass };
 }
 
 /** Mass/volume/ore content removed from storage by a sale or a partial split. */
@@ -271,13 +302,15 @@ export function extractOreFromFragment(
  * collectedOre[materialId] is decremented, by the exact kg extracted.
  * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
  * ore content — any fragment, ore-bearing or not — and debits every ore the
- * removed mass carried.
+ * removed mass carried. Rubble draws on the spoil heaps first (#1530), then
+ * storage; `buildings` is where the heaps are.
  */
 export function consumeStoredOre(
   state: LogisticsState,
   collectedOre: Record<string, number>,
   materialId: string,
   amountKg: number,
+  buildings: readonly Pick<Building, 'type' | 'storedSpoilKg'>[],
 ): { success: boolean; consumedKg: number; error?: string } {
   if (!Number.isFinite(amountKg) || amountKg <= 0) {
     return {
@@ -324,12 +357,12 @@ export function consumeStoredOre(
   }
 
   // Rubble / no-ore materials: consume raw stored mass, any fragment. Barren
-  // fragments (no ore content at all) go first, oldest-first within each
+  // fragments (ore below the spoil-heap threshold) go first, oldest-first within each
   // group, only reaching into ore-bearing fragments once barren stock runs
   // out — a rubble contract pays cents per kg where an ore_sale pays
   // dollars, so scrapping valuable ore-bearing rock as cheap rubble ahead of
   // genuinely worthless waste would squander it for no reason (#959).
-  const available = state.storedMassKg;
+  const available = rubbleStockKg(state.storedMassKg, buildings);
   if (amountKg > available) {
     return {
       success: false,
@@ -338,10 +371,11 @@ export function consumeStoredOre(
     };
   }
 
+  const fromHeaps = drawSpoilKg(buildings, amountKg);
+  const storageKg = amountKg - fromHeaps;
+
   const stored = state.fragments.filter(f => f.state === 'stored');
-  const isBarren = (f: TrackedFragment) => (
-    Object.values(f.fragment.oreDensities).every(d => d <= 0)
-  );
+  const isBarren = (f: TrackedFragment) => isBarrenFragment(f.fragment.oreDensities);
   const storedIds = [
     ...stored.filter(isBarren).map(f => f.fragment.id),
     ...stored.filter(f => !isBarren(f)).map(f => f.fragment.id),
@@ -349,11 +383,11 @@ export function consumeStoredOre(
 
   let removedMass = 0;
   for (const id of storedIds) {
-    if (removedMass >= amountKg) break;
+    if (removedMass >= storageKg) break;
     const tracked = findStoredFragment(state, id);
     if (!tracked) continue;
 
-    const remaining = amountKg - removedMass;
+    const remaining = storageKg - removedMass;
     const contribution = tracked.fragment.mass;
 
     // A rubble_disposal sale draws on every stored fragment regardless of ore
@@ -376,7 +410,7 @@ export function consumeStoredOre(
     }
   }
 
-  return { success: true, consumedKg: Math.min(removedMass, amountKg) };
+  return { success: true, consumedKg: Math.min(fromHeaps + removedMass, amountKg) };
 }
 
 /**

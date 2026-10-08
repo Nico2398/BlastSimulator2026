@@ -224,7 +224,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag2);
     const collectedOre: Record<string, number> = { oreA: 200 };
 
-    const result = consumeStoredOre(state, collectedOre, 'oreA', 100);
+    const result = consumeStoredOre(state, collectedOre, 'oreA', 100, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBeGreaterThan(0);
@@ -243,7 +243,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreB: 100 };
 
-    const result = consumeStoredOre(state, collectedOre, 'oreB', 100);
+    const result = consumeStoredOre(state, collectedOre, 'oreB', 100, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(100);
@@ -258,7 +258,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreC: 100 };
 
-    const result = consumeStoredOre(state, collectedOre, 'oreC', 300);
+    const result = consumeStoredOre(state, collectedOre, 'oreC', 300, []);
 
     expect(result.success).toBe(false);
     expect(result.consumedKg).toBe(0);
@@ -278,7 +278,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
 
-    const result = consumeStoredOre(state, collectedOre, 'unknownOre', 50);
+    const result = consumeStoredOre(state, collectedOre, 'unknownOre', 50, []);
 
     expect(result.success).toBe(false);
     expect(result.consumedKg).toBe(0);
@@ -300,7 +300,7 @@ describe('consumeStoredOre', () => {
     // that a strict split would leave a sub-epsilon sliver instead of fully
     // removing the fragment.
     const requested = 400 - FRAGMENT_SPLIT_EPSILON_KG / 2;
-    const result = consumeStoredOre(state, collectedOre, 'oreK', requested);
+    const result = consumeStoredOre(state, collectedOre, 'oreK', requested, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBeCloseTo(requested, 9);
@@ -330,7 +330,7 @@ describe('consumeStoredOre', () => {
     // the combined 700kg — must fully consume the oldest and partially split
     // 100kg of oreL (200kg of mass) off the newer, leaving its 400kg mass /
     // 200kg-of-oreL remainder in storage.
-    const result = consumeStoredOre(state, collectedOre, 'oreL', 500);
+    const result = consumeStoredOre(state, collectedOre, 'oreL', 500, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(500);
@@ -359,7 +359,7 @@ describe('consumeStoredOre', () => {
 
     // 300kg — exactly the barren fragment's own mass, so barren stock alone
     // covers it and the ore-bearing fragment is never reached.
-    const result = consumeStoredOre(state, collectedOre, '', 300);
+    const result = consumeStoredOre(state, collectedOre, '', 300, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(300);
@@ -386,7 +386,7 @@ describe('consumeStoredOre', () => {
     // out of the ore-bearing fragment, split rather than scrapped whole
     // (#973), and the ore that leaves with it is struck off collectedOre so
     // the ledger can't overstate what is physically in storage (#959).
-    const result = consumeStoredOre(state, collectedOre, '', 500);
+    const result = consumeStoredOre(state, collectedOre, '', 500, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(500);
@@ -409,7 +409,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
 
-    const first = consumeStoredOre(state, collectedOre, '', 100);
+    const first = consumeStoredOre(state, collectedOre, '', 100, []);
     expect(first.success).toBe(true);
     expect(first.consumedKg).toBe(100);
     expect(state.storedMassKg).toBe(695.75);
@@ -418,7 +418,7 @@ describe('consumeStoredOre', () => {
     expect(tracked!.state).toBe('stored');
     expect(tracked!.fragment.mass).toBe(695.75);
 
-    const second = consumeStoredOre(state, collectedOre, '', 40);
+    const second = consumeStoredOre(state, collectedOre, '', 40, []);
     expect(second.success).toBe(true);
     expect(second.consumedKg).toBe(40);
     expect(state.storedMassKg).toBe(655.75);
@@ -441,7 +441,7 @@ describe('consumeStoredOre', () => {
     // strict split would leave a sub-epsilon sliver instead of fully
     // removing the fragment.
     const requested = 400 - FRAGMENT_SPLIT_EPSILON_KG / 2;
-    const result = consumeStoredOre(state, collectedOre, '', requested);
+    const result = consumeStoredOre(state, collectedOre, '', requested, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBeCloseTo(requested, 9);
@@ -468,7 +468,7 @@ describe('consumeStoredOre', () => {
     // 500kg: more than the oldest fragment's 400kg alone, less than the
     // combined 700kg — must fully consume the oldest and partially split
     // 100kg off the newer, leaving its 200kg remainder in storage.
-    const result = consumeStoredOre(state, collectedOre, '', 500);
+    const result = consumeStoredOre(state, collectedOre, '', 500, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(500);
@@ -489,7 +489,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreX: 100 };
 
-    const result = consumeStoredOre(state, collectedOre, '', 200);
+    const result = consumeStoredOre(state, collectedOre, '', 200, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(200);
@@ -508,7 +508,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
 
-    const result = consumeStoredOre(state, collectedOre, '', 400);
+    const result = consumeStoredOre(state, collectedOre, '', 400, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(400);
@@ -522,7 +522,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = {};
 
-    const result = consumeStoredOre(state, collectedOre, '', 500);
+    const result = consumeStoredOre(state, collectedOre, '', 500, []);
 
     expect(result.success).toBe(false);
     expect(result.consumedKg).toBe(0);
@@ -538,7 +538,7 @@ describe('consumeStoredOre', () => {
     const collectedOreBefore = { ...collectedOre };
     const storedMassBefore = state.storedMassKg;
 
-    const result = consumeStoredOre(state, collectedOre, 'oreH', NaN);
+    const result = consumeStoredOre(state, collectedOre, 'oreH', NaN, []);
 
     expect(result.success).toBe(false);
     expect(result.consumedKg).toBe(0);
@@ -557,7 +557,7 @@ describe('consumeStoredOre', () => {
     const collectedOreBefore = { ...collectedOre };
     const storedMassBefore = state.storedMassKg;
 
-    const result = consumeStoredOre(state, collectedOre, 'oreI', Infinity);
+    const result = consumeStoredOre(state, collectedOre, 'oreI', Infinity, []);
 
     expect(result.success).toBe(false);
     expect(result.consumedKg).toBe(0);
@@ -575,7 +575,7 @@ describe('consumeStoredOre', () => {
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreF: 75, oreG: 75 };
 
-    const result = consumeStoredOre(state, collectedOre, 'oreF', 75);
+    const result = consumeStoredOre(state, collectedOre, 'oreF', 75, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(75);
@@ -595,7 +595,7 @@ describe('consumeStoredOre', () => {
     const collectedOre: Record<string, number> = { oreF: 75, oreG: 75 };
 
     // 30kg < the fragment's 75kg of oreF — only the sold ore is removed.
-    const result = consumeStoredOre(state, collectedOre, 'oreF', 30);
+    const result = consumeStoredOre(state, collectedOre, 'oreF', 30, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBe(30);
@@ -927,7 +927,7 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
   it('repro: selling all rustite leaves the 800kg of dirtite in the ledger and in storage', () => {
     const { state, collectedOre } = mixedStorage();
 
-    const result = consumeStoredOre(state, collectedOre, 'rustite', 400);
+    const result = consumeStoredOre(state, collectedOre, 'rustite', 400, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBeCloseTo(400, 6);
@@ -947,7 +947,7 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
     const bBefore = oreKgIn(frag, 'oreB');
     const collectedOre: Record<string, number> = { oreA: 400, oreB: 400 };
 
-    const result = consumeStoredOre(state, collectedOre, 'oreA', 400);
+    const result = consumeStoredOre(state, collectedOre, 'oreA', 400, []);
 
     expect(result.success).toBe(true);
     expect(oreKgIn(frag, 'oreB')).toBeCloseTo(bBefore, 6);
@@ -961,7 +961,7 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
     putInStorage(state, frag);
     const collectedOre: Record<string, number> = { oreA: 400, oreB: 400 };
 
-    const result = consumeStoredOre(state, collectedOre, 'oreA', 200);
+    const result = consumeStoredOre(state, collectedOre, 'oreA', 200, []);
 
     expect(result.success).toBe(true);
     expect(result.consumedKg).toBeCloseTo(200, 6);
@@ -976,9 +976,9 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
   it('keeps collectedOre and storedMassKg equal to the sums over stored fragments after sequential sales', () => {
     const { state, collectedOre } = mixedStorage();
 
-    consumeStoredOre(state, collectedOre, 'rustite', 150);
-    consumeStoredOre(state, collectedOre, 'dirtite', 300);
-    consumeStoredOre(state, collectedOre, 'rustite', 100);
+    consumeStoredOre(state, collectedOre, 'rustite', 150, []);
+    consumeStoredOre(state, collectedOre, 'dirtite', 300, []);
+    consumeStoredOre(state, collectedOre, 'rustite', 100, []);
 
     for (const oreId of ['rustite', 'dirtite']) {
       expect(collectedOre[oreId]).toBeCloseTo(storedOreKg(state, oreId), 6);
@@ -991,7 +991,7 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
   it('selling all dirtite removes pure-dirtite fragment 2 and leaves fragment 1 holding only rustite', () => {
     const { state, collectedOre } = mixedStorage();
 
-    const result = consumeStoredOre(state, collectedOre, 'dirtite', 400 - FRAGMENT_SPLIT_EPSILON_KG / 2 + 400);
+    const result = consumeStoredOre(state, collectedOre, 'dirtite', 400 - FRAGMENT_SPLIT_EPSILON_KG / 2 + 400, []);
 
     expect(result.success).toBe(true);
     // Fragment 2 is pure dirtite and fully consumed: it must be gone.
@@ -1008,14 +1008,14 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
     putInStorage(state, makeStoredFragment(1, 1000, 0.32, { oreA: 0.5 }));
     const collectedOre: Record<string, number> = { oreA: 400 };
 
-    const sale = consumeStoredOre(state, collectedOre, 'oreA', 400);
+    const sale = consumeStoredOre(state, collectedOre, 'oreA', 400, []);
     expect(sale.success).toBe(true);
     expect(collectedOre.oreA).toBeCloseTo(0, 6);
     // The barren half (500kg of gangue) is still stored.
     expect(state.storedMassKg).toBeCloseTo(500, 6);
     expect(getFragmentCounts(state).stored).toBe(1);
 
-    const rubble = consumeStoredOre(state, collectedOre, '', 500);
+    const rubble = consumeStoredOre(state, collectedOre, '', 500, []);
     expect(rubble.success).toBe(true);
     expect(rubble.consumedKg).toBeCloseTo(500, 6);
     expect(state.storedMassKg).toBeCloseTo(0, 6);
@@ -1024,10 +1024,10 @@ describe('consumeStoredOre keeps the other ores of a mixed fragment (#1371)', ()
   it('insufficient stock, NaN and non-positive amounts are still refused without touching state', () => {
     const { state, collectedOre } = mixedStorage();
 
-    expect(consumeStoredOre(state, collectedOre, 'rustite', 401).success).toBe(false);
-    expect(consumeStoredOre(state, collectedOre, 'rustite', NaN).success).toBe(false);
-    expect(consumeStoredOre(state, collectedOre, 'rustite', -5).success).toBe(false);
-    expect(consumeStoredOre(state, collectedOre, '', 99999).success).toBe(false);
+    expect(consumeStoredOre(state, collectedOre, 'rustite', 401, []).success).toBe(false);
+    expect(consumeStoredOre(state, collectedOre, 'rustite', NaN, []).success).toBe(false);
+    expect(consumeStoredOre(state, collectedOre, 'rustite', -5, []).success).toBe(false);
+    expect(consumeStoredOre(state, collectedOre, '', 99999, []).success).toBe(false);
     expect(collectedOre).toEqual({ rustite: 400, dirtite: 800 });
     expect(state.storedMassKg).toBe(1500);
   });

@@ -186,7 +186,7 @@ export function runTick(
 
   // 3. Contracts — stored ore is delivered first, so a deadline tick that stock
   // can still fill pays out and completes before the penalty is assessed.
-  const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount);
+  const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount, state.buildings.buildings);
   for (const delivery of contractsDelivered) {
     bookDeliveryIncome(state, delivery.contractId, delivery, state.tickCount);
   }
