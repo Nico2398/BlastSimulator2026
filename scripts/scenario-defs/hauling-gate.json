@@ -145,8 +145,8 @@
       }
     },
     {
-      "command": "build spoil_heap at:2,3",
-      "description": "#1530: this small blast leaves only barren rock, which goes to a spoil heap, not the warehouse. Crewless, so it stands at once (the warehouse above is already built). A Build menu click.",
+      "command": "build spoil_heap at:8,10",
+      "description": "#1530: this small blast leaves only barren rock, which goes to a spoil heap, not the warehouse. Crewless, so it stands at once (the warehouse above is already built). A Build menu click. Tile (8,10), not (2,3): a 2x2 heap at (2,3) strands crew-reachable cells and opens the \"Place anyway?\" cutoff modal (#1391), which this step never answers.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -162,8 +162,8 @@
         },
         {
           "type": "pickTile",
-          "x": 2,
-          "z": 3
+          "x": 8,
+          "z": 10
         },
         {
           "type": "clickSelector",

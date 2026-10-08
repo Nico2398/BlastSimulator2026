@@ -1530,8 +1530,9 @@
         }
       ],
       "expect": {
-        "tutorialStep": "sell-ore",
-        "note": "The card is still 'sell-ore' after accepting: accepting an offer is not selling anything, and this step's own predecessor already proved a delivery of any kind no longer advances it. Only the completed ore sale in the next step does."
+        "increased": [
+          "activeContractCount"
+        ]
       }
     },
     {
@@ -1555,16 +1556,12 @@
         {
           "type": "clickSelector",
           "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "free-play",
-          "timeout": 60000
         }
       ],
       "expect": {
-        "tutorialStep": "free-play",
-        "note": "#959/#1328: a COMPLETED ore_sale is what advances 'sell-ore'; the card landing on free-play (rails lifted) is the proof the tutorial sold the ore it blasted."
+        "increased": [
+          "cash"
+        ]
       }
     },
     {

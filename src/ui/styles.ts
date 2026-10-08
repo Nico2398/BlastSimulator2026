@@ -444,11 +444,11 @@ const CSS = `
   color: var(--bsx-text-primary);
 }
 /* ─── Placement parameter strip (redesign P3) ───
-   Bottom-docked like the tutorial coach card above, so a guided step that
+   Bottom-docked like the tutorial coach card above, so a step that
    arms the placement tool needs the strip pushed clear of the card instead
    of sitting behind it — same screen edge, same z-stack region. */
 #bs-param-strip { bottom: 18px; }
-body.bs-tutorial-guided #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
+body.bs-tutorial-card #bs-param-strip { bottom: var(--bsx-tutorial-card-clearance, 210px); }
 /* Overrides the shared .bs-panel-title (uppercase, gold, bordered) — the
    coach card's title sits inline with the CLOCK HELD chip and step counter
    instead of owning its own bordered header row. */
