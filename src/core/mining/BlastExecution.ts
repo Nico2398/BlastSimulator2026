@@ -276,7 +276,7 @@ export function executeBlast(
   groundFactor: number = DEFAULT_GROUND_FACTOR,
   buildingState?: BuildingState,
   emitter?: EventEmitter,
-  /** Hole ids currently flooded (raining, no tubing installed — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
+  /** Hole ids currently holding water (stored hole water past the wet threshold — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
   wetHoleIds: ReadonlySet<string> = new Set(),
 ): BlastResult | null {
   // 1. Validate

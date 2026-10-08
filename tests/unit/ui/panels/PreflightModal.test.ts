@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PreflightModal } from '../../../../src/ui/panels/PreflightModal.js';
+import { wetAllHoles } from '../../../helpers/holeWater.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
@@ -102,14 +103,16 @@ describe('PreflightModal', () => {
     expect(modal.root.textContent).toContain('projections — T3');
   });
 
-  it('warns about wet holes while raining, and shows the ok line once dry', () => {
+  it('warns about holes that hold water, and shows the ok line once they are dry', () => {
     const { modal } = makeModal();
     modal.show();
     const state = chargedPlan();
 
-    modal.update(state, 'heavy_rain');
+    wetAllHoles(state);
+    modal.update(state, 'sunny');
     expect(modal.root.textContent).toContain('1 holes are full of water');
 
+    state.holeWater = {};
     modal.update(state, 'sunny');
     expect(modal.root.textContent).toContain('All holes are dry or tubed');
   });

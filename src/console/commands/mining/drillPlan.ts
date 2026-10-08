@@ -38,6 +38,7 @@ export interface DrillHoleActionPayload {
 function clearHoleCharges(state: GameState, holeId: string): void {
   delete state.chargesByHole[holeId];
   delete state.plannedChargesByHole[holeId];
+  delete state.holeWater[holeId];
   removeAwaiting(state, holeId);
   removeHoleTubing(state.tubingState, holeId);
 }

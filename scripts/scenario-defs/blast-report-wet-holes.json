@@ -154,6 +154,32 @@
       "role": "bootstrap"
     },
     {
+      "command": "tick 4",
+      "description": "#1350: wetness is per-hole water state, not 'is it raining right now' -- the rain has to fall on the holes. Four heavy_rain ticks (0.7 intensity x HOLE_RAIN_FILL_RATE per tick) push every untubed hole past HOLE_WET_THRESHOLD; the weather pinned just above lasts up to 8 ticks, so it stays heavy_rain throughout.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 4"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "weather": "heavy_rain"
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "blast",
       "timeout": 70,
       "frames": 1,

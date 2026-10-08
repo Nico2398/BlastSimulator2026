@@ -1364,6 +1364,78 @@
       "role": "bootstrap"
     },
     {
+      "command": "buy tubing amount:4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "buy tubing amount:4"
+        }
+      ],
+      "description": "Tubing for cycle 3's four holes (#1350): tubed holes are watertight and may be drained, whereas an untubed porous hole refills and cannot be. Zero ticks, so the tick-phased hiring and shift timing of cycle 4 stays untouched.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "install_tubing hole:H1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "install_tubing hole:H1"
+        }
+      ],
+      "description": "Tube H1 (#1350), see the tubing buy step above.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "install_tubing hole:H2",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "install_tubing hole:H2"
+        }
+      ],
+      "description": "Tube H2 (#1350), see the tubing buy step above.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "install_tubing hole:H3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "install_tubing hole:H3"
+        }
+      ],
+      "description": "Tube H3 (#1350), see the tubing buy step above.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "install_tubing hole:H4",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "install_tubing hole:H4"
+        }
+      ],
+      "description": "Tube H4 (#1350), see the tubing buy step above.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "drain_hole hole:*",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drain_hole hole:*"
+        }
+      ],
+      "description": "Empty any standing water (#1350): this cycle's catastrophic boomite blast (see the #950 note on the blast step) must detonate at full strength, but natural rain may have wetted the holes while the crew worked and a wet hole fizzles water-sensitive boomite to 10%. Costs no ticks. Refused when no hole is wet.",
+      "role": "bootstrap",
+      "commandOutcome": "either",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
       "command": "blast",
       "timeout": 100,
       "frames": 6,

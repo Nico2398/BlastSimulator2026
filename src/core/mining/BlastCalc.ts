@@ -39,9 +39,8 @@ export function calculateHoleEnergy(charge: HoleCharge): number {
 export function computeInitialEnergy(charge: HoleCharge, holeDepth: number, isFlooded = false): number {
   const explosive = getExplosive(charge.explosiveId);
   if (!explosive) return 0;
-  // hasTubing is always false here: the caller (buildBlastEnergyField) only
-  // marks a hole flooded via wetHoles(), which already excludes tubed holes
-  // (WetHoles.ts) — isFlooded=true already means "and no tubing protects it".
+  // hasTubing is always false here: tubing does not remove water already in a
+  // hole (#1350), so isFlooded (from wetHoles(), WetHoles.ts) alone decides.
   const wf = waterEffect(isFlooded, explosive.waterSensitive, false);
   return explosive.energyPerKg * charge.amountKg * stemmingEfficiency(charge.stemmingM, holeDepth) * wf;
 }

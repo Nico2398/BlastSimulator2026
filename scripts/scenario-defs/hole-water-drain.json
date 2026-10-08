@@ -1,0 +1,283 @@
+{
+  "name": "hole-water-drain",
+  "description": "Issue #1350: tubing can be bought in dry weather, a storm wets untubed holes, tubing keeps the water already in them, and one Drain click (cost per hole) empties them. All by real clicks on the Charge step.",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 20,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:1 cols:1 spacing:5 depth:6 start:15,15",
+      "description": "One hole: a zero-size drag over a single tile (15,15) computes round(0/5)+1 = 1 row and column, so a 1x1 grid. A single hole keeps the install and drain clicks one-to-one with their console commands.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 5
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 6
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 15,
+          "z2": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 1,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 90",
+      "description": "Drain the ordered plan: the staffed driller/drill_rig lands the hole. Natural weather may already have wetted it; the wait below lets it dry out.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 90"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "weather set sunny",
+      "description": "Dry weather: no rain. #1350 lets tubing be bought and installed ahead of rain.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "weather": "sunny"
+        }
+      }
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until the hole holds no standing water: natural weather may have wetted it during the drilling ticks (#1350), and the storm below must be the only water source.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "buy amount:10",
+      "description": "#1350: in dry weather the Charge step still shows the tubing card. The player buys tubing from it with a real click.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"tubing-buy\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"tubing-buy\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -500
+        },
+        "usable": "#bs-blast-panel [data-action=\"tubing-install\"]"
+      }
+    },
+    {
+      "command": "weather set storm",
+      "description": "A storm falls on the untubed hole.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set storm"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "weather": "storm"
+        }
+      }
+    },
+    {
+      "command": "tick 3",
+      "description": "Three storm ticks (storm lasts up to 6): every untubed hole is past HOLE_WET_THRESHOLD.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 3"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 1,
+          "weather": "storm"
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "install_tubing hole:H1",
+      "description": "Tubing the wet holes makes them watertight but does NOT remove the water already in them: wetHoleCount stays 1.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"tubing-install\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"tubing-install\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 1
+        }
+      }
+    },
+    {
+      "command": "drain_hole hole:H1",
+      "description": "One Drain click empties the wet hole (tubed now, so porous rock cannot refill it). Costs HOLE_DRAIN_COST_PER_HOLE (20).",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"drain-holes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"drain-holes\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -20
+        },
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 2",
+      "description": "Drained tubed holes stay dry with the storm still falling.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 2"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    }
+  ]
+}

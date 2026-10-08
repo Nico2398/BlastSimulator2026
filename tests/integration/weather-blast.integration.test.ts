@@ -38,6 +38,25 @@ function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, ma
   }
 }
 
+/**
+ * Wetness is per-hole water state (#1350), not "is it raining right now", so a
+ * blast in rain needs the rain to have fallen on the holes first. Resets all
+ * water (earlier drift ticks may have rained), then either leaves the holes dry
+ * (non-rain weather) or pins the weather for a few ticks so the holes fill.
+ */
+const RAINY = new Set(['light_rain', 'heavy_rain', 'storm']);
+function applyWeather(runner: ConsoleRunner, ctx: GameContext, weather: string): void {
+  ctx.state!.holeWater = {};
+  ctx.state!.groundWetness = 0;
+  if (RAINY.has(weather)) {
+    for (let i = 0; i < 4; i++) {
+      runner.run(`weather set ${weather}`);
+      runner.run('tick 1');
+    }
+  }
+  runner.run(`weather set ${weather}`);
+}
+
 // Weather ticks with the game (#1403), so a weather set before the long drill
 // and charge drives has drifted by blast time. Pin it right before the blast.
 function drillChargeBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string, weather = 'sunny') {
@@ -45,7 +64,7 @@ function drillChargeBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: 
   driveDrillPlanToCompletion(runner, ctx);
   runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
   driveChargePlanToCompletion(runner, ctx);
-  runner.run(`weather set ${weather}`);
+  applyWeather(runner, ctx, weather);
   return runner.run('blast');
 }
 
@@ -98,7 +117,7 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
     }
     tubed.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     driveChargePlanToCompletion(tubed.runner, tubed.ctx);
-    tubed.runner.run('weather set heavy_rain');
+    applyWeather(tubed.runner, tubed.ctx, 'heavy_rain');
     const tubedBlast = tubed.runner.run('blast');
     expect(tubedBlast.success).toBe(true);
 
@@ -107,8 +126,8 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
     const dryBlast = drillChargeBlast(dry.runner, dry.ctx, 'boomite');
     expect(dryBlast.success).toBe(true);
 
-    // Tubing fully protects a hole (wetHoles() excludes tubed holes outright,
-    // WetHoles.ts) — same outcome as a dry blast despite the rain.
+    // A tubed hole never takes on water (#1350), so the holes stay dry through
+    // the rain: same outcome as a dry blast.
     expect(tubed.ctx.state!.lastBlastReport!.clearedVoxels)
       .toBe(dry.ctx.state!.lastBlastReport!.clearedVoxels);
   });
@@ -148,7 +167,7 @@ describe('software previews model wet holes like the real blast (#1347)', () => 
     driveDrillPlanToCompletion(game.runner, game.ctx);
     game.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
     driveChargePlanToCompletion(game.runner, game.ctx);
-    game.runner.run(`weather set ${weather ?? 'sunny'}`);
+    applyWeather(game.runner, game.ctx, weather ?? 'sunny');
     game.ctx.state!.softwareTier = 3;
     return game;
   }
@@ -187,7 +206,7 @@ describe('blast report lists wet and fizzled holes (#1348)', () => {
     game.runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
     driveChargePlanToCompletion(game.runner, game.ctx);
     const chargedIds = Object.keys(game.ctx.state!.chargesByHole).sort();
-    game.runner.run(`weather set ${weather ?? 'sunny'}`);
+    applyWeather(game.runner, game.ctx, weather ?? 'sunny');
     expect(game.runner.run('blast').success).toBe(true);
     return { report: game.ctx.state!.lastBlastReport!, chargedIds };
   }

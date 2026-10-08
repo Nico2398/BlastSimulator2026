@@ -2849,6 +2849,37 @@
       }
     },
     {
+      "command": "weather set cloudy",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "weather set cloudy"
+        }
+      ],
+      "description": "Third blast: the holes still hold water from the earlier storm (#1350) and would weaken the water-sensitive boomite. Pin dry weather before charging, then wait for the standing water to seep away.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:wetHoleCount equals:0 max_ticks:300",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "wetHoleCount",
+          "equals": 0,
+          "maxTicks": 300,
+          "timeoutMs": 120000
+        }
+      ],
+      "description": "Wait until no hole holds standing water (#1350): wet holes weaken water-sensitive charges. Always ticks at least once; waits longer only while water remains.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wetHoleCount": 0
+        }
+      }
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:6 stemming:3",
       "interaction": [
         {
@@ -3245,8 +3276,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 40.50072843995567,
-          "nuisance": 14.453787717584227
+          "ecology": 48.240728439955674,
+          "nuisance": 34.20378771758413
         },
         "changedBy": {
           "tickCount": 0
@@ -3938,7 +3969,7 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
@@ -3962,12 +3993,12 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 99.6591666666668,
           "safety": 0,
-          "ecology": 32.752412743407326,
-          "nuisance": 0
+          "ecology": 30.14659937179473,
+          "nuisance": 0.6012486912389817
         },
         "changedBy": {
           "tickCount": 0
@@ -3988,12 +4019,12 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 99.6591666666668,
           "safety": 0,
-          "ecology": 32.752412743407326,
-          "nuisance": 0
+          "ecology": 30.14659937179473,
+          "nuisance": 0.6012486912389817
         },
         "changedBy": {
           "tickCount": 0
@@ -4016,7 +4047,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000
+          "profit": 250000.00000000023
         },
         "increased": [
           "cash"
@@ -4039,7 +4070,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000
+          "profit": 250000.00000000023
         },
         "changedBy": {
           "cash": 0,

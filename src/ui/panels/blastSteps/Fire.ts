@@ -24,8 +24,8 @@ import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { computeDangerZone, isInZone, type ZoneBounds } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
-import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
+import type { GameState } from '../../../core/state/GameState.js';
 import type { GameConsoleFn } from '../../gameConsole.js';
 
 
@@ -90,10 +90,10 @@ export class FireStep {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
-  update(state: GameState, weather: WeatherState | undefined): void {
+  update(state: GameState, _weather?: WeatherState): void {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
     this.currentZone = zone;
-    const wet = weather ? wetHoles(state, weather) : [];
+    const wet = wetHoles(state);
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
     const signature = JSON.stringify({ zone, occupants: occupantKeys, wetCount: wet.length });

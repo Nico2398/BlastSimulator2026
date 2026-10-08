@@ -1865,3 +1865,39 @@ export const HAUL_BATCH_MAX_ITEMS = 6;
 
 /** Fewest stranded cells that make a placement report a cutoff (#1391). */
 export const PLACEMENT_CUTOFF_MIN_CELLS = 1;
+
+// ─── Hole water (#1350) ─────────────────────────────────────────────────────────
+
+/** Water level (fraction of hole depth) above which a hole counts as wet. */
+export const HOLE_WET_THRESHOLD = 0.3;
+
+/**
+ * Level fraction a bare hole gains per tick per unit of rain intensity. Storm (1.0) fills a bare
+ * hole in 2 ticks, light rain (0.3) in ~7, so rain is felt within the first ticks of a downpour.
+ */
+export const HOLE_RAIN_FILL_RATE = 0.5;
+
+/**
+ * Level fraction per tick seeping in from wet ground, per unit of ground wetness and porosity.
+ * Tight rock (0.03) seeps less than it fades and never refills; porous rock (0.35) on saturated
+ * ground out-seeps its slowed fade (0.105 vs 0.03 per tick) and refills for the few ticks the ground stays wet.
+ */
+export const HOLE_SEEP_RATE = 0.3;
+
+/** Level fraction lost per tick when it is not raining, in tight rock: ~17 ticks from full. */
+export const HOLE_WATER_FADE_RATE = 0.06;
+
+/** How strongly porosity slows fading (fade = rate * (1 - porosity * this)): 0.35 porosity fades ~2x slower than 0.03. */
+export const HOLE_FADE_POROSITY_SLOWDOWN = 1.4;
+
+/** Ground wetness gained per tick per unit of rain intensity (storm saturates in 4 ticks). */
+export const GROUND_WETNESS_RISE_RATE = 0.25;
+
+/** Ground wetness lost per tick when it is not raining: saturated ground lingers ~5 ticks. */
+export const GROUND_WETNESS_DECAY_RATE = 0.2;
+
+/** Cash to drain one wet hole. */
+export const HOLE_DRAIN_COST_PER_HOLE = 20;
+
+/** Porosity at or below which an untubed hole cannot be drained (water returns at once). */
+export const HOLE_DRAIN_POROSITY_LIMIT = 0.15;

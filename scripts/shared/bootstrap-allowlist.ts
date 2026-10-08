@@ -181,4 +181,13 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // is no hire button for a role that doesn't exist, a genuine no-op in
   // both modes.
   'employee hire role:hauler',
+  // blast-execution-visual.json (#1350): empties the rain water a hole picked
+  // up while the crew worked, with zero ticks. Waiting the water out costs
+  // ~26 ticks and tips that file's phase-tuned cycle 4 into a worker revolt,
+  // and an untubed porous hole refuses a drain, so the step tubes the holes
+  // first. Hole water is a real mechanic with real controls (Charge step
+  // drain button); this only avoids a tick cost that would shift the fixture.
+  'buy tubing',
+  'install_tubing',
+  'drain_hole',
 ];
