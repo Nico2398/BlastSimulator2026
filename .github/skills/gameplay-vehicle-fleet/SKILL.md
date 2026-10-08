@@ -247,6 +247,15 @@ reasons clear on the next classification; `NotificationCenter` toasts each once 
 (not per action), and again if the reason changes. Capacity is re-derived from the warehouses
 after any building mutation and on load.
 
+## Vehicle Repair (#1393)
+
+A damaged vehicle (`0 < hp < maxHp`, `isRepairable`) that nobody is sitting in and no order has reserved gets one self-dispatched `repair_vehicle` order per tick sync (`syncRepairDispatch`, `RepairDispatch.ts`, run beside `syncHaulDispatch`). The order is on foot (`requiredVehicleRole` null) and needs the `repair` skill, trained at the Driving Center. There is no Vehicle Depot building: repair happens in place, wherever the vehicle stands.
+
+- Orders skip the qualification check and sit queued with `blockedReason = 'no_qualified_employee'` while nobody holds `repair`; this never raises the unqualified modal or auto-pause. A qualified employee who is merely busy or resting does not block anything.
+- Stale queued orders (vehicle gone, fully healed, boarded or reserved) are pruned on the next sync.
+- A vehicle under a claimed repair order is not claimable by `findFreeVehicleForRole` / `findVehicleForClaim` until the repair completes or aborts.
+- Duration: `ceil(missingHp * REPAIR_BASE_TICKS_PER_HP)` base ticks, scaled by proficiency like any `payload.durationTicks` action. Each work tick restores `repairHpThisTick` (missing hp spread over the ticks left) and charges `REPAIR_PARTS_COST_PER_HP` per restored hp as an expense, so an interrupted repair resumes with the right remainder and is never double-charged. XP goes to `repair`.
+
 ## Traffic
 
 Vehicles cannot share a cell. A driver whose next drive step is occupied waits and retries, then

@@ -403,6 +403,7 @@ describe('every action type is judged by the red rule (#1306)', () => {
     drill_hole: true, charge_hole: true, dig_ramp_segment: true, level_ground: true,
     place_building: true, demolish_building: true, survey: true,
     fragment_debris: true, haul_debris: true, rest: true, general_work: true,
+    repair_vehicle: true,
   };
 
   it.each(Object.keys(ALL_ACTION_TYPES) as ActionType[])('%s: red with no actor, blue with an actor that reaches it, red when stranded', (type) => {

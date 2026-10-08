@@ -1,7 +1,7 @@
 ---
 name: gameplay-buildings
 description: >
-  Buildings system specification for BlastSimulator2026: 9 building types with 3 tiers each,
+  Buildings system specification for BlastSimulator2026: 8 building types with 3 tiers each,
   placement rules, training buildings, living quarters, warehouses, Research Center,
   and destruction effects. Use when implementing or modifying buildings,
   construction, demolition, tier upgrades, or any building-gated action.
@@ -22,7 +22,7 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 
 | Building | Tier 1 | Tier 2 | Tier 3 | Purpose |
 |----------|--------|--------|--------|---------|
-| Driving Center | "Learner's Lot" | "Wheel Academy" | "Turbo Campus" | Trains employees for specific vehicle roles |
+| Driving Center | "Learner's Lot" | "Wheel Academy" | "Turbo Campus" | Trains employees for specific vehicle roles and vehicle repair |
 | Blasting Academy | "Boom Shack" | "Detonation Den" | "The Kaboom Institute" | Trains explosives handling and blast sequencing |
 | Management Office | "The Cupboard" | "Bureaucracy Box" | "Corner Office Supreme" | Trains HR and commercial operations |
 | Geology Lab | "Rock Shed" | "Stone Science HQ" | "Institute of Expensive Rocks" | Trains survey techniques |
@@ -30,7 +30,6 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
 | Explosive Warehouse | "Boom Closet" | "Blast Vault" | "Fort Kaboom" | Stores explosives from supply contracts |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
-| Vehicle Depot | "Rusty Garage" | "Grease Palace" | "Mecha Hangar" | Parks and repairs vehicles |
 
 ## Tier System
 
@@ -55,7 +54,7 @@ Demolish is confirmed (#1399) from the Build menu row and the selection bar via 
 
 | Building | Skill Granted |
 |----------|--------------|
-| Driving Center | Vehicle licence — truck, excavator, drill rig, rock fragmenter. Roles arrive holding their own; the rock fragmenter licence is only earned here |
+| Driving Center | Vehicle licence — truck, excavator, drill rig, rock fragmenter; also the `repair` skill (vehicle repair, #1393). Roles arrive holding their own; the rock fragmenter licence is only earned here |
 | Blasting Academy | Explosives charging and blast sequencing |
 | Management Office | HR and commercial operations |
 | Geology Lab | Survey techniques and rock analysis |
@@ -159,7 +158,6 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 | Living Quarters Tier 3 | Housing/feeding | High well-being → productivity ×1.10 |
 | Explosive Warehouse | Enables supply contracts | Secondary blast if destroyed with stock |
 | Freight Warehouse | Enables ore sale contracts | Main income; throughput limited by distance |
-| Vehicle Depot | Vehicle parking/maintenance | Required for repairs |
 | Research Center | Unlocks building tiers | Occupied during each research task |
 | Training Buildings | Grants skill qualifications | Prevents unqualified-task errors |
 
@@ -167,7 +165,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 
 `src/core/entities/Building.ts` declares `BuildingType`, `BuildingTier` and `BuildingDef`, and is the only authority on their fields — costs, `footprint` and the approach `entryPoint`/`exitPoint` offsets, `capacity`, `maxHp`, `scoreEffects`. Read that file before writing against them.
 
-Meanings the code does not state: `capacity` is role-specific (beds for Living Quarters, trainees for a training building, kg for a warehouse, vehicle slots for a depot) — how many people fit inside is `getBuildingPeopleCapacity`, not `capacity` read raw; `nameKey` is an i18n key naming the tier-specific building name. Per-tier costs and thresholds live in `src/core/config/balance.ts`.
+Meanings the code does not state: `capacity` is role-specific (beds for Living Quarters, trainees for a training building, kg for a warehouse) — how many people fit inside is `getBuildingPeopleCapacity`, not `capacity` read raw; `nameKey` is an i18n key naming the tier-specific building name. Per-tier costs and thresholds live in `src/core/config/balance.ts`.
 
 
 Build catalog rows show a one-line purpose plus operating cost in $/h and a tooltip of absolute stats (footprint, capacity with unit, upkeep), built in `src/ui/catalogCardText.ts`; the tooltip follows the selected tier.

@@ -25,6 +25,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, removeVehicleReservation } from '../entities/Vehicle.js';
+import { isVehicleUnderRepair } from '../entities/VehicleRepair.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
@@ -186,7 +187,7 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
 
 /**
  * Cheapest-eligible free vehicle of `role` for `employee`: unreserved
- * (reservedForActionId === null), not `broken`, and either undriven
+ * (reservedForActionId === null), not `broken`, not under an active repair order (#1393), and either undriven
  * (driverId === null) or already driven by `employee` themself (the
  * continuity case — lets a claim naturally re-pick the vehicle the employee
  * is already sitting in for their next same-role task). A vehicle already
@@ -217,6 +218,7 @@ export function findFreeVehicleForRole(state: GameState, role: VehicleRole, empl
     v.type === role &&
     v.hp > 0 &&
     getVehicleReservation(state.vehicles, v.id) === null &&
+    !isVehicleUnderRepair(state.pendingActions, v.id) &&
     (vehicleDriverId(v) === null || vehicleDriverId(v) === employee.id),
   );
   if (qualifying.length === 0) return null;

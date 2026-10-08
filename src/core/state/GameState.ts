@@ -185,6 +185,7 @@ export type ActionType =
   | 'survey'
   | 'fragment_debris'
   | 'haul_debris'
+  | 'repair_vehicle'
   | 'rest'
   | 'general_work';
 

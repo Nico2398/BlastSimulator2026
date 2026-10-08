@@ -12,7 +12,6 @@
                      scavenged watchtower with a cold spotlight, cell doors 1 and 3 (2 welded shut).
 * explosive_warehouse Boom Closet: a two-seat outhouse stuffed with dynamite, TNT stencil, lit fuse, danger sign, sandbags.
 * freight_warehouse  The Pile: a junk heap under a tarp on crooked poles, bathtub, bent bike, scale, STUFF sign, rats.
-* vehicle_depot      Rusty Garage: a rusted tin lean-to, car on bricks with the hood up, oil puddle, GAR GE sign, work lamp.
 
 Same axes as buildings.py: the model is centred on its footprint, the FRONT
 (entry and exit doors) is +Y, ground is z = 0. Every tier-1 model stays under
@@ -43,7 +42,6 @@ DULL = {
     'living_quarters': 0xAEB4B8,
     'explosive_warehouse': 0xA55A4A,
     'freight_warehouse': 0x7A756E,
-    'vehicle_depot': 0xA08C4A,
 }
 
 
@@ -1478,87 +1476,6 @@ def build_freight_warehouse(sx, sz, ex, xx, m):
     pivot('Body', (0, 0, 0), parts)
 
 
-def build_vehicle_depot(sx, sz, ex, xx, m):
-    """Rusty Garage: a rusted tin lean-to open at the front, a car up on bricks with its hood raised and a
-    puddle of oil under it, an oil drum, a work lamp on a stand, and a GAR GE sign missing a letter."""
-    parts = dirt_lot(sx, sz, m)
-    z0 = 0.08
-    w, d = 3.4, 2.2
-    cy = -0.3
-    back_h, front_h = 1.35, 1.95
-    # Back and side walls of corrugated tin on a light frame; the front is open.
-    parts += tin_sheet('WallB', w, back_h, (0, cy - d / 2, z0 + back_h / 2), m, rot=(90, 0, 0), mat=m['body'])
-    for side in (-1, 1):
-        pts = [(-d / 2, 0.0), (d / 2, 0.0), (d / 2, front_h), (-d / 2, back_h)]
-        panel = prism(f'WallS{side}', pts, 0.06, loc=(side * w / 2, cy, z0), axis='X')
-        assign(panel, m['body'] if side < 0 else m['tin2'])
-        parts.append(panel)
-    for k, (px, py) in enumerate(((-w / 2, cy + d / 2), (w / 2, cy + d / 2))):
-        post = box(f'Post{k}', (0.11, 0.11, front_h), loc=(px, py, z0 + front_h / 2))
-        bevel(post, 0.02, 2)
-        assign(post, m['plank2'])
-        parts.append(post)
-    # Sloping tin roof from the low back to the open front, with a sagging corner.
-    ang = math.degrees(math.atan2(front_h - back_h, d))
-    roof_len = math.hypot(d + 0.3, front_h - back_h)
-    parts += tin_sheet('Roof', w + 0.3, roof_len, (0, cy + 0.02, z0 + (back_h + front_h) / 2 + 0.05), m,
-                       rot=(-ang, 0, 0), mat=m['tin2'])
-    lip = box('Roof.Lip', (w + 0.3, 0.1, 0.12), loc=(0, cy + d / 2 + 0.16, z0 + front_h + 0.02), rot=(-ang, 0, 0))
-    bevel(lip, 0.02, 2)
-    assign(lip, m['rust'])
-    parts.append(lip)
-    # Rust runs bleeding down the back wall.
-    for k, (rx, rw, rh) in enumerate(((-1.1, 0.2, 0.7), (-0.3, 0.14, 0.5), (0.75, 0.24, 0.85), (1.25, 0.12, 0.4))):
-        streak = box(f'Streak{k}', (rw, 0.03, rh), loc=(rx, cy - d / 2 - 0.04, z0 + back_h - rh / 2))
-        assign(streak, m['char'])
-        parts.append(streak)
-    # The patient: a car up on bricks, hood open, one wheel gone, oil pooled beneath.
-    parts += wreck_car('Car', (0.15, cy + 0.05, 0.0), m, yaw=-96, body_mat=m['blue'], missing=(1, -1), hood=62)
-    puddle = cylinder('Oil', 0.42, 0.02, loc=(0.1, cy - 0.15, z0 + 0.01), segments=18)
-    puddle.scale = (1.35, 1, 1)
-    assign(puddle, m['char'])
-    parts.append(puddle)
-    # Oil drum, a toolbox and a trolley jack against the back wall.
-    drum = cylinder('Drum', 0.24, 0.62, loc=(-1.28, cy - d / 2 + 0.35, z0 + 0.31), segments=16)
-    bevel(drum, 0.03, 2)
-    assign(drum, m['rust'])
-    for k, dz in enumerate((-0.14, 0.14)):
-        hoop = cylinder(f'Drum.Hoop{k}', 0.25, 0.05, loc=(-1.28, cy - d / 2 + 0.35, z0 + 0.31 + dz), segments=16)
-        assign(hoop, m['tin2'])
-        parts.append(hoop)
-    parts.append(drum)
-    tbox = box('Toolbox', (0.44, 0.24, 0.2), loc=(1.35, cy - d / 2 + 0.3, z0 + 0.1))
-    bevel(tbox, 0.02, 2)
-    assign(tbox, m['red'])
-    lid = box('Toolbox.Lid', (0.46, 0.26, 0.05), loc=(1.35, cy - d / 2 + 0.3, z0 + 0.22))
-    assign(lid, m['dark'])
-    parts += [tbox, lid]
-    # Work lamp on a stand, throwing light on the engine bay.
-    stand = cylinder('Lamp.Stand', 0.03, 1.25, loc=(-1.0, cy + 0.5, z0 + 0.62), segments=8, rot=(0, 6, 0))
-    assign(stand, m['steel'])
-    foot = cylinder('Lamp.Foot', 0.16, 0.04, loc=(-1.0, cy + 0.5, z0 + 0.02), segments=12)
-    assign(foot, m['dark'])
-    shade = cylinder('Lamp.Shade', 0.16, 0.18, loc=(-0.92, cy + 0.5, z0 + 1.3), radius2=0.09, segments=14, rot=(0, 34, 0))
-    assign(shade, m['tin'])
-    glow = sphere('Lamp.Glow', 0.09, loc=(-0.84, cy + 0.5, z0 + 1.24), segments=10, rings=6)
-    assign(glow, m['glow'])
-    parts += [stand, foot, shade, glow]
-    # Doors on the open front, and the sign with its missing A.
-    yf = cy + d / 2
-    parts += swing_door('Entry', ex, yf, z0, m, m['entry'], height=1.15, leaf_mat=m['tin'], swing=26, lamp=False)
-    parts += swing_door('Exit', xx, yf, z0, m, m['exit'], height=1.15, leaf_mat=m['tin'], hinge=1, lamp=False)
-    board = box('Sign', (1.9, 0.07, 0.42), loc=(0, yf + 0.12, z0 + front_h + 0.24), rot=(0, 2, 0))
-    bevel(board, 0.02, 2)
-    assign(board, m['tin2'])
-    parts.append(board)
-    parts += text('SignText', 'GAR GE', (0, yf + 0.17, z0 + front_h + 0.24), 0.26, m['stripe_y'], yaw=180)
-    # The fallen A, face down in the dirt below.
-    fallen = box('Sign.FallenA', (0.24, 0.24, 0.05), loc=(0.55, yf + 0.45, z0 + 0.03), rot=(0, 0, 28))
-    assign(fallen, m['stripe_y'])
-    parts.append(fallen)
-    pivot('Body', (0, 0, 0), parts)
-
-
 BUILDERS = {
     'driving_center': build_driving_center,
     'blasting_academy': build_blasting_academy,
@@ -1568,7 +1485,6 @@ BUILDERS = {
     'living_quarters': build_living_quarters,
     'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
-    'vehicle_depot': build_vehicle_depot,
 }
 
 

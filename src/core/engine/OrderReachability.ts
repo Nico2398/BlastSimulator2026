@@ -308,6 +308,8 @@ function classify(state: GameState, targets: ReadonlyArray<PendingAction>): Set<
     if (
       reason === 'no_qualified_employee'
       && action.requiredVehicleRole === null
+      // Self-dispatched repair orders wait silently for a trained mechanic (#1393).
+      && action.type !== 'repair_vehicle'
       && !state.employees.employees.some(emp => emp.alive && holdsRequiredSkill(emp, action.requiredSkill))
     ) {
       unqualifiedIds.add(action.id);

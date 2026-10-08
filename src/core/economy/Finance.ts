@@ -72,6 +72,18 @@ export function chargeFine(
   addExpense(state.finances, amount, 'fines', description, tick);
 }
 
+/** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
+export function deductExpense(
+  state: { cash: number; finances: FinanceState; tickCount: number },
+  cost: number,
+  category: ExpenseCategory,
+  label: string,
+): void {
+  if (cost <= 0) return;
+  state.cash -= cost;
+  addExpense(state.finances, cost, category, label, state.tickCount);
+}
+
 /** Get current balance. */
 export function getBalance(state: FinanceState): number {
   return state.cash;

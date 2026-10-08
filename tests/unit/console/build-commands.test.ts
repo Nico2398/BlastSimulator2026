@@ -310,7 +310,7 @@ describe('build command — terrain reservations (#1390)', () => {
     const { runner, state } = setup();
     expect(runner.run('build_ramp start:30,20 end:30,40 depth:8').success).toBe(true);
     const before = snapshot(state);
-    const r = runner.run('build vehicle_depot at:28,19');
+    const r = runner.run('build geology_lab at:28,19');
     expect(r.success).toBe(false);
     expect(r.output.toLowerCase()).toContain('blocks a ramp');
     expect(snapshot(state)).toEqual(before);
@@ -366,7 +366,7 @@ describe('build command — terrain reservations (#1390)', () => {
     const { runner } = setup();
     runner.run('build_ramp start:30,20 end:30,40 depth:8');
     setLocale('fr');
-    const r = runner.run('build vehicle_depot at:28,19');
+    const r = runner.run('build geology_lab at:28,19');
     expect(r.success).toBe(false);
     expect(r.output.toLowerCase()).not.toContain('blocks a ramp');
     expect(r.output).not.toContain('shell.placement.refused_ramp');

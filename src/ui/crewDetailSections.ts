@@ -50,6 +50,7 @@ export const ACTION_LABEL_KEY: Record<ActionType, string> = {
   survey: 'ui.crew.action_survey',
   fragment_debris: 'ui.crew.action_fragment_debris',
   haul_debris: 'ui.crew.action_haul_debris',
+  repair_vehicle: 'ui.crew.action_repair_vehicle',
   rest: 'ui.crew.task_resting',
   general_work: 'ui.crew.action_general_work',
 };

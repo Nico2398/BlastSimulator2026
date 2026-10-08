@@ -55,7 +55,6 @@ Tier 1 keeps the same node layout at 60–85 % of the tier-2 footprint.
 | living_quarters | The Cells: barred windows, barbed wire, watchtower, ball and chain | Unnecessarily Luxurious Hotel: rooftop infinity pool with slide, gold HOTEL sign, valet |
 | explosive_warehouse | Boom Closet: a two-seat outhouse stuffed with dynamite, lit fuse | Fort Kaboom: crenellated castle, moat, drawbridge, cannons, giant lit bomb |
 | freight_warehouse | The Pile: junk heap under a tarp, bathtub, bent bike, STUFF sign | Hoarder's Paradise: crate towers, gantry crane still adding more, MORE sign |
-| vehicle_depot | Rusty Garage: rusted lean-to, car on bricks, oil puddle, GAR GE sign | Mecha Hangar: blast doors half open on a mech, cyan light strips, gantries |
 
 Tier 2 is the plain building: a plinth, one storey per tier, window rows, a
 green-framed entry door and an orange-framed exit door on the +Y face, and a
