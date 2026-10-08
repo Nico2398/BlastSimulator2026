@@ -309,8 +309,11 @@ export class FleetPanel extends PanelBase {
           : makeNoDriverRow(v, state, () => this.onNavigateCb?.('crew')),
     );
 
+    // Redundant when makeNoDriverRow already warns that nobody holds the role licence.
+    const roleWarningShown = driverId === null && !pendingDriver
+      && !state.employees.employees.some(e => e.alive && isLicensedForRole(e, v.type));
     const nextTier = nextVehicleTier(v.tier);
-    if (nextTier !== null && !rosterCanDriveVehicleTier(state.employees.employees, v.type, nextTier)) {
+    if (!roleWarningShown && nextTier !== null && !rosterCanDriveVehicleTier(state.employees.employees, v.type, nextTier)) {
       rows.push(el('div', {
         text: t('ui.fleet.upgrade_licence_warning'),
         className: 'bs-fleet-upgrade-warning',
