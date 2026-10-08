@@ -3,6 +3,15 @@
 
 import type { EventDef, EventCategory, EventContext, EventConsequence } from './EventPool.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
+import { MAFIA_UNLOCK_THRESHOLD, MAFIA_ESCALATION_STEP } from '../config/balance.js';
+
+/**
+ * Corruption-meter level (0-100) at which mafia escalation tier `tier` opens.
+ * Tier 1 = the unlock threshold; each further tier adds MAFIA_ESCALATION_STEP.
+ */
+export function mafiaTier(tier: number): number {
+  return MAFIA_UNLOCK_THRESHOLD + (tier - 1) * MAFIA_ESCALATION_STEP;
+}
 
 /** Shorthand for building an event definition. */
 export function ev(
@@ -13,6 +22,7 @@ export function ev(
     canFire?: (ctx: EventContext) => boolean;
     followUpOnly?: boolean;
     repeatable?: boolean;
+    tags?: readonly string[];
     options: Array<{ cashDelta?: number; scoreDelta?: Partial<Record<keyof ScoreState, number>>;
       corruptionDelta?: number; exposureDelta?: number; followUp?: string; effectTag?: string;
       probability?: number; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>; }>;
@@ -40,6 +50,7 @@ export function ev(
     canFire: opts.canFire ?? (() => true),
     ...(opts.followUpOnly ? { followUpOnly: true } : {}),
     ...(opts.repeatable ? { repeatable: true } : {}),
+    ...(opts.tags ? { tags: opts.tags } : {}),
   };
 }
 

@@ -4,15 +4,25 @@
 //
 // Mafia exposure accumulates at +0.02/tick when smuggling is active.
 // Arrest triggers at exposureRisk >= 0.9.
-// Mafia is unlocked after 3 corruption attempts (MAFIA_UNLOCK_THRESHOLD).
+// Mafia is unlocked once the corruption meter reaches MAFIA_UNLOCK_THRESHOLD
+// (#1407: successful bribes add 5-15, failed ones 2), so several bribes are needed.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
   tickWithEvents,
 } from './helpers.js';
+import { MAFIA_UNLOCK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { bribeFailureFine } from '../../../src/core/economy/Corruption.js';
 import { corruptCommand, mafiaCommand } from '../../../src/console/commands/events.js';
+
+/** Bribe inspectors (funded for it) until the corruption meter latches the mafia unlock. */
+function bribeUntilMafiaUnlocked(ctx: ReturnType<typeof makeCampaignCtx>, maxBribes = 30): void {
+  ctx.state!.cash += 1_000_000;
+  for (let i = 0; i < maxBribes && !ctx.state!.corruption.mafiaUnlocked; i++) {
+    corruptCommand(ctx, [], { target: 'inspector' });
+  }
+}
 
 describe('Level 1 — Lose — Criminal Arrest', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -29,26 +39,30 @@ describe('Level 1 — Lose — Criminal Arrest', () => {
   });
 
   it('can bribe officials to unlock mafia access', () => {
-    // Bribe an inspector (costs $8,000 each); a failed attempt also draws a scandal fine.
+    // One bribe is far from enough for the mafia (#1407).
+    ctx.state!.cash += 1_000_000;
+    corruptCommand(ctx, [], { target: 'inspector' });
+    expect(ctx.state!.corruption.mafiaUnlocked).toBe(false);
+
+    // A failed attempt also draws a scandal fine; track cash across the rest.
     let expected = ctx.state!.cash;
-    for (let i = 0; i < 3; i++) {
+    let guard = 0;
+    while (!ctx.state!.corruption.mafiaUnlocked && guard++ < 30) {
       const result = corruptCommand(ctx, [], { target: 'inspector' });
       expect(result.success).toBe(true);
-      const attempt = ctx.state!.corruption.attempts[i]!;
+      const attempt = ctx.state!.corruption.attempts.at(-1)!;
       expected -= attempt.cost + (attempt.success ? 0 : bribeFailureFine(attempt.cost));
       expect(ctx.state!.cash).toBe(expected);
     }
 
-    // After 3 bribes, mafia should be unlocked
     expect(ctx.state!.corruption.mafiaUnlocked).toBe(true);
-    expect(ctx.state!.corruption.level).toBeGreaterThanOrEqual(3);
+    expect(ctx.state!.corruption.level).toBeGreaterThanOrEqual(MAFIA_UNLOCK_THRESHOLD);
+    expect(ctx.state!.corruption.attempts.length).toBeGreaterThan(3);
   });
 
   it('activates smuggling and accumulates exposure until arrested', () => {
     // Unlock mafia via bribes
-    corruptCommand(ctx, [], { target: 'inspector' });
-    corruptCommand(ctx, [], { target: 'inspector' });
-    corruptCommand(ctx, [], { target: 'inspector' });
+    bribeUntilMafiaUnlocked(ctx);
     expect(ctx.state!.corruption.mafiaUnlocked).toBe(true);
 
     // Activate smuggling

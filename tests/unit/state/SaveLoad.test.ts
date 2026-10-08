@@ -2208,3 +2208,28 @@ describe('deserialize — v33→v34 migration for pendingDetonation (#1362)', ()
     expect(restored.pendingDetonation).toBeNull();
   });
 });
+
+// ── Bribe protections persistence (#1407) ──
+describe('corruption.protections persistence (#1407)', () => {
+  it('a save without corruption.protections loads with an empty list', () => {
+    const raw = JSON.parse(serialize(createGame({ seed: 5 }))) as { corruption: Record<string, unknown> };
+    delete raw.corruption['protections'];
+    const loaded = deserialize(JSON.stringify(raw));
+    expect(loaded.corruption.protections).toEqual([]);
+  });
+
+  it('round-trips protections including dismissalsLeft', () => {
+    const state = createGame({ seed: 5 });
+    state.corruption.protections = [
+      { target: 'judge', expiresAtTick: 240, dismissalsLeft: 1 },
+      { target: 'inspector', expiresAtTick: 99, dismissalsLeft: 0 },
+    ];
+    const loaded = deserialize(serialize(state));
+    expect(loaded.corruption.protections).toEqual(state.corruption.protections);
+  });
+
+  it('a fresh game serializes with an empty protections list', () => {
+    const loaded = deserialize(serialize(createGame({ seed: 5 })));
+    expect(loaded.corruption.protections).toEqual([]);
+  });
+});

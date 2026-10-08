@@ -86,6 +86,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   storedMassKg: { type: 'number', description: 'Mass held in warehouse storage (LogisticsState.storedMassKg)' },
   collectedOreTotal: { type: 'number', description: 'Sum across every material key in state.collectedOre (kg, #671)' },
   dangerZoneClear: { type: 'boolean', description: 'computeDangerZone clear of every vehicle/employee (#557)' },
+  corruptionLevel: { type: 'number', description: '0-100 corruption meter (CorruptionState.level, #1407)' },
 };
 
 /** UI state schema — mirrors window.__uiState() in src/main.ts. */

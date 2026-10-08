@@ -26,5 +26,6 @@ export function buildTickEventContext(s: GameState): EventContext {
     activeContractCount: s.contracts.active.length,
     weatherId: s.weather.current,
     hasBlasted: s.damage.blastCount > 0,
+    protections: s.corruption.protections,
   };
 }

@@ -11,7 +11,9 @@ import {
   BRIBERY_FAILURE_NUISANCE_HIT,
   BRIBERY_FAILURE_CORRUPTION_DELTA,
   MAFIA_UNLOCK_THRESHOLD,
+  CORRUPTION_MAX,
 } from '../config/balance.js';
+import { BRIBE_PROFILES, grantProtection, type ActiveProtection } from './BribeProtection.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -26,13 +28,9 @@ export const MAFIA_THRESHOLD = MAFIA_UNLOCK_THRESHOLD;
 
 export type CorruptionTarget = 'judge' | 'union_leader' | 'inspector' | 'politician' | 'witness';
 
-const TARGET_COSTS: Record<CorruptionTarget, number> = {
-  judge: 50000,
-  union_leader: 15000,
-  inspector: 8000,
-  politician: 30000,
-  witness: 10000,
-};
+const TARGET_COSTS = Object.fromEntries(
+  Object.entries(BRIBE_PROFILES).map(([target, profile]) => [target, profile.price]),
+) as Record<CorruptionTarget, number>;
 
 // ── Corruption state ──
 
@@ -40,6 +38,8 @@ export interface CorruptionState {
   level: number;
   attempts: CorruptionAttempt[];
   mafiaUnlocked: boolean;
+  /** Timed bribe protections currently held (#1407). */
+  protections: ActiveProtection[];
 }
 
 export interface CorruptionAttempt {
@@ -50,7 +50,7 @@ export interface CorruptionAttempt {
 }
 
 export function createCorruptionState(): CorruptionState {
-  return { level: 0, attempts: [], mafiaUnlocked: false };
+  return { level: 0, attempts: [], mafiaUnlocked: false, protections: [] };
 }
 
 // ── Operations ──
@@ -60,6 +60,10 @@ export interface CorruptionResult {
   cost: number;
   scandalTriggered: boolean;
   mafiaJustUnlocked: boolean;
+  /** Protection granted by a successful bribe (#1407). */
+  protection?: ActiveProtection;
+  /** Exposure risk reduction from a witness bribe (0-1) (#1407). */
+  exposureReduction?: number;
 }
 
 /**
@@ -84,14 +88,23 @@ export function attemptCorruption(
 
   state.attempts.push({ tick, target, cost, success });
 
-  // Failed attempts raise the level too (you tried, you're corrupt).
-  const { mafiaJustUnlocked } = applyCorruptionDelta(state, 1);
+  // Success moves the meter by the target's delta and grants its protection.
+  // A failure's meter change is applied by applyBribeFailure, nothing is granted.
+  if (!success) {
+    return { success, cost, scandalTriggered: true, mafiaJustUnlocked: false };
+  }
+  const profile = BRIBE_PROFILES[target];
+  const { mafiaJustUnlocked } = applyCorruptionDelta(state, profile.corruptionDelta);
+  const protection = grantProtection(state.protections, target, tick) ?? undefined;
+  const exposureReduction = profile.effect.exposureReduction;
 
   return {
     success,
     cost,
-    scandalTriggered: !success,
+    scandalTriggered: false,
     mafiaJustUnlocked,
+    ...(protection ? { protection } : {}),
+    ...(exposureReduction ? { exposureReduction } : {}),
   };
 }
 
@@ -106,7 +119,7 @@ export function isMafiaUnlocked(state: CorruptionState): boolean {
 }
 
 /**
- * Shift corruption level by delta (floored at 0); latches mafiaUnlocked at threshold.
+ * Shift corruption level by delta (clamped to 0..CORRUPTION_MAX); latches mafiaUnlocked at threshold.
  * Non-finite delta is a no-op. Returns whether this call unlocked the mafia.
  */
 export function applyCorruptionDelta(
@@ -114,7 +127,7 @@ export function applyCorruptionDelta(
   delta: number,
 ): { mafiaJustUnlocked: boolean } {
   if (!Number.isFinite(delta)) return { mafiaJustUnlocked: false };
-  state.level = Math.max(0, state.level + delta);
+  state.level = Math.min(CORRUPTION_MAX, Math.max(0, state.level + delta));
   const mafiaJustUnlocked = !state.mafiaUnlocked && state.level >= MAFIA_THRESHOLD;
   if (mafiaJustUnlocked) state.mafiaUnlocked = true;
   return { mafiaJustUnlocked };

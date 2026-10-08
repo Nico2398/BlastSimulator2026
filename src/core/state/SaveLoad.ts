@@ -488,6 +488,12 @@ function migrateV27ToV28(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** #1407: a save from before bribe protections holds none. Idempotent; mutates `obj` in place. */
+function backfillProtections(obj: Record<string, unknown>): void {
+  const corruption = obj['corruption'] as Record<string, unknown> | undefined;
+  if (corruption && !Array.isArray(corruption['protections'])) corruption['protections'] = [];
+}
+
 /** #1380: an older save never raised an unqualified-task event. Idempotent; mutates `obj` in place. */
 function backfillRaisedUnqualified(obj: Record<string, unknown>): void {
   const events = obj['events'] as Record<string, unknown> | undefined;
@@ -904,6 +910,7 @@ export function deserialize(json: string): GameState {
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);
+  backfillProtections(obj);
   backfillRaises(obj);
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
