@@ -161,7 +161,7 @@ describe('hauling barren rock to a spoil heap (#1530)', () => {
   it('a heap trip is not limited by free warehouse room: barren rock beyond the tier-1 warehouse capacity dumps at the heap', () => {
     const { run, state, vehicle } = haulSite();
     const cap = getBuildingDef('freight_warehouse', 1).capacity;
-    const each = 900;
+    const each = 9000;
     const count = Math.ceil((cap + 1) / each) + 1;
     const frags = Array.from({ length: count }, (_, i) => barren(9201 + i, 5 + (i % 10), 6 + Math.floor(i / 10), each));
     expect(count * each).toBeGreaterThan(cap);
