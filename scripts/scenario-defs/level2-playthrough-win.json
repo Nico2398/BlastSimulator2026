@@ -1647,6 +1647,11 @@
           "selector": "[data-action=\"report-close\"]"
         },
         {
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 120000
+        },
+        {
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]"
         }
@@ -2316,6 +2321,11 @@
         {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 120000
         },
         {
           "type": "clickSelector",
@@ -3039,6 +3049,11 @@
           "selector": "[data-action=\"report-close\"]"
         },
         {
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 120000
+        },
+        {
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]"
         }
@@ -3747,6 +3762,11 @@
         {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "[data-action=\"report-close\"]",
+          "timeoutMs": 120000
         },
         {
           "type": "clickSelector",
