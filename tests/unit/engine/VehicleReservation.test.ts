@@ -95,6 +95,41 @@ describe('isLicensedForRole', () => {
   });
 });
 
+describe('findFreeVehicleForRole — licence tier (#1524)', () => {
+  function setup(level: 1 | 2 | 3) {
+    const state = createGame({ seed: SEED });
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    employee.qualifications.find(q => q.category === ROLE_LICENCE_REQUIRED.drill_rig)!.licenceLevel = level;
+    return { state, employee };
+  }
+
+  it('skips a tier-2 rig for a level-1 holder', () => {
+    const { state, employee } = setup(1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
+  });
+
+  it('picks the farther tier-1 rig over a nearer tier-2 rig for a level-1 holder', () => {
+    const { state, employee } = setup(1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+    const { vehicle: far } = purchaseVehicle(state.vehicles, 'drill_rig', 30, 30, 1);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)?.id).toBe(far.id);
+  });
+
+  it('returns the tier-2 rig for a level-2 holder', () => {
+    const { state, employee } = setup(2);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 2);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)?.id).toBe(vehicle.id);
+  });
+
+  it('skips a tier-3 rig for a level-2 holder', () => {
+    const { state, employee } = setup(2);
+    purchaseVehicle(state.vehicles, 'drill_rig', 1, 1, 3);
+    expect(findFreeVehicleForRole(state, 'drill_rig', employee)).toBeNull();
+  });
+});
+
 describe('findFreeVehicleForRole', () => {
   it('picks a free licensed vehicle of the right role, ignoring wrong-role and broken vehicles', () => {
     const state = createGame({ seed: SEED });
