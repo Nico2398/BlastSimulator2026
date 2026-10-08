@@ -19,8 +19,7 @@ import type { CancelledResearch } from '../entities/Building.js';
 import type { ArrivalGateResult } from './ArrivalGate.js';
 import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
-import type { ExpenseCategory } from '../economy/Finance.js';
-import { addExpense, addIncome, chargeFine } from '../economy/Finance.js';
+import { addExpense, addIncome, chargeFine, deductExpense } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
 import { tickHoleWater } from '../mining/WetHoles.js';
@@ -133,18 +132,6 @@ function recentVillageVibration(state: GameState): number {
   const report = state.lastBlastReport;
   if (!report?.maxVibration || state.tickCount - report.tick > SCORE_VIBRATION_WINDOW_TICKS) return 0;
   return report.maxVibration * VILLAGE_VIBRATION_SCORE_GAIN;
-}
-
-/** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
-function deductExpense(
-  state: GameState,
-  cost: number,
-  category: ExpenseCategory,
-  label: string,
-): void {
-  if (cost <= 0) return;
-  state.cash -= cost;
-  addExpense(state.finances, cost, category, label, state.tickCount);
 }
 
 /**
@@ -300,7 +287,10 @@ export function runTick(
   syncHaulDispatch(state);
 
   // 8c-4. Repair dispatch (#1393): one repair_vehicle order per idle damaged
-  // vehicle, queued silently until someone trained in repair is free.
+  // vehicle, queued until someone trained in repair is free. An unqualified
+  // roster raises no unqualified_task_error modal for it (orders skip the
+  // qualification check), but the blocked-order notification
+  // (no_qualified_employee) still fires.
   syncRepairDispatch(state);
 
   // 8d. Dispatch remaining pending actions to idle qualified employees. An

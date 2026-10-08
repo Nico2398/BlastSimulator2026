@@ -3,7 +3,8 @@ import type { PendingAction } from '../state/GameState.js';
 import { REPAIR_PARTS_COST_PER_HP } from '../config/balance.js';
 import { getVehicleDefByTier, type Vehicle } from './Vehicle.js';
 
-function missingHp(v: Vehicle): number {
+/** Hp a vehicle is short of its tier's maxHp (never negative). */
+export function missingHp(v: Vehicle): number {
   return Math.max(0, getVehicleDefByTier(v.type, v.tier).maxHp - v.hp);
 }
 

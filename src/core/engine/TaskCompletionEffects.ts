@@ -131,11 +131,12 @@ export function applyTaskCompletion(
     }
 
     // A completed 'repair_vehicle' task leaves the vehicle at full hp (#1393);
-    // per-tick restoration already got it there, this only guards rounding.
+    // per-tick restoration normally got it there; this snaps any rounding
+    // remainder to maxHp.
     if (progress.actionType === 'repair_vehicle' && progress.actionPayload) {
       const vehicle = state.vehicles.vehicles.find(v => v.id === progress.actionPayload!['vehicleId']);
       if (vehicle !== undefined) {
-        vehicle.hp = Math.min(vehicle.hp, getVehicleDefByTier(vehicle.type, vehicle.tier).maxHp);
+        vehicle.hp = getVehicleDefByTier(vehicle.type, vehicle.tier).maxHp;
       }
     }
 

@@ -2,10 +2,9 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import { getVehicleReservation } from '../entities/Vehicle.js';
-import { isRepairable } from '../entities/VehicleRepair.js';
+import { isRepairable, missingHp } from '../entities/VehicleRepair.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { REPAIR_BASE_TICKS_PER_HP } from '../config/balance.js';
-import { getVehicleDefByTier } from '../entities/Vehicle.js';
 
 /** Payload carried by a repair_vehicle PendingAction. */
 interface RepairActionPayload {
@@ -22,8 +21,7 @@ function isIdleRepairable(state: GameState, v: Vehicle): boolean {
 }
 
 function repairBaseTicks(v: Vehicle): number {
-  const missing = getVehicleDefByTier(v.type, v.tier).maxHp - v.hp;
-  return Math.max(1, Math.ceil(missing * REPAIR_BASE_TICKS_PER_HP));
+  return Math.max(1, Math.ceil(missingHp(v) * REPAIR_BASE_TICKS_PER_HP));
 }
 
 function repairTargetId(action: PendingAction): number | null {
@@ -35,7 +33,9 @@ function repairTargetId(action: PendingAction): number | null {
 /**
  * Idempotent: one `repair_vehicle` PendingAction per idle damaged vehicle,
  * stale ones pruned. Orders skip the qualification check so unqualified
- * ones sit queued with blockedReason 'no_qualified_employee'.
+ * ones sit queued with blockedReason 'no_qualified_employee'. No
+ * unqualified_task_error modal is raised for them, but the blocked-order
+ * notification still fires.
  */
 export function syncRepairDispatch(state: GameState): void {
   const vehicleById = new Map(state.vehicles.vehicles.map(v => [v.id, v]));

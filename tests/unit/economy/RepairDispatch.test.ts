@@ -3,7 +3,7 @@
 // syncRepairDispatch self-dispatches one `repair_vehicle` PendingAction per
 // idle damaged vehicle, idempotently, pruning stale orders. Orders skip the
 // qualification check, so with nobody trained in 'repair' they sit queued with
-// blockedReason 'no_qualified_employee'. Red phase: the module is a stub.
+// blockedReason 'no_qualified_employee'.
 
 import { describe, it, expect } from 'vitest';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';

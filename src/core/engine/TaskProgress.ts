@@ -11,7 +11,7 @@ import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { repairHpThisTick, repairPartsCost } from '../entities/VehicleRepair.js';
-import { addExpense } from '../economy/Finance.js';
+import { deductExpense } from '../economy/Finance.js';
 import { clearActiveTaskFields } from './TaskDispatch.js';
 import { computeRampSegmentCarveTarget, carveRampSegmentSlice } from '../mining/Ramp.js';
 
@@ -58,9 +58,7 @@ function tickRepairWork(state: GameState, vehicleId: unknown, ticksRemaining: nu
   const restored = repairHpThisTick(vehicle, ticksRemaining);
   if (restored <= 0) return;
   vehicle.hp += restored;
-  const cost = repairPartsCost(restored);
-  state.cash -= cost;
-  addExpense(state.finances, cost, 'vehicle_maintenance', `Vehicle repair parts: vehicle ${vehicle.id}`, state.tickCount);
+  deductExpense(state, repairPartsCost(restored), 'vehicle_maintenance', `Vehicle repair parts: vehicle ${vehicle.id}`);
 }
 
 /**
