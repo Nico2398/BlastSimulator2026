@@ -72,7 +72,6 @@
     "src/core/entities/Employee.ts:EnrolInTrainingResult",
     "src/core/entities/Employee.ts:GainXpResult",
     "src/core/entities/Employee.ts:HireResult",
-    "src/core/entities/Employee.ts:MAX_PROFICIENCY",
     "src/core/entities/Employee.ts:ProficiencyLevel",
     "src/core/entities/Employee.ts:TrainingCancellation",
     "src/core/entities/Employee.ts:TrainingCompletion",

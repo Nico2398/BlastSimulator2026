@@ -32,7 +32,6 @@ import {
   enrolInTraining,
   tickTraining,
   availableTrainingOffers,
-  MAX_PROFICIENCY,
   type EnrolInTrainingResult,
   type TrainingPlan,
 } from '../../../src/core/entities/EmployeeTraining.js';
@@ -183,7 +182,7 @@ describe('planTraining', () => {
     expect(planTraining(emp, 'blasting', 1)).toBeNull();
   });
 
-  it.each([2, 3, 4, MAX_PROFICIENCY] as const)('returns null for a skill already held at level %i', (level) => {
+  it.each([2, 3, 4, 5] as const)('returns null for a skill already held at level %i', (level) => {
     const emp = state.employees.employees[0]!;
     assignSkill(state.employees, emp.id, 'blasting', level);
     expect(planTraining(emp, 'blasting', 1)).toBeNull();
@@ -298,7 +297,7 @@ describe('enrolInTraining — validation', () => {
     expect(enrolInTraining(state, 999, makeBuilding({ type: 'geology_lab' }), 'geology').success).toBe(false);
   });
 
-  it.each([1, 3, MAX_PROFICIENCY] as const)('refuses a skill already held at level %i, with a translated error', (level) => {
+  it.each([1, 3, 5] as const)('refuses a skill already held at level %i, with a translated error', (level) => {
     assignSkill(state.employees, 1, 'blasting', level);
     const building = makeBuilding({ type: 'blasting_academy' });
     const result = enrolInTraining(state, 1, building, 'blasting');

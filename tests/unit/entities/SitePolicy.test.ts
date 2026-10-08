@@ -14,9 +14,6 @@ import {
   createSitePolicy,
   getShiftDurationTicks,
   shouldForceRest,
-  // ── #678: getEffectiveThresholds — merges a policy's own thresholds over
-  // the site defaults. Tests below cover it.
-  getEffectiveThresholds,
   type ShiftMode,
   type SitePolicy,
 } from '../../../src/core/entities/SitePolicy.js';
@@ -201,33 +198,8 @@ describe('shouldForceRest() — single site-wide fatigue threshold (#1388)', () 
     const policy: SitePolicy = createSitePolicy('continuous');
     policy.fatigueRestThreshold = 50;
 
-    expect(shouldForceRest(policy, { id: 3, fatigue: 40, ticksWorked: 1 }, true)).toBe(true);
-    expect(shouldForceRest(policy, { id: 4, fatigue: 80, ticksWorked: 1 }, true)).toBe(false);
-  });
-});
-
-// ─── getEffectiveThresholds() (#678) ─────────────────────────────────────────
-//
-// Extracted from shouldForceRest's own custom-mode override lookup so
-// ForceShiftRest.ts's forced-rest-under-policy path (#678) can report which
-// threshold actually applied, not just a yes/no verdict.
-
-describe('getEffectiveThresholds() (#678)', () => {
-  // ── Test 1 ──────────────────────────────────────────────────────────────────
-  it('returns the policy-level default threshold for a non-custom mode', () => {
-    const policy = createSitePolicy('shift_8h');
-
-    const result = getEffectiveThresholds(policy, 1);
-
-    expect(result).toEqual({ fatigue: policy.fatigueRestThreshold });
-  });
-
-  it('ignores the employee id: every employee gets the site threshold (#1388)', () => {
-    const policy = createSitePolicy('continuous');
-    policy.fatigueRestThreshold = 35;
-
-    expect(getEffectiveThresholds(policy, 7)).toEqual({ fatigue: 35 });
-    expect(getEffectiveThresholds(policy)).toEqual({ fatigue: 35 });
+    expect(shouldForceRest(policy, { fatigue: 40, ticksWorked: 1 }, true)).toBe(true);
+    expect(shouldForceRest(policy, { fatigue: 80, ticksWorked: 1 }, true)).toBe(false);
   });
 });
 

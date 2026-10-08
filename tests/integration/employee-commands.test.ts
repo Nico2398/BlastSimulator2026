@@ -275,7 +275,7 @@ describe('Console — set_policy', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe(
-      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [fatigue:N]',
+      'Usage: set_policy mode:(shift_8h|shift_12h|continuous) [fatigue:N]',
     );
   });
 
@@ -284,7 +284,7 @@ describe('Console — set_policy', () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toBe(
-      'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [fatigue:N]',
+      'Usage: set_policy mode:(shift_8h|shift_12h|continuous) [fatigue:N]',
     );
   });
 

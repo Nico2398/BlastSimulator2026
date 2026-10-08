@@ -291,19 +291,14 @@ describe('tickTraining', () => {
     expect(geology.proficiencyLevel).toBe(1);
   });
 
-  it('raises proficiency by one level when the employee already holds the skill', () => {
-    // Training a held skill used to leave the qualification untouched: the fee
-    // was charged and nothing changed, which made every level above Rookie
-    // unobtainable.
-    const before = (state.employees.employees.find(e => e.id === empId) as any).qualifications
-      .find((q: SkillQualification) => q.category === 'blasting')!.proficiencyLevel;
-
+  it('never changes the level of a skill the employee already holds (#1388)', () => {
+    assignSkill(state.employees, empId, 'blasting' as SkillCategory, 3);
     startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state);
 
     const after = (state.employees.employees.find(e => e.id === empId) as any).qualifications
       .find((q: SkillQualification) => q.category === 'blasting')!;
-    expect(after.proficiencyLevel).toBe(before + 1);
+    expect(after.proficiencyLevel).toBe(3);
   });
 
   it('does not add a duplicate qualification when promoting', () => {
@@ -332,14 +327,6 @@ describe('tickTraining', () => {
     expect(completed[0]!.skill).toBe('geology');
     expect(completed[0]!.level).toBe(1);
     expect(completed[0]!.isNew).toBe(true);
-  });
-
-  it('reports a promotion as not new', () => {
-    startTraining(state.employees, empId, buildingId, 'blasting' as SkillCategory, 1, 100);
-    const { completed } = tickTraining(state);
-
-    expect(completed[0]!.isNew).toBe(false);
-    expect(completed[0]!.level).toBe(2);
   });
 
   it('returns no completions while a course is still running', () => {

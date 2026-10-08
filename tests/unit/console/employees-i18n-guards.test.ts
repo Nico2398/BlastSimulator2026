@@ -579,7 +579,7 @@ describe('employees.ts — train_insufficient_funds', () => {
 
 describe('employees.ts — train success message', () => {
   function expectedEn(name: string, buildingId: number): string {
-    return `${name} enrolled at management_office #${buildingId}: management level 1 in 20 ticks ($2500).`;
+    return `${name} enrolled at management_office #${buildingId}: management in 20 ticks ($2500), +$5/h pay once qualified.`;
   }
 
   it('matches the exact English literal, embedding the real name/buildingId', () => {

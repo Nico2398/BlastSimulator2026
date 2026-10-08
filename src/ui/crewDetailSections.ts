@@ -80,18 +80,18 @@ function well(children: (Node | null | undefined)[]): HTMLElement {
 }
 
 /**
- * A training-offer row that cannot be started right now — already at max
- * proficiency, or the school is full (#1203) — rendered as a title + reason
+ * A training-offer row that cannot be started right now — already qualified, or the school is full (#1203) — rendered as a title + reason
  * line with a disabled Train button. Both callers in makeTrainingSection
  * differ only in the title text and the reason line's i18n key/params.
  */
-function renderLockedTrainingRow(row: HTMLElement, titleText: string, reasonKey: string, reasonParams?: Record<string, string | number>): void {
+function renderLockedTrainingRow(row: HTMLElement, titleText: string, reasonKey: string, reasonParams?: Record<string, string | number>, withButton = true): void {
   const info = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0' } });
   info.append(
     el('span', { text: titleText, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
     el('span', { text: t(reasonKey, reasonParams), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
   );
-  row.append(info, button('locked', t('ui.crew.train'), { disabled: true }));
+  row.append(info);
+  if (withButton) row.append(button('locked', t('ui.crew.train'), { disabled: true }));
 }
 
 // ── HIRED / LOCATION ──
@@ -315,7 +315,7 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px' } });
 
     if (!plan) {
-      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed');
+      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed', undefined, false);
     } else if (isSchoolFull(state, building)) {
       renderLockedTrainingRow(row, `${t(`course.${skill}`)}`, 'ui.crew.training_school_full');
     } else {
