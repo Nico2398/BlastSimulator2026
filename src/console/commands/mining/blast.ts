@@ -26,10 +26,42 @@ import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
+/** Dispatch `blast` subcommands: (none) = fire anyway, detonate, cancel, status (#1362). */
 export function blastCommand(
   ctx: MiningContext,
-  _args: string[],
+  args: string[],
   _named: Record<string, string>,
+): CommandResult {
+  const err = requireGame(ctx);
+  if (err) return { success: false, output: err };
+  switch (args[0]) {
+    case 'detonate': return blastDetonate(ctx);
+    case 'cancel': return blastCancel(ctx);
+    case 'status': return blastStatus(ctx);
+    default:
+      ctx.state!.pendingDetonation = null;
+      return fireBlast(ctx);
+  }
+}
+
+function blastDetonate(_ctx: MiningContext): CommandResult {
+  // TODO: implement
+  return undefined as never;
+}
+
+function blastCancel(_ctx: MiningContext): CommandResult {
+  // TODO: implement
+  return undefined as never;
+}
+
+function blastStatus(_ctx: MiningContext): CommandResult {
+  // TODO: implement
+  return undefined as never;
+}
+
+/** Fire the loaded pattern immediately. */
+export function fireBlast(
+  ctx: MiningContext,
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };

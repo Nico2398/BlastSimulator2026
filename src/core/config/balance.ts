@@ -1901,3 +1901,6 @@ export const HOLE_DRAIN_COST_PER_HOLE = 20;
 
 /** Porosity at or below which an untubed hole cannot be drained (water returns at once). */
 export const HOLE_DRAIN_POROSITY_LIMIT = 0.15;
+
+/** Ticks between re-issued evacuation orders while a detonation is armed (#1362). */
+export const DETONATION_REEVACUATE_INTERVAL_TICKS = 10;
