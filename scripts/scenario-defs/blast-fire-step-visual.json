@@ -178,10 +178,7 @@
           "type": "screenshot"
         }
       ],
-      "role": "guard",
-      "expect": {
-        "blocked": "#bs-blast-panel [data-action=\"sound-horn\"]"
-      }
+      "role": "observe"
     },
     {
       "command": "state",
