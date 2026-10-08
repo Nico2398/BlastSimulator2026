@@ -3,7 +3,7 @@ import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite } f
 import { createBuildingState, getDefSize, getBuildingDef, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { StartingBuildingSlot } from '../../../src/core/config/balance.js';
-import { STARTING_BUILDING_STANDOFF_M, STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG, STARTING_BUILDING_STANDOFF_M, STARTING_SITE_STAFFED_COMPOSITION } from '../../../src/core/config/balance.js';
 
 function solidVoxel(): VoxelData {
   return {
@@ -61,7 +61,7 @@ describe('placeStartingBuildings (#1363)', () => {
   it('provides the warehouse storage capacity', () => {
     const buildings = createBuildingState();
     placeStartingBuildings(buildings, makeFlatGrid(40), [WAREHOUSE], { x: 10, z: 10 });
-    expect(getStorageCapacity(buildings)).toBeGreaterThanOrEqual(2000);
+    expect(getStorageCapacity(buildings)).toBeGreaterThanOrEqual(FREIGHT_WAREHOUSE_CAPACITY_KG[1]);
   });
 
   it('skips steep ground and settles on the flat part of the site', () => {

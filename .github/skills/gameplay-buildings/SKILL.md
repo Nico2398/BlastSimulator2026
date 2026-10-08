@@ -103,6 +103,7 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 - Stores ore debris hauled from blast zone
 - Primary income source via ore sale contracts
 - Capacity scales with tier; farther from pit = longer haulage trips = lower throughput
+- Capacity per tier: 25,000 / 65,000 / 200,000 kg, from `FREIGHT_WAREHOUSE_CAPACITY_KG` (`balance.ts`): tier 2 holds a typical good Dusty Hollow blast (~57,000 kg ore) with margin.
 - **Per-warehouse inventory** (#1372): every stored fragment carries the `warehouseId` it sits in
   (reserved while `in_transit`, null on the ground); each warehouse's stock and free room are derived
   from fragments (`FreightWarehouses.ts`). A hauler loads only when some warehouse has room for the

@@ -1172,6 +1172,17 @@ export const BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD = 1;
 /** Summed ore density of a fragment at or below which it counts as barren and goes to a spoil heap (#1530). */
 export const SPOIL_BARREN_ORE_FRACTION_THRESHOLD = 0.02;
 
+/**
+ * Freight Warehouse storage capacity in kg, by tier (#1531). BuildingDefs reads it for `capacity`.
+ *
+ * Sized against a measured blast: the level-1 Dusty Hollow 2x2 boomite shot (seed 1138) yields
+ * 57,061 kg of ore-bearing rock (largest single ore fragment ~6,600 kg; other shots reach ~18 t).
+ * Tier 1 holds ~40% of that blast and any single fragment; tier 2 holds all of it with ~10% margin;
+ * tier 3 holds at least 3 such blasts. To re-measure, fire that shot headlessly (console, seed 1138)
+ * and sum the mass of fragments with ore density above SPOIL_BARREN_ORE_FRACTION_THRESHOLD.
+ */
+export const FREIGHT_WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3, number> = { 1: 25000, 2: 65000, 3: 200000 };
+
 /** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',

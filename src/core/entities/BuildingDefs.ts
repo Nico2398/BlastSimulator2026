@@ -2,6 +2,7 @@
 // 9 canonical building types × 3 tiers. Data file — line-limit exempt.
 
 import type { BuildingDef, BuildingTier, BuildingType } from './Building.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../config/balance.js';
 
 // ── Footprint helpers ──
 
@@ -231,7 +232,7 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       nameKey: 'building.freight_warehouse.t1.name',
       footprint: rect(4, 4), entryPoint: entry(), exitPoint: exit_(4),
       constructionCost: 15000, demolishCost: 4000, operatingCostPerTick: 10,
-      capacity: 2000, maxHp: 150, structuralResistance: 4000,
+      capacity: FREIGHT_WAREHOUSE_CAPACITY_KG[1], maxHp: 150, structuralResistance: 4000,
       scoreEffects: {},
     },
     2: {
@@ -239,7 +240,7 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       nameKey: 'building.freight_warehouse.t2.name',
       footprint: rect(5, 4), entryPoint: entry(), exitPoint: exit_(5),
       constructionCost: 36000, demolishCost: 9000, operatingCostPerTick: 16,
-      capacity: 6000, maxHp: 220, structuralResistance: 6000,
+      capacity: FREIGHT_WAREHOUSE_CAPACITY_KG[2], maxHp: 220, structuralResistance: 6000,
       scoreEffects: {},
     },
     3: {
@@ -247,7 +248,7 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       nameKey: 'building.freight_warehouse.t3.name',
       footprint: rect(6, 5), entryPoint: entry(), exitPoint: exit_(6),
       constructionCost: 72000, demolishCost: 18000, operatingCostPerTick: 24,
-      capacity: 15000, maxHp: 300, structuralResistance: 9000,
+      capacity: FREIGHT_WAREHOUSE_CAPACITY_KG[3], maxHp: 300, structuralResistance: 9000,
       scoreEffects: {},
     },
   },

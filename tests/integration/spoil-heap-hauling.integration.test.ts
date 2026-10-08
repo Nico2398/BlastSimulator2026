@@ -21,7 +21,7 @@ import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { syncHaulDispatch, haulBlockedReason } from '../../src/core/economy/HaulDispatch.js';
 import { isBarrenFragment, totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
-import { placeBuilding } from '../../src/core/entities/Building.js';
+import { placeBuilding, getBuildingDef } from '../../src/core/entities/Building.js';
 import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
 import { upgradeFreightWarehousesToTier3, addFreightWarehouseToState, ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
 import { makeGameContext } from '../helpers/gameContext.js';
@@ -158,17 +158,21 @@ describe('hauling barren rock to a spoil heap (#1530)', () => {
     expect(totalSpoilKg(state.buildings.buildings)).toBe(0);
   });
 
-  it('a heap trip is not limited by free warehouse room: 2700 kg of rock dumps beside a 2000 kg warehouse', () => {
+  it('a heap trip is not limited by free warehouse room: barren rock beyond the tier-1 warehouse capacity dumps at the heap', () => {
     const { run, state, vehicle } = haulSite();
-    const frags = [barren(9201, 5, 6), barren(9202, 6, 6), barren(9203, 7, 6)];
+    const cap = getBuildingDef('freight_warehouse', 1).capacity;
+    const each = 9000;
+    const count = Math.ceil((cap + 1) / each) + 1;
+    const frags = Array.from({ length: count }, (_, i) => barren(9201 + i, 5 + (i % 10), 6 + Math.floor(i / 10), each));
+    expect(count * each).toBeGreaterThan(cap);
     addBlastFragments(state.logistics, frags, state.navGrid);
     syncHaulDispatch(state);
 
     expect(run(`vehicle haul ${vehicle.id} fragment:9201`)).toMatchObject({ success: true });
-    tickUntil(run, () => frags.every(f => stateOf(state, f.id) === undefined), 1500);
+    tickUntil(run, () => frags.every(f => stateOf(state, f.id) === undefined), 6000);
 
-    expect(frags.map(f => stateOf(state, f.id))).toEqual([undefined, undefined, undefined]);
-    expect(totalSpoilKg(state.buildings.buildings)).toBe(2700);
+    expect(frags.map(f => stateOf(state, f.id))).toEqual(frags.map(() => undefined));
+    expect(totalSpoilKg(state.buildings.buildings)).toBe(count * each);
     expect(state.logistics.storedMassKg).toBe(0);
   });
 

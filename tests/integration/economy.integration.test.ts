@@ -42,7 +42,7 @@ import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelp
 import { destroyBuilding } from '../../src/core/entities/Building.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { addFreightWarehouse, ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
-import { ORE_PRICES as ALL_ORE_PRICES } from '../../src/core/config/balance.js';
+import { ORE_PRICES as ALL_ORE_PRICES, FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 
 // ── Contract fixture helpers ─────────────────────────────────────────────────
@@ -1114,12 +1114,10 @@ describe('Economy', () => {
     expect(buildResult.success).toBe(true);
     driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
-    expect(ctx.state!.logistics.storageCapacityKg).toBe(2000);
+    expect(ctx.state!.logistics.storageCapacityKg).toBe(FREIGHT_WAREHOUSE_CAPACITY_KG[1]);
 
-    // Bounded window: sandbox-measured convergence (warehouse permanently
-    // full at storedMassKg 1861/2000, no more deliveries possible, still
-    // unchanged 300+ ticks past this point) well inside 200 ticks on today's
-    // code.
+    // Bounded window: deliveries (ore first) land well inside 200 ticks; the
+    // assertions below hold whether or not the tier-1 warehouse fills.
     for (let i = 0; i < 200; i++) tickCommand(ctx, ['1'], {});
 
     const collectedOreTotal = Object.values(ctx.state!.collectedOre).reduce((sum, kg) => sum + kg, 0);
