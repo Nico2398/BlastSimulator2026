@@ -1114,6 +1114,67 @@ describe('tickEmployees — blockedReason classification (#1061)', () => {
     expect(reasons).not.toContain(stored.blockedReason);
   });
 
+  describe('licence tier (#1524)', () => {
+    function makeDrillOrder(id: number): PendingAction {
+      return {
+        id, type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig',
+        targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+        status: 'queued', holderId: null, queuedAtTick: 0,
+      };
+    }
+
+    function addRigDriller(state: GameState, level: 1 | 2 | 3) {
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED));
+      assignSkill(state.employees, employee.id, 'blasting', 1);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      employee.qualifications.find(q => q.category === ROLE_LICENCE_REQUIRED.drill_rig)!.licenceLevel = level;
+      return employee;
+    }
+
+    it('flags licence_level_too_low with the needed level when only a tier-2 rig exists and every driller is level 1, then clears once a level-2 holder exists', () => {
+      const state = createGame({ seed: SEED });
+      addRigDriller(state, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 2);
+      state.pendingActions.push(makeDrillOrder(1));
+
+      const result = tickEmployees(state);
+
+      const blocked = state.pendingActions.find(a => a.id === 1)!;
+      expect(blocked.blockedReason).toBe('licence_level_too_low');
+      expect(blocked.blockedLicenceLevel).toBe(2);
+      expect(blocked.status).toBe('queued');
+      expect(result.unqualified).not.toContain(1);
+
+      addRigDriller(state, 2);
+      tickEmployees(state);
+
+      const cleared = state.pendingActions.find(a => a.id === 1)!;
+      expect(cleared.blockedReason ?? null).toBeNull();
+    });
+
+    it('keeps no_licensed_driver when nobody holds the licence at any level', () => {
+      const state = createGame({ seed: SEED });
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 2);
+      state.pendingActions.push(makeDrillOrder(1));
+
+      tickEmployees(state);
+
+      expect(state.pendingActions.find(a => a.id === 1)!.blockedReason).toBe('no_licensed_driver');
+    });
+
+    it('does not flag licence_level_too_low while a tier-1 rig is also free for the level-1 holder', () => {
+      const state = createGame({ seed: SEED });
+      addRigDriller(state, 1);
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 2);
+      purchaseVehicle(state.vehicles, 'drill_rig', 3, 3, 1);
+      state.pendingActions.push(makeDrillOrder(1));
+
+      tickEmployees(state);
+
+      expect(state.pendingActions.find(a => a.id === 1)!.blockedReason ?? null).toBeNull();
+    });
+  });
+
   it('flags no_qualified_employee for a skill-gated (non-vehicle) action nobody on the roster can perform, recording it in result.unqualified', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);

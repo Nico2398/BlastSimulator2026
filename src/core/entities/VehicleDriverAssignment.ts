@@ -5,7 +5,7 @@
 // Vehicle.ts.
 
 import type { Employee, EmployeeState, SkillCategory } from '../entities/Employee.js';
-import type { Vehicle, VehicleRole, VehicleState } from './Vehicle.js';
+import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from './Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
 import { isMounted } from './EmployeeLocomotion.js';
 import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
@@ -20,6 +20,25 @@ export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
   rock_fragmenter: 'driving.rock_fragmenter',
   drill_rig: 'driving.drill_rig',
 };
+
+/** Licence level `employee` holds for `role`'s licence: 0 when not held, else `licenceLevel ?? 1` (#1524). */
+export function licenceLevelOf(employee: Pick<Employee, 'qualifications'>, role: VehicleRole): number {
+  const licence = ROLE_LICENCE_REQUIRED[role];
+  const held = employee.qualifications.find(q => q.category === licence);
+  return held ? (held.licenceLevel ?? 1) : 0;
+}
+
+/** Whether `employee` holds `role`'s licence at a level sufficient for a vehicle of `tier` (#1524). */
+export function canDriveTier(employee: Pick<Employee, 'qualifications'>, role: VehicleRole, tier: VehicleTier): boolean {
+  return licenceLevelOf(employee, role) >= tier;
+}
+
+/** Number of living employees licensed for `role` at a level sufficient for `tier` (#1524). */
+export function countLicenceHolders(employees: readonly Employee[], role: VehicleRole, tier: VehicleTier): number {
+  let count = 0;
+  for (const e of employees) if (e.alive && canDriveTier(e, role, tier)) count++;
+  return count;
+}
 
 /**
  * Validate that an employee may become a vehicle's driver: vehicle exists,
@@ -42,9 +61,9 @@ export function canAssignDriver(
   const employee = employeeState.employees.find(e => e.id === employeeId);
   if (!employee || !employee.alive) return { success: false, error: 'Employee not found' };
 
-  const requiredLicence = ROLE_LICENCE_REQUIRED[vehicle.type];
-  const hasLicence = employee.qualifications.some(q => q.category === requiredLicence);
-  if (!hasLicence) return { success: false, error: 'Employee lacks licence for this role' };
+  const heldLevel = licenceLevelOf(employee, vehicle.type);
+  if (heldLevel === 0) return { success: false, error: 'Employee lacks licence for this role' };
+  if (!canDriveTier(employee, vehicle.type, vehicle.tier)) return { success: false, error: 'Employee lacks licence level for this vehicle tier' };
 
   // A vehicle reserved for a vehicle-gated PendingAction (#550) may only be
   // boarded by the employee that reservation belongs to — anyone else (a

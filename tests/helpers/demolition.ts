@@ -10,10 +10,12 @@ import { employeeCommand } from '../../src/console/commands/entities.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import { isLicensedForRole } from '../../src/core/engine/VehicleReservation.js';
 import type { VehicleTier } from '../../src/core/entities/Vehicle.js';
+import { ROLE_LICENCE_REQUIRED } from '../../src/core/entities/VehicleDriverAssignment.js';
 
 /**
  * Give the site a building_destroyer of `vehicleTier` and (when nobody on the
- * roster holds the truck licence yet) hire a driver, who arrives licensed.
+ * roster holds the truck licence yet) hire a driver, who arrives licensed. One
+ * licensed operator is raised to licence level `vehicleTier`.
  * Spends cash — call before sampling a cash baseline.
  */
 export function equipDemolition(ctx: GameContext, vehicleTier: VehicleTier = 1): void {
@@ -26,6 +28,10 @@ export function equipDemolition(ctx: GameContext, vehicleTier: VehicleTier = 1):
     const hire = employeeCommand(ctx, ['hire'], { role: 'driver' });
     if (!hire.success) throw new Error(`equipDemolition: hire failed: ${hire.output}`);
   }
+  // Driving a tier-N vehicle needs licence level >= N (#1524): raise one licensed operator to match.
+  const operator = state.employees.employees.find(e => e.alive && isLicensedForRole(e, 'building_destroyer'));
+  const held = operator?.qualifications.find(q => q.category === ROLE_LICENCE_REQUIRED['building_destroyer']);
+  if (held && (held.licenceLevel ?? 1) < vehicleTier) held.licenceLevel = vehicleTier;
 }
 
 /** True while any demolition (or rebuild site it queued) is still outstanding. */

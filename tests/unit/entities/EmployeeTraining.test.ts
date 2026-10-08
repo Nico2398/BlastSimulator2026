@@ -674,3 +674,126 @@ describe('tickTraining keeps accumulated raises (#1383)', () => {
     expect(employee.salary).toBe(BASE_SALARIES[employee.role] + calculateQualificationBonus(employee) + 250);
   });
 });
+
+// ── Licence level courses (#1524) ───────────────────────────────────────────
+//
+// A held driving.* licence below level 3 can be raised one level at a time at a
+// Driving Center. The course changes licenceLevel only: proficiency and xp are
+// productivity, owned by work.
+
+function holdRigLicence(employee: Employee, licenceLevel?: 1 | 2 | 3) {
+  employee.qualifications = employee.qualifications.filter(q => q.category !== 'driving.drill_rig');
+  employee.qualifications.push({ category: 'driving.drill_rig', proficiencyLevel: 1, xp: 0 });
+  const qual = employee.qualifications.find(q => q.category === 'driving.drill_rig')!;
+  if (licenceLevel !== undefined) qual.licenceLevel = licenceLevel;
+  return qual;
+}
+
+describe('planTraining — licence level raise (#1524)', () => {
+  it('plans a raise to level 2 for a held level-1 licence (missing licenceLevel counts as 1)', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee);
+    const plan = planTraining(employee, 'driving.drill_rig', 1);
+    expect(plan).not.toBeNull();
+    expect(plan!.raisesLicenceTo).toBe(2);
+    expect(plan!.fee).toBe(balance.LICENCE_COURSE_FEE[2]);
+    expect(plan!.skill).toBe('driving.drill_rig');
+  });
+
+  it('plans a raise to level 3 for a held level-2 licence', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee, 2);
+    const plan = planTraining(employee, 'driving.drill_rig', 1);
+    expect(plan!.raisesLicenceTo).toBe(3);
+    expect(plan!.fee).toBe(balance.LICENCE_COURSE_FEE[3]);
+  });
+
+  it('scales course duration by LICENCE_COURSE_TICKS_MULT', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee);
+    const plan = planTraining(employee, 'driving.drill_rig', 1)!;
+    expect(plan.ticks).toBe(Math.max(1, Math.round(TRAINING_BASE_TICKS * TRAINING_TIER_SPEED[1] * balance.LICENCE_COURSE_TICKS_MULT[2])));
+  });
+
+  it('refuses at level 3 (boundary)', () => {
+    const { employee } = makeStateWithOne('driller');
+    holdRigLicence(employee, 3);
+    expect(planTraining(employee, 'driving.drill_rig', 1)).toBeNull();
+  });
+
+  it('refuses a held non-driving skill', () => {
+    const { employee } = makeStateWithOne('surveyor');
+    expect(planTraining(employee, 'geology', 1)).toBeNull();
+  });
+
+  it('a first-time licence course carries no raisesLicenceTo', () => {
+    const { employee } = makeStateWithOne('surveyor');
+    const plan = planTraining(employee, 'driving.drill_rig', 1)!;
+    expect(plan.raisesLicenceTo).toBeUndefined();
+  });
+
+  it('proficiency level never changes the planned raise', () => {
+    const { employee } = makeStateWithOne('driller');
+    const qual = holdRigLicence(employee);
+    qual.proficiencyLevel = 5;
+    expect(planTraining(employee, 'driving.drill_rig', 1)!.raisesLicenceTo).toBe(2);
+  });
+});
+
+describe('tickTraining — licence level course (#1524)', () => {
+  it('enrols, completes, and raises licenceLevel only', () => {
+    const { state, school } = setupSchool('driving_center');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    const qual = holdRigLicence(employee);
+    qual.proficiencyLevel = 3;
+    qual.xp = XP_THRESHOLDS[3] + 5;
+
+    const result = enrolInTraining(state, employee.id, school, 'driving.drill_rig');
+    expectSuccess(result);
+    expect(result.plan.raisesLicenceTo).toBe(2);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    const after = employee.qualifications.filter(q => q.category === 'driving.drill_rig');
+    expect(after).toHaveLength(1);
+    expect(after[0]!.licenceLevel).toBe(2);
+    expect(after[0]!.proficiencyLevel).toBe(3);
+    expect(after[0]!.xp).toBe(XP_THRESHOLDS[3] + 5);
+    expect(employee.trainingState).toBeNull();
+  });
+
+  it('a second course takes level 2 to level 3, and a third is refused', () => {
+    const { state, school } = setupSchool('driving_center');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    holdRigLicence(employee, 2);
+
+    const result = enrolInTraining(state, employee.id, school, 'driving.drill_rig');
+    expectSuccess(result);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    expect(employee.qualifications.find(q => q.category === 'driving.drill_rig')!.licenceLevel).toBe(3);
+    expect(enrolInTraining(state, employee.id, school, 'driving.drill_rig').success).toBe(false);
+  });
+
+  it('completion salary and held-skill list are otherwise untouched by a licence raise', () => {
+    const { state, school } = setupSchool('driving_center');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    holdRigLicence(employee);
+    const skillsBefore = employee.qualifications.map(q => q.category).sort();
+
+    const result = enrolInTraining(state, employee.id, school, 'driving.drill_rig');
+    expectSuccess(result);
+    resolveArrival(state, employee);
+    for (let i = 0; i < result.plan.ticks; i++) tickTraining(state);
+
+    expect(employee.qualifications.map(q => q.category).sort()).toEqual(skillsBefore);
+  });
+
+  it('a school that does not teach the licence still refuses the raise', () => {
+    const { state, school } = setupSchool('geology_lab');
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), 2, 2);
+    holdRigLicence(employee);
+    expect(enrolInTraining(state, employee.id, school, 'driving.drill_rig').success).toBe(false);
+  });
+});

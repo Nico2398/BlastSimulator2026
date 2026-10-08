@@ -686,6 +686,28 @@ describe('claimOnePoolCandidate', () => {
       expect(selection!.action.id).toBe(1);
     });
 
+    it('is tier-aware: an idle alternative whose licence is below the fleet\'s lowest tier does not defer the claim (#1524)', () => {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+      employee.qualifications.find(q => q.category === ROLE_LICENCE_REQUIRED.drill_rig)!.licenceLevel = 2;
+      purchaseVehicle(state.vehicles, 'drill_rig', 0, 0, 2); // lowest (only) fleet tier is 2
+
+      const { employee: levelOneAlternative } = hireEmployee(state.employees, 'driller', rng, 1, 1);
+      assignSkill(state.employees, levelOneAlternative.id, ROLE_LICENCE_REQUIRED.drill_rig, 1); // level 1: cannot drive tier 2
+
+      const action = makeAction({
+        id: 1, requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig', targetX: 5, targetZ: 5,
+      });
+      state.pendingActions.push(action);
+
+      const selection = claimOnePoolCandidate(state, employee, false, true);
+
+      expect(selection).not.toBeNull();
+      expect(selection!.action.id).toBe(1);
+    });
+
     it('does not defer an on-foot candidate (requiredVehicleRole: null), even with an idle alternative standing by', () => {
       const state = createGame({ seed: SEED });
       const rng = new Random(SEED);

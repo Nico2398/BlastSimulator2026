@@ -2115,3 +2115,9 @@ export const EVENT_CALM_DAYS = 7;
 
 /** Hours a lingering weather front holds the sky. */
 export const EVENT_FRONT_HOURS = 36;
+
+/** Fee for a course raising a driving licence to level 2 or 3 (#1524): the base course fee times the target level. */
+export const LICENCE_COURSE_FEE: Record<2 | 3, number> = { 2: TRAINING_BASE_FEE * 2, 3: TRAINING_BASE_FEE * 3 };
+
+/** Course duration multiplier for raising a driving licence to level 2 or 3 (#1524). */
+export const LICENCE_COURSE_TICKS_MULT: Record<2 | 3, number> = { 2: 1.5, 3: 2 };
