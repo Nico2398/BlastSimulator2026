@@ -8,6 +8,7 @@
 // concept) isn't available in core.
 
 import { getStorageCapacity } from '../entities/Building.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
@@ -18,6 +19,7 @@ import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { regionForColumns } from '../nav/NavGridSync.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
+import { loseOrphanedStock, type WarehouseLoss } from '../economy/FreightWarehouses.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
 export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
@@ -52,9 +54,16 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
   return { width: grid.sizeX, depth: grid.sizeZ, originX: grid.minX, originZ: grid.minZ };
 }
 
-/** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
-export function refreshLogisticsCapacity(state: GameState): void {
+/**
+ * Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move).
+ * Stock is lost only on destruction: a warehouse demolished for an upgrade keeps its id through
+ * the planned rebuild order, so its stock survives until the rebuilt building takes it back.
+ */
+export function refreshLogisticsCapacity(state: GameState): WarehouseLoss[] {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+  const liveIds = new Set(freightWarehouseSites(state.buildings).map(s => s.id));
+  for (const pb of state.plannedBuildings) liveIds.add(pb.buildingId);
+  return loseOrphanedStock(state.logistics, state.collectedOre, liveIds);
 }
 
 /**

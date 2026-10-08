@@ -88,3 +88,22 @@ export function freightWarehouseHasRoom(
 ): boolean {
   return currentStoredKg + additionalKg <= getStorageCapacity(state);
 }
+
+/** A placed, active freight warehouse as seen by logistics: where it is and how much it holds. */
+export interface WarehouseSite {
+  id: number;
+  x: number;
+  z: number;
+  capacityKg: number;
+}
+
+/** Active freight warehouses as logistics sites. */
+export function freightWarehouseSites(state: BuildingState): WarehouseSite[] {
+  const sites: WarehouseSite[] = [];
+  for (const b of state.buildings) {
+    if (b.active && b.type === 'freight_warehouse') {
+      sites.push({ id: b.id, x: b.x, z: b.z, capacityKg: getBuildingDef(b.type, b.tier).capacity });
+    }
+  }
+  return sites;
+}

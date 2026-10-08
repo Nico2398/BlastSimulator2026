@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
+import type { WarehouseSite } from '../../../src/core/entities/BuildingWarehouse.js';
 import {
   createLogisticsState,
   addBlastFragments,
@@ -77,9 +78,14 @@ function makeStoredFragment(
   };
 }
 
+/** Single freight warehouse (id 1) sized to the state's capacity. */
+function siteOf(state: LogisticsState): WarehouseSite[] {
+  return [{ id: 1, x: 0, z: 0, capacityKg: state.storageCapacityKg }];
+}
+
 /** Push a fragment directly into storage (bypassing pickup/deliver) for consumeStoredOre setup. */
 function putInStorage(state: LogisticsState, fragment: FragmentData): void {
-  state.fragments.push({ fragment, state: 'stored', vehicleId: null });
+  state.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: 1 });
   state.storedMassKg += fragment.mass;
 }
 
@@ -98,7 +104,7 @@ describe('Fragment logistics', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1)]);
 
-    const ok = pickupFragment(state, 1, 'truck-01');
+    const ok = pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
     expect(ok).toBe(true);
 
     const counts = getFragmentCounts(state);
@@ -109,8 +115,8 @@ describe('Fragment logistics', () => {
   it('delivering fragment to depot moves it to stored', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 50)]);
-    pickupFragment(state, 1, 'truck-01');
-    deliverToDepot(state, 1);
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
+    deliverToDepot(state, 1, undefined, siteOf(state), 0, 0);
 
     const counts = getFragmentCounts(state);
     expect(counts.stored).toBe(1);
@@ -120,8 +126,8 @@ describe('Fragment logistics', () => {
   it('selling fragment against contract credits income and reduces quantity', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 200)]);
-    pickupFragment(state, 1, 'truck-01');
-    deliverToDepot(state, 1);
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
+    deliverToDepot(state, 1, undefined, siteOf(state), 0, 0);
 
     const result = sellFragment(state, 1);
     expect(result).not.toBeNull();
@@ -136,8 +142,8 @@ describe('Fragment logistics', () => {
   it('deliverToDepot without collectedOre works as before', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
-    pickupFragment(state, 1, 'truck-01');
-    const result = deliverToDepot(state, 1);
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
+    const result = deliverToDepot(state, 1, undefined, siteOf(state), 0, 0);
     expect(result).toBe(true);
     const counts = getFragmentCounts(state);
     expect(counts.stored).toBe(1);
@@ -146,9 +152,9 @@ describe('Fragment logistics', () => {
   it('deliverToDepot with collectedOre accumulates ore mass correctly', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
     const collectedOre: Record<string, number> = {};
-    deliverToDepot(state, 1, collectedOre);
+    deliverToDepot(state, 1, collectedOre, siteOf(state), 0, 0);
     // fragment volume = 100/2.5 = 40, ore mass = 40 * 0.3 * 2500 = 30000 kg
     expect(collectedOre.dirtite).toBeCloseTo(30000);
   });
@@ -156,11 +162,11 @@ describe('Fragment logistics', () => {
   it('deliverToDepot accumulates multiple fragments into collectedOre', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 200)]);
-    pickupFragment(state, 1, 'truck-01');
-    pickupFragment(state, 2, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
+    pickupFragment(state, 2, 'truck-01', siteOf(state), 0, 0);
     const collectedOre: Record<string, number> = {};
-    deliverToDepot(state, 1, collectedOre);
-    deliverToDepot(state, 2, collectedOre);
+    deliverToDepot(state, 1, collectedOre, siteOf(state), 0, 0);
+    deliverToDepot(state, 2, collectedOre, siteOf(state), 0, 0);
     // Fragment 1: 40*0.3*2500 = 30000, Fragment 2: 80*0.3*2500 = 60000, total = 90000
     expect(collectedOre.dirtite).toBeCloseTo(90000);
   });
@@ -168,9 +174,9 @@ describe('Fragment logistics', () => {
   it('deliverToDepot adds to existing ore type in collectedOre', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
     const collectedOre: Record<string, number> = { existingOre: 50 };
-    deliverToDepot(state, 1, collectedOre);
+    deliverToDepot(state, 1, collectedOre, siteOf(state), 0, 0);
     // fragment volume = 40, ore mass = 40 * 0.3 * 2500 = 30000 kg
     expect(collectedOre.dirtite).toBeCloseTo(30000);
     expect(collectedOre.existingOre).toBe(50);
@@ -179,9 +185,9 @@ describe('Fragment logistics', () => {
   it('deliverToDepot returns false for missing fragment even with collectedOre', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
     const collectedOre: Record<string, number> = {};
-    const result = deliverToDepot(state, 999, collectedOre);
+    const result = deliverToDepot(state, 999, collectedOre, siteOf(state), 0, 0);
     expect(result).toBe(false);
     expect(collectedOre).toEqual({});
   });
@@ -191,12 +197,12 @@ describe('Fragment logistics', () => {
     addBlastFragments(state, [makeFragment(1, 100), makeFragment(2, 100)]);
 
     // First pickup succeeds
-    const ok1 = pickupFragment(state, 1, 'truck-01');
+    const ok1 = pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
     expect(ok1).toBe(true);
-    deliverToDepot(state, 1);
+    deliverToDepot(state, 1, undefined, siteOf(state), 0, 0);
 
     // Second pickup fails — would exceed capacity
-    const ok2 = pickupFragment(state, 2, 'truck-01');
+    const ok2 = pickupFragment(state, 2, 'truck-01', siteOf(state), 0, 0);
     expect(ok2).toBe(false);
 
     const counts = getFragmentCounts(state);
@@ -700,7 +706,7 @@ describe('returnFragmentToGround', () => {
   it('flips an in_transit fragment back to on_ground, clearing its vehicle association', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
     const before = state.fragments.find(f => f.fragment.id === 1)!;
     expect(before.state).toBe('in_transit');
     expect(before.vehicleId).toBe('truck-01');
@@ -728,7 +734,7 @@ describe('returnFragmentToGround', () => {
   it('returns false and mutates nothing for a nonexistent fragment id', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
 
     const ok = returnFragmentToGround(state, 999);
 
@@ -743,7 +749,7 @@ describe('returnFragmentToGround', () => {
     const navGrid = makeTestNavGrid(5, 5);
     addBlastFragments(state, [makeFragment(1, 100)], navGrid); // registers occupancy at (0,0)
     expect(navGrid.cellAt(0, 0)!.fragmentOccupancy).toBe(1);
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
     navGrid.removeFragmentOccupant(0, 0); // mirrors what the real haul pickup path does
     expect(navGrid.cellAt(0, 0)!.fragmentOccupancy).toBe(0);
 
@@ -756,7 +762,7 @@ describe('returnFragmentToGround', () => {
   it('succeeds without throwing when navGrid is omitted', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]);
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
 
     let ok = false;
     expect(() => { ok = returnFragmentToGround(state, 1); }).not.toThrow();
@@ -769,7 +775,7 @@ describe('returnFragmentToGround', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     // Fragment's ORIGINAL recorded position (where the blast placed it).
     addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
 
     // Vehicle's CURRENT position, partway through its 'to_depot' leg —
     // clearly different from the fragment's original position.
@@ -785,7 +791,7 @@ describe('returnFragmentToGround', () => {
   it('when dropPosition is omitted, the fragment reverts to its own already-recorded position', () => {
     const state = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(state, [makeFragment(1, 100)]); // position: {x: 0, y: 0, z: 0}
-    pickupFragment(state, 1, 'truck-01');
+    pickupFragment(state, 1, 'truck-01', siteOf(state), 0, 0);
 
     const ok = returnFragmentToGround(state, 1);
 
@@ -847,18 +853,18 @@ describe('inTransitMassKg (#1370)', () => {
   it('sums the mass of every in_transit fragment and ignores ground and stored ones', () => {
     const s = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 450), makeFragment(3, 1000), makeFragment(4, 70)]);
-    expect(pickupFragment(s, 1, '7')).toBe(true);
-    expect(pickupFragment(s, 2, '7')).toBe(true);
-    expect(pickupFragment(s, 3, '8')).toBe(true);
-    deliverToDepot(s, 3);
+    expect(pickupFragment(s, 1, '7', siteOf(s), 0, 0)).toBe(true);
+    expect(pickupFragment(s, 2, '7', siteOf(s), 0, 0)).toBe(true);
+    expect(pickupFragment(s, 3, '8', siteOf(s), 0, 0)).toBe(true);
+    deliverToDepot(s, 3, undefined, siteOf(s), 0, 0);
     expect(inTransitMassKg(s)).toBe(750);
   });
 
   it('drops back after a fragment is returned to the ground', () => {
     const s = createLogisticsState(TEST_STORAGE_KG);
     addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 450)]);
-    pickupFragment(s, 1, '7');
-    pickupFragment(s, 2, '7');
+    pickupFragment(s, 1, '7', siteOf(s), 0, 0);
+    pickupFragment(s, 2, '7', siteOf(s), 0, 0);
     returnFragmentToGround(s, 2);
     expect(inTransitMassKg(s)).toBe(300);
   });
@@ -868,26 +874,26 @@ describe('pickupFragment counts mass already in transit against capacity (#1370)
   it('refuses a pickup when stored + in-transit + mass exceeds capacity', () => {
     const s = createLogisticsState(1000);
     addBlastFragments(s, [makeFragment(1, 600), makeFragment(2, 600)]);
-    expect(pickupFragment(s, 1, '7')).toBe(true);
-    expect(pickupFragment(s, 2, '7')).toBe(false);
+    expect(pickupFragment(s, 1, '7', siteOf(s), 0, 0)).toBe(true);
+    expect(pickupFragment(s, 2, '7', siteOf(s), 0, 0)).toBe(false);
     expect(s.fragments.find(f => f.fragment.id === 2)!.state).toBe('on_ground');
   });
 
   it('accepts a pickup that exactly fills capacity with stored + in-transit mass', () => {
     const s = createLogisticsState(1000);
-    s.storedMassKg = 200;
+    putInStorage(s, makeFragment(90, 200));
     addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 500)]);
-    expect(pickupFragment(s, 1, '7')).toBe(true);
-    expect(pickupFragment(s, 2, '7')).toBe(true);
-    expect(pickupFragment(s, 1, '7')).toBe(false); // already in transit: not on the ground
+    expect(pickupFragment(s, 1, '7', siteOf(s), 0, 0)).toBe(true);
+    expect(pickupFragment(s, 2, '7', siteOf(s), 0, 0)).toBe(true);
+    expect(pickupFragment(s, 1, '7', siteOf(s), 0, 0)).toBe(false); // already in transit: not on the ground
   });
 
   it('refuses a pickup one kg over when stored and in-transit mass together are counted', () => {
     const s = createLogisticsState(1000);
-    s.storedMassKg = 200;
+    putInStorage(s, makeFragment(90, 200));
     addBlastFragments(s, [makeFragment(1, 300), makeFragment(2, 501)]);
-    expect(pickupFragment(s, 1, '7')).toBe(true);
-    expect(pickupFragment(s, 2, '7')).toBe(false);
+    expect(pickupFragment(s, 1, '7', siteOf(s), 0, 0)).toBe(true);
+    expect(pickupFragment(s, 2, '7', siteOf(s), 0, 0)).toBe(false);
   });
 });
 

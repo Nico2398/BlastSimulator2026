@@ -88,6 +88,7 @@ function addFragment(state: GameState, id: number, fragState: FragmentState = 'o
     },
     state: fragState,
     vehicleId: null,
+    warehouseId: null,
   });
 }
 

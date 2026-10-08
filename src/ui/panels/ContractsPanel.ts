@@ -29,7 +29,8 @@ import { getOre } from '../../core/world/OreCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { bestAvailableManagerLevel } from '../../core/entities/Employee.js';
 import { negotiationRefusalReason } from '../../core/economy/Negotiation.js';
-import { isFillableSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { contractAcceptBlocker, isFillableSaleOffer, remainingKg, type Contract, type ContractType, type NegotiationField } from '../../core/economy/Contract.js';
+import { freightWarehouseSites } from '../../core/entities/BuildingWarehouse.js';
 import type { GameConsoleFn } from '../gameConsole.js';
 
 
@@ -334,8 +335,10 @@ export class ContractsPanel extends PanelBase {
     const neg = state.contracts.lastNegotiation;
     const negBox = neg && neg.contractId === c.id && neg.changes.length > 0 ? this.makeNegotiateResult(neg) : null;
 
+    const blocked = contractAcceptBlocker(c, freightWarehouseSites(state.buildings).length > 0);
     const acceptBtn = button('primary', t('ui.contracts.accept'), {
       dataAction: 'accept',
+      ...(blocked === null ? {} : { disabled: true, title: t('economy.contract.needs_warehouse') }),
       onClick: () => this.gameConsole?.(`contract accept id:${c.id}`),
     });
     acceptBtn.classList.add('bs-contract-accept');

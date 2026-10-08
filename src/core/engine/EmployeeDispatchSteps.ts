@@ -20,7 +20,7 @@ import { claimPendingAction } from './TaskDispatch.js';
 import { beginRestTravel, resolveRestBuildingId } from './RestActionHelpers.js';
 import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, isLicensedForRole } from './VehicleReservation.js';
-import { createFragmentLookup, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 import { alightIfMounted } from './Mount.js';
@@ -45,6 +45,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
   // One id → fragment index for this whole pass, never a linear scan per
   // action — see createFragmentLookup's own doc comment (HaulDispatch.ts).
   const fragmentOf = createFragmentLookup(state);
+  const fits = createStorageFit(state);
   const targeted = state.pendingActions
     .filter(a => a.status === 'queued' && a.targetEmployeeId === employee.id
       // #552: a haul_debris/fragment_debris action whose fragment is no
@@ -52,7 +53,7 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // remaining storage room, stays queued rather than being claimed and
       // immediately failing at pickup — mirrors the vehicle-availability
       // check (findVehicleForClaim) just below.
-      && isHaulOrFragmentActionClaimable(state, a, fragmentOf)
+      && isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits)
       // #557: never re-claim a stale evacuation-relay leftover while its
       // zone is still occupied — see isEvacuationHoldActive's own doc
       // comment (Evacuation.ts).
@@ -359,13 +360,14 @@ export function claimOnePoolCandidate(
   // O(actions × fragments) for every idle employee, every tick (the
   // `level1-lose-ecology` cost createFragmentLookup's doc comment records).
   const fragmentOf = createFragmentLookup(state);
+  const fits = createStorageFit(state);
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
     (!excludeOnFootActions || a.requiredVehicleRole !== null) &&
     holdsRequiredSkill(employee, a.requiredSkill) &&
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
-    isHaulOrFragmentActionClaimable(state, a, fragmentOf) &&
+    isHaulOrFragmentActionClaimable(state, a, fragmentOf, fits) &&
     // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that
     // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
     // (called once per tick from tickEmployees) means this never permanently

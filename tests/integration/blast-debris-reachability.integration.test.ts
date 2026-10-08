@@ -19,6 +19,7 @@
 //
 // Drives the real console command layer (createRunner): no DOM, no Three.js.
 
+import { upgradeFreightWarehousesToTier3 } from '../helpers/freightWarehouse.js';
 import { describe, it, expect } from 'vitest';
 import type { GameState, PendingAction } from '../../src/core/state/GameState.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
@@ -56,8 +57,8 @@ function crewHaulingAndBuildDepot(run: (cmd: string) => unknown, state: GameStat
   expect(run('build freight_warehouse at:1,8')).toMatchObject({ success: true });
   tickUntilFresh(run, state, () => state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active), 400);
   expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active)).toBe(true);
-  // One tier-1 warehouse holds 2000 kg, less than this blast's reachable debris: without ample room the hauler stops on "storage full" and the queue never drains to just the pocket. Capacity is not what these tests probe.
-  state.logistics.storageCapacityKg = 1_000_000;
+  // One tier-1 warehouse holds 2000 kg, less than this blast's reachable debris: without ample room the hauler stops on "storage full" and the queue never drains to just the pocket. Capacity is not what these tests probe, so the depot is upgraded to tier 3 (15000 kg).
+  upgradeFreightWarehousesToTier3(state, 75_000);
 }
 
 /** Every currently-queued debris action (haul_debris/fragment_debris) still sitting in pendingActions. */

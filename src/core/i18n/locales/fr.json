@@ -3830,5 +3830,10 @@
   "ui.contracts.hold": "Suspendre",
   "ui.contracts.resume": "Reprendre",
   "ui.contracts.held_badge": "Suspendu",
-  "ui.contracts.history_paid": "Payé ${amount}"
+  "ui.contracts.history_paid": "Payé ${amount}",
+  "economy.contract.needs_warehouse": "Les contrats de vente de minerai exigent un entrepôt de fret pour stocker le minerai. Construisez-en un d'abord.",
+  "entities.build_destroy_lost_ore": "Attention : {kg} kg de minerai et de roche stockés seront perdus avec cet entrepôt.",
+  "mining.blast.warehouse_stock_lost": "Entrepôt de fret #{id} détruit : {kg} kg de stock perdus.",
+  "notification.warehouse_stock_lost": "L'entrepôt de fret #{id} a été détruit. {kg} kg de stock sont perdus.",
+  "notification.title.warehouse_stock_lost": "Stock perdu"
 }

@@ -1,5 +1,6 @@
 // BlastSimulator2026 — Integration tests for employee and set_policy commands (task 3.15)
 
+import { addFreightWarehouse, sitesOf } from "../helpers/freightWarehouse.js";
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
@@ -767,9 +768,9 @@ describe('Console — employee fire releases the employee from the world (#1378)
 
   it('firing a driver mid-haul returns the carried payload to the ground', () => {
     const { driverId, vehicle } = driverAboardHauler(ctx);
-    ctx.state!.logistics.storageCapacityKg = 5000;
+    addFreightWarehouse(ctx);
     addBlastFragments(ctx.state!.logistics, [makeCargoFragment(1, 850)]);
-    pickupFragment(ctx.state!.logistics, 1, String(vehicle.id));
+    pickupFragment(ctx.state!.logistics, 1, String(vehicle.id), sitesOf(ctx.state!), 0, 0);
     vehicle.cargo = [{ fragmentId: 1, massKg: 850 }];
 
     employeeCommand(ctx, ['fire', String(driverId)], {});
