@@ -55,7 +55,8 @@ export type SkillCategory =
   | 'driving.rock_fragmenter'
   | 'blasting'
   | 'management'
-  | 'geology';
+  | 'geology'
+  | 'repair';
 
 export interface SkillQualification {
   category: SkillCategory;

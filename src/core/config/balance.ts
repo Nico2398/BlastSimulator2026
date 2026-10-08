@@ -1374,7 +1374,7 @@ export const BASE_TASK_DURATION_TICKS = 20;
  * (ROLE_STARTING_QUALIFICATIONS); the rock fragmenter licence is reachable only here.
  */
 export const TRAINING_BUILDING_SKILLS = {
-  driving_center: ['driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter'],
+  driving_center: ['driving.truck', 'driving.excavator', 'driving.drill_rig', 'driving.rock_fragmenter', 'repair'],
   blasting_academy: ['blasting'],
   management_office: ['management'],
   geology_lab: ['geology'],
@@ -1927,3 +1927,9 @@ export const HOLE_DRAIN_POROSITY_LIMIT = 0.15;
 
 /** Ticks between re-issued evacuation orders while a detonation is armed (#1362). */
 export const DETONATION_REEVACUATE_INTERVAL_TICKS = 10;
+
+/** Base ticks to repair one hp of a damaged vehicle (before proficiency scaling). */
+export const REPAIR_BASE_TICKS_PER_HP = 0.5;
+
+/** Parts cost charged per hp restored by a repair order. */
+export const REPAIR_PARTS_COST_PER_HP = 5;
