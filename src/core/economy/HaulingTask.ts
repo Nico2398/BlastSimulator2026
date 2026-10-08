@@ -108,11 +108,16 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
  * nearest active freight_warehouse depot building — the itinerary-planning
  * replacement for the old tickHaulingProgress's own per-tick depot re-target
  * (formerly `resolveDepotApproach`, inlined per-tick since the depot leg only
- * needs resolving once now, at plan time). Returns null when no active depot
+ * needs resolving once now, at plan time). Prefers the nearest warehouse with
+ * room for `massKg`; when every warehouse is full for it, falls back to the
+ * nearest not-overbooked one so planning (and the pickup refusal that follows)
+ * behaves as with a single global store. Returns null when no active depot
  * exists.
  */
 export function findHaulDepotApproach(state: GameState, fromX: number, fromZ: number, massKg: number): { x: number; z: number } | null {
-  const site = pickWarehouse(state.logistics, freightWarehouseSites(state.buildings), fromX, fromZ, massKg);
+  const sites = freightWarehouseSites(state.buildings);
+  const site = pickWarehouse(state.logistics, sites, fromX, fromZ, massKg)
+    ?? pickWarehouse(state.logistics, sites, fromX, fromZ, 0);
   const depot = site && state.buildings.buildings.find(b => b.id === site.id);
   if (!depot) return null;
   return findBuildingApproachCell(state.navGrid, depot, getBuildingDef(depot.type, depot.tier), fromX, fromZ);
