@@ -101,7 +101,7 @@ export function completeDemolition(
   const { sizeX, sizeZ } = getDefSize(getBuildingDef(building.type, building.tier));
   destroyBuilding(state.buildings, building.id);
   releaseOccupantsOfRemovedBuildings(state, emitter);
-  refreshLogisticsCapacity(state);
+  for (const loss of refreshLogisticsCapacity(state)) emitter.emit('logistics:warehouse_stock_lost', loss);
   if (grid) emitFootprintRegionChanged(emitter, grid, building.x, building.z, sizeX, sizeZ);
   const rebuildActionId = payload.rebuildOrderId !== null ? dispatchRebuild(state, grid, payload.rebuildOrderId) : null;
   return { buildingId: building.id, rebuildActionId };

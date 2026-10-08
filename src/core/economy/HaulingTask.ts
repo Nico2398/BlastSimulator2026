@@ -13,11 +13,12 @@
 import type { GameState } from '../state/GameState.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
-import { storageRoomKg } from './Logistics.js';
+import { pickWarehouse } from './FreightWarehouses.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { findNearestReachableFragment, findRequestVehicleOfRole, claimAndDispatchFragmentAction, vehicleNoDriver } from './FragmentTaskLifecycle.js';
-import { findNearestActiveBuildingOfType, getBuildingDef } from '../entities/Building.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import { getBuildingDef } from '../entities/Building.js';
 import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 
 /**
@@ -85,7 +86,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!isHaulEligibleVehicle(vehicle, state.vehicles)) return null;
 
-  const roomKg = storageRoomKg(state.logistics);
+  const sites = freightWarehouseSites(state.buildings);
 
   return findNearestReachableFragment(state, vehicleId, vehicle.x, vehicle.z, tracked => {
     // An oversized fragment can never be hauled until a Rock Fragmenter
@@ -97,7 +98,7 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
     // away every tick from then on. Blasts throw off boulders far heavier than
     // an early warehouse holds, so skipping them here is what keeps the fleet
     // working instead of silently deadlocked on the nearest rock.
-    if (tracked.fragment.mass > roomKg) return false;
+    if (!pickWarehouse(state.logistics, sites, vehicle.x, vehicle.z, tracked.fragment.mass)) return false;
     return true;
   });
 }
@@ -110,8 +111,9 @@ export function findReachableGroundFragment(state: GameState, vehicleId: number)
  * needs resolving once now, at plan time). Returns null when no active depot
  * exists.
  */
-export function findHaulDepotApproach(state: GameState, fromX: number, fromZ: number): { x: number; z: number } | null {
-  const depot = findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', fromX, fromZ);
+export function findHaulDepotApproach(state: GameState, fromX: number, fromZ: number, massKg: number): { x: number; z: number } | null {
+  const site = pickWarehouse(state.logistics, freightWarehouseSites(state.buildings), fromX, fromZ, massKg);
+  const depot = site && state.buildings.buildings.find(b => b.id === site.id);
   if (!depot) return null;
   return findBuildingApproachCell(state.navGrid, depot, getBuildingDef(depot.type, depot.tier), fromX, fromZ);
 }

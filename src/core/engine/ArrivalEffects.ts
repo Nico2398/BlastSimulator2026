@@ -28,6 +28,7 @@ import { vehicleDriverId, getVehicleReservation, getVehicleDefByTier, vehicleCar
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
 import { pickupFragment, deliverToDepot, type TrackedFragment } from '../economy/Logistics.js';
 import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
@@ -109,7 +110,7 @@ export function applyHaulLoad(state: GameState, vehicle: Vehicle, emitter?: Even
 /** Picks `tracked` up onto `vehicle.cargo`; false when logistics refuses (storage room). */
 function loadFragment(state: GameState, vehicle: Vehicle, tracked: TrackedFragment, emitter?: EventEmitter): boolean {
   const fragmentId = tracked.fragment.id;
-  if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id))) return false;
+  if (!pickupFragment(state.logistics, fragmentId, String(vehicle.id), freightWarehouseSites(state.buildings), vehicle.x, vehicle.z)) return false;
 
   state.navGrid?.removeFragmentOccupant(
     Math.round(tracked.fragment.position.x),
@@ -151,8 +152,9 @@ export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: Ev
   // that never happened. A stale item is skipped; the trip fails only when
   // nothing at all was delivered.
   let delivered = 0;
+  const sites = freightWarehouseSites(state.buildings);
   for (const { fragmentId } of vehicle.cargo) {
-    if (!deliverToDepot(state.logistics, fragmentId, state.collectedOre)) continue;
+    if (!deliverToDepot(state.logistics, fragmentId, state.collectedOre, sites, vehicle.x, vehicle.z)) continue;
     delivered++;
     emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
     // An extra's own haul action is normally consumed at load; sweep any still queued.

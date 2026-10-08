@@ -98,6 +98,12 @@ export interface WarehouseSite {
 }
 
 /** Active freight warehouses as logistics sites. */
-export function freightWarehouseSites(_state: BuildingState): WarehouseSite[] {
-  return []; // TODO: implement
+export function freightWarehouseSites(state: BuildingState): WarehouseSite[] {
+  const sites: WarehouseSite[] = [];
+  for (const b of state.buildings) {
+    if (b.active && b.type === 'freight_warehouse') {
+      sites.push({ id: b.id, x: b.x, z: b.z, capacityKg: getBuildingDef(b.type, b.tier).capacity });
+    }
+  }
+  return sites;
 }

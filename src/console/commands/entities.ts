@@ -17,6 +17,7 @@ import {
   type BuildingTier,
   type FootprintOccupant,
 } from '../../core/entities/Building.js';
+import { warehouseStoredKg } from '../../core/economy/FreightWarehouses.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
@@ -95,10 +96,11 @@ export function buildCommand(
       addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       const lostKg = toDestroy.type === 'explosive_warehouse' ? (toDestroy.storedExplosivesKg ?? 0) : 0;
       const destroyOutput = t('entities.build_destroy_ordered', { id, cost: demolishCost });
-      return {
-        success: true,
-        output: lostKg > 0 ? `${destroyOutput}\n${t('entities.build_destroy_lost_explosives', { kg: lostKg })}` : destroyOutput,
-      };
+      const lostOreKg = toDestroy.type === 'freight_warehouse' ? Math.round(warehouseStoredKg(state.logistics, id)) : 0;
+      const lines = [destroyOutput];
+      if (lostKg > 0) lines.push(t('entities.build_destroy_lost_explosives', { kg: lostKg }));
+      if (lostOreKg > 0) lines.push(t('entities.build_destroy_lost_ore', { kg: lostOreKg }));
+      return { success: true, output: lines.join('\n') };
     }
     case 'upgrade': {
       const id = parseInt(args[1] ?? '', 10);

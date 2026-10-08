@@ -7,6 +7,7 @@ import { fetchModelBytes, preloadModels, yieldToEventLoop } from './renderer/mod
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { wireCrewNotifications } from './ui/notify/crewNotifications.js';
+import { wireLogisticsNotifications } from './ui/notify/logisticsNotifications.js';
 import { wireResearchNotifications } from './ui/notify/researchNotifications.js';
 import { wireCorruptionNotifications } from './ui/notify/corruptionNotifications.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
@@ -476,6 +477,7 @@ emitter.on('blast:started', ({ originX, originZ }) => {
 
 wireCrewNotifications(emitter, () => ctx.state, n => uiManager.notify(n));
 wireResearchNotifications(emitter, n => uiManager.notify(n));
+wireLogisticsNotifications(emitter, n => uiManager.notify(n));
 wireCorruptionNotifications(emitter, n => uiManager.notify(n));
 
 let lastCommandOutput = '';

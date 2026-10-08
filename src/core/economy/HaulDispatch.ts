@@ -10,7 +10,9 @@ import type { GameState, PendingAction, ActionType, BlockedOrderReason } from '.
 import { getVehicleReservation } from '../entities/Vehicle.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
-import { storageRoomKg, type TrackedFragment } from './Logistics.js';
+import { freightWarehouseSites } from '../entities/BuildingWarehouse.js';
+import type { TrackedFragment } from './Logistics.js';
+import { pickWarehouse } from './FreightWarehouses.js';
 import { fragmentHasOre } from '../mining/BlastOreReport.js';
 import { octileHeuristic } from '../nav/Pathfinding.js';
 
@@ -178,7 +180,8 @@ export function isHaulOrFragmentActionClaimable(
 
 /** True iff the fragment's mass fits the free storage room. Single source for the claim gate and haulBlockedReason. */
 function fitsStorageRoom(state: GameState, tracked: TrackedFragment): boolean {
-  return tracked.fragment.mass <= storageRoomKg(state.logistics);
+  const { x, z } = tracked.fragment.position;
+  return pickWarehouse(state.logistics, freightWarehouseSites(state.buildings), x, z, tracked.fragment.mass) !== null;
 }
 
 /**

@@ -7,7 +7,7 @@
 // the one field it actually reads — the grid — since GameContext (a console
 // concept) isn't available in core.
 
-import { getStorageCapacity } from '../entities/Building.js';
+import { getStorageCapacity, freightWarehouseSites } from '../entities/Building.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import type { BlastRegion } from '../mining/BlastExecution.js';
 import type { GameState } from '../state/GameState.js';
@@ -18,7 +18,7 @@ import { DEFAULT_GRID_SIZE } from '../config/balance.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import { regionForColumns } from '../nav/NavGridSync.js';
 import { updateVehicleCellOccupancy } from './EntityMovementTick.js';
-import type { WarehouseLoss } from '../economy/FreightWarehouses.js';
+import { loseOrphanedStock, type WarehouseLoss } from '../economy/FreightWarehouses.js';
 
 /** The rectangular region a building/footprint of `sizeX`x`sizeZ` occupies, anchored at (x, z). */
 export function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
@@ -56,7 +56,8 @@ export function siteBoundsForGrid(grid: VoxelGrid | null): { width: number; dept
 /** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
 export function refreshLogisticsCapacity(state: GameState): WarehouseLoss[] {
   syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
-  return []; // TODO: implement orphan-stock loss
+  const liveIds = new Set(freightWarehouseSites(state.buildings).map(s => s.id));
+  return loseOrphanedStock(state.logistics, state.collectedOre, liveIds);
 }
 
 /**

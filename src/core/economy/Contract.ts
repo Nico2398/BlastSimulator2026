@@ -441,8 +441,8 @@ export function checkDeadlines(
 
 /** Why a contract cannot be accepted yet, or null. */
 export function contractAcceptBlocker(
-  _c: Contract,
-  _hasFreightWarehouse: boolean,
+  c: Contract,
+  hasFreightWarehouse: boolean,
 ): 'needs_freight_warehouse' | null {
-  return null; // TODO: implement
+  return c.type === 'ore_sale' && !hasFreightWarehouse ? 'needs_freight_warehouse' : null;
 }

@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Per-warehouse freight storage behind the shared pool (#1372)
 
 import type { WarehouseSite } from '../entities/BuildingWarehouse.js';
-import type { LogisticsState } from './Logistics.js';
+import type { LogisticsState, TrackedFragment } from './Logistics.js';
+import { accumulateOreMass, decrementCollectedOre } from '../mining/BlastOreReport.js';
 
 export type { WarehouseSite };
 
@@ -13,31 +14,72 @@ export interface WarehouseLoss {
 }
 
 /** Mass (kg) stored in one warehouse. */
-export function warehouseStoredKg(_l: LogisticsState, _warehouseId: number): number {
-  return 0; // TODO: implement
+export function warehouseStoredKg(l: LogisticsState, warehouseId: number): number {
+  let total = 0;
+  for (const f of l.fragments) {
+    if (f.state === 'stored' && f.warehouseId === warehouseId) total += f.fragment.mass;
+  }
+  return total;
 }
 
 /** Free room (kg): capacity minus stored minus in-transit mass reserved for it. */
-export function warehouseFreeKg(_l: LogisticsState, _site: WarehouseSite): number {
-  return 0; // TODO: implement
+export function warehouseFreeKg(l: LogisticsState, site: WarehouseSite): number {
+  let used = 0;
+  for (const f of l.fragments) {
+    if (f.warehouseId === site.id && f.state !== 'on_ground') used += f.fragment.mass;
+  }
+  return site.capacityKg - used;
 }
 
 /** Nearest site with room for `massKg` (tie: lowest id), or null. */
 export function pickWarehouse(
-  _l: LogisticsState,
-  _sites: readonly WarehouseSite[],
-  _fromX: number,
-  _fromZ: number,
-  _massKg: number,
+  l: LogisticsState,
+  sites: readonly WarehouseSite[],
+  fromX: number,
+  fromZ: number,
+  massKg: number,
 ): WarehouseSite | null {
-  return null; // TODO: implement
+  let best: WarehouseSite | null = null;
+  let bestDist = Infinity;
+  for (const site of sites) {
+    if (warehouseFreeKg(l, site) < massKg) continue;
+    const dist = (site.x - fromX) ** 2 + (site.z - fromZ) ** 2;
+    if (dist < bestDist || (dist === bestDist && best !== null && site.id < best.id)) {
+      best = site;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 /** Remove stock held by warehouses not in `liveIds`; debits `collectedOre`. */
 export function loseOrphanedStock(
-  _l: LogisticsState,
-  _collectedOre: Record<string, number>,
-  _liveIds: ReadonlySet<number>,
+  l: LogisticsState,
+  collectedOre: Record<string, number>,
+  liveIds: ReadonlySet<number>,
 ): WarehouseLoss[] {
-  return []; // TODO: implement
+  const losses = new Map<number, WarehouseLoss>();
+  const kept: TrackedFragment[] = [];
+  for (const f of l.fragments) {
+    const id = f.warehouseId;
+    if (f.state !== 'stored' || id === null || liveIds.has(id)) {
+      kept.push(f);
+      continue;
+    }
+    let loss = losses.get(id);
+    if (!loss) {
+      loss = { buildingId: id, massKg: 0, oreKg: {} };
+      losses.set(id, loss);
+    }
+    loss.massKg += f.fragment.mass;
+    accumulateOreMass(loss.oreKg, f.fragment.volume, f.fragment.oreDensities);
+    decrementCollectedOre(collectedOre, f.fragment);
+    l.storedMassKg = Math.max(0, l.storedMassKg - f.fragment.mass);
+  }
+  if (losses.size === 0) return [];
+  l.fragments = kept;
+  for (const oreId of Object.keys(collectedOre)) {
+    if (collectedOre[oreId]! < 0) collectedOre[oreId] = 0;
+  }
+  return [...losses.values()].sort((a, b) => a.buildingId - b.buildingId);
 }

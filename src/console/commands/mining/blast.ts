@@ -7,7 +7,9 @@ import { requireGame, resetPlanState, cancelOutstandingDrillActions, assembleVal
 import { executeBlast, buildBlastReport, maxVillageVibration, type SecondaryBlastReport } from '../../../core/mining/BlastExecution.js';
 import { classifyWetChargedHoles } from '../../../core/mining/WetHoles.js';
 import { plannedChargesCost } from '../../../core/mining/ChargePlan.js';
-import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
+import { addBlastFragments } from '../../../core/economy/Logistics.js';
+import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
+import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { resolveSecondaryBlasts, type SecondaryBlastEvent } from '../../../core/entities/SecondaryBlast.js';
 import { emitFootprintOccupancyChanged } from '../buildingHelpers.js';
 import { getBuildingDef, getDefSize } from '../../../core/entities/Building.js';
@@ -22,9 +24,13 @@ import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { markSurveysStaleByBlast } from '../../../core/mining/SurveyStaleness.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
-import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
+
+/** Report line for one warehouse whose stock a blast destroyed with it. */
+function stockLossLine(loss: WarehouseLoss): string {
+  return t('mining.blast.warehouse_stock_lost', { id: loss.buildingId, kg: Math.round(loss.massKg) });
+}
 
 export function blastCommand(
   ctx: MiningContext,
@@ -70,6 +76,7 @@ export function blastCommand(
   ctx.lastBlastFlights = result.flights;
 
   const state = ctx.state!;
+  const stockLossLines: string[] = [];
 
   // Buildings destroyed by the blast: score penalty per building. Their freed
   // footprint is already inside clearedRegion, which executeBlast's own
@@ -81,7 +88,7 @@ export function blastCommand(
 
   // A blast can destroy a Freight Warehouse — keep logistics capacity honest.
   if (result.destroyedBuildings.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    stockLossLines.push(...refreshLogisticsCapacity(state).map(stockLossLine));
   }
 
   // Ore value is informational only here — cash is credited when the ore is
@@ -149,7 +156,7 @@ export function blastCommand(
     projectionSecondaryEvents,
   );
   if (impacts.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    stockLossLines.push(...refreshLogisticsCapacity(state).map(stockLossLine));
   }
   thisBlastAccidents.push(...impacts);
 
@@ -182,7 +189,7 @@ export function blastCommand(
     });
   }
   if (secondaryOutcomes.length > 0) {
-    syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
+    stockLossLines.push(...refreshLogisticsCapacity(state).map(stockLossLine));
     releaseOccupantsOfRemovedBuildings(state, ctx.emitter);
   }
 
@@ -289,6 +296,7 @@ export function blastCommand(
       ...(result.destroyedBuildings.length > 0
         ? [`Buildings destroyed: ${result.destroyedBuildings.map(b => `${b.type} #${b.buildingId}`).join(', ')}`]
         : []),
+      ...stockLossLines,
       ...secondaryReports.map(r => t('mining.blast.secondary_blast', { kg: r.explosivesKg, id: r.buildingId, casualties: r.casualties })),
     ].join('\n'),
   };

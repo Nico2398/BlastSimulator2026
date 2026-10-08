@@ -3822,5 +3822,10 @@
   "ui.contracts.hold": "Hold",
   "ui.contracts.resume": "Resume",
   "ui.contracts.held_badge": "Held",
-  "ui.contracts.history_paid": "Paid ${amount}"
+  "ui.contracts.history_paid": "Paid ${amount}",
+  "economy.contract.needs_warehouse": "Ore sale contracts need a Freight Warehouse to store the ore. Build one first.",
+  "entities.build_destroy_lost_ore": "Warning: {kg} kg of stored ore and rock will be lost with this warehouse.",
+  "mining.blast.warehouse_stock_lost": "Freight Warehouse #{id} destroyed: {kg} kg of stored stock lost.",
+  "notification.warehouse_stock_lost": "Freight Warehouse #{id} was destroyed. {kg} kg of stored stock is gone.",
+  "notification.title.warehouse_stock_lost": "Stock lost"
 }

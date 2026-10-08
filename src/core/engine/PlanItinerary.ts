@@ -519,7 +519,9 @@ function planFragmentTaskItinerary(
   // cargo) intact rather than releasing it (isCommittedToOwnCargo,
   // VehicleReservation.ts). Only the depot leg is left to plan.
   if (action.type === 'haul_debris' && vehicle.cargo.some(c => c.fragmentId === fragmentId)) {
-    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ);
+    // The carried fragment's mass is already reserved in its warehouse, so ask
+    // for any warehouse not overbooked (0 kg) rather than counting it twice.
+    const depotApproach = findHaulDepotApproach(state, driveFromX, driveFromZ, 0);
     if (depotApproach === null) return null;
 
     const depotLeg = buildDriveLeg(state, fidelity, vehicle, driveFromX, driveFromZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);
@@ -579,7 +581,7 @@ function planFragmentTaskItinerary(
     lastZ = extraApproach.z;
   }
 
-  const depotApproach = findHaulDepotApproach(state, lastX, lastZ);
+  const depotApproach = findHaulDepotApproach(state, lastX, lastZ, tracked.fragment.mass);
   if (depotApproach === null) return null;
 
   const toDepotLeg = buildDriveLeg(state, fidelity, vehicle, lastX, lastZ, depotApproach.x, depotApproach.z, { kind: 'effect', effectId: 'haul_unload' }, def, 'exact', false);

@@ -83,6 +83,22 @@ export function accumulateOreMass(
 }
 
 /**
+ * Subtract from `collectedOre` the exact ore-kg every ore carries in a
+ * fragment slice of `volume` m³. Returns the per-ore breakdown removed.
+ */
+export function decrementCollectedOre(
+  collectedOre: Record<string, number>,
+  slice: { volume: number; oreDensities: Record<string, number> },
+): Record<string, number> {
+  const acc: Record<string, number> = {};
+  accumulateOreMass(acc, slice.volume, slice.oreDensities);
+  for (const [oreId, kg] of Object.entries(acc)) {
+    collectedOre[oreId] = (collectedOre[oreId] ?? 0) - kg;
+  }
+  return acc;
+}
+
+/**
  * True iff any entry in `oreDensities` is > 0 — i.e. the fragment carries
  * some amount of at least one ore type. Shared "does this fragment have any
  * ore at all" primitive: HaulDispatch.ts uses it to rank ore-bearing haul
