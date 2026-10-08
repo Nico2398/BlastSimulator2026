@@ -1609,7 +1609,7 @@
       }
     },
     {
-      "command": "blast",
+      "command": "blast detonate",
       "interaction": [
         {
           "type": "ensureStep",
@@ -1626,6 +1626,21 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player",
+      "description": "#1362: DETONATE arms the sequence and orders the danger zone evacuated. People are still inside it, so nothing fires yet."
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         },
         {
           "type": "waitForSelector",
@@ -1649,7 +1664,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "description": "#1362: Fire anyway in the waiting state (people still in the zone), the armed zone having been evacuated by DETONATE above."
     },
     {
       "command": "state full",
@@ -2264,7 +2280,7 @@
       }
     },
     {
-      "command": "blast",
+      "command": "blast detonate",
       "interaction": [
         {
           "type": "ensureStep",
@@ -2281,6 +2297,21 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player",
+      "description": "#1362: DETONATE arms the sequence and orders the danger zone evacuated. People are still inside it, so nothing fires yet."
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         },
         {
           "type": "waitForSelector",
@@ -2305,7 +2336,8 @@
           "tickCount": 0
         },
         "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
-      }
+      },
+      "description": "#1362: Fire anyway in the waiting state (people still in the zone), the armed zone having been evacuated by DETONATE above."
     },
     {
       "command": "state full",
@@ -2969,7 +3001,7 @@
       }
     },
     {
-      "command": "blast",
+      "command": "blast detonate",
       "interaction": [
         {
           "type": "ensureStep",
@@ -2986,6 +3018,21 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player",
+      "description": "#1362: DETONATE arms the sequence and orders the danger zone evacuated. People are still inside it, so nothing fires yet."
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         },
         {
           "type": "waitForSelector",
@@ -3010,7 +3057,8 @@
           "tickCount": 0
         },
         "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
-      }
+      },
+      "description": "#1362: Fire anyway in the waiting state (people still in the zone), the armed zone having been evacuated by DETONATE above."
     },
     {
       "command": "state full",
@@ -3276,8 +3324,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 48.240728439955674,
-          "nuisance": 44.203787717583495
+          "ecology": 38.54554632996676,
+          "nuisance": 45.063423497605655
         },
         "changedBy": {
           "tickCount": 0
@@ -3663,7 +3711,7 @@
       }
     },
     {
-      "command": "blast",
+      "command": "blast detonate",
       "interaction": [
         {
           "type": "ensureStep",
@@ -3680,6 +3728,21 @@
         {
           "type": "clickSelector",
           "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player",
+      "description": "#1362: DETONATE arms the sequence and orders the danger zone evacuated. People are still inside it, so nothing fires yet."
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         },
         {
           "type": "waitForSelector",
@@ -3704,7 +3767,8 @@
           "tickCount": 0
         },
         "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
-      }
+      },
+      "description": "#1362: Fire anyway in the waiting state (people still in the zone), the armed zone having been evacuated by DETONATE above."
     },
     {
       "command": "state full",
@@ -3995,7 +4059,7 @@
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.6591666666668,
+          "wellBeing": 99.95,
           "safety": 0,
           "ecology": 30.14659937179473,
           "nuisance": 0.6012486912389817
@@ -4021,7 +4085,7 @@
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.6591666666668,
+          "wellBeing": 99.95,
           "safety": 0,
           "ecology": 30.14659937179473,
           "nuisance": 0.6012486912389817
@@ -4047,7 +4111,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "increased": [
           "cash"
@@ -4070,7 +4134,7 @@
           "levelEndReason": "completed",
           "bankrupt": false,
           "revolted": false,
-          "profit": 250000.00000000023
+          "profit": 250000
         },
         "changedBy": {
           "cash": 0,

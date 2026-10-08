@@ -143,8 +143,8 @@ export interface SerializableGameState {
   collectedOreTotal: number;
   /**
    * Whether computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) is
-   * clear of every vehicle and living employee — the same check Fire.ts's
-   * `check_zone_clear` preflight row and its Sound the Horn button both use.
+   * clear of every vehicle and living employee — the same check the
+   * pre-flight zone row and the DETONATE sequence both use.
    * True when no drill plan exists yet (nothing to be clear of). Lets a
    * scenario's wait_until prove an evacuation genuinely finished — arrived
    * outside the padded zone — rather than merely that `zone clear` returned

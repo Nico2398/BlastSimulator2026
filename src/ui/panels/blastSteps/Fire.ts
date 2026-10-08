@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Blast Workshop: Fire step (redesign P4)
-// Danger-zone occupant list + Sound the Horn (real zone clear evacuation),
-// and a 2-item pre-flight checklist. The FIRE button itself stays in the
+// Danger-zone occupant list and a 2-item pre-flight checklist (DETONATE clears
+// the zone itself, #1362). The FIRE button itself stays in the
 // always-visible sticky footer (blastFooter.ts) — it now opens
 // PreflightModal rather than firing directly (see that file's header).
 //
@@ -8,13 +8,9 @@
 // exists once the player has already run zone clear at least once) — it's
 // computeDangerZone()'s live padded box around the current holes, so the
 // occupant list has something real to show from the moment a plan exists.
-// Sound the Horn defines + clears that exact same box via the real `zone
-// clear` command; nothing here is mocked or hand-waved.
-//
-// No "horn sounded" flag: clearZone() actually moves entities out, so the
-// occupant list just empties on its own on the next tick once they're gone
-// — unlike the design mock's version, which re-tags occupants CLEAR in
-// place rather than having them leave.
+// DETONATE (PreflightModal) evacuates that exact same box via the real
+// detonation sequence, so the occupant list just empties on its own once
+// everyone is out.
 
 import { t } from '../../../core/i18n/I18n.js';
 import { el, scrollBoundedSection } from '../../dom.js';
@@ -26,7 +22,6 @@ import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 import { vehicleDriverId } from '../../../core/entities/Vehicle.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { GameState } from '../../../core/state/GameState.js';
-import type { GameConsoleFn } from '../../gameConsole.js';
 
 
 interface Occupant {
@@ -41,11 +36,8 @@ export class FireStep {
   private readonly el: HTMLElement;
   private readonly zoneHeaderLabelEl: HTMLElement;
   private readonly zoneListEl: HTMLElement;
-  private readonly hornBtn: HTMLButtonElement;
   private readonly checklistEl: HTMLElement;
 
-  private gameConsole?: GameConsoleFn;
-  private currentZone: ZoneBounds | null = null;
   private lastSignature = '';
   private readonly locale = new LocaleTextRegistry();
 
@@ -58,20 +50,9 @@ export class FireStep {
     zoneHeader.append(this.zoneHeaderLabelEl, el('span', { className: 'bsx-section-rule' }));
 
     // Bounded + independently scrollable, same reasoning as Charge's product
-    // list: a crowded danger zone would otherwise push Sound the Horn and the
+    // list: a crowded danger zone would otherwise push the
     // preflight checklist past the panel's fold.
     this.zoneListEl = scrollBoundedSection([], 200, { gap: 4 });
-
-    this.hornBtn = el('button', { className: 'bsx-btn bsx-btn-warn' });
-    this.hornBtn.style.cssText = 'height:38px;gap:9px';
-    this.hornBtn.dataset['action'] = 'sound-horn';
-    this.hornBtn.append(iconEl('horn', 15), this.locale.bindText(el('span'), 'ui.blast_workshop.fire.sound_horn'));
-    this.hornBtn.addEventListener('click', () => this.soundHorn());
-
-    const hornNote = this.locale.bindText(
-      el('span', { attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);margin-top:-5px' } }),
-      'ui.blast_workshop.fire.sound_horn_note',
-    );
 
     const preflightHeader = el('div', { className: 'bsx-section' });
     preflightHeader.style.cssText = 'padding-top:3px';
@@ -82,17 +63,14 @@ export class FireStep {
     this.checklistEl = el('div');
     this.checklistEl.style.cssText = 'display:flex;flex-direction:column;gap:7px';
 
-    this.el.append(zoneHeader, this.zoneListEl, this.hornBtn, hornNote, preflightHeader, this.checklistEl);
+    this.el.append(zoneHeader, this.zoneListEl, preflightHeader, this.checklistEl);
     container.appendChild(this.el);
   }
 
   get root(): HTMLElement { return this.el; }
 
-  setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
-
   update(state: GameState, _weather?: WeatherState): void {
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
-    this.currentZone = zone;
     const wet = wetHoles(state);
 
     const occupantKeys = zone ? this.occupantKeys(state, zone) : [];
@@ -104,7 +82,6 @@ export class FireStep {
     this.zoneHeaderLabelEl.textContent = t('ui.blast_workshop.fire.danger_zone', { span });
 
     const occupants = zone ? this.occupants(state, zone) : [];
-    this.hornBtn.disabled = occupants.length === 0;
     this.renderZoneList(occupants, zone !== null);
     this.renderChecklist(state.drillHoles.length, wet.length, occupants);
   }
@@ -204,11 +181,5 @@ export class FireStep {
       el('span', { text, attrs: { style: 'font:400 11px/1.4 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
     );
     return row;
-  }
-
-  private soundHorn(): void {
-    const zone = this.currentZone;
-    if (!zone) return;
-    this.gameConsole?.(`zone clear x1:${Math.round(zone.x1)} y1:${Math.round(zone.z1)} x2:${Math.round(zone.x2)} y2:${Math.round(zone.z2)}`);
   }
 }

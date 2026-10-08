@@ -197,7 +197,6 @@
     "src/ui/tutorialStepHelpers.ts:countVehiclesWithDriver",
     "src/ui/tutorialStepHelpers.ts:getBuildings",
     "src/ui/tutorialStepHelpers.ts:getVehicles",
-    "src/ui/tutorialStepHelpers.ts:isEvacuationZoneClear",
     "src/ui/uiActionProbe.ts:BlockedReason",
     "src/ui/uiActionProbe.ts:UiAction"
   ]
