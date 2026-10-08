@@ -13,6 +13,9 @@ const CSS = `
   z-index: 100;
 }
 .bs-ui * { box-sizing: border-box; }
+/* #bs-ui-root is click-through; its direct children opt back in. Zero specificity so
+   any pointer-events:none on a child (class or inline) still wins. */
+:where(#bs-ui-root) > :where(*) { pointer-events: auto; }
 
 /* ─── Panel base ─── */
 .bs-panel {
