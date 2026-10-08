@@ -25,6 +25,7 @@
         { "type": "screenshot" },
         { "type": "clickSelector", "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(2)" },
         { "type": "awaitUsable", "selector": "#bs-event-dialog .bs-event-dismiss" },
+        { "type": "screenshot" },
         { "type": "clickSelector", "selector": "#bs-event-dialog .bs-event-dismiss" },
         { "type": "waitForSelector", "selector": ".bs-modifier-chip" },
         { "type": "screenshot" }

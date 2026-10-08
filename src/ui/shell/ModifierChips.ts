@@ -9,7 +9,7 @@ import { TOPBAR_HEIGHT_PX, SPACING_3_PX } from '../tokens.js';
 
 /** Width and height of the chip strip, matching its inline style below. */
 const STRIP_WIDTH_PX = 520;
-const STRIP_HEIGHT_PX = 26;
+const STRIP_HEIGHT_PX = 30;
 
 /** Centered strip just under the top bar; one row, extra chips clip rather than wrap into other regions. */
 function stripBounds(viewport: Viewport): Rect {
