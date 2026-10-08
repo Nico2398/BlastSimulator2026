@@ -3,20 +3,20 @@
   "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 21). #1313: the mine is frozen once the level has ended, so exposure stops accruing and the arrest never happens here; every tick after the win asserts the frozen state (cash and tickCount unchanged). The arrest outcome itself is proven in tests/integration/full-level/level1-lose-arrest.integration.test.ts, which pre-completes the level so the arrest can race alone.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow staffed:false cash:100000",
+      "command": "campaign start level:dusty_hollow staffed:false cash:122500",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:false cash:100000"
+          "command": "campaign start level:dusty_hollow staffed:false cash:122500"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000
+          "cash": 122500
         }
       },
-      "description": "cash:100000 sits here because `campaign start` is the step that decides this level's cash: createGameForLevel builds a brand-new GameState from dusty_hollow's own $50,000, so a bump on a `new_game` before it would be discarded. $80,000 covers the eight bribes below ($55,000 of cost plus a 50% failed-bribe fine each, #1411: $82,500) plus both hires ($1,000 driller + $1,500 blaster), keeping cash positive through the whole opening so the Crew panel's hire buttons stay enabled. The loss condition here is corruption-driven arrest, not money, so funding the level does not weaken what this scenario proves."
+      "description": "cash:100000 sits here because `campaign start` is the step that decides this level's cash: createGameForLevel builds a brand-new GameState from dusty_hollow's own $50,000, so a bump on a `new_game` before it would be discarded. $80,000 covers the eight bribes below ($55,000 of cost plus a 50% failed-bribe fine each, #1411: $82,500) plus both hires ($1,000 driller + $1,500 blaster), keeping cash positive through the whole opening so the Crew panel's hire buttons stay enabled. The loss condition here is corruption-driven arrest, not money, so funding the level does not weaken what this scenario proves. #1407: the mafia now unlocks at corruption level 20 and every opening bribe here fails (+2 each), so the opening grew from eight to eleven bribes and the level's cash from $100,000 to $122,500 (the extra $22,500 of cost and fines), keeping the post-bribe balance unchanged."
     },
     {
       "command": "time resume",
@@ -159,7 +159,58 @@
         "changedBy": {
           "cash": -15000
         },
-        "note": "the eighth and last opening bribe: $82,500 of failed bribes (cost plus fine, #1411) against the level's $100,000, leaving $17,500 -- enough for both hires below to be real clicks on enabled buttons. `corrupt` itself still has no funds guard (only employee hire / vehicle buy / build got one), so this scenario no longer relies on that: it stays solvent by being funded, not by overdrawing."
+        "note": "the eighth of eleven opening bribes (#1407 added three more): $82,500 of failed bribes (cost plus fine, #1411) against the level's $100,000, leaving $17,500 -- enough for both hires below to be real clicks on enabled buttons. `corrupt` itself still has no funds guard (only employee hire / vehicle buy / build got one), so this scenario no longer relies on that: it stays solvent by being funded, not by overdrawing."
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:inspector cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:inspector cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
+      "expect": {
+        "changedBy": {
+          "cash": -7500
+        },
+        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:union_leader cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:union_leader cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
+      "expect": {
+        "changedBy": {
+          "cash": -7500
+        },
+        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:politician cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:politician cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
+      "expect": {
+        "changedBy": {
+          "cash": -7500
+        },
+        "note": "#1407: extra opening bribe so the corruption meter (failed bribe = +2) reaches the mafia unlock threshold of 20 before the mafia smuggle step."
       },
       "role": "bootstrap"
     },

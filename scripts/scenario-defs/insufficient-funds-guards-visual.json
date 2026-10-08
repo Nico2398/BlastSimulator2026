@@ -15,18 +15,18 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 mine_type:desert size:32 cash:200000",
+      "command": "new_game seed:42 mine_type:desert size:32 cash:305000",
       "timeout": 30,
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 mine_type:desert size:32 cash:200000"
+          "command": "new_game seed:42 mine_type:desert size:32 cash:305000"
         }
       ],
       "expect": {
         "equals": {
-          "cash": 200000,
+          "cash": 305000,
           "buildingCount": 0,
           "employeeCount": 0
         }
@@ -126,7 +126,7 @@
     },
     {
       "command": "corrupt target:witness",
-      "description": "1/3 — unlocking the mafia (MAFIA_UNLOCK_THRESHOLD=3, Corruption.ts) requires 3 corrupt attempts, and corruption.level rises on both a success and a failure so this is deterministic. The Shady panel only reveals itself once corruption.level>0 (ToolRail.ts) — before that first attempt there is no button to click at all, so this is left a console command rather than a click that cannot land, same convention as the vehicle-buy BLOCKED FINDING in crew-fleet-panels-visual.json.",
+      "description": "1/10 — unlocking the mafia (MAFIA_UNLOCK_THRESHOLD=20, balance.ts) requires corruption level 20 -- every witness bribe here fails (+2 each, BRIBERY_FAILURE_CORRUPTION_DELTA), so ten attempts, and corruption.level rises on both a success and a failure so this is deterministic. The Shady panel only reveals itself once corruption.level>0 (ToolRail.ts) — before that first attempt there is no button to click at all, so this is left a console command rather than a click that cannot land, same convention as the vehicle-buy BLOCKED FINDING in crew-fleet-panels-visual.json.",
       "interaction": [
         {
           "type": "command",
@@ -142,7 +142,7 @@
     },
     {
       "command": "corrupt target:witness",
-      "description": "2/3.",
+      "description": "2/10.",
       "interaction": [
         {
           "type": "command",
@@ -158,7 +158,119 @@
     },
     {
       "command": "corrupt target:witness",
-      "description": "3/3 — corruption.level now reaches MAFIA_UNLOCK_THRESHOLD; mafiaUnlocked flips true, and the Shady panel's accident/frame cards become reachable.",
+      "description": "3/10.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -15000
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "4/10.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -15000
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "5/10.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -15000
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "6/10.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -15000
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "7/10.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -15000
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "8/10.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -15000
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "9/10.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -15000
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "10/10 -- corruption.level now reaches MAFIA_UNLOCK_THRESHOLD; mafiaUnlocked flips true, and the Shady panel's accident/frame cards become reachable.",
       "interaction": [
         {
           "type": "command",

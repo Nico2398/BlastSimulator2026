@@ -11,6 +11,7 @@ import { createFinanceState } from '../../../src/core/economy/Finance.js';
 import { createEventSystemState } from '../../../src/core/events/EventSystem.js';
 import { resolveEvent } from '../../../src/core/events/EventResolver.js';
 import { selectEvent } from '../../../src/core/events/EventSystem.js';
+import { MAFIA_UNLOCK_THRESHOLD } from '../../../src/core/config/balance.js';
 
 function makeCtx(overrides: Partial<EventContext> = {}): EventContext {
   return {
@@ -61,7 +62,7 @@ describe('Mafia events (6.6)', () => {
   });
 
   it('mafia events fire once corruption level is sufficient', () => {
-    const ctx = makeCtx({ corruptionLevel: 5 });
+    const ctx = makeCtx({ corruptionLevel: MAFIA_UNLOCK_THRESHOLD });
 
     let fired = false;
     for (let seed = 0; seed < 50; seed++) {
@@ -73,6 +74,19 @@ describe('Mafia events (6.6)', () => {
       }
     }
     expect(fired).toBe(true);
+  });
+
+  it('mafia events are not selectable just below the unlock threshold (#1407)', () => {
+    const ctx = makeCtx({ corruptionLevel: MAFIA_UNLOCK_THRESHOLD - 1 });
+    for (let seed = 0; seed < 50; seed++) {
+      expect(selectEvent('mafia', ctx, new Random(seed))).toBeNull();
+    }
+  });
+
+  it('mafia events are selectable well above the threshold (#1407)', () => {
+    const ctx = makeCtx({ corruptionLevel: MAFIA_UNLOCK_THRESHOLD + 30 });
+    const picked = Array.from({ length: 50 }, (_, seed) => selectEvent('mafia', ctx, new Random(seed)));
+    expect(picked.some(e => e !== null)).toBe(true);
   });
 
   it('protection racket event resolves with corruption increase', () => {
@@ -105,7 +119,7 @@ describe('Mafia events (6.6)', () => {
   it('escalation: later events require higher corruption', () => {
     const events = getEventsByCategory('mafia');
     const lowCorrupt = makeCtx({ corruptionLevel: 1 });
-    const highCorrupt = makeCtx({ corruptionLevel: 10 });
+    const highCorrupt = makeCtx({ corruptionLevel: MAFIA_UNLOCK_THRESHOLD + 10 });
 
     const firesAtLow = events.filter(e => e.canFire(lowCorrupt)).length;
     const firesAtHigh = events.filter(e => e.canFire(highCorrupt)).length;

@@ -1,0 +1,296 @@
+{
+  "name": "bribe-protections-visual",
+  "description": "Issue #1407: a successful bribe grants a timed protection. A player opens the Shady panel, bribes the inspector through the real call button and confirm dialog, and the panel lists the active protection row ([data-protection=\"inspector\"]) while the influence level rises. Every bribe (caught or not) raises corruption.level, so the level assertions are deterministic in both modes; the protection row relies on at least one of five attempts succeeding.",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:32 cash:200000",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 mine_type:desert size:32 cash:200000"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 200000
+        }
+      },
+      "description": "Fresh desert game with enough cash for several $8,000 inspector bribes and their failure fines."
+    },
+    {
+      "command": "corrupt target:witness",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "corruption.level"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "role: bootstrap -- the Shady rail entry only reveals once corruption.level>0 (ToolRail.ts), and the entry is unlabeled by design, so the first dirty deal is what makes the panel reachable at all. Both outcomes of a bribe raise the level (success: BRIBE_CORRUPTION_DELTA, failure: BRIBERY_FAILURE_CORRUPTION_DELTA)."
+    },
+    {
+      "command": "tick 1",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "One tick so the Shady rail entry reveals itself from the new corruption level."
+    },
+    {
+      "command": "corrupt target:inspector",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-toolbar [data-panel=\"shady\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"shady\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "corruption.level"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "A player opens the Shady panel from the rail, clicks the inspector's call button and confirms the dialog. The influence level rises whether the bribe lands or is caught."
+    },
+    {
+      "command": "tick 5",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "Lets the bribe roll change before attempt 2: the roll is seeded from seed+tickCount, so back-to-back bribes in one tick would repeat the same outcome."
+    },
+    {
+      "command": "corrupt target:inspector",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "corruption.level"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "Inspector bribe attempt 2 by real clicks on the already-open Shady panel."
+    },
+    {
+      "command": "tick 5",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "Lets the bribe roll change before attempt 3: the roll is seeded from seed+tickCount, so back-to-back bribes in one tick would repeat the same outcome."
+    },
+    {
+      "command": "corrupt target:inspector",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "corruption.level"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "Inspector bribe attempt 3 by real clicks on the already-open Shady panel."
+    },
+    {
+      "command": "tick 5",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "Lets the bribe roll change before attempt 4: the roll is seeded from seed+tickCount, so back-to-back bribes in one tick would repeat the same outcome."
+    },
+    {
+      "command": "corrupt target:inspector",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "corruption.level"
+        ],
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "Inspector bribe attempt 4 by real clicks on the already-open Shady panel."
+    },
+    {
+      "command": "tick 5",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      },
+      "description": "Lets the bribe roll change before attempt 5: the roll is seeded from seed+tickCount, so back-to-back bribes in one tick would repeat the same outcome."
+    },
+    {
+      "command": "corrupt target:inspector",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-shady-panel [data-target=\"inspector\"] [data-action=\"corrupt\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "corruption.level"
+        ],
+        "decreased": [
+          "cash"
+        ],
+        "usable": "#bs-shady-panel [data-protection=\"inspector\"]"
+      },
+      "description": "Inspector bribe attempt 5 by real clicks on the already-open Shady panel. Five attempts at falling odds make a protection near-certain; the active-protection row must now be on screen (data-protection=\"inspector\") and the influence level above zero."
+    },
+    {
+      "command": "state",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        }
+      ]
+    }
+  ]
+}

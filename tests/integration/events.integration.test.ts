@@ -229,7 +229,8 @@ describe('Event system', () => {
   // ── 3b-ii. event choose routes corruptionDelta through applyCorruptionDelta (#1406) ──
 
   it('event choose with a positive corruptionDelta reaching the threshold unlocks mafia', () => {
-    // union_profit_sharing option 1: corruptionDelta +5, no cash cost.
+    // union_profit_sharing option 1: corruptionDelta +5, no cash cost (#1407: threshold is 20, start 5 below).
+    ctx.state!.corruption.level = MAFIA_UNLOCK_THRESHOLD - 5;
     ctx.state!.events.pendingEvent = { eventId: 'union_profit_sharing', firedAtTick: ctx.state!.tickCount };
     expect(ctx.state!.corruption.mafiaUnlocked).toBe(false);
 
@@ -262,6 +263,7 @@ describe('Event system', () => {
   });
 
   it('mafiaUnlocked stays latched after a later clean-up choose', () => {
+    ctx.state!.corruption.level = MAFIA_UNLOCK_THRESHOLD - 5;
     ctx.state!.events.pendingEvent = { eventId: 'union_profit_sharing', firedAtTick: ctx.state!.tickCount };
     eventCommand(ctx, ['choose', '1'], {});
     expect(ctx.state!.corruption.mafiaUnlocked).toBe(true);
