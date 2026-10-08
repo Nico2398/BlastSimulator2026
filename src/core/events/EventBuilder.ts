@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Event builder utility
 // Compact helpers for defining events without verbose boilerplate.
 
+import type { EventEffectSpec } from './EventEffectCatalog.js';
 import type { EventDef, EventCategory, EventContext, EventConsequence } from './EventPool.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import { MAFIA_UNLOCK_THRESHOLD, MAFIA_ESCALATION_STEP } from '../config/balance.js';
@@ -25,7 +26,7 @@ export function ev(
     tags?: readonly string[];
     options: Array<{ cashDelta?: number; scoreDelta?: Partial<Record<keyof ScoreState, number>>;
       corruptionDelta?: number; exposureDelta?: number; followUp?: string; effectTag?: string;
-      probability?: number; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>; }>;
+      probability?: number; effects?: EventEffectSpec[]; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>; }>;
   },
 ): EventDef {
   return {
@@ -42,6 +43,7 @@ export function ev(
       if (o.exposureDelta !== undefined) c.exposureDelta = o.exposureDelta;
       if (o.followUp !== undefined) c.followUpEventId = o.followUp;
       if (o.effectTag !== undefined) c.effectTag = o.effectTag;
+      if (o.effects !== undefined) c.effects = o.effects;
       if (o.probability !== undefined) c.probability = o.probability;
       if (o.alt !== undefined) c.altConsequence = o.alt;
       return c;

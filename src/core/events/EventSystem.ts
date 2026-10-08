@@ -2,6 +2,7 @@
 // Manages category timers, weighted selection, and event firing.
 
 import type { TrafficJam } from './TrafficJams.js';
+import type { ActiveModifier } from './ActiveModifiers.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
@@ -69,6 +70,10 @@ export interface EventSystemState {
   cooldownMinIntervalTicks: number | null;
   /** Action ids an unqualified_task event has already been raised for (#1380). */
   raisedUnqualifiedActionIds?: number[];
+  /** Live timed modifiers raised by event effects (#1414). */
+  activeModifiers: ActiveModifier[];
+  /** Next id handed to an ActiveModifier. */
+  nextModifierId: number;
 }
 
 export interface FiredEvent {
@@ -112,6 +117,8 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     pendingEvent: null,
     jamSilencedUntil: {},
     raisedUnqualifiedActionIds: [],
+    activeModifiers: [],
+    nextModifierId: 1,
     lastOutcome: null,
     followUpQueue: [],
     followUpDelayTicks: 0,

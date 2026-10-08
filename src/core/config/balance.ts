@@ -1932,3 +1932,17 @@ export const REPAIR_BASE_TICKS_PER_HP = 0.5;
 
 /** Parts cost charged per hp restored by a repair order. */
 export const REPAIR_PARTS_COST_PER_HP = 5;
+
+// ── Event effect catalog (#1414) ──
+
+/** Cap on simultaneously live event modifiers. */
+export const MAX_ACTIVE_MODIFIERS = 32;
+
+/** Lower bound a combined modifier factor may reach. */
+export const MODIFIER_FACTOR_MIN = 0.1;
+
+/** Upper bound a combined modifier factor may reach. */
+export const MODIFIER_FACTOR_MAX = 5;
+
+/** Default hp lost by a vehicle_breakdown effect when the spec omits it. */
+export const EVENT_EFFECT_BREAKDOWN_HP_LOSS = 20;

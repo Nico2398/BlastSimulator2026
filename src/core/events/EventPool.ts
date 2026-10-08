@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Event pool: defines event structure
 // Each event has weight coefficients, prerequisites, and decision options.
 
+import type { EventEffectSpec } from './EventEffectCatalog.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { ActiveProtection } from '../economy/BribeProtection.js';
@@ -45,6 +46,8 @@ export interface EventConsequence {
   exposureDelta?: number;
   /** Custom effect tag for the resolver to interpret. */
   effectTag?: string;
+  /** Declarative effects applied when this consequence is chosen (#1414). */
+  effects?: EventEffectSpec[];
   /** Probability this outcome occurs (1.0 = certain). */
   probability?: number;
   /** Alternative consequence if probability fails. */
