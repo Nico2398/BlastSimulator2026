@@ -44,7 +44,7 @@
       ]
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15",
+      "command": "drill_plan grid rows:2 cols:3 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
@@ -80,7 +80,7 @@
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
-          "x2": 19,
+          "x2": 22,
           "z2": 19
         },
         {
@@ -91,9 +91,9 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 4
+          "orderedHoleCount": 6
         },
-        "note": "4 holes ordered with the level's own crew and rig."
+        "note": "6 holes ordered with the level's own crew and rig."
       },
       "description": "Order a drill grid with the crew and rig the level opens with: nothing was hired or bought."
     },
@@ -163,38 +163,6 @@
       }
     },
     {
-      "command": "zone clear x1:-1 y1:-1 x2:40 y2:40",
-      "role": "player",
-      "timeout": 90,
-      "description": "Sound the Horn: everyone walks out of the blast radius before the shot, or the crew dies in it.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
-        }
-      ]
-    },
-    {
-      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
-      "role": "setup",
-      "description": "Wait for the walkout to finish.",
-      "timeout": 330,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "dangerZoneClear",
-          "equals": true,
-          "maxTicks": 300,
-          "timeoutMs": 300000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "dangerZoneClear": true
-        }
-      }
-    },
-    {
       "command": "weather set sunny",
       "interaction": [
         {
@@ -226,22 +194,54 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 60,
+      "command": "blast detonate",
+      "timeout": 90,
       "role": "player",
+      "description": "#1362: FIRE then DETONATE once. DETONATE sounds the horn itself and fires automatically as soon as nobody is left in the danger zone -- no separate Sound the Horn, wait, FIRE sequence.",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
+          "selector": "[data-action=\"preflight-detonate\"]"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "timeout": 330,
+      "role": "setup",
+      "description": "#1362: wait for the automatic fire -- the blast clears the plan (holeCount 0) only once the evacuation finished and the sequence fired.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "interaction": [
         {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
@@ -256,7 +256,8 @@
           "holeCount": 0,
           "chargedCount": 0
         }
-      }
+      },
+      "description": "(#1362: the blast already fired by itself; this step closes its report.)"
     },
     {
       "command": "tick 20",
@@ -281,13 +282,13 @@
       ]
     },
     {
-      "command": "tick 6",
+      "command": "tick 8",
       "role": "setup",
-      "description": "Let the hauler start clearing the blasted rock before selling it.",
+      "description": "Let the hauler start clearing the blasted rock before selling it. #1362: 8 ticks (was 6): DETONATE fires the blast a few ticks later than the old Sound the Horn + FIRE sequence, which re-rolls the contract board; at 6 the first fillable offer is a tiny dirtite order and the economy never recovers (bankruptcy). Contract draws are seeded by tick, so this pad picks a board whose sales carry the run.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 6"
+          "command": "tick 8"
         }
       ]
     },

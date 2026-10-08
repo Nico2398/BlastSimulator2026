@@ -163,54 +163,54 @@
       }
     },
     {
-      "command": "zone clear x1:-1 y1:-1 x2:40 y2:40",
-      "role": "player",
+      "command": "blast detonate",
       "timeout": 90,
-      "description": "Sound the Horn: everyone walks out of the blast radius before the shot, or the crew dies in it.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
-        }
-      ]
-    },
-    {
-      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
-      "role": "setup",
-      "description": "Wait for the walkout to finish.",
-      "timeout": 330,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "dangerZoneClear",
-          "equals": true,
-          "maxTicks": 300,
-          "timeoutMs": 300000
-        }
-      ],
-      "expect": {
-        "equals": {
-          "dangerZoneClear": true
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "timeout": 60,
       "role": "player",
+      "description": "#1362: FIRE then DETONATE once. DETONATE sounds the horn itself and fires automatically as soon as nobody is left in the danger zone -- no separate Sound the Horn, wait, FIRE sequence.",
       "interaction": [
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"execute\"]"
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
+          "selector": "[data-action=\"preflight-detonate\"]"
+        }
+      ]
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "timeout": 330,
+      "role": "setup",
+      "description": "#1362: wait for the automatic fire -- the blast clears the plan (holeCount 0) only once the evacuation finished and the sequence fired.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 60,
+      "role": "player",
+      "interaction": [
         {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
@@ -225,7 +225,8 @@
           "holeCount": 0,
           "chargedCount": 0
         }
-      }
+      },
+      "description": "(#1362: the blast already fired by itself; this step closes its report.)"
     },
     {
       "command": "tick 20",

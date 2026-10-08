@@ -299,10 +299,10 @@ describe('resolveStageIndex — evacuate-zone tab escape hatch (#926, #1344)', (
     panel.appendChild(chargeBody);
     makeButton({ 'data-action': 'charge-all' }, chargeBody);
 
-    const fireBody = document.createElement('div');
-    fireBody.style.display = activeStep === 4 ? '' : 'none';
-    panel.appendChild(fireBody);
-    makeButton({ 'data-action': 'sound-horn' }, fireBody);
+    // FIRE (data-action="execute") lives in the always-visible sticky footer (#1362).
+    const footer = document.createElement('div');
+    panel.appendChild(footer);
+    makeButton({ 'data-action': 'execute' }, footer);
   }
 
   for (const activeStep of [2, 4] as const) {

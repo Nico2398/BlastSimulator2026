@@ -767,43 +767,48 @@ describe('tutorialSteps', () => {
       expect(step.highlightTarget).toBe('#bs-toolbar [data-panel="blast"]');
     });
 
-    it('does not complete while an employee still stands inside the drill plan danger zone', () => {
-      const state = {
-        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
-        employees: { employees: [{ id: 1, x: 20, z: 20, alive: true }] },
-        vehicles: { vehicles: [] },
-      } as unknown as GameState;
-      expect(step.isComplete(state, {})).toBe(false);
+    // #1362: DETONATE arms the sequence (horn + auto-fire). The step is done
+    // once the detonation is armed or a blast already went off (clear zone:
+    // DETONATE fires in the same call, pendingDetonation never observed).
+    const armed = { armedTick: 1, strandedEmployeeIds: [], strandedVehicleIds: [], lastEvacuationTick: 1 };
+    const baseState = (over: Record<string, unknown> = {}): GameState => ({
+      drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
+      employees: { employees: [{ id: 1, x: 20, z: 20, alive: true }] },
+      vehicles: { vehicles: [{ id: 1, x: 20, z: 20 }] },
+      pendingDetonation: null,
+      levelStats: { blastsPerformed: 0 },
+      ...over,
+    }) as unknown as GameState;
+    const snapshotOf = (state: GameState) => step.captureSnapshot ? step.captureSnapshot(state) : {};
+
+    it('does not complete while nothing is armed, even with the zone occupied', () => {
+      const state = baseState();
+      expect(step.isComplete(state, snapshotOf(state))).toBe(false);
     });
 
-    it('does not complete while a vehicle still stands inside the drill plan danger zone', () => {
-      const state = {
-        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
-        employees: { employees: [] },
-        vehicles: { vehicles: [{ id: 1, x: 20, z: 20 }] },
-      } as unknown as GameState;
-      expect(step.isComplete(state, {})).toBe(false);
+    it('does not complete on a clear zone alone (the horn has not been sounded)', () => {
+      const state = baseState({ employees: { employees: [] }, vehicles: { vehicles: [] } });
+      expect(step.isComplete(state, snapshotOf(state))).toBe(false);
     });
 
-    it('completes once every employee and vehicle has cleared the danger zone', () => {
-      const state = {
-        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
-        employees: { employees: [{ id: 1, x: 100, z: 100, alive: true }] },
-        vehicles: { vehicles: [{ id: 1, x: 100, z: 100 }] },
-      } as unknown as GameState;
-      expect(step.isComplete(state, {})).toBe(true);
+    it('completes once a detonation is armed, even though the zone is still occupied', () => {
+      const state = baseState();
+      const snap = snapshotOf(state);
+      (state as unknown as { pendingDetonation: unknown }).pendingDetonation = armed;
+      expect(step.isComplete(state, snap)).toBe(true);
     });
 
-    it('does not falsely complete on a dead employee left inside the zone — only living crew must clear it', () => {
-      // isZoneClear (Zone.ts) already skips !emp.alive; this pins the same
-      // contract at the tutorial step boundary so a regression here is caught
-      // even if the step stops delegating to isZoneClear directly.
-      const state = {
-        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
-        employees: { employees: [{ id: 1, x: 20, z: 20, alive: false }] },
-        vehicles: { vehicles: [] },
-      } as unknown as GameState;
-      expect(step.isComplete(state, {})).toBe(true);
+    it('completes when a blast was performed since the snapshot (clear zone fired at once)', () => {
+      const state = baseState({ employees: { employees: [] }, vehicles: { vehicles: [] } });
+      const snap = snapshotOf(state);
+      (state as unknown as { levelStats: { blastsPerformed: number } }).levelStats = { blastsPerformed: 1 };
+      expect(step.isComplete(state, snap)).toBe(true);
+    });
+
+    it('does not complete when blastsPerformed was already high at snapshot time and did not rise', () => {
+      const state = baseState({ levelStats: { blastsPerformed: 3 } });
+      const snap = snapshotOf(state);
+      expect(step.isComplete(state, snap)).toBe(false);
     });
   });
 

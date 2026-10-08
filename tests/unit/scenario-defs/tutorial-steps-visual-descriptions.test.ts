@@ -112,9 +112,9 @@ describe('tutorial-steps-visual.json descriptions', () => {
         expect(step.description).toMatch(/all 9 holes/i);
     });
 
-    it('step 29 (blast) description re-derives deathCount:0 against the real footprint, assertion itself untouched', () => {
+    it('step 29 (blast, auto-fire wait) description re-derives deathCount:0 against the real footprint, assertion itself untouched', () => {
         const { steps } = loadScenarioDef(SCENARIO_NAME);
-        const step = findStep(steps, (s) => s.command === 'blast', 'blast');
+        const step = findStep(steps, (s) => s.command.startsWith('wait_until field:holeCount equals:0'), 'wait_until field:holeCount equals:0');
 
         const mentionsRealFootprint =
             step.description?.includes('20-26') ||

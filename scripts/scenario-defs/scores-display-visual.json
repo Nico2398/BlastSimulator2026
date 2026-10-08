@@ -481,25 +481,34 @@
       }
     },
     {
-      "command": "zone clear x1:5 y1:5 x2:39 y2:39",
-      "description": "#557: evacuate the crew before firing. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this exact 2x2/spacing:4 grid at (20,20) pads out to (5,5)-(39,39), matching the literal box declared here -- the same rectangle Fire.ts's Sound the Horn button computes and sends. The drillers (#1-#3, #965: a third pair was added to restore fatigue margin at the faster DRILL_HOLE_DEFAULT_DIAMETER_M default) are parked at the holes they just finished drilling, squarely inside it. Without this, Damage.ts's processProjections (attenuated out to the full 15m BLAST_DANGER_MARGIN_M, #557) kills them the instant the blast fires -- direct-traced (pre-#965, two drillers): deathCount 0 -> 2, and with nobody left alive, payroll/maintenance stop accruing and every `cash should have decreased` checkpoint for the rest of this file reads a frozen figure instead. clearZone no longer teleports: this only orders a walkout, so the wait_until step right after is what proves it actually finished.",
+      "command": "blast detonate",
+      "timeout": 90,
+      "role": "player",
+      "description": "#1362: FIRE then DETONATE once: DETONATE sounds the horn itself. A driverless drill rig cannot drive out, so the waiting state names it and keeps Fire anyway / Cancel on offer instead of auto-firing.",
       "interaction": [
         {
           "type": "ensureStep",
           "step": 4
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
           "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-fire-anyway\"]"
         }
       ],
-      "role": "player",
       "expect": {
-        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        "usable": "[data-action=\"preflight-fire-anyway\"]"
       }
     },
     {
@@ -537,7 +546,14 @@
         }
       ],
       "role": "setup",
-      "commandOutcome": "either"
+      "commandOutcome": "either",
+      "expect": {
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ],
+        "note": "#1362: the armed detonation auto-fires inside this tick batch once the zone is clear (tickCommand), so the blast's vibration dip in ecology/nuisance lands here."
+      }
     },
     {
       "command": "event choose 0",
@@ -578,27 +594,11 @@
       "commandOutcome": "either"
     },
     {
-      "command": "blast",
-      "description": "Vibration from this blast dips Ecology and Neighbour Relations immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above. #947-followup: leading `resolveEventIfPending` added -- the preceding step's own resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing this click with \"element is covered by div\" (same race rock-fragmenter-breaking.json's own #601-followup sequence/blast steps found and fixed, see their notes).",
+      "command": "state",
+      "description": "#1362: the armed detonation already auto-fired during the preceding tick pad once the zone cleared (no driverless rig is left stranded since #1042), so there is no Fire anyway to press: the player dismisses the blast report and the holes are gone with nobody dead. Original note: the following checkpoints show Ecology and Neighbour Relations decaying back toward neutral while Safety/Well-being climb from the buildings above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
-        },
-        {
-          "type": "ensureStep",
-          "step": 4
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
           "type": "clickSelector",
@@ -611,11 +611,7 @@
         "equals": {
           "holeCount": 0,
           "deathCount": 0
-        },
-        "decreased": [
-          "ecology",
-          "nuisance"
-        ]
+        }
       }
     },
     {

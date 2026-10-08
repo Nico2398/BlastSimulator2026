@@ -565,6 +565,13 @@ function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v33 -> v34 (#1362): GameState.pendingDetonation defaults to null; an existing one is kept. Idempotent. */
+function migrateV33ToV34(obj: Record<string, unknown>): Record<string, unknown> {
+  const pd = obj['pendingDetonation'];
+  if (typeof pd !== 'object' || pd === null || Array.isArray(pd)) obj['pendingDetonation'] = null;
+  return obj;
+}
+
 /** v32 -> v33 (#1370): Vehicle.payload (item or null) becomes Vehicle.cargo[]. */
 function migrateV32ToV33(obj: Record<string, unknown>): Record<string, unknown> {
   const vehicles = (obj['vehicles'] as { vehicles?: unknown[] } | undefined)?.vehicles;
@@ -899,6 +906,7 @@ export function deserialize(json: string): GameState {
   migrateV30ToV31(obj);
   migrateV31ToV32(obj);
   migrateV32ToV33(obj);
+  migrateV33ToV34(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);
