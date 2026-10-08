@@ -237,11 +237,12 @@ describe('Console — set_policy', () => {
     expect(result.output).toContain('mode=continuous');
   });
 
-  it('updates policy to custom mode', () => {
+  it('refuses the removed custom mode and leaves the policy untouched (#1388)', () => {
+    const before = ctx.state!.sitePolicy.shiftMode;
     const result = setPolicyCommand(ctx, [], { mode: 'custom' });
 
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('mode=custom');
+    expect(result.success).toBe(false);
+    expect(ctx.state!.sitePolicy.shiftMode).toBe(before);
   });
 
   it('applies a fatigue threshold override', () => {

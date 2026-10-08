@@ -4,8 +4,7 @@
  * Task 3.12 — Red-phase tests for SitePolicy shift/rest scheduling.
  *
  * #928: hunger and breakNeed thresholds (hungerRestThreshold,
- * socialBreakThreshold, and their customThresholds/EmployeeSnapshot
- * counterparts) were removed — fatigue is the sole gauge SitePolicy governs.
+ * socialBreakThreshold, and their EmployeeSnapshot counterparts) were removed — fatigue is the sole gauge SitePolicy governs.
  *
  * Each test captures exactly one specific behaviour of the SitePolicy system.
  */
@@ -46,18 +45,16 @@ describe('createSitePolicy() (3.12)', () => {
   it('createSitePolicy() with no argument returns a valid policy with default shiftMode', () => {
     const policy: SitePolicy = createSitePolicy();
 
-    // Must be one of the four valid shift modes
-    const validModes: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
+    // Must be one of the three valid shift modes (#1388: 'custom' removed)
+    const validModes: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous'];
     expect(validModes).toContain(policy.shiftMode);
   });
 
   // ── Test 4 ──────────────────────────────────────────────────────────────────
-  it('createSitePolicy() initialises customThresholds as an empty record', () => {
-    const policy: SitePolicy = createSitePolicy('custom');
+  it('createSitePolicy() carries no per-employee customThresholds (#1388)', () => {
+    const policy: SitePolicy = createSitePolicy('continuous');
 
-    expect(policy.customThresholds).toBeDefined();
-    expect(typeof policy.customThresholds).toBe('object');
-    expect(Object.keys(policy.customThresholds)).toHaveLength(0);
+    expect('customThresholds' in policy).toBe(false);
   });
 });
 
@@ -83,13 +80,6 @@ describe('getShiftDurationTicks() (3.12)', () => {
   // ── Test 7 ──────────────────────────────────────────────────────────────────
   it("getShiftDurationTicks('continuous') returns Infinity — no enforced break", () => {
     const result = getShiftDurationTicks('continuous');
-
-    expect(result).toBe(Infinity);
-  });
-
-  // ── Test 8 ──────────────────────────────────────────────────────────────────
-  it("getShiftDurationTicks('custom') returns Infinity — player sets individual thresholds", () => {
-    const result = getShiftDurationTicks('custom');
 
     expect(result).toBe(Infinity);
   });
@@ -204,49 +194,15 @@ describe('shouldForceRest() — need-threshold enforcement (3.12)', () => {
   });
 });
 
-// ─── shouldForceRest() — custom per-employee threshold overrides ─────────────
+// ─── shouldForceRest() — one site-wide threshold (#1388) ─────────────────────
 
-describe("shouldForceRest() — 'custom' mode with per-employee overrides (3.12)", () => {
-  // ── Test 18 ──────────────────────────────────────────────────────────────────
-  it('uses per-employee fatigue threshold when shiftMode is custom and an override exists for the employee id', () => {
-    const policy: SitePolicy = createSitePolicy('custom');
-    const employeeId = 3;
-    // Custom threshold: fatigue must stay above 50; fatigue=40 → trigger rest
-    policy.customThresholds[employeeId] = { fatigue: 50 };
+describe('shouldForceRest() — single site-wide fatigue threshold (#1388)', () => {
+  it('uses the policy threshold for every employee id', () => {
+    const policy: SitePolicy = createSitePolicy('continuous');
+    policy.fatigueRestThreshold = 50;
 
-    const employee = { id: employeeId, fatigue: 40, ticksWorked: 1 };
-
-    const result = shouldForceRest(policy, employee, true);
-
-    expect(result).toBe(true);
-  });
-
-  // ── Test 19 ──────────────────────────────────────────────────────────────────
-  it('does NOT trigger rest when fatigue is above the custom threshold', () => {
-    const policy: SitePolicy = createSitePolicy('custom');
-    const employeeId = 5;
-    policy.customThresholds[employeeId] = { fatigue: 20 };
-
-    // fatigue=80 — above the custom threshold → no rest
-    const employee = { id: employeeId, fatigue: 80, ticksWorked: 1 };
-
-    const result = shouldForceRest(policy, employee, true);
-
-    expect(result).toBe(false);
-  });
-
-  // ── Test 20 ──────────────────────────────────────────────────────────────────
-  it('falls back to policy-level threshold for an employee with no custom override in custom mode', () => {
-    const policy: SitePolicy = createSitePolicy('custom');
-    // Only override employee 99 — employee 1 has no override
-    policy.customThresholds[99] = { fatigue: 70 };
-
-    // Employee 1 should use the default policy threshold (fatigue < 60 → rest)
-    const employee = { id: 1, fatigue: 30, ticksWorked: 1 };
-
-    const result = shouldForceRest(policy, employee, true);
-
-    expect(result).toBe(true);
+    expect(shouldForceRest(policy, { id: 3, fatigue: 40, ticksWorked: 1 }, true)).toBe(true);
+    expect(shouldForceRest(policy, { id: 4, fatigue: 80, ticksWorked: 1 }, true)).toBe(false);
   });
 });
 
@@ -266,36 +222,12 @@ describe('getEffectiveThresholds() (#678)', () => {
     expect(result).toEqual({ fatigue: policy.fatigueRestThreshold });
   });
 
-  // ── Test 2 ──────────────────────────────────────────────────────────────────
-  it('returns the per-employee override when shiftMode is custom and one exists for the given id', () => {
-    const policy = createSitePolicy('custom');
-    const employeeId = 7;
-    policy.customThresholds[employeeId] = { fatigue: 10 };
+  it('ignores the employee id: every employee gets the site threshold (#1388)', () => {
+    const policy = createSitePolicy('continuous');
+    policy.fatigueRestThreshold = 35;
 
-    const result = getEffectiveThresholds(policy, employeeId);
-
-    expect(result).toEqual({ fatigue: 10 });
-  });
-
-  // ── Test 3 ──────────────────────────────────────────────────────────────────
-  it('falls back to the policy-level default in custom mode when no override exists for the given id', () => {
-    const policy = createSitePolicy('custom');
-    // Only employee 99 has an override — employee 1 does not.
-    policy.customThresholds[99] = { fatigue: 10 };
-
-    const result = getEffectiveThresholds(policy, 1);
-
-    expect(result).toEqual({ fatigue: policy.fatigueRestThreshold });
-  });
-
-  // ── Test 4 ──────────────────────────────────────────────────────────────────
-  it('falls back to the policy-level default in custom mode when employeeId is omitted', () => {
-    const policy = createSitePolicy('custom');
-    policy.customThresholds[7] = { fatigue: 10 };
-
-    const result = getEffectiveThresholds(policy);
-
-    expect(result).toEqual({ fatigue: policy.fatigueRestThreshold });
+    expect(getEffectiveThresholds(policy, 7)).toEqual({ fatigue: 35 });
+    expect(getEffectiveThresholds(policy)).toEqual({ fatigue: 35 });
   });
 });
 

@@ -358,17 +358,36 @@ describe('Employee skills', () => {
     expect(emp().x !== before.x || emp().z !== before.z).toBe(true);
   });
 
-  it('employee train raises proficiency in a skill already held', () => {
+  it('employee train refuses a skill already held: no fee, no enrolment, level untouched (#1388)', () => {
     const state = ctx.state!;
     placeBuilding(state.buildings, 'blasting_academy', 5, 5, 32, 32, 1);
     const emp = () => state.employees.employees.find(e => e.id === empId)!;
     const before = emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel;
+    const cashBefore = state.cash;
 
-    expect(employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' }).success).toBe(true);
+    const result = employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.length).toBeGreaterThan(0);
+    expect(state.cash).toBe(cashBefore);
+    expect(emp().pendingTrainingState).toBeNull();
+    expect(emp().trainingState).toBeNull();
+    expect(emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(before);
+  });
+
+  it('employee train grants a new qualification at Rookie with 0 xp and raises salary (#1388)', () => {
+    const state = ctx.state!;
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 1);
+    const emp = () => state.employees.employees.find(e => e.id === empId)!;
+    const salaryBefore = emp().salary;
+    expect(emp().qualifications.some(q => q.category === 'geology')).toBe(false);
+
+    expect(employeeCommand(ctx, ['train', String(empId)], { skill: 'geology' }).success).toBe(true);
     tickUntilTrainingStarted(ctx, empId);
     tickCommand(ctx, [String(emp().trainingState!.ticksRemaining)], {});
 
-    expect(emp().qualifications.find(q => q.category === 'blasting')!.proficiencyLevel).toBe(before + 1);
+    expect(emp().qualifications.find(q => q.category === 'geology')).toEqual({ category: 'geology', proficiencyLevel: 1, xp: 0 });
+    expect(emp().salary).toBeGreaterThan(salaryBefore);
   });
 
   it('employee train refuses when no school for that skill is built', () => {
@@ -396,8 +415,8 @@ describe('Employee skills', () => {
 
   it('an employee in training is not dispatched to work', () => {
     const state = ctx.state!;
-    placeBuilding(state.buildings, 'blasting_academy', 5, 5, 32, 32, 1);
-    employeeCommand(ctx, ['train', String(empId)], { skill: 'blasting' });
+    placeBuilding(state.buildings, 'geology_lab', 5, 5, 32, 32, 1);
+    employeeCommand(ctx, ['train', String(empId)], { skill: 'geology' });
 
     state.pendingActions.push({
       id: 1, type: 'charge_hole', requiredSkill: 'blasting',
