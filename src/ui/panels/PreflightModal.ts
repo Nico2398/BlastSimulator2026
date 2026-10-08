@@ -40,6 +40,7 @@ export class PreflightModal {
   private readonly detonateBtn: HTMLButtonElement;
   private readonly cancelBtn: HTMLButtonElement;
   private readonly waitingEl: HTMLElement;
+  private readonly refusalEl: HTMLElement;
   private readonly footerEl: HTMLElement;
   private readonly fireAnywayBtn: HTMLButtonElement;
   private readonly cancelDetonationBtn: HTMLButtonElement;
@@ -85,7 +86,11 @@ export class PreflightModal {
     this.waitingEl = el('div');
     this.waitingEl.style.cssText = 'display:none;flex-direction:column;gap:6px;padding:11px;border:1px solid rgba(255,91,76,.4);border-radius:5px;background:rgba(255,91,76,.06)';
 
-    body.append(this.waitingEl, this.statsEl, this.predictedEl, this.warningsEl);
+    this.refusalEl = el('div');
+    this.refusalEl.style.cssText = 'font:400 12px/1.45 var(--bsx-font-ui);color:var(--bsx-critical-text)';
+    this.refusalEl.dataset['role'] = 'preflight-refusal';
+
+    body.append(this.refusalEl, this.waitingEl, this.statsEl, this.predictedEl, this.warningsEl);
 
     const footer = el('div');
     this.footerEl = footer;
@@ -129,7 +134,7 @@ export class PreflightModal {
 
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
 
-  show(): void { this.open = true; this.awaitingDetonation = false; this.overlay.style.display = ''; this.lastSignature = ''; }
+  show(): void { this.open = true; this.awaitingDetonation = false; this.refusalEl.textContent = ''; this.overlay.style.display = ''; this.lastSignature = ''; }
   hide(): void { this.open = false; this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.open; }
 
@@ -238,8 +243,9 @@ export class PreflightModal {
   }
 
   private detonate(): void {
-    this.awaitingDetonation = true;
-    this.gameConsole?.('blast detonate');
+    const result = this.gameConsole?.('blast detonate');
+    this.refusalEl.textContent = result && !result.success ? result.output : '';
+    if (result?.success) this.awaitingDetonation = true;
   }
 
   /** Swap the footer and body between the pre-flight and the waiting state. */

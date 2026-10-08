@@ -33,14 +33,18 @@ function orderEvacuation(state: GameState): { employees: number[]; vehicles: num
   return { employees: result.strandedEmployeeIds, vehicles: result.strandedVehicleIds };
 }
 
+/** True when any drilled hole has a charge loaded or still loading. */
+export function hasChargedHole(state: GameState): boolean {
+  const planned = state.plannedChargesByHole;
+  return state.drillHoles.some(h => state.chargesByHole[h.id] !== undefined || planned[h.id] !== undefined);
+}
+
 /** Arm the detonation and order the danger zone evacuated. */
 export function armDetonation(state: GameState): DetonationResult<PendingDetonation> {
   if (state.pendingDetonation !== null) {
     return { success: false, error: t('mining.blast.detonation_already_armed') };
   }
-  const planned = state.plannedChargesByHole;
-  const charged = state.drillHoles.some(h => state.chargesByHole[h.id] !== undefined || planned[h.id] !== undefined);
-  if (!charged) return { success: false, error: t('mining.blast.no_charged_holes') };
+  if (!hasChargedHole(state)) return { success: false, error: t('mining.blast.no_charged_holes') };
   const stranded = orderEvacuation(state);
   if (stranded === null) return { success: false, error: t('mining.blast.no_charged_holes') };
   const pending: PendingDetonation = {

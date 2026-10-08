@@ -329,7 +329,7 @@ function boundsOverlap(a: ZoneBounds, b: ZoneBounds): boolean {
  * the zone as resolved.
  *
  * Keyed to the LIVE drill-hole-derived danger box (computeDangerZone — the
- * same one Fire.ts's Sound the Horn/occupant list and `dangerZoneClear`
+ * same one the pre-flight occupant list and `dangerZoneClear`
  * itself already use) rather than to `zone` (typically
  * `state.zone.activeZone`) reading non-null on its own: the player-drawn
  * zone never resets once drawn (defineZone only ever assigns it), so testing

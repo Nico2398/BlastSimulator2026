@@ -44,7 +44,7 @@
       ]
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15",
+      "command": "drill_plan grid rows:2 cols:3 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
@@ -80,7 +80,7 @@
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
-          "x2": 19,
+          "x2": 22,
           "z2": 19
         },
         {
@@ -91,9 +91,9 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 4
+          "orderedHoleCount": 6
         },
-        "note": "4 holes ordered with the level's own crew and rig."
+        "note": "6 holes ordered with the level's own crew and rig."
       },
       "description": "Order a drill grid with the crew and rig the level opens with: nothing was hired or bought."
     },

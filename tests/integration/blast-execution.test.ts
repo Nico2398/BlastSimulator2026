@@ -601,9 +601,8 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(s.state().damage.deathCount).toBe(0);
   });
 
-  it('no tutorial refusal: with tutorialActive, plain blast fires on an occupied zone', () => {
+  it('no occupied-zone refusal: plain blast fires on an occupied zone', () => {
     const s = setupCharged();
-    s.ctx.tutorialActive = true;
     crewAt(s, 16, 16);
 
     const res = s.run('blast');
@@ -612,9 +611,8 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     expect(s.state().damage.blastCount).toBe(1);
   });
 
-  it('no tutorial refusal: with tutorialActive, detonate arms the sequence on an occupied zone', () => {
+  it('no occupied-zone refusal: detonate arms the sequence on an occupied zone', () => {
     const s = setupCharged();
-    s.ctx.tutorialActive = true;
     crewAt(s, 16, 16);
 
     const res = s.run('blast detonate');
@@ -624,6 +622,34 @@ describe('Blast execution — DETONATE flow (#1362)', () => {
     tickUntilBlast(s);
     expect(s.state().damage.blastCount).toBe(1);
     expect(s.state().damage.deathCount).toBe(0);
+  });
+
+  it('a refused fire (charge still loading) leaves the armed detonation armed', () => {
+    const s = setupCharged();
+    crewAt(s, 16, 16);
+    expect(s.run('blast detonate').success).toBe(true);
+    const armed = s.state().pendingDetonation;
+    const holeId = s.state().drillHoles[0]!.id;
+    const landed = s.state().chargesByHole[holeId]!;
+    delete s.state().chargesByHole[holeId];
+    s.state().plannedChargesByHole[holeId] = landed;
+
+    const res = s.run('blast');
+
+    expect(res.success).toBe(false);
+    expect(s.state().pendingDetonation).toBe(armed);
+    expect(s.state().damage.blastCount).toBe(0);
+  });
+
+  it('an unknown blast subcommand is refused and fires nothing', () => {
+    const s = setupCharged();
+    crewClear(s);
+
+    const res = s.run('blast detonat');
+
+    expect(res.success).toBe(false);
+    expect(s.state().damage.blastCount).toBe(0);
+    expect(s.state().drillHoles.length).toBeGreaterThan(0);
   });
 
   it('a second detonate while armed is refused and leaves the armed record untouched', () => {

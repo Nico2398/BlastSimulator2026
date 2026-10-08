@@ -17,7 +17,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
-import { t } from '../../src/core/i18n/I18n.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
@@ -29,9 +28,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 import { getOperatingProfit } from '../../src/core/economy/Finance.js';
 import { isFillableSaleOffer } from '../../src/core/economy/Contract.js';
-import { computeDangerZone } from '../../src/core/entities/Zone.js';
 import {
-  BLAST_DANGER_MARGIN_M,
   DRILL_GRID_DEFAULT_SPACING_M,
   DRILL_GRID_DEFAULT_DEPTH_M,
   CHARGE_DEFAULT_AMOUNT_KG,
@@ -242,13 +239,12 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
 // ── evacuate before you fire (#557, reworked by #1362) ──────────────────────
 //
 // #1362 removed the tutorial-only refusal: `blast` (Fire anyway) fires even on
-// an occupied zone with ctx.tutorialActive set, and `blast detonate` is the
+// an occupied zone and `blast detonate` is the
 // evacuate-zone step's action — it arms the horn + auto-fire sequence.
 
 describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', () => {
   function setup(): { ctx: MiningContext; runCmd: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']> } {
     const { runner, ctx } = createRunner();
-    ctx.tutorialActive = true;
     const runCmd = (cmd: string) => runner.run(cmd);
     expect(runCmd('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
     expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
@@ -268,7 +264,7 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
     return { ctx, runCmd };
   }
 
-  it('fires on an occupied zone while tutorialActive (Fire anyway): no refusal', () => {
+  it('fires on an occupied zone (Fire anyway): no refusal', () => {
     const { ctx, runCmd } = setup();
     const state = ctx.state!;
     for (const emp of state.employees.employees) {
@@ -280,7 +276,6 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
 
     expect(result.success, result.output).toBe(true);
     expect(state.damage.blastCount).toBe(1);
-    expect(result.output).not.toContain(t('mining.blast.refused_zone_occupied', { count: 1 }));
   });
 
   it('blast detonate during the tutorial arms the sequence instead of refusing or firing at once', () => {
@@ -316,36 +311,6 @@ describe('the tutorial no longer refuses to fire on an occupied zone (#1362)', (
 
     expect(result.success, result.output).toBe(true);
     expect(state.damage.blastCount).toBe(1);
-  });
-
-  it('without tutorialActive, the same occupied zone does not block firing — the gate is tutorial-only', () => {
-    const { runner, ctx } = createRunner();
-    ctx.tutorialActive = false;
-    const runCmd = (cmd: string) => runner.run(cmd);
-    expect(runCmd('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
-    expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
-    const state = ctx.state!;
-    for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
-      for (const emp of state.employees.employees) {
-        emp.fatigue = 100;
-      }
-      runCmd('tick 1');
-    }
-    expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
-    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
-      for (const emp of state.employees.employees) {
-        emp.fatigue = 100;
-      }
-      runCmd('tick 1');
-    }
-
-    for (const emp of state.employees.employees) {
-      emp.x = 16;
-      emp.z = 16;
-    }
-
-    const result = runCmd('blast');
-    expect(result.success, result.output).toBe(true);
   });
 });
 

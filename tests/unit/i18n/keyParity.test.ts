@@ -475,7 +475,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1367: +14 keys (contract auto-delivery, hold toggle, partial expiry), both locales: 3797.
     // #1350: +14 keys (hole water, drain), both locales: 3811.
     // #1362: +12 keys (detonation flow), -5 (horn, zone-occupied refusal), both locales: 3818.
-    expect(Object.keys(en).length).toBe(3818);
+    // #1362 review: +1 (unknown blast subcommand): 3819.
+    expect(Object.keys(en).length).toBe(3819);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

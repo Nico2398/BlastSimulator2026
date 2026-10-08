@@ -24,7 +24,7 @@ import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { regionForColumns } from '../../../core/nav/NavGridSync.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
 import { computeDangerZone } from '../../../core/entities/Zone.js';
-import { armDetonation, cancelDetonation, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
+import { armDetonation, cancelDetonation, hasChargedHole, detonationPhase, type DetonationPhase } from '../../../core/engine/DetonationSequence.js';
 import { BLAST_DANGER_MARGIN_M, VILLAGE_VIBRATION_SCORE_GAIN, BLAST_PROJECTION_NUISANCE_PER_PROJECTION } from '../../../core/config/balance.js';
 
 /** Dispatch `blast` subcommands: (none) = fire anyway, detonate, cancel, status (#1362). */
@@ -39,7 +39,8 @@ export function blastCommand(
     case 'detonate': return blastDetonate(ctx);
     case 'cancel': return blastCancel(ctx);
     case 'status': return blastStatus(ctx);
-    default: return fireBlast(ctx);
+    case undefined: return fireBlast(ctx);
+    default: return { success: false, output: t('mining.blast.unknown_subcommand', { arg: args[0] }) };
   }
 }
 
@@ -77,18 +78,18 @@ export function fireBlast(
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
-  ctx.state!.pendingDetonation = null;
 
   // Nothing loaded or loading: refuse before anything mutates (#1345). A hole
   // whose charge is still loading falls through to validation, which names it.
-  const planned = ctx.state!.plannedChargesByHole;
-  if (!ctx.state!.drillHoles.some(h => ctx.state!.chargesByHole[h.id] !== undefined || planned[h.id] !== undefined)) {
+  if (!hasChargedHole(ctx.state!)) {
     return { success: false, output: t('mining.blast.no_charged_holes') };
   }
 
   const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.invalid_plan_header'));
   if (assembled.error) return assembled.error;
   const plan = assembled.plan;
+  // Validation passed: this fire consumes any armed detonation. Refusals above leave it armed.
+  ctx.state!.pendingDetonation = null;
 
   const wetHoleIds = wetHoleIdSet(ctx);
   const villages = levelVillagePositions(ctx);
