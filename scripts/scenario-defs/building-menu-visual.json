@@ -376,10 +376,10 @@
         }
       ],
       "role": "player",
-      "description": "The second former overdraw step, converted the same way: comfortably over $18,000 in hand against an $18,000 depot, so the catalog row is enabled and the click lands. Cash stays positive through the whole build-out, which is the point of funding the scenario instead of letting the console overdraw. #556: order-then-build semantics as above -- the site is queued, not placed.",
+      "description": "The second former overdraw step, converted the same way: comfortably over $12,000 in hand against a $12,000 geology lab, so the catalog row is enabled and the click lands. Cash stays positive through the whole build-out, which is the point of funding the scenario instead of letting the console overdraw. #556: order-then-build semantics as above -- the site is queued, not placed.",
       "expect": {
         "changedBy": {
-          "cash": -18000
+          "cash": -12000
         },
         "equals": {
           "buildingCount": 5,
