@@ -1172,6 +1172,9 @@ export const BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD = 1;
 /** Summed ore density of a fragment at or below which it counts as barren and goes to a spoil heap (#1530). */
 export const SPOIL_BARREN_ORE_FRACTION_THRESHOLD = 0.02;
 
+/** Freight Warehouse storage capacity in kg, by tier (#1531). BuildingDefs reads it for `capacity`. */
+export const FREIGHT_WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3, number> = { 1: 2000, 2: 6000, 3: 15000 };
+
 /** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',
