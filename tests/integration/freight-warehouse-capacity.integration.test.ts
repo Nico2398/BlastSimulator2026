@@ -5,15 +5,13 @@
 // (spacing 3, depth 6) at rig+(14,13), boomite 5 kg, stemming 2, auto
 // sequence (the recipe of level1-win.integration.test.ts). Barren rock goes to
 // a spoil heap (#1530), so only the ORE-BEARING mass has to fit a warehouse.
-// Measured on that shot: ~58,192 kg ore-bearing, largest ore fragment
-// ~17,875 kg. A tier-2 warehouse must hold the whole shot, a tier-1 must be a
+// Measured on that shot: ~57,061 kg ore-bearing, largest ore fragment
+// ~6,600 kg. A tier-2 warehouse must hold the whole shot, a tier-1 must be a
 // meaningful fraction of it yet still take the biggest single boulder, and a
 // tier-3 must have ample headroom.
 //
 // The ore mass is computed from the blast, never hardcoded. Capacities are
 // read through getBuildingDef so a rebalance only edits balance.ts.
-//
-// Red phase: FREIGHT_WAREHOUSE_CAPACITY_KG still holds the old 2000/6000/15000.
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';

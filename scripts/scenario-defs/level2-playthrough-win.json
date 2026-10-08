@@ -2420,15 +2420,15 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.91333333333334,
+          "wellBeing": 91.73666666666705,
           "safety": 0,
-          "ecology": 32.61818161074745,
-          "nuisance": 6.545454026868629
+          "ecology": 32.96818161074745,
+          "nuisance": 7.420454026868629
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1370 (multi-fragment hauling): haulers carry up to 4000 kg per trip, so haul timing shifts crew positions at blast time, so casualty counts shift and the rubble_disposal delivery of 350 leaves the contract active; scores and counts re-measured, no behaviour defect."
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1370 (multi-fragment hauling): haulers carry up to 4000 kg per trip, so haul timing shifts crew positions at blast time, so casualty counts shift and the rubble_disposal delivery of 350 leaves the contract active; scores and counts re-measured, no behaviour defect. #1531 (freight warehouse capacity 2000/6000/15000 -> 25000/65000/200000 kg): the depot no longer fills and stalls hauls, so haul timing and the later random-event draws shift; wellBeing/ecology/nuisance at steps 91, 128, 157 and 158 re-measured, counts (deaths, employees, contracts, surveys) unchanged, no behaviour defect."
       }
     },
     {
@@ -3324,8 +3324,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 38.54554632996676,
-          "nuisance": 45.063423497605655
+          "ecology": 59.79060703329644,
+          "nuisance": 27.868544904266
         },
         "changedBy": {
           "tickCount": 0
@@ -4061,8 +4061,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 30.14659937179473,
-          "nuisance": 0.6012486912389817
+          "ecology": 28.410203310335426,
+          "nuisance": 0
         },
         "changedBy": {
           "tickCount": 0
@@ -4087,8 +4087,8 @@
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 30.14659937179473,
-          "nuisance": 0.6012486912389817
+          "ecology": 28.410203310335426,
+          "nuisance": 0
         },
         "changedBy": {
           "tickCount": 0

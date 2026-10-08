@@ -631,7 +631,7 @@
     },
     {
       "command": "build freight_warehouse at:4,14",
-      "description": "#554: a second T1 freight_warehouse (2000kg capacity each, 4000kg combined) -- charging is real work now, and the extra real ticks the charge-order wait spends before this point let the single debris_hauler above make enough round trips that one 2000kg warehouse alone reaches ~1800/2000kg stored by the final tick-40 step below, with every remaining on-ground fragment too large (262.5kg+) to fit the last ~200kg of headroom -- storedMassKg then genuinely cannot grow further no matter how many more ticks pass, which is exactly the kind of stall this step's own 'increased' assertion exists to catch. The extra capacity removes that ceiling instead of chasing an exact mass figure that depends on which specific fragments the hauler happens to reach first.",
+      "description": "#554: a second T1 freight_warehouse (originally 2000kg each, 4000kg combined; #1531 raised T1 to 25000kg) -- charging is real work now, and the extra real ticks the charge-order wait spends before this point let the single debris_hauler above make enough round trips that one 2000kg warehouse (pre-#1531 capacity) alone reached ~1800/2000kg stored by the final tick-40 step below, with every remaining on-ground fragment too large (262.5kg+) to fit the last ~200kg of headroom -- storedMassKg then genuinely cannot grow further no matter how many more ticks pass, which is exactly the kind of stall this step's own 'increased' assertion exists to catch. The extra capacity removes that ceiling instead of chasing an exact mass figure that depends on which specific fragments the hauler happens to reach first.",
       "interaction": [
         {
           "type": "clickSelector",

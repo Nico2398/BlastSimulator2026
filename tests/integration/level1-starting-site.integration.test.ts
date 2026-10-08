@@ -7,8 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { recordProfit } from '../../src/core/campaign/Campaign.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
-import { STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
-import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
+import { STARTING_SITE_STAFFED_COMPOSITION, FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { getStorageCapacity } from '../../src/core/entities/Building.js';
 
 function startLevel(levelId: string, args = '') {
