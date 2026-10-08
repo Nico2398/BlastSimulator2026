@@ -8,6 +8,7 @@ import { createRunner } from '../../src/console/createRunner.js';
 import { recordProfit } from '../../src/core/campaign/Campaign.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { getStorageCapacity } from '../../src/core/entities/Building.js';
 
 function startLevel(levelId: string, args = '') {
@@ -30,14 +31,14 @@ describe('campaign start level:dusty_hollow (default) opens staffed (#1363)', ()
     expect(state.vehicles.vehicles.map((v) => v.type).sort()).toEqual(['debris_hauler', 'drill_rig']);
   });
 
-  it('has one active freight warehouse with at least 2000 kg of storage', () => {
+  it('has one active freight warehouse with its tier-1 storage capacity', () => {
     const { state } = startLevel('dusty_hollow');
     const warehouses = state.buildings.buildings.filter((b) => b.type === 'freight_warehouse');
     expect(warehouses).toHaveLength(1);
     expect(warehouses[0]!.active).toBe(true);
     expect(warehouses[0]!.tier).toBe(1);
-    expect(state.logistics.storageCapacityKg).toBeGreaterThanOrEqual(2000);
-    expect(getStorageCapacity(state.buildings)).toBeGreaterThanOrEqual(2000);
+    expect(state.logistics.storageCapacityKg).toBeGreaterThanOrEqual(FREIGHT_WAREHOUSE_CAPACITY_KG[1]);
+    expect(getStorageCapacity(state.buildings)).toBeGreaterThanOrEqual(FREIGHT_WAREHOUSE_CAPACITY_KG[1]);
   });
 
   it('keeps the level start cash: crew, fleet and warehouse are free', () => {

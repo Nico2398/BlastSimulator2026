@@ -9,6 +9,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { placeBuilding } from '../../src/core/entities/Building.js';
 import { freightWarehouseSites } from '../../src/core/entities/BuildingWarehouse.js';
+import { FREIGHT_WAREHOUSE_CAPACITY_KG } from '../../src/core/config/balance.js';
 import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
 
 /** Place a freight warehouse on a game state at (x, z) and return its building id. */
@@ -90,8 +91,8 @@ function fillerFragment(id: number, mass: number): FragmentData {
 }
 
 /**
- * Upgrade every placed (adding depots beside the first until `minTotalKg` fits) freight warehouse to tier 3 (15000 kg each) in place and
- * resync capacity: a tier-1 warehouse (2000 kg) cannot take one heavy boulder,
+ * Upgrade every placed (adding depots beside the first until `minTotalKg` fits) freight warehouse to tier 3 (FREIGHT_WAREHOUSE_CAPACITY_KG[3] each) in place and
+ * resync capacity: a tier-1 warehouse cannot take one heavy boulder,
  * and a per-warehouse rule means pooled capacity alone does not help.
  * Skips the research gate on purpose; upgrades are not what these fixtures probe.
  */
@@ -99,7 +100,7 @@ export function upgradeFreightWarehousesToTier3(state: GameState, minTotalKg = 0
   // Extra depots go in a row in a column beyond the first one (4x4 footprint, 5 apart).
   const first = state.buildings.buildings.find(b => b.type === 'freight_warehouse');
   for (let i = 1; first && sitesOf(state).length < MAX_FIXTURE_WAREHOUSES; i++) {
-    if (sitesOf(state).reduce((a, s) => a + (s.capacityKg > 2000 ? s.capacityKg : 15000), 0) >= minTotalKg) break;
+    if (sitesOf(state).reduce((a, s) => a + (s.capacityKg > FREIGHT_WAREHOUSE_CAPACITY_KG[1] ? s.capacityKg : FREIGHT_WAREHOUSE_CAPACITY_KG[3]), 0) >= minTotalKg) break;
     addFreightWarehouseToState(state, first.x, first.z + 5 * i, 1);
   }
   for (const b of state.buildings.buildings) {
