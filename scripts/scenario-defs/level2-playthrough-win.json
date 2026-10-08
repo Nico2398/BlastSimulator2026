@@ -2388,15 +2388,15 @@
           "employeeCount": 13,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 99.91333333333334,
-          "safety": 0,
-          "ecology": 32.61818161074745,
-          "nuisance": 6.545454026868629
+          "wellBeing": 98.31888888888894,
+          "safety": 21.450000000000134,
+          "ecology": 32.94818161074745,
+          "nuisance": 7.370454026868625
         },
         "changedBy": {
           "tickCount": 0
         },
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that. #1370 (multi-fragment hauling): haulers carry up to 4000 kg per trip, so haul timing shifts crew positions at blast time (one fewer casualty from step 110 on, recovered by step 146) and the rubble_disposal delivery of 350 now completes the contract; scores and counts re-measured, no behaviour defect."
       }
     },
     {
@@ -2968,7 +2968,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -2992,7 +2992,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3014,7 +3014,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3035,51 +3035,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "changedBy": {
-          "tickCount": 0
-        },
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
-      },
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        },
-        "increased": [
-          "tickCount"
-        ],
-        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3102,7 +3058,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3123,7 +3079,51 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "changedBy": {
+          "tickCount": 0
+        },
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        },
+        "increased": [
+          "tickCount"
+        ],
+        "note": " #1385 (hiring pool): hired candidates vary in skill and salary, so the crew's drilling progress and blast casualties were re-measured; no behaviour change beyond that."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3146,7 +3146,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3176,7 +3176,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3217,7 +3217,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3239,14 +3239,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 40.50072843995567,
-          "nuisance": 14.453787717584227
+          "ecology": 40.520728439955676,
+          "nuisance": 20.278787717583892
         },
         "changedBy": {
           "tickCount": 0
@@ -3265,7 +3265,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3287,7 +3287,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3433,7 +3433,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3487,7 +3487,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3509,7 +3509,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3531,7 +3531,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3591,7 +3591,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 9,
+          "deathCount": 8,
           "employeeCount": 17,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -3938,7 +3938,7 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
@@ -3962,12 +3962,12 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 32.752412743407326,
-          "nuisance": 0
+          "ecology": 32.88241274340733,
+          "nuisance": 7.40919321543197
         },
         "changedBy": {
           "tickCount": 0
@@ -3988,12 +3988,12 @@
         "equals": {
           "deathCount": 11,
           "employeeCount": 17,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 99.95,
           "safety": 0,
-          "ecology": 32.752412743407326,
-          "nuisance": 0
+          "ecology": 32.88241274340733,
+          "nuisance": 7.40919321543197
         },
         "changedBy": {
           "tickCount": 0
