@@ -28,6 +28,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { planItinerary } from './PlanItinerary.js';
 import { isLicensedForRole } from './VehicleReservation.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
+import { actionBlocked } from '../events/ActiveModifiers.js';
 
 /** Every configured NeedKey — used to validate an untyped payload value against the catalog rather than a hardcoded literal (#1062 genericity). */
 const NEED_KEYS = Object.keys(NEED_REST_DURATIONS) as NeedKey[];
@@ -431,7 +432,9 @@ export function selectBestActionForEmployee(
 ): SelectedAction | null {
   if (candidates.length === 0) return null;
 
-  const claimable = candidates.filter(isClaimable);
+  // Event modifiers (#1414): a stoppage, drill ban or haul pause keeps the action unclaimed.
+  const claimable = candidates.filter(a =>
+    !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role) && isClaimable(a));
   if (claimable.length === 0) return null;
 
   // Each candidate's estimate is computed exactly once, up front, rather

@@ -117,6 +117,16 @@ export function generateContracts(
   state.lastRefreshTick = currentTick;
 }
 
+/** Puts one extra offer on the board outside the refresh cycle (an event's special contract); the oldest offer makes room when full. */
+export function offerSpecialContract(
+  state: ContractState, rng: Random, priceMultiplier: number, availableOres: readonly string[],
+): Contract {
+  if (state.available.length >= MAX_AVAILABLE_CONTRACTS) state.available.shift();
+  const contract = generateOneContract(state, rng, priceMultiplier, availableOres);
+  state.available.push(contract);
+  return contract;
+}
+
 /** The cheapest SUPPLY_COMMON_ORE_COUNT of the given ores, by base price. */
 function commonOres(ores: readonly string[]): string[] {
   return [...ores]

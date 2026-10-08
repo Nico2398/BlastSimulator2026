@@ -130,6 +130,8 @@ export interface Employee {
    * UI omits the progress bar when absent instead of fabricating one.
    */
   activeTaskTotalTicks?: number;
+  /** Fraction of a work tick carried between ticks while an event slows the employee's role (#1414). Absent means none. */
+  workProgressCarry?: number;
   /**
    * Skill category of the in-progress dispatched task (mirrors taskTicksRemaining
    * lifecycle: set together on claim, cleared together on completion). Null when
@@ -411,9 +413,9 @@ export function fireEmployee(
 
 /**
  * Process pay cycle. Returns total salaries paid.
- * Call each tick; only pays when cycle completes.
+ * Call each tick; only pays when cycle completes. `salaryFactorOf` scales each role's pay (active event modifiers).
  */
-export function processPayCycle(state: EmployeeState): number {
+export function processPayCycle(state: EmployeeState, salaryFactorOf: (role: EmployeeRole) => number = () => 1): number {
   state.ticksSincePayday++;
   if (state.ticksSincePayday < PAY_CYCLE_TICKS) return 0;
 
@@ -421,7 +423,7 @@ export function processPayCycle(state: EmployeeState): number {
   let totalSalaries = 0;
   for (const emp of state.employees) {
     if (emp.alive) {
-      totalSalaries += emp.salary;
+      totalSalaries += emp.salary * salaryFactorOf(emp.role);
     }
   }
   return totalSalaries;

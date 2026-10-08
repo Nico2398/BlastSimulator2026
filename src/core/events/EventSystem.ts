@@ -2,6 +2,7 @@
 // Manages category timers, weighted selection, and event firing.
 
 import type { TrafficJam } from './TrafficJams.js';
+import { eventWeightFactor, type ActiveModifier } from './ActiveModifiers.js';
 import type { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
@@ -69,6 +70,10 @@ export interface EventSystemState {
   cooldownMinIntervalTicks: number | null;
   /** Action ids an unqualified_task event has already been raised for (#1380). */
   raisedUnqualifiedActionIds?: number[];
+  /** Live timed modifiers raised by event effects (#1414). */
+  activeModifiers: ActiveModifier[];
+  /** Next id handed to an ActiveModifier. */
+  nextModifierId: number;
 }
 
 export interface FiredEvent {
@@ -112,6 +117,8 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     pendingEvent: null,
     jamSilencedUntil: {},
     raisedUnqualifiedActionIds: [],
+    activeModifiers: [],
+    nextModifierId: 1,
     lastOutcome: null,
     followUpQueue: [],
     followUpDelayTicks: 0,
@@ -171,7 +178,9 @@ export function tickEventSystem(
       // Reset timer with score-modulated interval
       timer.remaining = Math.max(MIN_EVENT_TIMER_TICKS, Math.round(
         getModulatedInterval(timer.category, ctx.scores, timer.baseInterval)
-        * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)));
+        * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)
+        // A heavier category weight (#1414) brings its next event sooner.
+        / eventWeightFactor(state.activeModifiers, timer.category, ctx.tickCount)));
 
       // Cooldown check — prevent events from firing too rapidly. The random
       // component is drawn once per cooldown window and cached (#597) rather

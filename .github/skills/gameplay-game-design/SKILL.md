@@ -98,6 +98,36 @@ Gating (#1412): `CATEGORY_PREREQUISITE` (EventSystem.ts) blocks `union` until an
 ### Resolution
 Each event presents 2-4 decision options with different consequences on scores, finances, future event probabilities.
 
+### Event effects (#1414)
+What an outcome sentence promises is what happens. An option carries `effects?: EventEffectSpec[]` (`EventEffectCatalog.ts`); the resolver runs `applyEventEffects` after the cash/score/corruption deltas. Raw `effectTag` strings are never shown (they only route the traffic-jam and unqualified-task handlers); the outcome lists structured chips (`EventEffectText.ts`, i18n `ui.event.effect.*`) and `event modifiers` (console) / the TopBar chips (`ModifierChips.ts`, `.bs-modifier-chip`) list live modifiers with remaining time. Tunables are `EVENT_EFFECT_*` and the per-event constants in `balance.ts`; adding a variant is a spec type plus its handler and `ui.event.effect.<type>` text (en + fr).
+
+Time: hours = ticks, days = `days * TICKS_PER_DAY`. Timed effects register an `ActiveModifier` (`ActiveModifiers.ts`) in `state.events.activeModifiers`, saved with the game (`SAVE_VERSION` 35). An equal kind/role/target/category modifier is extended, never shortened; the list is capped at `MAX_ACTIVE_MODIFIERS`; factors are clamped to `MODIFIER_FACTOR_MIN..MAX`. `tickModifiers` (first step of the tick pipeline) prunes lapsed modifiers, pays recurring charges and applies morale drift.
+
+| Group | Spec type | Effect |
+|-------|-----------|--------|
+| Workforce | `work_stoppage` | role (or all) claims nothing and task progress freezes |
+| | `work_rate` (`pct` -40 = x0.6) | only a fraction of ticks counts; the remainder carries (`Employee.workProgressCarry`) |
+| | `morale_shift` | morale drifts by `perHour` |
+| | `fatigue_relief` | everyone rested |
+| | `employee_leaves` (`random`/`role`/`junior`) | one employee leaves, unionised ones included (only events do this); `_alt` text when nobody matches |
+| | `employee_joins` | free hire at the hire spawn point |
+| | `employee_injured` | a healthy employee is injured; `_alt` with nobody |
+| Pay | `salary` (`days: null` = permanent) | payroll and HUD cost scale for a role or all |
+| | `bonus_per_employee` | one-off cash per living employee |
+| | `recurring_charge` | `perDay` cost for N days |
+| Operations | `ban` `blast`/`haul`/`drill` | `blast detonate` and `blast` refuse (`mining.blast.banned`); haul/drill actions are not claimed |
+| | `cost_factor` `explosive`/`upkeep` | charge orders and building/vehicle upkeep scale; `survey`/`research` are stored only (TODO(#1568)) |
+| Market | `contract_price` | new offers priced by the factor (`resolveContractPriceMultiplier`) |
+| | `special_contract` | one extra offer at `EVENT_EFFECT_SPECIAL_CONTRACT_PRICE_BONUS` |
+| | `cancel_contract` | an active contract is cancelled, optionally with its outstanding penalty; `_alt` with none |
+| Assets | `vehicle_breakdown`, `building_closed` | HP loss and an `out_of_service` modifier (not yet enforced, TODO(#1568)) |
+| World | `forced_weather` | weather held each tick without drawing from the weather rng |
+| | `event_weight` | category timer interval divided by the factor |
+
+Named events: `union_strike_threat` call the bluff = all-role stoppage (`EVENT_STRIKE_HOURS`); `mafia_fbi_mole` fire him removes an employee; `union_hazard_emotional` pay = `EVENT_HAZARD_STIPEND_PER_DAY` for `EVENT_HAZARD_STIPEND_DAYS`; `politics_mayor_wins` relocate = `EVENT_RELOCATE_PAUSE_HOURS` stoppage on top of the cash cost; `politics_mining_ban_vote` partial ban = `EVENT_PARTIAL_BAN_WORK_PCT` for `EVENT_PARTIAL_BAN_HOURS`. Any result text that promises a lasting effect ("monthly", "lasting") must carry `effects`; otherwise it is written as one-off flavour. Spreading the catalog over the rest of the pool is #1538.
+
+Decisions: an equal-kind modifier takes the newest magnitude; a salary change with `days: null` is the only permanent modifier; the junior pick is the most recently hired; unionised staff can be removed only through event effects.
+
 ## Corruption & Mafia Gameplay
 
 - **Corruption (#1407):** a 0 to `CORRUPTION_MAX` (100) meter, clamped. Event choices keep their own deltas. A successful bribe adds `BRIBE_CORRUPTION_DELTA[target]` and grants a timed protection; a failed one adds only `BRIBERY_FAILURE_CORRUPTION_DELTA`, grants nothing and does not extend an existing protection. `mafiaUnlocked` latches at `MAFIA_UNLOCK_THRESHOLD` (20) and never unlatches; the `mafia` event category needs `corruptionLevel >= MAFIA_UNLOCK_THRESHOLD`. Within the category, each mafia event's `canFire` gates on `mafiaTier(n)` (`EventBuilder.ts`) = `MAFIA_UNLOCK_THRESHOLD + (n-1) * MAFIA_ESCALATION_STEP` (10): tier 1 = 20 ... tier 5 = 60, so later events open as the meter climbs.

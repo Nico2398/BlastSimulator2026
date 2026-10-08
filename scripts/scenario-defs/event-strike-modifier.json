@@ -1,0 +1,46 @@
+{
+  "name": "event-strike-modifier",
+  "description": "Issue #1414: a player answers the union strike threat by clicking 'Let Them Strike' and the lasting work stoppage shows up as a modifier chip in the HUD (selector .bs-modifier-chip). The strike event is raised with the `event fire` test hook; everything after is real clicks.",
+  "steps": [
+    {
+      "command": "campaign start level:dusty_hollow staffed:false",
+      "interaction": [{ "type": "command", "command": "campaign start level:dusty_hollow staffed:false" }],
+      "role": "setup"
+    },
+    {
+      "command": "time resume",
+      "interaction": [{ "type": "command", "command": "time resume" }],
+      "role": "setup"
+    },
+    {
+      "command": "event fire union_strike_threat",
+      "description": "test hook: `event fire` has no UI control and none is intended.",
+      "interaction": [{ "type": "command", "command": "event fire union_strike_threat" }],
+      "role": "bootstrap"
+    },
+    {
+      "command": "event choose 1",
+      "interaction": [
+        { "type": "awaitUsable", "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(2)" },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(2)" },
+        { "type": "awaitUsable", "selector": "#bs-event-dialog .bs-event-dismiss" },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-event-dialog .bs-event-dismiss" },
+        { "type": "waitForSelector", "selector": ".bs-modifier-chip" },
+        { "type": "screenshot" }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["wellBeing"],
+        "note": "Let Them Strike: wellBeing -20 and an all-role work_stoppage; the HUD must now show a modifier chip."
+      },
+      "commandOutcome": "either"
+    },
+    {
+      "command": "state",
+      "interaction": [{ "type": "command", "command": "state" }],
+      "role": "observe"
+    }
+  ]
+}

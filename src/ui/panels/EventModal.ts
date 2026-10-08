@@ -21,6 +21,8 @@ import type { GameState } from '../../core/state/GameState.js';
 import { getEventById, getOptionEffectHints, type EventCategory, type EventDef, type EventOptionEffectHint } from '../../core/events/EventPool.js';
 import type { EventEffect } from '../../core/events/EventSystem.js';
 import type { GameConsoleFn } from '../gameConsole.js';
+import { effectChipText } from '../../core/events/EventEffectText.js';
+import { createModifierChips } from '../shell/ModifierChips.js';
 
 
 const CATEGORY_ICON: Record<EventCategory, IconName> = {
@@ -106,6 +108,9 @@ export class EventModal {
   private readonly outcomeHeadlineEl: HTMLElement;
   private readonly outcomeEffectsEl: HTMLElement;
   private readonly outcomeNotesEl: HTMLElement;
+  /** Chips for the modifiers this event raised, with their remaining time (#1414). */
+  private readonly outcomeModifiersEl: HTMLElement;
+  private readonly updateOutcomeModifiers: ReturnType<typeof createModifierChips>;
   private readonly dismissBtn: HTMLButtonElement;
 
   private gameConsole?: GameConsoleFn;
@@ -159,6 +164,8 @@ export class EventModal {
     this.outcomeEffectsEl = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;gap:6px' } });
 
     this.outcomeNotesEl = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px' } });
+    this.outcomeModifiersEl = el('div', { attrs: { style: 'display:flex;flex-wrap:wrap;gap:6px' } });
+    this.updateOutcomeModifiers = createModifierChips(this.outcomeModifiersEl);
 
     this.dismissBtn = el('button', { className: 'bsx-btn bsx-btn-primary bs-btn bs-event-dismiss' });
     this.dismissBtn.style.cssText = 'width:100%;margin-top:4px';
@@ -169,7 +176,7 @@ export class EventModal {
       this.hide();
     });
 
-    body.append(this.descEl, this.chooseLabel, this.optionsEl, this.outcomeHeadlineEl, this.outcomeEffectsEl, this.outcomeNotesEl, this.dismissBtn);
+    body.append(this.descEl, this.chooseLabel, this.optionsEl, this.outcomeHeadlineEl, this.outcomeEffectsEl, this.outcomeNotesEl, this.outcomeModifiersEl, this.dismissBtn);
     box.append(this.stripe, header, body);
     this.overlay.appendChild(box);
     container.appendChild(this.overlay);
@@ -246,6 +253,7 @@ export class EventModal {
     this.outcomeHeadlineEl.textContent = '';
     this.outcomeEffectsEl.replaceChildren();
     this.outcomeNotesEl.replaceChildren();
+    this.updateOutcomeModifiers([], state.tickCount);
     this.dismissBtn.style.display = 'none';
 
     this.optionsEl.replaceChildren();
@@ -290,9 +298,11 @@ export class EventModal {
     const notes = outcome.effects.filter(e => e.textKey);
     this.outcomeEffectsEl.replaceChildren(...chips.map(effectChip));
     this.outcomeNotesEl.replaceChildren(...notes.map(e => el('p', {
-      text: t(e.textKey!),
+      text: effectChipText(e) ?? '',
       attrs: { style: 'margin:0;font:400 11px/1.5 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
     })));
+
+    this.updateOutcomeModifiers(state.events.activeModifiers.filter(m => m.sourceEventId === outcome.eventId), state.tickCount);
 
     this.dismissBtn.style.display = '';
   }

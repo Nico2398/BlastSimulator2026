@@ -565,6 +565,16 @@ function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/** v34 -> v35 (#1414): EventSystemState gains activeModifiers and nextModifierId. Idempotent. */
+function migrateV34ToV35(obj: Record<string, unknown>): Record<string, unknown> {
+  const events = obj['events'] as Record<string, unknown> | undefined;
+  if (events) {
+    if (!Array.isArray(events['activeModifiers'])) events['activeModifiers'] = [];
+    if (typeof events['nextModifierId'] !== 'number') events['nextModifierId'] = 1;
+  }
+  return obj;
+}
+
 /** v33 -> v34 (#1362): GameState.pendingDetonation defaults to null; an existing one is kept. Idempotent. */
 function migrateV33ToV34(obj: Record<string, unknown>): Record<string, unknown> {
   const pd = obj['pendingDetonation'];
@@ -907,6 +917,7 @@ export function deserialize(json: string): GameState {
   migrateV31ToV32(obj);
   migrateV32ToV33(obj);
   migrateV33ToV34(obj);
+  migrateV34ToV35(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);

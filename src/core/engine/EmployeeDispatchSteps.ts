@@ -22,6 +22,7 @@ import { releaseActionToOpenPool } from './TaskCancellation.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, isLicensedForRole } from './VehicleReservation.js';
 import { createFragmentLookup, createStorageFit, isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 import { isEvacuationHoldActive } from './Evacuation.js';
+import { actionBlocked } from '../events/ActiveModifiers.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 import { alightIfMounted } from './Mount.js';
 import { vehicleDriverId, findVehicleReservedForAction } from '../entities/Vehicle.js';
@@ -62,7 +63,9 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // cooldown — see isActionPastStuckBackoff's own doc comment.
       && isActionPastStuckBackoff(state, a)
       // #1342: a loaded charge waits for its hole's drill order to land.
-      && isChargeHoleClaimable(state, a))
+      && isChargeHoleClaimable(state, a)
+      // #1414: event modifiers (stoppage, drill ban, haul pause) keep it unclaimed.
+      && !actionBlocked(state.events.activeModifiers, a.type, state.tickCount, employee.role))
     .sort((a, b) => {
       // Rest actions win ties over any other targeted action, so a rest
       // queued alongside other work for this employee is always the first

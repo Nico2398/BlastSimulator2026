@@ -8,6 +8,7 @@ import {
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
 import { addExpense } from '../economy/Finance.js';
+import { factorFor } from '../events/ActiveModifiers.js';
 import { isExplosiveAvailable } from '../campaign/Level.js';
 
 type AutoChargeOutcome = 'ordered' | 'awaiting_funds' | 'invalid' | 'skipped';
@@ -35,6 +36,11 @@ export function cancelOutstandingChargeAction(state: GameState, holeId: string):
   if (action) cancelAction(state, action.id);
 }
 
+/** Price factor the live event modifiers put on explosives (#1414); 1 when none. */
+function explosivePriceFactor(state: GameState): number {
+  return factorFor(state.events.activeModifiers, 'explosive_price', state.tickCount);
+}
+
 /**
  * Queue a `charge_hole` action for `hole`, replacing any outstanding order so a
  * re-charge does not stack (#554). Pays the explosives cost now; the caller has
@@ -50,7 +56,7 @@ export function dispatchChargeAction(
   cancelOutstandingChargeAction(state, hole.id);
 
   const durationTicks = computeChargeHoleDurationTicks(amountKg);
-  const orderCost = chargeOrderCost(explosiveId, amountKg);
+  const orderCost = chargeOrderCost(explosiveId, amountKg) * explosivePriceFactor(state);
   const actionId = state.nextPendingActionId++;
   // skipQualificationCheck (#554): a charge order must queue silently even
   // when nobody on the roster holds 'blasting' yet.
@@ -87,7 +93,7 @@ export function chargeFundsFailureAmount(
   for (const o of orders) {
     const outstanding = findOutstandingChargeAction(state, o.holeId);
     const refund = outstanding ? ((outstanding.payload['orderCost'] as number) ?? 0) : 0;
-    need += chargeOrderCost(o.explosiveId, o.amountKg) - refund;
+    need += chargeOrderCost(o.explosiveId, o.amountKg) * explosivePriceFactor(state) - refund;
   }
   // A replacement costing no more than the refunded order needs no new cash,
   // even when the balance is negative. Sub-cent residue is float noise.

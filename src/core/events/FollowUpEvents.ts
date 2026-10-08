@@ -3,6 +3,7 @@
 
 import { ev as buildEvent } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
+import { EVENT_PARTIAL_BAN_HOURS, EVENT_PARTIAL_BAN_WORK_PCT, EVENT_RELOCATE_PAUSE_HOURS } from '../config/balance.js';
 
 /** Every event here fires only when a parent queues it — never from a category timer (#1413). */
 const ev: typeof buildEvent = (id, category, opts) => buildEvent(id, category, { ...opts, followUpOnly: true });
@@ -70,7 +71,8 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
       // Lobby to overturn at regional level
       { cashDelta: -40000, corruptionDelta: 15, effectTag: 'regional_lobby' },
       // Relocate operations (drastic, but fresh start)
-      { cashDelta: -100000, scoreDelta: { ecology: 30, nuisance: 20 }, effectTag: 'relocate_ops' },
+      { cashDelta: -100000, scoreDelta: { ecology: 30, nuisance: 20 }, effectTag: 'relocate_ops',
+        effects: [{ type: 'work_stoppage', hours: EVENT_RELOCATE_PAUSE_HOURS }] },
       // "Negotiate" with the new mayor (corruption path)
       { cashDelta: -25000, corruptionDelta: 25, scoreDelta: { ecology: 5 }, effectTag: 'bribe_new_mayor' },
     ],
@@ -84,7 +86,8 @@ export const FOLLOWUP_EVENTS: EventDef[] = [
       { cashDelta: -80000, scoreDelta: { ecology: 10 }, effectTag: 'emergency_lobby',
         probability: 0.6, alt: { cashDelta: -80000, scoreDelta: { ecology: -20 } } },
       // Accept partial ban (reduced operations for 60 ticks)
-      { cashDelta: -30000, scoreDelta: { ecology: 15 }, effectTag: 'partial_ban' },
+      { cashDelta: -30000, scoreDelta: { ecology: 15 }, effectTag: 'partial_ban',
+        effects: [{ type: 'work_rate', pct: EVENT_PARTIAL_BAN_WORK_PCT, hours: EVENT_PARTIAL_BAN_HOURS }] },
       // Bribe key parliament members
       { cashDelta: -50000, corruptionDelta: 30, effectTag: 'bribe_parliament' },
     ],

@@ -5,6 +5,8 @@ import { getTotalOperatingCost } from '../entities/Building.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
 import type { FinanceState } from './Finance.js';
+import type { ActiveModifier } from '../events/ActiveModifiers.js';
+import { factorFor, salaryFactor } from '../events/ActiveModifiers.js';
 import {
   OPERATING_INCOME_CATEGORIES,
   OPERATING_INCOME_WINDOW_TICKS,
@@ -37,13 +39,18 @@ export function getOperatingCostPerHour(s: {
   employees: EmployeeState;
   buildings: BuildingState;
   vehicles: VehicleState;
+  /** Active event modifiers (#1414): salary and upkeep factors scale the figures; absent means none. */
+  events?: { activeModifiers: readonly ActiveModifier[] };
+  tickCount?: number;
 }): OperatingCostBreakdown {
+  const modifiers = s.events?.activeModifiers ?? [];
+  const upkeep = factorFor(modifiers, 'upkeep_surcharge', s.tickCount ?? 0);
   let salaries = 0;
-  for (const e of getLivingEmployees(s.employees.employees)) salaries += e.salary;
+  for (const e of getLivingEmployees(s.employees.employees)) salaries += e.salary * salaryFactor(modifiers, e.role);
   const payroll = salaries / PAY_CYCLE_TICKS;
-  const buildings = getTotalOperatingCost(s.buildings);
-  const vehicleMaintenance = getVehicleMaintenanceCostPerTick(s.vehicles);
-  const fuel = getVehicleFuelCostPerTick(s.vehicles);
+  const buildings = getTotalOperatingCost(s.buildings) * upkeep;
+  const vehicleMaintenance = getVehicleMaintenanceCostPerTick(s.vehicles) * upkeep;
+  const fuel = getVehicleFuelCostPerTick(s.vehicles) * upkeep;
   return { payroll, buildings, vehicleMaintenance, fuel, total: payroll + buildings + vehicleMaintenance + fuel };
 }
 
@@ -72,6 +79,7 @@ export function getOperatingSummary(s: {
   vehicles: VehicleState;
   finances: FinanceState;
   tickCount: number;
+  events?: { activeModifiers: readonly ActiveModifier[] };
 }): OperatingSummary {
   const cost = getOperatingCostPerHour(s);
   const income = getOperatingIncomePerHour(s.finances, s.tickCount);

@@ -21,6 +21,7 @@ import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import { addExpense, addIncome, chargeFine, deductExpense } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
+import { factorFor, holdForcedWeather, salaryFactor, tickModifiers } from '../events/ActiveModifiers.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
 import { tickHoleWater } from '../mining/WetHoles.js';
 import { dominantRockUnderHole } from '../mining/ExplosiveRockFit.js';
@@ -156,8 +157,13 @@ export function runTick(
   state.tickCount++;
   state.time += BASE_TICK_MS;
 
-  // 0. Weather — own persisted rng stream, advanced before events read it
+  // 0a. Event modifiers (#1414) — lapsed ones drop, recurring charges and morale drift apply
+  tickModifiers(state);
+
+  // 0. Weather — own persisted rng stream, advanced before events read it; a forced
+  // weather overrides the result without drawing from that stream
   tickWeather(state.weather);
+  holdForcedWeather(state.weather, state.events.activeModifiers, state.tickCount);
   tickHoleWater(state, state.weather.current, hole => {
     const rock = grid ? dominantRockUnderHole(grid, hole) : null;
     return rock ? (getRock(rock.rockId)?.porosity ?? 0) : 0;
@@ -168,14 +174,15 @@ export function runTick(
   let fired = tickEventSystem(state.events, evCtx, rng);
 
   // 2. Payroll — processPayCycle increments ticksSincePayday internally
-  const paySalary = processPayCycle(state.employees);
+  const paySalary = processPayCycle(state.employees, role => salaryFactor(state.events.activeModifiers, role));
   deductExpense(state, paySalary, 'salaries', 'Payroll');
 
   // 2b. Building and vehicle maintenance — unconditional per-tick upkeep.
-  const buildingUpkeep = getTotalOperatingCost(state.buildings);
+  const upkeepFactor = factorFor(state.events.activeModifiers, 'upkeep_surcharge', state.tickCount);
+  const buildingUpkeep = getTotalOperatingCost(state.buildings) * upkeepFactor;
   deductExpense(state, buildingUpkeep, 'maintenance', 'Building upkeep');
-  deductExpense(state, getVehicleMaintenanceCostPerTick(state.vehicles), 'vehicle_maintenance', 'Vehicle maintenance');
-  deductExpense(state, getVehicleFuelCostPerTick(state.vehicles), 'fuel', 'Vehicle fuel');
+  deductExpense(state, getVehicleMaintenanceCostPerTick(state.vehicles) * upkeepFactor, 'vehicle_maintenance', 'Vehicle maintenance');
+  deductExpense(state, getVehicleFuelCostPerTick(state.vehicles) * upkeepFactor, 'fuel', 'Vehicle fuel');
 
   // 3. Contracts — stored ore is delivered first, so a deadline tick that stock
   // can still fill pays out and completes before the penalty is assessed.

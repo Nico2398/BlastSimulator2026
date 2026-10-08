@@ -50,7 +50,8 @@ export const MAFIA_EVENTS_2: EventDef[] = [
     weight: (s) => 1.3 + 0.9 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.corruptionLevel >= mafiaTier(3) && ctx.employeeCount >= 5,
     options: [
-      { cashDelta: -4000, scoreDelta: { wellBeing: -8 }, corruptionDelta: 5, effectTag: 'mole_fired' },
+      { cashDelta: -4000, scoreDelta: { wellBeing: -8 }, corruptionDelta: 5, effectTag: 'mole_fired',
+        effects: [{ type: 'employee_leaves', pick: 'random' }] },
       { cashDelta: 0, scoreDelta: { wellBeing: -3 }, corruptionDelta: -5, effectTag: 'cooperate_fbi' },
       { cashDelta: -2000, scoreDelta: { safety: -4 }, corruptionDelta: 3, effectTag: 'paranoia_sweep' },
     ],

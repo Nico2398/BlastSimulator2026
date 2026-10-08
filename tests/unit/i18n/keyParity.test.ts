@@ -480,7 +480,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1372: +5 keys (contract needs warehouse, warehouse stock lost warnings and notification), both locales: 3837.
     // #1393: net -2 keys (vehicle depot building removed, repair skill and repair order added), both locales: 3835.
     // #1401: +10 keys (vehicle upgrade command, Fleet panel upgrade button, SelectionBar upgrade_vehicle), both locales: 3845.
-    expect(Object.keys(en).length).toBe(3845);
+    // #1414: +53 keys (event effect texts, modifier chips), both locales: 3898.
+    expect(Object.keys(en).length).toBe(3898);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

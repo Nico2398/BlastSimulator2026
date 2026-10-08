@@ -152,7 +152,8 @@ import type { RampWidth } from '../config/balance.js';
 // v31 -> v32: holeWater + groundWetness (#1350). See SaveLoad.ts's migrateV31ToV32.
 // v32 -> v33: Vehicle.payload becomes Vehicle.cargo[] (#1370). See SaveLoad.ts's migrateV32ToV33.
 // v33 -> v34: pendingDetonation (#1362). See SaveLoad.ts's migrateV33ToV34.
-export const SAVE_VERSION = 34;
+// v34 -> v35: events.activeModifiers + nextModifierId (#1414). See SaveLoad.ts's migrateV34ToV35.
+export const SAVE_VERSION = 35;
 
 export interface GameConfig {
   seed: number;

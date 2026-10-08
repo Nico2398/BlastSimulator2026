@@ -26,7 +26,7 @@ import { HIRING_ROLES, candidatesForRole, takeCandidate } from '../../core/entit
 import { perHour } from '../../core/economy/formatMoney.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, noEmployeesMessage, refusalText } from './commandUtils.js';
-import { NavGrid } from '../../core/nav/NavGrid.js';
+import { hireSpawnPoint } from '../../core/entities/HireSpawn.js';
 import { t } from '../../core/i18n/I18n.js';
 import { emitFootprintOccupancyChanged } from './buildingHelpers.js';
 
@@ -84,21 +84,6 @@ export function employeeCommand(
           }),
         };
       }
-      const rawEmpX = state.world ? state.world.minX + state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
-      const rawEmpZ = state.world ? state.world.minZ + state.world.sizeZ / 2 : 32;
-      // Same hazards as the vehicle purchase spawn point, which makes the
-      // same call: a blast can clear the grid centre where new hires spawn
-      // down to a floorless column (#437 — findPath rejects an impassable
-      // start outright, so such a hire can never path anywhere again), wall
-      // the nearest traversable tiles off from the rest of the map, or bury
-      // the point in a fragment field whose cells still read 'walkable' but
-      // that the hire can never step out of (#954: tutorial-playthrough's
-      // own manager and driver both landed in a fresh crater's fragment
-      // field this way, boxed in, re-claiming and re-failing the same
-      // freight_warehouse order for 400+ ticks). findNearestSpawnCell rules
-      // out all three — see its own doc for why the anchor it snaps against
-      // is derived rather than the literal corner this call site used to
-      // assume (#1151).
       // Affordability passed: only now remove the candidate from the pool.
       const candidate = candidateId !== undefined && Number.isNaN(candidateId)
         ? null
@@ -106,9 +91,7 @@ export function employeeCommand(
       if (!candidate) {
         return { success: false, output: t('employees.hire_no_candidate', { role }) };
       }
-      const { x: empX, z: empZ } = state.navGrid
-        ? NavGrid.findNearestSpawnCell(state.navGrid, rawEmpX, rawEmpZ)
-        : { x: rawEmpX, z: rawEmpZ };
+      const { x: empX, z: empZ } = hireSpawnPoint(state);
       // Seeded on nextId too, not just seed+tickCount: two hires dispatched in
       // the same tick would otherwise re-seed identically and always pick the
       // same name pair (this is what the design mock's own CREW fixture data
