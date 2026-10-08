@@ -347,7 +347,7 @@ describe('TopBar (redesign P1)', () => {
     it('prints negative profit with a minus sign', () => {
       const { container, topBar, center, state } = setup('dusty_hollow');
       try {
-        addExpense(state.finances, 1500, 'equipment', 'x', 1);
+        addExpense(state.finances, 1500, 'salaries', 'x', 1);
         topBar.update(state, center);
         const text = container.querySelector(CHIP)?.textContent ?? '';
         expect(text).toContain('-$');
@@ -370,7 +370,7 @@ describe('TopBar (redesign P1)', () => {
       const { container, topBar, center, state } = setup('dusty_hollow');
       try {
         const width = () => Array.from(container.querySelectorAll<HTMLElement>(`${CHIP} *`)).find((e) => e.style.width.endsWith('%'))?.style.width;
-        addExpense(state.finances, 1000, 'equipment', 'x', 1);
+        addExpense(state.finances, 1000, 'salaries', 'x', 1);
         topBar.update(state, center);
         expect(width()).toBe('0%');
         addIncome(state.finances, 500000, 'sales', 'ore', 2);

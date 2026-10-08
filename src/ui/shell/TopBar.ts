@@ -77,7 +77,7 @@ export class TopBar {
   private readonly objectiveWrap: HTMLButtonElement;
   private readonly objectiveText: HTMLElement;
   private readonly objectiveFill: HTMLElement;
-  private lastObjectiveSig = '';
+  private lastObjectiveSig: string | null = null;
   private readonly trendValue: HTMLElement;
   private readonly trendRow: HTMLElement;
   private readonly trendIcon: HTMLElement;

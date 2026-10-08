@@ -1,7 +1,7 @@
 import { getOperatingProfit, type FinanceState } from '../economy/Finance.js';
 import { getLevel } from './Level.js';
 
-export interface LevelObjective {
+interface LevelObjective {
   profit: number;
   target: number;
   /** Progress toward the target, clamped to 0..1. */
