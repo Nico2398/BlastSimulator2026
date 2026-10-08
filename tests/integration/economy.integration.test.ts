@@ -37,6 +37,11 @@ import { negotiateContract } from '../../src/core/economy/Negotiation.js';
 import { Random } from '../../src/core/math/Random.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { makeGameContext } from '../helpers/gameContext.js';
+import { completeDemolition } from '../../src/core/engine/BuildingDemolition.js';
+import { refreshLogisticsCapacity } from '../../src/core/engine/BuildingTaskHelpers.js';
+import { destroyBuilding } from '../../src/core/entities/Building.js';
+import { t } from '../../src/core/i18n/I18n.js';
+import { addFreightWarehouse, ensureFreightWarehouse } from '../helpers/freightWarehouse.js';
 import { ORE_PRICES as ALL_ORE_PRICES } from '../../src/core/config/balance.js';
 const ALL_ORES: readonly string[] = Object.keys(ALL_ORE_PRICES);
 
@@ -97,7 +102,7 @@ function pushStoredFragment(
     shapeSeed: id,
     origin: { x: 0, y: 0, z: 0 },
   };
-  ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null });
+  ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: ensureFreightWarehouse(ctx) });
   ctx.state!.logistics.storedMassKg += mass;
 }
 
@@ -561,6 +566,7 @@ describe('Economy', () => {
   // names it by what it actually is instead.
 
   it('contract accept resolves a contract by material: selector, no id needed', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const result = contractCommand(ctx, ['accept'], { material: c.materialId });
     expect(result.success).toBe(true);
@@ -569,6 +575,7 @@ describe('Economy', () => {
   });
 
   it('contract accept resolves a contract by material: + type: selector together', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const result = contractCommand(ctx, ['accept'], { material: c.materialId, type: c.type });
     expect(result.success).toBe(true);
@@ -576,12 +583,14 @@ describe('Economy', () => {
   });
 
   it('contract accept by material: selector is refused when nothing matches, naming what was searched for', () => {
+    ensureFreightWarehouse(ctx);
     const result = contractCommand(ctx, ['accept'], { material: 'no_such_material' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('no_such_material');
   });
 
   it('contract accept with neither an id nor a material/type selector returns the usage message', () => {
+    ensureFreightWarehouse(ctx);
     const result = contractCommand(ctx, ['accept'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('Usage');
@@ -597,6 +606,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver resolves an active contract by material: selector', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     expect(contractCommand(ctx, ['accept'], { material: c.materialId }).success).toBe(true);
     pushStoredFragment(ctx, 1, 500, 0.04, { [c.materialId]: 1.0 });
@@ -627,6 +637,7 @@ describe('Economy', () => {
   });
 
   it('contract accept by material: selector still finds a same-kind contract after the numeric id it started as has rotated out of the pool', () => {
+    ensureFreightWarehouse(ctx);
     const rng = new Random(7);
     generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount, 1, ALL_ORES);
     const target = ctx.state!.contracts.available[0]!;
@@ -653,6 +664,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver rejects a non-finite amount and leaves cash unchanged', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const acceptResult = contractCommand(ctx, ['accept', String(c.id)], {});
     expect(acceptResult.success).toBe(true);
@@ -667,6 +679,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver caps an over-request to the contract\'s outstanding quantity, leaving surplus stock untouched', () => {
+    ensureFreightWarehouse(ctx);
     // Contract needs only 100kg of blingite.
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const acceptResult = contractCommand(ctx, ['accept', String(c.id)], {});
@@ -707,6 +720,7 @@ describe('Economy', () => {
 
   // ── #1368: fractional-kg deliveries match what the panel now offers ──────
   it('contract deliver amount:99.6 succeeds with 99.6 kg in stock', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
     pushStoredFragment(ctx, 1, 99.6, 0.04, { [c.materialId]: 1.0 });
@@ -718,6 +732,7 @@ describe('Economy', () => {
   });
 
   it('contract deliver amount:100 is refused with "Not enough" when only 99.6 kg is in stock', () => {
+    ensureFreightWarehouse(ctx);
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
     pushStoredFragment(ctx, 1, 99.6, 0.04, { [c.materialId]: 1.0 });
@@ -977,7 +992,7 @@ describe('Economy', () => {
       shapeSeed: 9001,
       origin: { x: 18, y: 0, z: 19 },
     };
-    ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null });
+    ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null, warehouseId: null });
 
     // 4. Accept an ore_sale contract for exactly what the fragment yields
     // (volume × density × ORE_DENSITY_KG_M3 = 0.43 × 0.4 × 2500 = 430 kg),
@@ -1402,5 +1417,120 @@ describe('Economy — automatic contract delivery (#1367)', () => {
     tick();
 
     expect(ctx.state!.contracts.completedHistory.find(a => a.id === c.id)!.penaltyCharged).toBe(300);
+  });
+});
+
+// ── Per-warehouse freight storage (#1372) ────────────────────────────────────
+
+describe('Economy — per-warehouse freight storage (#1372)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+    ctx.state!.contracts.available = [];
+  });
+
+  function storedIn(warehouseId: number): number {
+    return ctx.state!.logistics.fragments
+      .filter(f => f.state === 'stored' && f.warehouseId === warehouseId)
+      .reduce((n, f) => n + f.fragment.mass, 0);
+  }
+
+  function stock(id: number, mass: number, warehouseId: number): void {
+    const fragment: FragmentData = {
+      id, position: { x: 0, y: 0, z: 0 }, volume: 0.4, mass, rockId: 'sandite',
+      oreDensities: { blingite: 0.5 }, initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: id, origin: { x: 0, y: 0, z: 0 },
+    };
+    ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId });
+    ctx.state!.logistics.storedMassKg += mass;
+    ctx.state!.collectedOre.blingite = (ctx.state!.collectedOre.blingite ?? 0) + 0.4 * 0.5 * 2500;
+  }
+
+  it('contract accept for an ore_sale is refused without a freight warehouse', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const result = contractCommand(ctx, ['accept', String(c.id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(t('economy.contract.needs_warehouse'));
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)).toBeUndefined();
+    expect(ctx.state!.contracts.available.find(a => a.id === c.id)).toBeDefined();
+  });
+
+  it('contract accept for an ore_sale succeeds once a freight warehouse exists', () => {
+    addFreightWarehouse(ctx);
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+  });
+
+  it('contract accept for rubble_disposal needs no warehouse', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 1, { type: 'rubble_disposal', materialId: '' });
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+  });
+
+  it('demolishing a warehouse holding ore empties its stock and shrinks the pool', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const b = addFreightWarehouse(ctx, 60, 20);
+    stock(1, 300, a);
+    stock(2, 200, b);
+    expect(ctx.state!.logistics.storedMassKg).toBe(500);
+    const capBefore = ctx.state!.logistics.storageCapacityKg;
+    const oreBefore = ctx.state!.collectedOre.blingite!;
+
+    const ordered = buildCommand(ctx, ['destroy', String(a)], {});
+    expect(ordered.success).toBe(true);
+    completeDemolition(ctx.state!, null, ctx.emitter, {
+      buildingId: a, cost: 0, durationTicks: 1, footprint: [], rebuildOrderId: null,
+    });
+
+    expect(storedIn(a)).toBe(0);
+    expect(storedIn(b)).toBe(200);
+    expect(ctx.state!.logistics.storedMassKg).toBe(200);
+    expect(ctx.state!.logistics.storageCapacityKg).toBeLessThan(capBefore);
+    expect(ctx.state!.logistics.fragments.map(f => f.fragment.id)).toEqual([2]);
+    expect(ctx.state!.collectedOre.blingite!).toBeLessThan(oreBefore);
+    expect(ctx.state!.collectedOre.blingite!).toBeGreaterThanOrEqual(0);
+  });
+
+  it('refreshLogisticsCapacity after a blast-style destruction reports the lost stock', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const b = addFreightWarehouse(ctx, 60, 20);
+    stock(1, 300, a);
+    stock(2, 200, b);
+    destroyBuilding(ctx.state!.buildings, a);
+    const losses = refreshLogisticsCapacity(ctx.state!);
+    expect(losses).toHaveLength(1);
+    expect(losses[0]!.buildingId).toBe(a);
+    expect(losses[0]!.massKg).toBe(300);
+    expect(ctx.state!.logistics.storedMassKg).toBe(200);
+  });
+
+  it('refreshLogisticsCapacity reports nothing when no stocked warehouse is lost', () => {
+    const a = addFreightWarehouse(ctx);
+    stock(1, 100, a);
+    expect(refreshLogisticsCapacity(ctx.state!)).toEqual([]);
+    expect(ctx.state!.logistics.storedMassKg).toBe(100);
+  });
+
+  it('selling ore draws from both warehouses and keeps pool and per-warehouse totals equal', () => {
+    const a = addFreightWarehouse(ctx, 20, 20);
+    const b = addFreightWarehouse(ctx, 60, 20);
+    stock(1, 300, a);
+    stock(2, 200, b);
+    const total = ctx.state!.collectedOre.blingite!;
+    const c = insertOreSaleContract(ctx.state!.contracts, Math.floor(total * 0.8), 10);
+    expect(contractCommand(ctx, ['accept', String(c.id)], {}).success).toBe(true);
+    const res = contractCommand(ctx, ['deliver', String(c.id)], {});
+    expect(res.success, res.output).toBe(true);
+    expect(storedIn(a) + storedIn(b)).toBeCloseTo(ctx.state!.logistics.storedMassKg, 6);
+    expect(ctx.state!.logistics.storedMassKg).toBeLessThan(500);
+    expect(storedIn(a)).toBeLessThan(300);
+  });
+
+  it('save round trip keeps each fragment warehouseId', async () => {
+    const { serialize, deserialize } = await import('../../src/core/state/SaveLoad.js');
+    const a = addFreightWarehouse(ctx);
+    stock(1, 100, a);
+    const restored = deserialize(serialize(ctx.state!));
+    expect(restored.logistics.fragments[0]!.warehouseId).toBe(a);
   });
 });

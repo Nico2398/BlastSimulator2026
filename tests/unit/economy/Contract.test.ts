@@ -17,6 +17,7 @@ import {
   outstandingPenalty,
   sortByDeadline,
   contractShortOfStock,
+  contractAcceptBlocker,
 } from '../../../src/core/economy/Contract.js';
 import {
   CONTRACT_REFRESH_INTERVAL,
@@ -811,5 +812,25 @@ describe('outstandingPenalty', () => {
   });
   it('is zero when fully delivered', () => {
     expect(outstandingPenalty({ quantityKg: 100, deliveredKg: 100, penaltyAmount: 500 })).toBe(0);
+  });
+});
+
+describe('contractAcceptBlocker (#1372)', () => {
+  it('blocks an ore_sale without a freight warehouse', () => {
+    expect(contractAcceptBlocker(offer({ type: 'ore_sale' }), false)).toBe('needs_freight_warehouse');
+  });
+
+  it('allows an ore_sale with a freight warehouse', () => {
+    expect(contractAcceptBlocker(offer({ type: 'ore_sale' }), true)).toBeNull();
+  });
+
+  it('never blocks rubble_disposal', () => {
+    expect(contractAcceptBlocker(offer({ type: 'rubble_disposal' }), false)).toBeNull();
+    expect(contractAcceptBlocker(offer({ type: 'rubble_disposal' }), true)).toBeNull();
+  });
+
+  it('never blocks other contract types', () => {
+    expect(contractAcceptBlocker(offer({ type: 'supply' }), false)).toBeNull();
+    expect(contractAcceptBlocker(offer({ type: 'supply' }), true)).toBeNull();
   });
 });

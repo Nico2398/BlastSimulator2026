@@ -29,6 +29,7 @@ function makeFragment(id: number, fragState: TrackedFragment['state']): TrackedF
     },
     state: fragState,
     vehicleId: null,
+    warehouseId: null,
   };
 }
 

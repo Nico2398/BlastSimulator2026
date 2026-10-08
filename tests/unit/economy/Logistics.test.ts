@@ -79,7 +79,7 @@ function makeStoredFragment(
 
 /** Push a fragment directly into storage (bypassing pickup/deliver) for consumeStoredOre setup. */
 function putInStorage(state: LogisticsState, fragment: FragmentData): void {
-  state.fragments.push({ fragment, state: 'stored', vehicleId: null });
+  state.fragments.push({ fragment, state: 'stored', vehicleId: null, warehouseId: null });
   state.storedMassKg += fragment.mass;
 }
 
