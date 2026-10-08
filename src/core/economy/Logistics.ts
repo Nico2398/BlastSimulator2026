@@ -6,7 +6,7 @@ import { accumulateOreMass } from '../mining/BlastOreReport.js';
 import type { NavGrid } from '../nav/NavGrid.js';
 import { t } from '../i18n/I18n.js';
 import { scale } from '../math/Vec3.js';
-import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG } from '../config/balance.js';
+import { FRAGMENT_SPLIT_EPSILON_KG, INITIAL_STORAGE_CAPACITY_KG, ORE_DENSITY_KG_M3 } from '../config/balance.js';
 
 // ── Fragment states ──
 
@@ -174,14 +174,11 @@ export function splitStoredFragmentMass(
 }
 
 /**
- * Decrement `collectedOre` by the exact ore-kg carried in a just-sold
- * fragment (`sellFragment`'s return shape). Shared by both branches of
- * `consumeStoredOre` below — a materialId-specific sale and a rubble/no-ore
- * sale both need `collectedOre` to reflect a fragment leaving storage the
- * same way, they just differ in which fragments they pick to sell.
- * Returns the per-ore breakdown so a caller that needs the amount of one
- * specific ore removed (the materialId branch's own running tally) doesn't
- * have to recompute it.
+ * Decrement `collectedOre` by the exact ore-kg of EVERY ore carried in a
+ * just-removed fragment slice (`sellFragment`/`splitStoredFragmentMass`
+ * return shape). Used only by the rubble branch of `consumeStoredOre`, where
+ * all the removed mass leaves storage; the ore branch debits only the sold
+ * ore via `extractOreFromFragment`. Returns the per-ore breakdown.
  */
 function decrementCollectedOre(
   collectedOre: Record<string, number>,
@@ -209,21 +206,55 @@ export function extractOreFromFragment(
   oreId: string,
   oreKg: number,
 ): { oreKg: number; mass: number; volume: number } | null {
-  void state; void fragmentId; void oreId; void oreKg;
-  // TODO: implement
-  return null;
+  if (!Number.isFinite(oreKg) || oreKg <= 0) return null;
+  const tracked = findStoredFragment(state, fragmentId);
+  if (!tracked) return null;
+
+  const fragment = tracked.fragment;
+  const d = fragment.oreDensities[oreId] ?? 0;
+  const volume = fragment.volume;
+  const contribution = volume * d * ORE_DENSITY_KG_M3;
+  if (d <= 0 || !(contribution > 0)) return null;
+
+  const f = Math.min(1, Math.max(0, oreKg / contribution));
+  const removedVolume = volume * d * f;
+  const removedMass = fragment.mass * d * f;
+  const newVolume = volume - removedVolume;
+  const removedOreKg = contribution * f;
+
+  const othersPresent = Object.entries(fragment.oreDensities).some(([id, dens]) => id !== oreId && dens > 0);
+  const leftoverMass = fragment.mass - removedMass;
+  if (!othersPresent && (newVolume <= 0 || leftoverMass <= FRAGMENT_SPLIT_EPSILON_KG)) {
+    const sold = sellFragment(state, fragmentId);
+    if (!sold) return null;
+    return { oreKg: removedOreKg, mass: sold.mass, volume: sold.volume };
+  }
+  if (!(newVolume > 0)) return null;
+
+  const ratio = volume / newVolume;
+  const densities: Record<string, number> = {};
+  for (const [id, dens] of Object.entries(fragment.oreDensities)) {
+    const next = id === oreId ? dens * (1 - f) * ratio : dens * ratio;
+    if (next > 0) densities[id] = next;
+  }
+  fragment.oreDensities = densities;
+  fragment.mass = leftoverMass;
+  fragment.volume = newVolume;
+  fragment.halfExtents = scale(fragment.halfExtents, Math.cbrt(newVolume / volume));
+  state.storedMassKg -= removedMass;
+
+  return { oreKg: removedOreKg, mass: removedMass, volume: removedVolume };
 }
 
 /**
  * Consume up to `amountKg` of `materialId` ore from warehouse-stored fragments,
- * oldest-first, until the requested amount is covered: a fragment whose full
- * contribution the request still needs is removed whole (via sellFragment),
- * and a fragment that only needs to give up part of its contribution is
- * shrunk in place (via splitStoredFragmentMass), decrementing
- * collectedOre[materialId] (and every other ore key each touched fragment
- * carries) by the exact ore-kg physically removed. materialId === ''
- * (rubble_disposal) consumes raw stored mass regardless of ore content — any
- * fragment, ore-bearing or not.
+ * oldest-first, until the requested amount is covered. An ore sale removes only
+ * that ore from each fragment it touches (via extractOreFromFragment); other
+ * ores in the same fragments stay stored and in collectedOre. Only
+ * collectedOre[materialId] is decremented, by the exact kg extracted.
+ * materialId === '' (rubble_disposal) consumes raw stored mass regardless of
+ * ore content — any fragment, ore-bearing or not — and debits every ore the
+ * removed mass carried.
  */
 export function consumeStoredOre(
   state: LogisticsState,
@@ -261,23 +292,13 @@ export function consumeStoredOre(
       if (!tracked) continue;
 
       const remaining = amountKg - tally;
-      const probe: Record<string, number> = {};
-      accumulateOreMass(probe, tracked.fragment.volume, tracked.fragment.oreDensities);
-      const contribution = probe[materialId] ?? 0;
-
-      if (remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG) {
-        const sold = sellFragment(state, id);
-        if (!sold) continue;
-        const acc = decrementCollectedOre(collectedOre, sold);
-        tally += acc[materialId] ?? 0;
-      } else {
-        const massSlice = remaining * (tracked.fragment.mass / contribution);
-        const split = splitStoredFragmentMass(state, id, massSlice);
-        if (!split) continue;
-        decrementCollectedOre(collectedOre, split);
-        tally += remaining;
-        break;
-      }
+      const contribution = tracked.fragment.volume
+        * (tracked.fragment.oreDensities[materialId] ?? 0) * ORE_DENSITY_KG_M3;
+      const take = remaining >= contribution - FRAGMENT_SPLIT_EPSILON_KG ? contribution : remaining;
+      const extracted = extractOreFromFragment(state, id, materialId, take);
+      if (!extracted) continue;
+      collectedOre[materialId] = (collectedOre[materialId] ?? 0) - extracted.oreKg;
+      tally += extracted.oreKg;
     }
 
     return { success: true, consumedKg: Math.min(tally, amountKg) };
