@@ -296,8 +296,7 @@ function isMidLoadedHaul(state: GameState, employee: Employee): boolean {
  * incrementWorkTick only advances ticksWorked while activeActionId !== null,
  * so an idle employee's ticksWorked is whatever it was when they last went
  * idle, not accruing further), or fatigue at or below its effective
- * threshold (custom-mode per-employee overrides via getEffectiveThresholds)
- * for every mode including continuous/custom.
+ * threshold for every mode including continuous.
  *
  * Unlike the legacy function (fixed SHIFT_SLEEP_DURATION_TICKS, tier>=2
  * only), this routes to the nearest living_quarters of ANY tier

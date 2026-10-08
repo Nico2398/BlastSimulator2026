@@ -289,7 +289,7 @@ export function employeeCommand(
       }
 
       const plan = planTraining(emp, skill, building.tier);
-      if (!plan) return { success: false, output: t('employees.train_already_master', { name: emp.name, skill }) };
+      if (!plan) return { success: false, output: t('employees.train_already_qualified', { name: emp.name, skill }) };
       if (state.cash < plan.fee) {
         return { success: false, output: t('employees.train_insufficient_funds', { fee: plan.fee }) };
       }
@@ -306,9 +306,9 @@ export function employeeCommand(
           buildingType: building.type,
           buildingId: building.id,
           skill,
-          targetLevel: 1,
           ticks: plan.ticks,
           fee: plan.fee,
+          raise: perHour(plan.salaryIncrease),
         }),
       };
     }

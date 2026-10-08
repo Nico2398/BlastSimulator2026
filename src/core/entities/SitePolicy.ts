@@ -1,5 +1,5 @@
 // BlastSimulator2026 — SitePolicy: shift scheduling and rest thresholds.
-// Governs shift modes (8 h, 12 h, continuous, custom) and the fatigue level
+// Governs shift modes (8 h, 12 h, continuous) and the fatigue level
 // that forces rest. Hunger and breakNeed thresholds were removed (#928).
 
 import { SHIFT_DURATIONS_TICKS, SITE_POLICY_DEFAULT_THRESHOLD } from '../config/balance.js';
@@ -34,7 +34,7 @@ export function createSitePolicy(mode: ShiftMode = 'shift_8h'): SitePolicy {
 
 /**
  * Returns the number of ticks in a shift for the given mode.
- * continuous and custom have no enforced tick limit (Infinity).
+ * continuous has no enforced tick limit (Infinity).
  */
 export function getShiftDurationTicks(mode: ShiftMode): number {
   switch (mode) {
@@ -46,7 +46,6 @@ export function getShiftDurationTicks(mode: ShiftMode): number {
 
 /** Employee data subset required by shouldForceRest. */
 type EmployeeSnapshot = {
-  id?: number;
   fatigue: number;
   ticksWorked: number;
 };
@@ -57,9 +56,7 @@ type EmployeeSnapshot = {
  * Rules (evaluated in order):
  *  1. If !isWorking → false (already resting, nothing to force).
  *  2. For shift_8h / shift_12h → true if ticksWorked >= shift duration ticks.
- *  3. For all modes → true if fatigue is at or below its rest threshold. In
- *     'custom' mode, per-employee overrides (customThresholds[id]) take
- *     precedence over the policy-level default when present.
+ *  3. For all modes → true if fatigue is at or below the policy's rest threshold.
  *  4. Otherwise → false.
  */
 export function shouldForceRest(
@@ -75,21 +72,5 @@ export function shouldForceRest(
     return true;
   }
 
-  // Determine effective threshold
-  const { fatigue: fatigueThreshold } = getEffectiveThresholds(policy, employee.id);
-
-  if (employee.fatigue <= fatigueThreshold) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Returns the effective fatigue rest threshold for an employee under this
- * policy — a per-employee `customThresholds` override (in 'custom' mode)
- * takes precedence over the policy-level default when present.
- */
-export function getEffectiveThresholds(policy: SitePolicy, _employeeId?: number): { fatigue: number } {
-  return { fatigue: policy.fatigueRestThreshold };
+  return employee.fatigue <= policy.fatigueRestThreshold;
 }

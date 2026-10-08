@@ -1356,25 +1356,12 @@ export const TRAINING_TIER_SPEED: Record<1 | 2 | 3, number> = {
 /** Fee to teach a skill the employee does not hold yet ($). */
 export const TRAINING_BASE_FEE = 2500;
 
-/**
- * Fee and duration multiplier by the level being trained *to*. Reaching Master
- * costs several times what a first licence does, so raising one specialist is a
- * real alternative to hiring another body.
- */
-export const TRAINING_LEVEL_COST_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> = {
-  1: 1,
-  2: 1.6,
-  3: 2.4,
-  4: 3.4,
-  5: 4.6,
-} as const;
-
 // ─── Research Center ───────────────────────────────────────────────────────────
 
 /**
  * Duration and cost of a Research Center task by the tier it unlocks. Tier 3
- * research costs and takes more than tier 2 — a straight step up mirrors the
- * training level multiplier so late-game tiers stay a real investment rather
+ * research costs and takes more than tier 2 — a straight step up keeps
+ * late-game tiers stay a real investment rather
  * than a rubber-stamp.
  */
 /** Cost, duration, and prerequisites for a single tier's research task. */

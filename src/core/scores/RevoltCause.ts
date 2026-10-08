@@ -6,7 +6,7 @@ type RevoltCause = 'no_rest_policy' | 'no_housing' | 'morale_drain';
 
 /**
  * Classify the root cause of a worker revolt.
- * Rules, in precedence order: a shift mode with no end (continuous/custom)
+ * Rules, in precedence order: a shift mode with no end (continuous)
  * -> no_rest_policy; else no active living quarters -> no_housing;
  * else morale_drain.
  */

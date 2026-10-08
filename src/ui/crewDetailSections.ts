@@ -12,7 +12,7 @@ import { managerNegotiationBonusPct } from '../core/economy/Negotiation.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
 import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
-import { availableTrainingOffers, planTraining, isSchoolFull, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
+import { availableTrainingOffers, planTraining, isSchoolFull } from '../core/entities/EmployeeTraining.js';
 import { perHour } from '../core/economy/formatMoney.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
@@ -315,7 +315,7 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
     const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:9px' } });
 
     if (!plan) {
-      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) });
+      renderLockedTrainingRow(row, t(`course.${skill}`), 'ui.crew.training_maxed');
     } else if (isSchoolFull(state, building)) {
       renderLockedTrainingRow(row, `${t(`course.${skill}`)}`, 'ui.crew.training_school_full');
     } else {
@@ -324,7 +324,7 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
       info.append(
         el('span', { text: `${t(`course.${skill}`)}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
         el('span', {
-          text: t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks }),
+          text: t('ui.crew.training_offer', { school: t(`building.${building.type}.name`), tier: building.tier, fee: plan.fee, ticks: plan.ticks, raise: perHour(plan.salaryIncrease) }),
           attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
         }),
       );
@@ -339,7 +339,7 @@ export function makeTrainingSection(e: Employee, state: GameState, onTrain: (ski
   }
 
   if (e.injured) rows.push(reasonLine(t('ui.crew.training_injured'), true));
-  else if (!anyOffered) rows.push(reasonLine(t('ui.crew.training_all_maxed', { level: t(`proficiency.${MAX_PROFICIENCY}`) })));
+  else if (!anyOffered) rows.push(reasonLine(t('ui.crew.training_all_maxed')));
 
   wrap.appendChild(well(rows));
   return wrap;
