@@ -1100,6 +1100,9 @@ export const VEHICLE_BASE_STATS = {
  */
 export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 
+/** Highest vehicle tier; `vehicle upgrade` is refused at this tier (#1401). */
+export const VEHICLE_MAX_TIER: VehicleTier = 3;
+
 /**
  * Base excavation voxels/tick for a tier-1 rock digger (#555 ramp
  * excavation — matches VEHICLE_BASE_STATS.rock_digger.workRate). Shared by
