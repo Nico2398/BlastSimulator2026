@@ -251,4 +251,18 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
       scoreEffects: {},
     },
   },
+
+  // ── Spoil Heap (#1530) — single tier, tiers 2/3 alias tier 1 ───────────────
+  spoil_heap: {
+    1: {
+      type: 'spoil_heap', tier: 1,
+      nameKey: 'building.spoil_heap.t1.name',
+      footprint: rect(2, 2), entryPoint: entry(), exitPoint: exit_(2),
+      constructionCost: 2000, demolishCost: 500, operatingCostPerTick: 0,
+      capacity: 0, maxHp: 100, structuralResistance: 1000,
+      scoreEffects: {},
+    },
+    get 2() { return BUILDING_DEFS.spoil_heap[1]; },
+    get 3() { return BUILDING_DEFS.spoil_heap[1]; },
+  },
 };

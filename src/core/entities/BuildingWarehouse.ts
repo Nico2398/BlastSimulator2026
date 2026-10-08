@@ -107,3 +107,9 @@ export function freightWarehouseSites(state: BuildingState): WarehouseSite[] {
   }
   return sites;
 }
+
+/** Active spoil heaps as logistics sites (#1530); capacityKg is unbounded. */
+export function spoilHeapSites(_state: BuildingState): WarehouseSite[] {
+  // TODO: implement
+  return [];
+}

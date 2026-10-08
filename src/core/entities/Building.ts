@@ -27,7 +27,8 @@ export type BuildingType =
   | 'research_center'
   | 'living_quarters'
   | 'explosive_warehouse'
-  | 'freight_warehouse';
+  | 'freight_warehouse'
+  | 'spoil_heap';
 
 /** Building upgrade tier. Tier 1 is the base tier available from the start. */
 export type BuildingTier = 1 | 2 | 3;
@@ -182,6 +183,8 @@ export interface Building {
   hp: number;
   active: boolean;
   storedExplosivesKg?: number;
+  /** Barren rock dumped here (#1530); spoil heaps only. Never counts toward freight storage. */
+  storedSpoilKg?: number;
   /**
    * Employees inside this building right now (#1202) — the building case of
    * the one occupancy model `Vehicle.occupantIds` is the vehicle case of.
@@ -212,6 +215,22 @@ const PEOPLE_HOLDING_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>([
 /** How many employees fit inside a building of this type and tier — 0 for a type that takes no people. */
 export function getBuildingPeopleCapacity(type: BuildingType, tier: BuildingTier): number {
   return PEOPLE_HOLDING_TYPES.has(type) ? getBuildingDef(type, tier).capacity : 0;
+}
+
+/** Types with a single tier: tiers 2 and 3 alias tier 1 and cannot be researched (#1530). */
+const SINGLE_TIER_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap']);
+
+/** Types that take no crew (#1530). */
+const CREWLESS_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap']);
+
+/** Whether the type has only one tier. */
+export function isSingleTierType(type: BuildingType): boolean {
+  return SINGLE_TIER_TYPES.has(type);
+}
+
+/** Whether the type needs no crew. */
+export function isCrewlessBuilding(type: BuildingType): boolean {
+  return CREWLESS_TYPES.has(type);
 }
 
 // ── Building state ──
