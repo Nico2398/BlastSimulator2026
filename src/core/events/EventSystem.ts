@@ -7,7 +7,7 @@ import type { ScoreState } from '../scores/ScoreManager.js';
 import type { EventDef, EventCategory, EventContext } from './EventPool.js';
 import { getEventsByCategory, getEventById, hasEnvironmentalCause } from './EventPool.js';
 import { isEventShielded, consumeDismissal, pruneProtections, timerStretchFor } from '../economy/BribeProtection.js';
-import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD } from '../config/balance.js';
+import { EVENT_BASE_TIMERS, MIN_EVENT_INTERVAL_TICKS, MIN_EVENT_INTERVAL_RANDOM_RANGE, MIN_EVENT_INTERVAL_ACTIONS, FOLLOWUP_DELAY_TICKS, MAFIA_UNLOCK_THRESHOLD, MIN_EVENT_TIMER_TICKS } from '../config/balance.js';
 
 // ── Config (imported from centralized balance) ──
 
@@ -169,7 +169,7 @@ export function tickEventSystem(
 
     if (timer.remaining <= 0) {
       // Reset timer with score-modulated interval
-      timer.remaining = Math.max(5, Math.round(
+      timer.remaining = Math.max(MIN_EVENT_TIMER_TICKS, Math.round(
         getModulatedInterval(timer.category, ctx.scores, timer.baseInterval)
         * timerStretchFor(timer.category, ctx.protections ?? [], ctx.tickCount)));
 
@@ -310,7 +310,7 @@ function getModulatedInterval(
   }
 
   // Floor of 5 ticks ensures a minimum gap even with extreme score modulation
-  return Math.max(5, Math.round(baseInterval * multiplier));
+  return Math.max(MIN_EVENT_TIMER_TICKS, Math.round(baseInterval * multiplier));
 }
 
 

@@ -11,7 +11,7 @@ import {
   TARGET_COSTS,
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
-import { protectionRemainingTicks } from '../../core/economy/BribeProtection.js';
+import { BRIBE_PROFILES, protectionRemainingTicks } from '../../core/economy/BribeProtection.js';
 import { applyExposure } from '../../core/events/MafiaActions.js';
 import { addExpense, chargeFine } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -46,7 +46,7 @@ export function corruptCommand(
     return { success: true, output: lines.join('\n') };
   }
 
-  const validTargets: CorruptionTarget[] = ['judge', 'union_leader', 'inspector', 'politician', 'witness'];
+  const validTargets: CorruptionTarget[] = Object.keys(BRIBE_PROFILES) as CorruptionTarget[];
   if (!validTargets.includes(target)) {
     return { success: false, output: t('corruption.invalid_target', { valid: validTargets.join(', ') }) };
   }

@@ -3,6 +3,15 @@
 
 import type { EventDef, EventCategory, EventContext, EventConsequence } from './EventPool.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
+import { MAFIA_UNLOCK_THRESHOLD, MAFIA_ESCALATION_STEP } from '../config/balance.js';
+
+/**
+ * Corruption-meter level (0-100) at which mafia escalation tier `tier` opens.
+ * Tier 1 = the unlock threshold; each further tier adds MAFIA_ESCALATION_STEP.
+ */
+export function mafiaTier(tier: number): number {
+  return MAFIA_UNLOCK_THRESHOLD + (tier - 1) * MAFIA_ESCALATION_STEP;
+}
 
 /** Shorthand for building an event definition. */
 export function ev(

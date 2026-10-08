@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import { registerEvents, clearEvents, getEventsByCategory, getEventById, type EventContext } from '../../../src/core/events/EventPool.js';
+import { mafiaTier } from '../../../src/core/events/EventBuilder.js';
 import { MAFIA_EVENTS_1 } from '../../../src/core/events/MafiaEvents1.js';
 import { MAFIA_EVENTS_2 } from '../../../src/core/events/MafiaEvents2.js';
 import { createScoreState } from '../../../src/core/scores/ScoreManager.js';
@@ -118,13 +119,13 @@ describe('Mafia events (6.6)', () => {
 
   it('escalation: later events require higher corruption', () => {
     const events = getEventsByCategory('mafia');
-    const lowCorrupt = makeCtx({ corruptionLevel: 1 });
-    const highCorrupt = makeCtx({ corruptionLevel: MAFIA_UNLOCK_THRESHOLD + 10 });
+    const lowCorrupt = makeCtx({ corruptionLevel: MAFIA_UNLOCK_THRESHOLD });
+    const highCorrupt = makeCtx({ corruptionLevel: mafiaTier(5) });
 
     const firesAtLow = events.filter(e => e.canFire(lowCorrupt)).length;
     const firesAtHigh = events.filter(e => e.canFire(highCorrupt)).length;
 
     // More events should be available at higher corruption
-    expect(firesAtHigh).toBeGreaterThanOrEqual(firesAtLow);
+    expect(firesAtHigh).toBeGreaterThan(firesAtLow);
   });
 });

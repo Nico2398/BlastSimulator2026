@@ -100,7 +100,7 @@ Each event presents 2-4 decision options with different consequences on scores, 
 
 ## Corruption & Mafia Gameplay
 
-- **Corruption (#1407):** a 0 to `CORRUPTION_MAX` (100) meter, clamped. Event choices keep their own deltas. A successful bribe adds `BRIBE_CORRUPTION_DELTA[target]` and grants a timed protection; a failed one adds only `BRIBERY_FAILURE_CORRUPTION_DELTA`, grants nothing and does not extend an existing protection. `mafiaUnlocked` latches at `MAFIA_UNLOCK_THRESHOLD` (20) and never unlatches; the `mafia` event category needs `corruptionLevel >= MAFIA_UNLOCK_THRESHOLD`.
+- **Corruption (#1407):** a 0 to `CORRUPTION_MAX` (100) meter, clamped. Event choices keep their own deltas. A successful bribe adds `BRIBE_CORRUPTION_DELTA[target]` and grants a timed protection; a failed one adds only `BRIBERY_FAILURE_CORRUPTION_DELTA`, grants nothing and does not extend an existing protection. `mafiaUnlocked` latches at `MAFIA_UNLOCK_THRESHOLD` (20) and never unlatches; the `mafia` event category needs `corruptionLevel >= MAFIA_UNLOCK_THRESHOLD`. Within the category, each mafia event's `canFire` gates on `mafiaTier(n)` (`EventBuilder.ts`) = `MAFIA_UNLOCK_THRESHOLD + (n-1) * MAFIA_ESCALATION_STEP` (10): tier 1 = 20 ... tier 5 = 60, so later events open as the meter climbs.
 - **Protections (`economy/BribeProfile` table in `BribeProtection.ts`):** price = `BRIBE_PRICE_PER_PROTECTION_DAY` x `BRIBE_PROTECTION_DAYS` (witness: flat). Re-bribing refreshes to max(existing, now + duration), never stacks. Followups already queued are not shielded. Shown in the Shady panel (`[data-protection="<target>"]`) with remaining time.
 
 | Target | Delta | Days | Price | Effect |

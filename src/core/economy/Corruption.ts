@@ -28,13 +28,9 @@ export const MAFIA_THRESHOLD = MAFIA_UNLOCK_THRESHOLD;
 
 export type CorruptionTarget = 'judge' | 'union_leader' | 'inspector' | 'politician' | 'witness';
 
-const TARGET_COSTS: Record<CorruptionTarget, number> = {
-  judge: BRIBE_PROFILES.judge.price,
-  union_leader: BRIBE_PROFILES.union_leader.price,
-  inspector: BRIBE_PROFILES.inspector.price,
-  politician: BRIBE_PROFILES.politician.price,
-  witness: BRIBE_PROFILES.witness.price,
-};
+const TARGET_COSTS = Object.fromEntries(
+  Object.entries(BRIBE_PROFILES).map(([target, profile]) => [target, profile.price]),
+) as Record<CorruptionTarget, number>;
 
 // ── Corruption state ──
 

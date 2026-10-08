@@ -92,6 +92,10 @@ export const BRIBERY_HISTORY_PENALTY = 0.03;
 export const CORRUPTION_MAX = 100;
 /** Corruption level at which the mafia gets involved. */
 export const MAFIA_UNLOCK_THRESHOLD = 20;
+/** Corruption meter gap between mafia escalation tiers; tier 1 sits at the unlock threshold (#1407). */
+export const MAFIA_ESCALATION_STEP = 10;
+/** Shortest event timer reset (ticks) after score modulation, so a category never fires every tick. */
+export const MIN_EVENT_TIMER_TICKS = 5;
 
 /** Corruption meter increase per successful bribe, by target (#1407). */
 export const BRIBE_CORRUPTION_DELTA = {

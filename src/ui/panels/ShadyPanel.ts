@@ -13,7 +13,7 @@ import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { getSuccessRate, TARGET_COSTS, MAFIA_THRESHOLD, type CorruptionTarget } from '../../core/economy/Corruption.js';
-import { BRIBE_PROFILES, protectionRemainingTicks } from '../../core/economy/BribeProtection.js';
+import { BRIBE_PROFILES, protectionRemainingTicks, type ActiveProtection } from '../../core/economy/BribeProtection.js';
 import { CORRUPTION_MAX } from '../../core/config/balance.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import {
@@ -30,6 +30,11 @@ const TARGETS: readonly { id: CorruptionTarget; nameKey: string; noteKey: string
   { id: 'politician', nameKey: 'ui.shady.target.politician', noteKey: 'ui.shady.target.politician.note' },
   { id: 'witness', nameKey: 'ui.shady.target.witness', noteKey: 'ui.shady.target.witness.note' },
 ];
+
+/** "Time left" label for an active protection row. */
+function remainingLabel(p: ActiveProtection, tickCount: number): string {
+  return t('ui.shady.protection_remaining', { time: formatGameDuration(protectionRemainingTicks(p, tickCount)) });
+}
 
 export class ShadyPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -191,7 +196,7 @@ export class ShadyPanel extends PanelBase {
     for (const row of Array.from(this.protectionsEl.querySelectorAll<HTMLElement>('[data-protection]'))) {
       const p = state.corruption.protections.find(q => q.target === row.dataset['protection']);
       const remaining = row.querySelector<HTMLElement>('[data-role="remaining"]');
-      if (p && remaining) remaining.textContent = t('ui.shady.protection_remaining', { time: formatGameDuration(protectionRemainingTicks(p, state.tickCount)) });
+      if (p && remaining) remaining.textContent = remainingLabel(p, state.tickCount);
     }
   }
 
@@ -240,7 +245,7 @@ export class ShadyPanel extends PanelBase {
           attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-muted)' },
         })] : []),
         el('span', {
-          text: t('ui.shady.protection_remaining', { time: formatGameDuration(protectionRemainingTicks(p, state.tickCount)) }),
+          text: remainingLabel(p, state.tickCount),
           attrs: { 'data-role': 'remaining', style: 'margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-positive)' },
         }),
       ] });

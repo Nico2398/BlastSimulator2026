@@ -44,12 +44,6 @@ export const BRIBE_PROFILES: Record<CorruptionTarget, BribeProfile> = {
     price: BRIBE_PRICE_PER_PROTECTION_DAY.judge * BRIBE_PROTECTION_DAYS.judge,
     effect: { timerStretchCategory: 'lawsuit', timerStretch: JUDGE_LAWSUIT_TIMER_STRETCH, dismissNextCategory: 'lawsuit' },
   },
-  politician: {
-    corruptionDelta: BRIBE_CORRUPTION_DELTA.politician,
-    durationTicks: BRIBE_PROTECTION_DAYS.politician * TICKS_PER_DAY,
-    price: BRIBE_PRICE_PER_PROTECTION_DAY.politician * BRIBE_PROTECTION_DAYS.politician,
-    effect: { blockCategory: 'politics' },
-  },
   union_leader: {
     corruptionDelta: BRIBE_CORRUPTION_DELTA.union_leader,
     durationTicks: BRIBE_PROTECTION_DAYS.union_leader * TICKS_PER_DAY,
@@ -61,6 +55,12 @@ export const BRIBE_PROFILES: Record<CorruptionTarget, BribeProfile> = {
     durationTicks: BRIBE_PROTECTION_DAYS.inspector * TICKS_PER_DAY,
     price: BRIBE_PRICE_PER_PROTECTION_DAY.inspector * BRIBE_PROTECTION_DAYS.inspector,
     effect: { blockTag: INSPECTION_EVENT_TAG },
+  },
+  politician: {
+    corruptionDelta: BRIBE_CORRUPTION_DELTA.politician,
+    durationTicks: BRIBE_PROTECTION_DAYS.politician * TICKS_PER_DAY,
+    price: BRIBE_PRICE_PER_PROTECTION_DAY.politician * BRIBE_PROTECTION_DAYS.politician,
+    effect: { blockCategory: 'politics' },
   },
   witness: {
     corruptionDelta: BRIBE_CORRUPTION_DELTA.witness,
