@@ -32,7 +32,7 @@ import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { SerializedVoxels } from './VoxelGridCodec.js';
 import type { VehicleState } from '../entities/Vehicle.js';
 import { createVehicleState, purchaseVehicle } from '../entities/Vehicle.js';
-import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
+import type { EmployeeState, SkillCategory, LicenceLevel } from '../entities/Employee.js';
 import { createEmployeeState, hireEmployee, calculateSalary, qualificationAtLevel } from '../entities/Employee.js';
 import type { VehicleRole } from '../entities/Vehicle.js';
 import { Random } from '../math/Random.js';
@@ -288,7 +288,7 @@ export interface PendingAction {
    */
   blockedReason?: BlockedOrderReason | null;
   /** Licence level the blocking vehicle tier needs when `blockedReason` is 'licence_level_too_low' (#1524). Optional like `blockedReason`. */
-  blockedLicenceLevel?: number | null;
+  blockedLicenceLevel?: LicenceLevel | null;
   /**
    * Tick after which this action becomes claimable again, stamped when a
    * vehicle abandons it as stuck. Null/absent = no backoff active.

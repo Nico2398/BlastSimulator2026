@@ -5,7 +5,7 @@
 // licences (ROLE_STARTING_QUALIFICATIONS); `driving.rock_fragmenter` belongs to
 // no hiring role, so without a reachable course nobody could hold it.
 
-import type { Employee, EmployeeState, SkillCategory, TrainingState } from './Employee.js';
+import type { Employee, EmployeeState, SkillCategory, TrainingState, LicenceLevel } from './Employee.js';
 import { calculateSalary } from './Employee.js';
 import type { Building, BuildingType, BuildingTier } from './Building.js';
 import { getBuildingPeopleCapacity } from './Building.js';
@@ -103,7 +103,7 @@ export interface TrainingPlan {
   /** Salary raise (per pay cycle) the new qualification causes on grant. */
   salaryIncrease: number;
   /** Set when the course raises an already-held driving licence to this level (#1524). */
-  raisesLicenceTo?: 2 | 3;
+  raisesLicenceTo?: Exclude<LicenceLevel, 1>;
 }
 
 /**

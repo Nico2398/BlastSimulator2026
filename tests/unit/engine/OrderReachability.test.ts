@@ -238,6 +238,16 @@ describe('judgeQueuedOrders (#1306)', () => {
     const verdicts = judgeQueuedOrders(state);
     for (const id of ids) expect(verdicts.get(id)).toBe('reachable');
   });
+
+  it('ignores a vehicle tier no candidate is licensed to drive (#1524)', () => {
+    const state = makeState();
+    const driver = hire(state, IN_A, [ROLE_LICENCE_REQUIRED.rock_digger, 'driving.excavator']); // level 1 licence
+    purchaseVehicle(state.vehicles, 'rock_digger', IN_A.x, IN_A.z, 1);
+    const tier3 = purchaseVehicle(state.vehicles, 'rock_digger', IN_B.x, IN_B.z, 3).vehicle;
+    tier3.occupantIds = [driver.id]; // would make the far-side vehicle usable were its tier not filtered out
+    const id = queue(state, 'level_ground', IN_B_TARGET, { requiredSkill: 'driving.excavator', requiredVehicleRole: 'rock_digger' });
+    expect(judgeQueuedOrders(state).get(id)).toBe('unreachable');
+  });
 });
 
 describe('classifyQueuedOrders (#1306)', () => {

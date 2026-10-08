@@ -43,12 +43,7 @@ export function upgradeVehicle(vehicle: Vehicle): VehicleUpgradeResult {
   return { success: true, cost, fromTier, toTier };
 }
 
-/** True when `employee` may drive a vehicle of `role` at `tier`. */
-export function isLicensedForVehicleTier(employee: Employee, role: VehicleRole, tier: VehicleTier): boolean {
-  return canDriveTier(employee, role, tier);
-}
-
 /** True when any alive employee in the roster is licensed for `role` at `tier`. */
 export function rosterCanDriveVehicleTier(employees: readonly Employee[], role: VehicleRole, tier: VehicleTier): boolean {
-  return employees.some(e => e.alive && isLicensedForVehicleTier(e, role, tier));
+  return employees.some(e => e.alive && canDriveTier(e, role, tier));
 }

@@ -268,8 +268,7 @@ export class FleetPanel extends PanelBase {
 
   /** "Licence <name> level N — M hold it" for a dealership tier row. */
   private licenceLineText(role: VehicleRole, tier: VehicleTier, holders: number): string {
-    return t('ui.fleet.licence_required', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[role]}`), level: tier })
-      + ' — ' + t('ui.fleet.licence_holders', { count: holders });
+    return t('ui.fleet.licence_line', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[role]}`), level: tier, count: holders });
   }
 
   private refreshDealershipAffordability(state: GameState): void {

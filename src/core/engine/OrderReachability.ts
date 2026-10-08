@@ -132,7 +132,10 @@ function fillPool(
   const candidateIds = new Set(employees.map(e => e.id));
   const vehicles = state.vehicles.vehicles.filter(v => v.type === role);
   if (vehicles.length === 0) return NO_ACTORS;
+  // Best licence among the candidates: a vehicle above it has no one able to drive it, so it is no actor.
+  const bestLevel = employees.reduce((best, e) => Math.max(best, licenceLevelOf(e, role)), 0);
   const usable = vehicles.filter(v => {
+    if (v.tier > bestLevel) return false;
     const driverId = vehicleDriverId(v);
     return (driverId !== null && candidateIds.has(driverId)) || onFoot.has(Math.round(v.x), Math.round(v.z));
   });

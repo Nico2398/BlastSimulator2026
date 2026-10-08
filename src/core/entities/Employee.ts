@@ -81,7 +81,7 @@ export interface TrainingState {
   ticksRemaining: number;
   fee: number;
   /** Set when the course raises an already-held driving licence to this level (#1524). */
-  raisesLicenceTo?: 2 | 3;
+  raisesLicenceTo?: Exclude<LicenceLevel, 1>;
 }
 
 // ── Employee instance ──

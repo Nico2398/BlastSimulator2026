@@ -27,7 +27,7 @@ import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from '../entitie
 import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, removeVehicleReservation } from '../entities/Vehicle.js';
 import { isVehicleUnderRepair } from '../entities/VehicleRepair.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { ROLE_LICENCE_REQUIRED, canDriveTier } from '../entities/VehicleDriverAssignment.js';
+import { licenceLevelOf, canDriveTier } from '../entities/VehicleDriverAssignment.js';
 import { moveTo } from './MoveTo.js';
 import { returnFragmentToGround } from '../economy/Logistics.js';
 import { alight } from './Mount.js';
@@ -145,10 +145,9 @@ function hasActiveFreightWarehouse(state: GameState): boolean {
   return state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.active);
 }
 
-/** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
+/** True when `employee` holds `role`'s licence at any level (licenceLevelOf > 0). Role-only, tier-blind: use canDriveTier for a specific vehicle tier. */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
-  const requiredLicence = ROLE_LICENCE_REQUIRED[role];
-  return employee.qualifications.some(q => q.category === requiredLicence);
+  return licenceLevelOf(employee, role) > 0;
 }
 
 /** Lowest tier among the fleet's vehicles of `role`, or null when it owns none (#1524). */
