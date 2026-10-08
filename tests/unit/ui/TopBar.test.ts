@@ -5,6 +5,7 @@ import { NotificationCenter } from '../../../src/ui/notify/NotificationCenter.js
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createWeatherCycle, setWeather, type WeatherCycleState } from '../../../src/core/weather/WeatherCycle.js';
 import { hireEmployee, PAY_CYCLE_TICKS } from '../../../src/core/entities/Employee.js';
+import { addIncome, addExpense } from '../../../src/core/economy/Finance.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { formatDollars } from '../../../src/core/economy/formatMoney.js';
@@ -308,6 +309,127 @@ describe('TopBar (redesign P1)', () => {
     } finally {
       topBar.dispose();
     }
+  });
+
+  describe('level objective chip (#1374)', () => {
+    const CHIP = '[data-action="open-objective"]';
+    function setup(levelId: string | null) {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const topBar = new TopBar(container);
+      const center = new NotificationCenter();
+      const state = makeState();
+      state.campaign.activeLevelId = levelId;
+      return { container, topBar, center, state };
+    }
+
+    it('shows profit / target text in a campaign level', () => {
+      const { container, topBar, center, state } = setup('dusty_hollow');
+      try {
+        addIncome(state.finances, 20000, 'sales', 'ore', 1);
+        topBar.update(state, center);
+        const chip = container.querySelector<HTMLElement>(CHIP);
+        expect(chip).not.toBeNull();
+        expect(chip!.style.display).not.toBe('none');
+        expect(chip!.textContent).toContain(t('shell.topbar.objective', { profit: '$20,000', target: '$80,000' }));
+        expect(chip!.textContent).toContain('$20,000 / $80,000');
+      } finally { topBar.dispose(); }
+    });
+
+    it('carries data-panel="finances"', () => {
+      const { container, topBar, center, state } = setup('dusty_hollow');
+      try {
+        topBar.update(state, center);
+        expect(container.querySelector<HTMLElement>(CHIP)?.dataset['panel']).toBe('finances');
+      } finally { topBar.dispose(); }
+    });
+
+    it('prints negative profit with a minus sign', () => {
+      const { container, topBar, center, state } = setup('dusty_hollow');
+      try {
+        addExpense(state.finances, 1500, 'equipment', 'x', 1);
+        topBar.update(state, center);
+        const text = container.querySelector(CHIP)?.textContent ?? '';
+        expect(text).toContain('-$');
+        expect(text).toContain('/ $80,000');
+      } finally { topBar.dispose(); }
+    });
+
+    it('progress bar width is the rounded percentage', () => {
+      const { container, topBar, center, state } = setup('dusty_hollow');
+      try {
+        addIncome(state.finances, 20000, 'sales', 'ore', 1);
+        topBar.update(state, center);
+        const bar = Array.from(container.querySelectorAll<HTMLElement>(`${CHIP} *`)).find((e) => e.style.width.endsWith('%'));
+        expect(bar).toBeDefined();
+        expect(bar!.style.width).toBe('25%');
+      } finally { topBar.dispose(); }
+    });
+
+    it('progress bar is 0% at negative profit and 100% over target', () => {
+      const { container, topBar, center, state } = setup('dusty_hollow');
+      try {
+        const width = () => Array.from(container.querySelectorAll<HTMLElement>(`${CHIP} *`)).find((e) => e.style.width.endsWith('%'))?.style.width;
+        addExpense(state.finances, 1000, 'equipment', 'x', 1);
+        topBar.update(state, center);
+        expect(width()).toBe('0%');
+        addIncome(state.finances, 500000, 'sales', 'ore', 2);
+        topBar.update(state, center);
+        expect(width()).toBe('100%');
+      } finally { topBar.dispose(); }
+    });
+
+    it('text updates after income is recorded', () => {
+      const { container, topBar, center, state } = setup('dusty_hollow');
+      try {
+        topBar.update(state, center);
+        expect(container.querySelector(CHIP)?.textContent).toContain('$0 / $80,000');
+        addIncome(state.finances, 40000, 'sales', 'ore', 2);
+        topBar.update(state, center);
+        expect(container.querySelector(CHIP)?.textContent).toContain('$40,000 / $80,000');
+      } finally { topBar.dispose(); }
+    });
+
+    it('is hidden in sandbox', () => {
+      const { container, topBar, center, state } = setup('sandbox');
+      try {
+        topBar.update(state, center);
+        const chip = container.querySelector<HTMLElement>(CHIP);
+        expect(chip === null || chip.style.display === 'none').toBe(true);
+      } finally { topBar.dispose(); }
+    });
+
+    it('is hidden with no active level', () => {
+      const { container, topBar, center, state } = setup(null);
+      try {
+        topBar.update(state, center);
+        const chip = container.querySelector<HTMLElement>(CHIP);
+        expect(chip === null || chip.style.display === 'none').toBe(true);
+      } finally { topBar.dispose(); }
+    });
+
+    it('reappears when returning from sandbox to a campaign level', () => {
+      const { container, topBar, center, state } = setup('sandbox');
+      try {
+        topBar.update(state, center);
+        state.campaign.activeLevelId = 'dusty_hollow';
+        topBar.update(state, center);
+        const chip = container.querySelector<HTMLElement>(CHIP);
+        expect(chip).not.toBeNull();
+        expect(chip!.style.display).not.toBe('none');
+      } finally { topBar.dispose(); }
+    });
+
+    it('click navigates to finances', () => {
+      const { container, topBar, center, state } = setup('dusty_hollow');
+      try {
+        topBar.update(state, center);
+        const nav = vi.fn();
+        topBar.setNavigateHandler(nav);
+        container.querySelector<HTMLElement>(CHIP)?.click();
+        expect(nav).toHaveBeenCalledWith('finances');
+      } finally { topBar.dispose(); }
+    });
   });
 
   describe('balance formatting', () => {
