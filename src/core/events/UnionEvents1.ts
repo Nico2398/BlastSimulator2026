@@ -2,15 +2,39 @@
 // Satirical labor disputes, absurd demands, and workplace comedy in open-pit mining.
 import { ev, r } from './EventBuilder.js';
 import type { EventDef } from './EventPool.js';
-import { EVENT_STRIKE_HOURS } from '../config/balance.js';
+import {
+  EVENT_BRIEF_STOP_HOURS,
+  EVENT_CHEER_HOURS,
+  EVENT_CHEER_MORALE_PER_HOUR,
+  EVENT_CURFEW_BAN_HOURS,
+  EVENT_DRAG_HOURS,
+  EVENT_DRAG_WORK_PCT,
+  EVENT_GLOOM_HOURS,
+  EVENT_GLOOM_MORALE_PER_HOUR,
+  EVENT_RAISE_DAYS,
+  EVENT_RAISE_SALARY_PCT,
+  EVENT_SCRUTINY_DAYS,
+  EVENT_SCRUTINY_WEIGHT_FACTOR,
+  EVENT_SLOWDOWN_HOURS,
+  EVENT_SLOWDOWN_WORK_PCT,
+  EVENT_STRIKE_HOURS,
+  EVENT_SULK_HOURS,
+  EVENT_SULK_MORALE_PER_HOUR,
+  EVENT_SURGE_HOURS,
+  EVENT_SURGE_WORK_PCT,
+  EVENT_UPKEEP_DISCOUNT_DAYS,
+  EVENT_UPKEEP_DISCOUNT_PCT,
+} from '../config/balance.js';
 
 export const UNION_EVENTS_1: EventDef[] = [
   // 1 — Workers demand artisanal espresso machine
   ev('union_coffee_uprising', 'union', {
     weight: (s) => 1 + 1.5 * (1 - r.wb(s)),
     options: [
-      { cashDelta: -8000, scoreDelta: { wellBeing: 12 } },
-      { cashDelta: 0, scoreDelta: { wellBeing: -8 }, effectTag: 'morale_drop' },
+      { cashDelta: -8000, scoreDelta: { wellBeing: 12 },
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -8 }, effectTag: 'morale_drop',
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -2000, scoreDelta: { wellBeing: 3 }, effectTag: 'instant_coffee_compromise' },
     ],
   }),
@@ -19,8 +43,10 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 1.2 + 2 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.employeeCount > 3,
     options: [
-      { cashDelta: -15000, scoreDelta: { wellBeing: 15, safety: 5 } },
-      { cashDelta: 0, scoreDelta: { wellBeing: -12, safety: -8 } },
+      { cashDelta: -15000, scoreDelta: { wellBeing: 15, safety: 5 },
+        effects: [{ type: 'employee_joins' }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -12, safety: -8 },
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
       { cashDelta: -5000, scoreDelta: { wellBeing: 5 }, effectTag: 'shorter_shifts' },
     ],
   }),
@@ -29,7 +55,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.8 + 1.2 * (1 - r.sf(s)),
     options: [
       { cashDelta: -6000, scoreDelta: { safety: 8, wellBeing: 6 }, effectTag: 'designer_helmets' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -5 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -5 },
+        effects: [{ type: 'employee_leaves', pick: 'random' }] },
       { cashDelta: -12000, scoreDelta: { safety: 12, wellBeing: 10 }, effectTag: 'fashion_helmets' },
     ],
   }),
@@ -38,7 +65,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 2 + 3 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.scores.wellBeing < 35,
     options: [
-      { cashDelta: -25000, scoreDelta: { wellBeing: 20 } },
+      { cashDelta: -25000, scoreDelta: { wellBeing: 20 },
+        effects: [{ type: 'salary', pct: EVENT_RAISE_SALARY_PCT, days: EVENT_RAISE_DAYS }] },
       { cashDelta: 0, scoreDelta: { wellBeing: -20 }, effectTag: 'full_strike', followUp: 'union_strike_aftermath',
         effects: [{ type: 'work_stoppage', hours: EVENT_STRIKE_HOURS }] },
       { corruptionDelta: 15, scoreDelta: { wellBeing: -5 }, effectTag: 'bribe_union_boss' },
@@ -50,7 +78,10 @@ export const UNION_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.hasBuilding('living_quarters'),
     options: [
       { cashDelta: -3000, scoreDelta: { wellBeing: 8, nuisance: -5 } },
-      { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -4 },
+        effects: [
+          { type: 'event_weight', category: 'union', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -1000, scoreDelta: { wellBeing: 5 }, effectTag: 'karaoke_wednesdays' },
     ],
   }),
@@ -59,7 +90,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.9 + 1.0 * (1 - r.wb(s)),
     options: [
       { cashDelta: -10000, scoreDelta: { wellBeing: 10 }, effectTag: 'pit_recliners' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -6 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -6 },
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
     ],
   }),
   // 7 — Break room TV channel war
@@ -68,7 +100,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.hasBuilding('living_quarters'),
     options: [
       { cashDelta: -2000, scoreDelta: { wellBeing: 4 }, effectTag: 'extra_tvs' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -3 },
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -500, scoreDelta: { wellBeing: 2 }, effectTag: 'tv_schedule_vote' },
     ],
   }),
@@ -76,8 +109,12 @@ export const UNION_EVENTS_1: EventDef[] = [
   ev('union_book_club', 'union', {
     weight: (s) => 0.5 + 0.6 * r.wb(s),
     options: [
-      { cashDelta: -1500, scoreDelta: { wellBeing: 6 }, effectTag: 'sanctioned_book_club' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -3 }, effectTag: 'book_club_banned' },
+      { cashDelta: -1500, scoreDelta: { wellBeing: 6 }, effectTag: 'sanctioned_book_club',
+        effects: [{ type: 'fatigue_relief' }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -3 }, effectTag: 'book_club_banned',
+        effects: [
+          { type: 'event_weight', category: 'union', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -500, scoreDelta: { wellBeing: 4 }, effectTag: 'lunch_book_club' },
     ],
   }),
@@ -87,7 +124,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: 0, scoreDelta: { wellBeing: 5, safety: -10 }, effectTag: 'casual_friday' },
       { cashDelta: -4000, scoreDelta: { wellBeing: 7, safety: 2 }, effectTag: 'casual_ppe' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -4 },
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
     ],
   }),
   // 10 — Talent show in the quarry
@@ -95,8 +133,10 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.6 + 0.7 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.employeeCount > 5,
     options: [
-      { cashDelta: -5000, scoreDelta: { wellBeing: 10, nuisance: -3 } },
-      { cashDelta: 0, scoreDelta: { wellBeing: -5 } },
+      { cashDelta: -5000, scoreDelta: { wellBeing: 10, nuisance: -3 },
+        effects: [{ type: 'fatigue_relief' }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -5 },
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -2000, scoreDelta: { wellBeing: 6 }, effectTag: 'small_talent_show' },
     ],
   }),
@@ -105,8 +145,10 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.8 + 1.0 * (1 - r.wb(s)),
     canFire: (ctx) => ctx.hasBuilding('living_quarters'),
     options: [
-      { cashDelta: -7000, scoreDelta: { wellBeing: 9 }, effectTag: 'gourmet_chef' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -7 } },
+      { cashDelta: -7000, scoreDelta: { wellBeing: 9 }, effectTag: 'gourmet_chef',
+        effects: [{ type: 'work_rate', pct: EVENT_SURGE_WORK_PCT, hours: EVENT_SURGE_HOURS }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -7 },
+        effects: [{ type: 'employee_leaves', pick: 'random' }] },
       { cashDelta: -3000, scoreDelta: { wellBeing: 4 }, effectTag: 'taco_tuesday' },
     ],
   }),
@@ -116,7 +158,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -4000, scoreDelta: { wellBeing: 7 }, effectTag: 'mascot_rocky' },
       { cashDelta: 0, scoreDelta: { wellBeing: -2 } },
-      { cashDelta: -15000, scoreDelta: { wellBeing: 12, nuisance: -4 }, effectTag: 'mascot_animatronic' },
+      { cashDelta: -15000, scoreDelta: { wellBeing: 12, nuisance: -4 }, effectTag: 'mascot_animatronic',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
     ],
   }),
   // 13 — WiFi in the mine shaft
@@ -124,7 +167,10 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 1.0 + 0.8 * (1 - r.wb(s)),
     options: [
       { cashDelta: -20000, scoreDelta: { wellBeing: 14 }, effectTag: 'shaft_wifi' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -8 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -8 },
+        effects: [
+          { type: 'event_weight', category: 'union', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -5000, scoreDelta: { wellBeing: 5 }, effectTag: 'wifi_breakroom_only' },
     ],
   }),
@@ -134,7 +180,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.hasDrillPlan,
     options: [
       { cashDelta: -3000, scoreDelta: { wellBeing: 6 }, effectTag: 'exorcism_hired' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -6, safety: -4 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -6, safety: -4 },
+        effects: [{ type: 'ban', what: 'drill', hours: EVENT_CURFEW_BAN_HOURS }] },
       { cashDelta: -8000, scoreDelta: { wellBeing: 10, safety: 5 }, effectTag: 'relocate_drill' },
     ],
   }),
@@ -143,7 +190,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.6 + 0.5 * r.wb(s),
     options: [
       { cashDelta: -1000, scoreDelta: { wellBeing: 5 }, effectTag: 'remove_posters' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -3 },
+        effects: [{ type: 'work_rate', pct: EVENT_SLOWDOWN_WORK_PCT, hours: EVENT_SLOWDOWN_HOURS }] },
       { cashDelta: -2000, scoreDelta: { wellBeing: 3, nuisance: -2 }, effectTag: 'worker_posters' },
     ],
   }),
@@ -151,8 +199,10 @@ export const UNION_EVENTS_1: EventDef[] = [
   ev('union_nap_room', 'union', {
     weight: (s) => 0.9 + 1.2 * (1 - r.wb(s)),
     options: [
-      { cashDelta: -12000, scoreDelta: { wellBeing: 14, safety: 6 } },
-      { cashDelta: 0, scoreDelta: { wellBeing: -8 } },
+      { cashDelta: -12000, scoreDelta: { wellBeing: 14, safety: 6 },
+        effects: [{ type: 'fatigue_relief' }] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -8 },
+        effects: [{ type: 'morale_shift', perHour: EVENT_SULK_MORALE_PER_HOUR, hours: EVENT_SULK_HOURS }] },
       { cashDelta: -4000, scoreDelta: { wellBeing: 6 }, effectTag: 'hammocks' },
     ],
   }),
@@ -161,7 +211,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.4 + 0.3 * (1 - r.wb(s)),
     options: [
       { cashDelta: -3000, scoreDelta: { wellBeing: 5, safety: 2 }, effectTag: 'custom_colors' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -2 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -2 },
+        effects: [{ type: 'morale_shift', perHour: EVENT_GLOOM_MORALE_PER_HOUR, hours: EVENT_GLOOM_HOURS }] },
     ],
   }),
   // 18 — Bring-your-pet day
@@ -169,7 +220,10 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.5 + 0.4 * r.wb(s),
     options: [
       { cashDelta: -2000, scoreDelta: { wellBeing: 8, safety: -12 }, effectTag: 'pets_in_pit' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -4 },
+        effects: [
+          { type: 'event_weight', category: 'union', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { cashDelta: -1000, scoreDelta: { wellBeing: 5 }, effectTag: 'pet_photos_only' },
     ],
   }),
@@ -179,7 +233,10 @@ export const UNION_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.employeeCount > 8,
     options: [
       { cashDelta: -9000, scoreDelta: { wellBeing: 6 }, effectTag: 'pit_office' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -5 }, corruptionDelta: 5 },
+      { cashDelta: 0, scoreDelta: { wellBeing: -5 }, corruptionDelta: 5,
+        effects: [
+          { type: 'event_weight', category: 'union', factor: EVENT_SCRUTINY_WEIGHT_FACTOR, days: EVENT_SCRUTINY_DAYS },
+        ] },
       { corruptionDelta: 10, scoreDelta: { wellBeing: 3 }, effectTag: 'bribe_rep' },
     ],
   }),
@@ -189,7 +246,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.employeeCount > 4,
     options: [
       { cashDelta: -20000, scoreDelta: { wellBeing: 18 }, effectTag: 'beach_retreat' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -6 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -6 },
+        effects: [{ type: 'employee_leaves', pick: 'junior' }] },
       { cashDelta: -5000, scoreDelta: { wellBeing: 8 }, effectTag: 'camping_retreat' },
     ],
   }),
@@ -198,7 +256,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.8 + 1.5 * (1 - r.nu(s)),
     options: [
       { cashDelta: -15000, scoreDelta: { nuisance: 10, wellBeing: 8 }, effectTag: 'noise_cancel_headphones' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -6 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -6 },
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
       { cashDelta: -3000, scoreDelta: { nuisance: 3, wellBeing: 4 }, effectTag: 'ear_plugs' },
     ],
   }),
@@ -207,7 +266,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.5 + 0.4 * (1 - r.wb(s)),
     options: [
       { cashDelta: -6000, scoreDelta: { wellBeing: 9, nuisance: -8 }, effectTag: 'pit_orchestra' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -3 } },
+      { cashDelta: 0, scoreDelta: { wellBeing: -3 },
+        effects: [{ type: 'work_rate', pct: EVENT_DRAG_WORK_PCT, hours: EVENT_DRAG_HOURS }] },
       { cashDelta: -2000, scoreDelta: { wellBeing: 5, nuisance: -3 }, effectTag: 'lunch_jam_session' },
     ],
   }),
@@ -215,8 +275,12 @@ export const UNION_EVENTS_1: EventDef[] = [
   ev('union_truck_parking', 'union', {
     weight: (s) => 0.7 + 0.5 * (1 - r.wb(s)),
     options: [
-      { cashDelta: -18000, scoreDelta: { wellBeing: 7, safety: 5 }, effectTag: 'valet_parking' },
-      { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
+      { cashDelta: -18000, scoreDelta: { wellBeing: 7, safety: 5 }, effectTag: 'valet_parking',
+        effects: [
+          { type: 'cost_factor', what: 'upkeep', pct: EVENT_UPKEEP_DISCOUNT_PCT, days: EVENT_UPKEEP_DISCOUNT_DAYS },
+        ] },
+      { cashDelta: 0, scoreDelta: { wellBeing: -4 },
+        effects: [{ type: 'employee_injured' }] },
       { cashDelta: -6000, scoreDelta: { wellBeing: 4 }, effectTag: 'assigned_spots' },
     ],
   }),
@@ -224,7 +288,8 @@ export const UNION_EVENTS_1: EventDef[] = [
   ev('union_meditation', 'union', {
     weight: (s) => 0.6 + 0.8 * (1 - r.wb(s)),
     options: [
-      { cashDelta: -4000, scoreDelta: { wellBeing: 10, safety: 3 }, effectTag: 'blast_yoga' },
+      { cashDelta: -4000, scoreDelta: { wellBeing: 10, safety: 3 }, effectTag: 'blast_yoga',
+        effects: [{ type: 'morale_shift', perHour: EVENT_CHEER_MORALE_PER_HOUR, hours: EVENT_CHEER_HOURS }] },
       { cashDelta: 0, scoreDelta: { wellBeing: -4 } },
       { cashDelta: -1500, scoreDelta: { wellBeing: 5 }, effectTag: 'breathing_exercises' },
     ],
@@ -235,7 +300,8 @@ export const UNION_EVENTS_1: EventDef[] = [
     canFire: (ctx) => ctx.deathCount > 0,
     options: [
       { cashDelta: -30000, scoreDelta: { wellBeing: 15, safety: 10 }, effectTag: 'ghost_paid' },
-      { cashDelta: 0, scoreDelta: { safety: -15, wellBeing: -10 }, effectTag: 'ghost_angry' },
+      { cashDelta: 0, scoreDelta: { safety: -15, wellBeing: -10 }, effectTag: 'ghost_angry',
+        effects: [{ type: 'work_stoppage', hours: EVENT_BRIEF_STOP_HOURS }] },
       { cashDelta: -5000, corruptionDelta: 8, scoreDelta: { wellBeing: 5 }, effectTag: 'ghost_exorcised' },
       { cashDelta: -50000, scoreDelta: { wellBeing: 20, safety: 15 }, effectTag: 'ghost_promoted',
         probability: 0.3, alt: { cashDelta: -10000, scoreDelta: { wellBeing: 8 } } },
