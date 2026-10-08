@@ -1291,6 +1291,11 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
+          "type": "clickIfPresent",
+          "selector": "[data-action=\"preflight-fire-anyway\"]",
+          "timeoutMs": 3000
+        },
+        {
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]",
           "timeout": 20000
