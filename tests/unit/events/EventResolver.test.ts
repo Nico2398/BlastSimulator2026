@@ -339,7 +339,7 @@ describe('resolveEvent — spread declarative effects (#1538)', () => {
   };
   const BAN_KIND = { blast: 'blast_ban', haul: 'haul_pause', drill: 'drill_ban' } as Record<string, string>;
   const COST_KIND = { explosive: 'explosive_price', upkeep: 'upkeep_surcharge' } as Record<string, string>;
-  const modKind = (s: Spec & { what?: string }): string | undefined =>
+  const modKind = (s: Spec & { what?: string | undefined }): string | undefined =>
     s.type === 'ban' ? BAN_KIND[s.what!] : s.type === 'cost_factor' ? COST_KIND[s.what!] : KIND_OF[s.type];
 
   beforeEach(() => {
@@ -356,7 +356,7 @@ describe('resolveEvent — spread declarative effects (#1538)', () => {
   }
 
   /** First main-pool event of the category with an option carrying a timed modifier effect. */
-  function firstTimedEvent(category: string): { id: string; type: string; what?: string } {
+  function firstTimedEvent(category: string): { id: string; type: string; what?: string | undefined } {
     for (const e of getAllEvents()) {
       if (e.category !== category || e.followUpOnly) continue;
       for (const c of e.consequences) {
@@ -374,7 +374,7 @@ describe('resolveEvent — spread declarative effects (#1538)', () => {
     return { fx, result };
   }
 
-  function expectLasting(eventId: string, type: string, what?: string): void {
+  function expectLasting(eventId: string, type: string, what?: string | undefined): void {
     const opt = findOption(eventId, type, what);
     const { fx, result } = resolveOn(eventId, opt);
     expect(result).not.toBeNull();

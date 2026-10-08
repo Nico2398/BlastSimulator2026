@@ -1501,7 +1501,7 @@
   "event.union_hazard_emotional.opt0": "Pay Emotional Hazard Pay",
   "event.union_hazard_emotional.opt1": "Deny the Claim",
   "event.union_hazard_emotional.opt2": "Hand Out Earplugs",
-  "event.union_hazard_emotional.res0": "An 'emotional proximity' stipend is added to the payroll every day for 7 days, then quietly lapses.",
+  "event.union_hazard_emotional.res0": "An 'emotional proximity' stipend of $400 is added to the payroll every day for 7 days, then quietly lapses.",
   "event.union_hazard_emotional.res1": "You explain that fear is not a line item. The complaint gets filed, loudly, again next week. Morale falls by 1 per hour for 24 hours.",
   "event.union_hazard_emotional.res2": "A box of earplugs is relabeled 'feelings dampeners' and handed out. It is, technically, still earplugs.",
   "event.union_hazard_emotional.title": "Hazard Emotional",
