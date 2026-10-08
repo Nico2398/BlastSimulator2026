@@ -476,7 +476,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #1350: +14 keys (hole water, drain), both locales: 3811.
     // #1374: +1 key (shell.topbar.objective), both locales: 3812.
     // #1388: net -4 keys (custom shift mode removed, course copy reworded), both locales: 3808.
-    expect(Object.keys(en).length).toBe(3808);
+    // #1407: +16 keys (bribe protections, Shady panel protection rows, corruption meter), both locales: 3824.
+    expect(Object.keys(en).length).toBe(3824);
   });
 
   it('carries none of the keys of the removed detonation-sequence feature (#1344)', () => {

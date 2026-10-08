@@ -105,6 +105,6 @@ describe('corrupt command — protections (#1407)', () => {
     s.cash = 10_000_000;
     corruptCommand(ctx, [], { target: 'union_leader' });
     const out = corruptCommand(ctx, [], {}).output;
-    expect(out).toContain('union_leader');
+    expect(out).toContain('the union leader');
   });
 });

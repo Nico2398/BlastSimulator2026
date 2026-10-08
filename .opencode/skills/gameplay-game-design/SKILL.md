@@ -100,7 +100,16 @@ Each event presents 2-4 decision options with different consequences on scores, 
 
 ## Corruption & Mafia Gameplay
 
-- **Corruption:** Bribe judges, union leaders, inspectors. Success: problem goes away. Failure: scandal, fines, criminal charges.
+- **Corruption (#1407):** a 0 to `CORRUPTION_MAX` (100) meter, clamped. Event choices keep their own deltas. A successful bribe adds `BRIBE_CORRUPTION_DELTA[target]` and grants a timed protection; a failed one adds only `BRIBERY_FAILURE_CORRUPTION_DELTA`, grants nothing and does not extend an existing protection. `mafiaUnlocked` latches at `MAFIA_UNLOCK_THRESHOLD` (20) and never unlatches; the `mafia` event category needs `corruptionLevel >= MAFIA_UNLOCK_THRESHOLD`.
+- **Protections (`economy/BribeProfile` table in `BribeProtection.ts`):** price = `BRIBE_PRICE_PER_PROTECTION_DAY` x `BRIBE_PROTECTION_DAYS` (witness: flat). Re-bribing refreshes to max(existing, now + duration), never stacks. Followups already queued are not shielded. Shown in the Shady panel (`[data-protection="<target>"]`) with remaining time.
+
+| Target | Delta | Days | Price | Effect |
+|--------|-------|------|-------|--------|
+| judge | 15 | 5 | $50,000 | next lawsuit event dismissed (one-shot, counts as fired); lawsuit timer x`JUDGE_LAWSUIT_TIMER_STRETCH` (1.8) |
+| politician | 12 | 4 | $30,000 | no `politics` events |
+| union_leader | 8 | 4 | $15,000 | no `union` events |
+| inspector | 5 | 3 | $8,100 | no events tagged `INSPECTION_EVENT_TAG` (`inspection`: paperwork fine, OSHA hardhats, EPA, blast limit fines, UN inspector) |
+| witness | 5 | none | $10,000 | lowers mafia exposure by `WITNESS_EXPOSURE_REDUCTION` (0.25) |
 - **Corruption failure (#1411):** a failed bribe fines `BRIBERY_FAILURE_FINE_FRACTION` (0.5) of its cost (expense category `fines`), lowers the neighbour-relations score (`nuisance`) by `BRIBERY_FAILURE_NUISANCE_HIT` (8), and adds `BRIBERY_FAILURE_CORRUPTION_DELTA` (2) corruption (can unlock the mafia).
 - **Mafia failure (#1411):** a botched accident or detected frame raises exposure by `INVESTIGATION_EXPOSURE_JUMP` (0.2) and queues the repeatable follow-up `INVESTIGATION_FOLLOWUP_EVENT_ID` (`mafia_police_investigation`: pay off detective / hire lawyer / stonewall; events may carry `exposureDelta`). Exposed smuggling charges `SMUGGLING_EXPOSED_FINE` (25000), adds `SMUGGLING_EXPOSED_EXPOSURE_JUMP` (0.1) exposure and shuts smuggling off. Exposure decays `EXPOSURE_DECAY_PER_TICK` (0.004) per tick once `EXPOSURE_CLEAN_GRACE_TICKS` (30) pass with no mafia action and no active smuggling (`mafia.lastActivityTick`). Each of these raises a toast (`ui/notify/corruptionNotifications.ts`). Mafia rewards unchanged.
 - **Mafia:** Dark escalation path. Arrange incidents for unionized employees. Smuggling. Gets progressively more dangerous.

@@ -983,7 +983,7 @@ describe('failed bribe and botched mafia consequences (#1411)', () => {
       expect(fine).toBeGreaterThan(0);
       expect(s.cash).toBe(cashBefore - attempt.cost - fine);
       expect(s.scores.nuisance).toBeLessThan(nuisanceBefore);
-      expect(s.corruption.level).toBe(1 + BRIBERY_FAILURE_CORRUPTION_DELTA);
+      expect(s.corruption.level).toBe(BRIBERY_FAILURE_CORRUPTION_DELTA);
       return;
     }
     expect.unreachable('no failed bribe in 200 seeds');

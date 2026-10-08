@@ -26,7 +26,7 @@ describe('Corruption system', () => {
   it('corruption attempt deducts cost', () => {
     const state = createCorruptionState();
     const result = attemptCorruption(state, 'inspector', 1, new Random(42));
-    expect(result.cost).toBe(8000);
+    expect(result.cost).toBe(8100);
   });
 
   it('successful corruption removes the original problem', () => {
