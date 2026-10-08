@@ -2805,7 +2805,7 @@
   "tutorial.step_earlypolicy": "La politique par défaut envoie déjà les employés fatigués se reposer — sélectionnez Continu sous Horaires de poste et appliquez-le, pour que le personnel fatigué soit automatiquement retiré du travail avant de s'effondrer.",
   "tutorial.step5": "Ouvrez le panneau Atelier de tir et placez des trous de forage là où le minerai a été détecté.",
   "tutorial.step6": "Placez des charges explosives dans vos trous de forage pour préparer le tir.",
-  "tutorial.step8": "Déclenchez le tir pour briser la roche et collecter les fragments de minerai.",
+  "tutorial.step8": "Le tir part tout seul dès que la zone est dégagée. Regardez la roche se briser, puis fermez le rapport de tir.",
   "tutorial.step9": "Surveillez vos scores : bien-être, sécurité, écologie et nuisance. Survolez ou cliquez sur les barres de score en haut de l'écran pour les examiner.",
   "tutorial.step10": "Des événements aléatoires se produiront pendant le jeu. Répondez-y pour garder votre mine en bon fonctionnement.",
   "tutorial.step11": "Embauchez un gérant pour négocier de meilleurs contrats.",

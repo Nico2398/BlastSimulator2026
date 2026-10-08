@@ -837,7 +837,7 @@
       "command": "wait_until field:holeCount equals:0 max_ticks:600",
       "timeout": 330,
       "role": "setup",
-      "description": "#1362: wait for the automatic fire -- the blast clears the plan (holeCount 0) only once the evacuation finished and the sequence fired.",
+      "description": "#1362: wait for the automatic fire -- the blast clears the plan (holeCount 0) only once the evacuation finished and the sequence fired. deathCount stays 0: the horn evacuates the real drill-grid footprint (x:20-26, z:20-26) before the sequence fires, so nobody is caught in it.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -849,7 +849,8 @@
       ],
       "expect": {
         "equals": {
-          "holeCount": 0
+          "holeCount": 0,
+          "deathCount": 0
         },
         "tutorialStep": "blast"
       }

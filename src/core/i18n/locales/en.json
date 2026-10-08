@@ -2805,7 +2805,7 @@
   "tutorial.step_earlypolicy": "The default policy already sends tired crew to rest — select Continuous under Shift schedule and apply it, so tired crew get pulled off the line automatically before they collapse.",
   "tutorial.step5": "Open the Blast Workshop panel and place drill holes where ore was detected.",
   "tutorial.step6": "Set explosive charges on your drill holes to prepare for the blast.",
-  "tutorial.step8": "Fire the blast to break the rock and collect ore fragments.",
+  "tutorial.step8": "The blast fires by itself once the zone is clear. Watch the rock break, then close the Blast Report.",
   "tutorial.step9": "Keep an eye on your scores: well-being, safety, ecology and nuisance. Hover over or click the score bars at the top of the screen to inspect them.",
   "tutorial.step10": "Random events will occur during gameplay. Respond to keep your mine running smoothly.",
   "tutorial.step11": "Hire a Manager to negotiate better contracts.",

@@ -285,7 +285,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'blast',
     titleKey: 'tutorial.step8.title',
     textKey: 'tutorial.step8',
-    commands: ['blast'],
+    // No command: DETONATE (the evacuate-zone step) fires the blast itself (#1362).
     highlightTarget: TOOLBAR_TARGET.blast,
     captureSnapshot: (state: GameState) => ({
       prevValue: (state.levelStats?.blastsPerformed ?? 0) + Object.keys(state.collectedOre ?? {}).length,

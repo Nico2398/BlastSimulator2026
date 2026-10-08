@@ -15,13 +15,11 @@ function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
 }
 
-function makeStep(): { step: FireStep; container: HTMLElement; gameConsole: ReturnType<typeof vi.fn> } {
+function makeStep(): { step: FireStep; container: HTMLElement } {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const step = new FireStep(container);
-  const gameConsole = vi.fn().mockReturnValue({ success: true, output: '' });
-  step.setGameConsole(gameConsole);
-  return { step, container, gameConsole };
+  return { step, container };
 }
 
 function addEmployee(state: GameState, x: number, z: number): Employee {

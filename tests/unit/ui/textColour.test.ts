@@ -238,7 +238,7 @@ describe.each(['en', 'fr'] as const)('panel text colour (%s)', locale => {
     s.vehicles.vehicles[0]!.x = 21; s.vehicles.vehicles[0]!.z = 21;
     step.update(s, 'sunny');
     expect(step.root.querySelector('[data-action="sound-horn"]')).toBeNull(); // #1362: no Horn button
-    expect(step.root.textContent).toContain('IN ZONE');
+    expect(step.root.textContent).toContain(locale === 'en' ? 'IN ZONE' : 'DANS LA ZONE');
     expectNoDefaultColour(step.root);
   });
 

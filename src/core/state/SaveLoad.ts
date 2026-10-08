@@ -559,9 +559,10 @@ function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
-/** v33 -> v34 (#1362): GameState.pendingDetonation defaults to null. */
+/** v33 -> v34 (#1362): GameState.pendingDetonation defaults to null; an existing one is kept. Idempotent. */
 function migrateV33ToV34(obj: Record<string, unknown>): Record<string, unknown> {
-  obj['pendingDetonation'] = null;
+  const pd = obj['pendingDetonation'];
+  if (typeof pd !== 'object' || pd === null || Array.isArray(pd)) obj['pendingDetonation'] = null;
   return obj;
 }
 

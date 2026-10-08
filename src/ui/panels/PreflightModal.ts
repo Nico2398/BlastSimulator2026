@@ -40,6 +40,7 @@ export class PreflightModal {
   private readonly detonateBtn: HTMLButtonElement;
   private readonly cancelBtn: HTMLButtonElement;
   private readonly waitingEl: HTMLElement;
+  private readonly footerEl: HTMLElement;
   private readonly fireAnywayBtn: HTMLButtonElement;
   private readonly cancelDetonationBtn: HTMLButtonElement;
 
@@ -87,6 +88,7 @@ export class PreflightModal {
     body.append(this.waitingEl, this.statsEl, this.predictedEl, this.warningsEl);
 
     const footer = el('div');
+    this.footerEl = footer;
     footer.style.cssText = 'padding:14px 20px;background:var(--bsx-well);border-top:1px solid var(--bsx-hairline);display:flex;gap:9px';
     this.cancelBtn = el('button', { className: 'bsx-btn' });
     this.cancelBtn.style.cssText = 'flex:1;height:40px';
@@ -96,12 +98,12 @@ export class PreflightModal {
 
     // Waiting-state buttons (#1362): blast with people still inside, or abort.
     this.fireAnywayBtn = el('button', { className: 'bsx-btn bsx-btn-danger-solid' });
-    this.fireAnywayBtn.style.cssText = 'flex:1.6;height:40px;display:none';
+    this.fireAnywayBtn.style.cssText = 'flex:1.6;height:40px';
     this.fireAnywayBtn.dataset['action'] = 'preflight-fire-anyway';
     this.locale.bindText(this.fireAnywayBtn, 'ui.blast_workshop.preflight.fire_anyway');
     this.fireAnywayBtn.addEventListener('click', () => this.gameConsole?.('blast'));
     this.cancelDetonationBtn = el('button', { className: 'bsx-btn' });
-    this.cancelDetonationBtn.style.cssText = 'flex:1;height:40px;display:none';
+    this.cancelDetonationBtn.style.cssText = 'flex:1;height:40px';
     this.cancelDetonationBtn.dataset['action'] = 'preflight-cancel-detonation';
     this.locale.bindText(this.cancelDetonationBtn, 'ui.blast_workshop.preflight.cancel_detonation');
     this.cancelDetonationBtn.addEventListener('click', () => this.gameConsole?.('blast cancel'));
@@ -117,7 +119,7 @@ export class PreflightModal {
     this.detonateBtn.append(iconEl('blast', 16), this.locale.bindText(el('span'), 'ui.blast_workshop.preflight.detonate'));
     this.detonateBtn.addEventListener('click', () => { if (!this.detonateBtn.disabled) this.detonate(); });
 
-    footer.append(this.cancelBtn, this.detonateBtn, this.cancelDetonationBtn, this.fireAnywayBtn);
+    footer.append(this.cancelBtn, this.detonateBtn);
     box.append(stripe, header, body, footer);
     this.overlay.appendChild(box);
     container.appendChild(this.overlay);
@@ -243,10 +245,10 @@ export class PreflightModal {
   /** Swap the footer and body between the pre-flight and the waiting state. */
   private renderWaiting(phase: DetonationPhase): void {
     const waiting = phase.kind !== 'idle';
-    this.cancelBtn.style.display = waiting ? 'none' : '';
-    this.detonateBtn.style.display = waiting ? 'none' : '';
-    this.fireAnywayBtn.style.display = waiting ? '' : 'none';
-    this.cancelDetonationBtn.style.display = waiting ? '' : 'none';
+    // Only the controls of the current state exist in the DOM.
+    this.footerEl.replaceChildren(...(waiting
+      ? [this.cancelDetonationBtn, this.fireAnywayBtn]
+      : [this.cancelBtn, this.detonateBtn]));
     this.waitingEl.style.display = waiting ? 'flex' : 'none';
     if (!waiting) { this.waitingEl.replaceChildren(); return; }
     const body = phase.kind === 'stranded'
