@@ -67,7 +67,7 @@ export function pickupFragment(
   if (!tracked) return false;
 
   // Check if storage has room (fragments in transit will go to storage)
-  if (state.storedMassKg + inTransitMassKg(state) + tracked.fragment.mass > state.storageCapacityKg) {
+  if (!hasStorageRoom(state, tracked.fragment.mass)) {
     return false; // No room
   }
 

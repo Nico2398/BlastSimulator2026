@@ -601,9 +601,8 @@ describe('requestHaulFragment — batched hauls (#1370)', () => {
     const state = createGame({ seed: SEED });
     state.navGrid = makeFlatNavGrid(GRID);
     placeWarehouse(state, 40, 40);
-    state.logistics.storageCapacityKg = opts.storageKg ?? 1_000_000;
     const vehicle = makeDrivenHauler(state, 0, 0);
-    state.logistics.storageCapacityKg = opts.storageKg ?? 1_000_000;
+    state.logistics.storageCapacityKg = opts.storageKg ?? 1_000_000; // after makeDrivenHauler, which resets capacity
     if (opts.tier) vehicle.tier = opts.tier;
     addBlastFragments(state.logistics, fragments, state.navGrid);
     syncHaulDispatch(state);
@@ -710,7 +709,6 @@ describe('planned haul resume with cargo already aboard (#1370)', () => {
     placeWarehouse(state, 40, 40);
     state.logistics.storageCapacityKg = 1_000_000;
     const vehicle = makeDrivenHauler(state, 0, 0);
-    state.logistics.storageCapacityKg = 1_000_000;
     addBlastFragments(state.logistics, [makeFragment(1, 5, 5, 500), makeFragment(2, 6, 5, 500)], state.navGrid);
     syncHaulDispatch(state);
     const driver = state.employees.employees.find(e => e.id === vehicleDriverId(vehicle))!;

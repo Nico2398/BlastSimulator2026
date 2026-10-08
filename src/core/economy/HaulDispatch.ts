@@ -199,6 +199,16 @@ export function haulActionCarriesOre(
   return fragmentHasOre(tracked.fragment.oreDensities);
 }
 
+/** True iff `action` is a haul_debris order still queued with no holder (#1370). */
+export function isQueuedUnclaimedHaul(action: PendingAction): boolean {
+  return action.type === 'haul_debris' && action.status === 'queued' && action.holderId === null;
+}
+
+/** The queued, unclaimed haul_debris action for `fragmentId`, if any (#1370). */
+export function findQueuedHaulAction(state: GameState, fragmentId: number): PendingAction | undefined {
+  return state.pendingActions.find(a => isQueuedUnclaimedHaul(a) && a.payload['fragmentId'] === fragmentId);
+}
+
 /**
  * On-ground, non-oversized fragments within `radiusCells` (octile) of `primary`
  * whose haul_debris action is still queued and unclaimed, nearest first (id
@@ -208,7 +218,7 @@ export function findNearbyHaulableFragments(state: GameState, primary: TrackedFr
   const queued = new Set<number>();
   for (const a of state.pendingActions) {
     const fragmentId = a.payload['fragmentId'];
-    if (a.type === 'haul_debris' && a.status === 'queued' && a.holderId === null && typeof fragmentId === 'number') queued.add(fragmentId);
+    if (isQueuedUnclaimedHaul(a) && typeof fragmentId === 'number') queued.add(fragmentId);
   }
   const { x, z } = primary.fragment.position;
   const near: Array<{ tracked: TrackedFragment; dist: number }> = [];

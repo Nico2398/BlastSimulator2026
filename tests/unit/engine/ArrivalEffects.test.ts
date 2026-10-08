@@ -8,8 +8,8 @@
 // vehicle's `reservedForActionId` PendingAction's own `payload.fragmentId`
 // (see ArrivalEffects.ts's own doc comments: "the fragment named by the
 // vehicle's active haul_debris/fragment_debris action"); applyHaulUnload
-// reads it straight off `vehicle.payload.fragmentId`, since load already put
-// it there.
+// reads it straight off `vehicle.cargo` ids, since load already put
+// them there.
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -108,7 +108,7 @@ function reserveFragmentAction(
 // ── applyHaulLoad ────────────────────────────────────────────────────────────
 
 describe('applyHaulLoad', () => {
-  it('moves an on-ground fragment onto vehicle.payload, frees its nav-grid occupancy, and returns true', () => {
+  it('moves an on-ground fragment onto vehicle.cargo, frees its nav-grid occupancy, and returns true', () => {
     const state = createGame({ seed: SEED });
     state.logistics.storageCapacityKg = 5000; // fresh state holds 0 kg until a warehouse syncs capacity (#1369)
     state.navGrid = makeFlatNavGrid(20);
@@ -126,7 +126,7 @@ describe('applyHaulLoad', () => {
     expect(state.navGrid.cellAt(5, 5)!.fragmentOccupancy).toBe(0);
   });
 
-  it('returns false and leaves payload null when the fragment is already gone (picked up/removed elsewhere)', () => {
+  it('returns false and leaves cargo empty when the fragment is already gone (picked up/removed elsewhere)', () => {
     const state = createGame({ seed: SEED });
     const { vehicle, driverId } = makeDrivenHauler(state, 5, 5);
     // No fragment ever added — reservedForActionId names a fragmentId that
@@ -186,7 +186,7 @@ describe('applyHaulLoad', () => {
 // ── applyHaulUnload ──────────────────────────────────────────────────────────
 
 describe('applyHaulUnload', () => {
-  it('delivers the payload fragment to storage, credits collectedOre, and clears payload — returns true', () => {
+  it('delivers the cargo fragment to storage, credits collectedOre, and clears cargo — returns true', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = makeDrivenHauler(state, 10, 10);
     const fragment = makeFragment(1, 5, 5, 0.3, 1200);
@@ -206,7 +206,7 @@ describe('applyHaulUnload', () => {
     expect(vehicle.cargo).toEqual([]);
   });
 
-  it('returns false without mutating collectedOre/storage when vehicle.payload is already null', () => {
+  it('returns false without mutating collectedOre/storage when vehicle.cargo is already empty', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = makeDrivenHauler(state, 10, 10);
     const storedBefore = state.logistics.storedMassKg;
@@ -221,11 +221,11 @@ describe('applyHaulUnload', () => {
     expect(state.collectedOre).toEqual(collectedBefore);
   });
 
-  it('returns false and leaves payload untouched when the named fragment is not actually in_transit', () => {
+  it('returns false and leaves cargo untouched when the named fragment is not actually in_transit', () => {
     const state = createGame({ seed: SEED });
     const { vehicle } = makeDrivenHauler(state, 10, 10);
-    // Fragment named by payload was never tracked at all (e.g. returned to
-    // ground and re-picked by someone else, or a stale payload).
+    // Fragment named by cargo was never tracked at all (e.g. returned to
+    // ground and re-picked by someone else, or a stale cargo entry).
     vehicle.cargo = [{ fragmentId: 999, massKg: 500 }];
 
     const result = applyHaulUnload(state, vehicle);

@@ -529,20 +529,6 @@ export function backfillRaises(obj: Record<string, unknown>): void {
  * v30 -> v31 (#1385): backfill `hiringPool`; a missing or malformed one is
  * rebuilt from the saved seed and tick. Idempotent. Mutates `obj` in place.
  */
-/** v31 -> v32 (#1370): Vehicle.payload (item or null) becomes Vehicle.cargo[]. */
-function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> {
-  const vehicles = (obj['vehicles'] as { vehicles?: unknown[] } | undefined)?.vehicles;
-  if (!Array.isArray(vehicles)) return obj;
-  for (const raw of vehicles) {
-    const v = raw as Record<string, unknown>;
-    if (Array.isArray(v['cargo'])) continue;
-    const payload = v['payload'];
-    v['cargo'] = typeof payload === 'object' && payload !== null ? [payload] : [];
-    delete v['payload'];
-  }
-  return obj;
-}
-
 function migrateV30ToV31(obj: Record<string, unknown>): Record<string, unknown> {
   const p = obj['hiringPool'];
   const c = (typeof p === 'object' && p !== null ? p : {}) as
@@ -557,6 +543,20 @@ function migrateV30ToV31(obj: Record<string, unknown>): Record<string, unknown> 
       typeof seed === 'number' && Number.isFinite(seed) ? seed : 0,
       typeof tick === 'number' && Number.isFinite(tick) ? tick : 0,
     );
+  }
+  return obj;
+}
+
+/** v31 -> v32 (#1370): Vehicle.payload (item or null) becomes Vehicle.cargo[]. */
+function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehicles = (obj['vehicles'] as { vehicles?: unknown[] } | undefined)?.vehicles;
+  if (!Array.isArray(vehicles)) return obj;
+  for (const raw of vehicles) {
+    const v = raw as Record<string, unknown>;
+    if (Array.isArray(v['cargo'])) continue;
+    const payload = v['payload'];
+    v['cargo'] = typeof payload === 'object' && payload !== null ? [payload] : [];
+    delete v['payload'];
   }
   return obj;
 }

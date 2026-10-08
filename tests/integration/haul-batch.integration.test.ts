@@ -108,6 +108,7 @@ describe('batched hauling (#1370)', () => {
   it('an extra whose fragment vanished before pickup is skipped; the trip still delivers the rest', () => {
     const { run, state, vehicleId } = setup();
     const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    state.logistics.storageCapacityKg = Math.max(state.logistics.storageCapacityKg, 20000);
     addBlastFragments(state.logistics, [makeFragment(9201, 5, 6), makeFragment(9202, 6, 6), makeFragment(9203, 7, 6)], state.navGrid);
     syncHaulDispatch(state);
     expect(run(`vehicle haul ${vehicleId} fragment:9201`)).toMatchObject({ success: true });
@@ -116,7 +117,13 @@ describe('batched hauling (#1370)', () => {
     state.logistics.fragments = state.logistics.fragments.filter(f => f.fragment.id !== 9202);
     state.pendingActions = state.pendingActions.filter(a => a.payload['fragmentId'] !== 9202);
 
-    tickUntil(run, () => ['9201', '9203'].every(id => state.logistics.fragments.find(t => String(t.fragment.id) === `${id}`)?.state === 'stored'), 1500);
+    let maxCargo = 0;
+    tickUntil(run, () => {
+      maxCargo = Math.max(maxCargo, vehicle.cargo.length);
+      return [9201, 9203].every(id => state.logistics.fragments.find(t => t.fragment.id === id)?.state === 'stored');
+    }, 1500);
+
+    expect(maxCargo).toBeGreaterThanOrEqual(2); // the remaining extra rode in the same trip
 
     expect(state.logistics.fragments.find(t => t.fragment.id === 9201)!.state).toBe('stored');
     expect(state.logistics.fragments.find(t => t.fragment.id === 9203)!.state).toBe('stored');

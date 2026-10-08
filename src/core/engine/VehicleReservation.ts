@@ -260,7 +260,7 @@ function clearVehicleReservation(vehicleState: VehicleState, vehicleId: number):
  * releaseActionToOpenPool's own use of this, TaskCancellation.ts), and this
  * action is waiting to be reclaimed so its own remaining haul_unload leg can
  * finish the delivery. Always false for fragment_debris — breaking never
- * loads anything onto `vehicle.payload`, it splits the boulder in place.
+ * loads anything onto `vehicle.cargo`, it splits the boulder in place.
  */
 export function isCommittedToOwnCargo(state: GameState, action: PendingAction): boolean {
   if (action.type !== 'haul_debris') return false;

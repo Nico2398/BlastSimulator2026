@@ -556,6 +556,7 @@ function planFragmentTaskItinerary(
   let lastX = approach.x;
   let lastZ = approach.z;
   const candidates = findNearbyHaulableFragments(state, tracked, HAUL_BATCH_RADIUS_CELLS);
+  const candidateById = new Map(candidates.map(c => [c.fragment.id, c]));
   const batch = selectHaulBatch(
     { fragmentId, massKg: tracked.fragment.mass },
     candidates.map(c => ({ fragmentId: c.fragment.id, massKg: c.fragment.mass })),
@@ -564,8 +565,7 @@ function planFragmentTaskItinerary(
     HAUL_BATCH_MAX_ITEMS,
   );
   for (const extra of batch.slice(1)) {
-    const extraTracked = candidates.find(c => c.fragment.id === extra.fragmentId);
-    if (!extraTracked) continue;
+    const extraTracked = candidateById.get(extra.fragmentId)!; // batch extras are drawn from candidates
     const extraApproach = fragmentApproachCell(extraTracked.fragment, state, vehicle.id);
     const extraLeg = buildDriveLeg(state, fidelity, vehicle, lastX, lastZ, extraApproach.x, extraApproach.z, { kind: 'effect', effectId: 'haul_load', targetId: extra.fragmentId }, def, 'exact', false);
     if (extraLeg === null) continue; // unreachable extra: the trip just carries less

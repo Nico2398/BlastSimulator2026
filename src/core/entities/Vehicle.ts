@@ -124,7 +124,7 @@ export function vehicleRequiredClearanceCells(vehicle: Vehicle): number {
 // ── Vehicle instance ──
 
 /** One fragment aboard a hauler (#1370). */
-interface HaulCargoItem {
+export interface HaulCargoItem {
   fragmentId: number;
   massKg: number;
 }
@@ -142,11 +142,11 @@ export interface Vehicle {
   z: number;
   hp: number;
   /**
-   * The single cargo item this vehicle currently carries — a fragment loaded
-   * by a `haul_load` arrival effect, cleared by `haul_unload`. Null when
-   * empty. Replaces the old `payloadKg` + `haulingFragmentId` pair (#1091):
-   * mass and fragment identity travel together as one loaded/unloaded unit
-   * rather than two fields that could disagree.
+   * Fragments this vehicle currently carries, loaded one by one by
+   * `haul_load` arrival effects and cleared by `haul_unload`. Empty when
+   * unloaded. Replaces the old `payloadKg` + `haulingFragmentId` pair
+   * (#1091) and the single-item `payload` (#1370): mass and fragment
+   * identity travel together per item.
    */
   cargo: HaulCargoItem[];
   /**

@@ -1,8 +1,6 @@
+import type { HaulCargoItem } from '../entities/Vehicle.js';
 /** A fragment that could ride in a haul batch (#1370). */
-export interface HaulCandidate {
-  fragmentId: number;
-  massKg: number;
-}
+export type HaulCandidate = HaulCargoItem;
 
 /**
  * Picks the fragments one haul trip carries. The primary always rides; extras

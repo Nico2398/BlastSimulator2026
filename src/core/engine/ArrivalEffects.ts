@@ -29,6 +29,7 @@ import type { FragmentData } from '../mining/BlastExecution.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { pickupFragment, deliverToDepot, type TrackedFragment } from '../economy/Logistics.js';
+import { findQueuedHaulAction } from '../economy/HaulDispatch.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
 import { completeVehicleGatedAction } from './VehicleReservation.js';
@@ -124,8 +125,7 @@ function loadExtraFragment(state: GameState, vehicle: Vehicle, fragmentId: numbe
   if (!tracked || isOversized(tracked.fragment.volume)) return true;
   const capacityKg = getVehicleDefByTier(vehicle.type, vehicle.tier).capacity;
   if (vehicleCargoMassKg(vehicle) + tracked.fragment.mass > capacityKg) return true;
-  const extraAction = state.pendingActions.find(a =>
-    a.type === 'haul_debris' && a.status === 'queued' && a.holderId === null && a.payload['fragmentId'] === fragmentId);
+  const extraAction = findQueuedHaulAction(state, fragmentId);
   if (!extraAction) return true;
 
   if (loadFragment(state, vehicle, tracked, emitter)) completePendingAction(state, extraAction.id);
@@ -156,8 +156,7 @@ export function applyHaulUnload(state: GameState, vehicle: Vehicle, emitter?: Ev
     delivered++;
     emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId });
     // An extra's own haul action is normally consumed at load; sweep any still queued.
-    const leftover = state.pendingActions.find(a =>
-      a.type === 'haul_debris' && a.status === 'queued' && a.holderId === null && a.payload['fragmentId'] === fragmentId);
+    const leftover = findQueuedHaulAction(state, fragmentId);
     if (leftover) completePendingAction(state, leftover.id);
   }
   if (delivered === 0) return false;
