@@ -17,7 +17,8 @@ import { MAFIA_UNLOCK_THRESHOLD, ARREST_EXPOSURE_THRESHOLD } from '../../../src/
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { bribeFailureFine } from '../../../src/core/economy/Corruption.js';
-import { corruptCommand, mafiaCommand } from '../../../src/console/commands/events.js';
+import { applyInvestigation } from '../../../src/core/events/MafiaActions.js';
+import { corruptCommand } from '../../../src/console/commands/events.js';
 
 /** Bribe inspectors (funded for it) until the corruption meter latches the mafia unlock. */
 function bribeUntilMafiaUnlocked(ctx: ReturnType<typeof makeCampaignCtx>, maxBribes = 30): void {

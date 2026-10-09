@@ -1,4 +1,4 @@
-// #1411 — runTick wires smuggling-exposed and mafia-exposed consequences and exposure decay.
+// #1411 — runTick wires mafia-exposed consequences and exposure decay.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';

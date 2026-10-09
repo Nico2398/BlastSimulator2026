@@ -8,7 +8,7 @@ import {
   arrangeAccident,
   startFraming,
   completeFrame,
-  toggleSmuggling,
+  setSmugglingVolume,
   type MafiaActionResult,
   applyInvestigation,
   ACCIDENT_COST,
@@ -49,8 +49,8 @@ export function mafiaCommand(
           ? t('mafia.status_unlocked_yes')
           : t('mafia.status_unlocked_no'),
         t('mafia.status_exposure', { pct: (state.mafia.exposureRisk * 100).toFixed(0) }),
-        state.mafia.smugglingActive
-          ? t('mafia.status_smuggling_active', { income: state.mafia.smugglingIncome })
+        state.mafia.smugglingVolume > 0
+          ? t('mafia.status_smuggling_active', { volume: state.mafia.smugglingVolume })
           : t('mafia.status_smuggling_inactive'),
         t('mafia.status_pending_frames', { count: state.mafia.pendingFrames.length }),
       ];
@@ -106,13 +106,15 @@ export function mafiaCommand(
     }
 
     case 'smuggle': {
-      const result = toggleSmuggling(state.mafia);
-      return {
-        success: true,
-        output: result.active
-          ? t('mafia.smuggle_activated', { income: result.incomePerTick })
-          : t('mafia.smuggle_deactivated'),
-      };
+      const raw = named['volume'] ?? (args[1] === 'off' ? 'off' : undefined);
+      if (raw === undefined) {
+        const volume = state.mafia.smugglingVolume;
+        return { success: true, output: volume > 0 ? t('mafia.status_smuggling_active', { volume }) : t('mafia.smuggle_usage') };
+      }
+      const result = setSmugglingVolume(state.mafia, raw === 'off' ? 0 : Number(raw));
+      if (!result.success) return { success: false, output: t(result.error) };
+      const volume = result.data.volume;
+      return { success: true, output: volume > 0 ? t('mafia.smuggle_activated', { volume }) : t('mafia.smuggle_deactivated') };
     }
 
     default:

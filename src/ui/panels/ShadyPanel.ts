@@ -14,7 +14,7 @@ import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import { getSuccessRate, TARGET_COSTS, MAFIA_THRESHOLD, type CorruptionTarget } from '../../core/economy/Corruption.js';
 import { BRIBE_PROFILES, protectionRemainingTicks, type ActiveProtection } from '../../core/economy/BribeProtection.js';
-import { CORRUPTION_MAX } from '../../core/config/balance.js';
+import { CORRUPTION_MAX, SMUGGLING_VOLUME_LEVELS } from '../../core/config/balance.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import {
   ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS,
@@ -104,7 +104,7 @@ export class ShadyPanel extends PanelBase {
 
     // Built once and reused across renders — refreshDynamic() keeps it live every
     // tick without the signature-gated rebuild that owns everything else, since
-    // exposure climbs continuously while smuggling runs (MafiaActions.processSmuggling).
+    // exposure climbs continuously while smuggling runs (the audit is smuggling's risk channel).
     const exposureLabel = this.locale.bindText(
       el('span', { attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)' } }),
       'ui.shady.exposure_label',
@@ -209,7 +209,7 @@ export class ShadyPanel extends PanelBase {
       state.corruption.attempts.length,
       state.corruption.mafiaUnlocked ? 1 : 0,
       state.corruption.protections.map(p => `${p.target}:${p.expiresAtTick}:${p.dismissalsLeft}`).join(','),
-      state.mafia.smugglingActive ? 1 : 0,
+      state.mafia.smugglingVolume,
       framesSig,
       rosterSig,
     ].join('|');
@@ -307,25 +307,32 @@ export class ShadyPanel extends PanelBase {
   }
 
   private smugglingCard(state: GameState): HTMLElement {
-    const active = state.mafia.smugglingActive;
+    const volume = state.mafia.smugglingVolume;
+    const activeIndex = SMUGGLING_VOLUME_LEVELS.indexOf(volume as (typeof SMUGGLING_VOLUME_LEVELS)[number]);
     const label = el('span', { text: t('ui.shady.smuggling_label'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)' } });
     const status = el('span', {
-      text: active ? t('ui.shady.smuggling_active', { income: state.mafia.smugglingIncome }) : t('ui.shady.smuggling_inactive'),
-      attrs: { style: `margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:${active ? 'var(--bsx-positive)' : 'var(--bsx-text-muted)'}` },
+      text: activeIndex >= 0 ? t('ui.shady.smuggling_active', { volume: t(`ui.shady.smuggling_volume_${activeIndex + 1}`) }) : t('ui.shady.smuggling_inactive'),
+      attrs: { style: `margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:${activeIndex >= 0 ? 'var(--bsx-positive)' : 'var(--bsx-text-muted)'}` },
     });
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [label, status] });
     const note = el('span', { text: t('ui.shady.smuggling_note'), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
-    const toggleBtn = button(
-      active ? 'danger' : 'ghost',
-      t(active ? 'ui.shady.smuggling_stop' : 'ui.shady.smuggling_start'),
-      { dataAction: 'mafia-smuggle' },
-    );
-    toggleBtn.style.width = '100%';
-    toggleBtn.addEventListener('click', () => {
-      const cmdResult = this.gameConsole?.('mafia smuggle');
-      this.setStatus(cmdResult?.output ?? '');
+    const choices: Array<{ volume: number; label: string }> = [
+      { volume: 0, label: t('ui.shady.smuggling_off') },
+      ...SMUGGLING_VOLUME_LEVELS.map((k, i) => ({ volume: k, label: t(`ui.shady.smuggling_volume_${i + 1}`) })),
+    ];
+    const buttons = choices.map(choice => {
+      const btn = button(choice.volume === volume ? 'danger' : 'ghost', choice.label, { dataAction: 'mafia-smuggle' });
+      btn.dataset['volume'] = String(choice.volume);
+      btn.setAttribute('aria-pressed', choice.volume === volume ? 'true' : 'false');
+      btn.style.flex = '1';
+      btn.addEventListener('click', () => {
+        const cmdResult = this.gameConsole?.(`mafia smuggle volume:${choice.volume}`);
+        this.setStatus(cmdResult?.output ?? '');
+      });
+      return btn;
     });
-    return card([headRow, note, toggleBtn]);
+    const row = el('div', { attrs: { style: 'display:flex;gap:6px' }, children: buttons });
+    return card([headRow, note, row]);
   }
 
   private accidentCard(state: GameState, cash: number): HTMLElement {

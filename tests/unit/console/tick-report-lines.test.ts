@@ -20,7 +20,7 @@ function baseReport(overrides: Partial<TickReport>): TickReport {
     tick: 1,
     contractsExpired: [],
     contractsDelivered: [],
-    smuggling: { income: 0, exposed: false },
+    smuggling: { income: 0, audit: null },
     mafiaExposed: false,
     needEvents: [],
     trainingCompletions: [],

@@ -8,7 +8,6 @@ import {
   setSmugglingVolume,
   smugglingIncomeForTick,
   applyInvestigation,
-  applySmugglingExposure,
   FRAME_EVIDENCE_TICKS as FRAME_TICKS,
   decayExposure,
 } from '../../../src/core/events/MafiaActions.js';
@@ -217,14 +216,6 @@ describe('Mafia exposure decay (#1411)', () => {
     mafia.lastActivityTick = 100;
     decayExposure(mafia, 100 + EXPOSURE_CLEAN_GRACE_TICKS);
     expect(mafia.exposureRisk).toBeCloseTo(0.5 - EXPOSURE_DECAY_PER_TICK, 10);
-  });
-
-  it('never decays while smuggling is active', () => {
-    const mafia = createMafiaState();
-    mafia.exposureRisk = 0.5;
-    mafia.smugglingActive = true;
-    decayExposure(mafia, 10_000);
-    expect(mafia.exposureRisk).toBe(0.5);
   });
 
   it('floors exposure at 0', () => {
