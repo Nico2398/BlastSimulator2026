@@ -125,11 +125,10 @@ describe('startingBuildingAnchor (#1363)', () => {
     expect(anchor.z).toBeCloseTo(50);
   });
 
-  it('falls back to the origin centroid for an empty crew', () => {
+  it('stands off east of the site centre for an empty crew (#1574)', () => {
     const anchor = startingBuildingAnchor([], bounds);
-    const toCentre = Math.hypot(50, 50);
-    expect(anchor.x).toBeCloseTo((50 / toCentre) * STARTING_BUILDING_STANDOFF_M);
-    expect(anchor.z).toBeCloseTo((50 / toCentre) * STARTING_BUILDING_STANDOFF_M);
+    expect(anchor.x).toBeCloseTo(50 + STARTING_BUILDING_STANDOFF_M);
+    expect(anchor.z).toBeCloseTo(50);
   });
 
   it('does not move a crew already at the centre', () => {

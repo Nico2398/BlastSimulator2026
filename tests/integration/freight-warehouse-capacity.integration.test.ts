@@ -1,12 +1,19 @@
 // BlastSimulator2026 — Integration: freight warehouse capacity is sized to the
 // ore a good Dusty Hollow blast actually produces (#1531).
 //
-// Reference shot: `campaign start level:dusty_hollow seed:1138`, a 2x2 grid
+// Reference shot: `campaign start level:dusty_hollow seed:1138`, a 1x2 grid
 // (spacing 3, depth 6) at rig+(14,13), boomite 5 kg, stemming 2, auto
-// sequence (the recipe of level1-win.integration.test.ts). Barren rock goes to
-// a spoil heap (#1530), so only the ORE-BEARING mass has to fit a warehouse.
-// Measured on that shot: ~57,061 kg ore-bearing, largest ore fragment
-// ~6,600 kg. A tier-2 warehouse must hold the whole shot, a tier-1 must be a
+// sequence, holes dry. Barren rock goes to a spoil heap (#1530), so only the
+// ORE-BEARING mass has to fit a warehouse. Measured on that shot: ~30,662 kg
+// ore-bearing, largest ore fragment ~4,400 kg.
+//
+// #1574: the level now opens with a spoil heap, which shifts when the rig
+// reaches the pattern and so which weather window the holes sit in. The old
+// 2x2 shot (~57 t) was a wet-hole fizzle (28 voxels cleared); dry it clears
+// 240 voxels (~455 t), far past any tier-1/2 depot sized for one early
+// shot. The test therefore dries the holes (a weather-independent shot) and
+// uses the 1x2 pattern whose dry yield is the same order as the shot the
+// capacities were sized on. A tier-2 warehouse must hold the whole shot, a tier-1 must be a
 // meaningful fraction of it yet still take the biggest single boulder, and a
 // tier-3 must have ample headroom.
 //
@@ -76,8 +83,10 @@ beforeAll(() => {
   const rig = state.vehicles.vehicles.find((v) => v.type === 'drill_rig')!;
   const x = Math.round(rig.x) + 14;
   const z = Math.round(rig.z) + 13;
-  expect(run(`drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:${x},${z}`).success).toBe(true);
+  expect(run(`drill_plan grid rows:1 cols:2 spacing:3 depth:6 start:${x},${z}`).success).toBe(true);
   tickUntil(run, state, 600, () => state.plannedDrillHoles.length === 0);
+  // A dry day: the shot must not depend on which weather window the rig reached the holes in.
+  for (const hw of Object.values(state.holeWater)) hw.level = 0;
   run('charge hole:* explosive:boomite amount:5 stemming:2');
   tickUntil(run, state, 600, () => Object.keys(state.plannedChargesByHole).length === 0);
   run('sequence auto');
@@ -134,7 +143,7 @@ describe('freight warehouse capacity vs the reference Dusty Hollow blast (#1531)
     const oreLeft = () => state.logistics.fragments.filter((t) => t.state !== 'stored' && !isBarrenFragment(t.fragment.oreDensities));
     const massOf = (list: { fragment: { mass: number } }[]) => list.reduce((sum, t) => sum + t.fragment.mass, 0);
     let storageFull = 0;
-    // A full haul of ~57 t by one hauler takes thousands of ticks (minutes of wall clock): a bounded slice of it
+    // A full haul of ~31 t by one hauler takes thousands of ticks (minutes of wall clock): a bounded slice of it
     // proves the property, the invariant below extrapolates it to the rest.
     tickUntil(run, state, HAUL_SLICE_TICKS, () => {
       // Crew welfare is not what this probes: a long unrelieved haul must not end the level in a revolt.

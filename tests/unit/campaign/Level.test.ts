@@ -349,15 +349,24 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
     expect(getLevel('dusty_hollow')!.startingSite).toBe(DUSTY_HOLLOW_STARTING_SITE);
   });
 
-  it('the starting site is a driller, a blaster, a driver, a drill rig, a debris hauler and a T1 freight warehouse', () => {
+  it('the starting site is a driller, a blaster, a driver, a drill rig, a debris hauler, a T1 freight warehouse and a T1 spoil heap', () => {
     expect(DUSTY_HOLLOW_STARTING_SITE.employees.map(e => e.role).sort()).toEqual(['blaster', 'driller', 'driver']);
     expect(DUSTY_HOLLOW_STARTING_SITE.vehicles.map(v => v.role).sort()).toEqual(['debris_hauler', 'drill_rig']);
-    expect(DUSTY_HOLLOW_STARTING_SITE.buildings).toEqual([{ type: 'freight_warehouse', tier: 1 }]);
+    expect(DUSTY_HOLLOW_STARTING_SITE.buildings).toEqual([
+      { type: 'freight_warehouse', tier: 1 },
+      { type: 'spoil_heap', tier: 1 },
+    ]);
   });
 
-  it('no other level declares a starting site', () => {
+  it('only dusty hollow and the tutorial declare a starting site; the tutorial opens with just a spoil heap (#1574)', () => {
     for (const level of getAllLevels()) {
       if (level.id === 'dusty_hollow') continue;
+      if (level.id === 'tutorial_pit') {
+        expect(level.startingSite!.employees).toEqual([]);
+        expect(level.startingSite!.vehicles).toEqual([]);
+        expect(level.startingSite!.buildings).toEqual([{ type: 'spoil_heap', tier: 1 }]);
+        continue;
+      }
       expect(level.startingSite, level.id).toBeUndefined();
     }
   });

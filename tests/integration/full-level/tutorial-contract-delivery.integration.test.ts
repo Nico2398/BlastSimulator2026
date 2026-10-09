@@ -324,19 +324,6 @@ describe('Tutorial Level — Contract Delivery', () => {
   it('contract deliver after the haul-and-store cycle succeeds, decrements storage, and pays out', () => {
     executeTutorialBlast();
 
-    // Accept a live rubble_disposal contract right after the blast (#553),
-    // before the haul padding below — drilling plus a full haul-and-store
-    // cycle now spans well over a hundred ticks, long enough to run past a
-    // freshly-accepted contract's own deadlineTicks (30-100, Contract.ts's
-    // generateContracts) if accepted only afterward, same as the pre-#553
-    // version of this test did. Accepting reserves the contract; it doesn't
-    // require inventory yet. Not hardcoded to id 1 (#1166): the tutorial's
-    // very first contract has long since rotated off the board by the time
-    // drilling/charging (now real, mechanics-driven time, slower still under
-    // #1151's stricter slope-based traversal) finish — see
-    // acceptRubbleDisposalContract's own doc comment.
-    const contractId = acceptRubbleDisposalContract();
-
     const { vehicleId } = setupHaulingFleet();
     // rubble_disposal (materialId '') doesn't care which fragment, only that
     // it's haulable and reachable — routed through findNearestReachableFragment
@@ -353,6 +340,19 @@ describe('Tutorial Level — Contract Delivery', () => {
 
     const storedBefore = ctx.state!.logistics.storedMassKg;
     expect(storedBefore).toBeGreaterThan(0);
+
+    // Accept a live rubble_disposal contract only now (#1574). The level opens
+    // with a spoil heap, and a rubble contract draws on heap stock first and is
+    // delivered from it as soon as the hauler dumps barren rock there, so a
+    // contract accepted before the haul completes (and can end the level on
+    // its payout) before the warehouse even exists. This test is about the
+    // warehouse draw path, so the heap is emptied to make storage the only
+    // stock the delivery can use. Not hardcoded to id 1 (#1166): see
+    // acceptRubbleDisposalContract.
+    const contractId = acceptRubbleDisposalContract();
+    for (const b of ctx.state!.buildings.buildings) {
+      if (b.type === 'spoil_heap') b.storedSpoilKg = 0;
+    }
     const cashBefore = ctx.state!.cash;
 
     // rubble_disposal (materialId '') — deliver an amount well within what
