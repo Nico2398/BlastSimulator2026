@@ -360,3 +360,5 @@ Where the code still differs from this page, each difference has an owner:
 Remove a row when its issue lands.
 
 Dealership cards show a one-line purpose plus running cost in $/h and a tooltip of absolute stats (speed, capacity, work rate, licence level shown = tier, per #1524), built in `src/ui/catalogCardText.ts`.
+
+Event closures (#1568): a vehicle named by a live `out_of_service` modifier is never picked by `findFreeVehicleForRole`, and `findVehicleForClaim` releases an already-reserved closed vehicle's reservation and refuses the claim. A driver already mounted is not dismounted.

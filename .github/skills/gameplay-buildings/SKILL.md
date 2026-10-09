@@ -190,3 +190,5 @@ Meanings the code does not state: `capacity` is role-specific (beds for Living Q
 
 
 Build catalog rows show a one-line purpose plus operating cost in $/h and a tooltip of absolute stats (footprint, capacity with unit, upkeep), built in `src/ui/catalogCardText.ts`; the tooltip follows the selected tier.
+
+Event closures (#1568): a live `out_of_service` modifier naming a building sets the derived `Building.outOfService` flag each tick (`syncBuildingServiceFlags`, after `tickModifiers`); the player's `active` choice is untouched. `isOperating(b)` (= active and not closed) gates ore/explosive/spoil storage, nearest-building lookups, well-being, training (`availableTrainingOffers` skips it, `enrolInTraining` refuses with `employees.train_school_closed`) and the Research Center (queueing blocked as `no_research_center`). A closed centre only pauses research progress; destroying or switching it off still cancels and refunds. `research_cost` scales the task cost at queue time (`scaledCost`); the stored `task.cost` is what cancel refunds.
