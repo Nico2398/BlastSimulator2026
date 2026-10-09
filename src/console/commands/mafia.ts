@@ -111,7 +111,7 @@ export function mafiaCommand(
         const volume = state.mafia.smugglingVolume;
         return { success: true, output: volume > 0 ? t('mafia.status_smuggling_active', { volume }) : t('mafia.smuggle_usage') };
       }
-      const result = setSmugglingVolume(state.mafia, raw === 'off' ? 0 : Number(raw));
+      const result = setSmugglingVolume(state.mafia, raw === 'off' ? 0 : raw.trim() === '' ? NaN : Number(raw));
       if (!result.success) return { success: false, output: t(result.error) };
       const volume = result.data.volume;
       return { success: true, output: volume > 0 ? t('mafia.smuggle_activated', { volume }) : t('mafia.smuggle_deactivated') };
