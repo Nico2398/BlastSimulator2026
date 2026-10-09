@@ -5,8 +5,7 @@
 
 import type { EmployeeRole } from '../../core/entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
-import { isSingleTierType } from '../../core/entities/Building.js';
-import type { BuildingTier, BuildingType } from '../../core/entities/Building.js';
+import { isSingleTierType, type BuildingTier, type BuildingType } from '../../core/entities/Building.js';
 import { BUILDING_DEFS } from '../../core/entities/BuildingDefs.js';
 import { getAllVehicleRoles } from '../../core/entities/Vehicle.js';
 

@@ -708,10 +708,14 @@ def build_building(btype: str, tier: int) -> None:
     TYPE_BUILDERS[btype](sx, sz, tier, ex, xx, _materials(btype))
 
 
+def tiers_for(btype: str) -> tuple:
+    return (1,) if btype in SINGLE_TIER_TYPES else (1, 2, 3)
+
+
 def registry() -> dict:
     reg = {}
     for btype in TYPE_BUILDERS:
-        for tier in ((1,) if btype in SINGLE_TIER_TYPES else (1, 2, 3)):
+        for tier in tiers_for(btype):
             reg[f'building_{btype}_t{tier}'] = (lambda b, t: (lambda: build_building(b, t)))(btype, tier)
     reg['building_ruin'] = lambda: build_ruin(_materials('freight_warehouse'))
     return reg

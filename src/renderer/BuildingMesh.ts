@@ -7,9 +7,8 @@
 // the roof corners so the two doors read from any camera angle.
 
 import * as THREE from 'three';
-import { isSingleTierType } from '../core/entities/Building.js';
 import type { Building, BuildingType, BuildingTier } from '../core/entities/Building.js';
-import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
+import { getBuildingDef, getDefSize, isSingleTierType } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { buildingModelId, BUILDING_RUIN_MODEL_ID } from './models/ModelIds.js';

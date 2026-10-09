@@ -52,7 +52,7 @@ def _registry() -> dict[str, tuple[str, callable]]:
         reg[name] = ('buildings', builder)
     for btype in buildings.TYPE_BUILDERS:
         for tier, mod in overrides.items():
-            if btype in buildings.SINGLE_TIER_TYPES and tier != 1:
+            if tier not in buildings.tiers_for(btype):
                 continue
             if hasattr(mod, 'build_building'):
                 reg[f'building_{btype}_t{tier}'] = ('buildings', (lambda m_, b: (lambda: m_.build_building(b)))(mod, btype))

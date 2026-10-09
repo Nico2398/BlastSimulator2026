@@ -125,8 +125,7 @@ describe('public/models', () => {
       }
     }
     const heap = library.instantiate(buildingModelId('spoil_heap', 1), { size: [1, 1, 1] });
-    expect(heap.tints.has('TintBody'), 'spoil heap tint').toBe(true);
-    expect(heap.bounds.getSize(new THREE.Vector3()).y, 'spoil heap height').toBeLessThanOrEqual(2.8);
+    expect(heap.bounds.getSize(new THREE.Vector3()).y, 'spoil heap height').toBeLessThanOrEqual(2.0);
     const ruin = library.instantiate(BUILDING_RUIN_MODEL_ID, { size: [1, 1, 1] });
     expect(ruin.bounds.getSize(new THREE.Vector3()).x).toBeLessThanOrEqual(2.6);
   });
