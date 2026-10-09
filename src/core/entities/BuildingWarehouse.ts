@@ -2,7 +2,7 @@
 // Explosive Warehouse stock management and Freight Warehouse capacity checks.
 
 import type { BuildingState } from './Building.js';
-import { getBuildingDef, getStorageCapacity } from './Building.js';
+import { getBuildingDef, getStorageCapacity, isOperating } from './Building.js';
 
 // ── Explosive Warehouse ──────────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@ import { getBuildingDef, getStorageCapacity } from './Building.js';
 export function getExplosivesCapacity(state: BuildingState): number {
   let total = 0;
   for (const b of state.buildings) {
-    if (b.active && b.type === 'explosive_warehouse') {
+    if (isOperating(b) && b.type === 'explosive_warehouse') {
       total += getBuildingDef(b.type, b.tier).capacity;
     }
   }
@@ -21,7 +21,7 @@ export function getExplosivesCapacity(state: BuildingState): number {
 export function getExplosivesInStock(state: BuildingState): number {
   let total = 0;
   for (const b of state.buildings) {
-    if (b.active && b.type === 'explosive_warehouse') {
+    if (isOperating(b) && b.type === 'explosive_warehouse') {
       total += b.storedExplosivesKg ?? 0;
     }
   }
@@ -36,7 +36,7 @@ export function getExplosivesInStock(state: BuildingState): number {
 export function storeExplosives(state: BuildingState, amountKg: number): number {
   let remaining = amountKg;
   for (const b of state.buildings) {
-    if (!b.active || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
+    if (!isOperating(b) || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
     const def = getBuildingDef(b.type, b.tier);
     const current = b.storedExplosivesKg ?? 0;
     const available = def.capacity - current;
@@ -57,7 +57,7 @@ export function consumeExplosives(state: BuildingState, amountKg: number): boole
 
   let remaining = amountKg;
   for (const b of state.buildings) {
-    if (!b.active || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
+    if (!isOperating(b) || b.type !== 'explosive_warehouse' || remaining <= 0) continue;
     const current = b.storedExplosivesKg ?? 0;
     if (current <= 0) continue;
     const toConsume = Math.min(remaining, current);
@@ -70,7 +70,7 @@ export function consumeExplosives(state: BuildingState, amountKg: number): boole
 /** Returns true if at least one active explosive warehouse has stock > 0. */
 export function hasExplosivesForBlast(state: BuildingState): boolean {
   return state.buildings.some(
-    b => b.active && b.type === 'explosive_warehouse' && (b.storedExplosivesKg ?? 0) > 0,
+    b => isOperating(b) && b.type === 'explosive_warehouse' && (b.storedExplosivesKg ?? 0) > 0,
   );
 }
 
@@ -101,7 +101,7 @@ export interface WarehouseSite {
 export function freightWarehouseSites(state: BuildingState): WarehouseSite[] {
   const sites: WarehouseSite[] = [];
   for (const b of state.buildings) {
-    if (b.active && b.type === 'freight_warehouse') {
+    if (isOperating(b) && b.type === 'freight_warehouse') {
       sites.push({ id: b.id, x: b.x, z: b.z, capacityKg: getBuildingDef(b.type, b.tier).capacity });
     }
   }
@@ -135,7 +135,7 @@ export function nearestSite(
 export function spoilHeapSites(state: BuildingState): WarehouseSite[] {
   const sites: WarehouseSite[] = [];
   for (const b of state.buildings) {
-    if (b.active && b.type === 'spoil_heap') {
+    if (isOperating(b) && b.type === 'spoil_heap') {
       sites.push({ id: b.id, x: b.x, z: b.z, capacityKg: Infinity });
     }
   }

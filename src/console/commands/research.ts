@@ -13,6 +13,7 @@ import {
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { getResearchTaskDef } from '../../core/config/balance.js';
+import { factorFor, researchCostFor } from '../../core/events/ActiveModifiers.js';
 import { requireGame } from './commandUtils.js';
 
 /** Human-readable message for each read-only `getQueueBlockCode` result. */
@@ -75,15 +76,17 @@ export function researchCommand(
           output: QUEUE_BLOCK_MESSAGES[blockCode](type, tier),
         };
       }
-      if (state.cash < def.cost) {
+      const factor = factorFor(state.events.activeModifiers, 'research_cost', state.tickCount);
+      const scaled = researchCostFor(def.cost, state.events.activeModifiers, state.tickCount);
+      if (state.cash < scaled) {
         return {
           success: false,
           code: 'insufficient_funds',
-          output: `Insufficient funds: research costs $${def.cost}.`,
+          output: `Insufficient funds: research costs $${scaled}.`,
         };
       }
 
-      const result = queueResearchTask(state.buildings, type, tier);
+      const result = queueResearchTask(state.buildings, type, tier, factor);
       if (!result.success) {
         // Preconditions were re-checked above; a failure here means state
         // changed between the checks and the commit (should not happen in

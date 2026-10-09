@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   addModifier, pruneExpired, remainingTicks, workRate, salaryFactor, isActive, factorFor, tickModifiers, actionBlocked,
+  scaledCost, outOfServiceIds, isOutOfService,
   type ActiveModifier,
 } from '../../../src/core/events/ActiveModifiers.js';
 import { MODIFIER_FACTOR_MIN, MODIFIER_FACTOR_MAX, MAX_ACTIVE_MODIFIERS, TICKS_PER_DAY } from '../../../src/core/config/balance.js';
@@ -205,5 +206,72 @@ describe('ActiveModifiers.actionBlocked', () => {
     addModifier(list, mod({ kind: 'work_stoppage', endTick: 100 }), 1);
     expect(actionBlocked(list, 'drill_hole', 5, 'driller')).toBe(true);
     expect(actionBlocked(list, 'rest', 5, 'driller')).toBe(false);
+  });
+});
+
+// ── #1568: survey_cost / research_cost / out_of_service consumers ──
+
+describe('ActiveModifiers.scaledCost (#1568)', () => {
+  it('rounds base * factor to whole cash', () => {
+    expect(scaledCost(100, 2)).toBe(200);
+    expect(scaledCost(333, 1.5)).toBe(500); // 499.5 rounds up
+    expect(scaledCost(101, 0.5)).toBe(51);
+  });
+
+  it('is the identity at factor 1', () => {
+    expect(scaledCost(1234, 1)).toBe(1234);
+  });
+
+  it('is 0 for a zero base', () => {
+    expect(scaledCost(0, 3)).toBe(0);
+  });
+});
+
+describe('ActiveModifiers.outOfServiceIds / isOutOfService (#1568)', () => {
+  const oos = (targetId: number, targetKind: 'vehicle' | 'building', endTick: number | null = 100) =>
+    mod({ kind: 'out_of_service', targetId, targetKind, endTick });
+
+  it('collects the target ids of live modifiers of the asked kind', () => {
+    const list = listOf(oos(3, 'building'), oos(7, 'building'));
+    expect([...outOfServiceIds(list, 'building', 10)].sort()).toEqual([3, 7]);
+  });
+
+  it('is empty without modifiers', () => {
+    expect(outOfServiceIds([], 'vehicle', 0).size).toBe(0);
+  });
+
+  it('respects the kind discriminator: a building modifier never closes a vehicle with the same id', () => {
+    const list = listOf(oos(5, 'building'));
+    expect(outOfServiceIds(list, 'vehicle', 10).has(5)).toBe(false);
+    expect(isOutOfService(list, 'vehicle', 5, 10)).toBe(false);
+    expect(isOutOfService(list, 'building', 5, 10)).toBe(true);
+  });
+
+  it('respects the kind discriminator: a vehicle modifier never closes a building with the same id', () => {
+    const list = listOf(oos(5, 'vehicle'));
+    expect(isOutOfService(list, 'building', 5, 10)).toBe(false);
+    expect(isOutOfService(list, 'vehicle', 5, 10)).toBe(true);
+  });
+
+  it('ignores a lapsed modifier (endTick <= tick)', () => {
+    const list = listOf(oos(2, 'vehicle', 50));
+    expect(isOutOfService(list, 'vehicle', 2, 49)).toBe(true);
+    expect(isOutOfService(list, 'vehicle', 2, 50)).toBe(false);
+    expect(outOfServiceIds(list, 'vehicle', 60).size).toBe(0);
+  });
+
+  it('treats a permanent (null endTick) modifier as live', () => {
+    const list = listOf(oos(2, 'building', null));
+    expect(isOutOfService(list, 'building', 2, 1_000_000)).toBe(true);
+  });
+
+  it('ignores other modifier kinds that carry a targetId', () => {
+    const list = listOf(mod({ kind: 'work_rate', targetId: 9, targetKind: 'building' }));
+    expect(isOutOfService(list, 'building', 9, 0)).toBe(false);
+  });
+
+  it('is false for an id no modifier names', () => {
+    const list = listOf(oos(1, 'building'));
+    expect(isOutOfService(list, 'building', 99, 0)).toBe(false);
   });
 });
