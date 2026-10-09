@@ -140,6 +140,9 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
   `storedSpoilKg`; `storedMassKg` and `collectedOre` are untouched. A batch never mixes barren and ore.
 - With no heap placed, barren hauls are blocked as `no_spoil_heap` ("place a spoil heap"), never
   `storage_full`. Rubble-disposal contracts draw on heap stock first, then storage.
+- **Starting heap (#1574):** Dusty Hollow (`DUSTY_HOLLOW_STARTING_SITE`) and the tutorial
+  (`TUTORIAL_STARTING_SITE`) open with one free, active heap placed at tick 0, so the first blast's
+  barren rock has a dump and no "place a spoil heap" notice appears. Later levels still build their own.
 - **Crewless** (`isCrewlessBuilding`): `build spoil_heap at:x,z` and the Build menu validate funds and
   footprint as usual, then charge and place immediately (`placeBuilding`) — no `PlannedBuilding`, no
   `place_building` action, works with an empty roster.

@@ -52,8 +52,8 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(ctx.grid!.sizeZ).toBe(32);
     // No employees initially
     expect(ctx.state!.employees.employees.length).toBe(0);
-    // No buildings
-    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    // Only the opening spoil heap (#1574)
+    expect(ctx.state!.buildings.buildings.map(b => b.type)).toEqual(['spoil_heap']);
   });
 
   it('executes full tutorial sequence', () => {
@@ -175,9 +175,10 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // work) before asserting a real building exists.
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '0,8' });
     expect(buildResult.success).toBe(true);
-    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    // The opening spoil heap (#1574) is already there; the warehouse is not.
+    expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(false);
     driveConstructionToCompletion(ctx);
-    expect(ctx.state!.buildings.buildings.length).toBe(1);
+    expect(ctx.state!.buildings.buildings.filter(b => b.type === 'freight_warehouse').length).toBe(1);
 
     // 16. Accept a contract for whichever ore step 22's own greedy pickup
     // will actually land in storage, among what's currently on offer. Not

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite } from '../../../src/core/state/StartingBuildings.js';
+import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite, isStaffedComposition } from '../../../src/core/state/StartingBuildings.js';
 import { createBuildingState, getDefSize, getBuildingDef, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { StartingBuildingSlot } from '../../../src/core/config/balance.js';
@@ -125,11 +125,10 @@ describe('startingBuildingAnchor (#1363)', () => {
     expect(anchor.z).toBeCloseTo(50);
   });
 
-  it('falls back to the origin centroid for an empty crew', () => {
+  it('stands off east of the site centre for an empty crew (#1574)', () => {
     const anchor = startingBuildingAnchor([], bounds);
-    const toCentre = Math.hypot(50, 50);
-    expect(anchor.x).toBeCloseTo((50 / toCentre) * STARTING_BUILDING_STANDOFF_M);
-    expect(anchor.z).toBeCloseTo((50 / toCentre) * STARTING_BUILDING_STANDOFF_M);
+    expect(anchor.x).toBeCloseTo(50 + STARTING_BUILDING_STANDOFF_M);
+    expect(anchor.z).toBeCloseTo(50);
   });
 
   it('does not move a crew already at the centre', () => {
@@ -150,5 +149,16 @@ describe('resolveStartingSite (#1363)', () => {
 
   it('yields a bare site when staffed is false', () => {
     expect(resolveStartingSite(levelSite, false)).toBeUndefined();
+  });
+});
+
+describe('isStaffedComposition (#1574)', () => {
+  it('is false for an absent site and a heap-only site', () => {
+    expect(isStaffedComposition(undefined)).toBe(false);
+    expect(isStaffedComposition({ employees: [], vehicles: [], buildings: [] })).toBe(false);
+  });
+
+  it('is true for the global staffed composition', () => {
+    expect(isStaffedComposition(STARTING_SITE_STAFFED_COMPOSITION)).toBe(true);
   });
 });

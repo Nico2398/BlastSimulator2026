@@ -162,7 +162,8 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
       // deadlock with nowhere real to rest yet) before continuing into the
       // steps that need driving_center to actually exist.
       driveTutorialBuildingsToCompletion(engine);
-      expect(engine.ctx.state!.buildings.buildings.length).toBe(1);
+      // The level's free opening spoil heap (#1574) plus the living quarters.
+      expect(engine.ctx.state!.buildings.buildings.map(b => b.type).sort()).toEqual(['living_quarters', 'spoil_heap']);
 
       // Continue through "every drilled hole has actually landed":
       // the early policy, driver hire, drill_rig and rock_digger purchases

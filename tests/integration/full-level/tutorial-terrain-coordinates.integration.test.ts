@@ -169,15 +169,16 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
     expect(result.output).toContain('freight_warehouse T1 ordered');
 
     // Nothing is built yet — only queued.
-    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(false);
     expect(ctx.state!.plannedBuildings.length).toBe(1);
 
     // Drive construction to completion.
     driveConstructionToCompletion(ctx);
 
     // Building exists in state
-    expect(ctx.state!.buildings.buildings.length).toBe(1);
-    const building = ctx.state!.buildings.buildings[0]!;
+    const built = ctx.state!.buildings.buildings.filter(b => b.type === 'freight_warehouse');
+    expect(built.length).toBe(1);
+    const building = built[0]!;
     expect(building.x).toBe(x);
     expect(building.z).toBe(z);
     expect(building.type).toBe('freight_warehouse');

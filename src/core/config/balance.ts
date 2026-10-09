@@ -1299,11 +1299,26 @@ export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
  */
 export const STARTING_BUILDING_STANDOFF_M = 12;
 
-/** Dusty Hollow's own opening crew, fleet and warehouse (#1363). */
+/**
+ * Dusty Hollow's own opening crew, fleet, warehouse and spoil heap (#1363,
+ * #1574). The heap is placed after the warehouse, so barren rock has a dump
+ * from the first blast.
+ */
 export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
   employees: BASE_STARTING_EMPLOYEES,
   vehicles: BASE_STARTING_VEHICLES,
-  buildings: [{ type: 'freight_warehouse', tier: 1 }],
+  buildings: [{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }],
+};
+
+/**
+ * tutorial_pit's opening site (#1574): one free spoil heap, no crew or fleet
+ * (the tutorial hires its own). The heap is not a scripted step, so the first
+ * blast's barren rock has a dump without a "place a spoil heap" notification.
+ */
+export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
+  employees: [],
+  vehicles: [],
+  buildings: [{ type: 'spoil_heap', tier: 1 }],
 };
 
 /**
@@ -1318,10 +1333,17 @@ export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
  * fast styles only, 8.0 wins all but the slowest style, 9.0 wins all five in
  * ~220-300 ticks. Lower values hit the worker-revolt wall (payroll ~$200/tick,
  * morale capped at 70 without Living Quarters); above 10 the level is won
- * trivially. 9.5 sits near the top of that window (one 2x2 blast already
+ * trivially. 9.5 sat near the top of that window (one 2x2 blast already
  * wins it, ~tick 200-300).
+ *
+ * Re-bisected to 10 for the opening spoil heap (#1574): it sits between the
+ * rig and the first shot, so the rig arrives later, the first shot meets
+ * drier holes and clears 240 voxels (~455 t) instead of 28, which overfills the
+ * tier-1 warehouse and delays sales. 9.5 then ends the seed-1138 2x2 style in
+ * a revolt (tick 435, $49k profit); 9.75 wins with a thin margin ($83k),
+ * 10 wins both styles by ~$7k/$55k (tick 281/301).
  */
-export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 9.5;
+export const DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER = 10;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 

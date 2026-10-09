@@ -94,7 +94,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'builtRampWidth', 'vehicleCount', 'vehicleBoardingCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
-  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'rubbleDisposalOffered', 'fillableSaleOffered', 'deathCount',
+  'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'rubbleDisposalOffered', 'fillableSaleOffered', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'taxAuditCount', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg', 'storedSpoilKg', 'collectedOreTotal', 'dangerZoneClear', 'corruptionLevel',
@@ -388,6 +388,18 @@ describe('console-api', () => {
     // the whole quantity, not a single kilogram of the ore: only a COMPLETED
     // ore_sale advances the tutorial's own 'sell-ore' card, and a part
     // delivery completes nothing.
+    it('reports fillableDirtiteSaleOffered only for a fillable dirtite offer, not another ore', () => {
+      runner.runner.run('new_game seed:42');
+      const s = runner.ctx.state!;
+      s.collectedOre = { rustite: 500, dirtite: 50 };
+      s.contracts.available = [makeOreSaleOffer('rustite', 100)];
+      expect(serializeGameState(runner.ctx as MiningContext)!.fillableDirtiteSaleOffered).toBe(false);
+      s.contracts.available = [makeOreSaleOffer('dirtite', 100)];
+      expect(serializeGameState(runner.ctx as MiningContext)!.fillableDirtiteSaleOffered).toBe(false);
+      s.contracts.available = [makeOreSaleOffer('dirtite', 40)];
+      expect(serializeGameState(runner.ctx as MiningContext)!.fillableDirtiteSaleOffered).toBe(true);
+    });
+
     it('reports fillableOreSaleOffered false when the offered ore is not in storage at all', () => {
       runner.runner.run('new_game seed:42');
       const s = runner.ctx.state!;

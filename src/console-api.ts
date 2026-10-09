@@ -102,6 +102,8 @@ export interface SerializableGameState {
    * upstream of it.
    */
   fillableOreSaleOffered: boolean;
+  /** `fillableOreSaleOffered` narrowed to dirtite, the pit's bulk ore (#1574): the tutorial scenario sells it first so a single high-value sale cannot win the level before free play. */
+  fillableDirtiteSaleOffered: boolean;
   /**
    * True when `state.contracts.available` holds at least one
    * `rubble_disposal` offer (issue #1263 CI-fix) — the condition-based wait
@@ -213,6 +215,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
+    fillableDirtiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'dirtite'),
     rubbleDisposalOffered: hasRubbleDisposalOffer(s.contracts.available),
     fillableSaleOffered: hasFillableSaleOffer(s.contracts.available, s.collectedOre, stateRubbleStockKg(s)),
     deathCount: s.damage.deathCount,
