@@ -72,14 +72,19 @@ describe('Tutorial clock determinism (#1550)', () => {
     expect(ctx.state!.isPaused).toBe(false);
   });
 
-  it('clockFollowsTimer:false: the hold still engages after a command via onCommandExecuted', () => {
+  it('clockFollowsTimer:false: onCommandExecuted never pauses, so a later tick 40 runs in full', () => {
     const { runner, ctx, tutorial } = setup({ clockFollowsTimer: false });
-    runner.run('tick 12');
+    expect(runner.run('tick 12').success).toBe(true);
+    tutorial.onCommandExecuted(ctx.state!); // as main.ts does after each command
+    expect(ctx.state!.isPaused).toBe(false);
     vi.advanceTimersByTime(GUIDE_WAIT_MS);
     expect(ctx.state!.isPaused).toBe(false);
 
+    const before = ctx.state!.tickCount;
+    expect(runner.run('tick 40').success).toBe(true);
     tutorial.onCommandExecuted(ctx.state!);
-    expect(ctx.state!.isPaused).toBe(true);
+    expect(ctx.state!.tickCount - before).toBe(40);
+    expect(ctx.state!.isPaused).toBe(false);
   });
 
   it('clockFollowsTimer:false: onCommandExecuted does not hold while the budget is unspent', () => {

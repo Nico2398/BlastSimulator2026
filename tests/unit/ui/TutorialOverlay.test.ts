@@ -1257,10 +1257,23 @@ describe('TutorialOverlay clockFollowsTimer option (#1550)', () => {
     expect(tut.isActive).toBe(true);
   });
 
-  it('clockFollowsTimer:false: onCommandExecuted holds the clock once the budget is spent', () => {
+  it('clockFollowsTimer:false: onCommandExecuted does not pause in scenario mode even with the budget spent', () => {
     const { tut, state } = spent({ clockFollowsTimer: false });
     tut.onCommandExecuted(state);
-    expect(state.isPaused).toBe(true);
+    expect(state.isPaused).toBe(false);
+    vi.advanceTimersByTime(2_000);
+    tut.onCommandExecuted(state);
+    expect(state.isPaused).toBe(false);
+  });
+
+  it('clockFollowsTimer:true: onCommandExecuted still follows the default clock behaviour', () => {
+    const a = spent();
+    a.tut.onCommandExecuted(a.state);
+    const defaultPaused = a.state.isPaused;
+    a.tut.dispose();
+    const b = spent({ clockFollowsTimer: true });
+    b.tut.onCommandExecuted(b.state);
+    expect(b.state.isPaused).toBe(defaultPaused);
   });
 
   it('clockFollowsTimer:false: onCommandExecuted leaves the clock alone on an unguided step', () => {
