@@ -7,6 +7,7 @@
 // the roof corners so the two doors read from any camera angle.
 
 import * as THREE from 'three';
+import { isSingleTierType } from '../core/entities/Building.js';
 import type { Building, BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
@@ -44,6 +45,11 @@ interface BuildingEntry {
   building: Building;
 }
 
+/** Model id of an intact building: a single-tier type's higher tiers alias onto its tier-1 model. */
+function intactModelId(type: BuildingType, tier: BuildingTier): string {
+  return buildingModelId(type, isSingleTierType(type) ? 1 : tier);
+}
+
 /**
  * Instantiate and tint the (intact) model for a building type/tier from `library`,
  * sized to its footprint. Shared by the real building and the queued-order
@@ -55,7 +61,7 @@ export function instantiateBuildingModel(
   tier: BuildingTier,
 ): ModelInstance {
   const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
-  return library.instantiate(buildingModelId(type, tier), {
+  return library.instantiate(intactModelId(type, tier), {
     size: [sizeX, FALLBACK_BASE + FALLBACK_STOREY * tier, sizeZ],
     tint: BODY_TINT,
   });
@@ -218,7 +224,7 @@ export class BuildingMesh {
 function modelIdFor(building: Building): string {
   return building.hp <= 0
     ? BUILDING_RUIN_MODEL_ID
-    : buildingModelId(building.type as BuildingType, building.tier);
+    : intactModelId(building.type as BuildingType, building.tier);
 }
 
 function disposeEntry(entry: BuildingEntry): void {
