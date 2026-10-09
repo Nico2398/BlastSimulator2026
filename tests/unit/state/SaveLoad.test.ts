@@ -2233,3 +2233,56 @@ describe('corruption.protections persistence (#1407)', () => {
     expect(loaded.corruption.protections).toEqual([]);
   });
 });
+
+// ── #1409 — tax-audit books and smuggling volume are saved with the game ────
+
+describe('serialize/deserialize — tax audit (#1409)', () => {
+  it('a fresh game round-trips an empty tax-audit state', () => {
+    const restored = deserialize(serialize(createGame({ seed: 42 })));
+    expect(restored.taxAudit.buckets).toEqual([]);
+    expect(restored.taxAudit.clock).toBe(0);
+    expect(restored.taxAudit.lastAuditTick).toBeNull();
+    expect(restored.taxAudit.convictions).toBe(0);
+    expect(restored.taxAudit.debt).toBe(0);
+    expect(restored.taxAudit.auditsCount).toBe(0);
+  });
+
+  it('open books, audit clock, convictions and debt survive a round trip', () => {
+    const state = createGame({ seed: 42 });
+    state.taxAudit.buckets = [
+      { day: 3, legit: 1200.5, smuggled: 300.25, clockAtEarn: 70 },
+      { day: 4, legit: 900, smuggled: 0, clockAtEarn: 94 },
+    ];
+    state.taxAudit.clock = 120.5;
+    state.taxAudit.lastAuditTick = 55;
+    state.taxAudit.convictions = 2;
+    state.taxAudit.debt = 9876.5;
+    state.taxAudit.auditsCount = 3;
+
+    const restored = deserialize(serialize(state));
+
+    expect(restored.taxAudit).toEqual(state.taxAudit);
+  });
+
+  it('the chosen smuggling volume survives a round trip', () => {
+    const state = createGame({ seed: 42 });
+    state.mafia.smugglingVolume = 0.5;
+    state.mafia.smugglingActive = true;
+    const restored = deserialize(serialize(state));
+    expect(restored.mafia.smugglingVolume).toBe(0.5);
+  });
+
+  it('a save written before the tax audit existed loads with empty books and no smuggling', () => {
+    const json = serialize(createGame({ seed: 42 }));
+    const parsed = JSON.parse(json) as Record<string, any>;
+    delete parsed['taxAudit'];
+    delete parsed['mafia'].smugglingVolume;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.taxAudit.buckets).toEqual([]);
+    expect(restored.taxAudit.debt).toBe(0);
+    expect(restored.taxAudit.lastAuditTick).toBeNull();
+    expect(restored.mafia.smugglingVolume).toBe(0);
+  });
+});

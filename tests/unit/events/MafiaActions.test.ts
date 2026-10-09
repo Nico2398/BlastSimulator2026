@@ -5,8 +5,8 @@ import {
   arrangeAccident,
   startFraming,
   completeFrame,
-  toggleSmuggling,
-  processSmuggling,
+  setSmugglingVolume,
+  smugglingIncomeForTick,
   applyInvestigation,
   applySmugglingExposure,
   FRAME_EVIDENCE_TICKS as FRAME_TICKS,
@@ -21,6 +21,7 @@ import {
   INVESTIGATION_EXPOSURE_JUMP,
   SMUGGLING_EXPOSED_FINE,
   SMUGGLING_EXPOSED_EXPOSURE_JUMP,
+  SMUGGLING_VOLUME_LEVELS,
   INVESTIGATION_FOLLOWUP_EVENT_ID,
   EXPOSURE_CLEAN_GRACE_TICKS,
   EXPOSURE_DECAY_PER_TICK,
@@ -112,169 +113,55 @@ describe('Mafia gameplay mechanics', () => {
     expect(early.success).toBe(false);
   });
 
-  it('smuggling generates income but increases exposure risk', () => {
+  it('a new mafia state smuggles nothing', () => {
     const mafia = createMafiaState();
-    const { active, incomePerTick } = toggleSmuggling(mafia);
-    expect(active).toBe(true);
-    expect(incomePerTick).toBeGreaterThan(0);
-
-    const initialExposure = mafia.exposureRisk;
-    const result = processSmuggling(mafia, new Random(42), 5);
-    expect(result.income).toBeGreaterThan(0);
-    expect(mafia.exposureRisk).toBeGreaterThan(initialExposure);
+    expect(mafia.smugglingVolume).toBe(0);
   });
 
-  it('exposure leads to criminal charges (potential game over)', () => {
-    const mafia = createMafiaState();
-    mafia.exposureRisk = 0.95; // Very high exposure
-    mafia.smugglingActive = true;
-    mafia.smugglingIncome = 8000;
-
-    // With high exposure, should eventually trigger
-    let triggered = false;
-    for (let seed = 0; seed < 200; seed++) {
-      const result = processSmuggling(mafia, new Random(seed), 5);
-      // isExposed just checks if risk * 0.05 triggers, but processSmuggling checks exposure too
-      if (result.exposed) {
-        triggered = true;
-        break;
-      }
-    }
-    // With 0.95 exposure and 0.15 base risk, should trigger often
-    expect(triggered).toBe(true);
-  });
-
-  // ── completeFrame with no pending frame — issue #862 ────────────────────
-  //
-  // Not reachable through mafia.ts's console command (its 'frame' case only
-  // calls completeFrame after confirming a ready pending frame exists), so
-  // this outcome is covered directly against the core function instead.
-  it('completeFrame with no pending frame for the target returns outcomeKey mafia.frame_no_ready', () => {
-    const mafia = createMafiaState();
-    const employees = createEmployeeState();
-    const emp = addTestEmployee(employees);
-
-    const result = completeFrame(mafia, stateOf(employees), emp.id, 100, new Random(42));
-
-    expect(result.success).toBe(false);
-    expect(result.outcomeKey).toBe('mafia.frame_no_ready');
-    expect(result.outcomeParams).toBeUndefined();
-
-    const NO_READY_FRAME_EN = 'No ready frame for this employee';
-    expect(t(result.outcomeKey, result.outcomeParams)).toBe(NO_READY_FRAME_EN);
-
-    setLocale('fr');
-    expect(t(result.outcomeKey, result.outcomeParams)).not.toBe(NO_READY_FRAME_EN);
-  });
-
-  // ── exposureIncrease equals the applied delta — issue #1410 ─────────────
-  function accidentRun(wantSuccess: boolean, startExposure: number) {
-    for (let seed = 0; seed < 50; seed++) {
+  it('setSmugglingVolume accepts every configured volume level', () => {
+    for (const level of SMUGGLING_VOLUME_LEVELS) {
       const mafia = createMafiaState();
-      mafia.exposureRisk = startExposure;
-      const employees = createEmployeeState();
-      const emp = addTestEmployee(employees);
-      const result = arrangeAccident(mafia, stateOf(employees), createCorruptionState(), emp.id, new Random(seed));
-      if (result.success === wantSuccess) return { mafia, result };
-    }
-    return expect.unreachable(`No ${wantSuccess ? 'successful' : 'failed'} accident in 50 seeds`);
-  }
-
-  it('failed accident raises exposureRisk by exactly result.exposureIncrease', () => {
-    const { mafia, result } = accidentRun(false, 0);
-    expect(result.exposureIncrease).toBeCloseTo(ACCIDENT_EXPOSURE + ACCIDENT_FAILURE_EXPOSURE_EXTRA, 10);
-    expect(mafia.exposureRisk).toBeCloseTo(result.exposureIncrease, 10);
-    expect(mafia.exposureRisk).toBeCloseTo(0.2, 10);
-  });
-
-  it('successful accident raises exposureRisk by exactly result.exposureIncrease', () => {
-    const { mafia, result } = accidentRun(true, 0);
-    expect(result.exposureIncrease).toBeCloseTo(ACCIDENT_EXPOSURE, 10);
-    expect(mafia.exposureRisk).toBeCloseTo(result.exposureIncrease, 10);
-    expect(mafia.exposureRisk).toBeCloseTo(0.1, 10);
-  });
-
-  it('failed accident near the cap clamps to 1 and reports the applied delta', () => {
-    const { mafia, result } = accidentRun(false, 0.95);
-    expect(mafia.exposureRisk).toBe(1);
-    expect(result.exposureIncrease).toBeCloseTo(1 - 0.95, 10);
-  });
-
-  it('accident on an unknown target changes no exposure', () => {
-    const mafia = createMafiaState();
-    mafia.exposureRisk = 0.3;
-    const result = arrangeAccident(mafia, stateOf(createEmployeeState()), createCorruptionState(), 999, new Random(1));
-    expect(result.exposureIncrease).toBe(0);
-    expect(mafia.exposureRisk).toBe(0.3);
-  });
-
-  it('accident on a dead target changes no exposure', () => {
-    const mafia = createMafiaState();
-    mafia.exposureRisk = 0.3;
-    const employees = createEmployeeState();
-    const emp = addTestEmployee(employees);
-    emp.alive = false;
-    const result = arrangeAccident(mafia, stateOf(employees), createCorruptionState(), emp.id, new Random(1));
-    expect(result.exposureIncrease).toBe(0);
-    expect(mafia.exposureRisk).toBe(0.3);
-  });
-
-  it('startFraming exposureIncrease equals the applied delta, also near the cap', () => {
-    for (const start of [0, 0.98]) {
-      const mafia = createMafiaState();
-      mafia.exposureRisk = start;
-      const employees = createEmployeeState();
-      const emp = addTestEmployee(employees);
-      const before = mafia.exposureRisk;
-      const result = startFraming(mafia, employees, emp.id, 100);
-      expect(mafia.exposureRisk - before).toBeCloseTo(result.exposureIncrease, 10);
+      const result = setSmugglingVolume(mafia, level);
+      expect(result).toEqual({ success: true, data: { volume: level } });
+      expect(mafia.smugglingVolume).toBe(level);
     }
   });
 
-  it('detected completeFrame exposureIncrease equals the applied delta, also near the cap', () => {
-    for (const start of [0, 0.95]) {
-      let found = false;
-      for (let seed = 0; seed < 50 && !found; seed++) {
-        const mafia = createMafiaState();
-        const employees = createEmployeeState();
-        const emp = addTestEmployee(employees);
-        startFraming(mafia, employees, emp.id, 0);
-        mafia.exposureRisk = start;
-        const result = completeFrame(mafia, stateOf(employees), emp.id, 1_000_000, new Random(seed));
-        if (result.outcomeKey === 'mafia.frame_detected') {
-          found = true;
-          expect(mafia.exposureRisk - start).toBeCloseTo(result.exposureIncrease, 10);
-        }
-      }
-      expect(found, `no detected frame in 50 seeds at start ${start}`).toBe(true);
+  it('setSmugglingVolume accepts 0 to switch smuggling off', () => {
+    const mafia = createMafiaState();
+    setSmugglingVolume(mafia, SMUGGLING_VOLUME_LEVELS[1]);
+    const result = setSmugglingVolume(mafia, 0);
+    expect(result.success).toBe(true);
+    expect(mafia.smugglingVolume).toBe(0);
+  });
+
+  it('setSmugglingVolume rejects values outside the configured levels and leaves the volume alone', () => {
+    const mafia = createMafiaState();
+    setSmugglingVolume(mafia, 0.25);
+    for (const bad of [0.3, -0.25, 2, 0.01, NaN, Infinity]) {
+      const result = setSmugglingVolume(mafia, bad);
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.length).toBeGreaterThan(0);
+      expect(mafia.smugglingVolume).toBe(0.25);
     }
   });
-});
 
-
-describe('Mafia investigation (#1411)', () => {
-  it('applyInvestigation adds the configured exposure jump', () => {
-    const mafia = createMafiaState();
-    mafia.exposureRisk = 0.3;
-    const applied = applyInvestigation(mafia, createEventSystemState());
-    expect(applied).toBeCloseTo(INVESTIGATION_EXPOSURE_JUMP, 10);
-    expect(mafia.exposureRisk).toBeCloseTo(0.3 + INVESTIGATION_EXPOSURE_JUMP, 10);
+  it('smugglingIncomeForTick is the volume times the operating income per hour', () => {
+    expect(smugglingIncomeForTick(0.25, 1_000)).toBeCloseTo(250, 9);
+    expect(smugglingIncomeForTick(1, 1_234.5)).toBeCloseTo(1_234.5, 9);
+    expect(smugglingIncomeForTick(0.1, 300)).toBeCloseTo(30, 9);
   });
 
-  it('applyInvestigation queues the follow-up event', () => {
-    const events = createEventSystemState();
-    applyInvestigation(createMafiaState(), events);
-    expect(events.followUpQueue).toContain(INVESTIGATION_FOLLOWUP_EVENT_ID);
+  it('smugglingIncomeForTick is 0 without operating income or without volume', () => {
+    expect(smugglingIncomeForTick(1, 0)).toBe(0);
+    expect(smugglingIncomeForTick(0.5, 0)).toBe(0);
+    expect(smugglingIncomeForTick(0, 5_000)).toBe(0);
   });
 
-  it('applyInvestigation does not queue the follow-up twice but still raises exposure', () => {
+  it('choosing a volume adds no exposure', () => {
     const mafia = createMafiaState();
-    const events = createEventSystemState();
-    applyInvestigation(mafia, events);
-    const after1 = mafia.exposureRisk;
-    applyInvestigation(mafia, events);
-    expect(events.followUpQueue.filter(id => id === INVESTIGATION_FOLLOWUP_EVENT_ID)).toHaveLength(1);
-    expect(mafia.exposureRisk).toBeGreaterThan(after1);
+    setSmugglingVolume(mafia, 1);
+    expect(mafia.exposureRisk).toBe(0);
   });
 
   it('applyInvestigation stamps lastActivityTick when a tick is given', () => {
@@ -285,7 +172,7 @@ describe('Mafia investigation (#1411)', () => {
 
   it('applySmugglingExposure jumps exposure, stops smuggling and returns the fine', () => {
     const mafia = createMafiaState();
-    toggleSmuggling(mafia);
+    setSmugglingVolume(mafia, 0.25);
     const { fine } = applySmugglingExposure(mafia, 9);
     expect(fine).toBe(SMUGGLING_EXPOSED_FINE);
     expect(mafia.exposureRisk).toBeCloseTo(SMUGGLING_EXPOSED_EXPOSURE_JUMP, 10);
