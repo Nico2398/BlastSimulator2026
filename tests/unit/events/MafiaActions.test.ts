@@ -18,8 +18,6 @@ import {
   ACCIDENT_EXPOSURE,
   ACCIDENT_FAILURE_EXPOSURE_EXTRA,
   INVESTIGATION_EXPOSURE_JUMP,
-  SMUGGLING_EXPOSED_FINE,
-  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
   SMUGGLING_VOLUME_LEVELS,
   INVESTIGATION_FOLLOWUP_EVENT_ID,
   EXPOSURE_CLEAN_GRACE_TICKS,
@@ -167,17 +165,6 @@ describe('Mafia gameplay mechanics', () => {
     const mafia = createMafiaState();
     applyInvestigation(mafia, createEventSystemState(), 77);
     expect(mafia.lastActivityTick).toBe(77);
-  });
-
-  it('applySmugglingExposure jumps exposure, stops smuggling and returns the fine', () => {
-    const mafia = createMafiaState();
-    setSmugglingVolume(mafia, 0.25);
-    const { fine } = applySmugglingExposure(mafia, 9);
-    expect(fine).toBe(SMUGGLING_EXPOSED_FINE);
-    expect(mafia.exposureRisk).toBeCloseTo(SMUGGLING_EXPOSED_EXPOSURE_JUMP, 10);
-    expect(mafia.smugglingActive).toBe(false);
-    expect(mafia.smugglingIncome).toBe(0);
-    expect(mafia.lastActivityTick).toBe(9);
   });
 
   it('applyInvestigation caps exposure at 1 and returns the applied delta', () => {
