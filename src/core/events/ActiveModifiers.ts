@@ -12,9 +12,6 @@ import {
   MAX_ACTIVE_MODIFIERS, MODIFIER_FACTOR_MAX, MODIFIER_FACTOR_MIN, TICKS_PER_DAY,
 } from '../config/balance.js';
 
-// TODO(#1568): survey_cost, research_cost and out_of_service are stored, saved and shown but no system reads
-// them yet (surveys and research cost the base price, a broken-down vehicle or closed building still works).
-// Wire the hooks when #1568 lands and delete this comment.
 export type ModifierKind =
   | 'work_stoppage' | 'work_rate' | 'morale_drift' | 'salary_factor' | 'recurring_charge'
   | 'blast_ban' | 'haul_pause' | 'drill_ban' | 'survey_cost' | 'research_cost'
@@ -176,4 +173,26 @@ export function tickModifiers(state: ModifierTickState): void {
       }
     }
   }
+}
+
+/** Ids of vehicles or buildings a live out_of_service modifier takes out of use at `tick`. */
+export function outOfServiceIds(
+  list: readonly ActiveModifier[], kind: 'vehicle' | 'building', tick: number,
+): ReadonlySet<number> {
+  void list; void kind; void tick;
+  return new Set<number>(); // TODO: implement
+}
+
+/** True when a live out_of_service modifier names this vehicle or building. */
+export function isOutOfService(
+  list: readonly ActiveModifier[], kind: 'vehicle' | 'building', id: number, tick: number,
+): boolean {
+  void list; void kind; void id; void tick;
+  return false; // TODO: implement
+}
+
+/** A base price scaled by a modifier factor, rounded to whole cash. */
+export function scaledCost(base: number, factor: number): number {
+  void factor;
+  return base; // TODO: implement
 }

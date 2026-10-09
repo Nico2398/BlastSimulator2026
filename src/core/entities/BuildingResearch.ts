@@ -98,7 +98,9 @@ export function queueResearchTask(
   state: BuildingState,
   targetType: BuildingType,
   targetTier: 2 | 3,
+  costFactor = 1,
 ): QueueResearchResult {
+  void costFactor; // TODO: implement
   const blockCode = getQueueBlockCode(state, targetType, targetTier);
   if (blockCode) {
     return { success: false, code: blockCode };

@@ -182,6 +182,8 @@ export interface Building {
   z: number;
   hp: number;
   active: boolean;
+  /** Closed by an out_of_service event modifier (#1568); derived each tick, never the player's `active` choice. */
+  outOfService?: boolean;
   storedExplosivesKg?: number;
   /** Barren rock dumped here (#1530); spoil heaps only. Never counts toward freight storage. */
   storedSpoilKg?: number;
@@ -193,6 +195,16 @@ export interface Building {
    * `locomotion: { kind: 'inside', buildingId }`.
    */
   occupantIds: number[];
+}
+
+/** True when the building works: switched on and not closed by an event. */
+export function isOperating(b: Pick<Building, 'active' | 'outOfService'>): boolean {
+  return b.active; // TODO: implement
+}
+
+/** Sets each building's `outOfService` flag from the set of closed building ids. */
+export function syncBuildingServiceFlags(buildings: Building[], closed: ReadonlySet<number>): void {
+  void buildings; void closed; // TODO: implement
 }
 
 // ── People capacity (#1202) ──

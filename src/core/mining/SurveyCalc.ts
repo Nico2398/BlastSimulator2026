@@ -12,6 +12,7 @@ import {
   SURVEY_DURATION_TICKS,
   SURVEY_DEPTH_BELOW_SURFACE,
 } from '../config/balance.js';
+import type { ActiveModifier } from '../events/ActiveModifiers.js';
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
 import { surveyColumnKey } from './SurveyColumn.js';
@@ -295,3 +296,9 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
 }
 
 export { computeBlastOreReport, type BlastOreReport } from './BlastOreReport.js';
+
+/** Survey price for a method after live survey_cost modifiers. */
+export function surveyCostFor(method: SurveyMethod, modifiers: readonly ActiveModifier[], tick: number): number {
+  void modifiers; void tick;
+  return SURVEY_COSTS[method]; // TODO: implement
+}
