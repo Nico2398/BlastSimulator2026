@@ -185,7 +185,6 @@ describe('ShadyPanel', () => {
     expect(pressed()).toEqual(['0']);
 
     state.mafia.smugglingVolume = 0.25;
-    state.mafia.smugglingActive = true;
     panel.update(state);
     expect(pressed()).toEqual(['0.25']);
 
@@ -199,7 +198,6 @@ describe('ShadyPanel', () => {
     const { container, panel } = mount();
     const state = stateWithMafiaUnlocked();
     state.mafia.smugglingVolume = 0.25;
-    state.mafia.smugglingActive = true;
     panel.update(state);
     panel.show();
     // Nearest ancestor of a volume button that holds the smuggling heading but not the next card's.
@@ -374,7 +372,6 @@ describe('ShadyPanel', () => {
 
       // The card is rebuilt once the volume changes — the selector has to survive that.
       state.mafia.smugglingVolume = 0.25;
-      state.mafia.smugglingActive = true;
       panel.update(state);
       container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"][data-volume="0"]')!.click();
 

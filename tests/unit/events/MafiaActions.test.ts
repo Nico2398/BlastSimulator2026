@@ -15,16 +15,13 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
 import {
-  ACCIDENT_EXPOSURE,
-  ACCIDENT_FAILURE_EXPOSURE_EXTRA,
-  INVESTIGATION_EXPOSURE_JUMP,
   SMUGGLING_VOLUME_LEVELS,
   INVESTIGATION_FOLLOWUP_EVENT_ID,
   EXPOSURE_CLEAN_GRACE_TICKS,
   EXPOSURE_DECAY_PER_TICK,
 } from '../../../src/core/config/balance.js';
 import { createEventSystemState } from '../../../src/core/events/EventSystem.js';
-import { t, setLocale } from '../../../src/core/i18n/I18n.js';
+import { setLocale } from '../../../src/core/i18n/I18n.js';
 
 const EMPLOYEE_DEFAULTS = {
   activeActionId: null, fatigue: 100,

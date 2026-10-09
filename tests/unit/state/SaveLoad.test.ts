@@ -2267,7 +2267,6 @@ describe('serialize/deserialize — tax audit (#1409)', () => {
   it('the chosen smuggling volume survives a round trip', () => {
     const state = createGame({ seed: 42 });
     state.mafia.smugglingVolume = 0.5;
-    state.mafia.smugglingActive = true;
     const restored = deserialize(serialize(state));
     expect(restored.mafia.smugglingVolume).toBe(0.5);
   });
