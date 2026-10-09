@@ -39,6 +39,8 @@ export interface MafiaState {
   exposureRisk: number; // 0-1, accumulates
   smugglingActive: boolean;
   smugglingIncome: number;
+  /** Fraction of operating income smuggled, one of SMUGGLING_VOLUME_LEVELS or 0 (#1409). */
+  smugglingVolume: number;
   pendingFrames: PendingFrame[];
   /** Tick of the last mafia action or smuggling activity; drives exposure decay (#1411). */
   lastActivityTick: number;
@@ -55,6 +57,7 @@ export function createMafiaState(): MafiaState {
     exposureRisk: 0,
     smugglingActive: false,
     smugglingIncome: 0,
+    smugglingVolume: 0,
     pendingFrames: [],
     lastActivityTick: 0,
   };
@@ -196,6 +199,19 @@ export function toggleSmuggling(mafia: MafiaState): { active: boolean; incomePer
   mafia.smugglingActive = !mafia.smugglingActive;
   mafia.smugglingIncome = mafia.smugglingActive ? SMUGGLE_BASE_INCOME : 0;
   return { active: mafia.smugglingActive, incomePerTick: mafia.smugglingIncome };
+}
+
+/** Sets the smuggled fraction of operating income (#1409). */
+export function setSmugglingVolume(
+  _mafia: MafiaState,
+  _volume: number,
+): { success: true; data: { volume: number } } | { success: false; error: string } {
+  return { success: false, error: 'not implemented' }; // TODO: implement
+}
+
+/** Smuggled income for one tick at `volume` of `operatingIncomePerHour` (#1409). */
+export function smugglingIncomeForTick(_volume: number, _operatingIncomePerHour: number): number {
+  return undefined as unknown as number; // TODO: implement
 }
 
 /**
