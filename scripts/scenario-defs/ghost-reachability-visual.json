@@ -99,14 +99,14 @@
       "description": "Hire the driller. The hire happens while paused and the hologram turns BLUE with no tick: an employee now exists who can walk to the site (unreachableGhostCount 0)."
     },
     {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
       "timeout": 130,
       "description": "The driller builds the warehouse; the hologram is replaced by the real building.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 1,
+          "equals": 2,
           "maxTicks": 400,
           "timeoutMs": 120000
         }
@@ -114,7 +114,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 1,
+          "buildingCount": 2,
           "orderedBuildingCount": 0
         }
       }

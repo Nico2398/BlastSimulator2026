@@ -1449,7 +1449,7 @@
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
       "timeout": 650,
       "role": "player",
-      "description": "Free play sale 4: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338). #1362: interaction-only -- DETONATE's slightly different crew timing re-draws the contract board, and in command mode the level is already won after sale 3 with the stored ore spent, so no fillable offer can appear for a 4th sale.",
+      "description": "Free play sale 4: the rails are lifted and the clock runs; wait on the condition (an ore_sale or rubble_disposal offer that storage already covers in full), never a tick pad. Ore and rubble share one warehouse, so any sale keeps room free for the haulers (#1338). #1574: shared by both modes -- the free opening spoil heap takes barren rock, so rubble is no longer sold from the warehouse and the profit target takes five free-play sales, not three.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1464,13 +1464,12 @@
           "fillableSaleOffered": true
         }
       },
-      "skipWhenLevelEnded": true,
-      "interactionOnly": true
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract accept fillable:true",
       "timeout": 120,
-      "description": "Free play sale 4: click Accept on an offer the site can fill in full (ore or rubble). #1362: interaction-only -- DETONATE's slightly different crew timing re-draws the contract board, and in command mode the level is already won after sale 3 with the stored ore spent, so no fillable offer can appear for a 4th sale.",
+      "description": "Free play sale 4: click Accept on an offer the site can fill in full (ore or rubble). #1574: shared by both modes -- the free opening spoil heap takes barren rock, so rubble is no longer sold from the warehouse and the profit target takes five free-play sales, not three.",
       "role": "player",
       "interaction": [
         {
@@ -1495,13 +1494,12 @@
           "activeContractCount"
         ]
       },
-      "skipWhenLevelEnded": true,
-      "interactionOnly": true
+      "skipWhenLevelEnded": true
     },
     {
       "command": "contract deliver fillable:true amount:100000",
       "timeout": 120,
-      "description": "Free play sale 4: click Deliver; payment lands. #1362: interaction-only -- DETONATE's slightly different crew timing re-draws the contract board, and in command mode the level is already won after sale 3 with the stored ore spent, so no fillable offer can appear for a 4th sale.",
+      "description": "Free play sale 4: click Deliver; payment lands. #1574: shared by both modes -- the free opening spoil heap takes barren rock, so rubble is no longer sold from the warehouse and the profit target takes five free-play sales, not three.",
       "role": "player",
       "interaction": [
         {
@@ -1526,8 +1524,7 @@
           "cash"
         ]
       },
-      "skipWhenLevelEnded": true,
-      "interactionOnly": true
+      "skipWhenLevelEnded": true
     },
     {
       "command": "wait_until field:fillableSaleOffered equals:true max_ticks:6000",
@@ -1548,7 +1545,6 @@
           "fillableSaleOffered": true
         }
       },
-      "interactionOnly": true,
       "skipWhenLevelEnded": true
     },
     {
@@ -1579,7 +1575,6 @@
           "activeContractCount"
         ]
       },
-      "interactionOnly": true,
       "skipWhenLevelEnded": true
     },
     {
@@ -1610,7 +1605,6 @@
           "cash"
         ]
       },
-      "interactionOnly": true,
       "skipWhenLevelEnded": true
     },
     {

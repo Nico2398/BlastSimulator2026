@@ -448,14 +448,14 @@
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
       "description": "Wait for the warehouse to be built.",
       "timeout": 130,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 1,
+          "equals": 2,
           "maxTicks": 400,
           "timeoutMs": 120000
         }
@@ -463,7 +463,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 1,
+          "buildingCount": 2,
           "orderedBuildingCount": 0
         }
       }
