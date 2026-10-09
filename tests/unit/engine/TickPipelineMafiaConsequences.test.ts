@@ -1,13 +1,15 @@
-// #1411 — runTick wires smuggling-exposed and mafia-exposed consequences and exposure decay.
+// #1411 — runTick wires mafia-exposed consequences and exposure decay.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { runTick } from '../../../src/core/engine/TickPipeline.js';
 import { clearEvents } from '../../../src/core/events/EventPool.js';
+import { addIncome } from '../../../src/core/economy/Finance.js';
+import { setSmugglingVolume } from '../../../src/core/events/MafiaActions.js';
+import { bookTaxAuditIncome } from '../../../src/core/events/TaxAudit.js';
 import {
-  SMUGGLING_EXPOSED_FINE,
-  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
+  BANKRUPTCY_THRESHOLD,
   INVESTIGATION_FOLLOWUP_EVENT_ID,
   EXPOSURE_CLEAN_GRACE_TICKS,
   EXPOSURE_DECAY_PER_TICK,
@@ -24,32 +26,49 @@ function tickUntil(state: GameState, emitter: EventEmitter, done: () => boolean)
   if (!done()) throw new Error(`condition not met within ${MAX_TICKS} ticks`);
 }
 
+/** Books heavy 50 % smuggling onto the open books each tick until the tax office audits. */
+function tickUntilAudit(state: GameState, emitter: EventEmitter): void {
+  for (let i = 0; i < 40_000 && state.taxAudit.auditsCount === 0; i++) {
+    bookTaxAuditIncome(state.taxAudit, state.tickCount, 40_000, 40_000);
+    tick(state, emitter);
+  }
+  if (state.taxAudit.auditsCount === 0) throw new Error('no tax audit within 40000 ticks');
+}
+
 describe('runTick mafia consequences (#1411)', () => {
   beforeEach(() => clearEvents());
 
-  it('smuggling exposed: fine charged, exposure jumps, smuggling stops, event emitted', () => {
+  it('smuggling no longer raises exposure per tick (#1409)', () => {
     const state = createGame({ seed: 42 });
-    state.mafia.exposureRisk = 0.5;
-    state.mafia.smugglingActive = true;
-    state.mafia.smugglingIncome = 8000;
+    state.tickCount = 200;
+    addIncome(state.finances, 7_200, 'sales', 'Ore sale', 200);
+    setSmugglingVolume(state.mafia, 1);
     const emitter = new EventEmitter();
-    const fines: number[] = [];
-    emitter.on('mafia:smuggling_exposed', ({ fine }) => fines.push(fine));
+    for (let i = 0; i < 100; i++) tick(state, emitter);
+    expect(state.mafia.exposureRisk).toBe(0);
+    expect(state.arrest.arrested).toBe(false);
+  });
 
-    let before = 0;
-    tickUntil(state, emitter, () => {
-      if (fines.length === 0) before = state.mafia.exposureRisk;
-      return fines.length > 0;
-    });
+  it('a tax-audit conviction adds no exposure (#1409)', () => {
+    const state = createGame({ seed: 42 });
+    state.cash = 20_000;
+    const emitter = new EventEmitter();
+    tickUntilAudit(state, emitter);
+    expect(state.taxAudit.convictions).toBeGreaterThan(0);
+    expect(state.mafia.exposureRisk).toBe(0);
+    expect(state.arrest.arrested).toBe(false);
+  });
 
-    expect(fines).toEqual([SMUGGLING_EXPOSED_FINE]);
-    expect(state.mafia.smugglingActive).toBe(false);
-    expect(state.mafia.smugglingIncome).toBe(0);
-    expect(state.mafia.exposureRisk).toBeGreaterThanOrEqual(before + SMUGGLING_EXPOSED_EXPOSURE_JUMP - 1e-9);
-    const fine = state.finances.transactions.find(
-      tx => tx.type === 'expense' && tx.category === 'fines' && tx.description === 'Smuggling exposed',
-    );
-    expect(fine?.amount).toBe(SMUGGLING_EXPOSED_FINE);
+  it('a regularisation larger than cash is partly deferred, never bankrupting by itself (#1409)', () => {
+    const state = createGame({ seed: 42 });
+    state.cash = 20_000;
+    const emitter = new EventEmitter();
+    tickUntilAudit(state, emitter);
+    // 40 000 smuggled per tick over hundreds of ticks => owed is orders of magnitude above cash.
+    expect(state.taxAudit.debt).toBeGreaterThan(0);
+    expect(state.cash).toBeGreaterThanOrEqual(BANKRUPTCY_THRESHOLD - 1);
+    expect(state.levelEndReason).not.toBe('bankruptcy');
+    expect(state.bankruptcy.bankrupt).toBe(false);
   });
 
   it('mafia exposed: investigation queued once-per-botch and event emitted', () => {

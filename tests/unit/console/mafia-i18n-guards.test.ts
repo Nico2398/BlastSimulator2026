@@ -149,25 +149,25 @@ describe('mafia.ts insufficient funds — English literal + fr divergence', () =
 // ── smuggle toggle ────────────────────────────────────────────────────
 
 describe('mafia.ts smuggle toggle — English literal + fr divergence', () => {
-  const ACTIVATED_EN = 'Smuggling ACTIVATED. Income: $8000/tick. Watch your exposure.';
+  const ACTIVATED_EN = 'Smuggling volume set to 0.25 of operating income.';
   const DEACTIVATED_EN = 'Smuggling DEACTIVATED.';
 
   it('first call activates — matches the exact English literal by default', () => {
     const ctx = makeUnlockedCtx();
-    expect(ctx.state!.mafia.smugglingActive).toBe(false);
+    expect(ctx.state!.mafia.smugglingVolume).toBe(0);
 
-    const result = mafiaCommand(ctx, ['smuggle'], {});
+    const result = mafiaCommand(ctx, ['smuggle'], { volume: '0.25' });
 
     expect(result.success).toBe(true);
     expect(result.output).toBe(ACTIVATED_EN);
-    expect(ctx.state!.mafia.smugglingActive).toBe(true);
+    expect(ctx.state!.mafia.smugglingVolume).toBe(0.25);
   });
 
   it('first call activates — differs from the English literal under locale fr', () => {
     const ctx = makeUnlockedCtx();
     setLocale('fr');
 
-    const result = mafiaCommand(ctx, ['smuggle'], {});
+    const result = mafiaCommand(ctx, ['smuggle'], { volume: '0.25' });
 
     expect(result.success).toBe(true);
     expect(result.output).not.toBe(ACTIVATED_EN);
@@ -175,21 +175,21 @@ describe('mafia.ts smuggle toggle — English literal + fr divergence', () => {
 
   it('second call deactivates — matches the exact English literal by default', () => {
     const ctx = makeUnlockedCtx();
-    mafiaCommand(ctx, ['smuggle'], {}); // first call: activate
+    mafiaCommand(ctx, ['smuggle'], { volume: '0.25' }); // first call: activate
 
-    const result = mafiaCommand(ctx, ['smuggle'], {}); // second call: deactivate
+    const result = mafiaCommand(ctx, ['smuggle'], { volume: 'off' }); // second call: deactivate
 
     expect(result.success).toBe(true);
     expect(result.output).toBe(DEACTIVATED_EN);
-    expect(ctx.state!.mafia.smugglingActive).toBe(false);
+    expect(ctx.state!.mafia.smugglingVolume).toBe(0);
   });
 
   it('second call deactivates — differs from the English literal under locale fr', () => {
     const ctx = makeUnlockedCtx();
-    mafiaCommand(ctx, ['smuggle'], {}); // first call: activate
+    mafiaCommand(ctx, ['smuggle'], { volume: '0.25' }); // first call: activate
     setLocale('fr');
 
-    const result = mafiaCommand(ctx, ['smuggle'], {}); // second call: deactivate
+    const result = mafiaCommand(ctx, ['smuggle'], { volume: 'off' }); // second call: deactivate
 
     expect(result.success).toBe(true);
     expect(result.output).not.toBe(DEACTIVATED_EN);
@@ -410,17 +410,17 @@ describe('mafia.ts status subcommand — English literal + fr divergence', () =>
     const ctx = makeUnlockedCtx();
     const employee = hireTestEmployee(ctx);
     mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
-    mafiaCommand(ctx, ['smuggle'], {});
+    mafiaCommand(ctx, ['smuggle'], { volume: '0.25' });
 
     const mafia = ctx.state!.mafia;
     expect(mafia.pendingFrames.length).toBe(1);
-    expect(mafia.smugglingActive).toBe(true);
+    expect(mafia.smugglingVolume).toBe(0.25);
     expect(mafia.exposureRisk).toBeGreaterThan(0);
 
     const expectedEn = [
       'Mafia unlocked: YES',
       `Exposure risk: ${(mafia.exposureRisk * 100).toFixed(0)}%`,
-      `Smuggling: ACTIVE ($${mafia.smugglingIncome}/tick)`,
+      `Smuggling: ACTIVE (${mafia.smugglingVolume} of operating income)`,
       `Pending frames: ${mafia.pendingFrames.length}`,
     ].join('\n');
 

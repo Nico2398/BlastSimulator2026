@@ -1,0 +1,273 @@
+{
+  "name": "mafia-tax-audit-click",
+  "description": "Issue #1409: the player picks a smuggling volume with a real click in the Shady panel; the tax office eventually audits and, with nothing smuggled, finds everything in order. Smuggling has no per-tick exposure any more, so the run stays unarrested.",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:32 cash:300000",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 mine_type:desert size:32 cash:300000"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 300000,
+          "taxAuditCount": 0
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "corrupt target:judge cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:judge cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:inspector cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:inspector cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:union_leader cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:union_leader cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:politician cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:politician cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:witness cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:witness cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:judge cost:10000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:judge cost:10000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:inspector cost:10000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:inspector cost:10000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:union_leader cost:10000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:union_leader cost:10000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:inspector cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:inspector cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:union_leader cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:union_leader cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "corrupt target:politician cost:5000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "corrupt target:politician cost:5000"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience; ShadyPanel's real bribe button uses the fixed TARGET_COSTS rate. Bribes are only here to unlock the mafia section; a failed bribe also costs a fine, so cash is asserted by direction.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "mafia status",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "mafia status"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "mafia smuggle volume:0.25",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"shady\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-shady-panel [data-action=\"mafia-smuggle\"][data-volume=\"0.25\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-shady-panel [data-action=\"mafia-smuggle\"][data-volume=\"0.25\"]"
+        }
+      ],
+      "description": "role: player (#1409): a real click on a smuggling volume in the Shady panel. A site that earns nothing smuggles nothing, so the audits that follow find nothing.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:taxAuditCount equals:1 max_ticks:30000",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "taxAuditCount",
+          "equals": 1,
+          "maxTicks": 30000,
+          "timeoutMs": 600000
+        }
+      ],
+      "timeout": 700,
+      "role": "setup",
+      "description": "Advances time until the tax office pays its first visit. With nothing earned or smuggled the audit is clean and costs nothing.",
+      "expect": {
+        "equals": {
+          "taxAuditCount": 1
+        }
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}

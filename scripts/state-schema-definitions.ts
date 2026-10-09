@@ -76,6 +76,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   revolted: { type: 'boolean', description: 'Loss condition' },
   ecologicalShutdown: { type: 'boolean', description: 'Loss condition' },
   arrested: { type: 'boolean', description: 'Loss condition' },
+  taxAuditCount: { type: 'number', description: 'Tax audits held this level, clean ones included (#1409)' },
   cash: { type: 'number' },
   profit: { type: 'number', description: 'Total wealth accumulated this level' },
   wellBeing: { type: 'number', description: '0-100 score (ScoreState)' },

@@ -3,7 +3,8 @@
 
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
-import { SCORE_DECAY_RATE, QUALIFICATION_SALARY_BONUS } from '../config/balance.js';
+import { createTaxAuditState } from '../events/TaxAudit.js';
+import { SCORE_DECAY_RATE, QUALIFICATION_SALARY_BONUS, SMUGGLING_MIGRATED_VOLUME } from '../config/balance.js';
 import { syncLogisticsCapacity } from '../economy/Logistics.js';
 import { BASE_SALARIES, calculateQualificationBonus } from '../entities/Employee.js';
 import type { Employee, EmployeeRole } from '../entities/Employee.js';
@@ -565,6 +566,21 @@ function migrateV31ToV32(obj: Record<string, unknown>): Record<string, unknown> 
   return obj;
 }
 
+/**
+ * v35 -> v36 (#1409): tax-audit books appear; the on/off smuggling flag becomes a volume
+ * (an active old operation maps to the 0.25 level, off to 0). Idempotent.
+ */
+function migrateV35ToV36(obj: Record<string, unknown>): Record<string, unknown> {
+  if (typeof obj['taxAudit'] !== 'object' || obj['taxAudit'] === null) obj['taxAudit'] = createTaxAuditState();
+  const mafia = obj['mafia'] as Record<string, unknown> | undefined;
+  if (mafia) {
+    if (typeof mafia['smugglingVolume'] !== 'number') mafia['smugglingVolume'] = mafia['smugglingActive'] === true ? SMUGGLING_MIGRATED_VOLUME : 0;
+    delete mafia['smugglingActive'];
+    delete mafia['smugglingIncome'];
+  }
+  return obj;
+}
+
 /** v34 -> v35 (#1414): EventSystemState gains activeModifiers and nextModifierId. Idempotent. */
 function migrateV34ToV35(obj: Record<string, unknown>): Record<string, unknown> {
   const events = obj['events'] as Record<string, unknown> | undefined;
@@ -918,6 +934,7 @@ export function deserialize(json: string): GameState {
   migrateV32ToV33(obj);
   migrateV33ToV34(obj);
   migrateV34ToV35(obj);
+  migrateV35ToV36(obj);
   // Every migration above has run: the state is now at the current version.
   obj['version'] = SAVE_VERSION;
   backfillRaisedUnqualified(obj);

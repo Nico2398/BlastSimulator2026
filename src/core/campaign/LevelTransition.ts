@@ -8,6 +8,7 @@ import { recordProfit, recordStars, startLevel, type CampaignState } from './Cam
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
 import { getFinancialReport } from '../economy/Finance.js';
+import { closingAudit, settleTaxAudit, taxAuditRng } from '../events/TaxAudit.js';
 
 // ── Types ──
 
@@ -76,9 +77,17 @@ export function checkLevelComplete(
   const level = getLevel(levelId);
   if (!level) return { triggered: false, summary: null };
 
-  const report = getFinancialReport(state.finances, 0);
-  const profit = report.operatingProfit;
+  let profit = getFinancialReport(state.finances, 0).operatingProfit;
   if (profit < level.unlockThreshold) return { triggered: false, summary: null };
+
+  // Closing audit (#1409): the tax office reviews the smuggled books before the win counts.
+  // Without it, smuggling hard just before winning would escape every audit.
+  const audit = closingAudit(state.taxAudit, taxAuditRng(state.seed, state.tickCount), undefined, state.tickCount);
+  if (audit) {
+    settleTaxAudit(state, audit, 0, emitter);
+    profit = getFinancialReport(state.finances, 0).operatingProfit;
+    if (profit < level.unlockThreshold) return { triggered: false, summary: null };
+  }
 
   // Threshold reached — close the session (guards repeat triggers), record, build summary
   state.levelEnded = true;

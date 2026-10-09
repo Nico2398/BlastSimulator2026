@@ -1,5 +1,5 @@
 // BlastSimulator2026 — Mafia gameplay mechanics
-// Actions: arrange "accidents", frame employees, smuggling.
+// Actions: arrange "accidents", frame employees, smuggling volume.
 // Each has cost, success probability, exposure risk.
 
 import type { Random } from '../math/Random.js';
@@ -14,13 +14,11 @@ import {
   ACCIDENT_FAILURE_EXPOSURE_EXTRA,
   FRAMING_START_EXPOSURE,
   FRAMING_DETECTED_EXPOSURE,
-  SMUGGLING_EXPOSURE_PER_TICK,
   INVESTIGATION_EXPOSURE_JUMP,
   INVESTIGATION_FOLLOWUP_EVENT_ID,
   EXPOSURE_CLEAN_GRACE_TICKS,
   EXPOSURE_DECAY_PER_TICK,
-  SMUGGLING_EXPOSED_FINE,
-  SMUGGLING_EXPOSED_EXPOSURE_JUMP,
+  SMUGGLING_VOLUME_LEVELS,
 } from '../config/balance.js';
 
 // ── Config ──
@@ -30,17 +28,15 @@ const ACCIDENT_SUCCESS_RATE = 0.7;
 const FRAME_COST = 5000;
 const FRAME_SUCCESS_RATE = 0.6;
 const FRAME_EVIDENCE_TICKS = 10;
-const SMUGGLE_BASE_INCOME = 8000;
-const SMUGGLE_EXPOSURE_RISK = 0.15;
 
 // ── Exposure tracking ──
 
 export interface MafiaState {
   exposureRisk: number; // 0-1, accumulates
-  smugglingActive: boolean;
-  smugglingIncome: number;
+  /** Fraction of operating income smuggled, one of SMUGGLING_VOLUME_LEVELS or 0 (#1409). */
+  smugglingVolume: number;
   pendingFrames: PendingFrame[];
-  /** Tick of the last mafia action or smuggling activity; drives exposure decay (#1411). */
+  /** Tick of the last mafia action; drives exposure decay (#1411). */
   lastActivityTick: number;
 }
 
@@ -53,8 +49,7 @@ export interface PendingFrame {
 export function createMafiaState(): MafiaState {
   return {
     exposureRisk: 0,
-    smugglingActive: false,
-    smugglingIncome: 0,
+    smugglingVolume: 0,
     pendingFrames: [],
     lastActivityTick: 0,
   };
@@ -189,42 +184,21 @@ export function completeFrame(
   };
 }
 
-/**
- * Start/stop smuggling operation. Generates income but increases exposure.
- */
-export function toggleSmuggling(mafia: MafiaState): { active: boolean; incomePerTick: number } {
-  mafia.smugglingActive = !mafia.smugglingActive;
-  mafia.smugglingIncome = mafia.smugglingActive ? SMUGGLE_BASE_INCOME : 0;
-  return { active: mafia.smugglingActive, incomePerTick: mafia.smugglingIncome };
-}
-
-/**
- * Process smuggling per tick. Returns income earned and whether exposure triggered.
- */
-export function processSmuggling(
+/** Sets the smuggled fraction of operating income (#1409): 0 (off) or one of SMUGGLING_VOLUME_LEVELS. */
+export function setSmugglingVolume(
   mafia: MafiaState,
-  rng: Random,
-  tick: number,
-): { income: number; exposed: boolean } {
-  if (!mafia.smugglingActive) return { income: 0, exposed: false };
-
-  mafia.lastActivityTick = tick;
-  applyExposure(mafia, SMUGGLING_EXPOSURE_PER_TICK);
-  const exposed = rng.chance(SMUGGLE_EXPOSURE_RISK * mafia.exposureRisk);
-
-  return { income: mafia.smugglingIncome, exposed };
+  volume: number,
+): { success: true; data: { volume: number } } | { success: false; error: string } {
+  if (volume !== 0 && !(SMUGGLING_VOLUME_LEVELS as readonly number[]).includes(volume)) {
+    return { success: false, error: 'mafia.smuggle_volume_invalid' };
+  }
+  mafia.smugglingVolume = volume;
+  return { success: true, data: { volume } };
 }
 
-/**
- * Smuggling got caught (#1411): exposure jumps, the operation ends and activity is stamped
- * so decay does not start right after the spike. Returns the fine the caller must charge.
- */
-export function applySmugglingExposure(mafia: MafiaState, tick: number): { fine: number } {
-  applyExposure(mafia, SMUGGLING_EXPOSED_EXPOSURE_JUMP);
-  mafia.smugglingActive = false;
-  mafia.smugglingIncome = 0;
-  mafia.lastActivityTick = tick;
-  return { fine: SMUGGLING_EXPOSED_FINE };
+/** Smuggled income for one tick at `volume` of `operatingIncomePerHour` (#1409). */
+export function smugglingIncomeForTick(volume: number, operatingIncomePerHour: number): number {
+  return volume * operatingIncomePerHour;
 }
 
 /**
@@ -234,7 +208,7 @@ export function isExposed(mafia: MafiaState, rng: Random): boolean {
   return rng.chance(mafia.exposureRisk * 0.05); // 5% of exposure risk per check
 }
 
-export { ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS, SMUGGLE_BASE_INCOME };
+export { ACCIDENT_COST, ACCIDENT_SUCCESS_RATE, FRAME_COST, FRAME_SUCCESS_RATE, FRAME_EVIDENCE_TICKS };
 
 /** Botched action triggers a police investigation: bumps exposure, queues follow-up event. Returns exposure added (#1411). */
 export function applyInvestigation(mafia: MafiaState, events: EventSystemState, tick?: number): number {
@@ -249,7 +223,6 @@ export function applyInvestigation(mafia: MafiaState, events: EventSystemState, 
 
 /** Decay exposure risk after a clean grace period without activity (#1411). */
 export function decayExposure(mafia: MafiaState, tick: number): void {
-  if (mafia.smugglingActive) return;
   if (tick - (mafia.lastActivityTick ?? 0) < EXPOSURE_CLEAN_GRACE_TICKS) return;
   mafia.exposureRisk = Math.max(0, mafia.exposureRisk - EXPOSURE_DECAY_PER_TICK);
 }

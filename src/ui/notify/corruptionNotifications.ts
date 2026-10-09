@@ -6,7 +6,7 @@ import type { NotifyInput } from './NotificationCenter.js';
 import { t } from '../../core/i18n/I18n.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 
-/** Wires corruption:scandal, mafia:investigation, mafia:smuggling_exposed and mafia:exposed to `notify`. */
+/** Wires corruption:scandal, mafia:investigation, mafia:tax_audit and mafia:exposed to `notify`. */
 export function wireCorruptionNotifications(
   emitter: Pick<EventEmitter, 'on'>,
   notify: (input: NotifyInput) => void,
@@ -23,12 +23,10 @@ export function wireCorruptionNotifications(
       title: t('notification.title.investigation'),
       body: t('notification.mafia.investigation'),
     }));
-  emitter.on('mafia:smuggling_exposed', ({ fine }) =>
-    notify({
-      severity: 'critical',
-      title: t('notification.title.investigation'),
-      body: t('notification.mafia.smuggling_exposed', { fine: formatMoney(fine) }),
-    }));
+  emitter.on('mafia:tax_audit', ({ kind, amount }) =>
+    notify(kind === 'clean'
+      ? { severity: 'info', title: t('notification.title.tax_audit'), body: t('notification.mafia.tax_audit_clean') }
+      : { severity: 'critical', title: t('notification.title.tax_audit'), body: t('notification.mafia.tax_audit_regularisation', { amount: formatMoney(amount) }) }));
   emitter.on('mafia:exposed', () =>
     notify({
       severity: 'critical',

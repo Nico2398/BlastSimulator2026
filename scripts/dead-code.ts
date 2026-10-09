@@ -58,6 +58,19 @@ const ALWAYS_LIVE = new Set<string>([
  * silence a finding.
  */
 const LIVE_EXPORTS = new Set<string>([
+  // Balance-model functions and types of the tax audit (#1409): the unit-tested contract (docs/plans/issue-1409-smuggling-balance.md §9); production composes them inside tickTaxAudit/closingAudit.
+  'src/core/events/TaxAudit.ts:AuditBucket',
+  'src/core/events/TaxAudit.ts:DEFAULT_TAX_AUDIT_PARAMS',
+  'src/core/events/TaxAudit.ts:TaxAuditParams',
+  'src/core/events/TaxAudit.ts:auditChance',
+  'src/core/events/TaxAudit.ts:auditClockSpeed',
+  'src/core/events/TaxAudit.ts:auditHazard',
+  'src/core/events/TaxAudit.ts:closingLookBack',
+  'src/core/events/TaxAudit.ts:collectAuditDebt',
+  'src/core/events/TaxAudit.ts:regularisationMultiplier',
+  'src/core/events/TaxAudit.ts:smugglingIncomeRatio',
+  'src/core/events/TaxAudit.ts:targetGain',
+  'src/core/events/TaxAudit.ts:validateTaxAuditParams',
   // The operating-profit capital/running split is the unit-tested contract of Finance (#1363); production reads it only inside getFinancialReport.
   'src/core/economy/Finance.ts:CAPITAL_EXPENSE_CATEGORIES',
   // Unit-tested contract of the capacity unit table (#1377); production reads it only inside the tooltip builder.
