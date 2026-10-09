@@ -978,7 +978,7 @@
       "command": "tick 25",
       "timeout": 90,
       "role": "player",
-      "description": "#1339: train-fragmenter complete -- the course finishes and the driver holds driving.rock_fragmenter. waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick.",
+      "description": "#1339: train-fragmenter complete -- the course finishes and the driver holds driving.rock_fragmenter. waitForTutorialStep loops `tick 1` in interaction mode; command mode needs the explicit tick.",
       "interaction": [
         {
           "type": "waitForTutorialStep",
