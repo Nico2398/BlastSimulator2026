@@ -30,7 +30,7 @@ const CONGRATULATIONS_DISPLAY_MS = 4000;
 const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
 
 interface TutorialOverlayOptions {
-  /** true (default): the 250 ms guide pass may hold/release the clock. false (scenario mode): the overlay never sets or holds state.isPaused, so scripted `tick N` always runs in full (#1550). */
+  /** true (default): the 250 ms guide pass advances steps and may hold/release the clock. false (scenario mode): the timer only refreshes presentation; clock writes and step transitions happen solely at command boundaries (onCommandExecuted), so scripted `tick N` runs in full and step ticks are deterministic (#1550, #1580). */
   clockFollowsTimer?: boolean;
 }
 
@@ -423,18 +423,23 @@ export class TutorialOverlay {
     }
   }
 
-  /** One pass: check completion, move the rails, hold or release the clock. */
+  /** One pass: check completion, move the rails, hold or release the clock. With clockFollowsTimer false it only refreshes presentation. */
   private tickGuide(): void {
     if (!this._active || !this.gameState) return;
 
-    if (this.shortCircuitOnDefeat()) return;
-
-    const step = TUTORIAL_STEPS[this.stepIndex];
-    if (step && step.isComplete(this.gameState, this.snapshots ?? {})) {
-      this.advanceToNextStep();
-      return;
+    // Scenario mode: step transitions and defeat short-circuit belong to the
+    // deterministic command boundary (onCommandExecuted); the wall-clock timer
+    // would race the harness's `tick 1` polling (#1580).
+    if (this.clockFollowsTimer) {
+      if (this.shortCircuitOnDefeat()) return;
+      const done = TUTORIAL_STEPS[this.stepIndex];
+      if (done && done.isComplete(this.gameState, this.snapshots ?? {})) {
+        this.advanceToNextStep();
+        return;
+      }
     }
 
+    const step = TUTORIAL_STEPS[this.stepIndex];
     if (step?.textParamsFor) this.renderText(step);
     this.refreshGuide();
     if (step?.guided === false) {

@@ -361,6 +361,7 @@ function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Pr
 }
 
 // --- Tutorial ---
+// Scenario mode leaves clock writes and step transitions to command boundaries (#1550, #1580).
 const tutorial = new TutorialOverlay(uiContainer, { clockFollowsTimer: !scenarioMode });
 tutorial.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 const tutorialPitLevel = getLevel(TUTORIAL_LEVEL_ID);

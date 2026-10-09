@@ -1306,4 +1306,121 @@ describe('TutorialOverlay clockFollowsTimer option (#1550)', () => {
     vi.advanceTimersByTime(2_000);
     expect(state.isPaused).toBe(true);
   });
+
+  // ── #1580: scenario mode must not let the wall-clock timer move steps ──
+
+  const SCORES_IDX = TUTORIAL_STEPS.findIndex(s => s.id === 'scores');
+  let scoresEl: HTMLElement | null = null;
+
+  beforeEach(() => {
+    scoresEl = document.createElement('div');
+    scoresEl.id = 'bs-hud-scores';
+    document.body.appendChild(scoresEl);
+  });
+
+  afterEach(() => {
+    scoresEl?.remove();
+    scoresEl = null;
+  });
+
+  /** Overlay parked on the 'scores' step; completion is a DOM-only inspect click. */
+  function onScores(options?: { clockFollowsTimer?: boolean }) {
+    const tut = new TutorialOverlay(container, options);
+    const state = createMockState();
+    const commands: string[] = [];
+    tut.setGameConsole(cmd => { commands.push(cmd); return { success: true, output: '' } as any; });
+    tut.start(state);
+    (tut as any).landOnStep(SCORES_IDX);
+    state.isPaused = true;
+    return { tut, state, commands, internals: tut as any };
+  }
+
+  function completeScoresStep(): void {
+    scoresEl!.dataset['inspectCount'] = String(Number(scoresEl!.dataset['inspectCount'] ?? 0) + 1);
+  }
+
+  it('scores step exists and follows a step that has autoCommands', () => {
+    expect(SCORES_IDX).toBeGreaterThanOrEqual(0);
+    expect(TUTORIAL_STEPS[SCORES_IDX + 1]?.autoCommands?.length).toBeGreaterThan(0);
+  });
+
+  it('clockFollowsTimer:false: timer never advances a complete step, pauses, snapshots or runs auto-commands', () => {
+    const { tut, state, commands, internals } = onScores({ clockFollowsTimer: false });
+    overlay = tut;
+    const snapshotsBefore = internals.snapshots;
+    const startTickBefore = internals.rails.stepStartTick;
+    completeScoresStep();
+    vi.advanceTimersByTime(10_000);
+    expect(internals.stepIndex).toBe(SCORES_IDX);
+    expect(state.isPaused).toBe(true);
+    expect(internals.snapshots).toBe(snapshotsBefore);
+    expect(internals.rails.stepStartTick).toBe(startTickBefore);
+    expect(commands).toEqual([]);
+  });
+
+  it('clockFollowsTimer:false: onCommandExecuted still advances a complete step and runs auto-commands once', () => {
+    const { tut, state, commands, internals } = onScores({ clockFollowsTimer: false });
+    overlay = tut;
+    completeScoresStep();
+    vi.advanceTimersByTime(2_000);
+    tut.onCommandExecuted(state);
+    expect(internals.stepIndex).toBe(SCORES_IDX + 1);
+    expect(commands).toEqual(TUTORIAL_STEPS[SCORES_IDX + 1]!.autoCommands);
+  });
+
+  it('clockFollowsTimer:false: result of onCommandExecuted is independent of timers elapsing first (tick 1 race)', () => {
+    const racing = onScores({ clockFollowsTimer: false });
+    const calm = onScores({ clockFollowsTimer: false });
+    overlay = racing.tut;
+    const calmTut = calm.tut;
+    // The calm twin never sees the wall-clock timer: only its tick bump and the command.
+    calm.internals.stopGuide();
+    try {
+      completeScoresStep();
+
+      vi.advanceTimersByTime(1_000);
+      racing.state.tickCount += 1;
+      calm.state.tickCount += 1;
+
+      racing.tut.onCommandExecuted(racing.state);
+      calmTut.onCommandExecuted(calm.state);
+
+      expect(racing.internals.stepIndex).toBe(calm.internals.stepIndex);
+      expect(racing.internals.rails.stepStartTick).toBe(calm.internals.rails.stepStartTick);
+      expect(racing.internals.rails.stepStartTick).toBe(racing.state.tickCount);
+      expect(racing.internals.snapshots).toEqual(calm.internals.snapshots);
+      expect(racing.commands).toEqual(calm.commands);
+    } finally {
+      calmTut.dispose();
+    }
+  });
+
+  it('clockFollowsTimer:false: timer does not short-circuit a defeat, onCommandExecuted does', () => {
+    const { tut, state, internals } = onScores({ clockFollowsTimer: false });
+    overlay = tut;
+    state.levelEnded = true;
+    state.levelEndReason = 'bankruptcy';
+    vi.advanceTimersByTime(1_000);
+    expect(internals.stepIndex).toBe(SCORES_IDX);
+    tut.onCommandExecuted(state);
+    expect(internals.stepIndex).toBe(TOTAL_TUTORIAL_STEPS - 1);
+  });
+
+  it('default clockFollowsTimer: timer still advances a complete step and runs auto-commands', () => {
+    const { tut, commands, internals } = onScores();
+    overlay = tut;
+    completeScoresStep();
+    vi.advanceTimersByTime(2_000);
+    expect(internals.stepIndex).toBe(SCORES_IDX + 1);
+    expect(commands).toEqual(TUTORIAL_STEPS[SCORES_IDX + 1]!.autoCommands);
+  });
+
+  it('default clockFollowsTimer: timer still short-circuits a defeat', () => {
+    const { tut, state, internals } = onScores();
+    overlay = tut;
+    state.levelEnded = true;
+    state.levelEndReason = 'bankruptcy';
+    vi.advanceTimersByTime(1_000);
+    expect(internals.stepIndex).toBe(TOTAL_TUTORIAL_STEPS - 1);
+  });
 });
