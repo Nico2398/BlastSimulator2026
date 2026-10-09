@@ -206,6 +206,11 @@ export class TutorialOverlay {
       this.rails.releaseClock(state);
     }
     this.refreshGuide();
+    // Scenario mode: no wall-clock timer drives the clock, so re-evaluate it
+    // here, on the scripted command boundary (#1550).
+    if (!this.clockFollowsTimer && step.guided !== false) {
+      this.rails.updateClock(state);
+    }
   }
 
   /** Drop the rails class and hide the goal chip (tutorial ending or disposed). */
@@ -441,6 +446,7 @@ export class TutorialOverlay {
       this.pausedEl.style.display = 'none';
       return;
     }
+    if (!this.clockFollowsTimer) return;
     const held = this.rails.updateClock(this.gameState);
     this.pausedEl.style.display = held ? '' : 'none';
   }
