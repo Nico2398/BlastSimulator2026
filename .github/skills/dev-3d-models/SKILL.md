@@ -28,7 +28,7 @@ assets/models/blender/<family>.py   source of truth — edit here
 | `assets/models/blend/<id>.blend` | Blender file for hand iteration, modifiers unapplied | yes |
 | `public/models/<id>.glb` | What the browser fetches and what the tests parse | yes |
 
-`build.py` holds the registry that routes an id to its builder. Vehicles: `_t1` → `vehicles_t1.py`, `_t2` → `vehicles.py`, `_t3` → `vehicles_t3.py`. Buildings: `buildings_t1.py` / `buildings_t3.py` when they define the type, else `buildings.py` for every tier. Workers → `workers.py`, props → `props.py`.
+`build.py` holds the registry that routes an id to its builder. Vehicles: `_t1` → `vehicles_t1.py`, `_t2` → `vehicles.py`, `_t3` → `vehicles_t3.py`. Buildings: `buildings_t1.py` / `buildings_t3.py` when they define the type, else `buildings.py` for every tier. A single-tier type (`SINGLE_TIER_TYPES` in `buildings.py`, mirroring `isSingleTierType`) registers tier 1 only. Workers → `workers.py`, props → `props.py`.
 
 Buildings read their footprint from `building-defs.json`, dumped from the game's own `BuildingDefs` by `npm run models:defs` (which `models:build` runs first), so both sides agree on size.
 
@@ -187,7 +187,7 @@ Budget by **how many copies are drawn**, not by how important the model feels. A
 |--------|------------------|----------------------|-------|
 | Workers | tens | 9.7 k – 10.5 k | 13 merged meshes each |
 | Vehicles t1 / t2 / t3 | tens | 5.8 k – 11.4 k / 9.6 k – 11.1 k / 12.1 k – 17.6 k | tier 3 is the heaviest by design |
-| Buildings t1 / t2 / t3 | tens | 3.5 k – 6.7 k / 3.2 k – 6.3 k / 7.2 k – 13.2 k | 3 merged meshes each |
+| Buildings t1 / t2 / t3 | tens | 3.0 k – 6.7 k / 3.2 k – 6.3 k / 7.2 k – 13.2 k | 3 merged meshes each |
 | Trees (near) | thousands | 84 – 1 292 | test ceiling 1 600 |
 | Trees (far LOD) | thousands | 8 – 154 | test ceiling 220; `finish_far` decimates to 12 % |
 | Grass tufts | up to 9 000 | 64 – 96 | drawn without an outline hull |
@@ -195,7 +195,7 @@ Budget by **how many copies are drawn**, not by how important the model feels. A
 | Rocks, houses | hundreds | 1 280 / 216 – 348 | |
 | `prop_twister` | a handful | 5.8 k | not instanced |
 
-File budget, asserted by `ModelAssets.test.ts`: **≤ 400 KB per `.glb`**, ≤ 4 MB gzipped across every asset (what a host actually serves), ≤ 16 MB raw. Current set: 92 models, 10.2 MB raw, 1.9 MB compressed.
+File budget, asserted by `ModelAssets.test.ts`: **≤ 400 KB per `.glb`**, ≤ 4 MB gzipped across every asset (what a host actually serves), ≤ 16 MB raw. Current set: 90 models, 10.3 MB raw, 2.0 MB compressed.
 
 Where the triangles go:
 

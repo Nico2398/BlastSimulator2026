@@ -129,6 +129,8 @@ export interface SerializableGameState {
   revolted: boolean;
   ecologicalShutdown: boolean;
   arrested: boolean;
+  /** Tax audits held this level, clean ones included (state.taxAudit.auditsCount, #1409). */
+  taxAuditCount: number;
   cash: number;
   profit: number;
   /** The four 0-100 scores (ScoreState) that gate events and contracts. */
@@ -221,6 +223,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     revolted: s.revolt.revolted,
     ecologicalShutdown: s.ecological.shutdown,
     arrested: s.arrest.arrested,
+    taxAuditCount: s.taxAudit.auditsCount,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
     wellBeing: s.scores.wellBeing,

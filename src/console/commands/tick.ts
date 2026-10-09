@@ -15,7 +15,6 @@ import { runTick, type TickReport, type RunTickOptions, type FiredEventReport } 
 import { hasLevelEnded } from '../../core/engine/GameOverConditions.js';
 import { openMovementTrails } from '../../core/engine/Locomotion.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { SMUGGLING_EXPOSED_FINE } from '../../core/config/balance.js';
 import { requireGame } from './commandUtils.js';
 import { pushEventOptionLines } from './eventResolution.js';
 import { formatTaskCompletion } from './tickTaskCompletion.js';
@@ -78,8 +77,12 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] ${line}`);
     }
 
-    if (report.smuggling.exposed) {
-      lines.push(`[tick ${state.tickCount}] ${t('tick.smuggling_exposed', { fine: formatMoney(SMUGGLING_EXPOSED_FINE) })}`);
+    if (report.smuggling.audit) {
+      const audit = report.smuggling.audit;
+      const line = audit.kind === 'clean'
+        ? t('tick.tax_audit_clean')
+        : t('tick.tax_audit_regularisation', { amount: formatMoney(audit.owed) });
+      lines.push(`[tick ${state.tickCount}] ${line}`);
     }
 
     if (report.mafiaExposed) {

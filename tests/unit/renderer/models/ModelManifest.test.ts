@@ -28,6 +28,9 @@ describe('assets/models/manifest.json', () => {
     expect(models['vehicle_drill_rig_t3']!.builder).toBe('vehicles_t3.py');
     expect(models['building_living_quarters_t1']!.builder).toBe('buildings_t1.py');
     expect(models['building_living_quarters_t2']!.builder).toBe('buildings.py');
+    expect(models['building_spoil_heap_t1']!.builder).toBe('buildings_t1.py');
+    expect(models['building_spoil_heap_t2']).toBeUndefined();
+    expect(models['building_spoil_heap_t3']).toBeUndefined();
     expect(models['building_ruin']!.builder).toBe('buildings.py');
     expect(models['prop_grass_0']!.builder).toBe('props.py');
   });

@@ -2,7 +2,7 @@
 // Computes productivity multipliers from active Living Quarters by tier.
 
 import type { BuildingState, BuildingTier } from './Building.js';
-import { getBuildingDef } from './Building.js';
+import { getBuildingDef, isOperating } from './Building.js';
 import {
   LIVING_QUARTERS_WELLBEING_MULTIPLIERS,
   LIVING_QUARTERS_OVERCAPACITY_PENALTY,
@@ -25,7 +25,7 @@ export function getLivingQuartersWellbeingMultiplier(
   state: BuildingState,
   employeeCount: number,
 ): number {
-  const lqs = state.buildings.filter(b => b.active && b.type === 'living_quarters');
+  const lqs = state.buildings.filter(b => isOperating(b) && b.type === 'living_quarters');
 
   if (lqs.length === 0) {
     return LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent;

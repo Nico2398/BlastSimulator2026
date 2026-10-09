@@ -42,7 +42,7 @@ Tier 1 keeps the same node layout at 60–85 % of the tier-2 footprint.
 
 ## Buildings — `buildings_t1.py` / `buildings.py` / `buildings_t3.py`
 
-`building_<type>_t<tier>` for the nine types × tiers 1–3, plus
+`building_<type>_t<tier>` for the eight types × tiers 1–3, the single-tier `building_spoil_heap_t1` (below), plus
 `building_ruin` (shared rubble, stretched over any destroyed footprint).
 
 | Type | t1 | t3 |
@@ -55,6 +55,11 @@ Tier 1 keeps the same node layout at 60–85 % of the tier-2 footprint.
 | living_quarters | The Cells: barred windows, barbed wire, watchtower, ball and chain | Unnecessarily Luxurious Hotel: rooftop infinity pool with slide, gold HOTEL sign, valet |
 | explosive_warehouse | Boom Closet: a two-seat outhouse stuffed with dynamite, lit fuse | Fort Kaboom: crenellated castle, moat, drawbridge, cannons, giant lit bomb |
 | freight_warehouse | The Pile: junk heap under a tarp, bathtub, bent bike, STUFF sign | Hoarder's Paradise: crate towers, gantry crane still adding more, MORE sign |
+
+Single tier: `building_spoil_heap_t1` — The Dump: lumpy barren-rock mound (`TintBody` grey, three
+`displace()` domes), a leaning THE DUMP board on the -Y side the game camera sees, a tipped rusty barrel, a tyre, an
+arrayed row of loose stones. No doors (crewless). Built in `buildings_t1.py`; `build.py` and `registry()` skip tiers 2 and 3, and the
+renderer maps every tier onto it.
 
 Tier 2 is the plain building: a plinth, one storey per tier, window rows, a
 green-framed entry door and an orange-framed exit door on the +Y face, and a

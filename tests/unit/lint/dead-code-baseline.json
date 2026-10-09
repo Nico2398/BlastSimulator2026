@@ -85,7 +85,6 @@
     "src/core/entities/Employee.ts:trainableSkills",
     "src/core/entities/EmployeeXpRules.ts:XpAward",
     "src/core/events/MafiaActions.ts:PendingFrame",
-    "src/core/events/MafiaActions.ts:SMUGGLE_BASE_INCOME",
     "src/core/i18n/glossary.ts:GlossaryEntry",
     "src/core/i18n/glossary.ts:ORPHAN_KEYS",
     "src/core/i18n/glossary.ts:OrphanKeyEntry",

@@ -4,8 +4,8 @@ import type { CommandResult } from '../../ConsoleRunner.js';
 import { t } from '../../../core/i18n/I18n.js';
 import type { MiningContext } from './types.js';
 import { requireGameWithSub } from './shared.js';
-import { runSurvey, SURVEY_METHODS, type SurveyMethod } from '../../../core/mining/SurveyCalc.js';
-import { SURVEY_COSTS, SURVEY_COVERAGE_RADIUS } from '../../../core/config/balance.js';
+import { runSurvey, surveyCostFor, SURVEY_METHODS, type SurveyMethod } from '../../../core/mining/SurveyCalc.js';
+import { SURVEY_COVERAGE_RADIUS } from '../../../core/config/balance.js';
 import { claimForAction, cellsInDisc } from '../siteExpansion.js';
 
 export function surveyCommand(
@@ -95,7 +95,7 @@ export function surveyCommand(
 
   if (!result.success) {
     if (result.error === 'insufficient_funds') {
-      return { success: false, output: `Insufficient funds. ${method} survey costs $${SURVEY_COSTS[method]}.` };
+      return { success: false, output: `Insufficient funds. ${method} survey costs $${surveyCostFor(method, ctx.state!.events.activeModifiers, ctx.state!.tickCount)}.` };
     }
     if (result.error === 'no_surveyor') {
       return { success: false, output: t('mining.survey.no_surveyor') };

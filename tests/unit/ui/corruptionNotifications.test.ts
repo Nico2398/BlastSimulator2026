@@ -29,7 +29,9 @@ const KEYS = [
   'notification.title.investigation',
   'notification.corruption.scandal',
   'notification.mafia.investigation',
-  'notification.mafia.smuggling_exposed',
+  'notification.title.tax_audit',
+  'notification.mafia.tax_audit_clean',
+  'notification.mafia.tax_audit_regularisation',
   'notification.mafia.exposed',
   'event.mafia_police_investigation.title',
   'event.mafia_police_investigation.desc',
@@ -73,7 +75,7 @@ describe('wireCorruptionNotifications', () => {
   }
 
   it('subscribes to all four events', () => {
-    for (const e of ['corruption:scandal', 'mafia:investigation', 'mafia:smuggling_exposed', 'mafia:exposed']) {
+    for (const e of ['corruption:scandal', 'mafia:investigation', 'mafia:tax_audit', 'mafia:exposed']) {
       expect(emitter.has(e)).toBe(true);
     }
   });
@@ -93,11 +95,18 @@ describe('wireCorruptionNotifications', () => {
     expect(notified[0]!.title).toBe((en as Record<string, string>)['notification.title.investigation']);
   });
 
-  it('mafia:smuggling_exposed notifies once with the fine in the text', () => {
-    emitter.fire('mafia:smuggling_exposed', { fine: 7500 });
+  it('mafia:tax_audit notifies once with the amount in the text', () => {
+    emitter.fire('mafia:tax_audit', { kind: 'regularisation', amount: 7500 });
     expect(notified).toHaveLength(1);
     expectLocalized(notified[0]!);
     expect(notified[0]!.body).toMatch(/7[,.\s]?500/);
+  });
+
+  it('a clean mafia:tax_audit says everything is in order', () => {
+    emitter.fire('mafia:tax_audit', { kind: 'clean', amount: 0 });
+    expect(notified).toHaveLength(1);
+    expectLocalized(notified[0]!);
+    expect(notified[0]!.body).toContain('in order');
   });
 
   it('mafia:exposed notifies once', () => {

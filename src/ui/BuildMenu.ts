@@ -56,6 +56,7 @@ import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementK
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWidth } from '../core/config/balance.js';
+import { researchCostFor } from '../core/events/ActiveModifiers.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
@@ -674,6 +675,12 @@ export class BuildMenu extends PanelBase {
     }
   }
 
+  /** Research price after live research_cost modifiers. */
+  private researchCost(base: number): number {
+    const s = this.lastState;
+    return s ? researchCostFor(base, s.events.activeModifiers, s.tickCount) : base;
+  }
+
   /**
    * Label the research button with its cost and duration, or — when a task for
    * that building/tier is already queued — hide it and show the live progress.
@@ -689,7 +696,7 @@ export class BuildMenu extends PanelBase {
     const researchTier = tier !== null && tier > 1 ? (tier as 2 | 3) : null;
     if (researchTier !== null) {
       const def = getResearchTaskDef(type, researchTier);
-      btn.textContent = t('ui.build.queue_research_cost', { cost: formatMoney(def.cost), duration: def.ticks });
+      btn.textContent = t('ui.build.queue_research_cost', { cost: formatMoney(this.researchCost(def.cost)), duration: def.ticks });
     }
     const task = locked && researchTier !== null
       ? this.lastState?.buildings.researchQueue.find((r) => r.targetType === type && r.targetTier === researchTier)

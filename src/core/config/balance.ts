@@ -189,9 +189,6 @@ export const FRAMING_START_EXPOSURE = 0.05;
 /** Exposure added when a framing is detected on completion. */
 export const FRAMING_DETECTED_EXPOSURE = 0.15;
 
-/** Exposure added per tick while smuggling is active. */
-export const SMUGGLING_EXPOSURE_PER_TICK = 0.02;
-
 /** Ticks of worker morale crisis before revolt. */
 export const REVOLT_TICKS = 120;
 /** Ticks before revolt at which warning is shown. */
@@ -1875,12 +1872,6 @@ export const EXPOSURE_CLEAN_GRACE_TICKS = 30;
 /** Exposure risk lost per tick once the clean grace period has passed (#1411). */
 export const EXPOSURE_DECAY_PER_TICK = 0.004;
 
-/** Fine levied when smuggling is exposed (#1411). */
-export const SMUGGLING_EXPOSED_FINE = 25000;
-
-/** Exposure risk added when smuggling is exposed (#1411). */
-export const SMUGGLING_EXPOSED_EXPOSURE_JUMP = 0.1;
-
 // ─── Hiring pool ────────────────────────────────────────────────────────────────
 
 /** Candidates offered per role. */
@@ -2140,3 +2131,47 @@ export const LICENCE_COURSE_FEE: Record<2 | 3, number> = { 2: TRAINING_BASE_FEE 
 
 /** Course duration multiplier for raising a driving licence to level 2 or 3 (#1524). */
 export const LICENCE_COURSE_TICKS_MULT: Record<2 | 3, number> = { 2: 1.5, 3: 2 };
+
+// ── Smuggling vs tax audit (#1409) ──
+
+/** Period the three audit chances refer to (90 days). */
+export const TAX_AUDIT_TIME_BASE_TICKS = 2160;
+
+/** Chance of an audit within one time base at 0 % smuggling share. */
+export const TAX_AUDIT_CHANCE_AT_ZERO = 0.2;
+
+/** Chance of an audit within one time base at the sweet-spot share. */
+export const TAX_AUDIT_CHANCE_AT_SWEET_SPOT = 0.5;
+
+/** Chance of an audit within one time base at the max-risk share or above. */
+export const TAX_AUDIT_CHANCE_AT_MAX = 0.8;
+
+/** Expected gain (fraction of honest income) at the sweet-spot share. */
+export const TAX_AUDIT_GAIN_AT_SWEET_SPOT = 0.1;
+
+/** Expected gain (fraction of honest income) at the max-risk share. */
+export const TAX_AUDIT_GAIN_AT_MAX = -0.25;
+
+/** Smuggling share of the sweet spot (s1). */
+export const TAX_AUDIT_SWEET_SPOT_SHARE = 0.2;
+
+/** Smuggling share from which the audit chance stops rising (s2). */
+export const TAX_AUDIT_MAX_RISK_SHARE = 0.5;
+
+/** Ticks without any audit after an audit. */
+export const TAX_AUDIT_COOLDOWN_TICKS = 720;
+
+/** Ticks over which the audit clock speeds back up after the cooldown. */
+export const TAX_AUDIT_RAMP_TICKS = 720;
+
+/** Added to the regularisation multiplier per earlier conviction this level. */
+export const TAX_RECIDIVISM_SURCHARGE = 0.2;
+
+/** Cap on counted convictions for the recidivism surcharge. */
+export const TAX_RECIDIVISM_MAX_STEPS = 2;
+
+/** Selectable smuggling volumes, as a fraction of operating income. */
+export const SMUGGLING_VOLUME_LEVELS = [0.1, 0.25, 0.5, 1] as const;
+
+/** Volume an old save's active smuggling operation migrates to (#1409). */
+export const SMUGGLING_MIGRATED_VOLUME = 0.25;

@@ -182,6 +182,8 @@ export interface Building {
   z: number;
   hp: number;
   active: boolean;
+  /** Closed by an out_of_service event modifier (#1568); derived each tick, never the player's `active` choice. */
+  outOfService?: boolean;
   storedExplosivesKg?: number;
   /** Barren rock dumped here (#1530); spoil heaps only. Never counts toward freight storage. */
   storedSpoilKg?: number;
@@ -193,6 +195,19 @@ export interface Building {
    * `locomotion: { kind: 'inside', buildingId }`.
    */
   occupantIds: number[];
+}
+
+/** True when the building works: switched on and not closed by an event. */
+export function isOperating(b: Pick<Building, 'active' | 'outOfService'>): boolean {
+  return b.active && !b.outOfService;
+}
+
+/** Sets each building's `outOfService` flag from the set of closed building ids. */
+export function syncBuildingServiceFlags(buildings: Building[], closed: ReadonlySet<number>): void {
+  for (const b of buildings) {
+    if (closed.has(b.id)) b.outOfService = true;
+    else delete b.outOfService;
+  }
 }
 
 // ── People capacity (#1202) ──
@@ -473,7 +488,7 @@ export function getMaxBuildingTier(state: BuildingState): number {
 export function getStorageCapacity(state: BuildingState): number {
   let total = 0;
   for (const b of state.buildings) {
-    if (b.active && b.type === 'freight_warehouse') {
+    if (isOperating(b) && b.type === 'freight_warehouse') {
       total += getBuildingDef(b.type, b.tier).capacity;
     }
   }
@@ -507,7 +522,7 @@ export function findNearestActiveBuildingOfType(
   let nearest: Building | null = null;
   let bestDistSq = Infinity;
   for (const b of buildings.buildings) {
-    if (!b.active || b.type !== type) continue;
+    if (!isOperating(b) || b.type !== type) continue;
     const distSq = (b.x - x) ** 2 + (b.z - z) ** 2;
     if (distSq < bestDistSq) {
       bestDistSq = distSq;

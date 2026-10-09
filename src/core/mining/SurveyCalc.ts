@@ -12,6 +12,7 @@ import {
   SURVEY_DURATION_TICKS,
   SURVEY_DEPTH_BELOW_SURFACE,
 } from '../config/balance.js';
+import { factorFor, scaledCost, type ActiveModifier } from '../events/ActiveModifiers.js';
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
 import { surveyColumnKey } from './SurveyColumn.js';
@@ -238,12 +239,12 @@ export interface RunSurveyResult {
  * Validate preconditions, deduct cost, and enqueue a `survey` PendingAction.
  *
  * Guards (checked in order, state is never mutated on failure):
- * 1. `state.cash >= SURVEY_COSTS[method]` — otherwise returns `'insufficient_funds'`.
+ * 1. `state.cash >= surveyCostFor(...)` — otherwise returns `'insufficient_funds'`.
  * 2. At least one alive employee with a `'geology'` qualification exists —
  *    otherwise returns `'no_surveyor'`.
  *
  * On success the function:
- * - Deducts `SURVEY_COSTS[method]` from `state.cash`.
+ * - Deducts `surveyCostFor(...)` from `state.cash`.
  * - Pushes a `PendingAction` (type `'survey'`, skill `'geology'`) with a
  *   payload containing `{ method, centerX, centerZ }`.
  * - Pushes a matching `GhostPreview` for the renderer.
@@ -254,7 +255,7 @@ export interface RunSurveyResult {
  */
 export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyResult {
   const { method, centerX, centerZ } = params;
-  const cost = SURVEY_COSTS[method];
+  const cost = surveyCostFor(method, state.events.activeModifiers, state.tickCount);
 
   if (state.cash < cost) {
     return { success: false, error: 'insufficient_funds' };
@@ -287,7 +288,7 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     targetZ: centerZ,
     targetY: 0,
     // durationTicks is the base; computeActionWorkTicks scales it by geology proficiency.
-    payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method] },
+    payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method], orderCost: cost },
     targetEmployeeId: null,
   });
 
@@ -295,3 +296,8 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
 }
 
 export { computeBlastOreReport, type BlastOreReport } from './BlastOreReport.js';
+
+/** Survey price for a method after live survey_cost modifiers. */
+export function surveyCostFor(method: SurveyMethod, modifiers: readonly ActiveModifier[], tick: number): number {
+  return scaledCost(SURVEY_COSTS[method], factorFor(modifiers, 'survey_cost', tick));
+}

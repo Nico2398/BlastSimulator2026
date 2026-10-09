@@ -19,9 +19,9 @@ import type { CancelledResearch } from '../entities/Building.js';
 import type { ArrivalGateResult } from './ArrivalGate.js';
 import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
-import { addExpense, addIncome, chargeFine, deductExpense } from '../economy/Finance.js';
+import { addExpense, addIncome, deductExpense } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
-import { factorFor, holdForcedWeather, salaryFactor, tickModifiers } from '../events/ActiveModifiers.js';
+import { factorFor, holdForcedWeather, outOfServiceIds, salaryFactor, tickModifiers } from '../events/ActiveModifiers.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
 import { tickHoleWater } from '../mining/WetHoles.js';
 import { dominantRockUnderHole } from '../mining/ExplosiveRockFit.js';
@@ -31,7 +31,7 @@ import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
-import { tickResearch, getTotalOperatingCost } from '../entities/Building.js';
+import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags } from '../entities/Building.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../entities/EmployeeNeeds.js';
 import {
@@ -58,7 +58,9 @@ import {
   SCORE_VIBRATION_WINDOW_TICKS,
   VILLAGE_VIBRATION_SCORE_GAIN,
 } from '../config/balance.js';
-import { isExposed, processSmuggling, applySmugglingExposure, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
+import { isExposed, smugglingIncomeForTick, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
+import { bookTaxAuditIncome, tickTaxAudit, settleTaxAudit, taxAuditRng, type AuditOutcome } from '../events/TaxAudit.js';
+import { getOperatingIncomePerHour } from '../economy/OperatingFinance.js';
 import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { settleAwaitingFundsCharges } from '../mining/ChargeOrder.js';
@@ -101,7 +103,7 @@ export interface TickReport {
   contractsExpired: Array<{ contractId: number; penalty: number; deliveredKg: number; paid: number }>;
   /** Stored ore automatically delivered to active contracts this tick. */
   contractsDelivered: Array<{ contractId: number; kg: number; payment: number; bonus: number; completed: boolean }>;
-  smuggling: { income: number; exposed: boolean };
+  smuggling: { income: number; audit: AuditOutcome | null };
   mafiaExposed: boolean;
   needEvents: FiredEventReport[];
   trainingCompletions: TrainingCompletion[];
@@ -135,6 +137,15 @@ function recentVillageVibration(state: GameState): number {
   return report.maxVibration * VILLAGE_VIBRATION_SCORE_GAIN;
 }
 
+/** Books the tick's income into the audit books, draws the audit, pays what cash allows. */
+function runTaxAuditStep(state: GameState, smugglingIncome: number, emitter: EventEmitter): AuditOutcome | null {
+  const legit = getOperatingIncomePerHour(state.finances, state.tickCount, 1);
+  bookTaxAuditIncome(state.taxAudit, state.tickCount, legit, smugglingIncome);
+  const outcome = tickTaxAudit(state.taxAudit, state.tickCount, taxAuditRng(state.seed, state.tickCount));
+  settleTaxAudit(state, outcome, legit + smugglingIncome, emitter);
+  return outcome;
+}
+
 /**
  * Advance `state` by exactly one tick, mutating it in place, and report what
  * happened. The single core-owned tick step (dev-architecture) — console and
@@ -159,6 +170,7 @@ export function runTick(
 
   // 0a. Event modifiers (#1414) — lapsed ones drop, recurring charges and morale drift apply
   tickModifiers(state);
+  syncBuildingServiceFlags(state.buildings.buildings, outOfServiceIds(state.events.activeModifiers, 'building', state.tickCount));
 
   // 0. Weather — own persisted rng stream, advanced before events read it; a forced
   // weather overrides the result without drawing from that stream
@@ -207,17 +219,15 @@ export function runTick(
     refreshHiringPool(state.hiringPool, state.seed, state.tickCount);
   }
 
-  // 5. Smuggling income
-  const smugResult = processSmuggling(state.mafia, rng, state.tickCount);
-  if (smugResult.income > 0) {
-    state.cash += smugResult.income;
-    addIncome(state.finances, smugResult.income, 'smuggling', 'Smuggling', state.tickCount);
-  }
-  if (smugResult.exposed) {
-    // Exposure costs a fine, raises exposure and ends the operation (#1411).
-    const { fine } = applySmugglingExposure(state.mafia, state.tickCount);
-    chargeFine(state, fine, 'Smuggling exposed', state.tickCount);
-    emitter.emit('mafia:smuggling_exposed', { fine });
+  // 5. Smuggling income — a chosen fraction of trailing operating income, read before
+  // this income is booked so it never compounds on itself (#1409).
+  const smugglingIncome = smugglingIncomeForTick(
+    state.mafia.smugglingVolume,
+    getOperatingIncomePerHour(state.finances, state.tickCount),
+  );
+  if (smugglingIncome > 0) {
+    state.cash += smugglingIncome;
+    addIncome(state.finances, smugglingIncome, 'smuggling', 'Smuggling', state.tickCount);
   }
 
   // 6. Mafia exposure check
@@ -392,6 +402,10 @@ export function runTick(
   // rock): they end up on foot where it stood.
   releaseOccupantsOfRemovedVehicles(state, emitter);
 
+  // 8z. Tax audit (#1409) — books this tick's income, may audit, and settles the debt from
+  // cash above the bankruptcy floor; the rest is collected from later income. Own rng stream.
+  const taxAudit = state.levelEnded ? null : runTaxAuditStep(state, smugglingIncome, emitter);
+
   // 9. Win/lose condition checks (level complete, bankruptcy, ecological
   // shutdown, arrest, worker revolt).
   const gameOver = checkGameOverConditions(state, emitter);
@@ -424,7 +438,7 @@ export function runTick(
     tick: state.tickCount,
     contractsExpired: expired,
     contractsDelivered,
-    smuggling: smugResult,
+    smuggling: { income: smugglingIncome, audit: taxAudit },
     mafiaExposed,
     needEvents,
     trainingCompletions,

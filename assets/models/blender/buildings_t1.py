@@ -12,6 +12,8 @@
                      scavenged watchtower with a cold spotlight, cell doors 1 and 3 (2 welded shut).
 * explosive_warehouse Boom Closet: a two-seat outhouse stuffed with dynamite, TNT stencil, lit fuse, danger sign, sandbags.
 * freight_warehouse  The Pile: a junk heap under a tarp on crooked poles, bathtub, bent bike, scale, STUFF sign, rats.
+* spoil_heap         The Dump (single tier): a lumpy mound of barren rock, a leaning THE DUMP board (on the -Y side the game camera sees), a tipped
+                     rusty barrel and a half-buried tyre. No doors: it takes no crew.
 
 Same axes as buildings.py: the model is centred on its footprint, the FRONT
 (entry and exit doors) is +Y, ground is z = 0. Every tier-1 model stays under
@@ -27,7 +29,7 @@ import bmesh
 from mathutils import Matrix, Vector
 
 from common import (
-    array, assign, bevel, box, capsule, cylinder, hex_rgb, icosphere, material, pivot, prism, rotate,
+    array, assign, bevel, box, capsule, cylinder, displace, hex_rgb, icosphere, material, pivot, prism, rotate,
     solidify, sphere, srgb_to_linear, torus,
 )
 import buildings as B
@@ -42,6 +44,7 @@ DULL = {
     'living_quarters': 0xAEB4B8,
     'explosive_warehouse': 0xA55A4A,
     'freight_warehouse': 0x7A756E,
+    'spoil_heap': 0x8A8782,
 }
 
 
@@ -1476,6 +1479,58 @@ def build_freight_warehouse(sx, sz, ex, xx, m):
     pivot('Body', (0, 0, 0), parts)
 
 
+HEAP_PEAK_SEEDS = (3, 7, 11)  # displace() noise offsets, one per lump so the three do not share a skin
+
+
+def _dome(name: str, radius: float, loc, scale):
+    """A displaceable boulder with its lower half removed: the heap's base is flat, never below ground."""
+    ob = icosphere(name, radius, loc=loc, subdivisions=4, scale=scale)
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.001], context='VERTS')
+    bm.to_mesh(ob.data)
+    bm.free()
+    return ob
+
+
+def build_spoil_heap(sx, sz, ex, xx, m):
+    """The Dump: three overlapping lumps of barren rock, a hand-painted THE DUMP board leaning in front,
+    a rusty barrel tipped on its side and a tyre half-buried in the flank. Doorless: nobody works here."""
+    parts = dirt_lot(sx, sz, m)
+    z0 = 0.08
+    lumps = ((0.0, 0.2, 1.0, (1.0, 0.9, 1.3), 0.5, m['body']),
+             (-0.5, -0.15, 0.7, (1.0, 1.0, 0.9), 0.4, m['rock']),
+             (0.55, 0.0, 0.62, (1.0, 1.1, 0.85), 0.4, m['body']))
+    for k, (lx, ly, r, sc, dis, mat) in enumerate(lumps):
+        lump = _dome(f'Heap.Lump{k}', r, (lx, ly, z0 + 0.04), sc)
+        displace(lump, dis, 0.4, HEAP_PEAK_SEEDS[k])
+        assign(lump, mat)
+        parts.append(lump)
+    # Loose stones strewn along the toe of the heap: one stone, arrayed.
+    stone = icosphere('Heap.Stone', 0.11, loc=(-0.55, -0.78, z0 + 0.06), subdivisions=1, scale=(1.2, 1.0, 0.7))
+    array(stone, 5, (0.27, -0.04, 0.0))
+    assign(stone, m['rubble2'])
+    parts.append(stone)
+    # THE DUMP: a plank board on a leaning post, in front of the heap.
+    lean = 12
+    bx, by, bz = 0.42, -0.9, 0.82
+    post = cylinder('Sign.Post', 0.04, 0.76, loc=(bx, by + 0.03, z0 + 0.38), segments=6, rot=(6, 0, 0))
+    assign(post, m['plank2'])
+    board = box('Sign.Board', (1.25, 0.06, 0.3), loc=(bx, by, bz), rot=(0, 0, lean))
+    bevel(board, 0.02, 2)
+    assign(board, m['plank'])
+    parts += [post, board]
+    parts += text('SignText', 'THE DUMP', _yawed((bx, by - 0.04, bz), lean, (0, 0, 0)), 0.15, m['red'], yaw=lean)
+    # A rusty barrel tipped over by the side, and a tyre half-sunk in the heap's flank.
+    barrel_ = cylinder('Barrel', 0.2, 0.5, loc=(-0.78, -0.9, z0 + 0.2), axis='X', segments=14, rot=(0, 0, -35))
+    bevel(barrel_, 0.025, 2)
+    assign(barrel_, m['rust'])
+    tyre = torus('Tyre', 0.22, 0.07, loc=(0.9, -0.5, z0 + 0.3), rot=(70, 0, -20), major_segments=16, minor_segments=8)
+    assign(tyre, m['dark'])
+    parts += [barrel_, tyre]
+    pivot('Body', (0, 0, 0), parts)
+
+
 BUILDERS = {
     'driving_center': build_driving_center,
     'blasting_academy': build_blasting_academy,
@@ -1485,6 +1540,7 @@ BUILDERS = {
     'living_quarters': build_living_quarters,
     'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
+    'spoil_heap': build_spoil_heap,
 }
 
 

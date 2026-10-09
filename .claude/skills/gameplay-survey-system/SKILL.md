@@ -78,3 +78,5 @@ After a blast, `computeBlastOreReport()` calculates actual ore yield from destro
 - Surveyed voxels: color-coded ore density overlay, opacity = confidence
 - Seismic surveys disturb nearby buildings: −10 HP per survey if building within 5 cells
 
+
+Survey price (#1568): `surveyCostFor(method, modifiers, tick)` = `SURVEY_COSTS[method]` scaled by live `survey_cost` modifiers, rounded. `runSurvey` checks, charges and books that price and stores it as the action's `orderCost`, so cancelling refunds what was paid; console and Survey panel display the same scaled price.

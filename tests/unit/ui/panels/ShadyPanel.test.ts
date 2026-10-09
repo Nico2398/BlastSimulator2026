@@ -9,11 +9,16 @@ import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
 import { TARGET_COSTS } from '../../../../src/core/economy/Corruption.js';
 import { ACCIDENT_COST, FRAME_COST } from '../../../../src/core/events/MafiaActions.js';
+import { SMUGGLING_VOLUME_LEVELS } from '../../../../src/core/config/balance.js';
+
+const mounted: ShadyPanel[] = [];
 
 function mount(): { container: HTMLDivElement; panel: ShadyPanel } {
   const container = document.createElement('div');
   document.body.appendChild(container);
-  return { container, panel: new ShadyPanel(container) };
+  const panel = new ShadyPanel(container);
+  mounted.push(panel);
+  return { container, panel };
 }
 
 function stateWithMafiaUnlocked(): GameState {
@@ -29,7 +34,12 @@ function stateWithMafiaUnlocked(): GameState {
 }
 
 describe('ShadyPanel', () => {
-  afterEach(() => { setLocale('en'); vi.useRealTimers(); });
+  afterEach(() => {
+    setLocale('en');
+    vi.useRealTimers();
+    // A test that fails before its own dispose() must not leave a live panel for the next one.
+    while (mounted.length > 0) mounted.pop()!.dispose();
+  });
 
   it('carries a stable root id and is hidden by default', () => {
     const { container, panel } = mount();
@@ -127,27 +137,74 @@ describe('ShadyPanel', () => {
     panel.dispose();
   });
 
-  it('smuggling toggle sends the real mafia smuggle command', () => {
+  it('offers one volume button per configured level plus an Off button', () => {
+    const { container, panel } = mount();
+    panel.update(stateWithMafiaUnlocked());
+    panel.show();
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('[data-action="mafia-smuggle"]'));
+    expect(buttons.map(b => b.dataset['volume'])).toEqual(['0', ...SMUGGLING_VOLUME_LEVELS.map(String)]);
+    panel.dispose();
+  });
+
+  it('each volume button sends the real mafia smuggle volume command', () => {
     const { container, panel } = mount();
     panel.update(stateWithMafiaUnlocked());
     panel.show();
     const calls: string[] = [];
     panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
 
-    const toggleBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === t('ui.shady.smuggling_start'));
-    toggleBtn!.click();
-    expect(calls).toEqual(['mafia smuggle']);
+    for (const level of SMUGGLING_VOLUME_LEVELS) {
+      container.querySelector<HTMLButtonElement>(`[data-action="mafia-smuggle"][data-volume="${level}"]`)!.click();
+    }
+    container.querySelector<HTMLButtonElement>('[data-action="mafia-smuggle"][data-volume="0"]')!.click();
+    expect(calls).toEqual([
+      ...SMUGGLING_VOLUME_LEVELS.map(l => `mafia smuggle volume:${l}`),
+      'mafia smuggle volume:0',
+    ]);
     panel.dispose();
   });
 
-  it('shows ACTIVE with the real income once smuggling is running', () => {
+  it('never sends the bare toggle command', () => {
+    const { container, panel } = mount();
+    panel.update(stateWithMafiaUnlocked());
+    panel.show();
+    const calls: string[] = [];
+    panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
+    for (const b of Array.from(container.querySelectorAll<HTMLButtonElement>('[data-action="mafia-smuggle"]'))) b.click();
+    expect(calls).not.toContain('mafia smuggle');
+    panel.dispose();
+  });
+
+  it('highlights the active volume only (Off when nothing is smuggled)', () => {
     const { container, panel } = mount();
     const state = stateWithMafiaUnlocked();
-    state.mafia.smugglingActive = true;
-    state.mafia.smugglingIncome = 8000;
     panel.update(state);
     panel.show();
-    expect(container.textContent).toContain(t('ui.shady.smuggling_active', { income: 8000 }));
+    const pressed = () => Array.from(container.querySelectorAll<HTMLButtonElement>('[data-action="mafia-smuggle"]'))
+      .filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset['volume']);
+    expect(pressed()).toEqual(['0']);
+
+    state.mafia.smugglingVolume = 0.25;
+    panel.update(state);
+    expect(pressed()).toEqual(['0.25']);
+
+    state.mafia.smugglingVolume = 1;
+    panel.update(state);
+    expect(pressed()).toEqual(['1']);
+    panel.dispose();
+  });
+
+  it('shows no audit probability, sweet-spot hint or risk percentage in the smuggling card', () => {
+    const { container, panel } = mount();
+    const state = stateWithMafiaUnlocked();
+    state.mafia.smugglingVolume = 0.25;
+    panel.update(state);
+    panel.show();
+    // Nearest ancestor of a volume button that holds the smuggling heading but not the next card's.
+    let card: HTMLElement = container.querySelector<HTMLElement>('[data-action="mafia-smuggle"]')!;
+    while (!(card.textContent ?? '').includes(t('ui.shady.smuggling_label'))) card = card.parentElement!;
+    expect(card.textContent).not.toContain(t('ui.shady.accident_label'));
+    expect(card.textContent).not.toMatch(/\d+\s*%/);
     panel.dispose();
   });
 
@@ -303,7 +360,7 @@ describe('ShadyPanel', () => {
       panel.dispose();
     });
 
-    it('[data-action="mafia-smuggle"] resolves to the smuggling toggle in both its states', () => {
+    it('[data-action="mafia-smuggle"][data-volume] resolves to the volume buttons, surviving a rebuild', () => {
       const { container, panel } = mount();
       const state = stateWithMafiaUnlocked();
       panel.update(state);
@@ -311,19 +368,14 @@ describe('ShadyPanel', () => {
       const calls: string[] = [];
       panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
 
-      const startBtn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"]');
-      expect(startBtn!.textContent).toBe(t('ui.shady.smuggling_start'));
-      startBtn!.click();
+      container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"][data-volume="0.25"]')!.click();
 
-      // The button is rebuilt (label + variant change) once smuggling runs —
-      // the selector has to survive that rebuild, not just the first render.
-      state.mafia.smugglingActive = true;
+      // The card is rebuilt once the volume changes — the selector has to survive that.
+      state.mafia.smugglingVolume = 0.25;
       panel.update(state);
-      const stopBtn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"]');
-      expect(stopBtn!.textContent).toBe(t('ui.shady.smuggling_stop'));
-      stopBtn!.click();
+      container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"][data-volume="0"]')!.click();
 
-      expect(calls).toEqual(['mafia smuggle', 'mafia smuggle']);
+      expect(calls).toEqual(['mafia smuggle volume:0.25', 'mafia smuggle volume:0']);
       panel.dispose();
     });
 
@@ -441,13 +493,13 @@ describe('ShadyPanel', () => {
       panel.dispose();
     });
 
-    it('the mafia-smuggle toggle surfaces cmdResult.output in the status area on click', () => {
+    it('a mafia-smuggle volume button surfaces cmdResult.output in the status area on click', () => {
       const { container, panel } = mount();
       panel.update(stateWithMafiaUnlocked());
       panel.show();
       panel.setGameConsole(() => ({ success: true, output: 'Smuggling operation started.' }));
 
-      const btn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"]');
+      const btn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"][data-volume="0.5"]');
       btn!.click();
 
       expect(container.querySelector('#bs-shady-status')!.textContent).toBe('Smuggling operation started.');

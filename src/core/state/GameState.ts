@@ -48,6 +48,8 @@ import type { CorruptionState } from '../economy/Corruption.js';
 import { createCorruptionState } from '../economy/Corruption.js';
 import type { MafiaState } from '../events/MafiaActions.js';
 import { createMafiaState } from '../events/MafiaActions.js';
+import type { TaxAuditState } from '../events/TaxAudit.js';
+import { createTaxAuditState } from '../events/TaxAudit.js';
 import type { CampaignState } from '../campaign/Campaign.js';
 import { createCampaignState } from '../campaign/Campaign.js';
 import type { BankruptcyState } from '../campaign/Bankruptcy.js';
@@ -153,7 +155,7 @@ import type { RampWidth } from '../config/balance.js';
 // v32 -> v33: Vehicle.payload becomes Vehicle.cargo[] (#1370). See SaveLoad.ts's migrateV32ToV33.
 // v33 -> v34: pendingDetonation (#1362). See SaveLoad.ts's migrateV33ToV34.
 // v34 -> v35: events.activeModifiers + nextModifierId (#1414). See SaveLoad.ts's migrateV34ToV35.
-export const SAVE_VERSION = 35;
+export const SAVE_VERSION = 36;
 
 export interface GameConfig {
   seed: number;
@@ -452,6 +454,8 @@ export interface GameState {
   corruption: CorruptionState;
   /** Mafia state (exposure, smuggling, frames). */
   mafia: MafiaState;
+  /** Tax-audit books for smuggled income (#1409). */
+  taxAudit: TaxAuditState;
 
   // ── Campaign & Win/Lose ──
 
@@ -612,6 +616,7 @@ export function createGame(config: GameConfig): GameState {
     events: createEventSystemState(config.eventFreqMultiplier ?? 1),
     corruption: createCorruptionState(),
     mafia: createMafiaState(),
+    taxAudit: createTaxAuditState(),
     campaign: createCampaignState(),
     bankruptcy: createBankruptcyState(),
     arrest: createArrestState(),

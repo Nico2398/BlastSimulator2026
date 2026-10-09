@@ -42,8 +42,8 @@ export interface GameEventMap {
   'corruption:scandal': { target: string; fine: number };
   /** Botched mafia action led to a police investigation (#1411). */
   'mafia:investigation': { outcomeKey: string };
-  /** Smuggling was exposed; `fine` charged (#1411). */
-  'mafia:smuggling_exposed': { fine: number };
+  /** A tax audit ended (#1409): `amount` is the regularisation owed, 0 for a clean audit. */
+  'mafia:tax_audit': { kind: 'clean' | 'regularisation'; amount: number };
   /** Mafia exposure crossed the exposed threshold (#1411). */
   'mafia:exposed': Record<string, never>;
   'employee:need_warning': { employeeId: number; needKey: string };

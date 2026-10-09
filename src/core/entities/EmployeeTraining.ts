@@ -8,7 +8,7 @@
 import type { Employee, EmployeeState, SkillCategory, TrainingState, LicenceLevel } from './Employee.js';
 import { calculateSalary } from './Employee.js';
 import type { Building, BuildingType, BuildingTier } from './Building.js';
-import { getBuildingPeopleCapacity } from './Building.js';
+import { getBuildingPeopleCapacity, isOperating } from './Building.js';
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { alightIfMounted, leaveBuilding } from '../engine/Mount.js';
@@ -87,6 +87,7 @@ export interface SkillOffer {
 export function availableTrainingOffers(buildings: readonly Building[]): SkillOffer[] {
   const best = new Map<SkillCategory, Building>();
   for (const building of buildings) {
+    if (!isOperating(building)) continue;
     for (const skill of trainableSkills(building.type)) {
       const current = best.get(skill);
       if (!current || building.tier > current.tier) best.set(skill, building);
@@ -191,6 +192,14 @@ export function enrolInTraining(
   if (!employee || !employee.alive) return { success: false, error: 'Employee not found or not alive', errorKey: 'employees.employee_not_found', errorParams: { id: employeeId } };
   if (isEnrolledInTraining(employee)) return { success: false, error: 'Employee already in training', errorKey: 'employees.train_already_enrolled', errorParams: { name: employee.name } };
   if (employee.injured) return { success: false, error: 'Injured employees cannot train', errorKey: 'employees.train_injured', errorParams: { name: employee.name } };
+  if (!isOperating(building)) {
+    return {
+      success: false,
+      error: `${building.type} #${building.id} is closed`,
+      errorKey: 'employees.train_school_closed',
+      errorParams: { buildingType: building.type, buildingId: building.id, skill },
+    };
+  }
   if (!trainableSkills(building.type).includes(skill)) {
     return {
       success: false,
