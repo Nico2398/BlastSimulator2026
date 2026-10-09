@@ -1,4 +1,4 @@
-"""Buildings — 9 types × 3 tiers, sized from building-defs.json, plus the ruin.
+"""Buildings — 8 types × 3 tiers plus the single-tier spoil heap, sized from building-defs.json, plus the ruin.
 
 Axes: the model is centred on its footprint, x spanning ±sizeX/2 and y
 spanning ±sizeZ/2 (game +Z is Blender −Y, so the FRONT — the row holding
@@ -31,7 +31,11 @@ TYPE_COLORS = {
     'living_quarters': 0x4488CC,
     'explosive_warehouse': 0xFF2222,
     'freight_warehouse': 0x888888,
+    'spoil_heap': 0x8C8A86,
 }
+
+# Types drawn at tier 1 only; the game aliases tiers 2 and 3 onto tier 1 (isSingleTierType in Building.ts).
+SINGLE_TIER_TYPES = frozenset({'spoil_heap'})
 
 FLOOR_H = 1.45
 ENTRY_GREEN = 0x00CC44
@@ -669,6 +673,12 @@ def build_ruin(m):
     pivot('Body', (0, 0, 0), parts)
 
 
+def build_spoil_heap(sx, sz, tier, ex, xx, m):
+    """The Spoil Heap has no honest tier-2 machine to deform, so its one model is the tier-1 caricature."""
+    import buildings_t1
+    buildings_t1.build_building('spoil_heap')
+
+
 TYPE_BUILDERS = {
     'driving_center': build_driving_center,
     'blasting_academy': build_blasting_academy,
@@ -678,6 +688,7 @@ TYPE_BUILDERS = {
     'living_quarters': build_living_quarters,
     'explosive_warehouse': build_explosive_warehouse,
     'freight_warehouse': build_freight_warehouse,
+    'spoil_heap': build_spoil_heap,
 }
 
 
@@ -700,7 +711,7 @@ def build_building(btype: str, tier: int) -> None:
 def registry() -> dict:
     reg = {}
     for btype in TYPE_BUILDERS:
-        for tier in (1, 2, 3):
+        for tier in ((1,) if btype in SINGLE_TIER_TYPES else (1, 2, 3)):
             reg[f'building_{btype}_t{tier}'] = (lambda b, t: (lambda: build_building(b, t)))(btype, tier)
     reg['building_ruin'] = lambda: build_ruin(_materials('freight_warehouse'))
     return reg

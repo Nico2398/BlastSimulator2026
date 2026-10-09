@@ -5,6 +5,7 @@
 
 import type { EmployeeRole } from '../../core/entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
+import { isSingleTierType } from '../../core/entities/Building.js';
 import type { BuildingTier, BuildingType } from '../../core/entities/Building.js';
 import { BUILDING_DEFS } from '../../core/entities/BuildingDefs.js';
 import { getAllVehicleRoles } from '../../core/entities/Vehicle.js';
@@ -97,9 +98,9 @@ export function allModelIds(): string[] {
     for (const tier of VEHICLE_TIERS) ids.push(vehicleModelId(role, tier));
   }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
-    // TODO(#1572): spoil_heap has no Blender model yet and renders as a stand-in box. Drop this skip once #1572 adds it.
-    if (type === 'spoil_heap') continue;
-    for (const tier of BUILDING_TIERS) ids.push(buildingModelId(type, tier));
+    // A single-tier type has one model (tier 1); the game aliases its higher tiers onto it.
+    const tiers = isSingleTierType(type) ? [1 as BuildingTier] : BUILDING_TIERS;
+    for (const tier of tiers) ids.push(buildingModelId(type, tier));
   }
   ids.push(BUILDING_RUIN_MODEL_ID);
   ids.push(...propModelIds());

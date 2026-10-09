@@ -7,6 +7,7 @@
 // the roof corners so the two doors read from any camera angle.
 
 import * as THREE from 'three';
+import { isSingleTierType } from '../core/entities/Building.js';
 import type { Building, BuildingType, BuildingTier } from '../core/entities/Building.js';
 import { getBuildingDef, getDefSize } from '../core/entities/Building.js';
 import { tagPickable } from './Pickable.js';
@@ -218,7 +219,7 @@ export class BuildingMesh {
 function modelIdFor(building: Building): string {
   return building.hp <= 0
     ? BUILDING_RUIN_MODEL_ID
-    : buildingModelId(building.type as BuildingType, building.tier);
+    : buildingModelId(building.type as BuildingType, isSingleTierType(building.type as BuildingType) ? 1 : building.tier);
 }
 
 function disposeEntry(entry: BuildingEntry): void {
