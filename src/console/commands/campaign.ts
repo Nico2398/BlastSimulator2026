@@ -206,7 +206,7 @@ export function campaignStartCommand(
       gridX: level.gridX,
       gridZ: level.gridZ,
       cash: ctx.state.cash.toLocaleString('en-US'),
-      staffedSuffix: staffedSuffix(startingSite !== undefined),
+      staffedSuffix: staffedSuffix(startingSite !== undefined && (startingSite.employees.length > 0 || startingSite.vehicles.length > 0)),
     }),
   };
 }

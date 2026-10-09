@@ -1299,18 +1299,26 @@ export const STARTING_SITE_STAFFED_COMPOSITION: StartingSiteComposition = {
  */
 export const STARTING_BUILDING_STANDOFF_M = 12;
 
-/** Dusty Hollow's own opening crew, fleet and warehouse (#1363). */
+/**
+ * Dusty Hollow's own opening crew, fleet, warehouse and spoil heap (#1363,
+ * #1574). The heap is placed after the warehouse, so barren rock has a dump
+ * from the first blast.
+ */
 export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
   employees: BASE_STARTING_EMPLOYEES,
   vehicles: BASE_STARTING_VEHICLES,
-  buildings: [{ type: 'freight_warehouse', tier: 1 }],
+  buildings: [{ type: 'freight_warehouse', tier: 1 }, { type: 'spoil_heap', tier: 1 }],
 };
 
-/** tutorial_pit's opening site: buildings only, no crew or fleet (#1574). */
+/**
+ * tutorial_pit's opening site (#1574): one free spoil heap, no crew or fleet
+ * (the tutorial hires its own). The heap is not a scripted step, so the first
+ * blast's barren rock has a dump without a "place a spoil heap" notification.
+ */
 export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
   employees: [],
   vehicles: [],
-  buildings: [],
+  buildings: [{ type: 'spoil_heap', tier: 1 }],
 };
 
 /**

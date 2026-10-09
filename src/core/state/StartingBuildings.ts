@@ -22,9 +22,15 @@ export function startingBuildingAnchor(
   crew: ReadonlyArray<{ x: number; z: number }>,
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number },
 ): { x: number; z: number } {
+  const centreX = (bounds.minX + bounds.maxX) / 2;
+  const centreZ = (bounds.minZ + bounds.maxZ) / 2;
+  // No crew (the tutorial's heap-only site): stand off east of the site centre.
+  // The centre is where the tutorial's vehicles spawn and its box-cut corridor
+  // starts; its scripted builds sit west, so east stays clear of all of them.
+  if (crew.length === 0) return { x: centreX + STARTING_BUILDING_STANDOFF_M, z: centreZ };
   const centroid = meanPosition(crew);
-  const toCentreX = (bounds.minX + bounds.maxX) / 2 - centroid.x;
-  const toCentreZ = (bounds.minZ + bounds.maxZ) / 2 - centroid.z;
+  const toCentreX = centreX - centroid.x;
+  const toCentreZ = centreZ - centroid.z;
   const distance = Math.hypot(toCentreX, toCentreZ) || 1;
   return {
     x: centroid.x + (toCentreX / distance) * STARTING_BUILDING_STANDOFF_M,

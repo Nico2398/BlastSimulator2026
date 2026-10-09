@@ -5,7 +5,7 @@
 import type { GameState } from '../state/GameState.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, TUTORIAL_STARTING_SITE, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition } from '../config/balance.js';
 import { getBiome } from '../world/BiomeCatalog.js';
 import { siteRockIds } from '../world/Strata.js';
 import { resolveGeneratedBiome } from '../world/TerrainGen.js';
@@ -73,6 +73,7 @@ const LEVELS: readonly LevelDef[] = [
     // No events. Bonus contracts. Player-proof score decay.
     // ────────────────────────────────────────────────────────
     id: 'tutorial_pit',
+    startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
     nameKey: 'level.tutorial_pit.name',
     descKey: 'level.tutorial_pit.desc',
     biome: 'desert_badlands',
@@ -138,7 +139,7 @@ const LEVELS: readonly LevelDef[] = [
     // ────────────────────────────────────────────────────────
     // Level 1 — Dusty Hollow
     // Small desert quarry. Soft rocks. Basic explosives. Generous contracts.
-    // Opens staffed and equipped (DUSTY_HOLLOW_STARTING_SITE).
+    // Opens staffed and equipped, with a warehouse and a spoil heap (DUSTY_HOLLOW_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'dusty_hollow',
     nameKey: 'level.dusty_hollow.name',
@@ -155,7 +156,7 @@ const LEVELS: readonly LevelDef[] = [
     // capital purchases do not count).
     unlockThreshold: 80000,
     eventFreqMultiplier: 0.5,   // Rare events — forgiving tutorial
-    startingSite: DUSTY_HOLLOW_STARTING_SITE, // Crew, rig, hauler and warehouse from tick 0
+    startingSite: DUSTY_HOLLOW_STARTING_SITE, // Crew, rig, hauler, warehouse and spoil heap from tick 0
     contractPriceMultiplier: DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, // Generous buyers; rationale beside the constant
     scoreDecayRate: 0.03,        // Slow score decay — hard to ruin yourself
     mixedRockHardness: false,
