@@ -59,7 +59,7 @@ import {
   VILLAGE_VIBRATION_SCORE_GAIN,
 } from '../config/balance.js';
 import { isExposed, smugglingIncomeForTick, applyInvestigation, decayExposure } from '../events/MafiaActions.js';
-import { bookTaxAuditIncome, tickTaxAudit, payTaxAuditDebt, taxAuditRng, type AuditOutcome } from '../events/TaxAudit.js';
+import { bookTaxAuditIncome, tickTaxAudit, settleTaxAudit, taxAuditRng, type AuditOutcome } from '../events/TaxAudit.js';
 import { getOperatingIncomePerHour } from '../economy/OperatingFinance.js';
 import { resolveContractOres, resolveContractPriceMultiplier } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
@@ -142,11 +142,7 @@ function runTaxAuditStep(state: GameState, smugglingIncome: number, emitter: Eve
   const legit = getOperatingIncomePerHour(state.finances, state.tickCount, 1);
   bookTaxAuditIncome(state.taxAudit, state.tickCount, legit, smugglingIncome);
   const outcome = tickTaxAudit(state.taxAudit, state.tickCount, taxAuditRng(state.seed, state.tickCount));
-  // A fresh audit pays at once up to the floor; older debt is taken out of this tick's income.
-  payTaxAuditDebt(state, outcome ? Infinity : legit + smugglingIncome, state.tickCount);
-  if (outcome) {
-    emitter.emit('mafia:tax_audit', { kind: outcome.kind, amount: outcome.kind === 'regularisation' ? outcome.owed : 0 });
-  }
+  settleTaxAudit(state, outcome, legit + smugglingIncome, emitter);
   return outcome;
 }
 

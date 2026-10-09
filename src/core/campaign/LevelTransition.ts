@@ -8,7 +8,7 @@ import { recordProfit, recordStars, startLevel, type CampaignState } from './Cam
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
 import { getFinancialReport } from '../economy/Finance.js';
-import { closingAudit, payTaxAuditDebt, taxAuditRng } from '../events/TaxAudit.js';
+import { closingAudit, settleTaxAudit, taxAuditRng } from '../events/TaxAudit.js';
 
 // ── Types ──
 
@@ -84,8 +84,7 @@ export function checkLevelComplete(
   // Without it, smuggling hard just before winning would escape every audit.
   const audit = closingAudit(state.taxAudit, taxAuditRng(state.seed, state.tickCount), undefined, state.tickCount);
   if (audit) {
-    payTaxAuditDebt(state, Infinity, state.tickCount);
-    emitter.emit('mafia:tax_audit', { kind: audit.kind, amount: audit.kind === 'regularisation' ? audit.owed : 0 });
+    settleTaxAudit(state, audit, 0, emitter);
     profit = getFinancialReport(state.finances, 0).operatingProfit;
     if (profit < level.unlockThreshold) return { triggered: false, summary: null };
   }

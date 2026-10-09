@@ -104,7 +104,7 @@ export class ShadyPanel extends PanelBase {
 
     // Built once and reused across renders — refreshDynamic() keeps it live every
     // tick without the signature-gated rebuild that owns everything else, since
-    // exposure climbs continuously while smuggling runs (the audit is smuggling's risk channel).
+    // exposure changes every tick (the audit is smuggling's risk channel).
     const exposureLabel = this.locale.bindText(
       el('span', { attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)' } }),
       'ui.shady.exposure_label',

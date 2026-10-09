@@ -2,6 +2,7 @@
 // Open books with an audit clock; see docs/plans/issue-1409-smuggling-balance.md.
 
 import { Random } from '../math/Random.js';
+import type { EventEmitter } from '../state/EventEmitter.js';
 import { chargeFine, type FinanceState } from '../economy/Finance.js';
 import {
   TAX_AUDIT_TIME_BASE_TICKS,
@@ -264,7 +265,7 @@ export function collectAuditDebt(a: TaxAuditState, income: number, cash: number)
 }
 
 /** Charges what `collectAuditDebt` allows as a fine; returns the amount paid. */
-export function payTaxAuditDebt(
+function payTaxAuditDebt(
   state: { cash: number; finances: FinanceState; taxAudit: TaxAuditState },
   income: number,
   tick: number,
@@ -272,4 +273,20 @@ export function payTaxAuditDebt(
   const amount = collectAuditDebt(state.taxAudit, income, state.cash);
   chargeFine(state, amount, 'Tax audit regularisation', tick);
   return amount;
+}
+
+/**
+ * Settles one tax-audit step: a fresh audit pays at once up to the bankruptcy floor and is
+ * announced as `mafia:tax_audit`; without one, older debt is taken out of `income`.
+ */
+export function settleTaxAudit(
+  state: { cash: number; finances: FinanceState; taxAudit: TaxAuditState; tickCount: number },
+  outcome: AuditOutcome | null,
+  income: number,
+  emitter: EventEmitter,
+): void {
+  payTaxAuditDebt(state, outcome ? Infinity : income, state.tickCount);
+  if (outcome) {
+    emitter.emit('mafia:tax_audit', { kind: outcome.kind, amount: outcome.kind === 'regularisation' ? outcome.owed : 0 });
+  }
 }

@@ -2170,9 +2170,6 @@ export const TAX_RECIDIVISM_SURCHARGE = 0.2;
 /** Cap on counted convictions for the recidivism surcharge. */
 export const TAX_RECIDIVISM_MAX_STEPS = 2;
 
-/** Ticks over which an audit debt is collected from income. */
-export const TAX_AUDIT_DEBT_COLLECTION_TICKS = 720;
-
 /** Selectable smuggling volumes, as a fraction of operating income. */
 export const SMUGGLING_VOLUME_LEVELS = [0.1, 0.25, 0.5, 1] as const;
 
