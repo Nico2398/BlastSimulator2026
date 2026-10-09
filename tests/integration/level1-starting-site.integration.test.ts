@@ -87,11 +87,11 @@ describe('campaign start level:dusty_hollow staffed flag (#1363)', () => {
 });
 
 describe('other levels and the tutorial are unchanged (#1363)', () => {
-  it('tutorial_pit opens bare', () => {
+  it('tutorial_pit opens with no crew or fleet, only the opening spoil heap (#1574)', () => {
     const { state } = startLevel('tutorial_pit');
     expect(state.employees.employees).toHaveLength(0);
     expect(state.vehicles.vehicles).toHaveLength(0);
-    expect(state.buildings.buildings).toHaveLength(0);
+    expect(state.buildings.buildings.map((b) => b.type)).toEqual(['spoil_heap']);
   });
 
   it('grumpstone_ridge opens bare', () => {
@@ -101,10 +101,10 @@ describe('other levels and the tutorial are unchanged (#1363)', () => {
     expect(state.buildings.buildings).toHaveLength(0);
   });
 
-  it('a level restart re-opens dusty_hollow staffed again, one warehouse, not two', () => {
+  it('a level restart re-opens dusty_hollow staffed again, one warehouse and one heap, not two', () => {
     const { runner, ctx } = startLevel('dusty_hollow');
     expect(runner.run('campaign start level:dusty_hollow').success).toBe(true);
-    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings.map((b) => b.type).sort()).toEqual(['freight_warehouse', 'spoil_heap']);
     expect(ctx.state!.employees.employees).toHaveLength(3);
   });
 });
