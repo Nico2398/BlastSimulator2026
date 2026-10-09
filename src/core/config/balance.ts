@@ -1306,6 +1306,13 @@ export const DUSTY_HOLLOW_STARTING_SITE: StartingSiteComposition = {
   buildings: [{ type: 'freight_warehouse', tier: 1 }],
 };
 
+/** tutorial_pit's opening site: buildings only, no crew or fleet (#1574). */
+export const TUTORIAL_STARTING_SITE: StartingSiteComposition = {
+  employees: [],
+  vehicles: [],
+  buildings: [],
+};
+
 /**
  * Contract price multiplier for Dusty Hollow (#1363). Payroll for the opening
  * crew is ~$200/tick all-in, so market-rate prices can never reach the $80k
