@@ -2490,6 +2490,49 @@
         }
       }
     },
+    "building_spoil_heap_t1": {
+      "builder": "buildings_t1.py",
+      "triangles": 2988,
+      "glbKb": 83,
+      "size": [
+        2.42,
+        1.47,
+        2.35
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [],
+      "materials": [
+        "Dark",
+        "Dirt",
+        "Plank",
+        "PlankDark",
+        "Red",
+        "Rock",
+        "RubbleDark",
+        "Rust",
+        "TintBody"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 2988,
+          "parts": [
+            "Barrel",
+            "HeapLump0",
+            "HeapLump1",
+            "HeapLump2",
+            "HeapStone",
+            "Lot",
+            "SignBoard",
+            "SignPost",
+            "SignTextStroke",
+            "Tyre"
+          ]
+        }
+      }
+    },
     "prop_bush_0": {
       "builder": "props.py",
       "triangles": 960,

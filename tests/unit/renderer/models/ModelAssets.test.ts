@@ -13,7 +13,7 @@ import {
 } from '../../../../src/renderer/models/ModelIds.js';
 import { getAllVehicleRoles } from '../../../../src/core/entities/Vehicle.js';
 import { BUILDING_DEFS } from '../../../../src/core/entities/BuildingDefs.js';
-import { getFootprintSize } from '../../../../src/core/entities/Building.js';
+import { getFootprintSize, isSingleTierType } from '../../../../src/core/entities/Building.js';
 import type { BuildingTier, BuildingType } from '../../../../src/core/entities/Building.js';
 import { loadedModelLibrary, MODEL_DIR } from '../../../helpers/models.js';
 
@@ -110,9 +110,9 @@ describe('public/models', () => {
 
   it('every building fits its footprint, grows taller with tier and exposes the wall tint', () => {
     for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
-      if (type === 'spoil_heap') continue; // TODO(#1572): no model yet, stand-in box. Drop with the allModelIds skip.
       let previousHeight = 0;
-      for (const tier of [1, 2, 3] as BuildingTier[]) {
+      const tiers: BuildingTier[] = isSingleTierType(type) ? [1] : [1, 2, 3];
+      for (const tier of tiers) {
         const inst = library.instantiate(buildingModelId(type, tier), { size: [1, 1, 1] });
         const { sizeX, sizeZ } = getFootprintSize(BUILDING_DEFS[type][tier].footprint);
         const size = inst.bounds.getSize(new THREE.Vector3());
@@ -124,6 +124,8 @@ describe('public/models', () => {
         expect(inst.tints.has('TintBody'), `${type} t${tier}`).toBe(true);
       }
     }
+    const heap = library.instantiate(buildingModelId('spoil_heap', 1), { size: [1, 1, 1] });
+    expect(heap.bounds.getSize(new THREE.Vector3()).y, 'spoil heap height').toBeLessThanOrEqual(2.0);
     const ruin = library.instantiate(BUILDING_RUIN_MODEL_ID, { size: [1, 1, 1] });
     expect(ruin.bounds.getSize(new THREE.Vector3()).x).toBeLessThanOrEqual(2.6);
   });
