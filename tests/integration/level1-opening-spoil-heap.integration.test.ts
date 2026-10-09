@@ -67,7 +67,7 @@ describe('campaign start level:dusty_hollow opens with warehouse and heap (#1574
 
   it('the heap starts empty and lies on the grid', () => {
     const { ctx, state } = startLevel('dusty_hollow');
-    const heap = ofType(state, 'spoil_heap')[0]! as { x: number; z: number };
+    const heap = ofType(state, 'spoil_heap')[0]! as unknown as { x: number; z: number };
     expect(totalSpoilKg(state.buildings.buildings)).toBe(0);
     expect(heap.x).toBeGreaterThanOrEqual(0);
     expect(heap.z).toBeGreaterThanOrEqual(0);
@@ -197,7 +197,7 @@ describe('barren rock is hauled to the opening heap without a no_spoil_heap bloc
     const hauler = state.vehicles.vehicles.find((v) => v.type === 'debris_hauler')!;
     const driver = state.employees.employees.find((e) => e.role === 'driver')!;
     run(`vehicle driver ${hauler.id} ${driver.id}`);
-    const near = ofType(state, 'spoil_heap')[0]! as { x: number; z: number };
+    const near = ofType(state, 'spoil_heap')[0]! as unknown as { x: number; z: number };
     addBlastFragments(state.logistics, [fragment(9901, near.x + 4, near.z + 4)], state.navGrid);
     syncHaulDispatch(state);
     run('tick 3');
