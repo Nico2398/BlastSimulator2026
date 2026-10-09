@@ -86,8 +86,9 @@ export function vehicleModelId(role: VehicleRole, tier: VehicleTier): string {
   return `vehicle_${role}_t${tier}`;
 }
 
+/** A single-tier type has one model (tier 1); any higher tier is aliased onto it. */
 export function buildingModelId(type: BuildingType, tier: BuildingTier): string {
-  return `building_${type}_t${tier}`;
+  return `building_${type}_t${isSingleTierType(type) ? 1 : tier}`;
 }
 
 /** Every asset the game can ask for — what the loading screen preloads. */
