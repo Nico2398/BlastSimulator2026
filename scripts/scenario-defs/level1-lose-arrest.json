@@ -267,14 +267,34 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "description": "Three more drillers (the whole candidate pool) are hired through the real Crew panel so the accident route has enough targets to reach the arrest threshold.",
+      "description": "First driller hired through the real Crew panel: open the panel from the toolbar, then click the driller row's Hire button.",
       "expect": {
         "changedBy": {
-          "cash": -3000
+          "cash": -1000
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "description": "Two more drillers (the rest of the candidate pool) hired with the Crew panel already open; repeating the toolbar click would toggle the panel closed.",
+      "expect": {
+        "changedBy": {
+          "cash": -2000
         }
       },
       "role": "player",
-      "repeat": 3
+      "repeat": 2
     },
     {
       "command": "mafia smuggle volume:0.25",
@@ -309,12 +329,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "1"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
@@ -329,12 +354,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "2"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
@@ -349,12 +379,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "3"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
@@ -369,12 +404,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "4"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
@@ -389,12 +429,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "5"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
@@ -409,12 +454,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "6"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
@@ -429,12 +479,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "7"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
@@ -449,12 +504,17 @@
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
+          "type": "set",
+          "selector": "#bs-shady-panel [data-action=\"mafia-accident-employee\"]",
+          "value": "8"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-shady-panel [data-action=\"mafia-accident\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay:not(#bs-event-dialog) .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "role: player (#1409): a real click on the Shady panel's accident button and its confirmation. Each botched accident draws a police investigation and raises exposure; none is guaranteed to fail, so the outcome is not asserted per step.",
