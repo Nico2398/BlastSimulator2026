@@ -13,7 +13,7 @@ import {
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { getResearchTaskDef } from '../../core/config/balance.js';
-import { factorFor, scaledCost } from '../../core/events/ActiveModifiers.js';
+import { factorFor, researchCostFor } from '../../core/events/ActiveModifiers.js';
 import { requireGame } from './commandUtils.js';
 
 /** Human-readable message for each read-only `getQueueBlockCode` result. */
@@ -77,11 +77,12 @@ export function researchCommand(
         };
       }
       const factor = factorFor(state.events.activeModifiers, 'research_cost', state.tickCount);
-      if (state.cash < scaledCost(def.cost, factor)) {
+      const scaled = researchCostFor(def.cost, state.events.activeModifiers, state.tickCount);
+      if (state.cash < scaled) {
         return {
           success: false,
           code: 'insufficient_funds',
-          output: `Insufficient funds: research costs $${scaledCost(def.cost, factor)}.`,
+          output: `Insufficient funds: research costs $${scaled}.`,
         };
       }
 

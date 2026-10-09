@@ -48,6 +48,7 @@ export function hasActiveResearchCenter(state: BuildingState): boolean {
 export function isConditionMet(state: BuildingState, condition: ResearchCondition): boolean {
   switch (condition.kind) {
     case 'building_tier':
+      // Prerequisite buildings are intentionally not gated on isOperating: a closure does not unmeet them.
       return state.buildings.some(
         (b) => b.type === condition.buildingType && b.active && b.tier >= condition.tier,
       );
@@ -145,13 +146,14 @@ export function tickResearch(
 ): CancelledResearch | undefined {
   const task = state.researchQueue[0];
   if (!task) return undefined;
-  if (!state.buildings.some((b) => b.type === 'research_center' && b.active)) {
+  const hasResearchCenter = state.buildings.some((b) => b.type === 'research_center' && b.active);
+  if (!hasResearchCenter) {
     state.researchQueue.shift();
     const cancelled = { targetType: task.targetType, targetTier: task.targetTier, refund: task.cost };
     emitter?.emit('research:cancelled', cancelled);
     return cancelled;
   }
-  // A centre closed by an event pauses progress; only losing it cancels the task.
+  // hasResearchCenter ignores event closures: a closed centre pauses progress, only losing it cancels the task.
   if (!hasActiveResearchCenter(state)) return undefined;
   task.ticksRemaining -= 1;
   if (task.ticksRemaining <= 0) {

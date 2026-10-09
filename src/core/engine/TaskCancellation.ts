@@ -475,6 +475,7 @@ function actionOrderCost(action: PendingAction): number {
   if (typeof action.payload['orderCost'] === 'number') return action.payload['orderCost'];
   const method = action.payload['method'];
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;
+  // Fallback for saves queued before orderCost was stored on the payload.
   return SURVEY_COSTS[method as SurveyMethod];
 }
 

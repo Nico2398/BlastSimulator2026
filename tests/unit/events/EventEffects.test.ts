@@ -12,7 +12,7 @@ import {
   findNearestActiveBuildingOfType, getStorageCapacity, getBuildingDef, queueResearchTask,
   getQueueBlockCode, type Building,
 } from '../../../src/core/entities/Building.js';
-import { hasActiveResearchCenter } from '../../../src/core/entities/BuildingResearch.js';
+import { hasActiveResearchCenter, tickResearch } from '../../../src/core/entities/BuildingResearch.js';
 import { getExplosivesCapacity, freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import { enrolInTraining, availableTrainingOffers } from '../../../src/core/entities/EmployeeTraining.js';
 import { addModifier, pruneExpired, type ActiveModifier } from '../../../src/core/events/ActiveModifiers.js';
@@ -175,7 +175,7 @@ describe('research_cost (#1568)', () => {
     expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
   });
 
-  it('cancel refund uses the stored task cost', () => {
+  it('queue stores the scaled cost on the task (what a cancel refunds)', () => {
     // baseCost > 0 is required for the factor to be observable
     expect(baseCost).toBeGreaterThan(0);
     const ctx = researchCtx();
@@ -329,6 +329,18 @@ describe('closed buildings are skipped (#1568)', () => {
     expect(getQueueBlockCode(bs, 'driving_center', 2)).toBe('no_research_center');
     const res = queueResearchTask(bs, 'driving_center', 2);
     expect(res).toMatchObject({ success: false, code: 'no_research_center' });
+  });
+
+  it('a closed Research Center pauses research without cancelling the queue', () => {
+    const bs = createBuildingState();
+    bs.buildings.push(building({ type: 'research_center', outOfService: true }));
+    bs.researchQueue.push({ targetType: 'driving_center', targetTier: 2, ticksRemaining: 5, cost: 100, conditions: [] });
+    expect(tickResearch(bs)).toBeUndefined();
+    expect(bs.researchQueue).toHaveLength(1);
+    expect(bs.researchQueue[0]!.ticksRemaining).toBe(5);
+    delete bs.buildings[0]!.outOfService;
+    tickResearch(bs);
+    expect(bs.researchQueue[0]!.ticksRemaining).toBe(4);
   });
 
   it('an open Research Center still counts', () => {

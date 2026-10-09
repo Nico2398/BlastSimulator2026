@@ -56,7 +56,7 @@ import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementK
 import type { TileRegion } from './tutorialPickerRegion.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../core/mining/Ramp.js';
 import { RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_WIDTH, getResearchTaskDef, type RampWidth } from '../core/config/balance.js';
-import { factorFor, scaledCost } from '../core/events/ActiveModifiers.js';
+import { researchCostFor } from '../core/events/ActiveModifiers.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
@@ -678,7 +678,7 @@ export class BuildMenu extends PanelBase {
   /** Research price after live research_cost modifiers. */
   private researchCost(base: number): number {
     const s = this.lastState;
-    return s ? scaledCost(base, factorFor(s.events.activeModifiers, 'research_cost', s.tickCount)) : base;
+    return s ? researchCostFor(base, s.events.activeModifiers, s.tickCount) : base;
   }
 
   /**

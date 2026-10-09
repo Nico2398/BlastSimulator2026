@@ -190,10 +190,15 @@ export function outOfServiceIds(
 export function isOutOfService(
   list: readonly ActiveModifier[], kind: 'vehicle' | 'building', id: number, tick: number,
 ): boolean {
-  return list.some(m => m.kind === 'out_of_service' && m.targetKind === kind && m.targetId === id && isLive(m, tick));
+  return outOfServiceIds(list, kind, tick).has(id);
 }
 
 /** A base price scaled by a modifier factor, rounded to whole cash. */
 export function scaledCost(base: number, factor: number): number {
   return Math.round(base * factor);
+}
+
+/** Research price after live research_cost modifiers. */
+export function researchCostFor(base: number, list: readonly ActiveModifier[], tick: number): number {
+  return scaledCost(base, factorFor(list, 'research_cost', tick));
 }
