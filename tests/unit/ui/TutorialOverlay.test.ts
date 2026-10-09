@@ -1215,3 +1215,82 @@ describe('TutorialOverlay exit (#1332)', () => {
     expect(tut.isActive).toBe(false);
   });
 });
+
+describe('TutorialOverlay clockFollowsTimer option (#1550)', () => {
+  let container: HTMLDivElement;
+  let overlay: TutorialOverlay | null = null;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    try { localStorage.removeItem('bs_tutorial_done'); } catch { /* ignore */ }
+  });
+
+  afterEach(() => {
+    overlay?.dispose();
+    overlay = null;
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  /** Started overlay on step 0 with its budget spent and the pause lifted. */
+  function spent(options?: { clockFollowsTimer?: boolean }) {
+    const tut = options ? new TutorialOverlay(container, options) : new TutorialOverlay(container);
+    overlay = tut;
+    const state = createMockState();
+    tut.start(state);
+    state.isPaused = false;
+    state.tickCount += 50;
+    return { tut, state };
+  }
+
+  it('clockFollowsTimer:false: guide passes leave isPaused alone', () => {
+    const { state } = spent({ clockFollowsTimer: false });
+    vi.advanceTimersByTime(2_000);
+    expect(state.isPaused).toBe(false);
+  });
+
+  it('clockFollowsTimer:false: guide passes still run rail refresh (card stays active)', () => {
+    const { tut } = spent({ clockFollowsTimer: false });
+    vi.advanceTimersByTime(2_000);
+    expect(tut.isActive).toBe(true);
+  });
+
+  it('clockFollowsTimer:false: onCommandExecuted holds the clock once the budget is spent', () => {
+    const { tut, state } = spent({ clockFollowsTimer: false });
+    tut.onCommandExecuted(state);
+    expect(state.isPaused).toBe(true);
+  });
+
+  it('clockFollowsTimer:false: onCommandExecuted leaves the clock alone on an unguided step', () => {
+    const idx = TUTORIAL_STEPS.findIndex(s => s.guided === false);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const { tut, state } = spent({ clockFollowsTimer: false });
+    (tut as any).landOnStep(idx);
+    state.isPaused = false;
+    state.tickCount += 500;
+    tut.onCommandExecuted(state);
+    expect(state.isPaused).toBe(false);
+  });
+
+  it('clockFollowsTimer:false: onCommandExecuted is a no-op before start()', () => {
+    const tut = new TutorialOverlay(container, { clockFollowsTimer: false });
+    overlay = tut;
+    const state = createMockState();
+    tut.onCommandExecuted(state);
+    expect(state.isPaused).toBe(false);
+  });
+
+  it('default: guide passes pause the game once the budget is spent', () => {
+    const { state } = spent();
+    vi.advanceTimersByTime(2_000);
+    expect(state.isPaused).toBe(true);
+  });
+
+  it('clockFollowsTimer:true: guide passes pause the game once the budget is spent', () => {
+    const { state } = spent({ clockFollowsTimer: true });
+    vi.advanceTimersByTime(2_000);
+    expect(state.isPaused).toBe(true);
+  });
+});

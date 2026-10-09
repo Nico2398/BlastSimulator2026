@@ -99,7 +99,7 @@ describe('Level definition system (7.1)', () => {
     expect(level!.gridX).toBe(32);
     expect(level!.datum).toBe(11);
     expect(level!.gridZ).toBe(32);
-    expect(level!.startingCash).toBe(340000);
+    expect(level!.startingCash).toBe(400000);
     expect(level!.availableExplosives).toContain('pop_rock');
     expect(level!.availableExplosives).toContain('boomite');
     expect(level!.unlockThreshold).toBe(5000);
