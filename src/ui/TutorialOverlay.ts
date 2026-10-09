@@ -29,7 +29,7 @@ const CONGRATULATIONS_DISPLAY_MS = 4000;
 /** Index of the final (congratulations) step. */
 const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
 
-export interface TutorialOverlayOptions {
+interface TutorialOverlayOptions {
   /** true (default): the 250 ms guide pass may hold/release the clock. false (scenario mode): only command boundaries do. */
   clockFollowsTimer?: boolean;
 }
