@@ -3790,6 +3790,7 @@
   "employees.train_insufficient_funds": "Insufficient funds: course costs ${fee}.",
   "employees.train_success": "{name} enrolled at {buildingType} #{buildingId}: {skill} in {ticks} ticks (${fee}), +${raise}/h pay once qualified.",
   "employees.train_school_full": "{buildingType} #{buildingId} is full — no seats free to train {skill}.",
+  "employees.train_school_closed": "{buildingType} #{buildingId} is closed — cannot train {skill} there for now.",
   "employees.train_already_enrolled": "{name} is already in training.",
   "employees.train_injured": "{name} is injured and cannot train.",
   "employees.cancel_usage": "Usage: employee cancel <action-id>",

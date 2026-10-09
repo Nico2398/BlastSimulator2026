@@ -24,6 +24,8 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole, VehicleState, VehicleTier } from '../entities/Vehicle.js';
+import { isOperating } from '../entities/Building.js';
+import { isOutOfService, outOfServiceIds } from '../events/ActiveModifiers.js';
 import { vehicleDriverId, getVehicleReservation, findVehicleReservedForAction, removeVehicleReservation } from '../entities/Vehicle.js';
 import { isVehicleUnderRepair } from '../entities/VehicleRepair.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -158,7 +160,7 @@ function createDepotCheck(state: GameState): (action: PendingAction) => boolean 
     const depotType = typeof fragmentId === 'number' && byId.get(fragmentId) === 'spoil_heap' ? 'spoil_heap' : 'freight_warehouse';
     let found = exists.get(depotType);
     if (found === undefined) {
-      found = state.buildings.buildings.some(b => b.type === depotType && b.active);
+      found = state.buildings.buildings.some(b => b.type === depotType && isOperating(b));
       exists.set(depotType, found);
     }
     return found;
@@ -240,8 +242,10 @@ export function isMidVehicleGatedWork(state: GameState, employee: Employee): boo
 export function findFreeVehicleForRole(state: GameState, role: VehicleRole, employee: Employee): Vehicle | null {
   if (!isLicensedForRole(employee, role)) return null;
 
+  const closed = outOfServiceIds(state.events.activeModifiers, 'vehicle', state.tickCount);
   const qualifying = state.vehicles.vehicles.filter(v =>
     v.type === role &&
+    !closed.has(v.id) &&
     canDriveTier(employee, role, v.tier) &&
     v.hp > 0 &&
     getVehicleReservation(state.vehicles, v.id) === null &&
@@ -321,7 +325,14 @@ export function findVehicleForClaim(
   if (action.requiredVehicleRole === null) return { ok: true, vehicle: null };
 
   const alreadyReserved = findVehicleReservedForAction(state.vehicles, action.id);
-  if (alreadyReserved) return { ok: true, vehicle: alreadyReserved };
+  if (alreadyReserved) {
+    // A vehicle an event took out of service cannot serve its reservation: release it and retry next tick.
+    if (isOutOfService(state.events.activeModifiers, 'vehicle', alreadyReserved.id, state.tickCount)) {
+      removeVehicleReservation(state.vehicles, alreadyReserved.id);
+      return { ok: false };
+    }
+    return { ok: true, vehicle: alreadyReserved };
+  }
 
   const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee);
   return vehicle === null ? { ok: false } : { ok: true, vehicle };

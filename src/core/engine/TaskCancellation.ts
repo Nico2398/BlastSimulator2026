@@ -472,8 +472,10 @@ function actionOrderCost(action: PendingAction): number {
   // refunded in full on cancellation (#1341).
   if (action.type === 'charge_hole') return (action.payload['orderCost'] as number) ?? 0;
   if (action.type !== 'survey') return 0;
+  if (typeof action.payload['orderCost'] === 'number') return action.payload['orderCost'];
   const method = action.payload['method'];
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;
+  // Fallback for saves queued before orderCost was stored on the payload.
   return SURVEY_COSTS[method as SurveyMethod];
 }
 
