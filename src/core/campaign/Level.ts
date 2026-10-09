@@ -120,7 +120,10 @@ const LEVELS: readonly LevelDef[] = [
     // realistically land. The extra $50,000 buys roughly 200-250 more ticks
     // of runway past that same point, giving the first sale a real chance to
     // land before the grace window runs out.
-    startingCash: 340000,
+    // #1550: bumped $340,000 -> $400,000 for ~200 more ticks of payroll
+    // headroom (~$300/tick) before the first sale, same precedent as #959.
+    // Win condition is operating-profit based, so unaffected.
+    startingCash: 400000,
     availableExplosives: ['pop_rock', 'boomite'],
     unlockThreshold: 5000,
     eventFreqMultiplier: 0,

@@ -361,7 +361,7 @@ function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Pr
 }
 
 // --- Tutorial ---
-const tutorial = new TutorialOverlay(uiContainer);
+const tutorial = new TutorialOverlay(uiContainer, { clockFollowsTimer: !scenarioMode });
 tutorial.setConfirmHandler((cfg) => uiManager.showConfirm(cfg));
 const tutorialPitLevel = getLevel(TUTORIAL_LEVEL_ID);
 mainMenu.setOnTutorial(() => {

@@ -29,6 +29,11 @@ const CONGRATULATIONS_DISPLAY_MS = 4000;
 /** Index of the final (congratulations) step. */
 const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
 
+interface TutorialOverlayOptions {
+  /** true (default): the 250 ms guide pass may hold/release the clock. false (scenario mode): the overlay never sets or holds state.isPaused, so scripted `tick N` always runs in full (#1550). */
+  clockFollowsTimer?: boolean;
+}
+
 /**
  * Coach-mark tutorial that guides new players through the first campaign level.
  *
@@ -65,7 +70,11 @@ export class TutorialOverlay {
   private gameConsole: ((cmd: string) => CommandResult) | null = null;
   private confirmHandler: ((config: ConfirmModalConfig) => void) | null = null;
 
-  constructor(container: HTMLElement) {
+  /** Whether the real-time guide pass may hold/release the clock. */
+  private readonly clockFollowsTimer: boolean;
+
+  constructor(container: HTMLElement, options: TutorialOverlayOptions = {}) {
+    this.clockFollowsTimer = options.clockFollowsTimer ?? true;
     const els = buildTutorialCard(container);
     this.overlay = els.overlay;
     this.box = els.box;
@@ -432,6 +441,7 @@ export class TutorialOverlay {
       this.pausedEl.style.display = 'none';
       return;
     }
+    if (!this.clockFollowsTimer) return;
     const held = this.rails.updateClock(this.gameState);
     this.pausedEl.style.display = held ? '' : 'none';
   }
