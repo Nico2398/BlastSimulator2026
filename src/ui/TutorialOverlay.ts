@@ -30,7 +30,7 @@ const CONGRATULATIONS_DISPLAY_MS = 4000;
 const LAST_STEP_INDEX = TOTAL_TUTORIAL_STEPS - 1;
 
 interface TutorialOverlayOptions {
-  /** true (default): the 250 ms guide pass may hold/release the clock. false (scenario mode): only command boundaries do. */
+  /** true (default): the 250 ms guide pass may hold/release the clock. false (scenario mode): the overlay never sets or holds state.isPaused, so scripted `tick N` always runs in full (#1550). */
   clockFollowsTimer?: boolean;
 }
 
@@ -71,7 +71,7 @@ export class TutorialOverlay {
   private confirmHandler: ((config: ConfirmModalConfig) => void) | null = null;
 
   /** Whether the real-time guide pass may hold/release the clock. */
-  protected readonly clockFollowsTimer: boolean;
+  private readonly clockFollowsTimer: boolean;
 
   constructor(container: HTMLElement, options: TutorialOverlayOptions = {}) {
     this.clockFollowsTimer = options.clockFollowsTimer ?? true;
@@ -206,11 +206,6 @@ export class TutorialOverlay {
       this.rails.releaseClock(state);
     }
     this.refreshGuide();
-    // Scenario mode: no wall-clock timer drives the clock, so re-evaluate it
-    // here, on the scripted command boundary (#1550).
-    if (!this.clockFollowsTimer && step.guided !== false) {
-      this.rails.updateClock(state);
-    }
   }
 
   /** Drop the rails class and hide the goal chip (tutorial ending or disposed). */
