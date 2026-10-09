@@ -65,6 +65,18 @@ describe('BuildingMesh — tier visuals', () => {
   });
 });
 
+describe('BuildingMesh — single-tier spoil heap', () => {
+  it('a spoil heap of any tier resolves to the one tier-1 model', async () => {
+    const library = await loadedModelLibrary(['building_spoil_heap_t1']);
+    const bm = new BuildingMesh(new THREE.Scene(), library);
+    for (const tier of [1, 2, 3] as const) {
+      bm.addBuilding(makeBuilding(tier, 'spoil_heap', tier));
+      expect(bm.getInstance(tier)!.isFallback, `tier ${tier}`).toBe(false);
+    }
+    bm.dispose();
+  });
+});
+
 describe('BuildingMesh — entry/exit markers', () => {
   it('adds entry and exit marker meshes for an intact building', () => {
     const scene = new THREE.Scene();
