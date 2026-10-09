@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite } from '../../../src/core/state/StartingBuildings.js';
+import { placeStartingBuildings, startingBuildingAnchor, resolveStartingSite, isStaffedComposition } from '../../../src/core/state/StartingBuildings.js';
 import { createBuildingState, getDefSize, getBuildingDef, getStorageCapacity } from '../../../src/core/entities/Building.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { StartingBuildingSlot } from '../../../src/core/config/balance.js';
@@ -149,5 +149,16 @@ describe('resolveStartingSite (#1363)', () => {
 
   it('yields a bare site when staffed is false', () => {
     expect(resolveStartingSite(levelSite, false)).toBeUndefined();
+  });
+});
+
+describe('isStaffedComposition (#1574)', () => {
+  it('is false for an absent site and a heap-only site', () => {
+    expect(isStaffedComposition(undefined)).toBe(false);
+    expect(isStaffedComposition({ employees: [], vehicles: [], buildings: [] })).toBe(false);
+  });
+
+  it('is true for the global staffed composition', () => {
+    expect(isStaffedComposition(STARTING_SITE_STAFFED_COMPOSITION)).toBe(true);
   });
 });

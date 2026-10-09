@@ -51,6 +51,11 @@ export function resolveStartingSite(
   return staffed ? STARTING_SITE_STAFFED_COMPOSITION : undefined;
 }
 
+/** True when the site starts with at least one employee or vehicle. */
+export function isStaffedComposition(site: StartingSiteComposition | undefined): boolean {
+  return site !== undefined && (site.employees.length > 0 || site.vehicles.length > 0);
+}
+
 /**
  * Places each slot on free, buildable ground as close to `near` as possible.
  * Searches rings outward from `near`; no cash is deducted. Returns the number
