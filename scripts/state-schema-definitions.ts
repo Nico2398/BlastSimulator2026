@@ -67,6 +67,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   stuckEmployeeCount: { type: 'number', description: 'Employees currently in the isMoveStuck state — pathfinding failed STUCK_THRESHOLD consecutive times' },
   activeContractCount: { type: 'number', description: 'Contracts currently accepted and in progress (state.contracts.active)' },
   fillableOreSaleOffered: { type: 'boolean', description: 'An offered ore_sale asks for no more of its ore than storage already holds — the condition to wait on before accepting, since the pool re-rolls which ore and how much every refresh' },
+  fillableDirtiteSaleOffered: { type: 'boolean', description: 'fillableOreSaleOffered narrowed to dirtite, the bulk ore (#1574) — the wait before the tutorial scenario accepts its first sale' },
   rubbleDisposalOffered: { type: 'boolean', description: 'At least one rubble_disposal offer is present in the pool — the condition to wait on before opening the Contracts panel for its Accept button, since the pool re-rolls its contents every refresh' },
   fillableSaleOffered: { type: 'boolean', description: 'The pool holds an ore_sale or rubble_disposal offer the site can fill in full right now (ore against collected ore, rubble against stored mass) — the free-play condition to wait on before clicking Accept' },
   deathCount: { type: 'number', description: 'Employees killed so far (state.damage.deathCount)' },

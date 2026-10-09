@@ -687,6 +687,7 @@ window.__gameState = () => {
     // the board asks for and how much of it are both random per refresh.
     // Mirrors console-api.ts's own field so both modes read the same thing.
     fillableOreSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre),
+    fillableDirtiteSaleOffered: hasFillableOreSaleOffer(s.contracts.available, s.collectedOre, 'dirtite'),
     // An offered rubble_disposal contract, present in the pool at all — the
     // condition a scenario waits on before opening the Contracts panel for
     // that offer's own Accept button (issue #1263 CI-fix). Mirrors

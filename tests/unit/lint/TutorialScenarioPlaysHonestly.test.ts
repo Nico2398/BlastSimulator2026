@@ -92,7 +92,7 @@ describe.each(SCENARIOS)('%s.json plays honestly (#1338, #1517)', (scenarioName)
       (s.interaction ?? []).some(
         (a) =>
           a.type === 'waitUntil'
-          && ['fillableOreSaleOffered', 'fillableSaleOffered'].includes((a as { field?: string }).field ?? ''),
+          && ['fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableSaleOffered'].includes((a as { field?: string }).field ?? ''),
       );
     for (const s of trades) {
       expect(s.command, s.command).toContain('fillable:true');

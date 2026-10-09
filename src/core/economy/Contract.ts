@@ -287,14 +287,18 @@ export interface ContractSelector {
  * which ore is asked for and how much every `CONTRACT_REFRESH_INTERVAL` ticks, while
  * the haulers change what is in storage. That is why this is a condition to
  * wait on (the state dumps expose it as `fillableOreSaleOffered`) rather
- * than a tick count to guess at.
+ * than a tick count to guess at. `materialId` narrows the question to one
+ * ore (#1574: a scenario that must not sell the pit's priciest ore first).
  */
 export function hasFillableOreSaleOffer(
   available: readonly Contract[],
   collectedOre: Readonly<Record<string, number>>,
+  materialId?: string,
 ): boolean {
   return available.some(
-    c => c.type === 'ore_sale' && isFillableSaleOffer(c, collectedOre, 0),
+    c => c.type === 'ore_sale'
+      && (materialId === undefined || c.materialId === materialId)
+      && isFillableSaleOffer(c, collectedOre, 0),
   );
 }
 

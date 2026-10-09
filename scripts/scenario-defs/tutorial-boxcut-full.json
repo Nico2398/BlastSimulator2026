@@ -308,7 +308,7 @@
       ]
     },
     {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
       "timeout": 95,
       "description": "#556/#816: build-living-quarters complete -- the driller or surveyor (both idle, no skill required for place_building) walks to (29,10) and builds the tier-1 living_quarters over its ~40-tick base duration. Waits on buildingCount itself rather than waitForTutorialStep, matching the drill-plan/charge waits below -- the tutorial card only flips to 'set-early-policy' once the building genuinely exists. #1170 follow-up: living_quarters pin moved west of the box-cut corridor to (8,15), alongside driving_center (6,15) and freight_warehouse (8,18) -- see tutorialStages.ts's own REGION doc comment for the full trace.",
       "role": "setup",
@@ -316,14 +316,14 @@
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 1,
+          "equals": 2,
           "maxTicks": 300,
           "timeoutMs": 90000
         }
       ],
       "expect": {
         "equals": {
-          "buildingCount": 1
+          "buildingCount": 2
         },
         "tutorialStep": "set-early-policy"
       }
