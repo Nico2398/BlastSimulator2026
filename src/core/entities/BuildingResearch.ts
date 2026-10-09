@@ -2,7 +2,9 @@
 // Handles tier-unlock research tasks queued at the Research Center.
 
 import type { BuildingType, BuildingTier, BuildingState, ResearchTask } from './Building.js';
+import { isOperating } from './Building.js';
 import { getResearchTaskDef } from '../config/balance.js';
+import { scaledCost } from '../events/ActiveModifiers.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 
 export type { ResearchTask };
@@ -39,7 +41,7 @@ export interface QueueResearchResult {
  * Research cannot be queued at all without one.
  */
 export function hasActiveResearchCenter(state: BuildingState): boolean {
-  return state.buildings.some((b) => b.type === 'research_center' && b.active);
+  return state.buildings.some((b) => b.type === 'research_center' && isOperating(b));
 }
 
 /** Whether a single research condition currently holds against state. */
@@ -100,20 +102,20 @@ export function queueResearchTask(
   targetTier: 2 | 3,
   costFactor = 1,
 ): QueueResearchResult {
-  void costFactor; // TODO: implement
   const blockCode = getQueueBlockCode(state, targetType, targetTier);
   if (blockCode) {
     return { success: false, code: blockCode };
   }
   const def = getResearchTaskDef(targetType, targetTier);
+  const cost = scaledCost(def.cost, costFactor);
   state.researchQueue.push({
     targetType,
     targetTier,
     ticksRemaining: def.ticks,
-    cost: def.cost,
+    cost,
     conditions: def.conditions,
   });
-  return { success: true, cost: def.cost };
+  return { success: true, cost };
 }
 
 /**
@@ -143,12 +145,14 @@ export function tickResearch(
 ): CancelledResearch | undefined {
   const task = state.researchQueue[0];
   if (!task) return undefined;
-  if (!hasActiveResearchCenter(state)) {
+  if (!state.buildings.some((b) => b.type === 'research_center' && b.active)) {
     state.researchQueue.shift();
     const cancelled = { targetType: task.targetType, targetTier: task.targetTier, refund: task.cost };
     emitter?.emit('research:cancelled', cancelled);
     return cancelled;
   }
+  // A centre closed by an event pauses progress; only losing it cancels the task.
+  if (!hasActiveResearchCenter(state)) return undefined;
   task.ticksRemaining -= 1;
   if (task.ticksRemaining <= 0) {
     state.unlockedTiers[task.targetType] = task.targetTier;

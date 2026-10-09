@@ -179,20 +179,21 @@ export function tickModifiers(state: ModifierTickState): void {
 export function outOfServiceIds(
   list: readonly ActiveModifier[], kind: 'vehicle' | 'building', tick: number,
 ): ReadonlySet<number> {
-  void list; void kind; void tick;
-  return new Set<number>(); // TODO: implement
+  const ids = new Set<number>();
+  for (const m of list) {
+    if (m.kind === 'out_of_service' && m.targetKind === kind && m.targetId !== null && isLive(m, tick)) ids.add(m.targetId);
+  }
+  return ids;
 }
 
 /** True when a live out_of_service modifier names this vehicle or building. */
 export function isOutOfService(
   list: readonly ActiveModifier[], kind: 'vehicle' | 'building', id: number, tick: number,
 ): boolean {
-  void list; void kind; void id; void tick;
-  return false; // TODO: implement
+  return list.some(m => m.kind === 'out_of_service' && m.targetKind === kind && m.targetId === id && isLive(m, tick));
 }
 
 /** A base price scaled by a modifier factor, rounded to whole cash. */
 export function scaledCost(base: number, factor: number): number {
-  void factor;
-  return base; // TODO: implement
+  return Math.round(base * factor);
 }

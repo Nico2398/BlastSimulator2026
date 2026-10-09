@@ -3790,6 +3790,7 @@
   "employees.train_insufficient_funds": "Fonds insuffisants : la formation coûte {fee} $.",
   "employees.train_success": "{name} inscrit à {buildingType} #{buildingId} : {skill} en {ticks} ticks ({fee} $), +{raise} $/h de salaire une fois qualifié.",
   "employees.train_school_full": "{buildingType} #{buildingId} est complet — aucune place libre pour former {skill}.",
+  "employees.train_school_closed": "{buildingType} #{buildingId} est fermé — impossible d'y suivre une formation en {skill} pour le moment.",
   "employees.train_already_enrolled": "{name} est déjà en formation.",
   "employees.train_injured": "{name} est blessé(e) et ne peut pas suivre de formation.",
   "employees.cancel_usage": "Utilisation : employee cancel <action-id>",

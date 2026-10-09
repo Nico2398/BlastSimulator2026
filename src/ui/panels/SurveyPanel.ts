@@ -18,10 +18,10 @@ import { el, card, button, sectionHeader, emptyState, reasonLine, progressBar, p
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
-import type { SurveyMethod, SurveyResult } from '../../core/mining/SurveyCalc.js';
+import { surveyCostFor, type SurveyMethod, type SurveyResult } from '../../core/mining/SurveyCalc.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
 import {
-  SURVEY_COSTS, SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
+  SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
 } from '../../core/config/balance.js';
 import { armPointPick, type PlacementKit } from '../scene/PlacementKit.js';
@@ -167,7 +167,7 @@ export class SurveyPanel extends PanelBase {
     const hasSurveyor = state.employees.employees.some(
       e => e.alive && e.qualifications.some(q => q.category === SURVEYOR_SKILL),
     );
-    const cost = SURVEY_COSTS[this.selectedMethod];
+    const cost = this.costOf(this.selectedMethod, state);
     const affordable = state.cash >= cost;
     this.runBtn.disabled = !hasSurveyor || !affordable;
 
@@ -246,6 +246,11 @@ export class SurveyPanel extends PanelBase {
     }
   }
 
+  /** Survey price after live survey_cost modifiers (base price before the first state arrives). */
+  private costOf(method: SurveyMethod, state: GameState | null): number {
+    return surveyCostFor(method, state?.events.activeModifiers ?? [], state?.tickCount ?? 0);
+  }
+
   private makeMethodCard(method: SurveyMethod): HTMLElement {
     const radius = SURVEY_COVERAGE_RADIUS[method];
     const accuracy = Math.round((1 - SURVEY_BASE_ERROR[method]) * 100);
@@ -271,7 +276,7 @@ export class SurveyPanel extends PanelBase {
     head.append(
       iconEl('survey', 14),
       el('span', { text: t(`survey.${method}`), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }),
-      el('span', { text: `$${SURVEY_COSTS[method].toLocaleString('en-US')}`, className: 'bsx-mono', attrs: { style: 'margin-left:auto;font-size:11px;font-weight:600;color:var(--bsx-amber)' } }),
+      el('span', { text: `$${this.costOf(method, this.lastState).toLocaleString('en-US')}`, className: 'bsx-mono', attrs: { style: 'margin-left:auto;font-size:11px;font-weight:600;color:var(--bsx-amber)' } }),
     );
 
     const meta = el('div', { className: 'bsx-mono', attrs: { style: 'display:flex;gap:10px;font-size:10px;color:var(--bsx-text-muted)' } });
@@ -318,7 +323,7 @@ export class SurveyPanel extends PanelBase {
       title: t('ui.survey.pick_target'),
       subtitle: t(`survey.${this.selectedMethod}`),
       instruction: t('ui.survey.pick_instruction'),
-      result: (sel) => `(${sel.x1}, ${sel.z1}) · $${SURVEY_COSTS[this.selectedMethod].toLocaleString('en-US')}`,
+      result: (sel) => `(${sel.x1}, ${sel.z1}) · $${this.costOf(this.selectedMethod, this.lastState).toLocaleString('en-US')}`,
       marker: { tone: 'survey', ...(radius > 0 ? { radius } : {}) },
       // Show the pit aimed at the middle so the player is never staring at a blank scene.
       initialSelection: {

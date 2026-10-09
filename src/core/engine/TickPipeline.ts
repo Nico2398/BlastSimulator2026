@@ -21,7 +21,7 @@ import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import { addExpense, addIncome, chargeFine, deductExpense } from '../economy/Finance.js';
 import { tickEventSystem } from '../events/EventSystem.js';
-import { factorFor, holdForcedWeather, salaryFactor, tickModifiers } from '../events/ActiveModifiers.js';
+import { factorFor, holdForcedWeather, outOfServiceIds, salaryFactor, tickModifiers } from '../events/ActiveModifiers.js';
 import { tickWeather } from '../weather/WeatherCycle.js';
 import { tickHoleWater } from '../mining/WetHoles.js';
 import { dominantRockUnderHole } from '../mining/ExplosiveRockFit.js';
@@ -31,7 +31,7 @@ import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
-import { tickResearch, getTotalOperatingCost } from '../entities/Building.js';
+import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags } from '../entities/Building.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../entities/EmployeeNeeds.js';
 import {
@@ -159,6 +159,7 @@ export function runTick(
 
   // 0a. Event modifiers (#1414) — lapsed ones drop, recurring charges and morale drift apply
   tickModifiers(state);
+  syncBuildingServiceFlags(state.buildings.buildings, outOfServiceIds(state.events.activeModifiers, 'building', state.tickCount));
 
   // 0. Weather — own persisted rng stream, advanced before events read it; a forced
   // weather overrides the result without drawing from that stream
